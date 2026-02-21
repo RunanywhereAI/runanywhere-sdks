@@ -89,9 +89,10 @@ export class TelemetryService {
   }
 
   private _module: LlamaCppModule | null = null;
-  private _handle: number = 0;          // rac_telemetry_manager_t*
+  private _handle: number = 0;           // rac_telemetry_manager_t*
   private _httpCallbackPtr: number = 0;  // Emscripten function table ptr
   private _initialized = false;
+  private _initPromise: Promise<void> | null = null;  // guards concurrent initialize() calls
 
   private constructor() {}
 
@@ -102,6 +103,10 @@ export class TelemetryService {
   /**
    * Initialize the telemetry manager.
    * Called from LlamaCppBridge._doLoad() after WASM is loaded.
+   *
+   * Concurrent calls are safe: a second caller awaits the in-flight promise
+   * rather than starting a duplicate initialization, preventing duplicate
+   * WASM handles and leaked function-table entries.
    */
   async initialize(
     module: LlamaCppModule,
@@ -112,54 +117,18 @@ export class TelemetryService {
       logger.warning('TelemetryService already initialized');
       return;
     }
-
-    if (typeof module._rac_telemetry_manager_create !== 'function') {
-      logger.warning('rac_telemetry_manager_create not available — telemetry disabled');
+    // If initialization is already in flight, wait for it rather than
+    // starting a second one — mirrors the LlamaCppBridge.ensureLoaded() pattern.
+    if (this._initPromise) {
+      await this._initPromise;
       return;
     }
-
-    this._module = module;
-
-    // Map TypeScript SDKEnvironment to C++ rac_environment_t
-    const racEnv = this.mapEnvironment(environment);
-
-    const deviceId = getOrCreateDeviceId();
-
-    // Alloc C strings
-    const deviceIdPtr = this.allocString(deviceId);
-    const platformPtr  = this.allocString('web');
-    const versionPtr   = this.allocString(SDK_VERSION);
-
-    this._handle = module._rac_telemetry_manager_create!(
-      racEnv, deviceIdPtr, platformPtr, versionPtr,
-    );
-
-    this.freeAll([deviceIdPtr, platformPtr, versionPtr]);
-
-    if (!this._handle) {
-      logger.warning('rac_telemetry_manager_create returned null — telemetry disabled');
-      this._module = null;
-      return;
+    this._initPromise = this._doInitialize(module, environment, deviceInfo);
+    try {
+      await this._initPromise;
+    } finally {
+      this._initPromise = null;
     }
-
-    // Set device info
-    if (typeof module._rac_telemetry_manager_set_device_info === 'function') {
-      const modelPtr     = this.allocString(deviceInfo.model ?? 'Browser');
-      const osVersionPtr = this.allocString(deviceInfo.osVersion ?? 'unknown');
-      module._rac_telemetry_manager_set_device_info!(this._handle, modelPtr, osVersionPtr);
-      this.freeAll([modelPtr, osVersionPtr]);
-    }
-
-    // Register HTTP callback
-    this.registerHttpCallback(environment);
-
-    // Configure HTTPService in dev mode using WASM dev config
-    if (environment === SDKEnvironment.Development) {
-      this.configureDevHTTP(module);
-    }
-
-    this._initialized = true;
-    logger.info(`TelemetryService initialized (env=${environment}, device=${deviceId.substring(0, 8)}...)`);
   }
 
   /**
@@ -230,6 +199,63 @@ export class TelemetryService {
   // ---------------------------------------------------------------------------
   // Private
   // ---------------------------------------------------------------------------
+
+  /**
+   * Core initialization logic — only called once, guarded by initialize().
+   */
+  private async _doInitialize(
+    module: LlamaCppModule,
+    environment: SDKEnvironment,
+    deviceInfo: DeviceInfoData,
+  ): Promise<void> {
+    if (typeof module._rac_telemetry_manager_create !== 'function') {
+      logger.warning('rac_telemetry_manager_create not available — telemetry disabled');
+      return;
+    }
+
+    this._module = module;
+
+    // Map TypeScript SDKEnvironment to C++ rac_environment_t
+    const racEnv = this.mapEnvironment(environment);
+
+    const deviceId = getOrCreateDeviceId();
+
+    // Alloc C strings
+    const deviceIdPtr = this.allocString(deviceId);
+    const platformPtr  = this.allocString('web');
+    const versionPtr   = this.allocString(SDK_VERSION);
+
+    this._handle = module._rac_telemetry_manager_create!(
+      racEnv, deviceIdPtr, platformPtr, versionPtr,
+    );
+
+    this.freeAll([deviceIdPtr, platformPtr, versionPtr]);
+
+    if (!this._handle) {
+      logger.warning('rac_telemetry_manager_create returned null — telemetry disabled');
+      this._module = null;
+      return;
+    }
+
+    // Set device info
+    if (typeof module._rac_telemetry_manager_set_device_info === 'function') {
+      const modelPtr     = this.allocString(deviceInfo.model ?? 'Browser');
+      const osVersionPtr = this.allocString(deviceInfo.osVersion ?? 'unknown');
+      module._rac_telemetry_manager_set_device_info!(this._handle, modelPtr, osVersionPtr);
+      this.freeAll([modelPtr, osVersionPtr]);
+    }
+
+    // Register HTTP callback
+    this.registerHttpCallback(environment);
+
+    // Configure HTTPService in dev mode using WASM dev config
+    if (environment === SDKEnvironment.Development) {
+      this.configureDevHTTP(module);
+    }
+
+    this._initialized = true;
+    logger.info(`TelemetryService initialized (env=${environment}, device=${deviceId.substring(0, 8)}...)`);
+  }
 
   /**
    * Registers the HTTP callback with the WASM telemetry manager.
