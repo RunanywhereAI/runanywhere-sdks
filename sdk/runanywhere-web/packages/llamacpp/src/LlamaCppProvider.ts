@@ -15,12 +15,10 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
-  AnalyticsEmitter,
 } from '@runanywhere/web';
 
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { loadOffsets } from './Foundation/LlamaCppOffsets';
-import { WASMAnalyticsEmitter } from './Foundation/WASMAnalyticsEmitter';
 
 import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
 import { VLM } from './Extensions/RunAnywhere+VLM';
@@ -33,6 +31,35 @@ import type { BackendExtension } from '@runanywhere/web';
 const logger = new SDKLogger('LlamaCppProvider');
 
 let _isRegistered = false;
+let _registeringPromise: Promise<void> | null = null;
+
+async function _doRegister(): Promise<void> {
+  const bridge = LlamaCppBridge.shared;
+  await bridge.ensureLoaded();
+
+  // Load llama.cpp struct offsets from the WASM module
+  loadOffsets();
+
+  // Register model loaders with ModelManager
+  ModelManager.setLLMLoader(TextGeneration);
+
+  // Register extensions with lifecycle registry (only those with cleanup)
+  ExtensionRegistry.register(TextGeneration);
+  ExtensionRegistry.register(VLM);
+  ExtensionRegistry.register(ToolCalling);
+  ExtensionRegistry.register(Embeddings);
+  ExtensionRegistry.register(Diffusion);
+
+  // Register with ExtensionPoint for capability lookups
+  ExtensionPoint.registerBackend(llamacppExtension);
+
+  // Register typed provider so VoicePipeline (in core) can access
+  // the LLM via ExtensionPoint.getProvider('llm') at runtime.
+  ExtensionPoint.registerProvider('llm', TextGeneration);
+
+  _isRegistered = true;
+  logger.info('LlamaCpp backend registered successfully');
+}
 
 const llamacppExtension: BackendExtension = {
   id: 'llamacpp',
@@ -51,8 +78,8 @@ const llamacppExtension: BackendExtension = {
     Embeddings.cleanup();
     Diffusion.cleanup();
     ExtensionPoint.removeProvider('llm');
-    AnalyticsEmitter.removeBackend();
     _isRegistered = false;
+    _registeringPromise = null;
     logger.info('LlamaCpp backend cleaned up');
   },
 };
@@ -79,35 +106,17 @@ export const LlamaCppProvider = {
       return;
     }
 
-    const bridge = LlamaCppBridge.shared;
-    await bridge.ensureLoaded();
+    if (_registeringPromise) {
+      logger.debug('LlamaCpp registration in progress, awaiting...');
+      return _registeringPromise;
+    }
 
-    // Load llama.cpp struct offsets from the WASM module
-    loadOffsets();
-
-    // Register model loaders with ModelManager
-    ModelManager.setLLMLoader(TextGeneration);
-
-    // Register extensions with lifecycle registry
-    // Register extensions with lifecycle registry (only those with cleanup)
-    ExtensionRegistry.register(TextGeneration);
-    ExtensionRegistry.register(VLM);
-    ExtensionRegistry.register(ToolCalling);
-    ExtensionRegistry.register(Embeddings);
-    ExtensionRegistry.register(Diffusion);
-
-    // Register with ExtensionPoint for capability lookups
-    ExtensionPoint.registerBackend(llamacppExtension);
-
-    // Register typed provider so VoicePipeline (in core) can access
-    // the LLM via ExtensionPoint.getProvider('llm') at runtime.
-    ExtensionPoint.registerProvider('llm', TextGeneration);
-
-    // Route all analytics events through the C++ telemetry manager
-    AnalyticsEmitter.registerBackend(new WASMAnalyticsEmitter());
-
-    _isRegistered = true;
-    logger.info('LlamaCpp backend registered successfully');
+    _registeringPromise = _doRegister();
+    try {
+      await _registeringPromise;
+    } finally {
+      _registeringPromise = null;
+    }
   },
 
   /**
