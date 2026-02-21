@@ -7,6 +7,7 @@
 //
 //  Purpose: Start the background AVAudioSession and instruct the user to swipe
 //  back to the host app. Dismisses automatically once the session is ready.
+//  Branded with RunAnywhere color palette (#FF5500 primary accent).
 //
 
 #if os(iOS)
@@ -22,7 +23,16 @@ struct FlowActivationView: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground).ignoresSafeArea()
+            // Brand gradient background
+            LinearGradient(
+                colors: [
+                    AppColors.backgroundPrimaryDark,
+                    AppColors.backgroundSecondaryDark
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // MARK: Top Bar
@@ -34,9 +44,9 @@ struct FlowActivationView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.white.opacity(0.6))
                             .padding(12)
-                            .background(Color(.systemGray5), in: Circle())
+                            .background(Color.white.opacity(0.1), in: Circle())
                     }
                     .padding(.trailing, 20)
                     .padding(.top, 16)
@@ -50,10 +60,11 @@ struct FlowActivationView: View {
                     case .activating:
                         VStack(spacing: 12) {
                             ProgressView()
+                                .tint(AppColors.primaryAccent)
                                 .scaleEffect(1.4)
-                            Text("Setting up microphone…")
+                            Text("Setting up microphone...")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.6))
                         }
                         .frame(height: 60)
 
@@ -62,10 +73,10 @@ struct FlowActivationView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .font(.title)
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(AppColors.primaryAccent)
                             Text(flowSession.lastError ?? "Could not start microphone")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.6))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
                         }
@@ -75,6 +86,7 @@ struct FlowActivationView: View {
                         // All preconditions met — instruct user to swipe back
                         Text("Swipe back to continue")
                             .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
                             .multilineTextAlignment(.center)
                             .frame(height: 60)
 
@@ -82,10 +94,11 @@ struct FlowActivationView: View {
                         // .idle (initial) or .activating — show spinner
                         VStack(spacing: 12) {
                             ProgressView()
+                                .tint(AppColors.primaryAccent)
                                 .scaleEffect(1.4)
-                            Text("Setting up microphone…")
+                            Text("Setting up microphone...")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.6))
                         }
                         .frame(height: 60)
                     }
@@ -105,7 +118,7 @@ struct FlowActivationView: View {
                 // MARK: Explanation Text
                 Text("We wish you didn't have to switch apps to use RunAnywhere, but Apple requires this step to activate the microphone.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.4))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 48)
@@ -134,12 +147,22 @@ private struct PhoneIllustrationView: View {
 
     var body: some View {
         ZStack {
-            // Phone outline
+            // Phone outline with brand-tinted border
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color(.systemGray6))
+                .fill(AppColors.backgroundTertiaryDark)
                 .overlay(
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .strokeBorder(Color(.systemGray3), lineWidth: 2)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    AppColors.primaryAccent.opacity(0.3),
+                                    AppColors.primaryAccent.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
                 )
 
             // Phone screen content
@@ -152,14 +175,14 @@ private struct PhoneIllustrationView: View {
                         Spacer()
                         // Simulated keyboard strip
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray4))
+                            .fill(AppColors.backgroundGray5Dark)
                             .frame(height: 70)
                             .padding(.horizontal, 12)
                             .overlay(
                                 HStack(spacing: 6) {
-                                    ForEach(0..<4) { _ in
+                                    ForEach(0..<4, id: \.self) { _ in
                                         RoundedRectangle(cornerRadius: 4)
-                                            .fill(Color(.systemBackground))
+                                            .fill(AppColors.backgroundSecondaryDark)
                                             .frame(height: 28)
                                     }
                                 }
@@ -178,7 +201,7 @@ private struct PhoneIllustrationView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "waveform")
                             .font(.system(size: 40, weight: .medium))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(AppColors.primaryAccent)
                         // Swipe indicator — bottom center
                         SwipeIndicator()
                             .padding(.top, 20)
@@ -197,7 +220,7 @@ private struct SwipeIndicator: View {
 
     var body: some View {
         Circle()
-            .fill(Color.accentColor.opacity(0.7))
+            .fill(AppColors.primaryAccent.opacity(0.7))
             .frame(width: 22, height: 22)
             .scaleEffect(isAnimating ? 1.25 : 0.9)
             .opacity(isAnimating ? 0.5 : 1.0)

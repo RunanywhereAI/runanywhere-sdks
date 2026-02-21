@@ -3,6 +3,7 @@
 //  RunAnywhereKeyboard
 //
 //  SwiftUI keyboard UI — implements the 5-state WisprFlow-style UX.
+//  Branded with RunAnywhere color palette (#FF5500 primary accent).
 //
 //  State machine (driven by SharedDataBridge.sessionState):
 //    idle        → full keyboard + "Run" button in toolbar
@@ -15,6 +16,16 @@
 
 import SwiftUI
 import Combine
+
+// MARK: - Brand Colors (keyboard extension can't import main target)
+
+private enum Brand {
+    static let accent      = Color(.sRGB, red: 1.0, green: 0.333, blue: 0.0)    // #FF5500
+    static let accentDark  = Color(.sRGB, red: 0.902, green: 0.271, blue: 0.0)  // #E64500
+    static let green       = Color(.sRGB, red: 0.063, green: 0.725, blue: 0.506) // #10B981
+    static let darkSurface = Color(white: 0.18)   // key background
+    static let darkCard    = Color(white: 0.22)    // utility key background
+}
 
 struct KeyboardView: View {
     // Callbacks into KeyboardViewController
@@ -37,6 +48,7 @@ struct KeyboardView: View {
     // Waveform bar heights — 30 bars driven by audioLevel
     @State private var barPhase: Double = 0
     @State private var showUndo = false
+    @State private var showStats = false
 
     private let stateTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
     private let waveformTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
@@ -45,14 +57,27 @@ struct KeyboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            switch sessionState {
-            case "listening", "transcribing", "done":
-                waveformView
-            default:
-                fullKeyboardView
+            if showStats {
+                statsView
+            } else {
+                switch sessionState {
+                case "listening", "transcribing", "done":
+                    waveformView
+                default:
+                    fullKeyboardView
+                }
             }
         }
-        .background(Color(.systemGroupedBackground))
+        .background(
+            // Single soft radial blob centered in the keyboard — fades to clear at edges
+            RadialGradient(
+                colors: [Brand.accent.opacity(0.025), Color.clear],
+                center: .center,
+                startRadius: 0,
+                endRadius: 160
+            )
+            .allowsHitTesting(false)
+        )
         .onAppear { refreshState() }
         .onReceive(stateTimer) { _ in refreshState() }
         .onReceive(waveformTimer) { _ in
@@ -76,7 +101,7 @@ struct KeyboardView: View {
     private var fullKeyboardView: some View {
         VStack(spacing: 0) {
             toolbarRow
-            Divider()
+            Divider().overlay(Color.white.opacity(0.08))
             numberRow
             specialCharsRow1
             specialCharsRow2
@@ -88,9 +113,11 @@ struct KeyboardView: View {
 
     private var toolbarRow: some View {
         HStack(spacing: 0) {
-            // Settings icon (left)
-            iconButton(systemImage: "slider.horizontal.3", action: {})
-                .padding(.leading, 4)
+            // Settings icon (left) — opens stats view
+            iconButton(systemImage: "slider.horizontal.3") {
+                withAnimation(.easeInOut(duration: 0.2)) { showStats = true }
+            }
+            .padding(.leading, 4)
 
             Spacer()
 
@@ -98,18 +125,29 @@ struct KeyboardView: View {
             switch sessionState {
             case "idle":
                 Button(action: onRunTap) {
-                    Text("Run")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 8)
-                        .background(Color.accentColor)
-                        .cornerRadius(8)
+                    HStack(spacing: 6) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Run")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            colors: [Brand.accent, Brand.accentDark],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(8)
                 }
                 .padding(.trailing, 8)
 
             case "activating":
                 ProgressView()
+                    .tint(Brand.accent)
                     .scaleEffect(0.85)
                     .padding(.trailing, 12)
 
@@ -117,13 +155,13 @@ struct KeyboardView: View {
                 HStack(spacing: 6) {
                     Text("Using iPhone Microphone")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.5))
                     Button(action: onMicTap) {
-                        Image(systemName: "mic.fill")
+                        Image(systemName: "waveform")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.accentColor)
+                            .foregroundColor(Brand.accent)
                             .padding(8)
-                            .background(Color.accentColor.opacity(0.12), in: Circle())
+                            .background(Brand.accent.opacity(0.15), in: Circle())
                     }
                 }
                 .padding(.trailing, 8)
@@ -173,10 +211,10 @@ struct KeyboardView: View {
                 Image(systemName: "delete.left")
                     .font(.system(size: 14))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemGray5))
+                    .background(Brand.darkCard)
                     .cornerRadius(6)
             }
-            .foregroundColor(.primary)
+            .foregroundColor(.white.opacity(0.8))
             .padding(3)
             .frame(maxWidth: .infinity, minHeight: 42)
         }
@@ -193,10 +231,10 @@ struct KeyboardView: View {
                 Image(systemName: "globe")
                     .font(.system(size: 18))
                     .frame(width: 46, height: 42)
-                    .background(Color(.systemGray5))
+                    .background(Brand.darkCard)
                     .cornerRadius(6)
             }
-            .foregroundColor(.primary)
+            .foregroundColor(.white.opacity(0.8))
             .padding(3)
 
             // ABC key
@@ -204,24 +242,26 @@ struct KeyboardView: View {
                 Text("ABC")
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 52, height: 42)
-                    .background(Color(.systemGray5))
+                    .background(Brand.darkCard)
                     .cornerRadius(6)
             }
-            .foregroundColor(.primary)
+            .foregroundColor(.white.opacity(0.8))
             .padding(3)
 
             // Branded spacebar
             Button(action: onSpace) {
                 HStack(spacing: 6) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                    Image("runanywhere_icon")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     Text("RunAnywhere")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.9))
                 }
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(Color(.systemBackground))
+                .background(Brand.darkSurface)
                 .cornerRadius(6)
             }
             .padding(3)
@@ -231,14 +271,64 @@ struct KeyboardView: View {
                 Image(systemName: "return")
                     .font(.system(size: 16))
                     .frame(width: 52, height: 42)
-                    .background(Color(.systemGray5))
+                    .background(Brand.darkCard)
                     .cornerRadius(6)
             }
-            .foregroundColor(.primary)
+            .foregroundColor(.white.opacity(0.8))
             .padding(3)
         }
         .padding(.horizontal, 4)
         .padding(.bottom, 6)
+    }
+
+    // MARK: - Stats View (settings overlay)
+
+    private var statsView: some View {
+        VStack(spacing: 0) {
+            // Top bar: close only
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showStats = false }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                }
+                .padding(.leading, 12)
+
+                Spacer()
+            }
+            .padding(.top, 10)
+
+            Spacer()
+
+            // Word count
+            let stats = loadDictationStats()
+            Text(formattedWordCount(stats.totalWords))
+                .font(.system(size: 56, weight: .bold, design: .serif))
+                .foregroundStyle(Brand.accent)
+
+            Text("words")
+                .font(.system(size: 56, weight: .bold, design: .serif))
+                .foregroundStyle(Brand.accent)
+
+            Text("you've dictated so far.")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
+                .padding(.top, 4)
+
+            if stats.sessionCount > 0 {
+                Text("You've had \(stats.sessionCount) dictation session\(stats.sessionCount == 1 ? "" : "s")")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .padding(.top, 2)
+            }
+
+            Spacer()
+        }
+        .frame(minHeight: 260)
     }
 
     // MARK: - Waveform View (listening / transcribing / done)
@@ -254,7 +344,7 @@ struct KeyboardView: View {
                     Button(action: sessionState == "done" ? {} : onCancelTap) {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(sessionState == "done" ? Color.clear : Color.primary)
+                            .foregroundStyle(sessionState == "done" ? Color.clear : .white.opacity(0.8))
                             .frame(width: 44, height: 44)
                     }
                     .padding(.leading, 20)
@@ -266,13 +356,19 @@ struct KeyboardView: View {
                         if sessionState == "done" {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.title2)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(Brand.green)
                         } else {
-                            Text("Listening")
-                                .font(.system(size: 14, weight: .semibold))
+                            HStack(spacing: 6) {
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Brand.accent)
+                                Text("Listening")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
                             Text("iPhone Microphone")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.5))
                         }
                     }
 
@@ -283,14 +379,14 @@ struct KeyboardView: View {
                         Button(action: onUndoTap) {
                             Image(systemName: "arrow.uturn.backward.circle")
                                 .font(.system(size: 22))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.5))
                         }
                         .padding(.trailing, 20)
                     } else {
                         Button(action: onStopTap) {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(Brand.accent)
                                 .frame(width: 44, height: 44)
                         }
                         .padding(.trailing, 20)
@@ -308,10 +404,11 @@ struct KeyboardView: View {
             if sessionState == "transcribing" {
                 VStack(spacing: 4) {
                     ProgressView()
+                        .tint(Brand.accent)
                         .scaleEffect(0.9)
-                    Text("Transcribing…")
+                    Text("Transcribing...")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(.vertical, 8)
             }
@@ -324,10 +421,10 @@ struct KeyboardView: View {
                     Image(systemName: "globe")
                         .font(.system(size: 18))
                         .frame(width: 46, height: 40)
-                        .background(Color(.systemGray5))
+                        .background(Brand.darkCard)
                         .cornerRadius(6)
                 }
-                .foregroundColor(.primary)
+                .foregroundColor(.white.opacity(0.8))
                 .padding(.leading, 7)
                 .padding(.bottom, 6)
                 Spacer()
@@ -342,7 +439,7 @@ struct KeyboardView: View {
         HStack(spacing: 3) {
             ForEach(0..<30, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(barColor)
+                    .fill(barGradient)
                     .frame(width: 3, height: barHeight(for: index))
                     .animation(.easeOut(duration: 0.08), value: audioLevel)
             }
@@ -367,11 +464,18 @@ struct KeyboardView: View {
         return base + dynamic
     }
 
-    private var barColor: Color {
+    private var barGradient: LinearGradient {
         switch sessionState {
-        case "transcribing": return .orange
-        case "done":         return .green
-        default:             return .red
+        case "done":
+            return LinearGradient(
+                colors: [Brand.green.opacity(0.9), Brand.green.opacity(0.5)],
+                startPoint: .top, endPoint: .bottom
+            )
+        default: // listening, transcribing
+            return LinearGradient(
+                colors: [Brand.accent.opacity(0.9), Brand.accentDark.opacity(0.5)],
+                startPoint: .top, endPoint: .bottom
+            )
         }
     }
 
@@ -382,10 +486,10 @@ struct KeyboardView: View {
             Text(char)
                 .font(.system(size: 14))
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(Color(.systemBackground))
+                .background(Brand.darkSurface)
                 .cornerRadius(6)
         }
-        .foregroundColor(.primary)
+        .foregroundColor(.white.opacity(0.9))
         .padding(3)
     }
 
@@ -395,7 +499,36 @@ struct KeyboardView: View {
                 .font(.system(size: 16))
                 .padding(10)
         }
-        .foregroundColor(.secondary)
+        .foregroundColor(.white.opacity(0.5))
+    }
+
+    // MARK: - Stats Loading
+
+    private struct DictationStats {
+        let totalWords: Int
+        let sessionCount: Int
+    }
+
+    /// DictationEntry — must match the main app's definition for JSON decoding
+    private struct DictationEntry: Codable {
+        let id: UUID
+        let text: String
+        let date: Date
+    }
+
+    private func loadDictationStats() -> DictationStats {
+        guard let data = SharedDataBridge.shared.defaults?.data(forKey: SharedConstants.Keys.dictationHistory),
+              let entries = try? JSONDecoder().decode([DictationEntry].self, from: data) else {
+            return DictationStats(totalWords: 0, sessionCount: 0)
+        }
+        let totalWords = entries.reduce(0) { $0 + $1.text.split(separator: " ").count }
+        return DictationStats(totalWords: totalWords, sessionCount: entries.count)
+    }
+
+    private func formattedWordCount(_ count: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
     }
 
     // MARK: - State Refresh
