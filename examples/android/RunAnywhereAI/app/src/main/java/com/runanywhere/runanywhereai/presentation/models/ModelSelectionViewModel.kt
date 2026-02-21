@@ -170,6 +170,10 @@ class ModelSelectionViewModel(
      * Get the currently loaded model ID for this context from the SDK.
      * This syncs the selection sheet with what's actually loaded in memory.
      * Matches iOS's pattern of querying currentModelId from CppBridge.
+     *
+     * RAG contexts (RAG_EMBEDDING, RAG_LLM) return null — RAG models are selected
+     * by file path at pipeline creation time and are not pre-loaded into memory.
+     * This mirrors iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
     private fun getCurrentLoadedModelIdForContext(): String? {
         return when (context) {
@@ -181,6 +185,9 @@ class ModelSelectionViewModel(
                 // but typically the voice sheet doesn't auto-select
                 null
             }
+            ModelSelectionContext.RAG_EMBEDDING,
+            ModelSelectionContext.RAG_LLM,
+            -> null
         }
     }
 
@@ -202,6 +209,8 @@ class ModelSelectionViewModel(
                         ModelCategory.SPEECH_RECOGNITION,
                         ModelCategory.SPEECH_SYNTHESIS,
                     )
+            ModelSelectionContext.RAG_EMBEDDING -> category == ModelCategory.EMBEDDING
+            ModelSelectionContext.RAG_LLM -> category == ModelCategory.LANGUAGE
         }
     }
 
@@ -295,6 +304,10 @@ class ModelSelectionViewModel(
     /**
      * Select and load model - context-aware loading
      * Matches iOS context-based loading
+     *
+     * For RAG contexts (RAG_EMBEDDING, RAG_LLM), the model is selected but NOT loaded into
+     * memory — RAG models are referenced by file path at pipeline creation time.
+     * This matches iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
     suspend fun selectModel(modelId: String) {
         try {
@@ -328,16 +341,23 @@ class ModelSelectionViewModel(
                         else -> RunAnywhere.loadLLMModel(modelId)
                     }
                 }
+                ModelSelectionContext.RAG_EMBEDDING,
+                ModelSelectionContext.RAG_LLM,
+                -> {
+                    // RAG models are not loaded into memory; they are passed by file path
+                    // at pipeline creation time. Just set currentModel and dismiss.
+                    Log.d(TAG, "ℹ️ RAG context: selecting model by reference only (no load): $modelId")
+                }
             }
 
-            Log.d(TAG, "✅ Model loaded successfully: $modelId")
+            Log.d(TAG, "✅ Model selected successfully: $modelId")
 
             // Get the loaded model
             val loadedModel = _uiState.value.models.find { it.id == modelId }
 
             _uiState.update {
                 it.copy(
-                    loadingProgress = "Model loaded successfully!",
+                    loadingProgress = "Model selected!",
                     isLoadingModel = false,
                     selectedModelId = null,
                     currentModel = loadedModel,

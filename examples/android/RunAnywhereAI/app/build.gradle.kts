@@ -230,6 +230,7 @@ dependencies {
     // Pick the backends you need:
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-rag")) // RAG pipeline JNI bindings
 
     // ========================================
     // AndroidX Core & Lifecycle
@@ -285,6 +286,11 @@ dependencies {
     // File Management & Storage
     // ========================================
     implementation(libs.commons.io)
+
+    // ========================================
+    // PDF Text Extraction (RAG document ingestion)
+    // ========================================
+    implementation("com.tom_roush:pdfbox-android:2.0.27.0")
 
     // ========================================
     // Background Work
