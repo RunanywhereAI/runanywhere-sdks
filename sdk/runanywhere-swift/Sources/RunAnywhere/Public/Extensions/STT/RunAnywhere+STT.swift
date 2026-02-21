@@ -79,13 +79,13 @@ public extension RunAnywhere {
 
         // Transcribe (C++ emits events)
         var sttResult = rac_stt_result_t()
-        let transcribeResult = options.withCOptions { cOptions in
+        let transcribeResult = options.withCOptions { cOptionsPtr in
             audioData.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe(
                     handle,
                     audioPtr.baseAddress,
                     audioData.count,
-                    &cOptions,
+                    cOptionsPtr,
                     &sttResult
                 )
             }
@@ -211,13 +211,13 @@ public extension RunAnywhere {
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
         // Stream transcription with callback
-        let result = options.withCOptions { cOptions in
+        let result = options.withCOptions { cOptionsPtr in
             audioData.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe_stream(
                     handle,
                     audioPtr.baseAddress,
                     audioData.count,
-                    &cOptions,
+                    cOptionsPtr,
                     { partialText, isFinal, userData in
                         guard let userData = userData else { return }
                         let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
@@ -284,13 +284,13 @@ public extension RunAnywhere {
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
 
         var sttResult = rac_stt_result_t()
-        let transcribeResult = syntheticOptions.withCOptions { cOptions in
+        let transcribeResult = syntheticOptions.withCOptions { cOptionsPtr in
             data.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe(
                     handle,
                     audioPtr.baseAddress,
                     data.count,
-                    &cOptions,
+                    cOptionsPtr,
                     &sttResult
                 )
             }
@@ -314,30 +314,6 @@ public extension RunAnywhere {
         let sampleRate = 16000.0
         let samples = Double(dataSize) / Double(bytesPerSample)
         return samples / sampleRate
-    }
-}
-
-// MARK: - C Options Bridge
-
-private extension STTOptions {
-    /// Safely maps all STTOptions fields to rac_stt_options_t and invokes body.
-    ///
-    /// Uses `withCString` to guarantee the language pointer remains valid for
-    /// the entire duration of the C call — avoiding the dangling-pointer bug
-    /// that arose from `(options.language as NSString).utf8String`.
-    func withCOptions<T>(_ body: (inout rac_stt_options_t) throws -> T) rethrows -> T {
-        return try language.withCString { languageCStr in
-            var cOptions = rac_stt_options_t()
-            cOptions.language            = languageCStr
-            cOptions.detect_language     = detectLanguage    ? RAC_TRUE : RAC_FALSE
-            cOptions.sample_rate         = Int32(sampleRate)
-            cOptions.enable_punctuation  = enablePunctuation ? RAC_TRUE : RAC_FALSE
-            cOptions.enable_diarization  = enableDiarization ? RAC_TRUE : RAC_FALSE
-            cOptions.enable_timestamps   = enableTimestamps  ? RAC_TRUE : RAC_FALSE
-            cOptions.audio_format        = audioFormat.toCFormat()
-            cOptions.max_speakers        = Int32(maxSpeakers ?? 0)
-            return try body(&cOptions)
-        }
     }
 }
 
