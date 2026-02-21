@@ -555,9 +555,6 @@ export class ModelDownloader {
       return opfsStream;
     }
 
-    // Clean up corrupted 0-byte entries - we can't easily check length on the stream without consuming it,
-    // so we skip the 0-byte check here for now and rely on loadFromOPFS to clean them up.
-
     // Fall back to in-memory cache
     const cached = this.memoryCache.get(key);
     if (cached) {
@@ -572,6 +569,18 @@ export class ModelDownloader {
     }
 
     return null;
+  }
+
+  /** Load file object from storage (local FS or OPFS) without reading into memory. */
+  async loadModelFile(key: string): Promise<File | null> {
+    // Try local filesystem first
+    if (this.localFileStorage?.isReady) {
+      const file = await this.localFileStorage.loadModelFile(key);
+      if (file) return file;
+    }
+
+    // Try OPFS
+    return this.storage.loadModelFile(key);
   }
 
   /** Check existence in local storage, OPFS, or in-memory cache. */

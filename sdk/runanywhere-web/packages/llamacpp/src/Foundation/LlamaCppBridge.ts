@@ -160,6 +160,11 @@ export interface LlamaCppModule {
   FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
   FS_createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void;
   FS_unlink?: (path: string) => void;
+  FS_mkdir?: (path: string) => void;
+  FS_rmdir?: (path: string) => void;
+  FS_mount?: (type: any, opts: any, mountpoint: string) => void;
+  FS_unmount?: (mountpoint: string) => void;
+  WORKERFS?: any;
 
   // Generic index access for dynamic function lookups
   [key: string]: unknown;
@@ -171,6 +176,7 @@ export interface LlamaCppModule {
 
 export class LlamaCppBridge {
   private static _instance: LlamaCppBridge | null = null;
+  private static _nextMountId = 0;
   private _module: LlamaCppModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
@@ -436,6 +442,71 @@ export class LlamaCppBridge {
    */
   unlinkFile(path: string): void {
     try { this.module.FS_unlink?.(path); } catch { /* doesn't exist */ }
+  }
+
+  /**
+   * Mount a File object into the WASM filesystem (if WORKERFS is available).
+   * Returns the path to the mounted file, or null if mounting failed/unsupported.
+   *
+   * @param file - The browser File object
+   * @returns The absolute path to the file in WASM FS (e.g. /mnt-123/model.gguf) or null
+   */
+  mountFile(file: File): string | null {
+    const m = this.module;
+    if (!m.FS_mount || !m.WORKERFS) return null;
+
+    let createdMountDir = false;
+    let mountDir = '';
+
+    try {
+      // Create a unique mount point directory
+      const mountId = LlamaCppBridge._nextMountId++;
+      mountDir = `/mnt-${mountId}`;
+
+      if (m.FS_mkdir) {
+        m.FS_mkdir(mountDir);
+        createdMountDir = true;
+      }
+
+      // Mount the file. WORKERFS expects { files: [File, ...] } or { files: [{name, data: File}] }
+      // We assume the standard Emscripten WORKERFS behavior where `files` array mounts them by name.
+      m.FS_mount(m.WORKERFS, { files: [file] }, mountDir);
+
+      logger.debug(`Mounted ${file.name} to ${mountDir}`);
+      return `${mountDir}/${file.name}`;
+    } catch (err) {
+      if (createdMountDir && m.FS_rmdir) {
+        try { m.FS_rmdir(mountDir); } catch { logger.warning(`Failed to clean up mount dir ${mountDir}`); }
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`Failed to mount file (WORKERFS): ${msg}`);
+      return null;
+    }
+  }
+
+  /**
+   * Unmount a directory (and remove it).
+   * @param mountDir - The directory path (e.g. /mnt-123)
+   */
+  unmount(mountPath: string): void {
+    if (!mountPath.startsWith('/mnt-')) return; // Safety check
+
+    // Strip filename if present
+    const parts = mountPath.split('/');
+    // formatted like ["", "mnt-123", "filename"]
+    let dir = mountPath;
+    if (parts.length >= 3) {
+      dir = `/${parts[1]}`;
+    }
+
+    try {
+      const m = this.module;
+      if (m.FS_unmount) m.FS_unmount(dir);
+      if (m.FS_rmdir) m.FS_rmdir(dir);
+      logger.debug(`Unmounted ${dir}`);
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 
   // -----------------------------------------------------------------------
