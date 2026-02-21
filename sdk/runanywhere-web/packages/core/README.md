@@ -100,25 +100,36 @@ On-device AI for the browser. Run LLMs, Speech-to-Text, Text-to-Speech, Vision, 
 
 ## Package Structure
 
-The Web SDK is a single npm package. Unlike native SDKs (iOS, Android, React Native, Flutter) which use separate packages per backend, the Web SDK compiles all inference backends into a single WebAssembly binary. Backend selection happens at WASM build time, not at the package level.
+The Web SDK is split into three npm packages so you only ship the backends you need:
 
-```
-@runanywhere/web           -- TypeScript API + pre-built WASM (all backends)
-```
+| Package | Description | Includes |
+|---------|-------------|----------|
+| [`@runanywhere/web`](https://www.npmjs.com/package/@runanywhere/web) | Core SDK — lifecycle, logging, events, model management, storage | TypeScript only (no WASM) |
+| [`@runanywhere/web-llamacpp`](https://www.npmjs.com/package/@runanywhere/web-llamacpp) | LLM, VLM, tool calling, structured output, embeddings, diffusion | llama.cpp WASM (~3.7 MB CPU, ~3.9 MB WebGPU) |
+| [`@runanywhere/web-onnx`](https://www.npmjs.com/package/@runanywhere/web-onnx) | STT, TTS, VAD, audio capture/playback | [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) WASM (~12 MB, lazy-loaded) |
 
-The pre-built WASM includes llama.cpp (LLM/VLM), whisper.cpp (STT), and sherpa-onnx (TTS/VAD). Developers who need a smaller WASM binary with specific backends can [build from source](#building-from-source) with selective flags.
+Install only what you need — `@runanywhere/web` is always required as the core.
 
 ---
 
 ## Installation
 
 ```bash
-npm install @runanywhere/web
+# Core + all backends
+npm install @runanywhere/web @runanywhere/web-llamacpp @runanywhere/web-onnx
+
+# LLM/VLM only (no speech)
+npm install @runanywhere/web @runanywhere/web-llamacpp
+
+# Speech only (no LLM)
+npm install @runanywhere/web @runanywhere/web-onnx
 ```
 
-### Serve WASM Files
+### Serve WASM Files + Cross-Origin Isolation
 
-The package includes pre-built WASM files in `node_modules/@runanywhere/web/wasm/`. Configure your bundler to serve these as static assets.
+WASM files are included in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx`. Configure your bundler to serve them as static assets.
+
+> **Important:** Your server **must** set Cross-Origin Isolation headers for `SharedArrayBuffer` and multi-threaded WASM to work. Without these headers the SDK falls back to single-threaded mode, which is significantly slower. See [Cross-Origin Isolation Headers](#cross-origin-isolation-headers) for all platforms (Nginx, Vercel, Netlify, Cloudflare, AWS, Apache).
 
 **Vite:**
 
@@ -132,8 +143,14 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
   },
+  worker: { format: 'es' },
+  optimizeDeps: {
+    exclude: ['@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
+  },
 });
 ```
+
+> **Warning (Vite users):** You **must** add `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` to `optimizeDeps.exclude`. Vite's dependency pre-bundling flattens packages into `.vite/deps/`, which breaks the relative `import.meta.url` paths the SDK uses to locate its WASM files. Without this exclusion, WASM loading will fail with a "Failed to fetch dynamically imported module" error. This is a known Vite limitation with npm packages that resolve static assets via `import.meta.url`.
 
 **Webpack:**
 
@@ -145,8 +162,16 @@ module.exports = {
       { test: /\.wasm$/, type: 'asset/resource' },
     ],
   },
+  devServer: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
+  },
 };
 ```
+
+> **Safari/iOS:** Safari does not support `credentialless` COEP. Use the COI service worker pattern shown in the [demo app](../../examples/web/RunAnywhereAI/) — it intercepts responses and injects `require-corp` headers at runtime.
 
 ---
 
@@ -156,14 +181,20 @@ module.exports = {
 
 ```typescript
 import { RunAnywhere } from '@runanywhere/web';
+import { LlamaCPP, TextGeneration } from '@runanywhere/web-llamacpp';
+import { ONNX, STT, STTModelType, TTS, VAD, SpeechActivity } from '@runanywhere/web-onnx';
 
 await RunAnywhere.initialize({ environment: 'development', debug: true });
+
+// Register backends
+await LlamaCPP.register();
+await ONNX.register();
 ```
 
 ### 2. Text Generation (LLM)
 
 ```typescript
-import { TextGeneration } from '@runanywhere/web';
+import { TextGeneration } from '@runanywhere/web-llamacpp';
 
 // Load a GGUF model
 await TextGeneration.loadModel('/models/qwen2.5-0.5b-instruct-q4_0.gguf', 'qwen2.5-0.5b');
@@ -181,7 +212,7 @@ for await (const token of TextGeneration.generateStream('Write a haiku about cod
 ### 3. Speech-to-Text (STT)
 
 ```typescript
-import { STT } from '@runanywhere/web';
+import { STT, STTModelType } from '@runanywhere/web-onnx';
 
 await STT.loadModel({
   modelId: 'whisper-tiny',
@@ -197,7 +228,7 @@ console.log(result.text);
 ### 4. Text-to-Speech (TTS)
 
 ```typescript
-import { TTS } from '@runanywhere/web';
+import { TTS } from '@runanywhere/web-onnx';
 
 await TTS.loadVoice({
   voiceId: 'piper-en',
@@ -213,7 +244,7 @@ const result = await TTS.synthesize('Hello from RunAnywhere!');
 ### 5. Voice Activity Detection (VAD)
 
 ```typescript
-import { VAD, SpeechActivity } from '@runanywhere/web';
+import { VAD, SpeechActivity } from '@runanywhere/web-onnx';
 
 await VAD.initialize({ modelPath: '/models/silero_vad.onnx' });
 
@@ -231,7 +262,7 @@ VAD.processSamples(audioChunk);
 ### 6. Vision Language Model (VLM)
 
 ```typescript
-import { VLM, VLMImageFormat } from '@runanywhere/web';
+import { VLM, VLMImageFormat } from '@runanywhere/web-llamacpp';
 
 await VLM.loadModel('/models/qwen2-vl.gguf', '/models/mmproj.gguf', 'qwen2-vl');
 
@@ -650,38 +681,46 @@ The demo app runs on Vite with Cross-Origin Isolation headers pre-configured.
 
 ---
 
-## npm Package
+## npm Packages
 
-```
-@runanywhere/web
-```
-
-### Published Exports
+### `@runanywhere/web` (core)
 
 | Export | Description |
 |--------|-------------|
 | `RunAnywhere` | SDK lifecycle (initialize, shutdown, capabilities) |
-| `TextGeneration` | LLM text generation and streaming |
-| `STT` | Speech-to-text transcription |
-| `TTS` | Text-to-speech synthesis |
-| `VAD` | Voice activity detection |
-| `VLM` | Vision-language model inference |
-| `VoicePipeline` | STT -> LLM -> TTS orchestration |
-| `VoiceAgent` | Complete voice agent with C API pipeline |
-| `ToolCalling` | Function calling with typed tool definitions |
-| `StructuredOutput` | JSON schema-guided generation |
-| `Embeddings` | Vector embedding generation |
-| `Diffusion` | Image generation (WebGPU, scaffold) |
-| `AudioCapture` | Microphone capture via Web Audio API |
-| `AudioPlayback` | Audio playback via Web Audio API |
-| `VideoCapture` | Camera capture and frame extraction |
-| `ModelManager` | Advanced model download/storage/loading |
-| `OPFSStorage` | Low-level OPFS persistence |
-| `VLMWorkerBridge` | Web Worker bridge for VLM inference |
+| `ModelManager` | Model download, storage, and loading |
+| `OPFSStorage` | Persistent storage via OPFS |
 | `SDKLogger` | Structured logging |
 | `SDKError` | Typed error hierarchy |
 | `EventBus` | SDK event system |
 | `detectCapabilities` | Browser feature detection |
+
+### `@runanywhere/web-llamacpp`
+
+| Export | Description |
+|--------|-------------|
+| `LlamaCPP` | Backend registration |
+| `TextGeneration` | LLM text generation and streaming |
+| `VLM` | Vision-language model inference |
+| `ToolCalling` | Function calling with typed definitions |
+| `StructuredOutput` | JSON schema-guided generation |
+| `Embeddings` | Vector embedding generation |
+| `Diffusion` | Image generation (WebGPU) |
+| `VLMWorkerBridge` | Web Worker bridge for VLM inference |
+| `VideoCapture` | Camera capture and frame extraction |
+| `TelemetryService` | Telemetry and analytics |
+
+### `@runanywhere/web-onnx`
+
+| Export | Description |
+|--------|-------------|
+| `ONNX` | Backend registration |
+| `STT` | Speech-to-text transcription |
+| `TTS` | Text-to-speech synthesis |
+| `VAD` | Voice activity detection |
+| `AudioCapture` | Microphone capture via Web Audio API |
+| `AudioPlayback` | Audio playback via Web Audio API |
+| `AudioFileLoader` | Audio file loading and decoding |
 
 ---
 
@@ -714,6 +753,18 @@ Yes. Any GGUF-format model compatible with llama.cpp works for LLM/VLM. STT mode
 ---
 
 ## Troubleshooting
+
+### "Failed to fetch dynamically imported module" / WASM not loading (Vite)
+
+**Cause:** Vite pre-bundles npm dependencies into `.vite/deps/`, which breaks the relative `import.meta.url` paths used by `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` to locate their WASM files.
+
+**Fix:** Add both packages to `optimizeDeps.exclude` in your `vite.config.ts`:
+
+```typescript
+optimizeDeps: {
+  exclude: ['@runanywhere/web-llamacpp', '@runanywhere/web-onnx'],
+},
+```
 
 ### "SharedArrayBuffer is not defined"
 
