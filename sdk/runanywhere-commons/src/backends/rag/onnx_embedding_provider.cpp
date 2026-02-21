@@ -634,13 +634,34 @@ public:
                 LOGE("Output tensor data pointer is null");
                 return std::vector<float>(embedding_dim_, 0.0f);
             }
-            
+
+            OrtTensorTypeAndShapeInfo* shape_info = nullptr;
+            OrtStatusGuard shape_status_guard(ort_api_);
+            shape_status_guard.reset(ort_api_->GetTensorTypeAndShape(output_guard.get(), &shape_info));
+
+            size_t actual_hidden_dim = embedding_dim_; // fallback
+            if (!shape_status_guard.is_error() && shape_info != nullptr) {
+                size_t dim_count = 0;
+                ort_api_->GetDimensionsCount(shape_info, &dim_count);
+                if (dim_count >= 3) {
+                    std::vector<int64_t> dims(dim_count);
+                    ort_api_->GetDimensions(shape_info, dims.data(), dim_count);
+                    actual_hidden_dim = static_cast<size_t>(dims[2]);
+                    if (actual_hidden_dim != embedding_dim_) {
+                        LOGI("Model hidden dim %zu differs from configured %zu, using actual",
+                             actual_hidden_dim, embedding_dim_);
+                        embedding_dim_ = actual_hidden_dim;
+                    }
+                }
+                ort_api_->ReleaseTensorTypeAndShapeInfo(shape_info);
+            }
+
             // 5. Mean pooling
             auto pooled = mean_pooling(
                 output_data,
                 attention_mask,
                 max_seq_length_,
-                embedding_dim_
+                actual_hidden_dim
             );
             
             // 6. Normalize to unit vector

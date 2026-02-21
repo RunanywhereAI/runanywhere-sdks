@@ -338,6 +338,7 @@ void RAGBackend::clear() {
 }
 
 nlohmann::json RAGBackend::get_statistics() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     nlohmann::json stats;
     
     if (vector_store_) {

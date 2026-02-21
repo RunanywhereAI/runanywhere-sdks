@@ -47,7 +47,7 @@ void HybridRunAnywhereRAG::loadHybridMethods() {
 }
 
 rac_rag_config_t HybridRunAnywhereRAG::convertConfig(const RAGConfig& config) const {
-  rac_rag_config_t c_config = RAC_RAG_CONFIG_DEFAULT;
+  rac_rag_config_t c_config = rac_rag_config_default();
   
   c_config.embedding_model_path = config.embeddingModelPath.c_str();
   c_config.llm_model_path = config.llmModelPath.c_str();

@@ -273,13 +273,16 @@ build_commons_ios() {
     [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
     
     # Pass backends to commons build script
-    # Convert comma-separated backends to space-separated format for build-ios.sh
+    # build-ios.sh only supports a single --backend flag (last one wins).
+    # If multiple backends are requested, pass --backend all instead.
     if [[ "$BACKENDS" != "all" ]]; then
-        # Convert "onnx" or "llamacpp,onnx" to multiple --backend flags
-        local BACKENDS_SPACE="${BACKENDS//,/ }"
-        for BACKEND in $BACKENDS_SPACE; do
-            FLAGS="$FLAGS --backend $BACKEND"
-        done
+        IFS=',' read -ra BACKEND_ARRAY <<< "$BACKENDS"
+        if [[ ${#BACKEND_ARRAY[@]} -gt 1 ]]; then
+            # Multiple backends specified — build-ios.sh can only handle one at a time
+            FLAGS="$FLAGS --backend all"
+        else
+            FLAGS="$FLAGS --backend ${BACKEND_ARRAY[0]}"
+        fi
     fi
 
     log_step "Running: build-ios.sh $FLAGS"

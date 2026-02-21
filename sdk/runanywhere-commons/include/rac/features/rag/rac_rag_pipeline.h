@@ -90,21 +90,26 @@ typedef struct rac_rag_config {
 } rac_rag_config_t;
 
 /**
- * @brief Default RAG configuration
+ * @brief Get default RAG configuration
+ *
+ * Uses an inline function instead of a designated-initializer constant
+ * for C++17 compatibility (designated initializers are C99/C++20).
  */
-static const rac_rag_config_t RAC_RAG_CONFIG_DEFAULT = {
-    .embedding_model_path = NULL,
-    .llm_model_path = NULL,
-    .embedding_dimension = 384,
-    .top_k = 3,
-    .similarity_threshold = 0.7f,
-    .max_context_tokens = 2048,
-    .chunk_size = 512,
-    .chunk_overlap = 50,
-    .prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:",
-    .embedding_config_json = NULL,
-    .llm_config_json = NULL
-};
+static inline rac_rag_config_t rac_rag_config_default(void) {
+    rac_rag_config_t cfg;
+    cfg.embedding_model_path = NULL;
+    cfg.llm_model_path = NULL;
+    cfg.embedding_dimension = 384;
+    cfg.top_k = 3;
+    cfg.similarity_threshold = 0.7f;
+    cfg.max_context_tokens = 2048;
+    cfg.chunk_size = 512;
+    cfg.chunk_overlap = 50;
+    cfg.prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
+    cfg.embedding_config_json = NULL;
+    cfg.llm_config_json = NULL;
+    return cfg;
+}
 
 // =============================================================================
 // RAG QUERY

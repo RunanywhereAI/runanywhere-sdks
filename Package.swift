@@ -43,6 +43,12 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 // Updated automatically by CI/CD during releases
 let sdkVersion = "0.19.1"
 
+// RAG binary is only available in local dev mode until the release artifact is published.
+// In remote mode, the RAG xcframework zip + checksum don't exist yet, so including the
+// binary target would block ALL SPM package resolution (not just RAG).
+// Set to true once RABackendRAG-v<version>.zip is published to GitHub releases.
+let ragRemoteBinaryAvailable = false
+
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -74,14 +80,7 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
-        // =================================================================
-        // RAG Backend - adds Retrieval-Augmented Generation
-        // =================================================================
-        .library(
-            name: "RunAnywhereRAG",
-            targets: ["RAGRuntime"]
-        ),
-    ],
+    ] + ragProducts(),
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
@@ -125,16 +124,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // C Bridge Module - RAG Backend Headers
-        // =================================================================
-        .target(
-            name: "RAGBackend",
-            dependencies: ["RABackendRAGBinary"],
-            path: "sdk/runanywhere-swift/Sources/RAGRuntime/include",
-            publicHeadersPath: "."
-        ),
-
-        // =================================================================
         // Core SDK
         // =================================================================
         .target(
@@ -149,8 +138,7 @@ let package = Package(
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
-                "RAGBackend",
-            ],
+            ] + ragCoreDependencies(),
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
             swiftSettings: [
@@ -200,9 +188,46 @@ let package = Package(
             ]
         ),
 
-        // =================================================================
+    ] + ragTargets() + binaryTargets()
+)
+
+// =============================================================================
+// RAG TARGET HELPERS
+// =============================================================================
+// RAG targets are gated because the remote binary artifact doesn't exist yet.
+// Including a binary target with a placeholder checksum blocks ALL SPM resolution.
+
+/// RAG product (library) — only included when the binary is available
+func ragProducts() -> [Product] {
+    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
+    return [
+        .library(
+            name: "RunAnywhereRAG",
+            targets: ["RAGRuntime"]
+        ),
+    ]
+}
+
+/// RAG dependency for the RunAnywhere core target
+func ragCoreDependencies() -> [Target.Dependency] {
+    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
+    return [
+        "RAGBackend",
+    ]
+}
+
+/// RAG-related targets (C bridge + Swift runtime)
+func ragTargets() -> [Target] {
+    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
+    return [
+        // C Bridge Module - RAG Backend Headers
+        .target(
+            name: "RAGBackend",
+            dependencies: ["RABackendRAGBinary"],
+            path: "sdk/runanywhere-swift/Sources/RAGRuntime/include",
+            publicHeadersPath: "."
+        ),
         // RAG Runtime Backend
-        // =================================================================
         .target(
             name: "RAGRuntime",
             dependencies: [
@@ -215,9 +240,8 @@ let package = Package(
                 .linkedLibrary("c++"),
             ]
         ),
-
-    ] + binaryTargets()
-)
+    ]
+}
 
 // =============================================================================
 // BINARY TARGET SELECTION
@@ -268,7 +292,7 @@ func binaryTargets() -> [Target] {
         // Download XCFrameworks from GitHub releases
         // All xcframeworks include iOS + macOS slices (v0.19.0+)
         // =====================================================================
-        return [
+        var targets: [Target] = [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
@@ -285,15 +309,23 @@ func binaryTargets() -> [Target] {
                 checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
             ),
             .binaryTarget(
-                name: "RABackendRAGBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendRAG-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
-            ),
-            .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
                 checksum: "e0180262bd1b10fcda95aaf9aac595af5e6819bd454312b6fc8ffc3828db239f"
             ),
         ]
+
+        // Only include RAG binary when the release artifact is available
+        if ragRemoteBinaryAvailable {
+            targets.append(
+                .binaryTarget(
+                    name: "RABackendRAGBinary",
+                    url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendRAG-v\(sdkVersion).zip",
+                    checksum: "0000000000000000000000000000000000000000000000000000000000000000" // Replace with actual checksum
+                )
+            )
+        }
+
+        return targets
     }
 }

@@ -380,7 +380,15 @@ std::vector<SearchResult> VectorStoreUSearch::search(
     size_t top_k,
     float threshold
 ) const noexcept {
-    return impl_->search(query_embedding, top_k, threshold);
+    try {
+        return impl_->search(query_embedding, top_k, threshold);
+    } catch (const std::exception& e) {
+        LOGE("search() exception: %s", e.what());
+        return {};
+    } catch (...) {
+        LOGE("search() unknown exception");
+        return {};
+    }
 }
 
 bool VectorStoreUSearch::remove_chunk(const std::string& chunk_id) {

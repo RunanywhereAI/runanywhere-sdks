@@ -39,7 +39,7 @@ std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string&
         // Check for sentence endings
         if (c == '.' || c == '!' || c == '?' || c == '\n') {
             // Look ahead for whitespace
-            if (i + 1 < text.length() && std::isspace(text[i + 1])) {
+            if (i + 1 < text.length() && std::isspace(static_cast<unsigned char>(text[i + 1]))) {
                 boundaries.push_back(i + 1);
             }
         }

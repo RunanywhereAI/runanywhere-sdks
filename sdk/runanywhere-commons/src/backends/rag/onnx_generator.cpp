@@ -689,10 +689,23 @@ public:
                 
                 // Extract logits
                 float* logits_data = nullptr;
-                cached_api->GetTensorMutableData(output_tensors[0], (void**)&logits_data);
-                
-                // Get last token logits
-                std::vector<float> last_token_logits(logits_data, logits_data + vocab_size);
+                status = cached_api->GetTensorMutableData(output_tensors[0], (void**)&logits_data);
+                if (status != nullptr || logits_data == nullptr) {
+                    if (status) {
+                        LOGE("Failed to get logits data: %s", cached_api->GetErrorMessage(status));
+                        cached_api->ReleaseStatus(status);
+                    }
+                    for (auto* tensor : output_tensors) {
+                        if (tensor) cached_api->ReleaseValue(tensor);
+                    }
+                    break;
+                }
+
+                const size_t logits_offset = (current_seq_len - 1) * vocab_size;
+                std::vector<float> last_token_logits(
+                    logits_data + logits_offset,
+                    logits_data + logits_offset + vocab_size
+                );
                 
                 // Sample next token
                 int64_t next_token = sample_token(last_token_logits, options.temperature, options.top_p);

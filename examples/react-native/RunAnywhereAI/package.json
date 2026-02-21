@@ -26,7 +26,6 @@
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
     "@runanywhere/rag": "file:../../../sdk/runanywhere-react-native/packages/rag",
-    "nlohmann-json": "^0.0.1-security",
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-fs": "^2.20.0",
