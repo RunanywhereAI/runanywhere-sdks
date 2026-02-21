@@ -145,7 +145,7 @@ struct MacSettingsView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(AppColors.textSecondary)
                 .frame(width: 32, height: 32)
-                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(AppColors.overlayThin, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -192,10 +192,10 @@ struct MacSettingsView: View {
             if !isGranted {
                 Button("Open Settings", action: action)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.12), in: Capsule())
+                    .background(AppColors.overlayMedium, in: Capsule())
                     .buttonStyle(.plain)
             }
         }

@@ -93,7 +93,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         window.minSize = NSSize(width: 640, height: 480)
         window.contentView = NSHostingView(rootView: MacHubView())
         window.titlebarAppearsTransparent = true
-        window.backgroundColor = NSColor(AppColors.backgroundPrimaryDark)
+        window.backgroundColor = NSColor(AppColors.backgroundPrimary)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         hubWindow = window

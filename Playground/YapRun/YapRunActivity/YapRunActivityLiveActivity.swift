@@ -94,7 +94,7 @@ struct DictationLiveActivityWidget: Widget {
 
     private func expandedTitle(for phase: String) -> String {
         switch phase {
-        case "ready":        return "Ready"
+        case "ready":        return "YapRun"
         case "listening":    return "Listening..."
         case "transcribing": return "Transcribing..."
         case "done":         return "Done"
@@ -135,8 +135,8 @@ private struct LockScreenView: View {
                     Text(formattedDuration)
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.white.opacity(0.6))
-                } else if state.phase == "ready", state.wordCount > 0 {
-                    Text("\(state.wordCount) words dictated")
+                } else if state.wordCount > 0 {
+                    Text("\(state.wordCount) words")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.6))
                 }
@@ -144,11 +144,22 @@ private struct LockScreenView: View {
 
             Spacer()
 
-            if state.wordCount > 0, state.phase != "listening" {
-                Text("\(state.wordCount)w")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.5))
-                    .padding(.trailing, 4)
+            HStack(spacing: 12) {
+                Link(destination: URL(string: "yaprun://kill")!) {
+                    Image(systemName: "power")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                }
+
+                Link(destination: URL(string: "yaprun://playground")!) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.12), in: Circle())
+                }
             }
         }
         .padding(16)
@@ -165,7 +176,7 @@ private struct LockScreenView: View {
 
     private var title: String {
         switch state.phase {
-        case "ready":        return "YapRun Ready"
+        case "ready":        return "YapRun"
         case "listening":    return "Listening..."
         case "transcribing": return "Transcribing..."
         case "done":         return "Text inserted"

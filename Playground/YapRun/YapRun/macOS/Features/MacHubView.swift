@@ -20,7 +20,6 @@ struct MacHubView: View {
             detailView
         }
         .frame(minWidth: 640, minHeight: 480)
-        .preferredColorScheme(.dark)
         .onAppear {
             if !hasCompletedOnboarding {
                 showOnboarding = true

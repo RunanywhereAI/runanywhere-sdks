@@ -61,6 +61,5 @@ struct AddModelURLSheet: View {
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }

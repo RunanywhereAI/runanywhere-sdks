@@ -142,10 +142,10 @@ struct MacHomeView: View {
             if let label = actionLabel, let action {
                 Button(label, action: action)
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppColors.textPrimary)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.12), in: Capsule())
+                    .background(AppColors.overlayMedium, in: Capsule())
             }
         }
         .padding(14)
@@ -179,7 +179,7 @@ struct MacHomeView: View {
                     .foregroundStyle(AppColors.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.08), in: Capsule())
+                    .background(AppColors.overlayLight, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }

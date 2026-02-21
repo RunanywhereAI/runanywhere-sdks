@@ -19,6 +19,7 @@ struct YapRunApp: App {
     #if os(iOS)
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
+    @State private var selectedTab: AppTab = .home
     #endif
 
     #if os(macOS)
@@ -56,7 +57,7 @@ struct YapRunApp: App {
                     loadingView
                 }
             }
-            .preferredColorScheme(.dark)
+            // Respects system light/dark mode
             .task {
                 await initializeSDK()
             }
@@ -75,30 +76,48 @@ struct YapRunApp: App {
 
     #if os(iOS)
     private var iOSHomeContent: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             ContentView()
                 .environmentObject(flowSession)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
+                .tag(AppTab.home)
 
             PlaygroundView()
                 .tabItem {
                     Label("Playground", systemImage: "waveform")
                 }
+                .tag(AppTab.playground)
 
             NotepadView()
                 .tabItem {
                     Label("Notepad", systemImage: "note.text")
                 }
+                .tag(AppTab.notepad)
         }
         .tint(AppColors.ctaOrange)
         .onOpenURL { url in
-            guard url.scheme == SharedConstants.urlScheme,
-                  url.host == "startFlow" else { return }
-            logger.info("Received startFlow deep link")
-            showFlowActivation = true
-            Task { await flowSession.handleStartFlow() }
+            guard url.scheme == SharedConstants.urlScheme else { return }
+            switch url.host {
+            case "startFlow":
+                logger.info("Received startFlow deep link")
+                showFlowActivation = true
+                Task { await flowSession.handleStartFlow() }
+            case "kill":
+                logger.info("Received kill deep link — ending session and terminating")
+                Task {
+                    await flowSession.endSession()
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    exit(0)
+                }
+            case "playground":
+                logger.info("Received playground deep link")
+                Task { await flowSession.endSession() }
+                selectedTab = .playground
+            default:
+                break
+            }
         }
         .fullScreenCover(isPresented: $showFlowActivation) {
             FlowActivationView(isPresented: $showFlowActivation)

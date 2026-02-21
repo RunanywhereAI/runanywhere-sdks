@@ -52,7 +52,7 @@ struct OnboardingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
-        .preferredColorScheme(.dark)
+        // Respects system light/dark mode
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             viewModel.refreshStatus()
         }
@@ -97,7 +97,7 @@ struct OnboardingView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            (isReady ? AppColors.primaryGreen : Color.white).opacity(0.08),
+            (isReady ? AppColors.primaryGreen : Color.primary).opacity(0.08),
             in: Capsule()
         )
     }
@@ -112,7 +112,7 @@ private struct PageDotIndicator: View {
         HStack(spacing: 8) {
             ForEach(OnboardingViewModel.Step.allCases, id: \.rawValue) { step in
                 Capsule()
-                    .fill(step == current ? Color.white : Color.white.opacity(0.25))
+                    .fill(step == current ? Color.primary : Color.primary.opacity(0.25))
                     .frame(width: step == current ? 24 : 8, height: 8)
                     .animation(.easeInOut(duration: 0.25), value: current)
             }

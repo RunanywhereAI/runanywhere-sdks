@@ -10,13 +10,39 @@ import SwiftUI
 import Combine
 
 // MARK: - Brand Colors (keyboard extension can't import main target)
+// All colors adapt to the system color scheme via the `scheme` environment value.
 
 private enum Brand {
-    static let accent      = Color.white
-    static let accentDark  = Color(white: 0.75)
-    static let green       = Color(.sRGB, red: 0.063, green: 0.725, blue: 0.506) // #10B981
-    static let darkSurface = Color(white: 0.13)
-    static let darkCard    = Color(white: 0.17)
+    static let green = Color(.sRGB, red: 0.063, green: 0.725, blue: 0.506) // #10B981
+
+    // Adaptive helpers — call with the current colorScheme
+    static func accent(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : .black
+    }
+    static func accentDark(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(white: 0.75) : Color(white: 0.35)
+    }
+    static func keySurface(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(white: 0.13) : Color(white: 0.95)
+    }
+    static func keyCard(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(white: 0.17) : Color(white: 0.88)
+    }
+    static func textPrimary(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : .black
+    }
+    static func textSecondary(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white.opacity(0.5) : .black.opacity(0.5)
+    }
+    static func overlayColor(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? .white : .black
+    }
+    static func dividerColor(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.1)
+    }
+    static func yapBtnBg(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(white: 0.22) : Color(white: 0.85)
+    }
 }
 
 struct KeyboardView: View {
@@ -33,6 +59,7 @@ struct KeyboardView: View {
 
     // MARK: - State
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var sessionState: String = "idle"
     @State private var audioLevel: Float = 0
     @State private var barPhase: Double = 0
@@ -59,7 +86,7 @@ struct KeyboardView: View {
         }
         .background(
             RadialGradient(
-                colors: [Brand.accent.opacity(0.025), Color.clear],
+                colors: [Brand.accent(colorScheme).opacity(0.025), Color.clear],
                 center: .center,
                 startRadius: 0,
                 endRadius: 160
@@ -88,7 +115,7 @@ struct KeyboardView: View {
     private var fullKeyboardView: some View {
         VStack(spacing: 0) {
             toolbarRow
-            Divider().overlay(Color.white.opacity(0.08))
+            Divider().overlay(Brand.dividerColor(colorScheme))
             numberRow
             specialCharsRow1
             specialCharsRow2
@@ -116,17 +143,17 @@ struct KeyboardView: View {
                         Text("Yap")
                             .font(.system(size: 15, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(Brand.textPrimary(colorScheme))
                     .padding(.horizontal, 18)
                     .padding(.vertical, 8)
-                    .background(Color(white: 0.22))
+                    .background(Brand.yapBtnBg(colorScheme))
                     .cornerRadius(8)
                 }
                 .padding(.trailing, 8)
 
             case "activating":
                 ProgressView()
-                    .tint(Brand.accent)
+                    .tint(Brand.accent(colorScheme))
                     .scaleEffect(0.85)
                     .padding(.trailing, 12)
 
@@ -134,13 +161,13 @@ struct KeyboardView: View {
                 HStack(spacing: 6) {
                     Text("Using iPhone Microphone")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Brand.textSecondary(colorScheme))
                     Button(action: onMicTap) {
                         Image(systemName: "waveform")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(Brand.accent)
+                            .foregroundColor(Brand.accent(colorScheme))
                             .padding(8)
-                            .background(Brand.accent.opacity(0.15), in: Circle())
+                            .background(Brand.accent(colorScheme).opacity(0.15), in: Circle())
                     }
                 }
                 .padding(.trailing, 8)
@@ -189,10 +216,10 @@ struct KeyboardView: View {
                 Image(systemName: "delete.left")
                     .font(.system(size: 14))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Brand.darkCard)
+                    .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
             .padding(3)
             .frame(maxWidth: .infinity, minHeight: 42)
         }
@@ -208,20 +235,20 @@ struct KeyboardView: View {
                 Image(systemName: "globe")
                     .font(.system(size: 18))
                     .frame(width: 46, height: 42)
-                    .background(Brand.darkCard)
+                    .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
             .padding(3)
 
             Button(action: onNextKeyboard) {
                 Text("ABC")
                     .font(.system(size: 14, weight: .medium))
                     .frame(width: 52, height: 42)
-                    .background(Brand.darkCard)
+                    .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
             .padding(3)
 
             Button(action: onSpace) {
@@ -233,10 +260,10 @@ struct KeyboardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     Text("YapRun")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.9))
                 }
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(Brand.darkSurface)
+                .background(Brand.keySurface(colorScheme))
                 .cornerRadius(6)
             }
             .padding(3)
@@ -245,10 +272,10 @@ struct KeyboardView: View {
                 Image(systemName: "return")
                     .font(.system(size: 16))
                     .frame(width: 52, height: 42)
-                    .background(Brand.darkCard)
+                    .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
             .padding(3)
         }
         .padding(.horizontal, 4)
@@ -265,9 +292,9 @@ struct KeyboardView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.7))
                         .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.12), in: Circle())
+                        .background(Brand.overlayColor(colorScheme).opacity(0.12), in: Circle())
                 }
                 .padding(.leading, 12)
 
@@ -280,21 +307,21 @@ struct KeyboardView: View {
             let stats = loadDictationStats()
             Text(formattedWordCount(stats.totalWords))
                 .font(.system(size: 56, weight: .bold, design: .serif))
-                .foregroundStyle(Brand.accent)
+                .foregroundStyle(Brand.accent(colorScheme))
 
             Text("words")
                 .font(.system(size: 56, weight: .bold, design: .serif))
-                .foregroundStyle(Brand.accent)
+                .foregroundStyle(Brand.accent(colorScheme))
 
             Text("you've dictated so far.")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Brand.textSecondary(colorScheme))
                 .padding(.top, 4)
 
             if stats.sessionCount > 0 {
                 Text("You've had \(stats.sessionCount) dictation session\(stats.sessionCount == 1 ? "" : "s")")
                     .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.4))
                     .padding(.top, 2)
             }
 
@@ -314,7 +341,7 @@ struct KeyboardView: View {
                     Button(action: sessionState == "done" ? {} : onCancelTap) {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(sessionState == "done" ? Color.clear : .white.opacity(0.8))
+                            .foregroundStyle(sessionState == "done" ? Color.clear : Brand.textPrimary(colorScheme).opacity(0.8))
                             .frame(width: 44, height: 44)
                     }
                     .padding(.leading, 20)
@@ -330,14 +357,14 @@ struct KeyboardView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "waveform")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Brand.accent)
+                                    .foregroundStyle(Brand.accent(colorScheme))
                                 Text("Listening")
                                     .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Brand.textPrimary(colorScheme))
                             }
                             Text("iPhone Microphone")
                                 .font(.caption)
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(Brand.textSecondary(colorScheme))
                         }
                     }
 
@@ -347,14 +374,14 @@ struct KeyboardView: View {
                         Button(action: onUndoTap) {
                             Image(systemName: "arrow.uturn.backward.circle")
                                 .font(.system(size: 22))
-                                .foregroundStyle(.white.opacity(0.5))
+                                .foregroundStyle(Brand.textSecondary(colorScheme))
                         }
                         .padding(.trailing, 20)
                     } else {
                         Button(action: onStopTap) {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Brand.accent)
+                                .foregroundStyle(Brand.accent(colorScheme))
                                 .frame(width: 44, height: 44)
                         }
                         .padding(.trailing, 20)
@@ -370,11 +397,11 @@ struct KeyboardView: View {
             if sessionState == "transcribing" {
                 VStack(spacing: 4) {
                     ProgressView()
-                        .tint(Brand.accent)
+                        .tint(Brand.accent(colorScheme))
                         .scaleEffect(0.9)
                     Text("Transcribing...")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Brand.textSecondary(colorScheme))
                 }
                 .padding(.vertical, 8)
             }
@@ -386,10 +413,10 @@ struct KeyboardView: View {
                     Image(systemName: "globe")
                         .font(.system(size: 18))
                         .frame(width: 46, height: 40)
-                        .background(Brand.darkCard)
+                        .background(Brand.keyCard(colorScheme))
                         .cornerRadius(6)
                 }
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
                 .padding(.leading, 7)
                 .padding(.bottom, 6)
                 Spacer()
@@ -436,7 +463,7 @@ struct KeyboardView: View {
             )
         default:
             return LinearGradient(
-                colors: [Brand.accent.opacity(0.95), Brand.accentDark.opacity(0.5)],
+                colors: [Brand.accent(colorScheme).opacity(0.95), Brand.accentDark(colorScheme).opacity(0.5)],
                 startPoint: .top, endPoint: .bottom
             )
         }
@@ -449,10 +476,10 @@ struct KeyboardView: View {
             Text(char)
                 .font(.system(size: 14))
                 .frame(maxWidth: .infinity, minHeight: 42)
-                .background(Brand.darkSurface)
+                .background(Brand.keySurface(colorScheme))
                 .cornerRadius(6)
         }
-        .foregroundColor(.white.opacity(0.9))
+        .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.9))
         .padding(3)
     }
 
@@ -462,7 +489,7 @@ struct KeyboardView: View {
                 .font(.system(size: 16))
                 .padding(10)
         }
-        .foregroundColor(.white.opacity(0.5))
+        .foregroundColor(Brand.textSecondary(colorScheme))
     }
 
     // MARK: - Stats Loading

@@ -46,7 +46,7 @@ struct MacOnboardingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
-        .preferredColorScheme(.dark)
+        // Respects system light/dark mode
         .onAppear {
             viewModel.refreshStatus()
         }
@@ -74,7 +74,7 @@ struct MacOnboardingView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            (isReady ? AppColors.primaryGreen : Color.white).opacity(0.08),
+            (isReady ? AppColors.primaryGreen : Color.primary).opacity(0.08),
             in: Capsule()
         )
     }
@@ -85,7 +85,7 @@ struct MacOnboardingView: View {
         HStack(spacing: 8) {
             ForEach(MacOnboardingViewModel.Step.allCases, id: \.rawValue) { step in
                 Capsule()
-                    .fill(step == viewModel.currentStep ? Color.white : Color.white.opacity(0.25))
+                    .fill(step == viewModel.currentStep ? Color.primary : Color.primary.opacity(0.25))
                     .frame(width: step == viewModel.currentStep ? 24 : 8, height: 8)
                     .animation(.easeInOut(duration: 0.25), value: viewModel.currentStep)
             }

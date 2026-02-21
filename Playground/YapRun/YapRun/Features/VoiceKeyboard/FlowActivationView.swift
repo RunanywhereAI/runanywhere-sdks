@@ -39,9 +39,9 @@ struct FlowActivationView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(AppColors.textSecondary)
                             .padding(12)
-                            .background(Color.white.opacity(0.1), in: Circle())
+                            .background(AppColors.overlayMedium, in: Circle())
                     }
                     .padding(.trailing, 20)
                     .padding(.top, 16)
@@ -59,7 +59,7 @@ struct FlowActivationView: View {
                                 .scaleEffect(1.4)
                             Text("Setting up microphone...")
                                 .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(AppColors.textSecondary)
                         }
                         .frame(height: 60)
 
@@ -70,7 +70,7 @@ struct FlowActivationView: View {
                                 .foregroundStyle(AppColors.primaryAccent)
                             Text(flowSession.lastError ?? "Could not start microphone")
                                 .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(AppColors.textSecondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
                         }
@@ -79,7 +79,7 @@ struct FlowActivationView: View {
                     case .ready:
                         Text("Swipe back to continue")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(AppColors.textPrimary)
                             .multilineTextAlignment(.center)
                             .frame(height: 60)
 
@@ -90,7 +90,7 @@ struct FlowActivationView: View {
                                 .scaleEffect(1.4)
                             Text("Setting up microphone...")
                                 .font(.subheadline)
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(AppColors.textSecondary)
                         }
                         .frame(height: 60)
                     }
@@ -109,7 +109,7 @@ struct FlowActivationView: View {
 
                 Text("We wish you didn't have to switch apps, but Apple requires this step to activate the microphone.")
                     .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(AppColors.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
                     .padding(.bottom, 48)

@@ -53,7 +53,7 @@ struct ModelDownloadStepView: View {
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(AppColors.textPrimary, in: Capsule())
+                            .background(AppColors.ctaOrange, in: Capsule())
                     }
 
                     if viewModel.downloadError != nil {

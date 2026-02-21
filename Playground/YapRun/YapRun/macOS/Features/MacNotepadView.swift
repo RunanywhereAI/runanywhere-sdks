@@ -82,7 +82,7 @@ struct MacNotepadView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(width: 32, height: 32)
-                    .background(Color.white.opacity(0.08), in: Circle())
+                    .background(AppColors.overlayLight, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(text.isEmpty)
@@ -95,7 +95,7 @@ struct MacNotepadView: View {
                     .font(.system(size: 14))
                     .foregroundStyle(AppColors.textSecondary)
                     .frame(width: 32, height: 32)
-                    .background(Color.white.opacity(0.08), in: Circle())
+                    .background(AppColors.overlayLight, in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(text.isEmpty)

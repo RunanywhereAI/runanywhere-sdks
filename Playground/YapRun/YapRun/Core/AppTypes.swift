@@ -62,6 +62,14 @@ enum MicPermissionState: String {
     }
 }
 
+// MARK: - App Tab (iOS tab bar)
+
+enum AppTab: String {
+    case home
+    case playground
+    case notepad
+}
+
 // MARK: - Hub Section (macOS sidebar)
 
 enum HubSection: String, CaseIterable, Identifiable {

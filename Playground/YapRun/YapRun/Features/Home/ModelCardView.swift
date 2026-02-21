@@ -85,10 +85,10 @@ struct ModelCardView: View {
                 Button(action: onLoad) {
                     Text("Load")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppColors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.white.opacity(0.12), in: Capsule())
+                        .background(AppColors.overlayMedium, in: Capsule())
                 }
 
                 Button(action: onDelete) {

@@ -76,7 +76,7 @@ struct AccessibilityStepView: View {
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(AppColors.textPrimary, in: Capsule())
+                        .background(AppColors.ctaOrange, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }

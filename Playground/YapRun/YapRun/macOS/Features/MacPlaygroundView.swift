@@ -95,13 +95,13 @@ struct MacPlaygroundView: View {
                     ZStack {
                         Circle()
                             .stroke(
-                                viewModel.isRecording ? Color.red.opacity(0.3) : Color.white.opacity(0.15),
+                                viewModel.isRecording ? Color.red.opacity(0.3) : Color.primary.opacity(0.15),
                                 lineWidth: 3
                             )
                             .frame(width: 100, height: 100)
 
                         Circle()
-                            .fill(viewModel.isRecording ? Color.red : Color.white.opacity(0.08))
+                            .fill(viewModel.isRecording ? Color.red : Color.primary.opacity(0.08))
                             .frame(width: 88, height: 88)
 
                         Image(systemName: viewModel.isRecording ? "stop.fill" : "mic.fill")
