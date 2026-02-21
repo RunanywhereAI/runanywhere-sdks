@@ -20,16 +20,19 @@
  *   // result.audioData is Float32Array of PCM samples
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HTTPService } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
 export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
-// @ts-ignore – sherpa-onnx-tts.js has no .d.ts
-import { initSherpaOnnxOfflineTtsConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-tts.js';
+import { loadTTSHelpers } from '../Foundation/SherpaHelperLoader';
+import type { SherpaConfigHandle } from '../Foundation/SherpaHelperLoader';
 
 const logger = new SDKLogger('TTS');
+
+/** Matches RAC_FRAMEWORK_ONNX in rac_model_types.h */
+const RAC_FRAMEWORK_ONNX = 0;
 
 // ---------------------------------------------------------------------------
 // Internal Helpers
@@ -94,7 +97,9 @@ class TTSImpl {
 
     logger.debug(`Building TTS config struct... (_CopyHeap available: ${typeof m._CopyHeap})`);
 
-    let configStruct: ReturnType<typeof initSherpaOnnxOfflineTtsConfig>;
+    const { initSherpaOnnxOfflineTtsConfig, freeConfig } = await loadTTSHelpers();
+
+    let configStruct: SherpaConfigHandle;
     try {
       configStruct = initSherpaOnnxOfflineTtsConfig(configObj, m);
     } catch (initErr) {
@@ -120,14 +125,7 @@ class TTSImpl {
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
         modelId: config.voiceId, component: 'tts', loadTimeMs,
       });
-      HTTPService.shared.postTelemetryEvent({
-        event_type: 'tts.voice.load.completed',
-        modality: 'tts',
-        model_id: config.voiceId,
-        framework: 'onnx',
-        processing_time_ms: loadTimeMs,
-        success: true,
-      });
+      AnalyticsEmitter.emitTTSVoiceLoadCompleted(config.voiceId, config.voiceId, loadTimeMs, RAC_FRAMEWORK_ONNX);
     } catch (error) {
       this.cleanup();
       if (error instanceof Error) throw error;
@@ -267,19 +265,12 @@ class TTSImpl {
         sampleRate,
         textLength: text.length,
       });
-      HTTPService.shared.postTelemetryEvent({
-        event_type: 'tts.synthesis.completed',
-        modality: 'tts',
-        model_id: this._currentVoiceId,
-        framework: 'onnx',
-        processing_time_ms: processingTimeMs,
-        success: true,
-        character_count: text.length,
-        output_duration_ms: durationMs,
-        characters_per_second: processingTimeMs > 0 ? Math.round(text.length / processingTimeMs * 1000) : 0,
-        audio_size_bytes: numSamples * 4,
-        sample_rate: sampleRate,
-      });
+      const charsPerSec = processingTimeMs > 0 ? Math.round(text.length / processingTimeMs * 1000) : 0;
+      AnalyticsEmitter.emitTTSSynthesisCompleted(
+        crypto.randomUUID(), this._currentVoiceId, text.length,
+        durationMs, numSamples * 4, processingTimeMs,
+        charsPerSec, sampleRate, RAC_FRAMEWORK_ONNX,
+      );
 
       logger.debug(`TTS generated ${durationMs}ms audio in ${processingTimeMs}ms`);
       return result;

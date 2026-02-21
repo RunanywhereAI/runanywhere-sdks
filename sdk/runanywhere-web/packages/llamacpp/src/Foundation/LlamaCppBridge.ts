@@ -127,6 +127,29 @@ export interface LlamaCppModule {
   _rac_analytics_events_set_callback?: (callbackPtr: number, userData: number) => number;
   _rac_analytics_events_has_callback?: () => number;
 
+  // Platform Emit Helpers (STT/TTS/VAD/Download — called from TypeScript via ccall)
+  _rac_analytics_emit_stt_model_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_stt_model_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_stt_transcription_completed?: (
+    transcriptionIdPtr: number, modelIdPtr: number, textPtr: number, confidence: number,
+    durationMs: number, audioLengthMs: number, audioSizeBytes: number, wordCount: number,
+    realTimeFactor: number, languagePtr: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_stt_transcription_failed?: (transcriptionIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_voice_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_tts_voice_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_synthesis_completed?: (
+    synthesisIdPtr: number, modelIdPtr: number, characterCount: number,
+    audioDurationMs: number, audioSizeBytes: number, processingDurationMs: number,
+    charactersPerSecond: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_tts_synthesis_failed?: (synthesisIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_vad_speech_started?: () => void;
+  _rac_analytics_emit_vad_speech_ended?: (speechDurationMs: number, energyLevel: number) => void;
+  _rac_analytics_emit_model_download_started?: (modelIdPtr: number) => void;
+  _rac_analytics_emit_model_download_completed?: (modelIdPtr: number, fileSizeBytes: number, durationMs: number) => void;
+  _rac_analytics_emit_model_download_failed?: (modelIdPtr: number, errorMsgPtr: number) => void;
+
   // Dev Config (WASM wrappers)
   _rac_wasm_dev_config_is_available?: () => number;
   _rac_wasm_dev_config_get_supabase_url?: () => number;
@@ -219,6 +242,12 @@ export class LlamaCppBridge {
         : (this.wasmUrl ?? new URL('../../wasm/racommons-llamacpp.js', import.meta.url).href);
 
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
+
+      // Persist the resolved URL so VLMWorkerBridge (and others) can read it
+      if (useWebGPU) {
+        this.webgpuWasmUrl = moduleUrl;
+      }
+      this.wasmUrl = moduleUrl;
 
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);

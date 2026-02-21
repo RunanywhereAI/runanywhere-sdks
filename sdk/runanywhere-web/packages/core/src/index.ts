@@ -86,3 +86,5 @@ export type { InferredModelMeta } from './Infrastructure/ModelFileInference';
 // Services
 export { HTTPService } from './services/HTTPService';
 export type { HTTPServiceConfig, DevModeConfig } from './services/HTTPService';
+export { AnalyticsEmitter } from './services/AnalyticsEmitter';
+export type { AnalyticsEmitterBackend } from './services/AnalyticsEmitter';

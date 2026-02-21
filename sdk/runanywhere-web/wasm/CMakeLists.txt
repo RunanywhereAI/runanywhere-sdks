@@ -543,6 +543,21 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_analytics_events_set_callback"
     "_rac_analytics_events_has_callback"
 
+    # Platform Emit Helpers (called from TypeScript via ccall for STT/TTS/VAD/download events)
+    "_rac_analytics_emit_stt_model_load_completed"
+    "_rac_analytics_emit_stt_model_load_failed"
+    "_rac_analytics_emit_stt_transcription_completed"
+    "_rac_analytics_emit_stt_transcription_failed"
+    "_rac_analytics_emit_tts_voice_load_completed"
+    "_rac_analytics_emit_tts_voice_load_failed"
+    "_rac_analytics_emit_tts_synthesis_completed"
+    "_rac_analytics_emit_tts_synthesis_failed"
+    "_rac_analytics_emit_vad_speech_started"
+    "_rac_analytics_emit_vad_speech_ended"
+    "_rac_analytics_emit_model_download_started"
+    "_rac_analytics_emit_model_download_completed"
+    "_rac_analytics_emit_model_download_failed"
+
     # WASM helper functions (sizeof, ping, version)
     "_rac_wasm_ping"
     "_rac_wasm_get_version_major"

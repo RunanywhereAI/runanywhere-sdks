@@ -196,16 +196,16 @@ export class AnalyticsEventsBridge {
     if (this._telemetryCallback) {
       try {
         this._telemetryCallback(eventType, dataPtr);
-      } catch (err) {
-        logger.error(`TelemetryService callback error: ${err instanceof Error ? err.message : String(err)}`);
+      } catch {
+        // Silent — telemetry must never crash the app
       }
     }
 
     // Emit to public TypeScript EventBus
     try {
       this.emitToEventBus(eventType, dataPtr);
-    } catch (err) {
-      logger.error(`EventBus emit error for type ${eventType}: ${err instanceof Error ? err.message : String(err)}`);
+    } catch {
+      // Silent — analytics events must never crash the app
     }
   }
 

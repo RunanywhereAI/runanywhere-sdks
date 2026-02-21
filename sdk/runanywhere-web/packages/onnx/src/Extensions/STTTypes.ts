@@ -53,6 +53,7 @@ export interface STTTranscriptionResult {
   detectedLanguage?: string;
   processingTimeMs: number;
   words?: STTWord[];
+  [key: string]: unknown;
 }
 
 export interface STTWord {
