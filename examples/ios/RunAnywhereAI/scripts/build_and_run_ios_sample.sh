@@ -197,7 +197,8 @@ build_app() {
     local DESTINATION
     case "$TARGET" in
         simulator)
-            DESTINATION="platform=iOS Simulator,name=${DEVICE_NAME:-iPhone 16}"
+            # Explicit OS avoids "Unable to find device matching OS:latest" when multiple simulators share the same name
+            DESTINATION="platform=iOS Simulator,name=${DEVICE_NAME:-iPhone 16},OS=18.5"
             ;;
         mac)
             DESTINATION="platform=macOS"
@@ -249,8 +250,18 @@ deploy_and_run() {
 
     case "$TARGET" in
         simulator)
-            local SIM_ID=$(xcrun simctl list devices | grep "${DEVICE_NAME:-iPhone}" | grep -v "unavailable" | head -1 | sed 's/.*(\([^)]*\)).*/\1/')
+            # Extract simulator UUID (first parenthesized group is device id; second is state e.g. Shutdown/Booted)
+            local SIM_ID=$(xcrun simctl list devices | grep "${DEVICE_NAME:-iPhone}" | grep -v "unavailable" | head -1 | sed -n 's/.*(\([A-F0-9-]\{36\}\)).*/\1/p')
+            [[ -z "$SIM_ID" ]] && { log_error "No simulator found for ${DEVICE_NAME:-iPhone}"; exit 1; }
             xcrun simctl boot "$SIM_ID" 2>/dev/null || true
+            # Wait for simulator to be booted before install (boot is async)
+            local retries=30
+            while [[ $retries -gt 0 ]]; do
+                if xcrun simctl list devices | grep -q "$SIM_ID.*Booted"; then break; fi
+                sleep 1
+                ((retries--))
+            done
+            [[ $retries -eq 0 ]] && log_warn "Simulator may still be booting"
             xcrun simctl install "$SIM_ID" "$APP_PATH"
             xcrun simctl launch "$SIM_ID" "com.runanywhere.RunAnywhere"
             open -a Simulator

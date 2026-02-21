@@ -62,12 +62,34 @@ fi
 
 TEMP_DIR=$(mktemp -d)
 
+# Minimum OS version for embedded frameworks (required by App Store; empty = validation failure)
+MIN_OS_VERSION="17.0"
+
+# Patch framework Info.plist: MinimumOSVersion + CFBundleVersion (App Store validation)
+patch_ios_framework_plist() {
+    local fw_plist="$1"
+    if [[ ! -f "$fw_plist" ]]; then return 0; fi
+    local current
+    current=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$fw_plist" 2>/dev/null || echo "")
+    if [[ "$current" != "$MIN_OS_VERSION" ]]; then
+        if [[ -n "$current" ]]; then
+            /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $MIN_OS_VERSION" "$fw_plist" 2>/dev/null || true
+        else
+            /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $MIN_OS_VERSION" "$fw_plist" 2>/dev/null || true
+        fi
+    fi
+    current=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$fw_plist" 2>/dev/null || echo "")
+    [[ -z "$current" ]] && /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1" "$fw_plist" 2>/dev/null || true
+    current=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$fw_plist" 2>/dev/null || echo "")
+    [[ -z "$current" ]] && /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.0.0" "$fw_plist" 2>/dev/null || true
+    log_info "Patched Info.plist: $fw_plist"
+}
+
 # ============================================================================
-# Step 1: Extract iOS frameworks from existing xcframework
+# Step 1: Extract iOS frameworks from existing xcframework and patch plists
 # ============================================================================
 log_step "Extracting iOS frameworks from existing xcframework..."
 
-# Copy iOS device framework
 IOS_DEVICE_DIR=""
 IOS_SIM_DIR=""
 for dir in "${IOS_ONNX}"/*/; do
@@ -81,6 +103,19 @@ done
 
 if [[ -z "$IOS_DEVICE_DIR" ]]; then
     log_error "Could not find ios-arm64 slice in ${IOS_ONNX}"
+fi
+
+# Copy iOS slices to temp dir and patch Info.plist (App Store requires MinimumOSVersion)
+IOS_TEMP_DEVICE="${TEMP_DIR}/ios-arm64"
+IOS_TEMP_SIM="${TEMP_DIR}/ios-simulator"
+mkdir -p "${IOS_TEMP_DEVICE}" "${IOS_TEMP_SIM}"
+if [[ -d "${IOS_DEVICE_DIR}/onnxruntime.framework" ]]; then
+    cp -R "${IOS_DEVICE_DIR}/onnxruntime.framework" "${IOS_TEMP_DEVICE}/"
+    patch_ios_framework_plist "${IOS_TEMP_DEVICE}/onnxruntime.framework/Info.plist"
+fi
+if [[ -n "$IOS_SIM_DIR" ]] && [[ -d "${IOS_SIM_DIR}/onnxruntime.framework" ]]; then
+    cp -R "${IOS_SIM_DIR}/onnxruntime.framework" "${IOS_TEMP_SIM}/"
+    patch_ios_framework_plist "${IOS_TEMP_SIM}/onnxruntime.framework/Info.plist"
 fi
 
 # ============================================================================
@@ -129,7 +164,7 @@ framework module onnxruntime {
 }
 EOF
 
-# Info.plist in Resources
+# Info.plist in Resources (CFBundleVersion required by App Store)
 cat > "${MACOS_FW}/Versions/A/Resources/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -138,6 +173,8 @@ cat > "${MACOS_FW}/Versions/A/Resources/Info.plist" << 'EOF'
     <key>CFBundleExecutable</key><string>onnxruntime</string>
     <key>CFBundleIdentifier</key><string>ai.onnxruntime</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>1.0.0</string>
+    <key>CFBundleVersion</key><string>1</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict>
 </plist>
@@ -166,10 +203,11 @@ mkdir -p "${OUTPUT_DIR}"
 # Build the xcframework command args
 XCFW_ARGS=()
 
-# Add iOS device framework (from existing xcframework)
+# Add iOS device framework (use patched copy so MinimumOSVersion is set)
 if [[ -n "$IOS_DEVICE_DIR" ]]; then
-    # Check if it's a framework or static lib
-    if [[ -d "${IOS_DEVICE_DIR}/onnxruntime.framework" ]]; then
+    if [[ -d "${IOS_TEMP_DEVICE}/onnxruntime.framework" ]]; then
+        XCFW_ARGS+=(-framework "${IOS_TEMP_DEVICE}/onnxruntime.framework")
+    elif [[ -d "${IOS_DEVICE_DIR}/onnxruntime.framework" ]]; then
         XCFW_ARGS+=(-framework "${IOS_DEVICE_DIR}/onnxruntime.framework")
     elif [[ -f "${IOS_DEVICE_DIR}/libonnxruntime.a" ]]; then
         XCFW_ARGS+=(-library "${IOS_DEVICE_DIR}/libonnxruntime.a")
@@ -179,9 +217,11 @@ if [[ -n "$IOS_DEVICE_DIR" ]]; then
     fi
 fi
 
-# Add iOS simulator framework
+# Add iOS simulator framework (use patched copy when available)
 if [[ -n "$IOS_SIM_DIR" ]]; then
-    if [[ -d "${IOS_SIM_DIR}/onnxruntime.framework" ]]; then
+    if [[ -d "${IOS_TEMP_SIM}/onnxruntime.framework" ]]; then
+        XCFW_ARGS+=(-framework "${IOS_TEMP_SIM}/onnxruntime.framework")
+    elif [[ -d "${IOS_SIM_DIR}/onnxruntime.framework" ]]; then
         XCFW_ARGS+=(-framework "${IOS_SIM_DIR}/onnxruntime.framework")
     elif [[ -f "${IOS_SIM_DIR}/libonnxruntime.a" ]]; then
         XCFW_ARGS+=(-library "${IOS_SIM_DIR}/libonnxruntime.a")

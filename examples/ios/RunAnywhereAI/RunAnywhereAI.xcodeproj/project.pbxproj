@@ -127,6 +127,7 @@
 				5480A1EC2E2F250200337F2F /* Sources */,
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
+				54A1B2C32E2F250400337F2F /* Patch Framework MinimumOSVersion */,
 			);
 			buildRules = (
 			);
@@ -305,6 +306,25 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		54A1B2C32E2F250400337F2F /* Patch Framework MinimumOSVersion */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Patch Framework MinimumOSVersion";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# App Store: MinimumOSVersion + CFBundleVersion (and CFBundleShortVersionString) in embedded frameworks\nMIN_OS=\"17.0\"\nBUNDLE_VERSION=\"1\"\nBUNDLE_SHORT=\"1.0.0\"\nFRAMEWORKS_DIR=\"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\"\nif [ -d \"$FRAMEWORKS_DIR\" ]; then\n  for fw in \"$FRAMEWORKS_DIR\"/*.framework; do\n    [ -d \"$fw\" ] || continue\n    plist=\"$fw/Info.plist\"\n    if [ ! -f \"$plist\" ]; then continue; fi\n    current_os=$(/usr/libexec/PlistBuddy -c \"Print :MinimumOSVersion\" \"$plist\" 2>/dev/null || echo \"\")\n    if [ \"$current_os\" != \"$MIN_OS\" ]; then\n      if [ -n \"$current_os\" ]; then\n        /usr/libexec/PlistBuddy -c \"Set :MinimumOSVersion $MIN_OS\" \"$plist\" 2>/dev/null || true\n      else\n        /usr/libexec/PlistBuddy -c \"Add :MinimumOSVersion string $MIN_OS\" \"$plist\" 2>/dev/null || true\n      fi\n    fi\n    current_cfv=$(/usr/libexec/PlistBuddy -c \"Print :CFBundleVersion\" \"$plist\" 2>/dev/null || echo \"\")\n    if [ -z \"$current_cfv\" ]; then\n      /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $BUNDLE_VERSION\" \"$plist\" 2>/dev/null || true\n    fi\n    current_cfs=$(/usr/libexec/PlistBuddy -c \"Print :CFBundleShortVersionString\" \"$plist\" 2>/dev/null || echo \"\")\n    if [ -z \"$current_cfs\" ]; then\n      /usr/libexec/PlistBuddy -c \"Add :CFBundleShortVersionString string $BUNDLE_SHORT\" \"$plist\" 2>/dev/null || true\n    fi\n  done\nfi\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -470,7 +490,7 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -492,7 +512,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MARKETING_VERSION = 0.17.2;
+				MARKETING_VERSION = 0.17.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -513,7 +533,7 @@
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -535,7 +555,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
-				MARKETING_VERSION = 0.17.2;
+				MARKETING_VERSION = 0.17.7;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

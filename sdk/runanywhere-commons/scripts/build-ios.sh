@@ -410,6 +410,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>
@@ -586,6 +587,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>

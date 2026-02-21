@@ -39,7 +39,11 @@ echo "========================================"
 echo "Target MinimumOSVersion: $MIN_OS_VERSION"
 echo ""
 
-# Function to patch MinimumOSVersion in a plist
+# App Store also requires CFBundleVersion (and CFBundleShortVersionString) in framework Info.plist
+BUNDLE_VERSION="1"
+BUNDLE_SHORT="1.0.0"
+
+# Function to patch MinimumOSVersion + CFBundleVersion in a plist
 patch_plist() {
     local plist_path="$1"
 
@@ -47,31 +51,31 @@ patch_plist() {
         return 1
     fi
 
-    # Check current MinimumOSVersion value
+    # MinimumOSVersion
     local current_version
     current_version=$(/usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$plist_path" 2>/dev/null || echo "")
-
     if [ "$current_version" = "$MIN_OS_VERSION" ]; then
-        echo -e "${GREEN}[OK]${NC} Already set to $MIN_OS_VERSION: $plist_path"
-        return 0
+        : # already set
     elif [ -n "$current_version" ]; then
-        # Update existing value
-        /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $MIN_OS_VERSION" "$plist_path" 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo -e "${YELLOW}[UPDATED]${NC} $current_version -> $MIN_OS_VERSION: $plist_path"
-        else
-            echo -e "${RED}[ERROR]${NC} Failed to update: $plist_path"
-            return 1
-        fi
+        /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion $MIN_OS_VERSION" "$plist_path" 2>/dev/null && \
+            echo -e "${YELLOW}[UPDATED]${NC} MinimumOSVersion $current_version -> $MIN_OS_VERSION: $plist_path"
     else
-        # Add missing key
-        /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $MIN_OS_VERSION" "$plist_path" 2>/dev/null
-        if [ $? -eq 0 ]; then
+        /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string $MIN_OS_VERSION" "$plist_path" 2>/dev/null && \
             echo -e "${YELLOW}[ADDED]${NC} MinimumOSVersion=$MIN_OS_VERSION: $plist_path"
-        else
-            echo -e "${RED}[ERROR]${NC} Failed to add: $plist_path"
-            return 1
-        fi
+    fi
+
+    # CFBundleVersion (required by App Store)
+    current_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist_path" 2>/dev/null || echo "")
+    if [ -z "$current_version" ]; then
+        /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $BUNDLE_VERSION" "$plist_path" 2>/dev/null && \
+            echo -e "${YELLOW}[ADDED]${NC} CFBundleVersion=$BUNDLE_VERSION: $plist_path"
+    fi
+
+    # CFBundleShortVersionString (often required with CFBundleVersion)
+    current_version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$plist_path" 2>/dev/null || echo "")
+    if [ -z "$current_version" ]; then
+        /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $BUNDLE_SHORT" "$plist_path" 2>/dev/null && \
+            echo -e "${YELLOW}[ADDED]${NC} CFBundleShortVersionString=$BUNDLE_SHORT: $plist_path"
     fi
     return 0
 }
