@@ -820,6 +820,121 @@ object CppBridgeLLM {
         }
     }
 
+    // ========================================================================
+    // LORA ADAPTER MANAGEMENT
+    // ========================================================================
+
+    /**
+     * Load and apply a LoRA adapter.
+     *
+     * The adapter is loaded against the current model and applied to the context.
+     * Context is recreated internally. Only supported with LlamaCPP backend.
+     *
+     * @param adapterPath Path to the LoRA adapter GGUF file
+     * @param scale Adapter scale factor (0.0 to 1.0+, default 1.0)
+     * @return 0 on success, error code on failure
+     */
+    fun loadLoraAdapter(adapterPath: String, scale: Float = 1.0f): Int {
+        synchronized(lock) {
+            if (handle == 0L || state != LLMState.READY) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Cannot load LoRA adapter: model not ready (state=${LLMState.getName(state)})",
+                )
+                return -1
+            }
+
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.INFO,
+                TAG,
+                "Loading LoRA adapter: $adapterPath (scale=$scale)",
+            )
+
+            val result = RunAnywhereBridge.racLlmComponentLoadLora(handle, adapterPath, scale)
+            if (result != 0) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.ERROR,
+                    TAG,
+                    "Failed to load LoRA adapter: $adapterPath (error=$result)",
+                )
+            } else {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "LoRA adapter loaded: $adapterPath",
+                )
+            }
+
+            return result
+        }
+    }
+
+    /**
+     * Remove a specific LoRA adapter by path.
+     *
+     * @param adapterPath Path used when loading the adapter
+     * @return 0 on success, error code on failure
+     */
+    fun removeLoraAdapter(adapterPath: String): Int {
+        synchronized(lock) {
+            if (handle == 0L || state != LLMState.READY) {
+                return -1
+            }
+
+            val result = RunAnywhereBridge.racLlmComponentRemoveLora(handle, adapterPath)
+            if (result == 0) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "LoRA adapter removed: $adapterPath",
+                )
+            }
+            return result
+        }
+    }
+
+    /**
+     * Remove all LoRA adapters.
+     *
+     * @return 0 on success, error code on failure
+     */
+    fun clearLoraAdapters(): Int {
+        synchronized(lock) {
+            if (handle == 0L) {
+                return -1
+            }
+
+            val result = RunAnywhereBridge.racLlmComponentClearLora(handle)
+            if (result == 0) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.INFO,
+                    TAG,
+                    "All LoRA adapters cleared",
+                )
+            }
+            return result
+        }
+    }
+
+    /**
+     * Get info about loaded LoRA adapters as JSON.
+     *
+     * @return JSON array string, or null on failure
+     */
+    fun getLoraInfo(): String? {
+        synchronized(lock) {
+            if (handle == 0L) {
+                return null
+            }
+            return RunAnywhereBridge.racLlmComponentGetLoraInfo(handle)
+        }
+    }
+
+    // ========================================================================
+    // MODEL UNLOADING
+    // ========================================================================
+
     /**
      * Unload the current model.
      */
