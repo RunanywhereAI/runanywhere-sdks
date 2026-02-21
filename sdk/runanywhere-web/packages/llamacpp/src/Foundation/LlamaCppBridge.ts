@@ -17,9 +17,12 @@
  * package (@runanywhere/web) is pure TypeScript.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere } from '@runanywhere/web';
 import type { AccelerationMode } from '@runanywhere/web';
+import { getDeviceInfo } from '@runanywhere/web';
 import { PlatformAdapter } from './PlatformAdapter';
+import { AnalyticsEventsBridge } from './AnalyticsEventsBridge';
+import { TelemetryService } from './TelemetryService';
 
 const logger = new SDKLogger('LlamaCppBridge');
 
@@ -111,10 +114,57 @@ export interface LlamaCppModule {
   // Tool Calling
   _rac_tool_call_parse?: (textPtr: number, outResultPtr: number) => number;
 
+  // Telemetry Manager
+  _rac_telemetry_manager_create?: (env: number, deviceIdPtr: number, platformPtr: number, sdkVersionPtr: number) => number;
+  _rac_telemetry_manager_destroy?: (handle: number) => void;
+  _rac_telemetry_manager_set_device_info?: (handle: number, modelPtr: number, osVersionPtr: number) => void;
+  _rac_telemetry_manager_set_http_callback?: (handle: number, callbackPtr: number, userData: number) => void;
+  _rac_telemetry_manager_track_analytics?: (handle: number, eventType: number, dataPtr: number) => number;
+  _rac_telemetry_manager_flush?: (handle: number) => number;
+  _rac_telemetry_manager_http_complete?: (handle: number, success: number, responsePtr: number, errorPtr: number) => void;
+
+  // Analytics Events
+  _rac_analytics_events_set_callback?: (callbackPtr: number, userData: number) => number;
+  _rac_analytics_events_has_callback?: () => number;
+
+  // Platform Emit Helpers (STT/TTS/VAD/Download — called from TypeScript via ccall)
+  _rac_analytics_emit_stt_model_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_stt_model_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_stt_transcription_completed?: (
+    transcriptionIdPtr: number, modelIdPtr: number, textPtr: number, confidence: number,
+    durationMs: number, audioLengthMs: number, audioSizeBytes: number, wordCount: number,
+    realTimeFactor: number, languagePtr: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_stt_transcription_failed?: (transcriptionIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_voice_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_tts_voice_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_synthesis_completed?: (
+    synthesisIdPtr: number, modelIdPtr: number, characterCount: number,
+    audioDurationMs: number, audioSizeBytes: number, processingDurationMs: number,
+    charactersPerSecond: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_tts_synthesis_failed?: (synthesisIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_vad_speech_started?: () => void;
+  _rac_analytics_emit_vad_speech_ended?: (speechDurationMs: number, energyLevel: number) => void;
+  _rac_analytics_emit_model_download_started?: (modelIdPtr: number) => void;
+  _rac_analytics_emit_model_download_completed?: (modelIdPtr: number, fileSizeBytes: number, durationMs: number) => void;
+  _rac_analytics_emit_model_download_failed?: (modelIdPtr: number, errorMsgPtr: number) => void;
+
+  // Dev Config (WASM wrappers)
+  _rac_wasm_dev_config_is_available?: () => number;
+  _rac_wasm_dev_config_get_supabase_url?: () => number;
+  _rac_wasm_dev_config_get_supabase_key?: () => number;
+  _rac_wasm_dev_config_get_build_token?: () => number;
+
   // Emscripten FS helpers
   FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
   FS_createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void;
   FS_unlink?: (path: string) => void;
+  FS_mkdir?: (path: string) => void;
+  FS_rmdir?: (path: string) => void;
+  FS_mount?: (type: any, opts: any, mountpoint: string) => void;
+  FS_unmount?: (mountpoint: string) => void;
+  WORKERFS?: any;
 
   // Generic index access for dynamic function lookups
   [key: string]: unknown;
@@ -126,11 +176,14 @@ export interface LlamaCppModule {
 
 export class LlamaCppBridge {
   private static _instance: LlamaCppBridge | null = null;
+  private static _nextMountId = 0;
   private _module: LlamaCppModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
   private _accelerationMode: AccelerationMode = 'cpu';
   private _platformAdapter: PlatformAdapter | null = null;
+  private _analyticsEventsBridge: AnalyticsEventsBridge | null = null;
+  private _telemetryService: TelemetryService | null = null;
 
   /** Override the default URL to the racommons-llamacpp.js glue file. */
   wasmUrl: string | null = null;
@@ -196,6 +249,12 @@ export class LlamaCppBridge {
 
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
 
+      // Persist the resolved URL so VLMWorkerBridge (and others) can read it
+      if (useWebGPU) {
+        this.webgpuWasmUrl = moduleUrl;
+      }
+      this.wasmUrl = moduleUrl;
+
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
@@ -223,6 +282,21 @@ export class LlamaCppBridge {
 
       // Register the llama.cpp backend
       await this.registerBackend();
+
+      // Initialize analytics events bridge (subscribe to C++ events → TypeScript EventBus)
+      this._analyticsEventsBridge = new AnalyticsEventsBridge();
+
+      // Initialize telemetry service (C++ telemetry manager → browser fetch)
+      this._telemetryService = TelemetryService.shared;
+      const deviceInfo = await getDeviceInfo();
+      const environment = RunAnywhere.environment ?? SDKEnvironment.Production;
+      await this._telemetryService.initialize(this._module!, environment, deviceInfo);
+
+      // Wire analytics bridge: forwards C++ events to EventBus + TelemetryService
+      this._analyticsEventsBridge.register(
+        this._module!,
+        (eventType, dataPtr) => this._telemetryService?.trackAnalyticsEvent(eventType, dataPtr),
+      );
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
@@ -370,6 +444,71 @@ export class LlamaCppBridge {
     try { this.module.FS_unlink?.(path); } catch { /* doesn't exist */ }
   }
 
+  /**
+   * Mount a File object into the WASM filesystem (if WORKERFS is available).
+   * Returns the path to the mounted file, or null if mounting failed/unsupported.
+   *
+   * @param file - The browser File object
+   * @returns The absolute path to the file in WASM FS (e.g. /mnt-123/model.gguf) or null
+   */
+  mountFile(file: File): string | null {
+    const m = this.module;
+    if (!m.FS_mount || !m.WORKERFS) return null;
+
+    let createdMountDir = false;
+    let mountDir = '';
+
+    try {
+      // Create a unique mount point directory
+      const mountId = LlamaCppBridge._nextMountId++;
+      mountDir = `/mnt-${mountId}`;
+
+      if (m.FS_mkdir) {
+        m.FS_mkdir(mountDir);
+        createdMountDir = true;
+      }
+
+      // Mount the file. WORKERFS expects { files: [File, ...] } or { files: [{name, data: File}] }
+      // We assume the standard Emscripten WORKERFS behavior where `files` array mounts them by name.
+      m.FS_mount(m.WORKERFS, { files: [file] }, mountDir);
+
+      logger.debug(`Mounted ${file.name} to ${mountDir}`);
+      return `${mountDir}/${file.name}`;
+    } catch (err) {
+      if (createdMountDir && m.FS_rmdir) {
+        try { m.FS_rmdir(mountDir); } catch { logger.warning(`Failed to clean up mount dir ${mountDir}`); }
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`Failed to mount file (WORKERFS): ${msg}`);
+      return null;
+    }
+  }
+
+  /**
+   * Unmount a directory (and remove it).
+   * @param mountDir - The directory path (e.g. /mnt-123)
+   */
+  unmount(mountPath: string): void {
+    if (!mountPath.startsWith('/mnt-')) return; // Safety check
+
+    // Strip filename if present
+    const parts = mountPath.split('/');
+    // formatted like ["", "mnt-123", "filename"]
+    let dir = mountPath;
+    if (parts.length >= 3) {
+      dir = `/${parts[1]}`;
+    }
+
+    try {
+      const m = this.module;
+      if (m.FS_unmount) m.FS_unmount(dir);
+      if (m.FS_rmdir) m.FS_rmdir(dir);
+      logger.debug(`Unmounted ${dir}`);
+    } catch {
+      /* ignore cleanup errors */
+    }
+  }
+
   // -----------------------------------------------------------------------
   // WebGPU Detection
   // -----------------------------------------------------------------------
@@ -487,13 +626,36 @@ export class LlamaCppBridge {
   // -----------------------------------------------------------------------
 
   shutdown(): void {
+    // Flush and teardown telemetry before shutting down WASM
+    if (this._analyticsEventsBridge) {
+      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
+      this._analyticsEventsBridge = null;
+    }
+
+    if (this._telemetryService) {
+      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
+      this._telemetryService = null;
+    }
+
     if (this._module && this._loaded) {
-      try { this._module._rac_shutdown(); } catch { /* ignore */ }
+      try {
+        this._module._rac_shutdown();
+      } catch (err) {
+        logger.debug(
+          `LlamaCpp module shutdown failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     // Clean up platform adapter
     if (this._platformAdapter) {
-      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      try {
+        this._platformAdapter.cleanup();
+      } catch (err) {
+        logger.debug(
+          `Platform adapter cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       this._platformAdapter = null;
     }
 

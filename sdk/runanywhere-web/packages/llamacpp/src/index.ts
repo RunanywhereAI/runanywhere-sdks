@@ -45,6 +45,9 @@ export type { EmbeddingVector, EmbeddingsResult, EmbeddingsOptions } from './Ext
 // Types
 export type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from './types/LLMTypes';
 
+// Telemetry & Analytics
+export { TelemetryService, getOrCreateDeviceId } from './Foundation/TelemetryService';
+
 // Infrastructure
 export { VLMWorkerBridge } from './Infrastructure/VLMWorkerBridge';
 export type {

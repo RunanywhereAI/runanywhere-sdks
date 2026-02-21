@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-onnx",
-  "version": "0.1.0-beta.8",
+  "version": "0.1.0-beta.9",
   "description": "RunAnywhere Web SDK - ONNX backend for STT, TTS, and VAD via sherpa-onnx",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,7 +24,8 @@
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/sherpa/sherpa-onnx.wasm || (echo 'ERROR: wasm/sherpa/sherpa-onnx.wasm missing. Run build-web.sh --build-sherpa first.' && exit 1)"
   },
   "keywords": [
     "runanywhere",

@@ -8,6 +8,7 @@
 
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
+import { AnalyticsEmitter } from '../services/AnalyticsEmitter';
 import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import type { LocalFileStorage } from './LocalFileStorage';
@@ -216,6 +217,7 @@ export class ModelDownloader {
 
     this.registry.updateModel(modelId, { status: ModelStatus.Downloading, downloadProgress: 0 });
     EventBus.shared.emit('model.downloadStarted', SDKEventType.Model, { modelId, url: model.url });
+    AnalyticsEmitter.emitModelDownloadStarted(modelId);
 
     try {
       const totalFiles = 1 + (model.additionalFiles?.length ?? 0);
@@ -304,10 +306,12 @@ export class ModelDownloader {
         filesTotal: totalFiles,
       });
       EventBus.shared.emit('model.downloadCompleted', SDKEventType.Model, { modelId, sizeBytes: totalSize });
+      AnalyticsEmitter.emitModelDownloadCompleted(modelId, totalSize, 0);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.registry.updateModel(modelId, { status: ModelStatus.Error, error: message });
       EventBus.shared.emit('model.downloadFailed', SDKEventType.Model, { modelId, error: message });
+      AnalyticsEmitter.emitModelDownloadFailed(modelId, message);
     }
   }
 
@@ -551,9 +555,6 @@ export class ModelDownloader {
       return opfsStream;
     }
 
-    // Clean up corrupted 0-byte entries - we can't easily check length on the stream without consuming it,
-    // so we skip the 0-byte check here for now and rely on loadFromOPFS to clean them up.
-
     // Fall back to in-memory cache
     const cached = this.memoryCache.get(key);
     if (cached) {
@@ -568,6 +569,18 @@ export class ModelDownloader {
     }
 
     return null;
+  }
+
+  /** Load file object from storage (local FS or OPFS) without reading into memory. */
+  async loadModelFile(key: string): Promise<File | null> {
+    // Try local filesystem first
+    if (this.localFileStorage?.isReady) {
+      const file = await this.localFileStorage.loadModelFile(key);
+      if (file) return file;
+    }
+
+    // Try OPFS
+    return this.storage.loadModelFile(key);
   }
 
   /** Check existence in local storage, OPFS, or in-memory cache. */

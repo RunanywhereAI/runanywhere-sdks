@@ -174,6 +174,191 @@
 2. Verify badge text is "CPU" or "WebGPU" based on hardware
 3. Verify badge is visible in all tabs (persists across navigation)
 
+### U. Telemetry Verification — Development Mode (Supabase)
+
+This section verifies that analytics telemetry is correctly sent to the Supabase backend
+in development mode. Credentials are embedded in the WASM module via `development_config.cpp`.
+
+**Dev Endpoint:** `https://<dev-project-id>.supabase.co/rest/v1/telemetry_events` *(URL redacted — stored in dev config)*
+
+**Verification method:** Use DevTools Network tab or Playwright `browser_network_requests` to inspect HTTP POSTs.
+
+#### U1. SDK Init — Device Registration & Telemetry Setup
+
+1. Open app — check console for:
+   - `[INFO] [RunAnywhere:HTTPService] Development mode configured with Supabase`
+   - `[INFO] [RunAnywhere:TelemetryService] HTTPService configured with WASM dev config (Supabase)`
+   - `[INFO] [RunAnywhere:TelemetryService] TelemetryService initialized (env=development, device=<uuid>...)`
+   - `[INFO] [RunAnywhere:AnalyticsEventsBridge] Analytics events callback registered`
+2. Check `localStorage['rac_device_id']` — verify it is a UUID (e.g. `de9a040f-...`, 36 chars)
+3. Refresh page — verify `rac_device_id` is **the same** UUID (persistent)
+
+#### U2. Dev Telemetry POST — Network Inspection
+
+After SDK init (backend registration completes), check Network tab for:
+
+1. At least one POST to the dev Supabase telemetry endpoint (check Network tab — URL contains `supabase.co/rest/v1/telemetry_events`)
+2. Response status: `200` or `201` (or `204` for Supabase upsert)
+3. Request headers include:
+   - `Content-Type: application/json`
+   - `apikey: <supabase-anon-key>` (starts with `eyJ`)
+   - `Authorization: Bearer <supabase-anon-key>`
+4. Request body is valid JSON array or object
+
+#### U3. Telemetry Payload — Required Common Fields
+
+Inspect the POST body of any telemetry request and verify these fields are present:
+
+| Field | Expected Value |
+|-------|---------------|
+| `event_type` | Non-empty string (e.g. `"llm.backend.registered"`) |
+| `device_id` | UUID matching `localStorage['rac_device_id']` |
+| `platform` | `"web"` |
+| `sdk_version` | `"0.1.0-beta.8"` (or current version) |
+| `timestamp_ms` | Integer Unix timestamp in milliseconds |
+| `modality` | `"llm"`, `"stt"`, `"tts"`, `"model"`, or `"system"` |
+
+#### U4. Telemetry — LLM Generation Event
+
+*(Requires downloading and loading an LLM model, then running a chat generation)*
+
+After `LlamaCPP.register()` and a text generation, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"llm.generation.completed"` |
+| `modality` | `"llm"` |
+| `output_tokens` | Integer > 0 |
+| `tokens_per_second` | Float > 0 |
+| `generation_time_ms` | Float > 0 |
+| `time_to_first_token_ms` | Float ≥ 0 |
+| `model_id` | Non-empty string |
+| `framework` | `"llamacpp"` |
+| `platform` | `"web"` |
+
+#### U5. Telemetry — LLM Model Load Event
+
+After loading an LLM model, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"llm.model.load.completed"` |
+| `modality` | `"llm"` |
+| `model_id` | Non-empty string |
+| `processing_time_ms` | Float > 0 (load duration) |
+| `model_size_bytes` | Integer > 0 |
+| `framework` | `"llamacpp"` |
+| `platform` | `"web"` |
+
+#### U6. Telemetry — STT Transcription Event
+
+*(Requires ONNX backend loaded with a Whisper STT model and microphone input)*
+
+After a transcription completes, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"stt.transcription.completed"` |
+| `modality` | `"stt"` |
+| `audio_duration_ms` | Float > 0 |
+| `real_time_factor` | Float > 0 |
+| `word_count` | Integer ≥ 0 |
+| `confidence` | Float 0.0–1.0 |
+| `model_id` | Non-empty string |
+| `framework` | `"onnx"` |
+| `platform` | `"web"` |
+
+#### U7. Telemetry — TTS Synthesis Event
+
+*(Requires ONNX backend loaded with a Piper TTS model and Speak tab usage)*
+
+After a TTS synthesis completes, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"tts.synthesis.completed"` |
+| `modality` | `"tts"` |
+| `character_count` | Integer > 0 |
+| `characters_per_second` | Float > 0 |
+| `output_duration_ms` | Float > 0 |
+| `audio_size_bytes` | Integer > 0 |
+| `sample_rate` | Integer (e.g. 22050 or 44100) |
+| `model_id` | Non-empty string |
+| `framework` | `"onnx"` |
+| `platform` | `"web"` |
+
+#### U8. Telemetry — Model Download Event
+
+*(Requires initiating a model download from the model selector)*
+
+During/after model download, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"model.download.completed"` |
+| `modality` | `"model"` |
+| `model_id` | Non-empty string |
+| `model_size_bytes` | Integer > 0 |
+| `processing_time_ms` | Float > 0 (download duration) |
+| `platform` | `"web"` |
+
+#### U9. Telemetry — VAD Event
+
+*(Requires Voice tab with VAD active and speech input)*
+
+When speech activity is detected and ends, verify a POST contains:
+
+| Field | Expected |
+|-------|---------|
+| `event_type` | `"vad.speech.ended"` |
+| `modality` | `"system"` |
+| `speech_duration_ms` | Float > 0 |
+| `platform` | `"web"` |
+
+#### U10. Telemetry Batching Behavior
+
+1. In dev mode (default): telemetry events flush **immediately** on each event (no batching delay)
+2. Verify: after backend registration, a POST fires within 1-2 seconds of the SDK init log
+3. In prod mode: events batch in groups of 10 or flush after 5-second timeout
+
+#### U11. Device ID Persistence
+
+1. Check `localStorage['rac_device_id']` before page reload
+2. Reload page
+3. Check `localStorage['rac_device_id']` after reload — must be **identical**
+4. Verify all telemetry POSTs use the same `device_id` throughout the session
+
+### V. Telemetry Verification — Production Mode
+
+*(Pending: user to provide production API key and base URL)*
+
+**Prod Endpoint:** `<base-url>/api/v1/sdk/telemetry`
+
+#### V1. Configure Production Credentials
+
+To test production telemetry:
+1. Set API key in Settings tab → "API Key" field
+2. Set base URL in Settings tab → "Base URL" field
+3. Or configure via `RunAnywhere.initialize({ apiKey: '...', baseURL: '...' })`
+
+#### V2. Prod Telemetry POST — Network Inspection
+
+After configuring production credentials, repeat U2-U9 tests and verify:
+
+1. POST goes to `<base-url>/api/v1/sdk/telemetry` (NOT Supabase)
+2. Request headers include:
+   - `Authorization: Bearer <api-key>`
+   - `Content-Type: application/json`
+3. Response status: `200` or `202`
+4. Payload fields match the same schema as development (same `rac_telemetry_payload_t` fields)
+
+#### V3. Prod Batching — 10 Events or 5s Timeout
+
+In production mode (unlike dev's immediate flush):
+1. Trigger multiple events (multiple tab switches, multiple tool calls)
+2. Verify batch of 10 events triggers a single POST (not 10 separate POSTs)
+3. Or wait 5 seconds after any event — verify POST fires within 5s timeout
+
 ---
 
 ## Bug Report File

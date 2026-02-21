@@ -126,6 +126,169 @@ rac_bool_t rac_analytics_events_has_public_callback(void) {
     return state.public_callback != nullptr ? RAC_TRUE : RAC_FALSE;
 }
 
+// =============================================================================
+// PLATFORM EMIT HELPERS (C-linkage, callable from WASM via ccall)
+// =============================================================================
+
+void rac_analytics_emit_stt_model_load_completed(const char* model_id, const char* model_name,
+                                                  double duration_ms, int32_t framework) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STT_MODEL_LOAD_COMPLETED;
+    event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+    event.data.stt_transcription.model_id = model_id;
+    event.data.stt_transcription.model_name = model_name;
+    event.data.stt_transcription.duration_ms = duration_ms;
+    event.data.stt_transcription.framework = static_cast<rac_inference_framework_t>(framework);
+    event.data.stt_transcription.error_code = RAC_SUCCESS;
+    rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_COMPLETED, &event);
+}
+
+void rac_analytics_emit_stt_model_load_failed(const char* model_id, int32_t error_code,
+                                               const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STT_MODEL_LOAD_FAILED;
+    event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+    event.data.stt_transcription.model_id = model_id;
+    event.data.stt_transcription.error_code = static_cast<rac_result_t>(error_code);
+    event.data.stt_transcription.error_message = error_message;
+    rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_FAILED, &event);
+}
+
+void rac_analytics_emit_stt_transcription_completed(
+    const char* transcription_id, const char* model_id, const char* text, float confidence,
+    double duration_ms, double audio_length_ms, int32_t audio_size_bytes, int32_t word_count,
+    double real_time_factor, const char* language, int32_t sample_rate, int32_t framework) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STT_TRANSCRIPTION_COMPLETED;
+    event.data.stt_transcription.transcription_id = transcription_id;
+    event.data.stt_transcription.model_id = model_id;
+    event.data.stt_transcription.text = text;
+    event.data.stt_transcription.confidence = confidence;
+    event.data.stt_transcription.duration_ms = duration_ms;
+    event.data.stt_transcription.audio_length_ms = audio_length_ms;
+    event.data.stt_transcription.audio_size_bytes = audio_size_bytes;
+    event.data.stt_transcription.word_count = word_count;
+    event.data.stt_transcription.real_time_factor = real_time_factor;
+    event.data.stt_transcription.language = language;
+    event.data.stt_transcription.sample_rate = sample_rate;
+    event.data.stt_transcription.framework = static_cast<rac_inference_framework_t>(framework);
+    event.data.stt_transcription.error_code = RAC_SUCCESS;
+    rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
+}
+
+void rac_analytics_emit_stt_transcription_failed(const char* transcription_id,
+                                                  const char* model_id, int32_t error_code,
+                                                  const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
+    event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+    event.data.stt_transcription.transcription_id = transcription_id;
+    event.data.stt_transcription.model_id = model_id;
+    event.data.stt_transcription.error_code = static_cast<rac_result_t>(error_code);
+    event.data.stt_transcription.error_message = error_message;
+    rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+}
+
+void rac_analytics_emit_tts_voice_load_completed(const char* model_id, const char* model_name,
+                                                  double duration_ms, int32_t framework) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_TTS_VOICE_LOAD_COMPLETED;
+    event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
+    event.data.tts_synthesis.model_id = model_id;
+    event.data.tts_synthesis.model_name = model_name;
+    event.data.tts_synthesis.processing_duration_ms = duration_ms;
+    event.data.tts_synthesis.framework = static_cast<rac_inference_framework_t>(framework);
+    event.data.tts_synthesis.error_code = RAC_SUCCESS;
+    rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_COMPLETED, &event);
+}
+
+void rac_analytics_emit_tts_voice_load_failed(const char* model_id, int32_t error_code,
+                                               const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_TTS_VOICE_LOAD_FAILED;
+    event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
+    event.data.tts_synthesis.model_id = model_id;
+    event.data.tts_synthesis.error_code = static_cast<rac_result_t>(error_code);
+    event.data.tts_synthesis.error_message = error_message;
+    rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_FAILED, &event);
+}
+
+void rac_analytics_emit_tts_synthesis_completed(
+    const char* synthesis_id, const char* model_id, int32_t character_count,
+    double audio_duration_ms, int32_t audio_size_bytes, double processing_duration_ms,
+    double characters_per_second, int32_t sample_rate, int32_t framework) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_TTS_SYNTHESIS_COMPLETED;
+    event.data.tts_synthesis.synthesis_id = synthesis_id;
+    event.data.tts_synthesis.model_id = model_id;
+    event.data.tts_synthesis.character_count = character_count;
+    event.data.tts_synthesis.audio_duration_ms = audio_duration_ms;
+    event.data.tts_synthesis.audio_size_bytes = audio_size_bytes;
+    event.data.tts_synthesis.processing_duration_ms = processing_duration_ms;
+    event.data.tts_synthesis.characters_per_second = characters_per_second;
+    event.data.tts_synthesis.sample_rate = sample_rate;
+    event.data.tts_synthesis.framework = static_cast<rac_inference_framework_t>(framework);
+    event.data.tts_synthesis.error_code = RAC_SUCCESS;
+    rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event);
+}
+
+void rac_analytics_emit_tts_synthesis_failed(const char* synthesis_id, const char* model_id,
+                                              int32_t error_code, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_TTS_SYNTHESIS_FAILED;
+    event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
+    event.data.tts_synthesis.synthesis_id = synthesis_id;
+    event.data.tts_synthesis.model_id = model_id;
+    event.data.tts_synthesis.error_code = static_cast<rac_result_t>(error_code);
+    event.data.tts_synthesis.error_message = error_message;
+    rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event);
+}
+
+void rac_analytics_emit_vad_speech_started(void) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VAD_SPEECH_STARTED;
+    event.data.vad = RAC_ANALYTICS_VAD_DEFAULT;
+    rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_STARTED, &event);
+}
+
+void rac_analytics_emit_vad_speech_ended(double speech_duration_ms, float energy_level) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_VAD_SPEECH_ENDED;
+    event.data.vad.speech_duration_ms = speech_duration_ms;
+    event.data.vad.energy_level = energy_level;
+    rac_analytics_event_emit(RAC_EVENT_VAD_SPEECH_ENDED, &event);
+}
+
+void rac_analytics_emit_model_download_started(const char* model_id) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_STARTED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_STARTED, &event);
+}
+
+void rac_analytics_emit_model_download_completed(const char* model_id, int64_t file_size_bytes,
+                                                  double duration_ms) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_COMPLETED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.size_bytes = file_size_bytes;
+    event.data.model_download.duration_ms = duration_ms;
+    event.data.model_download.progress = 100.0;
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_COMPLETED, &event);
+}
+
+void rac_analytics_emit_model_download_failed(const char* model_id, const char* error_message) {
+    rac_analytics_event_data_t event = {};
+    event.type = RAC_EVENT_MODEL_DOWNLOAD_FAILED;
+    event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;
+    event.data.model_download.model_id = model_id;
+    event.data.model_download.error_code = RAC_ERROR_DOWNLOAD_FAILED;
+    event.data.model_download.error_message = error_message;
+    rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_FAILED, &event);
+}
+
 }  // extern "C"
 
 // =============================================================================

@@ -547,7 +547,29 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 break;
             }
 
-            // STT events
+            // STT Model load events
+            case RAC_EVENT_STT_MODEL_LOAD_STARTED:
+            case RAC_EVENT_STT_MODEL_LOAD_COMPLETED:
+            case RAC_EVENT_STT_MODEL_LOAD_FAILED:
+            case RAC_EVENT_STT_MODEL_UNLOADED: {
+                const auto& model = data->data.llm_model;
+                payload.model_id = model.model_id;
+                payload.model_name = model.model_name ? model.model_name : model.model_id;
+                payload.model_size_bytes = model.model_size_bytes;
+                payload.processing_time_ms = model.duration_ms;
+                payload.framework = framework_to_string(model.framework);
+                if (model.error_code != RAC_SUCCESS) {
+                    payload.success = RAC_FALSE;
+                    payload.has_success = RAC_TRUE;
+                    payload.error_message = model.error_message;
+                } else if (event_type == RAC_EVENT_STT_MODEL_LOAD_COMPLETED) {
+                    payload.success = RAC_TRUE;
+                    payload.has_success = RAC_TRUE;
+                }
+                break;
+            }
+
+            // STT Transcription events
             case RAC_EVENT_STT_TRANSCRIPTION_STARTED:
             case RAC_EVENT_STT_TRANSCRIPTION_COMPLETED:
             case RAC_EVENT_STT_TRANSCRIPTION_FAILED:
@@ -579,7 +601,29 @@ rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* mana
                 break;
             }
 
-            // TTS events
+            // TTS Voice load events
+            case RAC_EVENT_TTS_VOICE_LOAD_STARTED:
+            case RAC_EVENT_TTS_VOICE_LOAD_COMPLETED:
+            case RAC_EVENT_TTS_VOICE_LOAD_FAILED:
+            case RAC_EVENT_TTS_VOICE_UNLOADED: {
+                const auto& model = data->data.llm_model;
+                payload.model_id = model.model_id;
+                payload.model_name = model.model_name ? model.model_name : model.model_id;
+                payload.model_size_bytes = model.model_size_bytes;
+                payload.processing_time_ms = model.duration_ms;
+                payload.framework = framework_to_string(model.framework);
+                if (model.error_code != RAC_SUCCESS) {
+                    payload.success = RAC_FALSE;
+                    payload.has_success = RAC_TRUE;
+                    payload.error_message = model.error_message;
+                } else if (event_type == RAC_EVENT_TTS_VOICE_LOAD_COMPLETED) {
+                    payload.success = RAC_TRUE;
+                    payload.has_success = RAC_TRUE;
+                }
+                break;
+            }
+
+            // TTS Synthesis events
             case RAC_EVENT_TTS_SYNTHESIS_STARTED:
             case RAC_EVENT_TTS_SYNTHESIS_COMPLETED:
             case RAC_EVENT_TTS_SYNTHESIS_FAILED:

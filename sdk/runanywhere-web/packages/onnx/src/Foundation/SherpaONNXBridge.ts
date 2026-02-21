@@ -214,7 +214,7 @@ export class SherpaONNXBridge {
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mod = createModule({
+      const modOrPromise = createModule({
         noFSInit: true,
         print: (text: string) => logger.debug(text),
         printErr: (text: string) => logger.warning(text),
@@ -231,9 +231,8 @@ export class SherpaONNXBridge {
                 resolveWasm();
               } catch (err) {
                 // receiveInstance may throw if initRuntime fails (e.g. FS errors).
-                // The WASM exports are already set by our patch at this point.
-                logger.warning(`receiveInstance completed with error (exports should still be set): ${err}`);
-                resolveWasm(); // Still resolve — exports are set before the throw point
+                logger.warning(`receiveInstance completed with error: ${err}`);
+                resolveWasm();
               }
             })
             .catch((err) => {
@@ -243,15 +242,20 @@ export class SherpaONNXBridge {
             });
           return {}; // Indicates async instantiation
         },
-      }) as SherpaONNXModule;
+      });
 
-      // Wait for WASM instantiation + receiveInstance to complete.
-      // Also race with the module.ready promise (which resolves after full init).
+      // Wait for WASM instantiation + receiveInstance + initRuntime to complete.
+      // With Patch 6 applied, createModule returns a Promise (resolved after initRuntime).
+      // wasmReady resolves first (after receiveInstance), then initRuntime fires synchronously.
       const timeoutPromise = new Promise<void>((_, reject) => {
         setTimeout(() => reject(new Error('Sherpa-ONNX WASM module timed out after 30s')), 30_000);
       });
       await Promise.race([wasmReady, timeoutPromise]);
 
+      // Resolve the module: Emscripten returns a Promise<Module> when using async WASM init.
+      // Promise.resolve() is a no-op if modOrPromise is already the Module object.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mod = await Promise.resolve(modOrPromise) as SherpaONNXModule;
       this._module = mod;
 
       // Verify critical exports are available (set by our patched receiveInstance)
