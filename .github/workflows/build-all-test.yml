@@ -1,17 +1,277 @@
 name: Build All (Test)
 
-# Manually-triggered workflow that builds all SDKs and example projects.
-# Use this to verify everything compiles after changes.
+# =============================================================================
+# Comprehensive Build Verification Workflow
+#
+# Manually-triggered workflow with checkboxes for each build target.
+# Select what you want to build and hit "Run workflow".
+#
+# Targets:
+#   - C++ Android Backends (arm64-v8a, armeabi-v7a, x86_64)
+#   - C++ iOS Backends (XCFramework)
+#   - Kotlin SDK (JVM + Android)
+#   - Swift SDK (iOS/macOS)
+#   - Web SDK (TypeScript)
+#   - Flutter SDK (Dart analyze)
+#   - React Native SDK (TypeScript)
+#   - Android Example Apps
+#   - IntelliJ Plugin
+# =============================================================================
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build_cpp_android:
+        description: 'C++ Android Backends (arm64-v8a, armeabi-v7a, x86_64)'
+        required: false
+        default: true
+        type: boolean
+      build_cpp_ios:
+        description: 'C++ iOS Backends (XCFramework)'
+        required: false
+        default: true
+        type: boolean
+      build_kotlin_sdk:
+        description: 'Kotlin SDK (JVM + Android)'
+        required: false
+        default: true
+        type: boolean
+      build_swift_sdk:
+        description: 'Swift SDK (iOS/macOS)'
+        required: false
+        default: true
+        type: boolean
+      build_web_sdk:
+        description: 'Web SDK (TypeScript)'
+        required: false
+        default: true
+        type: boolean
+      build_flutter_sdk:
+        description: 'Flutter SDK (Dart)'
+        required: false
+        default: true
+        type: boolean
+      build_react_native_sdk:
+        description: 'React Native SDK (TypeScript)'
+        required: false
+        default: true
+        type: boolean
+      build_android_apps:
+        description: 'Android Example Apps'
+        required: false
+        default: true
+        type: boolean
+      build_intellij_plugin:
+        description: 'IntelliJ Plugin'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
 
+env:
+  COMMONS_DIR: sdk/runanywhere-commons
+
 jobs:
+  # ===========================================================================
+  # C++ Android Backends (Matrix: arm64-v8a, armeabi-v7a, x86_64)
+  # ===========================================================================
+  cpp-android:
+    name: C++ Android (${{ matrix.abi }})
+    if: ${{ inputs.build_cpp_android }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup NDK
+        run: |
+          NDK_VERSION="27.0.12077973"
+          echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" --sdk_root=${ANDROID_SDK_ROOT}
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+        run: |
+          CONFIG_FILE="src/infrastructure/network/development_config.cpp"
+          CLEAN_URL=$(printf '%s' "${SUPABASE_URL:-https://placeholder.supabase.co}" | tr -d '\n\r')
+          CLEAN_KEY=$(printf '%s' "${SUPABASE_ANON_KEY:-placeholder_key}" | tr -d '\n\r')
+          CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_test_build}" | tr -d '\n\r')
+
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          #include <cstring>
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+
+          namespace {
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          }
+
+          extern "C" {
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          const char* rac_dev_config_get_supabase_url(void) { return SUPABASE_URL; }
+          const char* rac_dev_config_get_supabase_key(void) { return SUPABASE_ANON_KEY; }
+          const char* rac_dev_config_get_build_token(void) { return BUILD_TOKEN; }
+          const char* rac_dev_config_get_sentry_dsn(void) { return SENTRY_DSN; }
+          bool rac_dev_config_has_supabase(void) { return rac_dev_config_is_available(); }
+          bool rac_dev_config_has_build_token(void) { return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0; }
+          }
+          CONFIGEOF
+
+      - name: Download Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/android/download-sherpa-onnx.sh
+          rm -rf third_party/sherpa-onnx-android
+          ./scripts/android/download-sherpa-onnx.sh
+
+      - name: Build C++ Android ${{ matrix.abi }}
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-android.sh
+          ./scripts/build-android.sh all ${{ matrix.abi }}
+
+      - name: List Build Output
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          echo "=== Build Artifacts ==="
+          find dist/android -name "*.so" -type f 2>/dev/null | head -30 || echo "No .so files found"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-android-${{ matrix.abi }}
+          path: ${{ env.COMMONS_DIR }}/dist/android/
+          retention-days: 7
+
+  # ===========================================================================
+  # C++ iOS Backends (XCFramework)
+  # ===========================================================================
+  cpp-ios:
+    name: C++ iOS (XCFramework)
+    if: ${{ inputs.build_cpp_ios }}
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Setup Development Config
+        working-directory: ${{ env.COMMONS_DIR }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          BUILD_TOKEN: ${{ secrets.BUILD_TOKEN }}
+        run: |
+          CONFIG_FILE="src/infrastructure/network/development_config.cpp"
+          CLEAN_URL=$(printf '%s' "${SUPABASE_URL:-https://placeholder.supabase.co}" | tr -d '\n\r')
+          CLEAN_KEY=$(printf '%s' "${SUPABASE_ANON_KEY:-placeholder_key}" | tr -d '\n\r')
+          CLEAN_TOKEN=$(printf '%s' "${BUILD_TOKEN:-bt_test_build}" | tr -d '\n\r')
+
+          cat > "$CONFIG_FILE" << CONFIGEOF
+          #include <cstring>
+          #include "rac/core/rac_logger.h"
+          #include "rac/infrastructure/network/rac_dev_config.h"
+
+          namespace {
+          constexpr const char* SUPABASE_URL = "${CLEAN_URL}";
+          constexpr const char* SUPABASE_ANON_KEY = "${CLEAN_KEY}";
+          constexpr const char* BUILD_TOKEN = "${CLEAN_TOKEN}";
+          constexpr const char* SENTRY_DSN = nullptr;
+          }
+
+          extern "C" {
+          bool rac_dev_config_is_available(void) {
+              if (SUPABASE_URL == nullptr || SUPABASE_ANON_KEY == nullptr) return false;
+              if (std::strlen(SUPABASE_URL) == 0 || std::strlen(SUPABASE_ANON_KEY) == 0) return false;
+              if (std::strstr(SUPABASE_URL, "YOUR_") != nullptr) return false;
+              if (std::strstr(SUPABASE_ANON_KEY, "YOUR_") != nullptr) return false;
+              return true;
+          }
+          const char* rac_dev_config_get_supabase_url(void) { return SUPABASE_URL; }
+          const char* rac_dev_config_get_supabase_key(void) { return SUPABASE_ANON_KEY; }
+          const char* rac_dev_config_get_build_token(void) { return BUILD_TOKEN; }
+          const char* rac_dev_config_get_sentry_dsn(void) { return SENTRY_DSN; }
+          bool rac_dev_config_has_supabase(void) { return rac_dev_config_is_available(); }
+          bool rac_dev_config_has_build_token(void) { return BUILD_TOKEN != nullptr && std::strlen(BUILD_TOKEN) > 0; }
+          }
+          CONFIGEOF
+
+      - name: Download iOS Dependencies
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/ios/download-sherpa-onnx.sh
+          chmod +x scripts/ios/download-onnx.sh
+          ./scripts/ios/download-sherpa-onnx.sh
+          ./scripts/ios/download-onnx.sh
+
+      - name: Build RACommons + All Backends (iOS)
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          chmod +x scripts/build-ios.sh
+          ./scripts/build-ios.sh --backend all --release --package
+
+      - name: List Build Output
+        working-directory: ${{ env.COMMONS_DIR }}
+        run: |
+          echo "=== Build Artifacts ==="
+          ls -la dist/
+          [ -d dist/RACommons.xcframework ] && echo "RACommons.xcframework" || echo "RACommons.xcframework MISSING"
+          [ -d dist/RABackendLLAMACPP.xcframework ] && echo "RABackendLLAMACPP.xcframework" || echo "RABackendLLAMACPP.xcframework MISSING"
+          [ -d dist/RABackendONNX.xcframework ] && echo "RABackendONNX.xcframework" || echo "RABackendONNX.xcframework MISSING"
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-ios-xcframeworks
+          path: |
+            ${{ env.COMMONS_DIR }}/dist/RACommons.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendLLAMACPP.xcframework
+            ${{ env.COMMONS_DIR }}/dist/RABackendONNX.xcframework
+          retention-days: 7
+
+  # ===========================================================================
+  # Kotlin SDK (JVM + Android)
+  # ===========================================================================
   kotlin-sdk:
     name: Kotlin SDK (JVM + Android)
+    if: ${{ inputs.build_kotlin_sdk }}
     runs-on: ubuntu-latest
 
     steps:
@@ -29,8 +289,7 @@ jobs:
 
       - name: Setup local.properties
         working-directory: sdk/runanywhere-kotlin
-        run: |
-          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
       - name: Build JVM JAR
         working-directory: sdk/runanywhere-kotlin
@@ -55,8 +314,31 @@ jobs:
         run: ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
         continue-on-error: true
 
+  # ===========================================================================
+  # Swift SDK (iOS/macOS)
+  # ===========================================================================
+  swift-sdk:
+    name: Swift SDK
+    if: ${{ inputs.build_swift_sdk }}
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift Build (remote XCFrameworks)
+        run: swift build
+
+      - name: Swift Test
+        run: swift test
+        continue-on-error: true
+
+  # ===========================================================================
+  # Web SDK (TypeScript)
+  # ===========================================================================
   web-sdk:
     name: Web SDK (TypeScript)
+    if: ${{ inputs.build_web_sdk }}
     runs-on: ubuntu-latest
 
     steps:
@@ -80,23 +362,78 @@ jobs:
         working-directory: sdk/runanywhere-web/packages/core
         run: npx tsc
 
-  swift-sdk:
-    name: Swift SDK
-    runs-on: macos-14
+  # ===========================================================================
+  # Flutter SDK (Dart)
+  # ===========================================================================
+  flutter-sdk:
+    name: Flutter SDK (Dart)
+    if: ${{ inputs.build_flutter_sdk }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Swift Build (remote XCFrameworks)
-        run: swift build
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.x'
+          channel: 'stable'
 
-      - name: Swift Test
-        run: swift test
+      - name: Install Melos
+        run: dart pub global activate melos
+
+      - name: Bootstrap Packages
+        working-directory: sdk/runanywhere-flutter
+        run: melos bootstrap
+
+      - name: Analyze All Packages
+        working-directory: sdk/runanywhere-flutter
+        run: melos run analyze || dart analyze packages/runanywhere packages/runanywhere_llamacpp packages/runanywhere_onnx
         continue-on-error: true
 
-  android-app:
-    name: Android Example App
+      - name: Run Tests
+        working-directory: sdk/runanywhere-flutter
+        run: melos run test || true
+        continue-on-error: true
+
+  # ===========================================================================
+  # React Native SDK (TypeScript)
+  # ===========================================================================
+  react-native-sdk:
+    name: React Native SDK (TypeScript)
+    if: ${{ inputs.build_react_native_sdk }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        working-directory: sdk/runanywhere-react-native
+        run: yarn install --frozen-lockfile || npm install
+
+      - name: TypeScript Typecheck
+        working-directory: sdk/runanywhere-react-native
+        run: npx tsc --noEmit -p tsconfig.base.json
+        continue-on-error: true
+
+      - name: Build Packages
+        working-directory: sdk/runanywhere-react-native
+        run: npx lerna run build || true
+        continue-on-error: true
+
+  # ===========================================================================
+  # Android Example Apps
+  # ===========================================================================
+  android-apps:
+    name: Android Example Apps
+    if: ${{ inputs.build_android_apps }}
     runs-on: ubuntu-latest
 
     steps:
@@ -115,17 +452,29 @@ jobs:
       - name: Setup local.properties
         run: |
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > examples/android/RunAnywhereAI/local.properties
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > examples/android/RunAnyWhereLora/local.properties
           echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
 
-      - name: Build Android App
+      - name: Build RunAnywhereAI
         working-directory: examples/android/RunAnywhereAI
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug -Prunanywhere.testLocal=false
         continue-on-error: true
 
+      - name: Build RunAnyWhereLora
+        working-directory: examples/android/RunAnyWhereLora
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug -Prunanywhere.testLocal=false
+        continue-on-error: true
+
+  # ===========================================================================
+  # IntelliJ Plugin
+  # ===========================================================================
   intellij-plugin:
     name: IntelliJ Plugin
+    if: ${{ inputs.build_intellij_plugin }}
     runs-on: ubuntu-latest
 
     steps:
@@ -142,8 +491,7 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Setup local.properties
-        run: |
-          echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
+        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
 
       - name: Publish SDK to Maven Local
         working-directory: sdk/runanywhere-kotlin
@@ -157,9 +505,21 @@ jobs:
           chmod +x gradlew
           ./gradlew buildPlugin
 
+  # ===========================================================================
+  # Build Summary
+  # ===========================================================================
   summary:
     name: Build Summary
-    needs: [kotlin-sdk, web-sdk, swift-sdk, android-app, intellij-plugin]
+    needs:
+      - cpp-android
+      - cpp-ios
+      - kotlin-sdk
+      - swift-sdk
+      - web-sdk
+      - flutter-sdk
+      - react-native-sdk
+      - android-apps
+      - intellij-plugin
     if: always()
     runs-on: ubuntu-latest
 
@@ -168,13 +528,32 @@ jobs:
         run: |
           echo "## Build All (Test) Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Project | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Kotlin SDK (JVM + Android) | ${{ needs.kotlin-sdk.result == 'success' && 'Pass' || needs.kotlin-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Web SDK (TypeScript) | ${{ needs.web-sdk.result == 'success' && 'Pass' || needs.web-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Swift SDK | ${{ needs.swift-sdk.result == 'success' && 'Pass' || needs.swift-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Android Example App | ${{ needs.android-app.result == 'success' && 'Pass' || needs.android-app.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| IntelliJ Plugin | ${{ needs.intellij-plugin.result == 'success' && 'Pass' || needs.intellij-plugin.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Helper: map job result to display string
+          status() {
+            case "$1" in
+              success) echo "Pass" ;;
+              skipped) echo "Skipped (unchecked)" ;;
+              failure) echo "FAILED" ;;
+              cancelled) echo "Cancelled" ;;
+              *) echo "$1" ;;
+            esac
+          }
+
+          echo "| C++ Android Backends | $(status '${{ needs.cpp-android.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| C++ iOS Backends | $(status '${{ needs.cpp-ios.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Kotlin SDK (JVM + Android) | $(status '${{ needs.kotlin-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Swift SDK | $(status '${{ needs.swift-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web SDK (TypeScript) | $(status '${{ needs.web-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Flutter SDK (Dart) | $(status '${{ needs.flutter-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| React Native SDK | $(status '${{ needs.react-native-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android Example Apps | $(status '${{ needs.android-apps.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| IntelliJ Plugin | $(status '${{ needs.intellij-plugin.result }}') |" >> $GITHUB_STEP_SUMMARY
+
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: **${{ github.actor }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY

@@ -2,6 +2,10 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/arm64-v8a/_deps/llamacpp-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/arm64-v8a/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev-core/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev/_deps/llamacpp-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev/_deps/nlohmann_json-src" vcs="Git" />
   </component>
 </project>

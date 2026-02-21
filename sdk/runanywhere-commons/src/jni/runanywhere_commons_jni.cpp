@@ -1110,6 +1110,78 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 }
 
 // =============================================================================
+// JNI FUNCTIONS - LLM LoRA Adapter Management
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath, jfloat scale) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    std::string path = getCString(env, adapterPath);
+
+    LOGi("racLlmComponentLoadLora: handle=%lld, path=%s, scale=%.2f",
+         (long long)handle, path.c_str(), (float)scale);
+
+    rac_result_t result = rac_llm_component_load_lora(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str(), static_cast<float>(scale));
+
+    LOGi("racLlmComponentLoadLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentRemoveLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    std::string path = getCString(env, adapterPath);
+
+    rac_result_t result = rac_llm_component_remove_lora(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str());
+
+    LOGi("racLlmComponentRemoveLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentClearLora(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    rac_result_t result = rac_llm_component_clear_lora(reinterpret_cast<rac_handle_t>(handle));
+    LOGi("racLlmComponentClearLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraInfo(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) {
+        return nullptr;
+    }
+
+    char* json = nullptr;
+    rac_result_t result = rac_llm_component_get_lora_info(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+
+    if (result != RAC_SUCCESS || !json) {
+        return nullptr;
+    }
+
+    jstring jresult = env->NewStringUTF(json);
+    rac_free(json);
+    return jresult;
+}
+
+// =============================================================================
 // JNI FUNCTIONS - STT Component
 // =============================================================================
 
