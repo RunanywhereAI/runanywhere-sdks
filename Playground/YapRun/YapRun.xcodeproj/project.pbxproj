@@ -1,0 +1,1013 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		54398FEF2F497A03009D6B51 /* YapRunKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFB2F497A34009D6B51 /* WidgetKit.framework */; };
+		54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFD2F497A34009D6B51 /* SwiftUI.framework */; };
+		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		543991CD2F498152009D6B51 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CC2F498152009D6B51 /* RunAnywhere */; };
+		543991CF2F498152009D6B51 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CE2F498152009D6B51 /* RunAnywhereONNX */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		54398FC82F4979D3009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 54398FB22F4979D2009D6B51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398FB92F4979D2009D6B51;
+			remoteInfo = YapRun;
+		};
+		54398FD22F4979D3009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 54398FB22F4979D2009D6B51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398FB92F4979D2009D6B51;
+			remoteInfo = YapRun;
+		};
+		54398FED2F497A03009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 54398FB22F4979D2009D6B51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398FE72F497A02009D6B51;
+			remoteInfo = YapRunKeyboard;
+		};
+		543990092F497A35009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 54398FB22F4979D2009D6B51 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398FF82F497A34009D6B51;
+			remoteInfo = YapRunActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		54398FF42F497A03009D6B51 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */,
+				54398FEF2F497A03009D6B51 /* YapRunKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		54398FBA2F4979D2009D6B51 /* YapRun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YapRun.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398FC72F4979D3009D6B51 /* YapRunTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YapRunTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398FD12F4979D3009D6B51 /* YapRunUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YapRunUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = YapRunKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = YapRunActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398FFB2F497A34009D6B51 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		54398FFD2F497A34009D6B51 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		5439902E2F497B77009D6B51 /* YapRunActivityExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = YapRunActivityExtension.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		54398FF02F497A03009D6B51 /* Exceptions for "YapRunKeyboard" folder in "YapRunKeyboard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54398FE72F497A02009D6B51 /* YapRunKeyboard */;
+		};
+		5439900C2F497A35009D6B51 /* Exceptions for "YapRunActivity" folder in "YapRunActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54398FF82F497A34009D6B51 /* YapRunActivityExtension */;
+		};
+		543990402F497D00009D6B51 /* Exceptions for "YapRun" folder in "YapRun" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54398FB92F4979D2009D6B51 /* YapRun */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		54398FBC2F4979D2009D6B51 /* YapRun */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				543990402F497D00009D6B51 /* Exceptions for "YapRun" folder in "YapRun" target */,
+			);
+			path = YapRun;
+			sourceTree = "<group>";
+		};
+		54398FCA2F4979D3009D6B51 /* YapRunTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = YapRunTests;
+			sourceTree = "<group>";
+		};
+		54398FD42F4979D3009D6B51 /* YapRunUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = YapRunUITests;
+			sourceTree = "<group>";
+		};
+		54398FE92F497A02009D6B51 /* YapRunKeyboard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				54398FF02F497A03009D6B51 /* Exceptions for "YapRunKeyboard" folder in "YapRunKeyboard" target */,
+			);
+			path = YapRunKeyboard;
+			sourceTree = "<group>";
+		};
+		54398FFF2F497A34009D6B51 /* YapRunActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5439900C2F497A35009D6B51 /* Exceptions for "YapRunActivity" folder in "YapRunActivityExtension" target */,
+			);
+			path = YapRunActivity;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		54398FB72F4979D2009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				543991CF2F498152009D6B51 /* RunAnywhereONNX in Frameworks */,
+				543991CD2F498152009D6B51 /* RunAnywhere in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FC42F4979D3009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FCE2F4979D3009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FE52F497A02009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FF62F497A34009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */,
+				54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		54398FB12F4979D2009D6B51 = {
+			isa = PBXGroup;
+			children = (
+				5439902E2F497B77009D6B51 /* YapRunActivityExtension.entitlements */,
+				54398FBC2F4979D2009D6B51 /* YapRun */,
+				54398FCA2F4979D3009D6B51 /* YapRunTests */,
+				54398FD42F4979D3009D6B51 /* YapRunUITests */,
+				54398FE92F497A02009D6B51 /* YapRunKeyboard */,
+				54398FFF2F497A34009D6B51 /* YapRunActivity */,
+				54398FFA2F497A34009D6B51 /* Frameworks */,
+				54398FBB2F4979D2009D6B51 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		54398FBB2F4979D2009D6B51 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				54398FBA2F4979D2009D6B51 /* YapRun.app */,
+				54398FC72F4979D3009D6B51 /* YapRunTests.xctest */,
+				54398FD12F4979D3009D6B51 /* YapRunUITests.xctest */,
+				54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */,
+				54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		54398FFA2F497A34009D6B51 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				54398FFB2F497A34009D6B51 /* WidgetKit.framework */,
+				54398FFD2F497A34009D6B51 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		54398FB92F4979D2009D6B51 /* YapRun */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398FDB2F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRun" */;
+			buildPhases = (
+				54398FB62F4979D2009D6B51 /* Sources */,
+				54398FB72F4979D2009D6B51 /* Frameworks */,
+				54398FB82F4979D2009D6B51 /* Resources */,
+				54398FF42F497A03009D6B51 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				54398FEE2F497A03009D6B51 /* PBXTargetDependency */,
+				5439900A2F497A35009D6B51 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				54398FBC2F4979D2009D6B51 /* YapRun */,
+			);
+			name = YapRun;
+			packageProductDependencies = (
+				543991CC2F498152009D6B51 /* RunAnywhere */,
+				543991CE2F498152009D6B51 /* RunAnywhereONNX */,
+			);
+			productName = YapRun;
+			productReference = 54398FBA2F4979D2009D6B51 /* YapRun.app */;
+			productType = "com.apple.product-type.application";
+		};
+		54398FC62F4979D3009D6B51 /* YapRunTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398FDE2F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRunTests" */;
+			buildPhases = (
+				54398FC32F4979D3009D6B51 /* Sources */,
+				54398FC42F4979D3009D6B51 /* Frameworks */,
+				54398FC52F4979D3009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				54398FC92F4979D3009D6B51 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				54398FCA2F4979D3009D6B51 /* YapRunTests */,
+			);
+			name = YapRunTests;
+			packageProductDependencies = (
+			);
+			productName = YapRunTests;
+			productReference = 54398FC72F4979D3009D6B51 /* YapRunTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		54398FD02F4979D3009D6B51 /* YapRunUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398FE12F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRunUITests" */;
+			buildPhases = (
+				54398FCD2F4979D3009D6B51 /* Sources */,
+				54398FCE2F4979D3009D6B51 /* Frameworks */,
+				54398FCF2F4979D3009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				54398FD32F4979D3009D6B51 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				54398FD42F4979D3009D6B51 /* YapRunUITests */,
+			);
+			name = YapRunUITests;
+			packageProductDependencies = (
+			);
+			productName = YapRunUITests;
+			productReference = 54398FD12F4979D3009D6B51 /* YapRunUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		54398FE72F497A02009D6B51 /* YapRunKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398FF12F497A03009D6B51 /* Build configuration list for PBXNativeTarget "YapRunKeyboard" */;
+			buildPhases = (
+				54398FE42F497A02009D6B51 /* Sources */,
+				54398FE52F497A02009D6B51 /* Frameworks */,
+				54398FE62F497A02009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				54398FE92F497A02009D6B51 /* YapRunKeyboard */,
+			);
+			name = YapRunKeyboard;
+			packageProductDependencies = (
+			);
+			productName = YapRunKeyboard;
+			productReference = 54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		54398FF82F497A34009D6B51 /* YapRunActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5439900D2F497A35009D6B51 /* Build configuration list for PBXNativeTarget "YapRunActivityExtension" */;
+			buildPhases = (
+				54398FF52F497A34009D6B51 /* Sources */,
+				54398FF62F497A34009D6B51 /* Frameworks */,
+				54398FF72F497A34009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				54398FFF2F497A34009D6B51 /* YapRunActivity */,
+			);
+			name = YapRunActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = YapRunActivityExtension;
+			productReference = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		54398FB22F4979D2009D6B51 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					54398FB92F4979D2009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					54398FC62F4979D3009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 54398FB92F4979D2009D6B51;
+					};
+					54398FD02F4979D3009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 54398FB92F4979D2009D6B51;
+					};
+					54398FE72F497A02009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					54398FF82F497A34009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 54398FB52F4979D2009D6B51 /* Build configuration list for PBXProject "YapRun" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 54398FB12F4979D2009D6B51;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 54398FBB2F4979D2009D6B51 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				54398FB92F4979D2009D6B51 /* YapRun */,
+				54398FC62F4979D3009D6B51 /* YapRunTests */,
+				54398FD02F4979D3009D6B51 /* YapRunUITests */,
+				54398FE72F497A02009D6B51 /* YapRunKeyboard */,
+				54398FF82F497A34009D6B51 /* YapRunActivityExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		54398FB82F4979D2009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FC52F4979D3009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FCF2F4979D3009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FE62F497A02009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FF72F497A34009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		54398FB62F4979D2009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FC32F4979D3009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FCD2F4979D3009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FE42F497A02009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398FF52F497A34009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		54398FC92F4979D3009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54398FB92F4979D2009D6B51 /* YapRun */;
+			targetProxy = 54398FC82F4979D3009D6B51 /* PBXContainerItemProxy */;
+		};
+		54398FD32F4979D3009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54398FB92F4979D2009D6B51 /* YapRun */;
+			targetProxy = 54398FD22F4979D3009D6B51 /* PBXContainerItemProxy */;
+		};
+		54398FEE2F497A03009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54398FE72F497A02009D6B51 /* YapRunKeyboard */;
+			targetProxy = 54398FED2F497A03009D6B51 /* PBXContainerItemProxy */;
+		};
+		5439900A2F497A35009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 54398FF82F497A34009D6B51 /* YapRunActivityExtension */;
+			targetProxy = 543990092F497A35009D6B51 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		54398FD92F4979D3009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		54398FDA2F4979D3009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		54398FDC2F4979D3009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = YapRun/YapRun.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRun/Info.plist;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		54398FDD2F4979D3009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = YapRun/YapRun.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRun/Info.plist;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		54398FDF2F4979D3009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YapRun.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YapRun";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		54398FE02F4979D3009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YapRun.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YapRun";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		54398FE22F4979D3009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = YapRun;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		54398FE32F4979D3009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_TARGET_NAME = YapRun;
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Release;
+		};
+		54398FF22F497A03009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = YapRunKeyboard/YapRunKeyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRunKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = YapRunKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		54398FF32F497A03009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = YapRunKeyboard/YapRunKeyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRunKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = YapRunKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		5439900E2F497A35009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = YapRunActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRunActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = YapRunActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5439900F2F497A35009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = YapRunActivityExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = YapRunActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = YapRunActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		54398FB52F4979D2009D6B51 /* Build configuration list for PBXProject "YapRun" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398FD92F4979D3009D6B51 /* Debug */,
+				54398FDA2F4979D3009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54398FDB2F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRun" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398FDC2F4979D3009D6B51 /* Debug */,
+				54398FDD2F4979D3009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54398FDE2F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRunTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398FDF2F4979D3009D6B51 /* Debug */,
+				54398FE02F4979D3009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54398FE12F4979D3009D6B51 /* Build configuration list for PBXNativeTarget "YapRunUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398FE22F4979D3009D6B51 /* Debug */,
+				54398FE32F4979D3009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54398FF12F497A03009D6B51 /* Build configuration list for PBXNativeTarget "YapRunKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398FF22F497A03009D6B51 /* Debug */,
+				54398FF32F497A03009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5439900D2F497A35009D6B51 /* Build configuration list for PBXNativeTarget "YapRunActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5439900E2F497A35009D6B51 /* Debug */,
+				5439900F2F497A35009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.19.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		543991CC2F498152009D6B51 /* RunAnywhere */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			productName = RunAnywhere;
+		};
+		543991CE2F498152009D6B51 /* RunAnywhereONNX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			productName = RunAnywhereONNX;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 54398FB22F4979D2009D6B51 /* Project object */;
+}
