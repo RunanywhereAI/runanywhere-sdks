@@ -73,6 +73,14 @@ let package = Package(
             name: "RunAnywhereLlamaCPP",
             targets: ["LlamaCPPRuntime"]
         ),
+
+        // =================================================================
+        // RAG Backend - adds Retrieval-Augmented Generation
+        // =================================================================
+        .library(
+            name: "RunAnywhereRAG",
+            targets: ["RAGRuntime"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -111,8 +119,18 @@ let package = Package(
         // =================================================================
         .target(
             name: "ONNXBackend",
-            dependencies: ["RABackendONNXBinary", "ONNXRuntimeBinary"],
+            dependencies: ["RABackendONNXBinary"],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // C Bridge Module - RAG Backend Headers
+        // =================================================================
+        .target(
+            name: "RAGBackend",
+            dependencies: ["RABackendRAGBinary"],
+            path: "sdk/runanywhere-swift/Sources/RAGRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -131,6 +149,7 @@ let package = Package(
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
+                "RAGBackend",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
@@ -181,6 +200,22 @@ let package = Package(
             ]
         ),
 
+        // =================================================================
+        // RAG Runtime Backend
+        // =================================================================
+        .target(
+            name: "RAGRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "RAGBackend",
+            ],
+            path: "sdk/runanywhere-swift/Sources/RAGRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+            ]
+        ),
+
     ] + binaryTargets()
 )
 
@@ -211,16 +246,20 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
+            .binaryTarget(
+                name: "RABackendRAGBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendRAG.xcframework"
+            ),
         ]
 
         // Local combined ONNX Runtime xcframework (iOS + macOS)
         // Created by: cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
-        targets.append(
-            .binaryTarget(
-                name: "ONNXRuntimeBinary",
-                path: "sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
-            )
-        )
+        // targets.append(
+        //     .binaryTarget(
+        //         name: "ONNXRuntimeBinary",
+        //         path: "sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
+        //     )
+        // )
 
         return targets
     } else {
@@ -244,6 +283,11 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
                 checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
+            ),
+            .binaryTarget(
+                name: "RABackendRAGBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendRAG-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
