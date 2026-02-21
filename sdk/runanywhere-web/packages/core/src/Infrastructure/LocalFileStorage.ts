@@ -350,6 +350,23 @@ export class LocalFileStorage {
   }
 
   /**
+   * Get the File object for a model without reading into memory.
+   * Enables streaming / mounting for locally stored files.
+   * @param key - Model identifier
+   */
+  async loadModelFile(key: string): Promise<File | null> {
+    if (!this.dirHandle || !this._isReady) return null;
+
+    try {
+      const filename = this.sanitizeFilename(key);
+      const fileHandle = await this.dirHandle.getFileHandle(filename);
+      return await fileHandle.getFile();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Check if a model file exists in local storage.
    * @param key - Model identifier
    */

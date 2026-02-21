@@ -326,9 +326,24 @@ class ModelManagerImpl {
         if (!data) throw new Error('Model not downloaded — please download the model first.');
         await this.loadVADModel(model, data);
       } else {
-        const dataStream = await this.downloader.loadStreamFromOPFS(modelId);
-        if (!dataStream) throw new Error('Model not downloaded — please download the model first.');
-        await this.loadLLMModel(model, modelId, undefined, dataStream);
+        // Try to get the File object directly (WORKERFS path) to avoid loading into memory
+        const file = await this.downloader.loadModelFile(modelId);
+        let dataStream: ReadableStream<Uint8Array> | undefined;
+        let data: Uint8Array | undefined;
+
+        if (!file) {
+          // Try streaming
+          dataStream = await this.downloader.loadStreamFromOPFS(modelId) ?? undefined;
+
+          if (!dataStream) {
+            // Fallback to legacy buffering
+            data = await this.downloader.loadFromOPFS(modelId) ?? undefined;
+          }
+        }
+
+        if (!file && !dataStream && !data) throw new Error('Model not downloaded — please download the model first.');
+
+        await this.loadLLMModel(model, modelId, data, dataStream, file ?? undefined);
       }
 
       this.loadedByCategory.set(category, modelId);
@@ -461,11 +476,12 @@ class ModelManagerImpl {
   /**
    * Build a ModelLoadContext for passing to backend loaders.
    */
-  private buildLoadContext(model: ManagedModel, data?: Uint8Array, dataStream?: ReadableStream<Uint8Array>): ModelLoadContext {
+  private buildLoadContext(model: ManagedModel, data?: Uint8Array, dataStream?: ReadableStream<Uint8Array>, file?: File): ModelLoadContext {
     return {
       model,
       data,
       dataStream,
+      file,
       downloadFile: (url: string) => this.downloader.downloadFile(url),
       loadFile: (fileKey: string) => this.downloader.loadFromOPFS(fileKey),
       storeFile: (fileKey: string, fileData: Uint8Array) => this.downloader.storeInOPFS(fileKey, fileData),
@@ -478,9 +494,9 @@ class ModelManagerImpl {
    * The loader (in @runanywhere/web-llamacpp) handles writing to its own
    * Emscripten FS and calling the C API.
    */
-  private async loadLLMModel(model: ManagedModel, _modelId: string, data?: Uint8Array, dataStream?: ReadableStream<Uint8Array>): Promise<void> {
+  private async loadLLMModel(model: ManagedModel, _modelId: string, data?: Uint8Array, dataStream?: ReadableStream<Uint8Array>, file?: File): Promise<void> {
     if (!this.llmLoader) throw new Error('No LLM loader registered. Register the @runanywhere/web-llamacpp package.');
-    const ctx = this.buildLoadContext(model, data, dataStream);
+    const ctx = this.buildLoadContext(model, data, dataStream, file);
     await this.llmLoader.loadModelFromData(ctx);
     logger.info(`LLM model loaded: ${model.id}`);
   }
@@ -498,9 +514,18 @@ class ModelManagerImpl {
     if (!mmprojFile) {
       // No mmproj — load as text-only LLM
       logger.warning(`No mmproj found, loading as text-only LLM: ${modelId}`);
-      const dataStream = await this.downloader.loadStreamFromOPFS(modelId);
-      if (!dataStream) throw new Error('Model not downloaded.');
-      await this.loadLLMModel(model, modelId, undefined, dataStream);
+
+      const file = await this.downloader.loadModelFile(modelId);
+      let dataStream: ReadableStream<Uint8Array> | undefined;
+      let data: Uint8Array | undefined;
+
+      if (!file) {
+        dataStream = await this.downloader.loadStreamFromOPFS(modelId) ?? undefined;
+        if (!dataStream) data = await this.downloader.loadFromOPFS(modelId) ?? undefined;
+      }
+
+      if (!file && !dataStream && !data) throw new Error('Model not downloaded.');
+      await this.loadLLMModel(model, modelId, data, dataStream, file ?? undefined);
       return;
     }
 

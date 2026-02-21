@@ -208,6 +208,25 @@ export class OPFSStorage {
   }
 
   /**
+   * Load model file object from OPFS without reading contents into memory.
+   *
+   * @param key - Model identifier or nested path
+   * @returns File object, or null if not found
+   */
+  async loadModelFile(key: string): Promise<File | null> {
+    if (!this.modelsDir) return null;
+
+    try {
+      const dir = await this.resolveParentDir(key, /* create */ false);
+      const filename = this.resolveFilename(key);
+      const fileHandle = await dir.getFileHandle(filename);
+      return await fileHandle.getFile();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Check if a model exists in OPFS.
    *
    * @param key - Model identifier or nested path
