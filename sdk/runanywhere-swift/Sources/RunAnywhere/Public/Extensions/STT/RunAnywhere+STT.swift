@@ -10,6 +10,7 @@
 @preconcurrency import AVFoundation
 import CRACommons
 import Foundation
+import os
 
 // MARK: - STT Operations
 
@@ -272,19 +273,23 @@ public extension RunAnywhere {
     /// Process audio samples for streaming transcription
     /// - Parameters:
     ///   - samples: Audio samples
-    ///   - language: BCP-47 language code for transcription (default: "en")
-    static func processStreamingAudio(_ samples: [Float], language: String = "en") async throws {
+    ///   - options: Transcription options (default: STTOptions())
+    static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        guard await CppBridge.STT.shared.isLoaded else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
+        }
+
         let handle = try await CppBridge.STT.shared.getHandle()
 
-        let syntheticOptions = STTOptions(language: language)
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
 
+        // sttResult is intentionally unused: the C layer delivers results via CppEventBridge events.
         var sttResult = rac_stt_result_t()
-        let transcribeResult = syntheticOptions.withCOptions { cOptionsPtr in
+        let transcribeResult = options.withCOptions { cOptionsPtr in
             data.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe(
                     handle,
@@ -319,10 +324,17 @@ public extension RunAnywhere {
 
 // MARK: - Streaming Context Helper
 
-/// Context class for bridging C callbacks to Swift closures
-private final class STTStreamingContext: @unchecked Sendable {
+/// Context class for bridging C callbacks to Swift closures.
+/// `finalText` is written by the C callback thread and read by the async
+/// continuation — protected by OSAllocatedUnfairLock to prevent data races.
+private final class STTStreamingContext: Sendable {
     let onPartialResult: (STTTranscriptionResult) -> Void
-    var finalText: String = ""
+    private let _finalText = OSAllocatedUnfairLock(initialState: "")
+
+    var finalText: String {
+        get { _finalText.withLock { $0 } }
+        set { _finalText.withLock { $0 = newValue } }
+    }
 
     init(onPartialResult: @escaping (STTTranscriptionResult) -> Void) {
         self.onPartialResult = onPartialResult
