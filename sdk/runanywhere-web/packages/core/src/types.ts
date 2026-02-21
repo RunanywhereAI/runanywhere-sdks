@@ -1,12 +1,4 @@
-/**
- * RunAnywhere Web SDK - Public API Type Definitions
- *
- * Single entry point for all public-facing types. Re-exports from types/enums
- * and types/models, and adds chat/generation/IRunAnywhere interfaces for
- * full TypeScript parity with the React Native SDK.
- */
 
-// Re-export all enums and models (existing types)
 export {
   AccelerationPreference,
   ComponentState,
@@ -56,26 +48,17 @@ import type {
 } from './types/models';
 import type { ModelCategory } from './types/enums';
 
-/** @deprecated Use SDKInitOptions. Kept for API compatibility. */
 export type InitializeOptions = SDKInitOptions;
 
-/** Alias for GenerationOptions (generate/chat options). */
 export type GenerateOptions = GenerationOptions;
 
-/** Alias for STTOptions (transcription options). */
 export type TranscribeOptions = STTOptions;
 
-/** Alias for STTResult (transcription result). */
 export type TranscribeResult = STTResult;
 
-/** Alias for TTSConfiguration (synthesis options). */
 export type SynthesisOptions = TTSConfiguration;
 
-// ---------------------------------------------------------------------------
-// Chat & model descriptor types
-// ---------------------------------------------------------------------------
 
-/** A single message in a chat conversation. */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -104,16 +87,10 @@ export interface ModelDescriptor {
   artifactType?: ModelArtifactType;
 }
 
-// ---------------------------------------------------------------------------
-// IRunAnywhere interface (describes the RunAnywhere object shape)
-// ---------------------------------------------------------------------------
 
 import type { DownloadProgress } from './Infrastructure/ModelRegistry';
 
-/**
- * Interface describing the public RunAnywhere API surface.
- * Implemented by the RunAnywhere object exported from this package.
- */
+
 export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;
