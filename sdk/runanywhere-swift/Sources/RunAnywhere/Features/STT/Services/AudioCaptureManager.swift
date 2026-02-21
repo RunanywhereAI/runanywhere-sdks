@@ -84,22 +84,30 @@ public class AudioCaptureManager: ObservableObject {
         }
 
         #if os(iOS) || os(tvOS)
-        // Configure audio session (iOS/tvOS only)
-        // watchOS is NOT supported - AVAudioEngine inputNode tap does not work on watchOS
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.record, mode: .measurement)
         try audioSession.setActive(true)
         #endif
 
-        // Create audio engine (works on all platforms)
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
 
-        // Get input format
+        #if os(macOS)
+        // On macOS there is no AVAudioSession. Preparing the engine before
+        // reading the input node format establishes the audio-unit graph
+        // connections and avoids kAudioUnitErr_NoConnection (-10877).
+        engine.prepare()
+        #endif
+
         let inputFormat = inputNode.outputFormat(forBus: 0)
+
+        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
+            logger.error("No valid audio input device (sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount))")
+            throw AudioCaptureError.noInputDevice
+        }
+
         logger.info("Input format: \(inputFormat.sampleRate) Hz, \(inputFormat.channelCount) channels")
 
-        // Create converter format (16kHz, mono, int16)
         guard let outputFormat = AVAudioFormat(
             commonFormat: .pcmFormatInt16,
             sampleRate: targetSampleRate,
@@ -109,24 +117,19 @@ public class AudioCaptureManager: ObservableObject {
             throw AudioCaptureError.formatConversionFailed
         }
 
-        // Create audio converter
         guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
             throw AudioCaptureError.formatConversionFailed
         }
 
-        // Install tap on input node
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
 
-            // Update audio level for visualization
             self.updateAudioLevel(buffer: buffer)
 
-            // Convert to target format
             guard let convertedBuffer = self.convert(buffer: buffer, using: converter, to: outputFormat) else {
                 return
             }
 
-            // Convert to Data (int16 PCM)
             if let audioData = self.bufferToData(buffer: convertedBuffer) {
                 DispatchQueue.main.async {
                     onAudioData(audioData)
@@ -134,7 +137,6 @@ public class AudioCaptureManager: ObservableObject {
             }
         }
 
-        // Start engine (remove tap on failure to avoid resource leak)
         do {
             try engine.start()
         } catch {
@@ -177,12 +179,18 @@ public class AudioCaptureManager: ObservableObject {
 
     // MARK: - Private Helpers
 
-    /// Converts a PCM buffer to the target format. Internal for unit testing (converter input block single-use behavior).
+    /// Converts a PCM buffer to the target format. Internal for unit testing.
     internal func convert(
         buffer: AVAudioPCMBuffer,
         using converter: AVAudioConverter,
         to format: AVAudioFormat
     ) -> AVAudioPCMBuffer? {
+        // The input block returns .endOfStream after providing one buffer.
+        // On macOS the converter stays in that "finished" state across calls,
+        // producing empty output for every subsequent buffer. Resetting before
+        // each conversion clears the state so the next buffer is processed.
+        converter.reset()
+
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * (format.sampleRate / buffer.format.sampleRate))
 
         guard let convertedBuffer = AVAudioPCMBuffer(
@@ -260,6 +268,7 @@ public enum AudioCaptureError: LocalizedError {
     case permissionDenied
     case formatConversionFailed
     case engineStartFailed
+    case noInputDevice
 
     public var errorDescription: String? {
         switch self {
@@ -269,6 +278,8 @@ public enum AudioCaptureError: LocalizedError {
             return "Failed to convert audio format"
         case .engineStartFailed:
             return "Failed to start audio engine"
+        case .noInputDevice:
+            return "No audio input device available"
         }
     }
 }
