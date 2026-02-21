@@ -33,6 +33,11 @@ final class LLMViewModel {
     private(set) var modelSupportsStreaming = true
     private(set) var currentConversation: Conversation?
 
+    // MARK: - LoRA Adapter State
+
+    private(set) var loraAdapters: [LoRAAdapterInfo] = []
+    private(set) var isLoadingLoRA = false
+
     // MARK: - User Settings
 
     var currentInput = ""
@@ -306,6 +311,50 @@ final class LLMViewModel {
 
     func createNewConversation() {
         clearChat()
+    }
+
+    // MARK: - LoRA Adapter Management
+
+    func loadLoraAdapter(path: String, scale: Float) async {
+        isLoadingLoRA = true
+        error = nil
+        do {
+            try await RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path: path, scale: scale))
+            await refreshLoraAdapters()
+            logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
+        } catch {
+            logger.error("Failed to load LoRA adapter: \(error)")
+            self.error = error
+        }
+        isLoadingLoRA = false
+    }
+
+    func removeLoraAdapter(path: String) async {
+        do {
+            try await RunAnywhere.removeLoraAdapter(path)
+            await refreshLoraAdapters()
+        } catch {
+            logger.error("Failed to remove LoRA adapter: \(error)")
+            self.error = error
+        }
+    }
+
+    func clearLoraAdapters() async {
+        do {
+            try await RunAnywhere.clearLoraAdapters()
+            loraAdapters = []
+        } catch {
+            logger.error("Failed to clear LoRA adapters: \(error)")
+            self.error = error
+        }
+    }
+
+    func refreshLoraAdapters() async {
+        do {
+            loraAdapters = try await RunAnywhere.getLoadedLoraAdapters()
+        } catch {
+            logger.error("Failed to refresh LoRA adapters: \(error)")
+        }
     }
 
     // MARK: - Private Methods - Message Generation
