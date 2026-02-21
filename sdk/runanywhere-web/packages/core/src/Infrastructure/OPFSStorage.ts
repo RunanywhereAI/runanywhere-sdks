@@ -21,7 +21,6 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
-import type { DirectoryHandleWithEntries } from '../types/fsapi';
 
 const logger = new SDKLogger('OPFSStorage');
 
@@ -295,8 +294,7 @@ export class OPFSStorage {
 
     const models: StoredModelInfo[] = [];
 
-    const dir = this.modelsDir as DirectoryHandleWithEntries;
-    for await (const [name, handle] of dir.entries()) {
+    for await (const [name, handle] of this.modelsDir.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

@@ -27,7 +27,6 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
-import type { DirectoryHandleWithEntries } from '../types/fsapi';
 
 const logger = new SDKLogger('LocalFileStorage');
 
@@ -422,9 +421,7 @@ export class LocalFileStorage {
 
     const models: Array<{ id: string; sizeBytes: number; lastModified: number }> = [];
 
-    // FileSystemDirectoryHandle.entries() exists in runtime but may be missing from older DOM lib types
-    const dir = this.dirHandle as DirectoryHandleWithEntries;
-    for await (const [name, handle] of dir.entries()) {
+    for await (const [name, handle] of this.dirHandle.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

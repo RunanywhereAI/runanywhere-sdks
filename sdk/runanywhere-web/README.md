@@ -211,7 +211,7 @@ try {
 }
 ```
 
-Note: `InitializeOptions` is an alias for `SDKInitOptions`; `GenerateOptions` for `GenerationOptions`. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
+Note: `InitializeOptions` is a convenience alias for `SDKInitOptions`; `GenerateOptions` for `GenerationOptions`. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
 
 ---
 

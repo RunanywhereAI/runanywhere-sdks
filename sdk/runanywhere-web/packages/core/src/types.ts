@@ -61,10 +61,10 @@ import type {
 } from './types/models';
 import type { ModelCategory } from './types/enums';
 
-/** @alias SDKInitOptions — convenience alias for SDK initialization options. */
+/** Convenience alias for {@link SDKInitOptions}. */
 export type InitializeOptions = SDKInitOptions;
 
-/** @alias GenerationOptions — convenience alias for generation options. */
+/** Convenience alias for {@link GenerationOptions}. */
 export type GenerateOptions = GenerationOptions;
 
 export type TranscribeOptions = STTOptions;

@@ -18,7 +18,6 @@ import type { MetadataMap } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
 import { ModelDownloader } from './ModelDownloader';
 import { inferModelFromFilename, sanitizeId } from './ModelFileInference';
-import type { DirectoryHandleWithEntries } from '../types/fsapi';
 import type {
   ManagedModel,
   CompactModelDef,
@@ -425,8 +424,7 @@ class ModelManagerImpl {
     try {
       const root = await navigator.storage.getDirectory();
       const modelsDir = await root.getDirectoryHandle('models');
-      const dir = modelsDir as DirectoryHandleWithEntries;
-      for await (const [name, handle] of dir.entries()) {
+      for await (const [name, handle] of modelsDir.entries()) {
         if (handle.kind === 'file' && !name.startsWith('_')) {
           modelCount++;
           const file = await (handle as FileSystemFileHandle).getFile();
