@@ -207,7 +207,7 @@ public class AudioCaptureManager: ObservableObject {
         using converter: AVAudioConverter,
         to format: AVAudioFormat
     ) -> AVAudioPCMBuffer? {
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * (format.sampleRate / buffer.format.sampleRate))
+        let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * (format.sampleRate / buffer.format.sampleRate)))
 
         guard let convertedBuffer = AVAudioPCMBuffer(
             pcmFormat: format,
@@ -220,7 +220,7 @@ public class AudioCaptureManager: ObservableObject {
         var hasProvidedData = false
         let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
             if hasProvidedData {
-                outStatus.pointee = .endOfStream
+                outStatus.pointee = .noDataNow
                 return nil
             }
             hasProvidedData = true

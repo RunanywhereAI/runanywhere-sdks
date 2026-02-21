@@ -231,17 +231,16 @@ final class FlowSessionManager: ObservableObject {
             return
         }
 
-        // Transition away from .listening — the audio callback gate immediately stops
-        // buffering. Engine keeps running for subsequent dictation segments.
+        // Gate closed: transition away from .listening so the audio callback stops buffering.
+        // Engine keeps running for subsequent dictation segments.
         transition(to: .transcribing)
         SharedDataBridge.shared.sessionState = "transcribing"
         if #available(iOS 16.1, *) {
             await updateLiveActivity(phase: "transcribing", transcript: "")
         }
 
-        // Drain: allow any DispatchQueue.main callbacks already queued before the state
-        // change to flush (they will see sessionPhase != .listening and discard their data)
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        // Brief drain to let any already-queued DispatchQueue.main.async audio callbacks flush.
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
 
         let audio = audioBuffer
         audioBuffer = Data()
@@ -278,11 +277,6 @@ final class FlowSessionManager: ObservableObject {
     // MARK: - Transcription
 
     private func transcribeAndDeliver(_ audio: Data) async {
-        transition(to: .transcribing)
-        SharedDataBridge.shared.sessionState = "transcribing"
-        if #available(iOS 16.1, *) {
-            await updateLiveActivity(phase: "transcribing", transcript: "")
-        }
         logger.info("Transcribing \(audio.count) bytes")
 
         do {
