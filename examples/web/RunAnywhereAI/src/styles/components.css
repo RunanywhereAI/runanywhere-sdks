@@ -1682,6 +1682,44 @@ input[type="range"]::-webkit-slider-thumb {
   height: 72px;
 }
 
+/** Drag-and-drop file zone for STT */
+.stt-drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 18px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+  margin-top: 16px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+  user-select: none;
+}
+
+.stt-drop-zone:hover,
+.stt-drop-zone.drag-over {
+  border-color: var(--color-blue);
+  background: rgba(59, 130, 246, 0.06);
+  color: var(--color-blue);
+}
+
+.stt-drop-zone-icon {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.stt-drop-zone-label {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.stt-drop-zone-hint {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
 /* =============================================================================
  * TTS (Speak) Sub-view Specifics
  * ============================================================================= */

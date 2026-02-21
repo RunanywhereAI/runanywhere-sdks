@@ -77,6 +77,14 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
         </div>
         <h3 class="font-semibold">Ready to transcribe</h3>
         <p id="stt-mode-desc" class="helper-text text-center">Record first, then transcribe</p>
+
+        <!-- File drop zone — visible in batch mode only -->
+        <div id="stt-drop-zone" class="stt-drop-zone">
+          <div class="stt-drop-zone-icon">📂</div>
+          <div class="stt-drop-zone-label">Drop audio file or click to browse</div>
+          <div class="stt-drop-zone-hint">wav · mp3 · m4a · ogg · flac</div>
+        </div>
+        <input type="file" id="stt-file-input" accept="audio/*" style="display:none">
       </div>
 
       <!-- Transcription result area -->
@@ -118,6 +126,9 @@ export function initTranscribeTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#stt-toolbar-model')!.addEventListener('click', () =>
     showModelSelectionSheet(ModelCategory.SpeechRecognition),
   );
+
+  // File drop zone
+  wireDropZone();
 
   // Subscribe to model changes so the pill label stays current
   ModelManager.onChange(onSTTModelsChanged);
@@ -344,6 +355,67 @@ function stopLiveVAD(): void {
 }
 
 // ---------------------------------------------------------------------------
+// File Drop Zone (delegates all conversion + transcription to SDK)
+// ---------------------------------------------------------------------------
+
+function wireDropZone(): void {
+  const dropZone = container.querySelector('#stt-drop-zone') as HTMLElement;
+  const fileInput = container.querySelector('#stt-file-input') as HTMLInputElement;
+
+  // Click → open file picker
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  // File picker selection
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) {
+      fileInput.value = '';
+      void transcribeFromFile(file);
+    }
+  });
+
+  // Drag events
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer?.files[0];
+    if (file) void transcribeFromFile(file);
+  });
+}
+
+async function transcribeFromFile(file: File): Promise<void> {
+  if (sttState !== 'idle') return;
+
+  sttError = '';
+  sttTranscription = '';
+  sttState = 'transcribing';
+  renderSTTUI();
+
+  try {
+    const model = await ModelManager.ensureLoaded(ModelCategory.SpeechRecognition);
+    if (!model) throw new Error('No STT model loaded. Tap the model button to download one.');
+
+    const { STT } = await import('../../../../../sdk/runanywhere-web/packages/onnx/src/index');
+    if (!STT.isModelLoaded) throw new Error('STT model not loaded. Select a model first.');
+
+    // SDK handles all decoding, resampling, and transcription
+    const result = await STT.transcribeFile(file);
+    sttTranscription = result.text.trim() || '';
+    if (!sttTranscription) sttError = 'No speech detected in the audio file.';
+  } catch (err) {
+    sttError = err instanceof Error ? err.message : String(err);
+  }
+
+  sttState = 'idle';
+  renderSTTUI();
+}
+
+// ---------------------------------------------------------------------------
 // UI Rendering
 // ---------------------------------------------------------------------------
 
@@ -381,6 +453,12 @@ function renderSTTUI(): void {
   readyArea.style.display = hasResult ? 'none' : 'flex';
   resultArea.style.display = hasResult ? 'flex' : 'none';
   if (hasResult) resultText.textContent = sttTranscription || 'Transcribing...';
+
+  // Drop zone: visible only in batch idle state
+  const dropZone = container.querySelector('#stt-drop-zone') as HTMLElement | null;
+  if (dropZone) {
+    dropZone.style.display = (sttMode === 'batch' && sttState === 'idle') ? '' : 'none';
+  }
 
   // Level bars
   levelBars.style.display = sttState === 'recording' ? '' : 'none';

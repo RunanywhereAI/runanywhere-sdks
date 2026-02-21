@@ -17,9 +17,12 @@
  * package (@runanywhere/web) is pure TypeScript.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere } from '@runanywhere/web';
 import type { AccelerationMode } from '@runanywhere/web';
+import { getDeviceInfo } from '@runanywhere/web';
 import { PlatformAdapter } from './PlatformAdapter';
+import { AnalyticsEventsBridge } from './AnalyticsEventsBridge';
+import { TelemetryService } from './TelemetryService';
 
 const logger = new SDKLogger('LlamaCppBridge');
 
@@ -111,6 +114,48 @@ export interface LlamaCppModule {
   // Tool Calling
   _rac_tool_call_parse?: (textPtr: number, outResultPtr: number) => number;
 
+  // Telemetry Manager
+  _rac_telemetry_manager_create?: (env: number, deviceIdPtr: number, platformPtr: number, sdkVersionPtr: number) => number;
+  _rac_telemetry_manager_destroy?: (handle: number) => void;
+  _rac_telemetry_manager_set_device_info?: (handle: number, modelPtr: number, osVersionPtr: number) => void;
+  _rac_telemetry_manager_set_http_callback?: (handle: number, callbackPtr: number, userData: number) => void;
+  _rac_telemetry_manager_track_analytics?: (handle: number, eventType: number, dataPtr: number) => number;
+  _rac_telemetry_manager_flush?: (handle: number) => number;
+  _rac_telemetry_manager_http_complete?: (handle: number, success: number, responsePtr: number, errorPtr: number) => void;
+
+  // Analytics Events
+  _rac_analytics_events_set_callback?: (callbackPtr: number, userData: number) => number;
+  _rac_analytics_events_has_callback?: () => number;
+
+  // Platform Emit Helpers (STT/TTS/VAD/Download — called from TypeScript via ccall)
+  _rac_analytics_emit_stt_model_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_stt_model_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_stt_transcription_completed?: (
+    transcriptionIdPtr: number, modelIdPtr: number, textPtr: number, confidence: number,
+    durationMs: number, audioLengthMs: number, audioSizeBytes: number, wordCount: number,
+    realTimeFactor: number, languagePtr: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_stt_transcription_failed?: (transcriptionIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_voice_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
+  _rac_analytics_emit_tts_voice_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_tts_synthesis_completed?: (
+    synthesisIdPtr: number, modelIdPtr: number, characterCount: number,
+    audioDurationMs: number, audioSizeBytes: number, processingDurationMs: number,
+    charactersPerSecond: number, sampleRate: number, framework: number,
+  ) => void;
+  _rac_analytics_emit_tts_synthesis_failed?: (synthesisIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
+  _rac_analytics_emit_vad_speech_started?: () => void;
+  _rac_analytics_emit_vad_speech_ended?: (speechDurationMs: number, energyLevel: number) => void;
+  _rac_analytics_emit_model_download_started?: (modelIdPtr: number) => void;
+  _rac_analytics_emit_model_download_completed?: (modelIdPtr: number, fileSizeBytes: number, durationMs: number) => void;
+  _rac_analytics_emit_model_download_failed?: (modelIdPtr: number, errorMsgPtr: number) => void;
+
+  // Dev Config (WASM wrappers)
+  _rac_wasm_dev_config_is_available?: () => number;
+  _rac_wasm_dev_config_get_supabase_url?: () => number;
+  _rac_wasm_dev_config_get_supabase_key?: () => number;
+  _rac_wasm_dev_config_get_build_token?: () => number;
+
   // Emscripten FS helpers
   FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
   FS_createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void;
@@ -131,6 +176,8 @@ export class LlamaCppBridge {
   private _loading: Promise<void> | null = null;
   private _accelerationMode: AccelerationMode = 'cpu';
   private _platformAdapter: PlatformAdapter | null = null;
+  private _analyticsEventsBridge: AnalyticsEventsBridge | null = null;
+  private _telemetryService: TelemetryService | null = null;
 
   /** Override the default URL to the racommons-llamacpp.js glue file. */
   wasmUrl: string | null = null;
@@ -196,6 +243,12 @@ export class LlamaCppBridge {
 
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
 
+      // Persist the resolved URL so VLMWorkerBridge (and others) can read it
+      if (useWebGPU) {
+        this.webgpuWasmUrl = moduleUrl;
+      }
+      this.wasmUrl = moduleUrl;
+
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
@@ -223,6 +276,21 @@ export class LlamaCppBridge {
 
       // Register the llama.cpp backend
       await this.registerBackend();
+
+      // Initialize analytics events bridge (subscribe to C++ events → TypeScript EventBus)
+      this._analyticsEventsBridge = new AnalyticsEventsBridge();
+
+      // Initialize telemetry service (C++ telemetry manager → browser fetch)
+      this._telemetryService = TelemetryService.shared;
+      const deviceInfo = await getDeviceInfo();
+      const environment = RunAnywhere.environment ?? SDKEnvironment.Production;
+      await this._telemetryService.initialize(this._module!, environment, deviceInfo);
+
+      // Wire analytics bridge: forwards C++ events to EventBus + TelemetryService
+      this._analyticsEventsBridge.register(
+        this._module!,
+        (eventType, dataPtr) => this._telemetryService?.trackAnalyticsEvent(eventType, dataPtr),
+      );
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
@@ -487,6 +555,17 @@ export class LlamaCppBridge {
   // -----------------------------------------------------------------------
 
   shutdown(): void {
+    // Flush and teardown telemetry before shutting down WASM
+    if (this._analyticsEventsBridge) {
+      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
+      this._analyticsEventsBridge = null;
+    }
+
+    if (this._telemetryService) {
+      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
+      this._telemetryService = null;
+    }
+
     if (this._module && this._loaded) {
       try { this._module._rac_shutdown(); } catch { /* ignore */ }
     }

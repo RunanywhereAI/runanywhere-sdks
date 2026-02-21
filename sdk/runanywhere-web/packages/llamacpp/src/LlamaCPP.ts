@@ -10,6 +10,7 @@
  *   LlamaCPP.addModel({ id: 'my-model', name: 'My Model', url: '...' });
  */
 
+import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { LlamaCppProvider } from './LlamaCppProvider';
 
 /** Module identifier. */
@@ -24,6 +25,11 @@ export const LlamaCPP = {
   /** Whether the backend is registered. */
   get isRegistered(): boolean {
     return LlamaCppProvider.isRegistered;
+  },
+
+  /** Current hardware acceleration mode ('cpu' | 'webgpu'). Available after register(). */
+  get accelerationMode(): string {
+    return LlamaCppBridge.shared?.accelerationMode ?? 'cpu';
   },
 
   /**

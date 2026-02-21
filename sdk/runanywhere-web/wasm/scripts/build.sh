@@ -72,8 +72,9 @@ while [[ $# -gt 0 ]]; do
         --all-backends)
             LLAMACPP="ON"
             VLM="ON"
-            WHISPERCPP="ON"
-            ONNX="ON"
+            # WhisperCPP excluded: v1.8.2 GGML API is incompatible with llama.cpp b8011+.
+            # STT is handled by sherpa-onnx (separate WASM module via --build-sherpa).
+            # ONNX excluded: requires native ONNX Runtime headers (not available for WASM).
             shift
             ;;
         --clean)
@@ -91,7 +92,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --whispercpp     Include whisper.cpp STT backend"
             echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
             echo "  --webgpu         Enable WebGPU GPU acceleration (produces racommons-webgpu variant)"
-            echo "  --all-backends   Enable all backends (llama.cpp + VLM + whisper.cpp + onnx)"
+            echo "  --all-backends   Enable WASM-compatible backends (llama.cpp + VLM)"
             echo "  --clean          Clean build directory before building"
             echo "  --help           Show this help"
             exit 0
