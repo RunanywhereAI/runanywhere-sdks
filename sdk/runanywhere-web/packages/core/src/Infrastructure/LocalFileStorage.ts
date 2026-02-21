@@ -27,6 +27,7 @@
  */
 
 import { SDKLogger } from '../Foundation/SDKLogger';
+import type { DirectoryHandleWithEntries } from '../types/fsapi';
 
 const logger = new SDKLogger('LocalFileStorage');
 
@@ -35,7 +36,6 @@ const logger = new SDKLogger('LocalFileStorage');
 // (Not yet in standard TypeScript DOM lib)
 // ---------------------------------------------------------------------------
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 interface FileSystemPermissionDescriptor {
   mode: 'read' | 'readwrite';
 }
@@ -44,7 +44,6 @@ interface FileSystemHandlePermissionMethods {
   queryPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
   requestPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
 // IndexedDB Constants
@@ -424,7 +423,7 @@ export class LocalFileStorage {
     const models: Array<{ id: string; sizeBytes: number; lastModified: number }> = [];
 
     // FileSystemDirectoryHandle.entries() exists in runtime but may be missing from older DOM lib types
-    const dir = this.dirHandle as FileSystemDirectoryHandle & { entries(): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]> };
+    const dir = this.dirHandle as DirectoryHandleWithEntries;
     for await (const [name, handle] of dir.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();

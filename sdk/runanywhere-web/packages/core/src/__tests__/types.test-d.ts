@@ -14,6 +14,7 @@ import {
   type ChatMessage,
   type ModelDescriptor,
   type DownloadProgress,
+  type IRunAnywhere,
 } from '../index';
 
 // InitializeOptions (SDKInitOptions) must accept environment
@@ -40,6 +41,7 @@ expectType<'user' | 'assistant' | 'system'>(msg.role);
 
 // role must not accept arbitrary strings
 // @ts-expect-error role must not accept 'admin'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- intentional for type test
 const bad: ChatMessage = { role: 'admin', content: 'x' };
 
 // ModelDescriptor and DownloadProgress are exported
@@ -59,3 +61,7 @@ const prog: DownloadProgress = {
   totalBytes: 200,
 };
 expectType<number>(prog.progress);
+
+// IRunAnywhere must be satisfied by the RunAnywhere export
+const sdk: IRunAnywhere = RunAnywhere;
+expectType<IRunAnywhere>(sdk);

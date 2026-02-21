@@ -1,4 +1,16 @@
+/**
+ * RunAnywhere Web SDK - Public API Type Definitions
+ *
+ * Single entry point for all public-facing types. Re-exports from types/enums
+ * and types/models, and adds chat/generation/IRunAnywhere interfaces for
+ * full TypeScript parity with the React Native SDK.
+ */
 
+import type { DownloadProgress } from './Infrastructure/ModelRegistry';
+
+export type { DownloadProgress };
+
+// Re-export all enums and models (existing types)
 export {
   AccelerationPreference,
   ComponentState,
@@ -8,6 +20,7 @@ export {
   FrameworkModality,
   HardwareAcceleration,
   LLMFramework,
+  ModelCategory,
   ModelFormat,
   ModelStatus,
   RoutingPolicy,
@@ -48,8 +61,10 @@ import type {
 } from './types/models';
 import type { ModelCategory } from './types/enums';
 
+/** @alias SDKInitOptions — convenience alias for SDK initialization options. */
 export type InitializeOptions = SDKInitOptions;
 
+/** @alias GenerationOptions — convenience alias for generation options. */
 export type GenerateOptions = GenerationOptions;
 
 export type TranscribeOptions = STTOptions;
@@ -88,9 +103,10 @@ export interface ModelDescriptor {
 }
 
 
-import type { DownloadProgress } from './Infrastructure/ModelRegistry';
-
-
+/**
+ * Interface describing the public RunAnywhere API surface.
+ * Implemented by the RunAnywhere object exported from this package.
+ */
 export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;

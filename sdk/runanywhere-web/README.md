@@ -173,20 +173,20 @@ import {
   SDKError,
   SDKErrorCode,
   isSDKError,
-  type InitializeOptions,
-  type GenerateOptions,
+  type SDKInitOptions,    // canonical name (or InitializeOptions alias)
+  type GenerationOptions, // canonical name (or GenerateOptions alias)
   type ChatMessage,
   type ModelDescriptor,
 } from '@runanywhere/web';
 
 // Fully typed initialization
-const options: InitializeOptions = {
+const options: SDKInitOptions = {
   environment: SDKEnvironment.Development,
 };
 await RunAnywhere.initialize(options);
 
 // Typed generation options (used by backend packages: LlamaCPP, ONNX)
-const genOptions: GenerateOptions = {
+const genOptions: GenerationOptions = {
   systemPrompt: 'You are a helpful assistant.',
   maxTokens: 256,
   temperature: 0.7,
