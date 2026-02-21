@@ -1,0 +1,62 @@
+{
+  "name": "@runanywhere/web",
+  "version": "0.1.0-beta.9",
+  "description": "RunAnywhere Web SDK - Core infrastructure for on-device AI in the browser (pure TypeScript)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1)"
+  },
+  "keywords": [
+    "runanywhere",
+    "ai",
+    "llm",
+    "stt",
+    "tts",
+    "vad",
+    "wasm",
+    "webgpu",
+    "on-device",
+    "browser",
+    "inference"
+  ],
+  "author": "RunAnywhere AI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
+    "directory": "sdk/runanywhere-web/packages/core"
+  },
+  "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
+  "bugs": {
+    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {},
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

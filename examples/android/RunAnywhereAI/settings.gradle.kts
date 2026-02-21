@@ -11,13 +11,14 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        mavenLocal() // Add Maven Local to use the published SDK
+        mavenLocal()
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") } // For android-vad and other JitPack libraries
+        maven { url = uri("https://jitpack.io") }
     }
     versionCatalogs {
         create("libs") {
@@ -29,28 +30,15 @@ dependencyResolutionManagement {
 rootProject.name = "RunAnywhereAI"
 include(":app")
 
-// =============================================================================
-// SDK Inclusion (Local Development)
-// =============================================================================
-// Include the main SDK module - JNI libraries are bundled directly in the SDK
-// When testLocal=false (default), libs are downloaded from GitHub releases
-// When testLocal=true, libs are built locally via ./scripts/build-local.sh
-// =============================================================================
+// SDK (local project dependency)
+include(":runanywhere-kotlin")
+project(":runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
 
-// Main SDK - includes JNI libraries for all AI capabilities
-include(":sdk:runanywhere-kotlin")
-project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
+// Backend modules
+include(":runanywhere-core-llamacpp")
+project(":runanywhere-core-llamacpp").projectDir =
+    file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
 
-// =============================================================================
-// Backend Adapter Modules (Pure Kotlin - no native libs)
-// =============================================================================
-// These modules provide Kotlin adapters for specific AI backends.
-// Native libraries are bundled in the main SDK (runanywhere-kotlin).
-
-// LlamaCPP module - LLM text generation adapter
-include(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")
-project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
-
-// ONNX module - STT, TTS, VAD adapter
-include(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")
-project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
+include(":runanywhere-core-onnx")
+project(":runanywhere-core-onnx").projectDir =
+    file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")

@@ -1,8 +1,16 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -12,21 +20,30 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import kotlinx.coroutines.launch
 
 /**
- * Text to Speech Screen - Matching iOS TextToSpeechView.swift exactly
- *
- * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
+ * Text to Speech Screen
  *
  * Features:
  * - Text input area with character count
@@ -41,120 +58,126 @@ import kotlinx.coroutines.launch
 fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
+    var showModelLoadedToast by remember { mutableStateOf(false) }
+    var loadedModelToastName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+    Scaffold(
+        topBar = {
+            if (uiState.isModelLoaded) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "Text to Speech",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    actions = {
+                        Surface(
+                            onClick = { showModelPicker = true },
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            TTSModelChip(
+                                modelName = uiState.selectedModelName,
+                                modifier = Modifier.padding(
+                                    start = 6.dp,
+                                    end = 12.dp,
+                                    top = 6.dp,
+                                    bottom = 6.dp,
+                                ),
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+            }
+        },
+    ) { paddingValues ->
+        Box(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .padding(paddingValues)
                     .background(MaterialTheme.colorScheme.background),
         ) {
-            // Header with title
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Text to Speech",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-
-            // Model Status Banner - Always visible
-            // iOS Reference: ModelStatusBanner component
-            ModelStatusBannerTTS(
-                framework = uiState.selectedFramework?.displayName,
-                modelName = uiState.selectedModelName,
-                isLoading = uiState.isGenerating && uiState.selectedModelName == null,
-                onSelectModel = { showModelPicker = true },
-            )
-
-            HorizontalDivider()
-
-            // Main content - only enabled when model is selected
-            if (uiState.isModelLoaded) {
-                // Scrollable content area
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                ) {
-                    // Text input section
-                    // iOS Reference: TextEditor in TextToSpeechView
-                    TextInputSection(
-                        text = uiState.inputText,
-                        onTextChange = { viewModel.updateInputText(it) },
-                        characterCount = uiState.characterCount,
-                        maxCharacters = uiState.maxCharacters,
-                        onShuffle = { viewModel.shuffleSampleText() },
-                    )
-
-                    // Voice settings section
-                    // iOS Reference: Voice Settings section with sliders
-                    VoiceSettingsSection(
-                        speed = uiState.speed,
-                        pitch = uiState.pitch,
-                        onSpeedChange = { viewModel.updateSpeed(it) },
-                        onPitchChange = { viewModel.updatePitch(it) },
-                    )
-
-                    // Audio info section (shown after generation)
-                    // iOS Reference: Audio Info section with metadata
-                    if (uiState.audioDuration != null) {
-                        AudioInfoSection(
-                            duration = uiState.audioDuration!!,
-                            audioSize = uiState.audioSize,
-                            sampleRate = uiState.sampleRate,
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.isModelLoaded) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        TextInputSection(
+                            text = uiState.inputText,
+                            onTextChange = { viewModel.updateInputText(it) },
+                            characterCount = uiState.characterCount,
+                            maxCharacters = uiState.maxCharacters,
+                            onShuffle = { viewModel.shuffleSampleText() },
                         )
+
+                        VoiceSettingsSection(
+                            speed = uiState.speed,
+                            pitch = uiState.pitch,
+                            onSpeedChange = { viewModel.updateSpeed(it) },
+                            onPitchChange = { viewModel.updatePitch(it) },
+                        )
+
+                        if (uiState.audioDuration != null) {
+                            AudioInfoSection(
+                                duration = uiState.audioDuration!!,
+                                audioSize = uiState.audioSize,
+                                sampleRate = uiState.sampleRate,
+                            )
+                        }
                     }
+
+                    HorizontalDivider()
+
+                    ControlsSection(
+                        isGenerating = uiState.isGenerating,
+                        isPlaying = uiState.isPlaying,
+                        isSpeaking = uiState.isSpeaking,
+                        hasGeneratedAudio = uiState.hasGeneratedAudio,
+                        isSystemTTS = uiState.isSystemTTS,
+                        isTextEmpty = uiState.inputText.isEmpty(),
+                        isModelSelected = uiState.selectedModelName != null,
+                        playbackProgress = uiState.playbackProgress,
+                        currentTime = uiState.currentTime,
+                        duration = uiState.audioDuration ?: 0.0,
+                        errorMessage = uiState.errorMessage,
+                        onGenerate = { viewModel.generateSpeech() },
+                        onStopSpeaking = { viewModel.stopSynthesis() },
+                        onTogglePlayback = { viewModel.togglePlayback() },
+                    )
                 }
-
-                HorizontalDivider()
-
-                // Controls section
-                // iOS Reference: Controls VStack at bottom
-                ControlsSection(
-                    isGenerating = uiState.isGenerating,
-                    isPlaying = uiState.isPlaying,
-                    isSpeaking = uiState.isSpeaking,
-                    hasGeneratedAudio = uiState.hasGeneratedAudio,
-                    isSystemTTS = uiState.isSystemTTS,
-                    isTextEmpty = uiState.inputText.isEmpty(),
-                    isModelSelected = uiState.selectedModelName != null,
-                    playbackProgress = uiState.playbackProgress,
-                    currentTime = uiState.currentTime,
-                    duration = uiState.audioDuration ?: 0.0,
-                    errorMessage = uiState.errorMessage,
-                    onGenerate = { viewModel.generateSpeech() },
-                    onStopSpeaking = { viewModel.stopSynthesis() },
-                    onTogglePlayback = { viewModel.togglePlayback() },
-                )
-            } else {
-                // No model selected - show spacer
-                Spacer(modifier = Modifier.weight(1f))
             }
-        }
 
-        // Overlay when no model is selected
-        // iOS Reference: ModelRequiredOverlay component
-        if (!uiState.isModelLoaded && !uiState.isGenerating) {
-            ModelRequiredOverlayTTS(
-                onSelectModel = { showModelPicker = true },
+            if (!uiState.isModelLoaded && !uiState.isGenerating) {
+                ModelRequiredOverlay(
+                    modality = ModelSelectionContext.TTS,
+                    onSelectModel = { showModelPicker = true },
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+
+            // Model loaded toast overlay
+            ModelLoadedToast(
+                modelName = loadedModelToastName,
+                isVisible = showModelLoadedToast,
+                onDismiss = { showModelLoadedToast = false },
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
+    }
 
-        // Model picker bottom sheet - Full-screen with framework/model hierarchy
-        // iOS Reference: ModelSelectionSheet(context: .tts)
-        if (showModelPicker) {
+    if (showModelPicker) {
             ModelSelectionBottomSheet(
                 context = ModelSelectionContext.TTS,
                 onDismiss = { showModelPicker = false },
@@ -168,16 +191,95 @@ fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
                             framework = model.framework,
                         )
                         showModelPicker = false
+                        // Show model loaded toast
+                        loadedModelToastName = model.name
+                        showModelLoadedToast = true
                     }
                 },
+            )
+        }
+}
+
+/**
+ * TTS app bar model chip - same style as ChatTopBar: pill Surface, model icon + name + Streaming.
+ */
+@Composable
+private fun TTSModelChip(
+    modelName: String?,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier,
+    ) {
+        if (modelName != null) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+            ) {
+                Image(
+                    painter = painterResource(id = getModelLogoResIdForName(modelName)),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text(
+                    text = shortModelNameTTS(modelName, maxLength = 12),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bolt,
+                        contentDescription = null,
+                        modifier = Modifier.size(10.dp),
+                        tint = AppColors.primaryGreen,
+                    )
+                    Text(
+                        text = "Streaming",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                        color = AppColors.primaryGreen,
+                    )
+                }
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.ViewInAr,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = AppColors.primaryAccent,
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "Select Model",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
 }
 
+private fun shortModelNameTTS(name: String, maxLength: Int = 15): String {
+    val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
+    return if (cleaned.length > maxLength) cleaned.take(maxLength - 1) + "\u2026" else cleaned
+}
+
 /**
- * Model Status Banner for TTS
- * iOS Reference: ModelStatusBanner in ModelStatusComponents.swift
+ * Model Status Banner for TTS (kept for reference; not used when app bar shows model)
  */
 @Composable
 private fun ModelStatusBannerTTS(
@@ -273,7 +375,6 @@ private fun ModelStatusBannerTTS(
 
 /**
  * Text Input Section
- * iOS Reference: TextEditor section in TextToSpeechView
  */
 @Composable
 private fun TextInputSection(
@@ -304,7 +405,7 @@ private fun TextInputSection(
         )
 
         // Character count and Surprise me! button row
-        // iOS Reference: HStack with character count and dice button
+        // Character count and dice button row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -316,22 +417,29 @@ private fun TextInputSection(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            TextButton(
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = AppColors.primaryPurple.copy(alpha = 0.15f),
                 onClick = onShuffle,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Casino,
-                    contentDescription = "Shuffle",
-                    modifier = Modifier.size(16.dp),
-                    tint = AppColors.primaryAccent,
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "Surprise me!",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = AppColors.primaryAccent,
-                )
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Surprise me",
+                        modifier = Modifier.size(11.dp),
+                        tint = AppColors.primaryPurple,
+                    )
+                    Text(
+                        text = "Surprise me",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.primaryPurple,
+                    )
+                }
             }
         }
     }
@@ -339,7 +447,6 @@ private fun TextInputSection(
 
 /**
  * Voice Settings Section with Speed and Pitch sliders
- * iOS Reference: Voice Settings section in TextToSpeechView
  */
 @Composable
 private fun VoiceSettingsSection(
@@ -392,7 +499,8 @@ private fun VoiceSettingsSection(
                 )
             }
 
-            // Pitch slider
+            // Pitch slider - Commented out for now
+            /*
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -415,18 +523,18 @@ private fun VoiceSettingsSection(
                     steps = 14,
                     colors =
                         SliderDefaults.colors(
-                            thumbColor = AppColors.primaryAccent,
-                            activeTrackColor = AppColors.primaryAccent,
+                            thumbColor = AppColors.primaryPurple,
+                            activeTrackColor = AppColors.primaryPurple,
                         ),
                 )
             }
+            */
         }
     }
 }
 
 /**
  * Audio Info Section
- * iOS Reference: Audio Info section in TextToSpeechView
  */
 @Composable
 private fun AudioInfoSection(
@@ -506,7 +614,6 @@ private fun AudioInfoRow(
 
 /**
  * Controls Section with Generate and Play buttons
- * iOS Reference: Controls VStack in TextToSpeechView
  */
 @Composable
 private fun ControlsSection(
@@ -534,12 +641,11 @@ private fun ControlsSection(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Error message
         errorMessage?.let { error ->
             Text(
                 text = error,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = AppColors.statusRed,
                 textAlign = TextAlign.Center,
             )
         }
@@ -672,74 +778,6 @@ private fun ControlsSection(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/**
- * Model Required Overlay for TTS
- * iOS Reference: ModelRequiredOverlay in ModelStatusComponents.swift
- */
-@Composable
-private fun ModelRequiredOverlayTTS(onSelectModel: () -> Unit) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.95f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(40.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.VolumeUp,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            )
-
-            Text(
-                text = "Text to Speech",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Text(
-                text = "Select a text-to-speech voice to generate audio. Choose from System TTS or Piper models.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            Button(
-                onClick = onSelectModel,
-                modifier =
-                    Modifier
-                        .fillMaxWidth(0.7f)
-                        .height(50.dp),
-                shape = RoundedCornerShape(25.dp),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = AppColors.primaryAccent,
-                        contentColor = Color.White,
-                    ),
-            ) {
-                Icon(
-                    Icons.Filled.Apps,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = Color.White,
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Select a Voice",
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-        }
     }
 }
 

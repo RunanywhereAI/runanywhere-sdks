@@ -11,23 +11,23 @@
 ext {
     // Set this to true for local development/testing
     // Set to false for production builds (downloads from GitHub releases)
-    testLocal = true
+    testLocal = false
 
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.1.4"
+    coreVersion = "0.1.6"
 
     // =============================================================================
     // Remote binary URLs
-    // RABackendLlamaCPP from runanywhere-binaries
+    // RABackendLlamaCPP from runanywhere-sdks
     // =============================================================================
     binariesGitHubOrg = "RunanywhereAI"
-    binariesRepo = "runanywhere-binaries"
+    binariesRepo = "runanywhere-sdks"
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    llamacppAndroidUrl = "${binariesBaseUrl}/core-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
+    llamacppAndroidUrl = "${binariesBaseUrl}/commons-v${coreVersion}/RABackendLlamaCPP-android-v${coreVersion}.zip"
 
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->

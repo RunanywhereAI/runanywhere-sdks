@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -20,6 +21,7 @@ import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -638,11 +640,12 @@ class RunAnywhere {
     logger.debug('Transcribing ${audioData.length} bytes of audio...');
     final startTime = DateTime.now().millisecondsSinceEpoch;
     final modelId = currentSTTModelId ?? 'unknown';
-    
+
     // Get model name for telemetry
-    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelInfo =
+        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
-    
+
     // Calculate audio duration from bytes (PCM16 at 16kHz mono)
     // Duration = bytes / 2 (16-bit = 2 bytes) / 16000 Hz * 1000 ms
     final calculatedDurationMs = (audioData.length / 32).round();
@@ -650,13 +653,14 @@ class RunAnywhere {
     try {
       final result = await DartBridge.stt.transcribe(audioData);
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      
+
       // Use calculated duration if C++ returns 0
-      final audioDurationMs = result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
-      
+      final audioDurationMs =
+          result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
+
       // Count words in transcription
-      final wordCount = result.text.trim().isEmpty 
-          ? 0 
+      final wordCount = result.text.trim().isEmpty
+          ? 0
           : result.text.trim().split(RegExp(r'\s+')).length;
 
       // Track transcription success with full metrics
@@ -709,24 +713,26 @@ class RunAnywhere {
     logger.debug('Transcribing ${audioData.length} bytes with details...');
     final startTime = DateTime.now().millisecondsSinceEpoch;
     final modelId = currentSTTModelId ?? 'unknown';
-    
+
     // Get model name for telemetry
-    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelInfo =
+        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
-    
+
     // Calculate audio duration from bytes (PCM16 at 16kHz mono)
     final calculatedDurationMs = (audioData.length / 32).round();
 
     try {
       final result = await DartBridge.stt.transcribe(audioData);
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      
+
       // Use calculated duration if C++ returns 0
-      final audioDurationMs = result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
-      
+      final audioDurationMs =
+          result.durationMs > 0 ? result.durationMs : calculatedDurationMs;
+
       // Count words in transcription
-      final wordCount = result.text.trim().isEmpty 
-          ? 0 
+      final wordCount = result.text.trim().isEmpty
+          ? 0
           : result.text.trim().split(RegExp(r'\s+')).length;
 
       // Track transcription success with full metrics
@@ -899,9 +905,10 @@ class RunAnywhere {
         'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
     final startTime = DateTime.now().millisecondsSinceEpoch;
     final voiceId = currentTTSVoiceId ?? 'unknown';
-    
+
     // Get model name for telemetry
-    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(voiceId);
+    final modelInfo =
+        await DartBridgeModelRegistry.instance.getPublicModel(voiceId);
     final modelName = modelInfo?.name;
 
     try {
@@ -912,7 +919,7 @@ class RunAnywhere {
         volume: volume,
       );
       final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      
+
       // Calculate audio size in bytes (Float32 samples = 4 bytes each)
       final audioSizeBytes = result.samples.length * 4;
 
@@ -1102,9 +1109,8 @@ class RunAnywhere {
 
       // Audio is already in WAV format (C++ voice agent converts Float32 TTS to WAV)
       // No conversion needed - pass directly to playback
-      final synthesizedAudio = result.audioWavData.isNotEmpty
-          ? result.audioWavData
-          : null;
+      final synthesizedAudio =
+          result.audioWavData.isNotEmpty ? result.audioWavData : null;
 
       logger.info(
         'Voice turn complete: transcript="${result.transcription.substring(0, result.transcription.length.clamp(0, 50))}", '
@@ -1181,10 +1187,26 @@ class RunAnywhere {
     }
 
     final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-    
+
     // Get model name from registry for telemetry
-    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelInfo =
+        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
+
+    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
+    String? effectiveSystemPrompt = opts.systemPrompt;
+    if (opts.structuredOutput != null) {
+      final jsonSystemPrompt =
+          DartBridgeStructuredOutput.shared.getSystemPrompt(
+        opts.structuredOutput!.schema,
+      );
+      // If user already provided a system prompt, prepend the JSON instructions
+      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
+        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
+      } else {
+        effectiveSystemPrompt = jsonSystemPrompt;
+      }
+    }
 
     try {
       // Generate directly via DartBridgeLLM (calls rac_llm_component_generate)
@@ -1192,6 +1214,7 @@ class RunAnywhere {
         prompt,
         maxTokens: opts.maxTokens,
         temperature: opts.temperature,
+        systemPrompt: effectiveSystemPrompt,
       );
 
       final endTime = DateTime.now();
@@ -1214,6 +1237,23 @@ class RunAnywhere {
         isStreaming: false,
       );
 
+      // Extract structured data if structuredOutput is provided
+      Map<String, dynamic>? structuredData;
+      if (opts.structuredOutput != null) {
+        try {
+          final jsonString =
+              DartBridgeStructuredOutput.shared.extractJson(result.text);
+          if (jsonString != null) {
+            final parsed = jsonDecode(jsonString);
+            structuredData = _normalizeStructuredData(parsed);
+          }
+        } catch (e) {
+          // JSON extraction/parse failed — return text result without structured data
+          final logger = SDKLogger('StructuredOutputHandler');
+          logger.info('JSON extraction/parse failed: $e');
+        }
+      }
+
       return LLMGenerationResult(
         text: result.text,
         inputTokens: result.promptTokens,
@@ -1222,6 +1262,7 @@ class RunAnywhere {
         latencyMs: latencyMs,
         framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
+        structuredData: structuredData,
       );
     } catch (e) {
       // Track generation failure
@@ -1278,10 +1319,26 @@ class RunAnywhere {
     }
 
     final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-    
+
     // Get model name from registry for telemetry
-    final modelInfo = await DartBridgeModelRegistry.instance.getPublicModel(modelId);
+    final modelInfo =
+        await DartBridgeModelRegistry.instance.getPublicModel(modelId);
     final modelName = modelInfo?.name;
+
+    // Determine effective system prompt - add JSON conversion instructions if structuredOutput is provided
+    String? effectiveSystemPrompt = opts.systemPrompt;
+    if (opts.structuredOutput != null) {
+      final jsonSystemPrompt =
+          DartBridgeStructuredOutput.shared.getSystemPrompt(
+        opts.structuredOutput!.schema,
+      );
+      // If user already provided a system prompt, prepend the JSON instructions
+      if (effectiveSystemPrompt != null && effectiveSystemPrompt.isNotEmpty) {
+        effectiveSystemPrompt = '$jsonSystemPrompt\n\n$effectiveSystemPrompt';
+      } else {
+        effectiveSystemPrompt = jsonSystemPrompt;
+      }
+    }
 
     // Create a broadcast stream controller for the tokens
     final controller = StreamController<String>.broadcast();
@@ -1292,6 +1349,7 @@ class RunAnywhere {
       prompt,
       maxTokens: opts.maxTokens,
       temperature: opts.temperature,
+      systemPrompt: effectiveSystemPrompt,
     );
 
     // Forward tokens and collect them, track subscription in bridge for cancellation
@@ -1336,7 +1394,8 @@ class RunAnywhere {
       // Calculate time to first token
       int? timeToFirstTokenMs;
       if (firstTokenTime != null) {
-        timeToFirstTokenMs = firstTokenTime!.difference(startTime).inMilliseconds;
+        timeToFirstTokenMs =
+            firstTokenTime!.difference(startTime).inMilliseconds;
       }
 
       // Estimate tokens (~4 chars per token)
@@ -1358,14 +1417,31 @@ class RunAnywhere {
         isStreaming: true,
       );
 
+      // Extract structured data if structuredOutput is provided
+      Map<String, dynamic>? structuredData;
+      final fullText = allTokens.join();
+      if (opts.structuredOutput != null) {
+        try {
+          final jsonString =
+              DartBridgeStructuredOutput.shared.extractJson(fullText);
+          if (jsonString != null) {
+            final parsed = jsonDecode(jsonString);
+            structuredData = _normalizeStructuredData(parsed);
+          }
+        } catch (_) {
+          // JSON extraction/parse failed — return text result without structured data
+        }
+      }
+
       return LLMGenerationResult(
-        text: allTokens.join(),
+        text: fullText,
         inputTokens: promptTokens,
         tokensUsed: completionTokens,
         modelUsed: modelId,
         latencyMs: latencyMs,
         framework: 'llamacpp',
         tokensPerSecond: tokensPerSecond,
+        structuredData: structuredData,
       );
     });
 
@@ -1423,7 +1499,8 @@ class RunAnywhere {
       } else if (progress.stage == ModelDownloadStage.extracting) {
         logger.info('Extracting model...');
       } else if (progress.stage == ModelDownloadStage.completed) {
-        final downloadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+        final downloadTimeMs =
+            DateTime.now().millisecondsSinceEpoch - startTime;
         logger.info('✅ Download completed for model: $modelId');
 
         // Track download success
@@ -1797,5 +1874,30 @@ class RunAnywhere {
     if (lower.endsWith('.bin')) return ModelFormat.bin;
     if (lower.endsWith('.ort')) return ModelFormat.ort;
     return ModelFormat.unknown;
+  }
+
+  // ============================================================================
+  // Structured Output Helpers
+  // ============================================================================
+
+  /// Normalizes parsed JSON to Map<String, dynamic>.
+  /// If the parsed result is a List, wraps it in a Map with 'items' key.
+  /// If it's already a Map, returns it directly.
+  /// Returns null if parsing fails.
+  static Map<String, dynamic>? _normalizeStructuredData(dynamic parsed) {
+    if (parsed is Map<String, dynamic>) {
+      return parsed;
+    } else if (parsed is List) {
+      // Wrap array in object with 'items' key
+      return {'items': parsed};
+    } else if (parsed is Map) {
+      // Convert Map to Map<String, dynamic>; guard against non-String keys.
+      try {
+        return parsed.map((k, v) => MapEntry(k.toString(), v));
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
   }
 }

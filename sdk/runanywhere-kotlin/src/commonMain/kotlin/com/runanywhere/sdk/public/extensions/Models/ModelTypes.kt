@@ -69,6 +69,9 @@ enum class ModelSelectionContext(
 
     /** Select models for voice agent (all 3 types) */
     VOICE("voice"),
+
+    /** Select a vision language model (VLM) */
+    VLM("vlm"),
     ;
 
     /** Human-readable title for the selection context */
@@ -79,6 +82,7 @@ enum class ModelSelectionContext(
                 STT -> "Select STT Model"
                 TTS -> "Select TTS Voice"
                 VOICE -> "Select Voice Models"
+                VLM -> "Select Vision Model"
             }
 
     /** Check if a category is relevant for this selection context */
@@ -91,6 +95,9 @@ enum class ModelSelectionContext(
                 category == ModelCategory.LANGUAGE ||
                     category == ModelCategory.SPEECH_RECOGNITION ||
                     category == ModelCategory.SPEECH_SYNTHESIS
+            VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
         }
 
     /** Check if a framework is relevant for this selection context */
@@ -108,6 +115,7 @@ enum class ModelSelectionContext(
                 LLM.isFrameworkRelevant(framework) ||
                     STT.isFrameworkRelevant(framework) ||
                     TTS.isFrameworkRelevant(framework)
+            VLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
         }
 }
 
@@ -210,10 +218,17 @@ data class ExpectedModelFiles(
  */
 @Serializable
 data class ModelFileDescriptor(
-    val relativePath: String,
-    val destinationPath: String,
+    /** Full URL to download this file from */
+    val url: String,
+    /** Filename to save as (e.g., "model.gguf" or "mmproj.gguf") */
+    val filename: String,
+    /** Whether this file is required for the model to work */
     val isRequired: Boolean = true,
-)
+) {
+    /** Legacy compatibility */
+    val relativePath: String get() = url.substringAfterLast('/').substringBefore('?')
+    val destinationPath: String get() = filename
+}
 
 // MARK: - Model Artifact Type
 

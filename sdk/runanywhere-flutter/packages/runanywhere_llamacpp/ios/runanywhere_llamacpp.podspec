@@ -14,13 +14,13 @@
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-LLAMACPP_VERSION = "0.1.4"
+LLAMACPP_VERSION = "0.1.6"
 
 # =============================================================================
-# Binary Source - RABackendLlamaCPP from runanywhere-binaries
+# Binary Source - RABackendLlamaCPP from runanywhere-sdks
 # =============================================================================
 GITHUB_ORG = "RunanywhereAI"
-BINARIES_REPO = "runanywhere-binaries"
+BINARIES_REPO = "runanywhere-sdks"
 
 # =============================================================================
 # testLocal Toggle
@@ -30,7 +30,7 @@ TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.tes
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_llamacpp'
-  s.version          = '0.15.11'
+  s.version          = '0.16.0'
   s.summary          = 'RunAnywhere LlamaCPP: LLM text generation for Flutter'
   s.description      = <<-DESC
 LlamaCPP backend for RunAnywhere Flutter SDK. Provides LLM text generation
@@ -84,7 +84,7 @@ https://github.com/RunanywhereAI/runanywhere-binaries
       rm -rf "$FRAMEWORK_DIR/RABackendLLAMACPP.xcframework"
 
       # Download from runanywhere-binaries
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{BINARIES_REPO}/releases/download/core-v$VERSION/RABackendLlamaCPP-ios-v$VERSION.zip"
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{BINARIES_REPO}/releases/download/commons-v$VERSION/RABackendLlamaCPP-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendLlamaCPP.zip"
 
       echo "   URL: $DOWNLOAD_URL"

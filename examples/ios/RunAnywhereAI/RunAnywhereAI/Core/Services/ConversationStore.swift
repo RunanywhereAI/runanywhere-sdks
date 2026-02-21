@@ -134,11 +134,11 @@ class ConversationStore: ObservableObject {
         guard let conversation = conversations.first(where: { $0.id == conversationId }) else {
             return
         }
-        
+
         // Get the fallback title to compare
         let fallbackTitle = conversation.messages.first(where: { $0.role == .user })
             .map { generateTitle(from: $0.content) } ?? "New Chat"
-        
+
         // Only generate if title is still the default or fallback
         let currentTitle = conversation.title
         guard currentTitle == "New Chat" || currentTitle == fallbackTitle else {
@@ -449,6 +449,9 @@ struct ConversationListView: View {
                 Text("This action cannot be undone.")
             }
         }
+        #if os(iOS)
+        .navigationViewStyle(.stack)
+        #endif
     }
 }
 
@@ -457,7 +460,7 @@ struct ConversationListView: View {
 struct ConversationRow: View {
     let conversation: Conversation
     let searchQuery: String
-    
+
     init(conversation: Conversation, searchQuery: String = "") {
         self.conversation = conversation
         self.searchQuery = searchQuery

@@ -12,19 +12,33 @@ import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageAnalytics
 import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
+import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.LLMEvent
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
+import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
+import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
@@ -32,7 +46,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
 /**
- * Enhanced ChatUiState matching iOS functionality
+ * Enhanced ChatUiState  functionality
  */
 data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
@@ -49,7 +63,7 @@ data class ChatUiState(
 }
 
 /**
- * Enhanced ChatViewModel matching iOS ChatViewModel functionality
+ * Enhanced ChatViewModel  ChatViewModel functionality
  * Includes streaming, thinking mode, analytics, and conversation management
  *
  * Architecture:
@@ -66,6 +80,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+
+    private val generationPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("generation_settings", android.content.Context.MODE_PRIVATE)
+    }
 
     init {
         // Always start with a new conversation for a fresh chat experience
@@ -84,10 +102,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Initialize with system message if model is already loaded
         viewModelScope.launch {
             checkModelStatus()
-            // Add system message only if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         }
     }
 
@@ -122,28 +136,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Add system message
-     */
-    private fun addSystemMessage() {
-        val modelName = _uiState.value.loadedModelName ?: return
-
-        val content = "Model '$modelName' is loaded and ready to chat!"
-        val systemMessage = ChatMessage.system(content)
-
-        val currentMessages = _uiState.value.messages.toMutableList()
-        currentMessages.add(0, systemMessage)
-        _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        // Save to conversation store
-        _uiState.value.currentConversation?.let { conversation ->
-            val updatedConversation = conversation.copy(messages = currentMessages)
-            conversationStore.updateConversation(updatedConversation)
-        }
-    }
-
-    /**
      * Send message with streaming support and analytics
-     * Matches iOS sendMessage functionality
+     *  sendMessage functionality
      */
     fun sendMessage() {
         val currentState = _uiState.value
@@ -177,9 +171,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 messages = _uiState.value.messages + userMessage,
             )
 
-        // Save user message to conversation
+        // Save user message to conversation (store sets title from first user input)
+        // Refresh currentConversation from store so title appears in history immediately
         _uiState.value.currentConversation?.let { conversation ->
             conversationStore.addMessage(userMessage, conversation)
+            conversationStore.loadConversation(conversation.id)?.let { updated ->
+                _uiState.value = _uiState.value.copy(currentConversation = updated)
+            }
         }
 
         // Create assistant message that will be updated with streaming tokens
@@ -202,7 +200,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     // Clear metrics from previous generation
                     tokensPerSecondHistory.clear()
 
-                    if (currentState.useStreaming) {
+                    // Check if tool calling is enabled and tools are registered
+                    val toolViewModel = ToolSettingsViewModel.getInstance(app)
+                    val useToolCalling = toolViewModel.toolCallingEnabled
+                    val registeredTools = RunAnywhereToolCalling.getRegisteredTools()
+
+                    if (useToolCalling && registeredTools.isNotEmpty()) {
+                        Log.i(TAG, "🔧 Using tool calling with ${registeredTools.size} tools")
+                        generateWithToolCalling(prompt, assistantMessage.id)
+                    } else if (currentState.useStreaming) {
                         generateWithStreaming(prompt, assistantMessage.id)
                     } else {
                         generateWithoutStreaming(prompt, assistantMessage.id)
@@ -214,8 +220,92 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Generate with tool calling support
+     * Matches iOS generateWithToolCalling pattern
+     */
+    private suspend fun generateWithToolCalling(
+        prompt: String,
+        messageId: String,
+    ) {
+        val startTime = System.currentTimeMillis()
+
+        try {
+            // Detect the appropriate tool call format based on loaded model
+            // Note: loadedModelName can be null if model state changes during generation
+            val modelName = _uiState.value.loadedModelName
+            if (modelName == null) {
+                Log.w(TAG, "⚠️ Tool calling initiated but model name is null, using default format")
+            }
+            val toolViewModel = ToolSettingsViewModel.getInstance(app)
+            val format = toolViewModel.detectToolCallFormat(modelName)
+
+            Log.i(TAG, "🔧 Tool calling with format: $format for model: ${modelName ?: "unknown"}")
+
+            // Create tool calling options
+            val toolOptions = ToolCallingOptions(
+                maxToolCalls = 3,
+                autoExecute = true,
+                temperature = 0.7f,
+                maxTokens = 1024,
+                format = format
+            )
+
+            // Generate with tools
+            val result = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
+            val endTime = System.currentTimeMillis()
+
+            // Update the assistant message with the result
+            val response = result.text
+            updateAssistantMessage(messageId, response, null)
+
+            // Log tool calls and create tool call info
+            if (result.toolCalls.isNotEmpty()) {
+                Log.i(TAG, "🔧 Tool calls made: ${result.toolCalls.map { it.toolName }}")
+                result.toolResults.forEach { toolResult ->
+                    Log.i(TAG, "📋 Tool result: ${toolResult.toolName} - success: ${toolResult.success}")
+                }
+
+                // Create ToolCallInfo from the first tool call and result
+                val firstToolCall = result.toolCalls.first()
+                val firstToolResult = result.toolResults.firstOrNull { it.toolName == firstToolCall.toolName }
+
+                val toolCallInfo = ToolCallInfo(
+                    toolName = firstToolCall.toolName,
+                    arguments = formatToolValueMapToJson(firstToolCall.arguments),
+                    result = firstToolResult?.result?.let { formatToolValueMapToJson(it) },
+                    success = firstToolResult?.success ?: false,
+                    error = firstToolResult?.error,
+                )
+
+                updateAssistantMessageWithToolCallInfo(messageId, toolCallInfo)
+            }
+
+            // Create analytics
+            val analytics = createMessageAnalytics(
+                startTime = startTime,
+                endTime = endTime,
+                firstTokenTime = null,
+                thinkingStartTime = null,
+                thinkingEndTime = null,
+                inputText = prompt,
+                outputText = response,
+                thinkingText = null,
+                wasInterrupted = false,
+            )
+
+            updateAssistantMessageWithAnalytics(messageId, analytics)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Tool calling failed", e)
+            throw e
+        } finally {
+            _uiState.value = _uiState.value.copy(isGenerating = false)
+        }
+    }
+
+    /**
      * Generate with streaming support and thinking mode
-     * Matches iOS streaming generation pattern
+     *  streaming generation pattern
      */
     private suspend fun generateWithStreaming(
         prompt: String,
@@ -237,7 +327,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // Use SDK streaming generation - returns Flow<String>
-            RunAnywhere.generateStream(prompt).collect { token ->
+            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { token ->
                 fullResponse += token
                 totalTokensReceived++
 
@@ -346,6 +436,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Update message with analytics
         updateAssistantMessageWithAnalytics(messageId, analytics)
 
+        syncCurrentConversationToStore()
         _uiState.value = _uiState.value.copy(isGenerating = false)
         Log.i(TAG, "✅ Streaming generation completed")
     }
@@ -361,7 +452,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // RunAnywhere.generate() returns LLMGenerationResult
-            val result = RunAnywhere.generate(prompt)
+            val result = RunAnywhere.generate(prompt, getGenerationOptions())
             val response = result.text
             val endTime = System.currentTimeMillis()
 
@@ -381,6 +472,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
+            syncCurrentConversationToStore()
         } catch (e: Exception) {
             throw e
         } finally {
@@ -404,6 +496,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         updateAssistantMessage(messageId, errorMessage, null)
+        syncCurrentConversationToStore()
 
         _uiState.value =
             _uiState.value.copy(
@@ -454,6 +547,35 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
 
         _uiState.value = _uiState.value.copy(messages = updatedMessages)
+    }
+
+    private fun updateAssistantMessageWithToolCallInfo(
+        messageId: String,
+        toolCallInfo: ToolCallInfo,
+    ) {
+        val currentMessages = _uiState.value.messages
+        val updatedMessages =
+            currentMessages.map { message ->
+                if (message.id == messageId) {
+                    message.copy(toolCallInfo = toolCallInfo)
+                } else {
+                    message
+                }
+            }
+
+        _uiState.value = _uiState.value.copy(messages = updatedMessages)
+    }
+
+    /**
+     * Persist current conversation messages to the store so that loading the conversation
+     * later shows both user and assistant messages.
+     */
+    private fun syncCurrentConversationToStore() {
+        val conv = _uiState.value.currentConversation ?: return
+        val messages = _uiState.value.messages
+        val updated = conv.copy(messages = messages)
+        conversationStore.updateConversation(updated)
+        _uiState.value = _uiState.value.copy(currentConversation = updated)
     }
 
     /**
@@ -572,11 +694,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Create new conversation
         val conversation = conversationStore.createConversation()
         _uiState.value = _uiState.value.copy(currentConversation = conversation)
-
-        // Only add system message if model is loaded
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
@@ -589,6 +706,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Set the loaded model display name (e.g. when user selects a model from the sheet).
+     * Ensures the app bar shows the correct model icon immediately.
+     */
+    fun setLoadedModelName(modelName: String) {
+        _uiState.value = _uiState.value.copy(loadedModelName = modelName)
+    }
+
+    /**
      * Check model status and load appropriate chat model.
      */
     suspend fun checkModelStatus() {
@@ -596,12 +721,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
                 if (RunAnywhere.isLLMModelLoaded()) {
-                    val loadedModelId = RunAnywhere.currentLLMModelId
-                    Log.i(TAG, "✅ LLM model already loaded: $loadedModelId")
+                    val currentModel = RunAnywhere.currentLLMModel()
+                    val displayName = currentModel?.name ?: RunAnywhere.currentLLMModelId
+                    Log.i(TAG, "✅ LLM model already loaded: $displayName")
                     _uiState.value =
                         _uiState.value.copy(
                             isModelLoaded = true,
-                            loadedModelName = loadedModelId,
+                            loadedModelName = displayName,
                         )
                     addSystemMessageIfNeeded()
                     return
@@ -677,35 +803,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             currentMessages.removeAt(0)
         }
         _uiState.value = _uiState.value.copy(messages = currentMessages)
-
-        if (_uiState.value.isModelLoaded) {
-            addSystemMessage()
-        }
     }
 
     /**
-     * Load a conversation
+     * Load a conversation by ID from store (or disk) so we always have the latest messages,
+     * then update UI state. Using the store ensures we don't rely on a possibly stale list item.
      */
     fun loadConversation(conversation: Conversation) {
-        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+        val loaded = conversationStore.loadConversation(conversation.id) ?: conversation
+        conversationStore.ensureConversationInList(loaded)
+        _uiState.value = _uiState.value.copy(currentConversation = loaded)
 
-        // For new conversations (empty messages), start fresh
-        // For existing conversations, load the messages
-        if (conversation.messages.isEmpty()) {
+        if (loaded.messages.isEmpty()) {
             _uiState.value = _uiState.value.copy(messages = emptyList())
-            // Add system message if model is loaded
-            if (_uiState.value.isModelLoaded) {
-                addSystemMessage()
-            }
         } else {
-            _uiState.value = _uiState.value.copy(messages = conversation.messages)
-
-            val analyticsCount = conversation.messages.mapNotNull { it.analytics }.size
-            Log.i(TAG, "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics")
+            _uiState.value = _uiState.value.copy(messages = loaded.messages)
+            val analyticsCount = loaded.messages.mapNotNull { it.analytics }.size
+            Log.i(TAG, "📂 Loaded conversation with ${loaded.messages.size} messages, $analyticsCount have analytics")
         }
 
-        // Update model info if available
-        conversation.modelName?.let { modelName ->
+        loaded.modelName?.let { modelName ->
             _uiState.value = _uiState.value.copy(loadedModelName = modelName)
         }
     }
@@ -718,10 +835,70 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Ensure the current chat is in the store's list and persisted before showing history.
+     * Syncs latest messages to the store and adds the conversation to the list if absent.
+     */
+    fun ensureCurrentConversationInHistory() {
+        syncCurrentConversationToStore()
+        _uiState.value.currentConversation?.let { conversationStore.ensureConversationInList(it) }
+    }
+
+    /**
      * Clear error state
      */
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
+    }
+
+    /**
+     * Get generation options from SharedPreferences
+     */
+    private fun getGenerationOptions(): com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions {
+        val temperature = generationPrefs.getFloat("defaultTemperature", 0.7f)
+        val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
+        val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
+        val systemPrompt = if (systemPromptValue.isNullOrEmpty()) null else systemPromptValue
+        val systemPromptInfo = systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"
+
+        Log.i(TAG, "[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
+
+        return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
+            maxTokens = maxTokens,
+            temperature = temperature,
+            systemPrompt = systemPrompt
+        )
+    }
+
+    /**
+     * Format a ToolValue map to JSON string for display.
+     * Uses kotlinx.serialization for proper JSON escaping of special characters.
+     */
+    private fun formatToolValueMapToJson(map: Map<String, ToolValue>): String {
+        val jsonObject = buildJsonObject {
+            map.forEach { (key, value) ->
+                put(key, formatToolValueToJsonElement(value))
+            }
+        }
+        return Json.encodeToString(JsonObject.serializer(), jsonObject)
+    }
+
+    /**
+     * Convert a ToolValue to the appropriate JsonElement type.
+     * Handles all ToolValue variants with proper JSON escaping.
+     */
+    private fun formatToolValueToJsonElement(value: ToolValue): JsonElement {
+        return when (value) {
+            is ToolValue.StringValue -> JsonPrimitive(value.value)
+            is ToolValue.NumberValue -> JsonPrimitive(value.value)
+            is ToolValue.BoolValue -> JsonPrimitive(value.value)
+            is ToolValue.NullValue -> JsonNull
+            is ToolValue.ArrayValue -> buildJsonArray {
+                value.value.forEach { add(formatToolValueToJsonElement(it)) }
+            }
+            is ToolValue.ObjectValue -> buildJsonObject {
+                value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
+            }
+        }
     }
 
     companion object {

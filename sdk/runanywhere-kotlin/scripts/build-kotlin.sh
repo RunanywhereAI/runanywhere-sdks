@@ -16,7 +16,7 @@
 #   --rebuild-commons   Force rebuild of runanywhere-commons (even if cached)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip Gradle build (only setup native libs)
-#   --abis=ABIS         ABIs to build (default: arm64-v8a)
+#   --abis=ABIS         ABIs to build (default: arm64-v8a,x86_64)
 #                       Supported: arm64-v8a, armeabi-v7a, x86_64, x86
 #                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --help              Show this help message
@@ -27,14 +27,14 @@
 #   x86_64           64-bit Intel (emulators on Intel Macs, ~2%)
 #
 # EXAMPLES:
-#   # First-time setup (modern devices only, ~4min build)
+#   # First-time setup (device + emulator, default)
 #   ./scripts/build-kotlin.sh --setup
 #
 #   # RECOMMENDED for production (97% device coverage, ~7min build)
 #   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,armeabi-v7a
 #
-#   # Development with emulator support (device + Intel Mac emulator)
-#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a,x86_64
+#   # Device only (faster build, no emulator support)
+#   ./scripts/build-kotlin.sh --setup --abis=arm64-v8a
 #
 #   # Rebuild only commons (after C++ code changes)
 #   ./scripts/build-kotlin.sh --local --rebuild-commons
@@ -73,7 +73,7 @@ SETUP_MODE=false
 REBUILD_COMMONS=false
 CLEAN_BUILD=false
 SKIP_BUILD=false
-ABIS="arm64-v8a"
+ABIS="arm64-v8a,x86_64"
 
 # =============================================================================
 # Colors & Logging
@@ -421,10 +421,10 @@ set_gradle_mode() {
     log_step "Setting testLocal=${mode} in gradle.properties"
 
     if [ "$mode" = "local" ]; then
-        sed -i '' 's/runanywhere.testLocal=false/runanywhere.testLocal=true/' "$properties_file"
+        sed -i.bak 's/runanywhere.testLocal=false/runanywhere.testLocal=true/' "$properties_file" && rm -f "${properties_file}.bak"
         log_info "Switched to LOCAL mode (using jniLibs/)"
     else
-        sed -i '' 's/runanywhere.testLocal=true/runanywhere.testLocal=false/' "$properties_file"
+        sed -i.bak 's/runanywhere.testLocal=true/runanywhere.testLocal=false/' "$properties_file" && rm -f "${properties_file}.bak"
         log_info "Switched to REMOTE mode (downloading from GitHub)"
     fi
 }

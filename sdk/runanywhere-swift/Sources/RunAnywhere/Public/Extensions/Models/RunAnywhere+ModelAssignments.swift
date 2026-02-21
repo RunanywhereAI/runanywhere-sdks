@@ -51,11 +51,14 @@ public extension RunAnywhere {
         )
 
         // Save to C++ registry (fire-and-forget)
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
         Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
+                logger.info("Model saved to registry: \(modelId)")
             } catch {
-                SDKLogger(category: "RunAnywhere.Models").error("Failed to register model: \(error)")
+                logger.error("Failed to register model: \(error)")
             }
         }
 
@@ -98,6 +101,72 @@ public extension RunAnywhere {
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking
         )
+    }
+
+    // MARK: - Multi-File Model Cache
+
+    /// Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays)
+    private static var multiFileModelCache: [String: [ModelFileDescriptor]] = [:]
+    private static let multiFileCacheLock = NSLock()
+
+    /// Get cached file descriptors for a multi-file model
+    static func getMultiFileDescriptors(forModelId modelId: String) -> [ModelFileDescriptor]? {
+        multiFileCacheLock.lock()
+        defer { multiFileCacheLock.unlock() }
+        return multiFileModelCache[modelId]
+    }
+
+    /// Register a multi-file model (e.g., VLM with separate main model + mmproj files)
+    /// Files are downloaded separately and stored in the same model folder
+    /// - Parameters:
+    ///   - id: Model ID (required for multi-file models)
+    ///   - name: Display name for the model
+    ///   - files: Array of file descriptors specifying URL and filename for each file
+    ///   - framework: Target inference framework
+    ///   - modality: Model category
+    ///   - memoryRequirement: Estimated memory usage in bytes
+    /// - Returns: The created ModelInfo
+    @discardableResult
+    static func registerMultiFileModel(
+        id: String,
+        name: String,
+        files: [ModelFileDescriptor],
+        framework: InferenceFramework,
+        modality: ModelCategory = .multimodal,
+        memoryRequirement: Int64? = nil
+    ) -> ModelInfo {
+        // Cache the file descriptors (C++ registry doesn't preserve them)
+        multiFileCacheLock.lock()
+        multiFileModelCache[id] = files
+        multiFileCacheLock.unlock()
+
+        // Create ModelInfo with multiFile artifact type
+        let modelInfo = ModelInfo(
+            id: id,
+            name: name,
+            category: modality,
+            format: .gguf,  // Assume GGUF for VLM models
+            framework: framework,
+            downloadURL: files.first?.url,  // Use first file URL as primary (for display)
+            localPath: nil,
+            artifactType: .multiFile(files),
+            downloadSize: memoryRequirement,
+            contextLength: nil,
+            supportsThinking: false,
+            description: "Multi-file model (\(files.count) files)",
+            source: .local
+        )
+
+        // Save to C++ registry (fire-and-forget)
+        Task {
+            do {
+                try await CppBridge.ModelRegistry.shared.save(modelInfo)
+            } catch {
+                SDKLogger(category: "RunAnywhere.Models").error("Failed to register multi-file model: \(error)")
+            }
+        }
+
+        return modelInfo
     }
 
     // MARK: - Private Helpers

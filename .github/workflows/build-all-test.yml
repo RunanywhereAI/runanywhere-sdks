@@ -1,0 +1,180 @@
+name: Build All (Test)
+
+# Manually-triggered workflow that builds all SDKs and example projects.
+# Use this to verify everything compiles after changes.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  kotlin-sdk:
+    name: Kotlin SDK (JVM + Android)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup local.properties
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
+
+      - name: Build JVM JAR
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          chmod +x gradlew
+          ./gradlew jvmJar -Prunanywhere.testLocal=false
+
+      - name: Build Android AAR (Debug)
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew assembleDebug -Prunanywhere.testLocal=false
+        continue-on-error: true
+
+      - name: Build Backend Modules
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          ./gradlew :modules:runanywhere-core-llamacpp:assembleDebug -Prunanywhere.testLocal=false || true
+          ./gradlew :modules:runanywhere-core-onnx:assembleDebug -Prunanywhere.testLocal=false || true
+        continue-on-error: true
+
+      - name: Publish to Maven Local
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
+        continue-on-error: true
+
+  web-sdk:
+    name: Web SDK (TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        working-directory: sdk/runanywhere-web
+        run: npm install
+
+      - name: TypeScript Typecheck
+        working-directory: sdk/runanywhere-web/packages/core
+        run: npx tsc --noEmit
+
+      - name: TypeScript Build
+        working-directory: sdk/runanywhere-web/packages/core
+        run: npx tsc
+
+  swift-sdk:
+    name: Swift SDK
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift Build (remote XCFrameworks)
+        run: swift build
+
+      - name: Swift Test
+        run: swift test
+        continue-on-error: true
+
+  android-app:
+    name: Android Example App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup local.properties
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > examples/android/RunAnywhereAI/local.properties
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
+
+      - name: Build Android App
+        working-directory: examples/android/RunAnywhereAI
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug -Prunanywhere.testLocal=false
+        continue-on-error: true
+
+  intellij-plugin:
+    name: IntelliJ Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup local.properties
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
+
+      - name: Publish SDK to Maven Local
+        working-directory: sdk/runanywhere-kotlin
+        run: |
+          chmod +x gradlew
+          ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
+
+      - name: Build IntelliJ Plugin
+        working-directory: examples/intellij-plugin-demo/plugin
+        run: |
+          chmod +x gradlew
+          ./gradlew buildPlugin
+
+  summary:
+    name: Build Summary
+    needs: [kotlin-sdk, web-sdk, swift-sdk, android-app, intellij-plugin]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build Results
+        run: |
+          echo "## Build All (Test) Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Project | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Kotlin SDK (JVM + Android) | ${{ needs.kotlin-sdk.result == 'success' && 'Pass' || needs.kotlin-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web SDK (TypeScript) | ${{ needs.web-sdk.result == 'success' && 'Pass' || needs.web-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Swift SDK | ${{ needs.swift-sdk.result == 'success' && 'Pass' || needs.swift-sdk.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android Example App | ${{ needs.android-app.result == 'success' && 'Pass' || needs.android-app.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| IntelliJ Plugin | ${{ needs.intellij-plugin.result == 'success' && 'Pass' || needs.intellij-plugin.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Triggered by: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

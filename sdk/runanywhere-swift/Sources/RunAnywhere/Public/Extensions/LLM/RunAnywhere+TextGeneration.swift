@@ -58,10 +58,23 @@ public extension RunAnywhere {
         cOptions.top_p = opts.topP
         cOptions.streaming_enabled = RAC_FALSE
 
-        // Generate (C++ emits events)
+        SDKLogger.llm.info("[PARAMS] generate: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), max_tokens=\(cOptions.max_tokens), system_prompt=\(opts.systemPrompt != nil ? "set(\(opts.systemPrompt!.count) chars)" : "nil"), streaming=\(cOptions.streaming_enabled == RAC_TRUE)")
+
+        // Generate (C++ emits events) - wrap in system_prompt lifetime scope
         var llmResult = rac_llm_result_t()
-        let generateResult = prompt.withCString { promptPtr in
-            rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+        let generateResult: rac_result_t
+        if let systemPrompt = opts.systemPrompt {
+            generateResult = systemPrompt.withCString { sysPromptPtr in
+                cOptions.system_prompt = sysPromptPtr
+                return prompt.withCString { promptPtr in
+                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                }
+            }
+        } else {
+            cOptions.system_prompt = nil
+            generateResult = prompt.withCString { promptPtr in
+                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+            }
         }
 
         guard generateResult == RAC_SUCCESS else {
@@ -148,11 +161,14 @@ public extension RunAnywhere {
         cOptions.top_p = opts.topP
         cOptions.streaming_enabled = RAC_TRUE
 
+        SDKLogger.llm.info("[PARAMS] generateStream: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), max_tokens=\(cOptions.max_tokens), system_prompt=\(opts.systemPrompt != nil ? "set(\(opts.systemPrompt!.count) chars)" : "nil"), streaming=\(cOptions.streaming_enabled == RAC_TRUE)")
+
         let stream = createTokenStream(
             prompt: prompt,
             handle: handle,
             options: cOptions,
-            collector: collector
+            collector: collector,
+            systemPrompt: opts.systemPrompt
         )
 
         let resultTask = Task<LLMGenerationResult, Error> {
@@ -168,7 +184,8 @@ public extension RunAnywhere {
         prompt: String,
         handle: UnsafeMutableRawPointer,
         options: rac_llm_options_t,
-        collector: LLMStreamingMetricsCollector
+        collector: LLMStreamingMetricsCollector,
+        systemPrompt: String? = nil
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream<String, Error> { continuation in
             Task {
@@ -181,16 +198,29 @@ public extension RunAnywhere {
                     let callbacks = LLMStreamCallbacks.create()
                     var cOptions = options
 
-                    let streamResult = prompt.withCString { promptPtr in
-                        rac_llm_component_generate_stream(
-                            handle,
-                            promptPtr,
-                            &cOptions,
-                            callbacks.token,
-                            callbacks.complete,
-                            callbacks.error,
-                            contextPtr
-                        )
+                    let callCFunction: () -> rac_result_t = {
+                        prompt.withCString { promptPtr in
+                            rac_llm_component_generate_stream(
+                                handle,
+                                promptPtr,
+                                &cOptions,
+                                callbacks.token,
+                                callbacks.complete,
+                                callbacks.error,
+                                contextPtr
+                            )
+                        }
+                    }
+
+                    let streamResult: rac_result_t
+                    if let systemPrompt = systemPrompt {
+                        streamResult = systemPrompt.withCString { sysPtr in
+                            cOptions.system_prompt = sysPtr
+                            return callCFunction()
+                        }
+                    } else {
+                        cOptions.system_prompt = nil
+                        streamResult = callCFunction()
                     }
 
                     if streamResult != RAC_SUCCESS {
@@ -338,14 +368,15 @@ private actor LLMStreamingMetricsCollector {
             timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
         }
 
-        let inputTokens = max(1, promptLength / 4)
-        let outputTokens = max(1, fullText.count / 4)
-        let tokensPerSecond = latencyMs > 0 ? Double(outputTokens) / (latencyMs / 1000.0) : 0
+        // Use actual token count from streaming callbacks, not character estimation (fixes #339)
+        let outputTokens = max(1, tokenCount)
+        let totalTimeSec = latencyMs / 1000.0
+        let tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
 
         return LLMGenerationResult(
             text: fullText,
             thinkingContent: nil,
-            inputTokens: inputTokens,
+            inputTokens: 0,
             tokensUsed: outputTokens,
             modelUsed: modelId,
             latencyMs: latencyMs,

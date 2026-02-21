@@ -277,6 +277,9 @@ object CppBridgeModelRegistry {
                 "stt" to ModelCategory.SPEECH_RECOGNITION,
                 "tts" to ModelCategory.SPEECH_SYNTHESIS,
                 "vad" to ModelCategory.AUDIO,
+                "vision" to ModelCategory.VISION,
+                "multimodal" to ModelCategory.MULTIMODAL,
+                "other" to -1, // Backward compat: VLM models were saved here before proper dirs existed
             )
 
         var restoredCount = 0

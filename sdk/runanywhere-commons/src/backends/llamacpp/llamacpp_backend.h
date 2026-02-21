@@ -29,6 +29,7 @@ enum class DeviceType {
     GPU = 1,
     METAL = 3,
     CUDA = 4,
+    WEBGPU = 5,
 };
 
 // =============================================================================
@@ -133,17 +134,13 @@ class LlamaCppTextGeneration {
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};
+    std::atomic<bool> decode_failed_{false};
 
     std::string model_path_;
     nlohmann::json model_config_;
 
     int context_size_ = 0;
     int max_default_context_ = 8192;
-
-    float temperature_ = 0.8f;
-    float top_p_ = 0.95f;
-    float min_p_ = 0.05f;
-    int top_k_ = 40;
 
     mutable std::mutex mutex_;
 };
