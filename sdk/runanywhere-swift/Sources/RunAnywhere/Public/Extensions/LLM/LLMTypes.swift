@@ -402,6 +402,39 @@ public struct ThinkingTagPattern: Codable, Sendable {
     }
 }
 
+// MARK: - LoRA Adapter Types
+
+/// Configuration for loading a LoRA adapter.
+/// Mirrors the C++ LoraAdapterEntry and Kotlin LoRAAdapterConfig.
+public struct LoRAAdapterConfig: Sendable {
+
+    /// Path to the LoRA adapter GGUF file
+    public let path: String
+
+    /// Scale factor (0.0 to 1.0+, default 1.0). Higher = stronger adapter effect.
+    public let scale: Float
+
+    public init(path: String, scale: Float = 1.0) {
+        precondition(!path.isEmpty, "LoRA adapter path cannot be empty")
+        self.path = path
+        self.scale = scale
+    }
+}
+
+/// Info about a loaded LoRA adapter (read-only).
+/// Mirrors the C++ LoRA info JSON structure.
+public struct LoRAAdapterInfo: Sendable {
+
+    /// Path used when loading the adapter
+    public let path: String
+
+    /// Active scale factor
+    public let scale: Float
+
+    /// Whether the adapter is currently applied to the context
+    public let applied: Bool
+}
+
 // MARK: - Structured Output Types
 
 /// Protocol for types that can be generated as structured output from LLMs
