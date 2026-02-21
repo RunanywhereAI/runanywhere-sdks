@@ -33,7 +33,7 @@ export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnRes
 export * from './types';
 
 // Foundation
-export { SDKError, SDKErrorCode } from './Foundation/ErrorTypes';
+export { SDKError, SDKErrorCode, isSDKError } from './Foundation/ErrorTypes';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';

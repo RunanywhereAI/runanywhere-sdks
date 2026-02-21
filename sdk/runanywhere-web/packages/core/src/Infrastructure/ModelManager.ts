@@ -424,8 +424,8 @@ class ModelManagerImpl {
     try {
       const root = await navigator.storage.getDirectory();
       const modelsDir = await root.getDirectoryHandle('models');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for await (const [name, handle] of (modelsDir as any).entries()) {
+      const dir = modelsDir as FileSystemDirectoryHandle & { entries(): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]> };
+      for await (const [name, handle] of dir.entries()) {
         if (handle.kind === 'file' && !name.startsWith('_')) {
           modelCount++;
           const file = await (handle as FileSystemFileHandle).getFile();

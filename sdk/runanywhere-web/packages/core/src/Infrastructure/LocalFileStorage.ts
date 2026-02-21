@@ -128,8 +128,8 @@ export class LocalFileStorage {
 
     try {
       // showDirectoryPicker requires user gesture (button click)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.dirHandle = await (window as any).showDirectoryPicker({
+      const win = window as Window & { showDirectoryPicker?(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle> };
+      this.dirHandle = await win.showDirectoryPicker!({
         mode: 'readwrite',
       });
 
@@ -423,8 +423,9 @@ export class LocalFileStorage {
 
     const models: Array<{ id: string; sizeBytes: number; lastModified: number }> = [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for await (const [name, handle] of (this.dirHandle as any).entries()) {
+    // FileSystemDirectoryHandle.entries() exists in runtime but may be missing from older DOM lib types
+    const dir = this.dirHandle as FileSystemDirectoryHandle & { entries(): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]> };
+    for await (const [name, handle] of dir.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

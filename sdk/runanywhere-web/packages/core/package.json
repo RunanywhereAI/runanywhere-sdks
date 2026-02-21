@@ -5,58 +5,40 @@
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/types/index.d.ts",
   "sideEffects": false,
   "exports": {
     ".": {
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
-  "files": [
-    "dist/",
-    "README.md"
-  ],
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test:types": "tsd",
+    "test": "tsd",
     "clean": "rm -rf dist",
     "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1)"
   },
-  "keywords": [
-    "runanywhere",
-    "ai",
-    "llm",
-    "stt",
-    "tts",
-    "vad",
-    "wasm",
-    "webgpu",
-    "on-device",
-    "browser",
-    "inference"
-  ],
+  "keywords": ["runanywhere", "ai", "llm", "stt", "tts", "vad", "wasm", "webgpu", "on-device", "browser", "inference"],
   "author": "RunAnywhere AI",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git",
-    "directory": "sdk/runanywhere-web/packages/core"
-  },
+  "repository": {"type": "git", "url": "https://github.com/RunanywhereAI/runanywhere-sdks.git", "directory": "sdk/runanywhere-web/packages/core"},
   "homepage": "https://github.com/RunanywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web",
-  "bugs": {
-    "url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "bugs": {"url": "https://github.com/RunanywhereAI/runanywhere-sdks/issues"},
+  "publishConfig": {"access": "public"},
+  "engines": {"node": ">=18.0.0"},
   "peerDependencies": {},
+  "tsd": {
+    "directory": "src/__tests__"
+  },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "tsd": "^0.33.0"
   }
 }
