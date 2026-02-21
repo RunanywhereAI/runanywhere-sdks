@@ -18,18 +18,27 @@ enum SharedConstants {
 
     // App Group UserDefaults keys
     enum Keys {
-        static let sessionState = "sessionState"               // FlowSessionState raw value
-        static let transcribedText = "transcribedText"         // Final transcription result
-        static let returnToAppScheme = "returnToAppScheme"     // Host app URL scheme for bounce-back
-        static let preferredSTTModelId = "preferredSTTModelId" // User's chosen STT model
-        static let dictationHistory = "dictationHistory"       // JSON-encoded [TranscriptionEntry]
+        static let sessionState        = "sessionState"          // FlowSessionPhase raw value
+        static let transcribedText     = "transcribedText"       // Final transcription result
+        static let returnToAppScheme   = "returnToAppScheme"     // Host app URL scheme for bounce-back
+        static let preferredSTTModelId = "preferredSTTModelId"   // User's chosen STT model
+        static let dictationHistory    = "dictationHistory"      // JSON-encoded [DictationEntry]
+        static let audioLevel          = "audioLevel"            // Float 0–1, updated ~10×/s during listening
+        static let lastInsertedText    = "lastInsertedText"      // String, for undo button after insertion
+        static let lastHeartbeat       = "lastHeartbeat"         // Double unix timestamp, written every 1s while session is active
     }
 
     // Darwin inter-process notification names (CFNotificationCenter)
-    // These fire instantly across process boundaries with no polling
+    // These fire instantly across process boundaries with no polling.
     enum DarwinNotifications {
-        static let stopRecording = "com.runanywhere.keyboard.stopRecording"
+        // app → keyboard
         static let transcriptionReady = "com.runanywhere.keyboard.transcriptionReady"
+        static let sessionReady       = "com.runanywhere.session.ready"
+        // keyboard → app
+        static let startListening     = "com.runanywhere.keyboard.startListening"
+        static let stopListening      = "com.runanywhere.keyboard.stopListening"
+        static let cancelListening    = "com.runanywhere.keyboard.cancelListening"
+        static let endSession         = "com.runanywhere.session.end"
     }
 
     // Curated map of host app bundle IDs → URL schemes for bounce-back (WisprFlow approach).

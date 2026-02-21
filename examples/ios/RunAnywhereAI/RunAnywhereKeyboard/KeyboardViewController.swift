@@ -3,11 +3,14 @@
 //  RunAnywhereKeyboard
 //
 //  Custom keyboard extension that triggers on-device dictation via the main app.
-//  Flow:
-//    1. User taps "Dictate" → opens runanywhere://startFlow in main app
-//    2. Main app records + transcribes on-device (Sherpa-ONNX)
-//    3. Main app posts Darwin notification when done
-//    4. This VC receives notification → reads text → inserts into proxy
+//
+//  State machine:
+//    idle        → "Run" tapped → writes sessionState="activating" + opens deep link
+//    ready       → mic icon tapped → posts startListening Darwin notification
+//    listening   → ✓ tapped → posts stopListening Darwin notification
+//    listening   → X tapped → posts cancelListening Darwin notification
+//    done        → undo tapped → deletes lastInsertedText characters
+//    any         → Darwin transcriptionReady → insert text into proxy
 //
 
 import UIKit
@@ -29,6 +32,11 @@ final class KeyboardViewController: UIInputViewController {
             self?.handleTranscriptionReady()
         }
 
+        // Observe sessionReady for instant keyboard update (avoids waiting for next 0.3s poll)
+        DarwinNotificationCenter.shared.addObserver(
+            name: SharedConstants.DarwinNotifications.sessionReady
+        ) { /* KeyboardView's 0.3s poll handles the visual update */ }
+
         setupKeyboardView()
     }
 
@@ -36,15 +44,25 @@ final class KeyboardViewController: UIInputViewController {
 
     private func setupKeyboardView() {
         let keyboardView = KeyboardView(
-            onDictate: { [weak self] in self?.startDictation() },
-            onNextKeyboard: { [weak self] in self?.advanceToNextInputMode() },
-            onSpace: { [weak self] in self?.textDocumentProxy.insertText(" ") },
-            onReturn: { [weak self] in self?.textDocumentProxy.insertText("\n") },
-            onDelete: { [weak self] in self?.textDocumentProxy.deleteBackward() }
+            onRunTap:          { [weak self] in self?.handleRunTap() },
+            onMicTap:          { DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.startListening) },
+            onStopTap:         { DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.stopListening) },
+            onCancelTap:       { DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.cancelListening) },
+            onUndoTap:         { [weak self] in self?.handleUndo() },
+            onNextKeyboard:    { [weak self] in self?.advanceToNextInputMode() },
+            onSpace:           { [weak self] in self?.textDocumentProxy.insertText(" ") },
+            onReturn:          { [weak self] in self?.textDocumentProxy.insertText("\n") },
+            onDelete:          { [weak self] in self?.textDocumentProxy.deleteBackward() },
+            onInsertCharacter: { [weak self] char in self?.textDocumentProxy.insertText(char) }
         )
 
         hostingController = UIHostingController(rootView: keyboardView)
         hostingController.view.backgroundColor = .clear
+
+        // Let the system keyboard height constraint win over SwiftUI's intrinsic size
+        hostingController.view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        hostingController.view.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+
         addChild(hostingController)
         view.addSubview(hostingController.view)
         hostingController.didMove(toParent: self)
@@ -58,12 +76,22 @@ final class KeyboardViewController: UIInputViewController {
         ])
     }
 
-    // MARK: - Dictation
+    // MARK: - "Run" Button (idle state)
 
-    private func startDictation() {
-        SharedDataBridge.shared.sessionState = "recording"
+    private func handleRunTap() {
+        SharedDataBridge.shared.sessionState = "activating"
         guard let url = URL(string: SharedConstants.startFlowURLString) else { return }
         openURL(url)
+    }
+
+    // MARK: - Undo
+
+    private func handleUndo() {
+        guard let text = SharedDataBridge.shared.lastInsertedText, !text.isEmpty else { return }
+        for _ in text {
+            textDocumentProxy.deleteBackward()
+        }
+        SharedDataBridge.shared.lastInsertedText = nil
     }
 
     // MARK: - Transcription Result
@@ -71,7 +99,9 @@ final class KeyboardViewController: UIInputViewController {
     private func handleTranscriptionReady() {
         guard let text = SharedDataBridge.shared.transcribedText, !text.isEmpty else { return }
         textDocumentProxy.insertText(text)
-        SharedDataBridge.shared.clearSession()
+        // Do NOT call clearSession() here — that would set state back to "idle".
+        // FlowSessionManager handles the done→ready transition itself.
+        SharedDataBridge.shared.transcribedText = nil
     }
 
     // MARK: - URL Opening (keyboard extension workaround via responder chain)

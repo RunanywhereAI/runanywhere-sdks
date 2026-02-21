@@ -19,5 +19,10 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<!-- Live Activities (Dynamic Island recording indicator) -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 </dict>
 </plist>

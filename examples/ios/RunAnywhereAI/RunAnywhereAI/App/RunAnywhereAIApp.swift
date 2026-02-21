@@ -23,6 +23,7 @@ struct RunAnywhereAIApp: App {
     @StateObject private var modelManager = ModelManager.shared
     #if os(iOS)
     @StateObject private var flowSession = FlowSessionManager.shared
+    @State private var showFlowActivation = false
     #endif
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
@@ -39,7 +40,12 @@ struct RunAnywhereAIApp: App {
                             guard url.scheme == SharedConstants.urlScheme,
                                   url.host == "startFlow" else { return }
                             logger.info("📲 Received startFlow deep link")
-                            flowSession.handleStartFlow()
+                            showFlowActivation = true
+                            Task { await flowSession.handleStartFlow() }
+                        }
+                        .fullScreenCover(isPresented: $showFlowActivation) {
+                            FlowActivationView(isPresented: $showFlowActivation)
+                                .environmentObject(flowSession)
                         }
                         #endif
                         .onAppear {

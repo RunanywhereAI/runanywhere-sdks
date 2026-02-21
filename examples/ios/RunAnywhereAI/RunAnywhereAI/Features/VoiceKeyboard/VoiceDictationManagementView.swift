@@ -89,7 +89,9 @@ struct VoiceDictationManagementView: View {
     private var sessionPhaseDescription: String? {
         switch flowSession.sessionPhase {
         case .idle:           return nil
-        case .recording:      return "Recording…"
+        case .activating:     return "Starting microphone…"
+        case .ready:          return "Mic ready — tap mic icon to dictate"
+        case .listening:      return "Listening…"
         case .transcribing:   return "Transcribing…"
         case .done(let text): return "Done: \"\(text.prefix(40))\""
         }

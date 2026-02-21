@@ -472,6 +472,190 @@ When a user enables Full Access for a keyboard extension, iOS displays a system 
 
 ***
 
+## User Experience — End-to-End Keyboard Flow
+
+This section documents the complete user experience of the WisprFlow keyboard, step by step, based on the actual production app behavior.
+
+### State 1: Keyboard Idle — App Not Active in Background
+
+When the user opens the Flow keyboard for the first time (or when the main app is not running in the background), the keyboard displays a compact input surface:
+
+**Layout:**
+- **Top toolbar row:** A settings/sliders icon (left), an info `(i)` button (center-right), and a **"Start Flow"** button (far right).
+- **Number row:** `1 2 3 4 5 6 7 8 9 0`
+- **Special characters row 1:** `- / : ; ( ) $ & @ "`
+- **Special characters row 2:** `#+= . , ? ! ' ⌫` (backspace at the end)
+- **Bottom row:** `ABC` key (left) | `Flow` spacebar (center, branded with the Flow waveform logo) | `Search` button (right, blue/accent-colored)
+- **Globe key:** Bottom-left corner, mandatory iOS keyboard switcher.
+
+The **"Start Flow"** button is the key affordance in this state. It is only shown when the main app is **not** actively running in the background with an audio session. This communicates to the user that they need to activate the microphone before they can dictate.
+
+### State 2: App Launch — Microphone Activation Screen
+
+When the user taps **"Start Flow"**, the keyboard extension opens the containing app via a deep link. The app launches to a dedicated **microphone activation screen** with the following elements:
+
+**Screen layout:**
+- **Dynamic Island** (top): Shows an orange recording indicator dot, signaling the app has activated the microphone.
+- **Close button** `(X)`: Top-right corner, allows dismissal.
+- **Headline text:** "Swipe back to continue" — a clear, bold instruction telling the user to navigate back.
+- **Animated phone illustration:** A stylized iPhone mockup in the center of the screen showing an animation that cycles between two frames:
+  - **Frame A:** The Flow waveform icon centered on a blank phone screen, with a swipe gesture indicator (circle) at the bottom of the phone mockup suggesting the user should swipe up/back.
+  - **Frame B:** The same phone mockup but now showing a keyboard appearing on screen, with the swipe gesture indicator moved to the bottom-right, reinforcing that the user should go back to where they were typing.
+- **Explanatory text** (below the phone illustration): *"We wish you didn't have to switch apps to use Flow, but Apple requires this step to activate the microphone"* — this transparently explains the iOS limitation to the user.
+
+This screen serves a single purpose: start the `AVAudioSession` for background recording and instruct the user to go back to their previous app. The animation loop visually guides the user through the swipe-back gesture.
+
+### State 3: Return to Host App — Microphone Ready (Idle Listening)
+
+Once the user swipes back to the host app (e.g., Spotlight Search, Messages, Safari, etc.), the keyboard appearance changes to reflect that the main app is now active in the background with the microphone engaged:
+
+**Layout changes from State 1:**
+- **Dynamic Island** (top of screen): Now persistently shows the Flow waveform logo, indicating the app is running in the background.
+- **Top toolbar row:** The "Start Flow" button and info `(i)` button are **replaced** by:
+  - Settings/sliders icon (left)
+  - **"Using iPhone Microphone"** label (center) — tells the user the mic is active
+  - **Microphone icon button** (right) — this is the tap target to begin active listening
+- **Number row, special characters, bottom row:** Remain the same as State 1.
+
+In this state, the microphone is **technically active** (the app holds a background audio session), but it is **not processing or transcribing** anything yet. The audio session is alive to maintain background execution, but no STT inference is happening. The user must explicitly tap the microphone button to begin dictation.
+
+### State 4: Active Listening — Dictation in Progress
+
+When the user taps the **microphone icon button** on the keyboard, the keyboard transitions to a full listening UI:
+
+**Layout changes:**
+- The number pad, special characters, and standard keyboard keys are **hidden**.
+- The keyboard area is replaced with a full-width **listening interface**:
+  - **Cancel button** `(X)`: Left side — cancels the current dictation without inserting any text.
+  - **Checkmark button** `(✓)`: Right side — ends the dictation and triggers transcription + text insertion.
+  - **Waveform visualization** (center): A large, animated audio waveform showing live audio levels, confirming the app is actively listening.
+  - **"Listening"** label: Below the waveform, confirming the active state.
+  - **"iPhone Microphone"** label: Below "Listening", indicating the audio source.
+- **Globe key:** Remains visible at the bottom-left for keyboard switching.
+
+During this state:
+- The app is actively streaming audio from the background audio session to the processing pipeline.
+- The waveform animates in response to the user's voice, providing real-time visual feedback.
+- The user speaks naturally without needing to hold any button.
+
+### State 5: Dictation Complete — Text Insertion
+
+When the user taps the **checkmark** `(✓)` button:
+
+1. The audio stream is finalized and sent for ASR processing (on-device or cloud, depending on configuration).
+2. The transcribed text is passed back to the keyboard extension via the App Group shared storage / Darwin notifications.
+3. The keyboard extension calls `textDocumentProxy.insertText()` to paste the transcribed result at the current cursor position in the host app's text field.
+4. The keyboard returns to **State 3** (microphone ready, idle listening) — the user can immediately dictate again without re-launching the app.
+
+**Example from screenshots:** The user dictated "Hello, hello, hello" and it was inserted into the Spotlight Search field. After insertion, the keyboard toolbar shows an **undo button** (circular arrow) alongside the microphone button, allowing the user to undo the last insertion if the transcription was incorrect.
+
+### State 6: Lock Screen — Live Activity Persistent Indicator
+
+Even when the phone is locked or the user is on the lock screen, a **Live Activity** widget is displayed to indicate that Flow is running in the background:
+
+**Live Activity layout:**
+- **Background:** Purple/dark blue gradient, matching the Flow brand.
+- **Header:** Flow waveform logo + "Flow" label.
+- **Word count:** Displays a running total of words dictated in the session (e.g., "1,649 words").
+- **Action buttons:**
+  - **Power/timer button:** Likely to end the Flow session or show session duration.
+  - **Compose button:** Quick action to open the app or start a new dictation.
+- **System prompt** (first time): iOS asks *"Do you want to continue to allow Live Activities from Wispr Flow?"* with "Don't Allow" and "Always Allow" options.
+
+The Live Activity also appears in the **Dynamic Island** (on supported devices) as a compact indicator showing the Flow waveform logo, visible across all apps and the home screen. This persistent presence reassures the user that the microphone session is alive without needing to open the app.
+
+### RunAnywhere-Specific Behavior
+
+Our implementation differs from WisprFlow in a few key ways, primarily because we run ASR **on-device** rather than in the cloud.
+
+**Button naming:** The idle keyboard button is called **"Run"** instead of "Start Flow". This aligns with the RunAnywhere brand.
+
+**What happens when the user taps "Run":**
+
+The containing app is launched via deep link and must satisfy the following **preconditions** before the keyboard can transition to the "ready" state:
+
+1. **Microphone permission** — Request/verify `AVAudioSession` recording permission. If not granted, prompt the user.
+2. **ASR model downloaded** — Check if the on-device ASR model exists on disk. If not, show a download prompt and download it before proceeding.
+3. **ASR model loaded into memory** — Load the model so it is ready for real-time inference. This must complete before the keyboard shows the "ready" state.
+4. **Audio session active** — Start the background `AVAudioSession` so the mic stays alive when the user swipes back.
+
+If any precondition fails (e.g., model not downloaded, permission denied), the app stays on the activation screen and surfaces the issue to the user. The keyboard does **not** transition to "ready" until all preconditions are met.
+
+**Swipe-back screen:** Same experience as WisprFlow — the app shows the "Swipe back to continue" animation with the explanation that Apple requires the app switch to activate the microphone. The user swipes back to the host app once the model is loaded and the mic is active.
+
+**Dictation and text insertion flow:**
+
+1. User taps the microphone button on the keyboard (State 4 — Listening).
+2. Audio is recorded in the background by the containing app and streamed to the on-device ASR model in real-time.
+3. When the user taps the checkmark (or stops talking), the recorded audio is transcribed on-device.
+4. The transcribed text is passed to the keyboard extension via App Group shared storage.
+5. The keyboard extension inserts the text at the current cursor position using `textDocumentProxy.insertText()`.
+
+**Edge cases:**
+
+- **Model not downloaded:** The "Run" button opens the app, which shows a download screen instead of the swipe-back screen. The keyboard remains in the idle state until download + load completes.
+- **Model download in progress:** Show progress in the app. The keyboard stays idle.
+- **Microphone permission denied:** The app shows a prompt directing the user to Settings. The keyboard stays idle.
+- **App killed by the system:** The keyboard reverts to the idle state with the "Run" button. User must tap "Run" again to re-launch and re-load the model.
+- **Live Activity:** Same as WisprFlow — a persistent Live Activity in the Dynamic Island and lock screen indicates the session is active and the model is loaded.
+
+### State Transition Summary
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                    KEYBOARD STATE MACHINE (RunAnywhere)                    │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌──────────────┐   Tap "Run"   ┌──────────────────────────────────┐     │
+│  │  State 1:    │ ────────────> │  State 2: App Launch             │     │
+│  │  Idle        │               │  Preconditions:                  │     │
+│  │  (App Dead)  │               │   1. Mic permission              │     │
+│  │  ["Run"      │               │   2. ASR model downloaded?       │     │
+│  │   visible]   │               │      → No: show download prompt  │     │
+│  └──────────────┘               │   3. Load ASR model into memory  │     │
+│        ^                        │   4. Start audio session         │     │
+│        │ App killed /           │  Then: show "Swipe back" screen  │     │
+│        │ session lost           └──────────────┬───────────────────┘     │
+│        │                                       │                         │
+│        │                             All preconditions met,              │
+│        │                             user swipes back                    │
+│        │                                       │                         │
+│        │                                       v                         │
+│  ┌─────┴────────┐   Tap Microphone   ┌───────────────────────┐          │
+│  │              │ <───────────────   │  State 3:             │          │
+│  │  State 4:    │                     │  Ready                │          │
+│  │  Listening   │                     │  (Mic active, model   │          │
+│  │  [Waveform   │                     │   loaded, not         │          │
+│  │   + X / ✓]   │                     │   transcribing yet)   │          │
+│  └──────┬───────┘                     └───────────────────────┘          │
+│         │                                       ^                        │
+│         │ Tap ✓ / stop talking                  │                        │
+│         v                                       │                        │
+│  ┌──────────────┐   Text inserted, ─────────────┘                        │
+│  │  State 5:    │   return to State 3                                    │
+│  │  Transcribe  │                                                        │
+│  │  + Insert    │                                                        │
+│  └──────────────┘                                                        │
+│                                                                           │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │  State 6: Live Activity (visible whenever session is active)       │  │
+│  │  - Dynamic Island: RunAnywhere indicator                           │  │
+│  │  - Lock Screen: Session active widget with word count + controls   │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key UX Design Principles Observed
+
+1. **Transparency over iOS limitations:** The activation screen explicitly tells the user *why* they need to switch apps, building trust rather than hiding the constraint.
+2. **Minimal friction re-entry:** After the initial activation, the keyboard stays in State 3 (mic ready) so subsequent dictations are a single tap — no re-launching needed.
+3. **Always-visible session indicator:** The Dynamic Island and Lock Screen Live Activity ensure the user always knows Flow is active, preventing confusion about whether the microphone is on.
+4. **Clear modal separation:** The listening state (State 4) is a full takeover of the keyboard area, making it unmistakable that dictation is in progress and preventing accidental key presses.
+5. **Undo safety net:** After text insertion, an undo button is immediately available in case the transcription was wrong.
+6. **Branded but minimal:** The keyboard is not a full QWERTY — it provides just enough keys (numbers, punctuation, special characters) for quick edits alongside the primary voice input workflow.
+
+***
+
 ## Development Checklist for Swift Recreation
 
 ### Phase 1 — Foundation

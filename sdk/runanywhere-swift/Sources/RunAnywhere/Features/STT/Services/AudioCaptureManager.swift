@@ -152,8 +152,31 @@ public class AudioCaptureManager: ObservableObject {
         logger.info("Recording started")
     }
 
-    /// Stop recording
-    public func stopRecording() {
+    /// Activates the AVAudioSession without starting the audio engine.
+    /// Call this to keep the app alive in the background (with UIBackgroundModes: audio)
+    /// before the user is ready to record. Follow with `startRecording` when recording begins.
+    public func activateAudioSession() throws {
+        #if os(iOS) || os(tvOS)
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.record, mode: .measurement)
+        try audioSession.setActive(true)
+        logger.info("Audio session activated (keepalive)")
+        #endif
+    }
+
+    /// Deactivates the AVAudioSession. Call this when the session is fully ended.
+    public func deactivateAudioSession() {
+        #if os(iOS) || os(tvOS)
+        try? AVAudioSession.sharedInstance().setActive(false)
+        logger.info("Audio session deactivated")
+        #endif
+    }
+
+    /// Stop recording.
+    /// - Parameter deactivateSession: When `true` (default) the AVAudioSession is also
+    ///   deactivated. Pass `false` to keep the session alive for subsequent recordings
+    ///   (e.g. between listening segments in a flow session).
+    public func stopRecording(deactivateSession: Bool = true) {
         guard isRecording else { return }
 
         inputNode?.removeTap(onBus: 0)
@@ -163,8 +186,9 @@ public class AudioCaptureManager: ObservableObject {
         inputNode = nil
 
         #if os(iOS) || os(tvOS)
-        // Deactivate audio session (iOS/tvOS only)
-        try? AVAudioSession.sharedInstance().setActive(false)
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false)
+        }
         #endif
 
         DispatchQueue.main.async {
@@ -172,7 +196,7 @@ public class AudioCaptureManager: ObservableObject {
             self.audioLevel = 0.0
         }
 
-        logger.info("Recording stopped")
+        logger.info("Recording stopped (deactivateSession=\(deactivateSession))")
     }
 
     // MARK: - Private Helpers

@@ -123,11 +123,57 @@ final class SharedDataBridge {
         set { defaults?.set(newValue, forKey: SharedConstants.Keys.preferredSTTModelId) }
     }
 
+    // MARK: - Audio Level (waveform IPC)
+
+    /// Current audio input level, 0.0–1.0. Written by main app every ~100ms during listening.
+    /// Read by keyboard extension for waveform animation.
+    var audioLevel: Float {
+        get { defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0 }
+        set {
+            defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel)
+            // No synchronize() — high-frequency writes; keyboard polls with its own timer
+        }
+    }
+
+    // MARK: - Heartbeat (app-alive signal for keyboard extension)
+
+    /// Unix timestamp written by the main app every ~1s while a flow session is active.
+    /// A value of 0 means no active session. The keyboard uses this to detect a dead app
+    /// and revert to idle state.
+    var lastHeartbeatTimestamp: Double {
+        get { defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0 }
+        set { defaults?.set(newValue, forKey: SharedConstants.Keys.lastHeartbeat) }
+    }
+
+    // MARK: - Last Inserted Text (undo support)
+
+    var lastInsertedText: String? {
+        get { defaults?.string(forKey: SharedConstants.Keys.lastInsertedText) }
+        set {
+            if let value = newValue {
+                defaults?.set(value, forKey: SharedConstants.Keys.lastInsertedText)
+            } else {
+                defaults?.removeObject(forKey: SharedConstants.Keys.lastInsertedText)
+            }
+        }
+    }
+
     // MARK: - Cleanup
 
-    /// Clear all transient session data. Called after text is inserted.
+    /// Clear transient session data after text is inserted.
+    /// Transitions back to "ready" (session stays alive) rather than "idle".
+    func clearAfterInsertion() {
+        defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
+        defaults?.removeObject(forKey: SharedConstants.Keys.lastInsertedText)
+        sessionState = "ready"
+    }
+
+    /// Full session teardown — called when the session is ended completely.
     func clearSession() {
         defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
+        defaults?.removeObject(forKey: SharedConstants.Keys.lastInsertedText)
+        defaults?.set(Float(0), forKey: SharedConstants.Keys.audioLevel)
+        defaults?.set(Double(0), forKey: SharedConstants.Keys.lastHeartbeat)
         sessionState = "idle"
     }
 }

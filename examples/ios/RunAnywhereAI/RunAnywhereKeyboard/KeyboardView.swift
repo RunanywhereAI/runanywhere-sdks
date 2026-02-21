@@ -2,123 +2,418 @@
 //  KeyboardView.swift
 //  RunAnywhereKeyboard
 //
-//  SwiftUI keyboard UI.
-//  Shows a "Dictate" button that triggers the Flow Session in the main app,
-//  plus standard utility keys (space, return, delete, globe/switch keyboard).
+//  SwiftUI keyboard UI — implements the 5-state WisprFlow-style UX.
+//
+//  State machine (driven by SharedDataBridge.sessionState):
+//    idle        → full keyboard + "Run" button in toolbar
+//    activating  → full keyboard + spinner in toolbar
+//    ready       → full keyboard + "Using iPhone Microphone" + mic icon
+//    listening   → waveform takeover + X / ✓ controls
+//    transcribing→ waveform + spinner
+//    done        → waveform + checkmark flash (brief, then back to ready)
 //
 
 import SwiftUI
 import Combine
 
 struct KeyboardView: View {
-    let onDictate: () -> Void
+    // Callbacks into KeyboardViewController
+    let onRunTap: () -> Void         // idle → tap "Run" (opens main app)
+    let onMicTap: () -> Void         // ready → tap mic (posts startListening)
+    let onStopTap: () -> Void        // listening → tap ✓ (posts stopListening)
+    let onCancelTap: () -> Void      // listening → tap X (posts cancelListening)
+    let onUndoTap: () -> Void        // done → tap undo (deletes last inserted text)
     let onNextKeyboard: () -> Void
     let onSpace: () -> Void
     let onReturn: () -> Void
     let onDelete: () -> Void
+    let onInsertCharacter: (String) -> Void
+
+    // MARK: - State (polled from SharedDataBridge)
 
     @State private var sessionState: String = "idle"
+    @State private var audioLevel: Float = 0
 
-    // Poll state whenever the view appears / becomes visible
+    // Waveform bar heights — 30 bars driven by audioLevel
+    @State private var barPhase: Double = 0
+    @State private var showUndo = false
+
     private let stateTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
+    private let waveformTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
+
+    // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 6) {
-            if sessionState != "idle" {
-                statusBanner
+        VStack(spacing: 0) {
+            switch sessionState {
+            case "listening", "transcribing", "done":
+                waveformView
+            default:
+                fullKeyboardView
             }
-            buttonsRow
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
         .background(Color(.systemGroupedBackground))
         .onAppear { refreshState() }
         .onReceive(stateTimer) { _ in refreshState() }
+        .onReceive(waveformTimer) { _ in
+            guard sessionState == "listening" else { return }
+            audioLevel = SharedDataBridge.shared.audioLevel
+            barPhase += 0.15
+        }
+        .onChange(of: sessionState) { _, newState in
+            if newState == "done" {
+                showUndo = true
+                // Hide undo after 5s
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    withAnimation { showUndo = false }
+                }
+            }
+        }
     }
 
-    // MARK: - Status Banner
+    // MARK: - Full Keyboard (idle / activating / ready)
 
-    @ViewBuilder
-    private var statusBanner: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .scaleEffect(0.75)
-            Text(statusText)
-                .font(.caption)
-                .foregroundColor(.secondary)
+    private var fullKeyboardView: some View {
+        VStack(spacing: 0) {
+            toolbarRow
+            Divider()
+            numberRow
+            specialCharsRow1
+            specialCharsRow2
+            bottomRow
+        }
+    }
+
+    // MARK: Toolbar
+
+    private var toolbarRow: some View {
+        HStack(spacing: 0) {
+            // Settings icon (left)
+            iconButton(systemImage: "slider.horizontal.3", action: {})
+                .padding(.leading, 4)
+
             Spacer()
+
+            // Center / right content depends on state
+            switch sessionState {
+            case "idle":
+                Button(action: onRunTap) {
+                    Text("Run")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor)
+                        .cornerRadius(8)
+                }
+                .padding(.trailing, 8)
+
+            case "activating":
+                ProgressView()
+                    .scaleEffect(0.85)
+                    .padding(.trailing, 12)
+
+            case "ready":
+                HStack(spacing: 6) {
+                    Text("Using iPhone Microphone")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Button(action: onMicTap) {
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.accentColor)
+                            .padding(8)
+                            .background(Color.accentColor.opacity(0.12), in: Circle())
+                    }
+                }
+                .padding(.trailing, 8)
+
+            default:
+                EmptyView()
+            }
+        }
+        .frame(height: 44)
+    }
+
+    // MARK: Number Row
+
+    private var numberRow: some View {
+        HStack(spacing: 0) {
+            ForEach(["1","2","3","4","5","6","7","8","9","0"], id: \.self) { char in
+                characterKey(char)
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: Special Characters Row 1
+
+    private var specialCharsRow1: some View {
+        HStack(spacing: 0) {
+            ForEach(["-","/",":",";"," ( "," ) ","$","&","@","\""], id: \.self) { char in
+                characterKey(char)
+            }
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: Special Characters Row 2
+
+    private var specialCharsRow2: some View {
+        HStack(spacing: 0) {
+            characterKey("#+=")
+                .frame(maxWidth: .infinity)
+            ForEach([".","," ,"?","!","'"], id: \.self) { char in
+                characterKey(char)
+            }
+            // Delete key at the end
+            Button(action: onDelete) {
+                Image(systemName: "delete.left")
+                    .font(.system(size: 14))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(6)
+            }
+            .foregroundColor(.primary)
+            .padding(3)
+            .frame(maxWidth: .infinity, minHeight: 42)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: Bottom Row
+
+    private var bottomRow: some View {
+        HStack(spacing: 0) {
+            // Globe key (mandatory iOS requirement)
+            Button(action: onNextKeyboard) {
+                Image(systemName: "globe")
+                    .font(.system(size: 18))
+                    .frame(width: 46, height: 42)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(6)
+            }
+            .foregroundColor(.primary)
+            .padding(3)
+
+            // ABC key
+            Button(action: onNextKeyboard) {
+                Text("ABC")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 52, height: 42)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(6)
+            }
+            .foregroundColor(.primary)
+            .padding(3)
+
+            // Branded spacebar
+            Button(action: onSpace) {
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text("RunAnywhere")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.primary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(Color(.systemBackground))
+                .cornerRadius(6)
+            }
+            .padding(3)
+
+            // Return key
+            Button(action: onReturn) {
+                Image(systemName: "return")
+                    .font(.system(size: 16))
+                    .frame(width: 52, height: 42)
+                    .background(Color(.systemGray5))
+                    .cornerRadius(6)
+            }
+            .foregroundColor(.primary)
+            .padding(3)
         }
         .padding(.horizontal, 4)
-        .transition(.opacity)
+        .padding(.bottom, 6)
     }
 
-    private var statusText: String {
-        switch sessionState {
-        case "recording":    return "Recording… speak now"
-        case "transcribing": return "Transcribing…"
-        case "done":         return "Done — text inserted"
-        default:             return ""
-        }
-    }
+    // MARK: - Waveform View (listening / transcribing / done)
 
-    // MARK: - Buttons Row
-
-    private var buttonsRow: some View {
-        HStack(spacing: 6) {
-            dictateButton
+    private var waveformView: some View {
+        VStack(spacing: 0) {
             Spacer()
-            keyButton(label: "space", action: onSpace)
-            iconButton(systemImage: "return", action: onReturn)
-            iconButton(systemImage: "delete.left", action: onDelete)
-            iconButton(systemImage: "globe", action: onNextKeyboard)
-        }
-    }
 
-    private var dictateButton: some View {
-        Button(action: {
-            onDictate()
-            refreshState()
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: sessionState == "recording" ? "stop.circle.fill" : "mic.fill")
-                Text(sessionState == "recording" ? "Recording…" : "Dictate")
+            // X / ✓ controls row (hidden during transcribing)
+            if sessionState != "transcribing" {
+                HStack {
+                    // Cancel (X)
+                    Button(action: sessionState == "done" ? {} : onCancelTap) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(sessionState == "done" ? Color.clear : Color.primary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .padding(.leading, 20)
+
+                    Spacer()
+
+                    // Status label
+                    VStack(spacing: 2) {
+                        if sessionState == "done" {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                        } else {
+                            Text("Listening")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("iPhone Microphone")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Confirm (✓) or Undo
+                    if sessionState == "done" && showUndo {
+                        Button(action: onUndoTap) {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.trailing, 20)
+                    } else {
+                        Button(action: onStopTap) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .frame(width: 44, height: 44)
+                        }
+                        .padding(.trailing, 20)
+                        .opacity(sessionState == "done" ? 0 : 1)
+                    }
+                }
             }
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundColor(.white)
-            .padding(.horizontal, 18)
-            .padding(.vertical, 11)
-            .background(sessionState == "recording" ? Color.orange : Color.accentColor)
-            .cornerRadius(8)
+
+            // Waveform bars
+            waveformBars
+                .frame(height: 56)
+                .padding(.horizontal, 20)
+
+            // Transcribing spinner (below bars)
+            if sessionState == "transcribing" {
+                VStack(spacing: 4) {
+                    ProgressView()
+                        .scaleEffect(0.9)
+                    Text("Transcribing…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+
+            Spacer()
+
+            // Globe key always visible at bottom-left
+            HStack {
+                Button(action: onNextKeyboard) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 18))
+                        .frame(width: 46, height: 40)
+                        .background(Color(.systemGray5))
+                        .cornerRadius(6)
+                }
+                .foregroundColor(.primary)
+                .padding(.leading, 7)
+                .padding(.bottom, 6)
+                Spacer()
+            }
+        }
+        .frame(minHeight: 180)
+    }
+
+    // MARK: Waveform Bars
+
+    private var waveformBars: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<30, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(barColor)
+                    .frame(width: 3, height: barHeight(for: index))
+                    .animation(.easeOut(duration: 0.08), value: audioLevel)
+            }
         }
     }
 
-    private func keyButton(label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
+    private func barHeight(for index: Int) -> CGFloat {
+        let base: CGFloat = 4
+        let maxH: CGFloat = 50
+        if sessionState == "transcribing" {
+            // Gentle idle wave during transcribing
+            let wave = CGFloat(sin(Double(index) * 0.5 + barPhase))
+            return base + (maxH * 0.25) * (0.5 + 0.5 * wave)
+        }
+        if sessionState == "done" {
+            return base + 8
+        }
+        // Listening — level-driven wave with per-bar phase offset
+        let wave = CGFloat(sin(Double(index) * 0.45 + barPhase))
+        let level = CGFloat(min(max(audioLevel, 0), 1))
+        let dynamic = (maxH - base) * level * (0.6 + 0.4 * ((wave + 1) / 2))
+        return base + dynamic
+    }
+
+    private var barColor: Color {
+        switch sessionState {
+        case "transcribing": return .orange
+        case "done":         return .green
+        default:             return .red
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func characterKey(_ char: String) -> some View {
+        Button(action: { onInsertCharacter(char.trimmingCharacters(in: .whitespaces)) }) {
+            Text(char)
                 .font(.system(size: 14))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
-                .background(Color(.systemGray5))
-                .cornerRadius(8)
+                .frame(maxWidth: .infinity, minHeight: 42)
+                .background(Color(.systemBackground))
+                .cornerRadius(6)
         }
         .foregroundColor(.primary)
+        .padding(3)
     }
 
     private func iconButton(systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 16))
-                .padding(11)
-                .background(Color(.systemGray5))
-                .cornerRadius(8)
+                .padding(10)
         }
-        .foregroundColor(.primary)
+        .foregroundColor(.secondary)
     }
 
-    // MARK: - State
+    // MARK: - State Refresh
 
     private func refreshState() {
-        let newState = SharedDataBridge.shared.sessionState
+        var newState = SharedDataBridge.shared.sessionState
+
+        // If the session appears active but the main app has not written a heartbeat recently,
+        // the app has likely been killed. Revert to idle so the "Run" button is shown again.
+        if newState != "idle" {
+            let heartbeat = SharedDataBridge.shared.lastHeartbeatTimestamp
+            // heartbeat == 0 means never set (fresh install or manually cleared); don't override.
+            // heartbeat > 0 but older than 3 s means the app has died.
+            if heartbeat > 0 && (Date().timeIntervalSince1970 - heartbeat) > 3.0 {
+                newState = "idle"
+            }
+        }
+
         if newState != sessionState {
             withAnimation(.easeInOut(duration: 0.2)) {
                 sessionState = newState
