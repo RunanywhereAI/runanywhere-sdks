@@ -7,10 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		54398FEF2F497A03009D6B51 /* YapRunKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54398FEF2F497A03009D6B51 /* YapRunKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FE82F497A02009D6B51 /* YapRunKeyboard.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFB2F497A34009D6B51 /* WidgetKit.framework */; };
 		54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFD2F497A34009D6B51 /* SwiftUI.framework */; };
-		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		543991CD2F498152009D6B51 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CC2F498152009D6B51 /* RunAnywhere */; };
 		543991CF2F498152009D6B51 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CE2F498152009D6B51 /* RunAnywhereONNX */; };
 /* End PBXBuildFile section */
@@ -475,11 +475,13 @@
 		};
 		54398FEE2F497A03009D6B51 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 54398FE72F497A02009D6B51 /* YapRunKeyboard */;
 			targetProxy = 54398FED2F497A03009D6B51 /* PBXContainerItemProxy */;
 		};
 		5439900A2F497A35009D6B51 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilter = ios;
 			target = 54398FF82F497A34009D6B51 /* YapRunActivityExtension */;
 			targetProxy = 543990092F497A35009D6B51 /* PBXContainerItemProxy */;
 		};
@@ -617,6 +619,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = YapRun/Info.plist;
+				"INFOPLIST_KEY_LSUIElement[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -630,7 +633,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -663,6 +666,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = YapRun/Info.plist;
+				"INFOPLIST_KEY_LSUIElement[sdk=macosx*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -676,7 +680,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
-				MACOSX_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";

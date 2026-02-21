@@ -421,16 +421,4 @@ enum FlowSessionPhase: Equatable {
     }
 }
 
-struct DictationEntry: Codable, Identifiable {
-    let id: UUID
-    let text: String
-    let date: Date
-
-    init(text: String, date: Date) {
-        self.id = UUID()
-        self.text = text
-        self.date = date
-    }
-}
-
 #endif

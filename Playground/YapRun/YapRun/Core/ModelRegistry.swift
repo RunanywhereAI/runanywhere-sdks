@@ -1,0 +1,70 @@
+//
+//  ModelRegistry.swift
+//  YapRun
+//
+//  Centralized ASR model definitions shared across iOS and macOS.
+//
+
+import Foundation
+import RunAnywhere
+
+enum ModelRegistry {
+
+    struct ASRModel {
+        let id: String
+        let name: String
+        let url: URL
+        let archiveType: ArchiveType
+        let sizeBytes: Int64
+    }
+
+    /// Default model used during onboarding.
+    static let defaultModelId = "asr-moonshine-tiny-en-int8"
+
+    /// All available ASR models (tar.gz for fast native gzip extraction on iOS/macOS).
+    static let asrModels: [ASRModel] = [
+        ASRModel(
+            id: "asr-moonshine-tiny-en-int8",
+            name: "Moonshine Tiny EN (int8)",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-moonshine-tiny-en-int8.tar.gz")!,
+            archiveType: .tarGz,
+            sizeBytes: 118_000_000
+        ),
+        ASRModel(
+            id: "asr-moonshine-base-en-int8",
+            name: "Moonshine Base EN (int8)",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-moonshine-base-en-int8.tar.gz")!,
+            archiveType: .tarGz,
+            sizeBytes: 273_000_000
+        ),
+        ASRModel(
+            id: "sherpa-onnx-whisper-tiny.en",
+            name: "Whisper Tiny EN",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-whisper-tiny.en.tar.gz")!,
+            archiveType: .tarGz,
+            sizeBytes: 75_000_000
+        ),
+        ASRModel(
+            id: "asr-parakeet-tdt-ctc-110m-en-int8",
+            name: "Parakeet TDT-CTC 110M EN (int8)",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8.tar.gz")!,
+            archiveType: .tarGz,
+            sizeBytes: 126_000_000
+        ),
+    ]
+
+    /// Register all ASR models with the RunAnywhere SDK.
+    static func registerAll() {
+        for model in asrModels {
+            RunAnywhere.registerModel(
+                id: model.id,
+                name: model.name,
+                url: model.url,
+                framework: .onnx,
+                modality: .speechRecognition,
+                artifactType: .archive(model.archiveType, structure: .nestedDirectory),
+                memoryRequirement: model.sizeBytes
+            )
+        }
+    }
+}

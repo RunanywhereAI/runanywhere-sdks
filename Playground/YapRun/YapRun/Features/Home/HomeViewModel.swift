@@ -2,53 +2,29 @@
 //  HomeViewModel.swift
 //  YapRun
 //
-//  State management for the redesigned home screen.
+//  State management for the home screen.
+//  Shared between iOS and macOS with targeted #if os() for platform-specific APIs.
 //
 
-#if os(iOS)
 import AVFoundation
 import Observation
 import RunAnywhere
+import SwiftUI
 import os
+
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 @Observable
 @MainActor
 final class HomeViewModel {
 
-    // MARK: - Types
-
-    enum MicState: String {
-        case unknown, granted, denied
-
-        var icon: String {
-            switch self {
-            case .unknown: "mic.fill"
-            case .granted: "checkmark.circle.fill"
-            case .denied:  "xmark.circle.fill"
-            }
-        }
-
-        var color: Color {
-            switch self {
-            case .unknown: .orange
-            case .granted: AppColors.primaryGreen
-            case .denied:  AppColors.primaryRed
-            }
-        }
-
-        var label: String {
-            switch self {
-            case .unknown: "Not determined"
-            case .granted: "Granted"
-            case .denied:  "Denied — open Settings to allow"
-            }
-        }
-    }
-
     // MARK: - State
 
-    var micPermission: MicState = .unknown
-    var keyboardReady = false
+    var micPermission: MicPermissionState = .unknown
     var models: [ModelInfo] = []
     var currentSTTModelId: String?
     var downloadProgress: [String: Double] = [:]
@@ -56,6 +32,12 @@ final class HomeViewModel {
     var dictationHistory: [DictationEntry] = []
     var showAddModelSheet = false
     var errorMessage: String?
+
+    #if os(iOS)
+    var keyboardReady = false
+    #elseif os(macOS)
+    var accessibilityGranted = false
+    #endif
 
     // MARK: - Private
 
@@ -65,16 +47,29 @@ final class HomeViewModel {
 
     func refresh() async {
         // Mic permission
+        #if os(iOS)
         let status = AVAudioApplication.shared.recordPermission
         switch status {
         case .granted:    micPermission = .granted
         case .denied:     micPermission = .denied
         default:          micPermission = .unknown
         }
+        #elseif os(macOS)
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:            micPermission = .granted
+        case .denied, .restricted:   micPermission = .denied
+        case .notDetermined:         micPermission = .unknown
+        @unknown default:            micPermission = .unknown
+        }
+        #endif
 
-        // Keyboard + Full Access
+        // Platform-specific status
+        #if os(iOS)
         let hasSessionState = SharedDataBridge.shared.defaults?.string(forKey: SharedConstants.Keys.sessionState) != nil
         keyboardReady = hasSessionState
+        #elseif os(macOS)
+        accessibilityGranted = AXIsProcessTrusted()
+        #endif
 
         // Models
         do {
@@ -96,14 +91,33 @@ final class HomeViewModel {
     // MARK: - Mic Permission
 
     func requestMicPermission() async {
+        #if os(iOS)
         let granted = await AVAudioApplication.requestRecordPermission()
         micPermission = granted ? .granted : .denied
+        #elseif os(macOS)
+        let granted = await AVCaptureDevice.requestAccess(for: .audio)
+        micPermission = granted ? .granted : .denied
+        #endif
     }
 
     func openSettings() {
+        #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
+        #elseif os(macOS)
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            NSWorkspace.shared.open(url)
+        }
+        #endif
     }
+
+    #if os(macOS)
+    func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    #endif
 
     // MARK: - Model Management
 
@@ -122,7 +136,13 @@ final class HomeViewModel {
             // Auto-load after download
             try await RunAnywhere.loadSTTModel(modelId)
             currentSTTModelId = modelId
+
+            #if os(iOS)
             SharedDataBridge.shared.preferredSTTModelId = modelId
+            #else
+            UserDefaults.standard.set(modelId, forKey: "preferredSTTModelId")
+            #endif
+
             logger.info("Model \(modelId) downloaded and loaded")
         } catch {
             errorMessage = "Download failed: \(error.localizedDescription)"
@@ -131,8 +151,6 @@ final class HomeViewModel {
 
         downloadingIds.remove(modelId)
         downloadProgress.removeValue(forKey: modelId)
-
-        // Refresh model list to update isDownloaded states
         await refresh()
     }
 
@@ -140,7 +158,13 @@ final class HomeViewModel {
         do {
             try await RunAnywhere.loadSTTModel(modelId)
             currentSTTModelId = modelId
+
+            #if os(iOS)
             SharedDataBridge.shared.preferredSTTModelId = modelId
+            #else
+            UserDefaults.standard.set(modelId, forKey: "preferredSTTModelId")
+            #endif
+
             logger.info("Model \(modelId) loaded")
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
@@ -182,22 +206,28 @@ final class HomeViewModel {
 
     func clearHistory() {
         dictationHistory = []
+        #if os(iOS)
         SharedDataBridge.shared.defaults?.removeObject(forKey: SharedConstants.Keys.dictationHistory)
+        #else
+        DictationHistory.shared.clear()
+        #endif
     }
 
     private func loadHistory() {
+        #if os(iOS)
         guard let data = SharedDataBridge.shared.defaults?.data(forKey: SharedConstants.Keys.dictationHistory),
               let entries = try? JSONDecoder().decode([DictationEntry].self, from: data) else {
             dictationHistory = []
             return
         }
         dictationHistory = entries
+        #else
+        dictationHistory = DictationHistory.shared.entries
+        #endif
     }
 }
 
-// MARK: - Helpers
-
-import SwiftUI
+// MARK: - ModelInfo Helpers
 
 extension ModelInfo {
     var sizeLabel: String {
@@ -221,5 +251,3 @@ extension ModelInfo {
         }
     }
 }
-
-#endif

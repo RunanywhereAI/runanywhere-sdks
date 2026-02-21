@@ -3,9 +3,9 @@
 //  YapRun
 //
 //  Manages audio recording and on-device transcription for the ASR playground.
+//  Shared between iOS and macOS.
 //
 
-#if os(iOS)
 import Foundation
 import Observation
 import RunAnywhere
@@ -64,7 +64,7 @@ final class PlaygroundViewModel {
             return
         }
 
-        audioBuffer = Data()
+        audioBuffer = Foundation.Data()
         elapsedSeconds = 0
         errorMessage = nil
         transcription = ""
@@ -129,10 +129,8 @@ final class PlaygroundViewModel {
 
     func clear() {
         transcription = ""
-        audioBuffer = Data()
+        audioBuffer = Foundation.Data()
         errorMessage = nil
         elapsedSeconds = 0
     }
 }
-
-#endif

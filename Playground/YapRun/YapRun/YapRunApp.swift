@@ -2,8 +2,9 @@
 //  YapRunApp.swift
 //  YapRun
 //
-//  On-device voice dictation keyboard powered by RunAnywhere SDK.
+//  On-device voice dictation powered by RunAnywhere SDK.
 //  ASR only — uses Sherpa Whisper Tiny (ONNX) for transcription.
+//  Supports both iOS and macOS from a shared codebase.
 //
 
 import SwiftUI
@@ -15,20 +16,33 @@ import os
 struct YapRunApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.yaprun", category: "App")
 
+    #if os(iOS)
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
+    #endif
+
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) var appDelegate
+    #endif
+
     @State private var isSDKInitialized = false
     @State private var initializationError: String?
+
+    #if os(iOS)
     @State private var hasCompletedOnboarding = SharedDataBridge.shared.defaults?.bool(
         forKey: SharedConstants.Keys.hasCompletedOnboarding
     ) ?? false
+    #elseif os(macOS)
+    @State private var hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    #endif
 
     var body: some Scene {
+        #if os(iOS)
         WindowGroup {
             Group {
                 if isSDKInitialized {
                     if hasCompletedOnboarding {
-                        homeContent
+                        iOSHomeContent
                     } else {
                         OnboardingView {
                             withAnimation(.easeInOut(duration: 0.4)) {
@@ -47,11 +61,20 @@ struct YapRunApp: App {
                 await initializeSDK()
             }
         }
+        #elseif os(macOS)
+        // macOS uses agent app pattern — UI driven by MacAppDelegate.
+        // Settings scene is a no-op required by SwiftUI App protocol.
+        Settings {
+            EmptyView()
+        }
+        .defaultSize(width: 0, height: 0)
+        #endif
     }
 
-    // MARK: - Home Content
+    // MARK: - iOS Home Content
 
-    private var homeContent: some View {
+    #if os(iOS)
+    private var iOSHomeContent: some View {
         TabView {
             ContentView()
                 .environmentObject(flowSession)
@@ -82,30 +105,19 @@ struct YapRunApp: App {
                 .environmentObject(flowSession)
         }
     }
+    #endif
 
     // MARK: - SDK Initialization
 
-    private func initializeSDK() async {
+    func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
 
             try RunAnywhere.initialize()
             logger.info("SDK initialized in development mode")
 
-            // Register the Whisper STT model
-            if let whisperURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz") {
-                RunAnywhere.registerModel(
-                    id: "sherpa-onnx-whisper-tiny.en",
-                    name: "Sherpa Whisper Tiny (ONNX)",
-                    url: whisperURL,
-                    framework: .onnx,
-                    modality: .speechRecognition,
-                    artifactType: .archive(.tarGz, structure: .nestedDirectory),
-                    memoryRequirement: 75_000_000
-                )
-            }
-
-            logger.info("STT model registered")
+            ModelRegistry.registerAll()
+            logger.info("ASR models registered")
             await MainActor.run { isSDKInitialized = true }
         } catch {
             logger.error("SDK initialization failed: \(error.localizedDescription)")

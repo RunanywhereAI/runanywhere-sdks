@@ -99,7 +99,8 @@ final class OnboardingViewModel {
         downloadStage = "Preparing…"
 
         do {
-            let stream = try await RunAnywhere.downloadModel("sherpa-onnx-whisper-tiny.en")
+            let modelId = ModelRegistry.defaultModelId
+            let stream = try await RunAnywhere.downloadModel(modelId)
             for await progress in stream {
                 downloadProgress = progress.overallProgress
                 switch progress.stage {
@@ -113,8 +114,8 @@ final class OnboardingViewModel {
             }
 
             logger.info("Model downloaded — loading into memory")
-            try await RunAnywhere.loadSTTModel("sherpa-onnx-whisper-tiny.en")
-            SharedDataBridge.shared.preferredSTTModelId = "sherpa-onnx-whisper-tiny.en"
+            try await RunAnywhere.loadSTTModel(modelId)
+            SharedDataBridge.shared.preferredSTTModelId = modelId
 
             isModelReady = true
             logger.info("Model loaded — onboarding model step complete")

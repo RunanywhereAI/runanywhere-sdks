@@ -8,6 +8,7 @@
 //  TARGET MEMBERSHIP: YapRun (main app) + YapRunActivity (widget extension)
 //
 
+#if os(iOS)
 import ActivityKit
 import Foundation
 
@@ -22,3 +23,4 @@ struct DictationActivityAttributes: ActivityAttributes {
 
     var sessionId: String
 }
+#endif

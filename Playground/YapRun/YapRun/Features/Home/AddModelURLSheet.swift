@@ -3,9 +3,9 @@
 //  YapRun
 //
 //  Sheet for adding a custom STT model from a URL.
+//  Shared between iOS and macOS.
 //
 
-#if os(iOS)
 import SwiftUI
 
 struct AddModelURLSheet: View {
@@ -26,9 +26,11 @@ struct AddModelURLSheet: View {
             Form {
                 Section {
                     TextField("https://example.com/model.tar.gz", text: $urlString)
+                        #if os(iOS)
                         .keyboardType(.URL)
-                        .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        #endif
+                        .autocorrectionDisabled()
                 } header: {
                     Text("Model URL")
                 } footer: {
@@ -40,7 +42,9 @@ struct AddModelURLSheet: View {
                 }
             }
             .navigationTitle("Add Model")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { isPresented = false }
@@ -60,5 +64,3 @@ struct AddModelURLSheet: View {
         .preferredColorScheme(.dark)
     }
 }
-
-#endif

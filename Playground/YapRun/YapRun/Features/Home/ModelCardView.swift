@@ -3,9 +3,9 @@
 //  YapRun
 //
 //  Card component for displaying a single STT model with its state.
+//  Shared between iOS and macOS.
 //
 
-#if os(iOS)
 import RunAnywhere
 import SwiftUI
 
@@ -107,5 +107,3 @@ struct ModelCardView: View {
         }
     }
 }
-
-#endif
