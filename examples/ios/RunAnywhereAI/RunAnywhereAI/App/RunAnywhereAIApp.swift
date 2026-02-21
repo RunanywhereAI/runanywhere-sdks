@@ -21,6 +21,9 @@ import AppKit
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     @StateObject private var modelManager = ModelManager.shared
+    #if os(iOS)
+    @StateObject private var flowSession = FlowSessionManager.shared
+    #endif
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
 
@@ -30,6 +33,15 @@ struct RunAnywhereAIApp: App {
                 if isSDKInitialized {
                     ContentView()
                         .environmentObject(modelManager)
+                        #if os(iOS)
+                        .environmentObject(flowSession)
+                        .onOpenURL { url in
+                            guard url.scheme == SharedConstants.urlScheme,
+                                  url.host == "startFlow" else { return }
+                            logger.info("📲 Received startFlow deep link")
+                            flowSession.handleStartFlow()
+                        }
+                        #endif
                         .onAppear {
                             logger.info("🎉 App is ready to use!")
                         }

@@ -18,5 +18,10 @@
     <!-- macOS User-selected files for model imports (read-write) -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    <!-- App Group for keyboard extension IPC (iOS + macOS) -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.runanywhere.runanywhereai</string>
+    </array>
 </dict>
 </plist>
