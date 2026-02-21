@@ -116,9 +116,11 @@ The pre-built WASM includes llama.cpp (LLM/VLM), whisper.cpp (STT), and sherpa-o
 npm install @runanywhere/web
 ```
 
-### Serve WASM Files
+### Serve WASM Files + Cross-Origin Isolation
 
 The package includes pre-built WASM files in `node_modules/@runanywhere/web/wasm/`. Configure your bundler to serve these as static assets.
+
+> **Important:** Your server **must** set Cross-Origin Isolation headers for `SharedArrayBuffer` and multi-threaded WASM to work. Without these headers the SDK falls back to single-threaded mode, which is significantly slower. See [Cross-Origin Isolation Headers](#cross-origin-isolation-headers) for all platforms (Nginx, Vercel, Netlify, Cloudflare, AWS, Apache).
 
 **Vite:**
 
@@ -128,6 +130,7 @@ export default defineConfig({
   assetsInclude: ['**/*.wasm'],
   server: {
     headers: {
+      // Required for SharedArrayBuffer / multi-threaded WASM
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
@@ -145,8 +148,17 @@ module.exports = {
       { test: /\.wasm$/, type: 'asset/resource' },
     ],
   },
+  devServer: {
+    headers: {
+      // Required for SharedArrayBuffer / multi-threaded WASM
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
+  },
 };
 ```
+
+> **Safari/iOS:** Safari does not support `credentialless` COEP. Use the COI service worker pattern shown in the [demo app](../../examples/web/RunAnywhereAI/) — it intercepts responses and injects `require-corp` headers at runtime. See `public/coi-serviceworker.js` and the `ensureCrossOriginIsolation()` call in `src/main.ts`.
 
 ---
 

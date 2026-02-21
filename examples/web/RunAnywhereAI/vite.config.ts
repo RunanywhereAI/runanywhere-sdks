@@ -60,9 +60,11 @@ export default defineConfig({
   },
   server: {
     headers: {
-      // Required for SharedArrayBuffer (pthreads) and WASM threads
+      // Cross-Origin Isolation — required for SharedArrayBuffer / multi-threaded WASM.
+      // Without these headers the SDK falls back to single-threaded mode.
+      // Safari doesn't support 'credentialless'; see public/coi-serviceworker.js
+      // and the ensureCrossOriginIsolation() call in src/main.ts for the fallback.
       'Cross-Origin-Opener-Policy': 'same-origin',
-      // 'credentialless' allows cross-origin resource loading
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
     fs: {
