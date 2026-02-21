@@ -190,6 +190,36 @@ data class ThinkingTagPattern(
     }
 }
 
+// MARK: - LoRA Adapter Types
+
+/**
+ * Configuration for a LoRA adapter.
+ * Mirrors the C++ LoraAdapterEntry.
+ *
+ * @param path Path to the LoRA adapter GGUF file
+ * @param scale Scale factor (0.0 to 1.0+, default 1.0). Higher = stronger adapter effect.
+ */
+@Serializable
+data class LoRAAdapterConfig(
+    val path: String,
+    val scale: Float = 1.0f,
+) {
+    init {
+        require(path.isNotBlank()) { "LoRA adapter path cannot be blank" }
+    }
+}
+
+/**
+ * Info about a loaded LoRA adapter.
+ * Mirrors the C++ LoRA info JSON structure.
+ */
+@Serializable
+data class LoRAAdapterInfo(
+    val path: String,
+    val scale: Float,
+    val applied: Boolean,
+)
+
 // MARK: - Structured Output Types
 
 /**

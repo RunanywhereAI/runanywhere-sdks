@@ -364,6 +364,13 @@ bool LlamaCppTextGeneration::unload_model_internal() {
 
     LOGI("Unloading model");
 
+    // Clear LoRA adapters from context before freeing
+    // (adapter memory is freed automatically with the model per llama.cpp API)
+    if (context_ && !lora_adapters_.empty()) {
+        llama_clear_adapter_lora(context_);
+    }
+    lora_adapters_.clear();
+
     if (sampler_) {
         llama_sampler_free(sampler_);
         sampler_ = nullptr;
@@ -771,6 +778,181 @@ nlohmann::json LlamaCppTextGeneration::get_model_info() const {
     }
 
     return info;
+}
+
+// =============================================================================
+// LORA ADAPTER MANAGEMENT
+// =============================================================================
+
+bool LlamaCppTextGeneration::recreate_context() {
+    LOGI("Recreating context to accommodate LoRA adapters");
+
+    // Free existing sampler and context
+    if (sampler_) {
+        llama_sampler_free(sampler_);
+        sampler_ = nullptr;
+    }
+
+    if (context_) {
+        llama_free(context_);
+        context_ = nullptr;
+    }
+
+    // Create new context (adapters are now visible to it)
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = context_size_;
+    ctx_params.n_batch = context_size_;
+    ctx_params.n_ubatch = context_size_;
+    ctx_params.n_threads = backend_->get_num_threads();
+    ctx_params.n_threads_batch = backend_->get_num_threads();
+    ctx_params.no_perf = true;
+
+    context_ = llama_init_from_model(model_, ctx_params);
+    if (!context_) {
+        LOGE("Failed to recreate context after LoRA adapter load");
+        return false;
+    }
+
+    // Rebuild sampler chain
+    auto sparams = llama_sampler_chain_default_params();
+    sparams.no_perf = true;
+    sampler_ = llama_sampler_chain_init(sparams);
+    llama_sampler_chain_add(sampler_, llama_sampler_init_greedy());
+
+    LOGI("Context recreated successfully");
+    return true;
+}
+
+bool LlamaCppTextGeneration::apply_lora_adapters() {
+    for (auto& entry : lora_adapters_) {
+        int32_t result = llama_set_adapter_lora(context_, entry.adapter, entry.scale);
+        if (result != 0) {
+            LOGE("Failed to apply LoRA adapter: %s (error=%d)", entry.path.c_str(), result);
+            entry.applied = false;
+            return false;
+        }
+        entry.applied = true;
+        LOGI("Applied LoRA adapter: %s (scale=%.2f)", entry.path.c_str(), entry.scale);
+    }
+    return true;
+}
+
+bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, float scale) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!model_loaded_ || !model_) {
+        LOGE("Cannot load LoRA adapter: model not loaded");
+        return false;
+    }
+
+    // Check if adapter already loaded
+    for (const auto& entry : lora_adapters_) {
+        if (entry.path == adapter_path) {
+            LOGE("LoRA adapter already loaded: %s", adapter_path.c_str());
+            return false;
+        }
+    }
+
+    LOGI("Loading LoRA adapter: %s (scale=%.2f)", adapter_path.c_str(), scale);
+
+    // Load adapter against model
+    llama_adapter_lora* adapter = llama_adapter_lora_init(model_, adapter_path.c_str());
+    if (!adapter) {
+        LOGE("Failed to load LoRA adapter from: %s", adapter_path.c_str());
+        return false;
+    }
+
+    // Store adapter entry
+    LoraAdapterEntry entry;
+    entry.adapter = adapter;
+    entry.path = adapter_path;
+    entry.scale = scale;
+    entry.applied = false;
+    lora_adapters_.push_back(std::move(entry));
+
+    // Recreate context so the new adapter is visible
+    if (!recreate_context()) {
+        // Remove the adapter entry we just added on failure
+        lora_adapters_.pop_back();
+        return false;
+    }
+
+    // Apply all loaded adapters to the new context
+    if (!apply_lora_adapters()) {
+        lora_adapters_.pop_back();
+        return false;
+    }
+
+    // Clear KV cache after adapter changes
+    llama_memory_clear(llama_get_memory(context_), true);
+
+    LOGI("LoRA adapter loaded and applied: %s (%zu total adapters)",
+         adapter_path.c_str(), lora_adapters_.size());
+    return true;
+}
+
+bool LlamaCppTextGeneration::remove_lora_adapter(const std::string& adapter_path) {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!model_loaded_ || !context_) {
+        LOGE("Cannot remove LoRA adapter: model not loaded");
+        return false;
+    }
+
+    auto it = std::find_if(lora_adapters_.begin(), lora_adapters_.end(),
+                           [&adapter_path](const LoraAdapterEntry& e) { return e.path == adapter_path; });
+
+    if (it == lora_adapters_.end()) {
+        LOGE("LoRA adapter not found: %s", adapter_path.c_str());
+        return false;
+    }
+
+    // Remove from context
+    int32_t result = llama_rm_adapter_lora(context_, it->adapter);
+    if (result != 0) {
+        LOGE("Failed to remove LoRA adapter from context: %s (error=%d)", adapter_path.c_str(), result);
+        return false;
+    }
+
+    // Remove from tracking (adapter memory is freed automatically with the model
+    // per llama.cpp API — llama_adapter_lora_free is deprecated since b8011)
+    lora_adapters_.erase(it);
+
+    // Clear KV cache after adapter changes
+    llama_memory_clear(llama_get_memory(context_), true);
+
+    LOGI("LoRA adapter removed: %s (%zu remaining)", adapter_path.c_str(), lora_adapters_.size());
+    return true;
+}
+
+void LlamaCppTextGeneration::clear_lora_adapters() {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (lora_adapters_.empty()) {
+        return;
+    }
+
+    if (context_) {
+        llama_clear_adapter_lora(context_);
+        llama_memory_clear(llama_get_memory(context_), true);
+    }
+
+    lora_adapters_.clear();
+    LOGI("All LoRA adapters cleared");
+}
+
+nlohmann::json LlamaCppTextGeneration::get_lora_info() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    nlohmann::json adapters = nlohmann::json::array();
+    for (const auto& entry : lora_adapters_) {
+        nlohmann::json adapter_info;
+        adapter_info["path"] = entry.path;
+        adapter_info["scale"] = entry.scale;
+        adapter_info["applied"] = entry.applied;
+        adapters.push_back(adapter_info);
+    }
+    return adapters;
 }
 
 }  // namespace runanywhere
