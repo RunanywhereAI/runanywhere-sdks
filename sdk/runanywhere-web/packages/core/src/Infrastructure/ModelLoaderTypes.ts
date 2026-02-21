@@ -118,6 +118,25 @@ export interface TTSModelLoader {
 }
 
 /**
+ * Loader for KittenTTS voice models (StyleTTS 2 architecture).
+ *
+ * Unlike the sherpa-onnx TTSModelLoader, KittenTTS uses onnxruntime-web
+ * directly with a custom inference pipeline (phonemizer + style embeddings).
+ *
+ * The implementation in @runanywhere/web-kittentts handles:
+ * - Loading ONNX model via onnxruntime-web InferenceSession
+ * - Parsing .npz voice embeddings
+ * - Text preprocessing, phonemization, and token mapping
+ */
+export interface KittenTTSModelLoader {
+  /** Check if this loader can handle the given model. */
+  canHandle(model: ManagedModel): boolean;
+  /** Load a KittenTTS model from raw data + context for additional files. */
+  loadModelFromData(ctx: ModelLoadContext): Promise<void>;
+  unloadVoice(): Promise<void>;
+}
+
+/**
  * Loader for VAD models (voice activity detection).
  *
  * The implementation in @runanywhere/web-onnx handles:

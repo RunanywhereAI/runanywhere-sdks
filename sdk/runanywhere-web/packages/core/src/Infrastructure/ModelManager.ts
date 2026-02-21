@@ -12,7 +12,7 @@
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { ModelCategory, LLMFramework, ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
-import type { LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader, ModelLoadContext } from './ModelLoaderTypes';
+import type { LLMModelLoader, STTModelLoader, TTSModelLoader, KittenTTSModelLoader, VADModelLoader, ModelLoadContext } from './ModelLoaderTypes';
 import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
@@ -87,6 +87,7 @@ class ModelManagerImpl {
   private sttLoader: STTModelLoader | null = null;
   private ttsLoader: TTSModelLoader | null = null;
   private vadLoader: VADModelLoader | null = null;
+  private kittenTTSLoader: KittenTTSModelLoader | null = null;
 
   constructor() {
     this.downloader = new ModelDownloader(this.registry, this.storage);
@@ -113,6 +114,7 @@ class ModelManagerImpl {
   setSTTLoader(loader: STTModelLoader): void { this.sttLoader = loader; }
   setTTSLoader(loader: TTSModelLoader): void { this.ttsLoader = loader; }
   setVADLoader(loader: VADModelLoader): void { this.vadLoader = loader; }
+  setKittenTTSLoader(loader: KittenTTSModelLoader): void { this.kittenTTSLoader = loader; }
 
   /** Expose the downloader for backend packages that need file operations. */
   getDownloader(): ModelDownloader { return this.downloader; }
@@ -575,8 +577,15 @@ class ModelManagerImpl {
    * All sherpa-onnx FS operations are handled by the loader.
    */
   private async loadTTSModel(model: ManagedModel, data: Uint8Array): Promise<void> {
-    if (!this.ttsLoader) throw new Error('No TTS loader registered. Register the @runanywhere/web-onnx package.');
     const ctx = this.buildLoadContext(model, data);
+
+    if (this.kittenTTSLoader?.canHandle(model)) {
+      await this.kittenTTSLoader.loadModelFromData(ctx);
+      logger.info(`KittenTTS model loaded: ${model.id}`);
+      return;
+    }
+
+    if (!this.ttsLoader) throw new Error('No TTS loader registered. Register the @runanywhere/web-onnx package.');
     await this.ttsLoader.loadModelFromData(ctx);
     logger.info(`TTS model loaded: ${model.id}`);
   }
@@ -603,7 +612,12 @@ class ModelManagerImpl {
       if (category === ModelCategory.SpeechRecognition) {
         await this.sttLoader?.unloadModel();
       } else if (category === ModelCategory.SpeechSynthesis) {
-        await this.ttsLoader?.unloadVoice();
+        const loadedModel = modelId ? this.registry.getModel(modelId) : null;
+        if (loadedModel && this.kittenTTSLoader?.canHandle(loadedModel)) {
+          await this.kittenTTSLoader.unloadVoice();
+        } else {
+          await this.ttsLoader?.unloadVoice();
+        }
       } else if (category === ModelCategory.Audio) {
         this.vadLoader?.cleanup();
       } else if (category === ModelCategory.Multimodal) {

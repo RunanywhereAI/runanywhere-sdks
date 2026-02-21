@@ -9,6 +9,9 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "dependencies": {
+    "onnxruntime-web": "^1.21.0"
+  },
   "devDependencies": {
     "vite": "^6.0.0",
     "typescript": "^5.6.0"

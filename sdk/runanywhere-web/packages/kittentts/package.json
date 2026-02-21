@@ -1,0 +1,49 @@
+{
+  "name": "@runanywhere/web-kittentts",
+  "version": "0.1.0-beta.1",
+  "description": "RunAnywhere Web SDK - KittenTTS backend for high-quality TTS via onnxruntime-web",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "runanywhere",
+    "ai",
+    "tts",
+    "kittentts",
+    "onnx",
+    "onnxruntime",
+    "wasm",
+    "on-device",
+    "browser",
+    "speech"
+  ],
+  "author": "RunAnywhere AI",
+  "license": "MIT",
+  "peerDependencies": {
+    "@runanywhere/web": ">=0.1.0-beta.0",
+    "onnxruntime-web": ">=1.17.0"
+  },
+  "devDependencies": {
+    "onnxruntime-web": "^1.21.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -227,6 +227,9 @@ const ttsModelLoader = {
     } else {
       await loadTTSFromIndividualFiles(ctx, sherpa, modelDir);
     }
+
+    // Re-register as the active TTS provider (in case KittenTTS was previously active)
+    ExtensionPoint.registerProvider('tts', TTS);
   },
 
   async unloadVoice(): Promise<void> {

@@ -16,6 +16,7 @@ import {
   type ModelFileDescriptor,
 } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
+import { KittenTTSProvider } from '../../../../../sdk/runanywhere-web/packages/kittentts/src/index';
 import { showToast } from '../components/dialogs';
 
 // Re-export SDK types for existing consumers (ManagedModel aliased as ModelInfo
@@ -167,6 +168,38 @@ const REGISTERED_MODELS: CompactModelDef[] = [
   },
 
   // =========================================================================
+  // TTS models (KittenTTS — StyleTTS 2 architecture via onnxruntime-web)
+  // Individual files: ONNX model + voices.npz + config.json
+  // =========================================================================
+  {
+    id: 'kitten-tts-mini-0.8',
+    name: 'Kitten TTS Mini (80M)',
+    repo: 'KittenML/kitten-tts-mini-0.8',
+    files: ['kitten_tts_mini_v0_8.onnx', 'voices.npz', 'config.json'],
+    framework: LLMFramework.ONNX,
+    modality: ModelCategory.SpeechSynthesis,
+    memoryRequirement: 82_000_000,
+  },
+  {
+    id: 'kitten-tts-micro-0.8',
+    name: 'Kitten TTS Micro (40M)',
+    repo: 'KittenML/kitten-tts-micro-0.8',
+    files: ['kitten_tts_micro_v0_8.onnx', 'voices.npz', 'config.json'],
+    framework: LLMFramework.ONNX,
+    modality: ModelCategory.SpeechSynthesis,
+    memoryRequirement: 45_000_000,
+  },
+  {
+    id: 'kitten-tts-nano-0.8',
+    name: 'Kitten TTS Nano (15M)',
+    repo: 'KittenML/kitten-tts-nano-0.8-fp32',
+    files: ['kitten_tts_nano_v0_8.onnx', 'voices.npz', 'config.json'],
+    framework: LLMFramework.ONNX,
+    modality: ModelCategory.SpeechSynthesis,
+    memoryRequirement: 56_000_000,
+  },
+
+  // =========================================================================
   // VAD model (Silero VAD, single ONNX file)
   // =========================================================================
   {
@@ -215,6 +248,10 @@ export async function ensureVADLoaded(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 RunAnywhere.registerModels(REGISTERED_MODELS);
+
+// Register the KittenTTS provider so KittenTTS models are recognized
+// and loaded via onnxruntime-web (separate from sherpa-onnx Piper/VITS).
+KittenTTSProvider.register();
 
 // Import the VLM worker using Vite's ?worker&url suffix so it gets compiled
 // as a standalone bundle with all dependencies resolved — no raw-source data URLs.

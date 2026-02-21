@@ -48,8 +48,43 @@ function copyWasmPlugin(): Plugin {
   };
 }
 
+/**
+ * Vite plugin to serve onnxruntime-web WASM/worker files.
+ *
+ * onnxruntime-web dynamically imports worker .mjs files and fetches .wasm
+ * binaries at absolute paths (e.g. /ort-wasm-simd-threaded.wasm). Vite's
+ * dep optimizer rewrites the import but can't resolve the sibling files.
+ * This plugin intercepts those requests and serves them from node_modules.
+ */
+function serveOrtFilesPlugin(): Plugin {
+  const ortDistDir = path.resolve(__dir, 'node_modules/onnxruntime-web/dist');
+
+  return {
+    name: 'serve-ort-files',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? '';
+        // Match /ort-wasm-*.wasm and /ort-wasm-*.mjs (with optional ?query)
+        const match = url.match(/^\/(ort-wasm[^?]*\.(wasm|mjs))(\?.*)?$/);
+        if (!match) return next();
+
+        const filename = match[1];
+        const filePath = path.join(ortDistDir, filename);
+
+        if (!fs.existsSync(filePath)) return next();
+
+        const ext = match[2];
+        const mime = ext === 'wasm' ? 'application/wasm' : 'application/javascript';
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Cache-Control', 'public, max-age=31536000');
+        fs.createReadStream(filePath).pipe(res);
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [copyWasmPlugin()],
+  plugins: [copyWasmPlugin(), serveOrtFilesPlugin()],
   resolve: {
     alias: {
       // Ensure all packages resolve to the same source modules during development.
@@ -74,5 +109,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@runanywhere/web'],
   },
-  assetsInclude: ['**/*.wasm'],
+  assetsInclude: ['**/*.wasm', '**/*.onnx'],
 });

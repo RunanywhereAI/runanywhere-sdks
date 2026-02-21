@@ -6,6 +6,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
+import { ExtensionPoint } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 
 let container: HTMLElement;
 
@@ -139,15 +140,18 @@ async function handleSpeak(): Promise<void> {
     statusEl.textContent = 'Synthesizing speech...';
     const speed = parseFloat(speedSlider.value);
 
-    const { TTS, AudioPlayback } = await import(
-      '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
-    );
-
-    if (!TTS.isVoiceLoaded) {
+    // Use the provider pattern: both sherpa-onnx TTS and KittenTTS register
+    // as the 'tts' provider when their model is loaded.
+    const ttsProvider = ExtensionPoint.getProvider('tts');
+    if (!ttsProvider) {
       throw new Error('TTS voice not loaded. Select and load a model first.');
     }
 
-    const result = await TTS.synthesize(text, { speed });
+    const { AudioPlayback } = await import(
+      '../../../../../sdk/runanywhere-web/packages/onnx/src/index'
+    );
+
+    const result = await ttsProvider.synthesize(text, { speed });
 
     statusEl.textContent = `Playing (${(result.durationMs / 1000).toFixed(1)}s)...`;
     ttsIsSpeaking = true;
