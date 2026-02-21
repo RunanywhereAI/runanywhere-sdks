@@ -30,6 +30,24 @@ const RAC_ENV_DEVELOPMENT = 0;
 const RAC_ENV_STAGING      = 1;
 const RAC_ENV_PRODUCTION   = 2;
 
+/**
+ * Columns in the V2 `telemetry_events` Supabase table.
+ * The C++ telemetry manager serializes modality-specific fields (e.g.
+ * `speech_duration_ms`, `audio_duration_ms`, `word_count`) into the same
+ * flat JSON payload. In production these go through the backend API which
+ * splits them into child tables (`stt_telemetry`, `tts_telemetry`, etc.),
+ * but in dev mode we POST directly to Supabase REST API — PostgREST
+ * rejects any column not in the target table with HTTP 400.
+ */
+const TELEMETRY_V2_COLUMNS = new Set([
+  'id', 'org_id', 'api_key_id', 'device_id', 'sdk_event_id',
+  'event_type', 'modality', 'session_id', 'framework',
+  'model_id', 'model_name', 'device', 'os_version', 'platform',
+  'sdk_version', 'processing_time_ms', 'success',
+  'error_message', 'error_code', 'event_timestamp', 'created_at',
+  'received_at', 'migrated_from_v1', 'v1_source_id', 'synced_from_prod',
+]);
+
 // ---------------------------------------------------------------------------
 // Device UUID helper
 // ---------------------------------------------------------------------------
@@ -150,8 +168,12 @@ export class TelemetryService {
   trackAnalyticsEvent(eventType: number, dataPtr: number): void {
     if (!this._initialized || !this._module || !this._handle) return;
 
-    if (typeof this._module._rac_telemetry_manager_track_analytics === 'function') {
-      this._module._rac_telemetry_manager_track_analytics!(this._handle, eventType, dataPtr);
+    try {
+      if (typeof this._module._rac_telemetry_manager_track_analytics === 'function') {
+        this._module._rac_telemetry_manager_track_analytics!(this._handle, eventType, dataPtr);
+      }
+    } catch {
+      // Silent — telemetry must never crash the app
     }
   }
 
@@ -161,11 +183,12 @@ export class TelemetryService {
   flush(): void {
     if (!this._initialized || !this._module || !this._handle) return;
 
-    if (typeof this._module._rac_telemetry_manager_flush === 'function') {
-      const result = this._module._rac_telemetry_manager_flush!(this._handle);
-      if (result !== 0) {
-        logger.warning(`Telemetry flush returned: ${result}`);
+    try {
+      if (typeof this._module._rac_telemetry_manager_flush === 'function') {
+        this._module._rac_telemetry_manager_flush!(this._handle);
       }
+    } catch {
+      // Silent — telemetry must never crash the app
     }
   }
 
@@ -177,19 +200,23 @@ export class TelemetryService {
 
     this.flush();
 
-    if (this._module && this._handle) {
-      if (typeof this._module._rac_telemetry_manager_set_http_callback === 'function') {
-        this._module._rac_telemetry_manager_set_http_callback!(this._handle, 0, 0);
+    try {
+      if (this._module && this._handle) {
+        if (typeof this._module._rac_telemetry_manager_set_http_callback === 'function') {
+          this._module._rac_telemetry_manager_set_http_callback!(this._handle, 0, 0);
+        }
+        if (typeof this._module._rac_telemetry_manager_destroy === 'function') {
+          this._module._rac_telemetry_manager_destroy!(this._handle);
+        }
       }
-      if (typeof this._module._rac_telemetry_manager_destroy === 'function') {
-        this._module._rac_telemetry_manager_destroy!(this._handle);
-      }
-    }
 
-    if (this._module && this._httpCallbackPtr !== 0) {
-      if (typeof this._module.removeFunction === 'function') {
-        this._module.removeFunction(this._httpCallbackPtr);
+      if (this._module && this._httpCallbackPtr !== 0) {
+        if (typeof this._module.removeFunction === 'function') {
+          this._module.removeFunction(this._httpCallbackPtr);
+        }
       }
+    } catch {
+      // Silent — cleanup must not throw
     }
 
     this._handle = 0;
@@ -197,7 +224,7 @@ export class TelemetryService {
     this._module = null;
     this._initialized = false;
     TelemetryService._instance = null;
-    logger.info('TelemetryService shut down');
+    logger.debug('TelemetryService shut down');
   }
 
   // ---------------------------------------------------------------------------
@@ -251,7 +278,6 @@ export class TelemetryService {
     jsonBody: string,
     environment: SDKEnvironment,
   ): Promise<string | null> {
-    // For dev mode, HTTPService is pre-configured with Supabase credentials
     if (!HTTPService.shared.isConfigured) {
       logger.debug('HTTPService not configured — skipping telemetry POST');
       return null;
@@ -265,13 +291,45 @@ export class TelemetryService {
         body = jsonBody;
       }
 
+      // In dev mode we POST directly to Supabase REST API which rejects
+      // columns that don't exist on the target table. The C++ telemetry
+      // manager includes modality-specific metrics (e.g. speech_duration_ms,
+      // audio_duration_ms) that belong in child tables in V2.  Strip them
+      // so PostgREST accepts the payload.
+      if (environment === SDKEnvironment.Development && endpoint.includes('telemetry_events')) {
+        body = this.filterForDevTable(body);
+      }
+
       const response = await HTTPService.shared.post<unknown, unknown>(endpoint, body);
       return typeof response === 'string' ? response : JSON.stringify(response);
     } catch (err) {
-      // Non-critical: telemetry failures should not surface to users
       logger.debug(`Telemetry POST failed (${environment}): ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
+  }
+
+  /**
+   * Strip keys that don't exist in the V2 `telemetry_events` table.
+   * Handles both array format (dev flat batch) and single-object format.
+   */
+  private filterForDevTable(body: unknown): unknown {
+    if (Array.isArray(body)) {
+      return body.map((item) => this.filterObject(item as Record<string, unknown>));
+    }
+    if (body !== null && typeof body === 'object') {
+      return this.filterObject(body as Record<string, unknown>);
+    }
+    return body;
+  }
+
+  private filterObject(obj: Record<string, unknown>): Record<string, unknown> {
+    const filtered: Record<string, unknown> = {};
+    for (const key of Object.keys(obj)) {
+      if (TELEMETRY_V2_COLUMNS.has(key)) {
+        filtered[key] = obj[key];
+      }
+    }
+    return filtered;
   }
 
   /**

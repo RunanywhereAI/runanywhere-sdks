@@ -247,7 +247,6 @@ if (src.includes('Module["HEAP32"]=HEAP32')) {
   patchCount++;
 } else {
   console.log('  ⚠ Patch 7: updateMemoryViews end pattern not found');
-  }
 }
 
 // ---------------------------------------------------------------------------

@@ -182,6 +182,12 @@ for wrapper in sherpa-onnx-asr.js sherpa-onnx-tts.js sherpa-onnx-vad.js sherpa-o
     fi
 done
 
+# NOTE: The sherpa-onnx wrapper files (sherpa-onnx-asr.js, -tts.js, -vad.js)
+# are CJS and contain implicit globals that break in ESM strict mode.
+# These are handled at runtime by SherpaHelperLoader.ts in the SDK, which
+# loads the files via Blob URLs with the necessary fixes applied in-memory.
+# No build-time patching is needed.
+
 # =============================================================================
 # Step 3.5: Post-compile patches for browser compatibility
 # =============================================================================

@@ -24,6 +24,9 @@ const DEFAULT_TIMEOUT_MS = 30000;
 const DEVICE_ID_KEY = 'rac_device_id';
 const TELEMETRY_TABLE = 'rest/v1/telemetry_events';
 
+// NOTE: TELEMETRY_COLUMNS filter removed — all telemetry now flows through
+// the C++ telemetry manager via AnalyticsEmitter → rac_analytics_emit_*().
+
 /**
  * HTTP Service Configuration for non-dev environments.
  */
@@ -91,16 +94,14 @@ export class HTTPService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Fire-and-forget telemetry event POST.
-   * Used by TTS/STT/download code that runs outside the C++ telemetry manager
-   * (e.g. Sherpa-ONNX events, model downloads). Common fields are filled automatically.
-   *
-   * @param partialPayload - Event-specific fields (event_type, modality, model_id, etc.)
+   * @deprecated Use `AnalyticsEmitter` instead.  All telemetry now routes
+   * through the C++ telemetry manager via `rac_analytics_emit_*()`.
+   * Kept as a fallback for edge cases where C++ is unavailable.
    */
   postTelemetryEvent(partialPayload: Record<string, unknown>): void {
     if (!this.isConfigured) return;
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       sdk_event_id: crypto.randomUUID(),
       event_timestamp: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -110,8 +111,9 @@ export class HTTPService {
       ...partialPayload,
     };
 
-    // Fire-and-forget — telemetry failures are non-critical
-    this.post(TELEMETRY_TABLE, [payload]).catch(() => { /* silent */ });
+    const url = this.buildFullURL(TELEMETRY_TABLE);
+    const headers = this.buildHeaders(false);
+    this.executeRequest('POST', url, headers, [payload]).catch(() => { /* silent */ });
   }
 
   /**
@@ -294,7 +296,12 @@ export class HTTPService {
       // ignore
     }
 
-    logger.error(`HTTP ${response.status}: ${path}`);
+    // Telemetry failures are non-critical — log at debug level only
+    if (path.includes('telemetry')) {
+      logger.debug(`HTTP ${response.status}: ${path}`);
+    } else {
+      logger.error(`HTTP ${response.status}: ${path}`);
+    }
     throw this.mapHttpError(response.status, errorMessage);
   }
 

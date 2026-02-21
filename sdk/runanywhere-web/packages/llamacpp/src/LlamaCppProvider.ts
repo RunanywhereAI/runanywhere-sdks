@@ -15,10 +15,12 @@ import {
   ExtensionPoint,
   BackendCapability,
   ExtensionRegistry,
+  AnalyticsEmitter,
 } from '@runanywhere/web';
 
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { loadOffsets } from './Foundation/LlamaCppOffsets';
+import { WASMAnalyticsEmitter } from './Foundation/WASMAnalyticsEmitter';
 
 import { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
 import { VLM } from './Extensions/RunAnywhere+VLM';
@@ -49,6 +51,7 @@ const llamacppExtension: BackendExtension = {
     Embeddings.cleanup();
     Diffusion.cleanup();
     ExtensionPoint.removeProvider('llm');
+    AnalyticsEmitter.removeBackend();
     _isRegistered = false;
     logger.info('LlamaCpp backend cleaned up');
   },
@@ -99,6 +102,9 @@ export const LlamaCppProvider = {
     // Register typed provider so VoicePipeline (in core) can access
     // the LLM via ExtensionPoint.getProvider('llm') at runtime.
     ExtensionPoint.registerProvider('llm', TextGeneration);
+
+    // Route all analytics events through the C++ telemetry manager
+    AnalyticsEmitter.registerBackend(new WASMAnalyticsEmitter());
 
     _isRegistered = true;
     logger.info('LlamaCpp backend registered successfully');

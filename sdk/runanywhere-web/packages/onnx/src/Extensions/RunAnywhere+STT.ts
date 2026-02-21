@@ -27,20 +27,18 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HTTPService } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { AudioFileLoader } from '../Infrastructure/AudioFileLoader';
 import { STTModelType } from './STTTypes';
 import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
 
-// Import sherpa-onnx C struct packing helpers.
-// These functions properly allocate and fill C structs in WASM memory
-// for passing to the sherpa-onnx C API.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore — JS helper file, no .d.ts available
-import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-asr.js';
+import { loadASRHelpers } from '../Foundation/SherpaHelperLoader';
 
 const logger = new SDKLogger('STT');
+
+/** Matches RAC_FRAMEWORK_ONNX in rac_model_types.h */
+const RAC_FRAMEWORK_ONNX = 0;
 
 // ---------------------------------------------------------------------------
 // STT Types (re-exported from STTTypes.ts)
@@ -212,6 +210,7 @@ class STTImpl {
     });
 
     const startMs = performance.now();
+    const { initSherpaOnnxOnlineRecognizerConfig, initSherpaOnnxOfflineRecognizerConfig, freeConfig } = await loadASRHelpers();
 
     try {
       if (config.type === STTModelType.Zipformer) {
@@ -249,14 +248,7 @@ class STTImpl {
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
         modelId: config.modelId, component: 'stt', loadTimeMs,
       });
-      HTTPService.shared.postTelemetryEvent({
-        event_type: 'stt.model.load.completed',
-        modality: 'stt',
-        model_id: config.modelId,
-        framework: 'onnx',
-        processing_time_ms: loadTimeMs,
-        success: true,
-      });
+      AnalyticsEmitter.emitSTTModelLoadCompleted(config.modelId, config.modelId, loadTimeMs, RAC_FRAMEWORK_ONNX);
     } catch (error) {
       this.cleanup();
       throw error;
@@ -342,20 +334,14 @@ class STTImpl {
         text: transcription.text,
         confidence: transcription.confidence,
       });
-      HTTPService.shared.postTelemetryEvent({
-        event_type: 'stt.transcription.completed',
-        modality: 'stt',
-        model_id: this._currentModelId,
-        framework: 'onnx',
-        processing_time_ms: processingTimeMs,
-        success: true,
-        audio_duration_ms: Math.round(audioSamples.length / sampleRate * 1000),
-        word_count: transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0,
-        confidence: transcription.confidence,
-        real_time_factor: processingTimeMs > 0
-          ? Math.round(audioSamples.length / sampleRate * 1000) / processingTimeMs
-          : 0,
-      });
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
+      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
+      AnalyticsEmitter.emitSTTTranscriptionCompleted(
+        crypto.randomUUID(), this._currentModelId, transcription.text,
+        transcription.confidence, processingTimeMs, audioDurationMs,
+        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+      );
 
       return transcription;
     } finally {
@@ -402,20 +388,14 @@ class STTImpl {
         processingTimeMs,
       };
 
-      HTTPService.shared.postTelemetryEvent({
-        event_type: 'stt.transcription.completed',
-        modality: 'stt',
-        model_id: this._currentModelId,
-        framework: 'onnx',
-        processing_time_ms: processingTimeMs,
-        success: true,
-        audio_duration_ms: Math.round(audioSamples.length / sampleRate * 1000),
-        word_count: transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0,
-        confidence: transcription.confidence,
-        real_time_factor: processingTimeMs > 0
-          ? Math.round(audioSamples.length / sampleRate * 1000) / processingTimeMs
-          : 0,
-      });
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
+      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
+      AnalyticsEmitter.emitSTTTranscriptionCompleted(
+        crypto.randomUUID(), this._currentModelId, transcription.text,
+        transcription.confidence, processingTimeMs, audioDurationMs,
+        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+      );
 
       return transcription;
     } finally {

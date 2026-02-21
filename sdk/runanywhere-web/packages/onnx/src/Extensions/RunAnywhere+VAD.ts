@@ -18,14 +18,12 @@
  *   if (hasVoice) console.log('Speech detected!');
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import { SpeechActivity } from './VADTypes';
 import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
 
-// @ts-expect-error -- sherpa-onnx JS wrappers ship without type declarations
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-import { initSherpaOnnxVadModelConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-vad.js';
+import { loadVADHelpers } from '../Foundation/SherpaHelperLoader';
 
 export { SpeechActivity } from './VADTypes';
 export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
@@ -51,6 +49,7 @@ class VADImpl {
   private _sampleRate = 16000;
   private _jsActivityCallback: SpeechActivityCallback | null = null;
   private _lastSpeechState = false;
+  private _speechStartMs = 0;
 
   /**
    * Load the Silero VAD model via sherpa-onnx.
@@ -100,6 +99,7 @@ class VADImpl {
       debug: 0,
     };
 
+    const { initSherpaOnnxVadModelConfig, freeConfig } = await loadVADHelpers();
     const configStruct = initSherpaOnnxVadModelConfig(configObj, m);
 
     try {
@@ -166,13 +166,18 @@ class VADImpl {
       // Check detection state
       const detected = m._SherpaOnnxVoiceActivityDetectorDetected(this._vadHandle) !== 0;
 
-      // Emit speech activity callbacks
+      // Emit speech activity callbacks and analytics
       if (detected && !this._lastSpeechState) {
+        this._speechStartMs = performance.now();
         this._jsActivityCallback?.(SpeechActivity.Started);
         EventBus.shared.emit('vad.speechStarted', SDKEventType.Voice, { activity: SpeechActivity.Started });
+        AnalyticsEmitter.emitVADSpeechStarted();
       } else if (!detected && this._lastSpeechState) {
+        const speechDurationMs = this._speechStartMs > 0 ? performance.now() - this._speechStartMs : 0;
+        this._speechStartMs = 0;
         this._jsActivityCallback?.(SpeechActivity.Ended);
         EventBus.shared.emit('vad.speechEnded', SDKEventType.Voice, { activity: SpeechActivity.Ended });
+        AnalyticsEmitter.emitVADSpeechEnded(speechDurationMs, 0);
       } else if (detected) {
         this._jsActivityCallback?.(SpeechActivity.Ongoing);
       }
@@ -253,6 +258,7 @@ class VADImpl {
     }
     this._jsActivityCallback = null;
     this._lastSpeechState = false;
+    this._speechStartMs = 0;
   }
 }
 
