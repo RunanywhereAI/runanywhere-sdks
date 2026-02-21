@@ -118,12 +118,12 @@ async function initializeSDK(): Promise<void> {
 
     console.log(
       '[RunAnywhere] SDK initialized, version:', RunAnywhere.version,
-      '| acceleration:', RunAnywhere.accelerationMode,
+      '| acceleration:', LlamaCPP.accelerationMode,
       '| local storage:', localRestored ? RunAnywhere.localStorageDirectoryName : 'OPFS',
     );
 
     // Show an acceleration badge so the user knows which backend is active
-    showAccelerationBadge(RunAnywhere.accelerationMode);
+    showAccelerationBadge(LlamaCPP.accelerationMode);
   } catch (err) {
     // SDK not built or WASM not available -- continue in demo mode
     console.warn('[RunAnywhere] SDK not available, running in demo mode:', err);

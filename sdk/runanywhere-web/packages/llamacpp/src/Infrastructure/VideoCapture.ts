@@ -72,6 +72,7 @@ export class VideoCapture {
   private _videoEl: HTMLVideoElement;
   private _canvasEl: HTMLCanvasElement;
   private _isCapturing = false;
+  private _startPromise: Promise<void> | null = null;
 
   constructor(config: VideoCaptureConfig = {}) {
     this.config = {
@@ -134,6 +135,21 @@ export class VideoCapture {
       return;
     }
 
+    // Coalesce concurrent start() calls — return the in-flight promise
+    if (this._startPromise) {
+      logger.debug('Start already in progress, awaiting existing attempt');
+      return this._startPromise;
+    }
+
+    this._startPromise = this._doStart();
+    try {
+      await this._startPromise;
+    } finally {
+      this._startPromise = null;
+    }
+  }
+
+  private async _doStart(): Promise<void> {
     logger.info(`Starting video capture (${this.config.facingMode}, ${this.config.idealWidth}x${this.config.idealHeight})`);
 
     try {

@@ -27,19 +27,18 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
+import { AudioFileLoader } from '../Infrastructure/AudioFileLoader';
 import { STTModelType } from './STTTypes';
 import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
 
-// Import sherpa-onnx C struct packing helpers.
-// These functions properly allocate and fill C structs in WASM memory
-// for passing to the sherpa-onnx C API.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore — JS helper file, no .d.ts available
-import { initSherpaOnnxOfflineRecognizerConfig, initSherpaOnnxOnlineRecognizerConfig, freeConfig } from '../../wasm/sherpa/sherpa-onnx-asr.js';
+import { loadASRHelpers } from '../Foundation/SherpaHelperLoader';
 
 const logger = new SDKLogger('STT');
+
+/** Matches RAC_FRAMEWORK_ONNX in rac_model_types.h */
+const RAC_FRAMEWORK_ONNX = 0;
 
 // ---------------------------------------------------------------------------
 // STT Types (re-exported from STTTypes.ts)
@@ -211,6 +210,7 @@ class STTImpl {
     });
 
     const startMs = performance.now();
+    const { initSherpaOnnxOnlineRecognizerConfig, initSherpaOnnxOfflineRecognizerConfig, freeConfig } = await loadASRHelpers();
 
     try {
       if (config.type === STTModelType.Zipformer) {
@@ -248,6 +248,7 @@ class STTImpl {
       EventBus.shared.emit('model.loadCompleted', SDKEventType.Model, {
         modelId: config.modelId, component: 'stt', loadTimeMs,
       });
+      AnalyticsEmitter.emitSTTModelLoadCompleted(config.modelId, config.modelId, loadTimeMs, RAC_FRAMEWORK_ONNX);
     } catch (error) {
       this.cleanup();
       throw error;
@@ -333,6 +334,14 @@ class STTImpl {
         text: transcription.text,
         confidence: transcription.confidence,
       });
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
+      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
+      AnalyticsEmitter.emitSTTTranscriptionCompleted(
+        crypto.randomUUID(), this._currentModelId, transcription.text,
+        transcription.confidence, processingTimeMs, audioDurationMs,
+        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+      );
 
       return transcription;
     } finally {
@@ -373,11 +382,22 @@ class STTImpl {
       const result = JSON.parse(jsonStr || '{}');
       const processingTimeMs = Math.round(performance.now() - startMs);
 
-      return {
+      const transcription = {
         text: (result.text ?? '').trim(),
         confidence: result.confidence ?? 0,
         processingTimeMs,
       };
+
+      const audioDurationMs = Math.round(audioSamples.length / sampleRate * 1000);
+      const wordCount = transcription.text ? transcription.text.split(/\s+/).filter(Boolean).length : 0;
+      const rtf = processingTimeMs > 0 ? audioDurationMs / processingTimeMs : 0;
+      AnalyticsEmitter.emitSTTTranscriptionCompleted(
+        crypto.randomUUID(), this._currentModelId, transcription.text,
+        transcription.confidence, processingTimeMs, audioDurationMs,
+        audioSamples.length * 4, wordCount, rtf, '', sampleRate, RAC_FRAMEWORK_ONNX,
+      );
+
+      return transcription;
     } finally {
       m._free(audioPtr);
       m._SherpaOnnxDestroyOnlineStream(stream);
@@ -397,6 +417,22 @@ class STTImpl {
     }
 
     return new STTStreamingSessionImpl(this._onlineRecognizerHandle, options);
+  }
+
+  /**
+   * Transcribe an audio file (wav, mp3, m4a, ogg, flac, etc.).
+   * Handles decoding and resampling to 16 kHz internally via AudioFileLoader.
+   *
+   * @param file    Audio file from a file picker, drag-drop, or any File source
+   * @param options Optional transcription options (language, sampleRate override)
+   */
+  async transcribeFile(
+    file: File,
+    options: STTTranscribeOptions = {},
+  ): Promise<STTTranscriptionResult> {
+    const targetRate = options.sampleRate ?? 16000;
+    const { samples, sampleRate } = await AudioFileLoader.toFloat32Array(file, targetRate);
+    return this.transcribe(samples, { ...options, sampleRate });
   }
 
   /** Clean up the STT resources. */

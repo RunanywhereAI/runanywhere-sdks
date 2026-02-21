@@ -80,6 +80,16 @@ export async function detectCapabilities(): Promise<WebCapabilities> {
     `Cores=${capabilities.hardwareConcurrency}`,
   );
 
+  if (!capabilities.isCrossOriginIsolated) {
+    logger.warning(
+      'Cross-Origin Isolation is NOT enabled. SharedArrayBuffer and multi-threaded WASM ' +
+      'will be unavailable. Set these HTTP headers on your server:\n' +
+      '  Cross-Origin-Opener-Policy: same-origin\n' +
+      '  Cross-Origin-Embedder-Policy: credentialless\n' +
+      'See: https://github.com/AnywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web#cross-origin-isolation-headers',
+    );
+  }
+
   return capabilities;
 }
 

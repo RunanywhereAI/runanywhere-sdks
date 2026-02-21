@@ -11,6 +11,7 @@
 #include <emscripten/emscripten.h>
 
 // Core
+#include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
@@ -25,6 +26,7 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/network/rac_http_client.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
@@ -501,6 +503,33 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_generation_time_ms(v
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_safety_flagged(void) {
     return (int)offsetof(rac_diffusion_result_t, safety_flagged);
+}
+
+// =============================================================================
+// DEV CONFIG WRAPPERS
+//
+// Expose development configuration values (Supabase URL/key, build token)
+// so that the TypeScript HTTP layer can use them for dev-mode telemetry.
+// =============================================================================
+
+EMSCRIPTEN_KEEPALIVE
+int rac_wasm_dev_config_is_available(void) {
+    return rac_dev_config_is_available() ? 1 : 0;
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char* rac_wasm_dev_config_get_supabase_url(void) {
+    return rac_dev_config_get_supabase_url();
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char* rac_wasm_dev_config_get_supabase_key(void) {
+    return rac_dev_config_get_supabase_key();
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char* rac_wasm_dev_config_get_build_token(void) {
+    return rac_dev_config_get_build_token();
 }
 
 } // extern "C"

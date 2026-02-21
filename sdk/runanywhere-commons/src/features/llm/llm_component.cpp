@@ -45,7 +45,10 @@ struct rac_llm_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    rac_llm_component() : lifecycle(nullptr) {
+    /** Resolved inference framework (defaults to LlamaCPP, the primary LLM backend) */
+    rac_inference_framework_t actual_framework;
+
+    rac_llm_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_LLAMACPP) {
         // Initialize with defaults - matches rac_llm_types.h rac_llm_config_t
         config = RAC_LLM_CONFIG_DEFAULT;
 
@@ -178,6 +181,13 @@ extern "C" rac_result_t rac_llm_component_configure(rac_handle_t handle,
     // Mirrors Swift's: self.config = config
     component->config = *config;
 
+    // Resolve actual framework: if caller explicitly set one (not UNKNOWN=99), use it;
+    // otherwise keep the default (RAC_FRAMEWORK_LLAMACPP for LLM components)
+    if (config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
+        component->actual_framework =
+            static_cast<rac_inference_framework_t>(config->preferred_framework);
+    }
+
     // Update default options based on config
     if (config->max_tokens > 0) {
         component->default_options.max_tokens = config->max_tokens;
@@ -235,9 +245,51 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Emit model load started event
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_MODEL_LOAD_STARTED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_LLM_MODEL_LOAD_STARTED, &event);
+    }
+
+    auto load_start = std::chrono::steady_clock::now();
+
     // Delegate to lifecycle manager with separate path, model_id, and model_name
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
+    rac_result_t result =
+        rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
+
+    double load_duration_ms = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                              load_start)
+            .count());
+
+    if (result != RAC_SUCCESS) {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_MODEL_LOAD_FAILED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = result;
+        event.data.llm_model.error_message = "Model load failed";
+        rac_analytics_event_emit(RAC_EVENT_LLM_MODEL_LOAD_FAILED, &event);
+    } else {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_MODEL_LOAD_COMPLETED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_LLM_MODEL_LOAD_COMPLETED, &event);
+    }
+
+    return result;
 }
 
 extern "C" rac_result_t rac_llm_component_unload(rac_handle_t handle) {
@@ -324,8 +376,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.data.llm_generation.model_id = model_id;
         event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.is_streaming = RAC_FALSE;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;
@@ -402,8 +453,7 @@ extern "C" rac_result_t rac_llm_component_generate(rac_handle_t handle, const ch
         event.data.llm_generation.tokens_per_second = tokens_per_second;
         event.data.llm_generation.is_streaming = RAC_FALSE;
         event.data.llm_generation.time_to_first_token_ms = 0;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;
@@ -594,8 +644,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.model_id = model_id;
         event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.is_streaming = RAC_TRUE;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;
@@ -614,7 +663,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.generation_id = generation_id;
     ctx.model_id = model_id;
     ctx.model_name = model_name;
-    ctx.framework = static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+    ctx.framework = component->actual_framework;
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
@@ -691,8 +740,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.tokens_per_second = tokens_per_second;
         event.data.llm_generation.is_streaming = RAC_TRUE;
         event.data.llm_generation.time_to_first_token_ms = ttft_ms;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;
