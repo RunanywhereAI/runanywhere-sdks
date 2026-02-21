@@ -37,7 +37,7 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -131,6 +131,7 @@ let package = Package(
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
+                "RACommonsBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
@@ -150,6 +151,8 @@ let package = Package(
             dependencies: [
                 "RunAnywhere",
                 "ONNXBackend",
+                "RABackendONNXBinary",
+                "ONNXRuntimeBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include"],
@@ -170,6 +173,7 @@ let package = Package(
             dependencies: [
                 "RunAnywhere",
                 "LlamaCPPBackend",
+                "RABackendLlamaCPPBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime",
             exclude: ["include"],
