@@ -19,24 +19,23 @@ struct YapRunApp: App {
     @State private var showFlowActivation = false
     @State private var isSDKInitialized = false
     @State private var initializationError: String?
+    @State private var hasCompletedOnboarding = SharedDataBridge.shared.defaults?.bool(
+        forKey: SharedConstants.Keys.hasCompletedOnboarding
+    ) ?? false
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if isSDKInitialized {
-                    ContentView()
-                        .environmentObject(flowSession)
-                        .onOpenURL { url in
-                            guard url.scheme == SharedConstants.urlScheme,
-                                  url.host == "startFlow" else { return }
-                            logger.info("Received startFlow deep link")
-                            showFlowActivation = true
-                            Task { await flowSession.handleStartFlow() }
+                    if hasCompletedOnboarding {
+                        homeContent
+                    } else {
+                        OnboardingView {
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                hasCompletedOnboarding = true
+                            }
                         }
-                        .fullScreenCover(isPresented: $showFlowActivation) {
-                            FlowActivationView(isPresented: $showFlowActivation)
-                                .environmentObject(flowSession)
-                        }
+                    }
                 } else if let error = initializationError {
                     errorView(error)
                 } else {
@@ -47,6 +46,40 @@ struct YapRunApp: App {
             .task {
                 await initializeSDK()
             }
+        }
+    }
+
+    // MARK: - Home Content
+
+    private var homeContent: some View {
+        TabView {
+            ContentView()
+                .environmentObject(flowSession)
+                .tabItem {
+                    Label("Home", systemImage: "house")
+                }
+
+            PlaygroundView()
+                .tabItem {
+                    Label("Playground", systemImage: "waveform")
+                }
+
+            NotepadView()
+                .tabItem {
+                    Label("Notepad", systemImage: "note.text")
+                }
+        }
+        .tint(AppColors.ctaOrange)
+        .onOpenURL { url in
+            guard url.scheme == SharedConstants.urlScheme,
+                  url.host == "startFlow" else { return }
+            logger.info("Received startFlow deep link")
+            showFlowActivation = true
+            Task { await flowSession.handleStartFlow() }
+        }
+        .fullScreenCover(isPresented: $showFlowActivation) {
+            FlowActivationView(isPresented: $showFlowActivation)
+                .environmentObject(flowSession)
         }
     }
 
@@ -83,28 +116,37 @@ struct YapRunApp: App {
     // MARK: - Views
 
     private var loadingView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
+            Image("yaprun_logo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+            Text("YapRun")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(AppColors.textPrimary)
+
             ProgressView()
-                .tint(AppColors.primaryAccent)
-                .scaleEffect(1.3)
-            Text("Setting up YapRun...")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .tint(.white)
+                .scaleEffect(1.1)
+                .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(AppColors.backgroundPrimaryDark)
     }
 
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
-                .foregroundStyle(AppColors.primaryAccent)
+                .foregroundStyle(AppColors.ctaOrange)
             Text("Setup Failed")
                 .font(.title2.bold())
+                .foregroundStyle(AppColors.textPrimary)
             Text(message)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             Button("Retry") {
@@ -112,9 +154,10 @@ struct YapRunApp: App {
                 Task { await initializeSDK() }
             }
             .buttonStyle(.borderedProminent)
-            .tint(AppColors.primaryAccent)
+            .tint(.white)
+            .foregroundStyle(.black)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemBackground))
+        .background(AppColors.backgroundPrimaryDark)
     }
 }

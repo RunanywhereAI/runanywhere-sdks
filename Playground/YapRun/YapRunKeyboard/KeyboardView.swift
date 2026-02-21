@@ -119,13 +119,7 @@ struct KeyboardView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 18)
                     .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(
-                            colors: [Brand.accent, Brand.accentDark],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+                    .background(Color(white: 0.22))
                     .cornerRadius(8)
                 }
                 .padding(.trailing, 8)

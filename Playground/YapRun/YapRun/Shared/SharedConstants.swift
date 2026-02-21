@@ -25,7 +25,8 @@ enum SharedConstants {
         static let dictationHistory    = "dictationHistory"
         static let audioLevel          = "audioLevel"
         static let lastInsertedText    = "lastInsertedText"
-        static let lastHeartbeat       = "lastHeartbeat"
+        static let lastHeartbeat           = "lastHeartbeat"
+        static let hasCompletedOnboarding  = "hasCompletedOnboarding"
     }
 
     // Darwin inter-process notification names (CFNotificationCenter)
