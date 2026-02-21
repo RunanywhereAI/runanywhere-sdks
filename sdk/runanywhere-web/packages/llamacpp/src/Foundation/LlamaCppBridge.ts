@@ -451,12 +451,24 @@ export class LlamaCppBridge {
 
   shutdown(): void {
     if (this._module && this._loaded) {
-      try { this._module._rac_shutdown(); } catch { /* ignore */ }
+      try {
+        this._module._rac_shutdown();
+      } catch (err) {
+        logger.debug(
+          `LlamaCpp module shutdown failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
 
     // Clean up platform adapter
     if (this._platformAdapter) {
-      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      try {
+        this._platformAdapter.cleanup();
+      } catch (err) {
+        logger.debug(
+          `Platform adapter cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       this._platformAdapter = null;
     }
 
