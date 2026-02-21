@@ -77,21 +77,18 @@ public extension RunAnywhere {
         let audioSizeBytes = audioData.count
         let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
 
-        // Build C options
-        var cOptions = rac_stt_options_t()
-        cOptions.language = (options.language as NSString).utf8String
-        cOptions.sample_rate = Int32(options.sampleRate)
-
         // Transcribe (C++ emits events)
         var sttResult = rac_stt_result_t()
-        let transcribeResult = audioData.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe(
-                handle,
-                audioPtr.baseAddress,
-                audioData.count,
-                &cOptions,
-                &sttResult
-            )
+        let transcribeResult = options.withCOptions { cOptions in
+            audioData.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe(
+                    handle,
+                    audioPtr.baseAddress,
+                    audioData.count,
+                    &cOptions,
+                    &sttResult
+                )
+            }
         }
 
         guard transcribeResult == RAC_SUCCESS else {
@@ -213,39 +210,36 @@ public extension RunAnywhere {
         let context = STTStreamingContext(onPartialResult: onPartialResult)
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
-        // Build C options
-        var cOptions = rac_stt_options_t()
-        cOptions.language = (options.language as NSString).utf8String
-        cOptions.sample_rate = Int32(options.sampleRate)
-
         // Stream transcription with callback
-        let result = audioData.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe_stream(
-                handle,
-                audioPtr.baseAddress,
-                audioData.count,
-                &cOptions,
-                { partialText, isFinal, userData in
-                    guard let userData = userData else { return }
-                    let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
+        let result = options.withCOptions { cOptions in
+            audioData.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe_stream(
+                    handle,
+                    audioPtr.baseAddress,
+                    audioData.count,
+                    &cOptions,
+                    { partialText, isFinal, userData in
+                        guard let userData = userData else { return }
+                        let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
 
-                    let text = partialText.map { String(cString: $0) } ?? ""
-                    let partialResult = STTTranscriptionResult(
-                        transcript: text,
-                        confidence: nil,
-                        timestamps: nil,
-                        language: nil,
-                        alternatives: nil
-                    )
+                        let text = partialText.map { String(cString: $0) } ?? ""
+                        let partialResult = STTTranscriptionResult(
+                            transcript: text,
+                            confidence: nil,
+                            timestamps: nil,
+                            language: nil,
+                            alternatives: nil
+                        )
 
-                    ctx.onPartialResult(partialResult)
+                        ctx.onPartialResult(partialResult)
 
-                    if isFinal == RAC_TRUE {
-                        ctx.finalText = text
-                    }
-                },
-                contextPtr
-            )
+                        if isFinal == RAC_TRUE {
+                            ctx.finalText = text
+                        }
+                    },
+                    contextPtr
+                )
+            }
         }
 
         // Release context
@@ -276,30 +270,30 @@ public extension RunAnywhere {
     }
 
     /// Process audio samples for streaming transcription
-    /// - Parameter samples: Audio samples
-    static func processStreamingAudio(_ samples: [Float]) async throws {
+    /// - Parameters:
+    ///   - samples: Audio samples
+    ///   - language: BCP-47 language code for transcription (default: "en")
+    static func processStreamingAudio(_ samples: [Float], language: String = "en") async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.STT.shared.getHandle()
 
-        var cOptions = rac_stt_options_t()
-        cOptions.sample_rate = Int32(RAC_STT_DEFAULT_SAMPLE_RATE)
-
-        let data = samples.withUnsafeBufferPointer { buffer in
-            Data(buffer: buffer)
-        }
+        let syntheticOptions = STTOptions(language: language)
+        let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
 
         var sttResult = rac_stt_result_t()
-        let transcribeResult = data.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe(
-                handle,
-                audioPtr.baseAddress,
-                data.count,
-                &cOptions,
-                &sttResult
-            )
+        let transcribeResult = syntheticOptions.withCOptions { cOptions in
+            data.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe(
+                    handle,
+                    audioPtr.baseAddress,
+                    data.count,
+                    &cOptions,
+                    &sttResult
+                )
+            }
         }
 
         if transcribeResult != RAC_SUCCESS {
@@ -320,6 +314,30 @@ public extension RunAnywhere {
         let sampleRate = 16000.0
         let samples = Double(dataSize) / Double(bytesPerSample)
         return samples / sampleRate
+    }
+}
+
+// MARK: - C Options Bridge
+
+private extension STTOptions {
+    /// Safely maps all STTOptions fields to rac_stt_options_t and invokes body.
+    ///
+    /// Uses `withCString` to guarantee the language pointer remains valid for
+    /// the entire duration of the C call — avoiding the dangling-pointer bug
+    /// that arose from `(options.language as NSString).utf8String`.
+    func withCOptions<T>(_ body: (inout rac_stt_options_t) throws -> T) rethrows -> T {
+        return try language.withCString { languageCStr in
+            var cOptions = rac_stt_options_t()
+            cOptions.language            = languageCStr
+            cOptions.detect_language     = detectLanguage    ? RAC_TRUE : RAC_FALSE
+            cOptions.sample_rate         = Int32(sampleRate)
+            cOptions.enable_punctuation  = enablePunctuation ? RAC_TRUE : RAC_FALSE
+            cOptions.enable_diarization  = enableDiarization ? RAC_TRUE : RAC_FALSE
+            cOptions.enable_timestamps   = enableTimestamps  ? RAC_TRUE : RAC_FALSE
+            cOptions.audio_format        = audioFormat.toCFormat()
+            cOptions.max_speakers        = Int32(maxSpeakers ?? 0)
+            return try body(&cOptions)
+        }
     }
 }
 
