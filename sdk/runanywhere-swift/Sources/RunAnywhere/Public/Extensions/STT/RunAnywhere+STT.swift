@@ -279,11 +279,11 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        let handle = try await CppBridge.STT.shared.getHandle()
+
         guard await CppBridge.STT.shared.isLoaded else {
             throw SDKError.stt(.notInitialized, "STT model not loaded")
         }
-
-        let handle = try await CppBridge.STT.shared.getHandle()
 
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
 
@@ -328,7 +328,7 @@ public extension RunAnywhere {
 /// `finalText` is written by the C callback thread and read by the async
 /// continuation — protected by OSAllocatedUnfairLock to prevent data races.
 private final class STTStreamingContext: Sendable {
-    let onPartialResult: (STTTranscriptionResult) -> Void
+    let onPartialResult: @Sendable (STTTranscriptionResult) -> Void
     private let _finalText = OSAllocatedUnfairLock(initialState: "")
 
     var finalText: String {
@@ -336,7 +336,7 @@ private final class STTStreamingContext: Sendable {
         set { _finalText.withLock { $0 = newValue } }
     }
 
-    init(onPartialResult: @escaping (STTTranscriptionResult) -> Void) {
+    init(onPartialResult: @Sendable @escaping (STTTranscriptionResult) -> Void) {
         self.onPartialResult = onPartialResult
     }
 }
