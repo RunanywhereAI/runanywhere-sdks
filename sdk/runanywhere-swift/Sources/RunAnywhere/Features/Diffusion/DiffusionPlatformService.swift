@@ -54,16 +54,17 @@ public actor DiffusionPlatformService {
         disableSafetyChecker: Bool = false,
         tokenizerSource: DiffusionTokenizerSource = .sd15
     ) async throws {
-        logger.info("Initializing diffusion pipeline from: \(URL(filePath: modelPath).lastPathComponent)")
+        let modelURL = URL(filePath: modelPath)
+        logger.info("Initializing diffusion pipeline from: \(modelURL.lastPathComponent)")
         logger.info("Tokenizer source: \(tokenizerSource.description)")
 
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(URL(filePath: modelPath).lastPathComponent)")
+            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelURL.lastPathComponent)")
         }
 
         // Find the actual model directory (handles nested directory structure from zip extraction)
-        let resourceURL = try findModelResourceDirectory(at: URL(fileURLWithPath: modelPath))
+        let resourceURL = try findModelResourceDirectory(at: modelURL)
         logger.info("Using model resources from: \(resourceURL.lastPathComponent)")
 
         // Ensure tokenizer files exist (Apple's compiled models don't include them)
