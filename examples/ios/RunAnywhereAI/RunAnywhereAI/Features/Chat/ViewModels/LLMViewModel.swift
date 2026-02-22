@@ -38,6 +38,14 @@ final class LLMViewModel {
     private(set) var loraAdapters: [LoRAAdapterInfo] = []
     private(set) var isLoadingLoRA = false
 
+    // MARK: - LoRA Adapter Download State
+    // TODO: [Portal Integration] Remove demo adapter download state once portal delivers adapters OTA.
+
+    private(set) var availableDemoAdapters: [DemoLoRAAdapter] = []
+    private(set) var adapterDownloadProgress: [String: Double] = [:]
+    private(set) var downloadedAdapterPaths: [String: String] = [:]
+    private(set) var isDownloadingAdapter: [String: Bool] = [:]
+
     // MARK: - User Settings
 
     var currentInput = ""
@@ -357,6 +365,95 @@ final class LLMViewModel {
         }
     }
 
+    // MARK: - Demo LoRA Adapter Download
+    // TODO: [Portal Integration] Remove demo adapter download logic once portal delivers adapters OTA.
+
+    /// Refreshes the list of available demo adapters for the currently loaded model.
+    func refreshAvailableDemoAdapters() {
+        guard let modelId = ModelListViewModel.shared.currentModel?.id else {
+            availableDemoAdapters = []
+            return
+        }
+        availableDemoAdapters = DemoLoRAAdapterCatalog.adapters(forModelId: modelId)
+        syncDownloadedAdapterPaths()
+    }
+
+    /// Checks if a demo adapter's file already exists on disk.
+    func isAdapterDownloaded(_ adapter: DemoLoRAAdapter) -> Bool {
+        downloadedAdapterPaths[adapter.id] != nil
+    }
+
+    /// Returns the local file path for a downloaded adapter, or nil.
+    func localPath(for adapter: DemoLoRAAdapter) -> String? {
+        downloadedAdapterPaths[adapter.id]
+    }
+
+    /// Downloads a demo adapter from its URL, then loads it.
+    func downloadAndLoadAdapter(_ adapter: DemoLoRAAdapter, scale: Float) async {
+        guard isDownloadingAdapter[adapter.id] != true else { return }
+
+        isDownloadingAdapter[adapter.id] = true
+        adapterDownloadProgress[adapter.id] = 0.0
+        error = nil
+
+        do {
+            let localPath: String
+            if let existing = downloadedAdapterPaths[adapter.id] {
+                localPath = existing
+            } else {
+                localPath = try await downloadAdapter(adapter)
+            }
+            await loadLoraAdapter(path: localPath, scale: scale)
+        } catch {
+            logger.error("Failed to download/load adapter \(adapter.id): \(error)")
+            self.error = error
+        }
+
+        isDownloadingAdapter[adapter.id] = false
+        adapterDownloadProgress[adapter.id] = nil
+    }
+
+    /// Downloads the adapter file to the LoRA directory.
+    private func downloadAdapter(_ adapter: DemoLoRAAdapter) async throws -> String {
+        let loraDir = Self.loraDownloadDirectory()
+        try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
+        let destinationURL = loraDir.appendingPathComponent(adapter.fileName)
+
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            downloadedAdapterPaths[adapter.id] = destinationURL.path
+            return destinationURL.path
+        }
+
+        let delegate = DownloadProgressDelegate { [weak self] progress in
+            Task { @MainActor in
+                self?.adapterDownloadProgress[adapter.id] = progress
+            }
+        }
+
+        let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+        try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+
+        downloadedAdapterPaths[adapter.id] = destinationURL.path
+        logger.info("Adapter downloaded to \(destinationURL.path)")
+        return destinationURL.path
+    }
+
+    /// Scans the LoRA directory to populate downloadedAdapterPaths.
+    private func syncDownloadedAdapterPaths() {
+        let loraDir = Self.loraDownloadDirectory()
+        for adapter in availableDemoAdapters {
+            let path = loraDir.appendingPathComponent(adapter.fileName).path
+            if FileManager.default.fileExists(atPath: path) {
+                downloadedAdapterPaths[adapter.id] = path
+            }
+        }
+    }
+
+    static func loraDownloadDirectory() -> URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("LoRA", isDirectory: true)
+    }
+
     // MARK: - Private Methods - Message Generation
 
     private func ensureModelIsLoaded() async throws {
@@ -436,6 +533,7 @@ final class LLMViewModel {
                         self.messages.removeFirst()
                     }
                     self.addSystemMessage()
+                    self.refreshAvailableDemoAdapters()
                 }
             } else {
                 await self.checkModelStatus()
