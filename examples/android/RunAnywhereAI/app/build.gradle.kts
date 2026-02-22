@@ -11,6 +11,8 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
+    ndkVersion = "27.0.12077973"
+
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
         val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -223,9 +225,11 @@ dependencies {
     // SDK
     implementation(project(":runanywhere-kotlin"))
 
-    // Backend modules (optional, pick what you need)
-    implementation(project(":runanywhere-core-llamacpp")) // LLM text generation
-    implementation(project(":runanywhere-core-onnx")) // STT, TTS, VAD
+    // Backend modules - each is SELF-CONTAINED with all native libs
+    // Pick the backends you need:
+    implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
+    implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
+    implementation(project(":runanywhere-core-rag")) // RAG pipeline JNI bindings
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)
@@ -265,6 +269,11 @@ dependencies {
 
     // File Management & Storage
     implementation(libs.commons.io)
+
+    // ========================================
+    // PDF Text Extraction (RAG document ingestion)
+    // ========================================
+    implementation(libs.pdfbox.android)
 
     // Background Work
     implementation(libs.androidx.work.runtime.ktx)

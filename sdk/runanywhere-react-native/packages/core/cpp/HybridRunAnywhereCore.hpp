@@ -92,6 +92,7 @@ public:
   std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) override;
   std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) override;
+  std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) override;
 
   // ============================================================================
   // Download Service - Delegates to DownloadBridge
@@ -231,6 +232,13 @@ public:
     const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
+  
+  // Aliases for semantic clarity (forward to Set/Get implementations)
+  std::shared_ptr<Promise<void>> secureStorageStore(
+    const std::string& key,
+    const std::string& value) override;
+  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageRetrieve(
+    const std::string& key) override;
   std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
 
   // ============================================================================

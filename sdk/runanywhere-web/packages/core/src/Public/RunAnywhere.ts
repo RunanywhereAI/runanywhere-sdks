@@ -26,6 +26,16 @@ import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
 import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 
+/** Options for showOpenFilePicker. */
+interface OpenFilePickerOptions {
+  types?: Array<{ description?: string; accept?: { [k: string]: string[] } }>;
+  multiple?: boolean;
+}
+/** Window with File System Access API (showOpenFilePicker). */
+interface WindowWithFilePicker extends Window {
+  showOpenFilePicker?(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;
+}
+
 const logger = new SDKLogger('RunAnywhere');
 
 // ---------------------------------------------------------------------------
@@ -164,11 +174,9 @@ export const RunAnywhere = {
   async importModelFromPicker(options?: { modelId?: string; accept?: string[] }): Promise<string | null> {
     const acceptExts = options?.accept ?? ['.gguf', '.onnx', '.bin'];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ('showOpenFilePicker' in window) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const [handle] = await (window as any).showOpenFilePicker({
+        const [handle] = await (window as WindowWithFilePicker).showOpenFilePicker!({
           types: [{
             description: 'AI Model Files',
             accept: { 'application/octet-stream': acceptExts },

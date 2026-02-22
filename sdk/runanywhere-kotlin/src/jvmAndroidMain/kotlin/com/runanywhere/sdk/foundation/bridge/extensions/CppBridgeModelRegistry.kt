@@ -41,6 +41,7 @@ object CppBridgeModelRegistry {
         const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
         const val IMAGE_GENERATION = 5 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
         const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val EMBEDDING = 7
     }
 
     /**
@@ -272,15 +273,22 @@ object CppBridgeModelRegistry {
         }
 
         val typeDirectories =
-            mapOf(
-                "llm" to ModelCategory.LANGUAGE,
-                "stt" to ModelCategory.SPEECH_RECOGNITION,
-                "tts" to ModelCategory.SPEECH_SYNTHESIS,
-                "vad" to ModelCategory.AUDIO,
-                "vision" to ModelCategory.VISION,
-                "multimodal" to ModelCategory.MULTIMODAL,
-                "other" to -1, // Backward compat: VLM models were saved here before proper dirs existed
-            )
+    mapOf(
+        "llm" to ModelCategory.LANGUAGE,
+        "stt" to ModelCategory.SPEECH_RECOGNITION,
+        "tts" to ModelCategory.SPEECH_SYNTHESIS,
+        "vad" to ModelCategory.AUDIO,
+
+        // RAG
+        "embedding" to ModelType.EMBEDDING,
+
+        // Vision / VLM
+        "vision" to ModelCategory.VISION,
+        "multimodal" to ModelCategory.MULTIMODAL,
+
+        // Backward compatibility
+        "other" to -1,
+    )
 
         var restoredCount = 0
 

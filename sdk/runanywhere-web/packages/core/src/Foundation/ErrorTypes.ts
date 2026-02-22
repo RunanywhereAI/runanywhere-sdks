@@ -119,3 +119,8 @@ export class SDKError extends Error {
     );
   }
 }
+
+/** Type guard: returns true if the value is an SDKError instance. */
+export function isSDKError(error: unknown): error is SDKError {
+  return error instanceof SDKError;
+}

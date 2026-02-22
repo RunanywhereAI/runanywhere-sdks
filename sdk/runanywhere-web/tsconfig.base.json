@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "DOM.AsyncIterable", "WebWorker"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

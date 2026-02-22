@@ -36,8 +36,14 @@ import {
 } from './src/theme/spacing';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, SDKEnvironment, ModelCategory, LLMFramework } from '@runanywhere/core';
-import { LlamaCPP } from '@runanywhere/llamacpp';
+import { RunAnywhere, SDKEnvironment, ModelCategory, initializeNitroModulesGlobally } from '@runanywhere/core';
+// Make LlamaCPP optional for ONNX-only builds
+let LlamaCPP: any = null;
+try {
+  LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP;
+} catch (e) {
+  console.warn('[App] LlamaCPP backend not available - some features disabled');
+}
 import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
 import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
 
@@ -107,108 +113,152 @@ const App: React.FC = () => {
    * to complete before the UI queries models.
    */
   const registerModulesAndModels = async () => {
-    // LlamaCPP module with LLM models
+    // LlamaCPP module with LLM models (optional - skip if not built)
     // Using explicit IDs ensures models are recognized after download across app restarts
-    LlamaCPP.register();
-    await LlamaCPP.addModel({
-      id: 'smollm2-360m-q8_0',
-      name: 'SmolLM2 360M Q8_0',
-      url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
-      memoryRequirement: 500_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'llama-2-7b-chat-q4_k_m',
-      name: 'Llama 2 7B Chat Q4_K_M',
-      url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
-      memoryRequirement: 4_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'mistral-7b-instruct-q4_k_m',
-      name: 'Mistral 7B Instruct Q4_K_M',
-      url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
-      memoryRequirement: 4_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'qwen2.5-0.5b-instruct-q6_k',
-      name: 'Qwen 2.5 0.5B Instruct Q6_K',
-      url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+    const llamacppPromises = [];
+    if (LlamaCPP) {
+      LlamaCPP.register();
+      // Register models in parallel to avoid blocking
+      llamacppPromises.push(
+        LlamaCPP.addModel({
+          id: 'smollm2-360m-q8_0',
+          name: 'SmolLM2 360M Q8_0',
+          url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+          memoryRequirement: 500_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'llama-2-7b-chat-q4_k_m',
+          name: 'Llama 2 7B Chat Q4_K_M',
+          url: 'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+          memoryRequirement: 4_000_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'mistral-7b-instruct-q4_k_m',
+          name: 'Mistral 7B Instruct Q4_K_M',
+          url: 'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+          memoryRequirement: 4_000_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'qwen2.5-0.5b-instruct-q6_k',
+          name: 'Qwen 2.5 0.5B Instruct Q6_K',
+          url: 'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+          memoryRequirement: 600_000_000,
+        }),
+        // Llama 3.2 3B - Ideal for tool calling on mobile (3B params, ~1.8GB)
+        LlamaCPP.addModel({
+          id: 'llama-3.2-3b-instruct-q4_k_m',
+          name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
+          url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+          memoryRequirement: 2_000_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'lfm2-350m-q4_k_m',
+          name: 'LiquidAI LFM2 350M Q4_K_M',
+          url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+          memoryRequirement: 250_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'lfm2-350m-q8_0',
+          name: 'LiquidAI LFM2 350M Q8_0',
+          url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
+          memoryRequirement: 400_000_000,
+        }),
+        // LFM2.5 1.2B - Best-in-class edge model from Liquid AI (1.2B params, ~700MB Q4)
+        // 239 tok/s on AMD CPU, designed for on-device deployment
+        LlamaCPP.addModel({
+          id: 'lfm2.5-1.2b-instruct-q4_k_m',
+          name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
+          url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
+          memoryRequirement: 900_000_000,
+        }),
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        LlamaCPP.addModel({
+          id: 'lfm2-1.2b-tool-q4_k_m',
+          name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
+          url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+          memoryRequirement: 800_000_000,
+        }),
+        LlamaCPP.addModel({
+          id: 'lfm2-1.2b-tool-q8_0',
+          name: 'LiquidAI LFM2 1.2B Tool Q8_0',
+          url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+          memoryRequirement: 1_400_000_000,
+        })
+      );
+      // Wait for all LlamaCPP models to register
+      await Promise.all(llamacppPromises);
+    } else {
+      console.warn('[App] Skipping LlamaCPP models - backend not available');
+    }
+
+    // VLM (Vision Language) models
+    // VLM models require 2 files: main model + mmproj (vision projector)
+    // Bundled as tar.gz archives for easy download/extraction
+    // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+    await LlamaCPP.addVLMModel({
+      id: 'smolvlm-500m-instruct-q8_0',
+      name: 'SmolVLM 500M Instruct',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
       memoryRequirement: 600_000_000,
-    });
-    // Llama 3.2 3B - Ideal for tool calling on mobile (3B params, ~1.8GB)
-    await LlamaCPP.addModel({
-      id: 'llama-3.2-3b-instruct-q4_k_m',
-      name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
-      url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      memoryRequirement: 2_000_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-350m-q4_k_m',
-      name: 'LiquidAI LFM2 350M Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
-      memoryRequirement: 250_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-350m-q8_0',
-      name: 'LiquidAI LFM2 350M Q8_0',
-      url: 'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
-      memoryRequirement: 400_000_000,
-    });
-    // LFM2.5 1.2B - Best-in-class edge model from Liquid AI (1.2B params, ~700MB Q4)
-    // 239 tok/s on AMD CPU, designed for on-device deployment
-    await LlamaCPP.addModel({
-      id: 'lfm2.5-1.2b-instruct-q4_k_m',
-      name: 'LiquidAI LFM2.5 1.2B Instruct Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf',
-      memoryRequirement: 900_000_000,
-    });
-    // Tool Calling Optimized Models
-    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
-    await LlamaCPP.addModel({
-      id: 'lfm2-1.2b-tool-q4_k_m',
-      name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
-      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
-      memoryRequirement: 800_000_000,
-    });
-    await LlamaCPP.addModel({
-      id: 'lfm2-1.2b-tool-q8_0',
-      name: 'LiquidAI LFM2 1.2B Tool Q8_0',
-      url: 'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
-      memoryRequirement: 1_400_000_000,
     });
 
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
     // Using explicit IDs ensures models are recognized after download across app restarts
     ONNX.register();
-    // STT Models (Sherpa-ONNX Whisper)
-    await ONNX.addModel({
-      id: 'sherpa-onnx-whisper-tiny.en',
-      name: 'Sherpa Whisper Tiny (ONNX)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-      modality: ModelCategory.SpeechRecognition,
-      artifactType: ModelArtifactType.TarGzArchive,
-      memoryRequirement: 75_000_000,
-    });
-    // NOTE: whisper-small.en not included to match iOS/Android examples
-    // All ONNX models use tar.gz from RunanywhereAI/sherpa-onnx fork for fast native extraction
-    // If you need whisper-small, convert to tar.gz and upload to the fork
-    // TTS Models (Piper VITS)
-    await ONNX.addModel({
-      id: 'vits-piper-en_US-lessac-medium',
-      name: 'Piper TTS (US English - Medium)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
-      modality: ModelCategory.SpeechSynthesis,
-      artifactType: ModelArtifactType.TarGzArchive,
-      memoryRequirement: 65_000_000,
-    });
-    await ONNX.addModel({
-      id: 'vits-piper-en_GB-alba-medium',
-      name: 'Piper TTS (British English)',
-      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
-      modality: ModelCategory.SpeechSynthesis,
-      artifactType: ModelArtifactType.TarGzArchive,
-      memoryRequirement: 65_000_000,
-    });
+    // Register ONNX models in parallel
+    const onnxPromises = [
+      ONNX.addModel({
+        id: 'sherpa-onnx-whisper-tiny.en',
+        name: 'Sherpa Whisper Tiny (ONNX)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+        modality: ModelCategory.SpeechRecognition,
+        artifactType: ModelArtifactType.TarGzArchive,
+        memoryRequirement: 75_000_000,
+      }),
+      // NOTE: whisper-small.en not included to match iOS/Android examples
+      // All ONNX models use tar.gz from RunanywhereAI/sherpa-onnx fork for fast native extraction
+      // If you need whisper-small, convert to tar.gz and upload to the fork
+      // TTS Models (Piper VITS)
+      ONNX.addModel({
+        id: 'vits-piper-en_US-lessac-medium',
+        name: 'Piper TTS (US English - Medium)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+        modality: ModelCategory.SpeechSynthesis,
+        artifactType: ModelArtifactType.TarGzArchive,
+        memoryRequirement: 65_000_000,
+      }),
+      ONNX.addModel({
+        id: 'vits-piper-en_GB-alba-medium',
+        name: 'Piper TTS (British English)',
+        url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+        modality: ModelCategory.SpeechSynthesis,
+        artifactType: ModelArtifactType.TarGzArchive,
+        memoryRequirement: 65_000_000,
+      }),
+      // Embedding model for RAG
+      // NOTE: RAG has its own ONNXEmbeddingProvider (onnx_embedding_provider.cpp) that directly
+      // uses ONNX Runtime C API. It's independent from the general ONNX backend used for STT/TTS.
+      // The embedding model is a single ONNX file; vocab.txt is downloaded separately.
+      ONNX.addModel({
+        id: 'all-minilm-l6-v2',
+        name: 'All MiniLM L6 v2 (Embedding)',
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+        modality: ModelCategory.Embedding,
+        artifactType: ModelArtifactType.SingleFile,
+        memoryRequirement: 25_000_000,
+      }),
+      ONNX.addModel({
+        id: 'all-minilm-l6-v2-vocab',
+        name: 'All MiniLM L6 v2 (Vocab)',
+        url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+        modality: ModelCategory.Embedding,
+        artifactType: ModelArtifactType.SingleFile,
+        memoryRequirement: 500_000,
+      }),
+    ];
+    await Promise.all(onnxPromises);
 
     // Diffusion (CoreML) is Swift SDK + Swift example app only. React Native does not
     // depend on the Swift SDK, so we do not register diffusion models or Diffusion.register()
@@ -227,6 +277,11 @@ const App: React.FC = () => {
 
     try {
       const startTime = Date.now();
+
+      // CRITICAL: Initialize NitroModules globally FIRST to prevent JSI conflicts
+      console.log('[App] Initializing global NitroModules...');
+      await initializeNitroModulesGlobally();
+      console.log('[App] Global NitroModules initialized successfully');
 
       // Check for custom API configuration (stored via Settings screen)
       const customApiKey = await getStoredApiKey();
@@ -283,7 +338,13 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    initializeSDK();
+    // Defer initialization to avoid blocking React's initial render and causing ANR
+    // Schedule on next event loop iteration to ensure React can render the loading screen first
+    const timeoutId = setTimeout(() => {
+      initializeSDK();
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
   }, [initializeSDK]);
 
   // Render based on state

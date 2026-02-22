@@ -16,6 +16,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDeta
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
+import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
@@ -23,12 +24,6 @@ import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
 import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
-/**
- * Main navigation component matching iOS app structure exactly.
- * 5 tabs: Chat, Vision, Voice, More, Settings
- *
- * iOS Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/App/ContentView.swift
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation() {
@@ -63,19 +58,17 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
-            // Vision hub — matches iOS VisionHubView
             composable(NavigationRoute.VISION) {
                 VisionHubScreen(
                     onNavigateToVLM = {
                         navController.navigate(NavigationRoute.VLM)
                     },
                     onNavigateToImageGeneration = {
-                        // Future: navigate to image generation screen
+                        // Future
                     },
                 )
             }
 
-            // VLM screen — nested route from Vision hub
             composable(NavigationRoute.VLM) {
                 VLMScreen()
             }
@@ -84,7 +77,7 @@ fun AppNavigation() {
                 VoiceAssistantScreen()
             }
 
-            // "More" hub routes — STT, TTS, and Benchmarks here to match iOS structure
+            // "More" hub routes — STT, TTS, RAG, and Benchmarks here to match iOS structure
             composable(NavigationRoute.MORE) {
                 MoreHubScreen(
                     onNavigateToSTT = {
@@ -92,6 +85,9 @@ fun AppNavigation() {
                     },
                     onNavigateToTTS = {
                         navController.navigate(NavigationRoute.TTS)
+                    },
+                    onNavigateToRAG = {
+                        navController.navigate(NavigationRoute.RAG)
                     },
                     onNavigateToBenchmarks = {
                         navController.navigate(NavigationRoute.BENCHMARKS)
@@ -105,6 +101,10 @@ fun AppNavigation() {
 
             composable(NavigationRoute.TTS) {
                 TextToSpeechScreen()
+            }
+
+            composable(NavigationRoute.RAG) {
+                DocumentRAGScreen()
             }
 
             composable(NavigationRoute.BENCHMARKS) {
@@ -140,6 +140,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
             NavigationRoute.MORE,
             NavigationRoute.STT,
             NavigationRoute.TTS,
+            NavigationRoute.RAG,
             NavigationRoute.BENCHMARKS,
         ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
@@ -157,11 +158,6 @@ private fun bottomNavTabToRoute(tab: BottomNavTab): String {
     }
 }
 
-/**
- * Navigation routes matching iOS tabs exactly.
- *
- * iOS Reference: ContentView.swift TabView
- */
 object NavigationRoute {
     const val CHAT = "chat"
     const val VISION = "vision"
@@ -170,6 +166,7 @@ object NavigationRoute {
     const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
+    const val RAG = "rag"
     const val BENCHMARKS = "benchmarks"
     const val BENCHMARK_DETAIL = "benchmark_detail"
     const val SETTINGS = "settings"

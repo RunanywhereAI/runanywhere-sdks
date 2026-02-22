@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeUp
@@ -35,15 +36,14 @@ import androidx.compose.ui.unit.sp
 
 /**
  * More Hub Screen — matches iOS MoreHubView.
- * Contains additional utility features: STT, TTS, etc.
- *
- * iOS Reference: examples/ios/RunAnywhereAI/.../App/ContentView.swift — MoreHubView
+ * Contains additional utility features: STT, TTS, RAG.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreHubScreen(
     onNavigateToSTT: () -> Unit,
     onNavigateToTTS: () -> Unit,
+    onNavigateToRAG: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
 ) {
     Scaffold(
@@ -85,6 +85,27 @@ fun MoreHubScreen(
                 title = "Text to Speech",
                 subtitle = "Convert text to natural-sounding speech",
                 onClick = onNavigateToTTS,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // =========================
+            // Document Section (RAG)
+            // =========================
+
+            Text(
+                "Document AI",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
+
+            MoreFeatureCard(
+                icon = Icons.Filled.Description,
+                iconColor = Color(0xFF673AB7), // Purple
+                title = "Document Q&A",
+                subtitle = "Ask questions about your documents using on-device AI",
+                onClick = onNavigateToRAG,
             )
 
             Spacer(modifier = Modifier.height(16.dp))

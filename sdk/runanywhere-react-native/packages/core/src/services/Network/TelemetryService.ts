@@ -16,10 +16,15 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+Telemetry.swift
  */
 
-import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereCore } from '../../specs/RunAnywhereCore.nitro';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { SDKEnvironment } from '../../types/enums';
+import { getNitroModulesProxySync } from '../../native/NitroModulesGlobalInit';
+
+// Use the global NitroModules initialization
+function getNitroModulesProxy(): any {
+  return getNitroModulesProxySync();
+}
 
 const logger = new SDKLogger('TelemetryService');
 
@@ -28,7 +33,14 @@ let _nativeModule: RunAnywhereCore | null = null;
 
 function getNativeModule(): RunAnywhereCore {
   if (!_nativeModule) {
-    _nativeModule = NitroModules.createHybridObject<RunAnywhereCore>('RunAnywhereCore');
+    const NitroProxy = getNitroModulesProxy();
+    if (!NitroProxy) {
+      throw new Error(
+        'NitroModules is not available for TelemetryService. This can happen in Bridgeless mode if ' +
+        'react-native-nitro-modules is not properly linked.'
+      );
+    }
+    _nativeModule = NitroProxy.createHybridObject('RunAnywhereCore') as RunAnywhereCore;
   }
   return _nativeModule;
 }

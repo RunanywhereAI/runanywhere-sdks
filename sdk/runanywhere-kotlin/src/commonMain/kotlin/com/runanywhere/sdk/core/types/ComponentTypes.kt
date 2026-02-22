@@ -84,6 +84,7 @@ enum class SDKComponent(
     VAD("VAD"),
     VOICE("VOICE"),
     EMBEDDING("EMBEDDING"),
+    RAG("RAG"),
     VLM("VLM"),
     ;
 
@@ -97,6 +98,7 @@ enum class SDKComponent(
                 VAD -> "Voice Activity Detection"
                 VOICE -> "Voice Agent"
                 EMBEDDING -> "Embedding"
+                RAG -> "Retrieval-Augmented Generation"
                 VLM -> "Vision Language Model"
             }
 

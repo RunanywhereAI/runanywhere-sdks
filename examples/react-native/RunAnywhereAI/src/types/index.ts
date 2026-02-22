@@ -22,13 +22,15 @@ export * from './settings';
 // Tab 1: Speech-to-Text
 // Tab 2: Text-to-Speech
 // Tab 3: Voice Assistant (STT + LLM + TTS)
-// Tab 4: Vision (hub: VLM only; image generation is Swift sample app only)
-// Tab 5: Settings (includes Tool Settings)
+// Tab 4: RAG (Retrieval-Augmented Generation)
+// Tab 5: Vision (VLM hub; image generation is Swift sample app only)
+// Tab 6: Settings
 export type RootTabParamList = {
   Chat: undefined;
   STT: undefined;
   TTS: undefined;
   Voice: undefined;
+  RAG: undefined;
   Vision: undefined;
   Settings: undefined;
 };

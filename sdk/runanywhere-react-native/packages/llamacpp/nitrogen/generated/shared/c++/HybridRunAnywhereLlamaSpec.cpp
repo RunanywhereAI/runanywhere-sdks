@@ -27,6 +27,13 @@ namespace margelo::nitro::runanywhere::llama {
       prototype.registerHybridMethod("generateStructured", &HybridRunAnywhereLlamaSpec::generateStructured);
       prototype.registerHybridMethod("getLastError", &HybridRunAnywhereLlamaSpec::getLastError);
       prototype.registerHybridMethod("getMemoryUsage", &HybridRunAnywhereLlamaSpec::getMemoryUsage);
+      prototype.registerHybridMethod("registerVLMBackend", &HybridRunAnywhereLlamaSpec::registerVLMBackend);
+      prototype.registerHybridMethod("loadVLMModel", &HybridRunAnywhereLlamaSpec::loadVLMModel);
+      prototype.registerHybridMethod("isVLMModelLoaded", &HybridRunAnywhereLlamaSpec::isVLMModelLoaded);
+      prototype.registerHybridMethod("unloadVLMModel", &HybridRunAnywhereLlamaSpec::unloadVLMModel);
+      prototype.registerHybridMethod("processVLMImage", &HybridRunAnywhereLlamaSpec::processVLMImage);
+      prototype.registerHybridMethod("processVLMImageStream", &HybridRunAnywhereLlamaSpec::processVLMImageStream);
+      prototype.registerHybridMethod("cancelVLMGeneration", &HybridRunAnywhereLlamaSpec::cancelVLMGeneration);
     });
   }
 

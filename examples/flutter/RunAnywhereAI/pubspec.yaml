@@ -39,6 +39,12 @@ dependencies:
   url_launcher: ^6.2.0
   # HTTP client for API calls
   http: ^1.2.0
+  # Camera access for VLM
+  camera: ^0.11.0
+  # Image picker for gallery photos
+  image_picker: ^1.0.0
+  # Image manipulation (BGRA to RGB pixel conversion)
+  image: ^4.0.0
 
 dev_dependencies:
   flutter_test:

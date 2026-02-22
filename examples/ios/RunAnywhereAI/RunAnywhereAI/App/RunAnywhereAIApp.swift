@@ -333,6 +333,26 @@ struct RunAnywhereAIApp: App {
         }
         logger.info("✅ ONNX STT/TTS models registered")
 
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        if let miniLMModelURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"),
+           let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
+            RunAnywhere.registerMultiFileModel(
+                id: "all-minilm-l6-v2",
+                name: "All MiniLM L6 v2 (Embedding)",
+                files: [
+                    ModelFileDescriptor(url: miniLMModelURL, filename: "model.onnx"),
+                    ModelFileDescriptor(url: miniLMVocabURL, filename: "vocab.txt")
+                ],
+                framework: .onnx,
+                modality: .embedding,
+                memoryRequirement: 25_500_000
+            )
+        }
+        logger.info("✅ ONNX Embedding models registered")
+
         // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
         // ============================================================================
         // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)
