@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="IntelliJ: 1 Build Plugin" type="GradleRunConfiguration" factoryName="Gradle">
+    <ExternalSystemSettings>
+      <option name="externalProjectPath" value="$PROJECT_DIR$" />
+      <option name="taskNames">
+        <list>
+          <option value="buildIntellijPlugin" />
+        </list>
+      </option>
+    </ExternalSystemSettings>
+  </configuration>
+</component>

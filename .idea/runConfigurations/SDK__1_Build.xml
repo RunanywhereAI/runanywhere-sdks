@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="SDK: 1 Build" type="GradleRunConfiguration" factoryName="Gradle">
+    <ExternalSystemSettings>
+      <option name="externalProjectPath" value="$PROJECT_DIR$" />
+      <option name="taskNames">
+        <list>
+          <option value="buildSdk" />
+        </list>
+      </option>
+    </ExternalSystemSettings>
+  </configuration>
+</component>
