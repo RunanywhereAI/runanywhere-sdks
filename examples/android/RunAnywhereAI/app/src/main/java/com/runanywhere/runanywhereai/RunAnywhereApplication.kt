@@ -10,6 +10,7 @@ import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.registerModel
@@ -356,6 +357,32 @@ class RunAnywhereApplication : Application() {
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
 
+
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        // Mirrors iOS RunAnywhereAIApp.registerMultiFileModel() exactly.
+        RunAnywhere.registerMultiFileModel(
+            id = "all-minilm-l6-v2",
+            name = "All MiniLM L6 v2 (Embedding)",
+            primaryUrl = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx", // .onnx keeps resolve (LFS binary)
+            companionFiles = listOf(
+                ModelCompanionFile(
+                    url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/vocab.txt", // Changed to raw
+                    filename = "vocab.txt",
+                ),
+                ModelCompanionFile(
+                    url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/tokenizer.json", // Added tokenizer and used raw
+                    filename = "tokenizer.json",
+                ),
+            ),
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.EMBEDDING,
+            memoryRequirement = 25_500_000,
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX Embedding models registered")
+
         // Register VLM (Vision Language Model) models — matching iOS exactly
         // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total, archive)
         RunAnywhere.registerModel(
@@ -405,6 +432,7 @@ class RunAnywhereApplication : Application() {
             memoryRequirement = 1_800_000_000,
         )
         Log.i("RunAnywhereApp", "✅ VLM models registered")
+
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }

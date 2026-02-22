@@ -8,10 +8,14 @@ module.exports = {
     },
   },
   dependencies: {
-    // Disable autolinking for audio libraries that are incompatible with New Architecture.
-    // iOS: These libraries don't support the New Architecture (TurboModules/Fabric).
-    // Android: Some libraries also disabled on Android due to build conflicts or
-    //          because we use custom native implementations instead.
+    // Nitro modules requires Turbo codegen for iOS (NitroModulesSpec.h)
+    'react-native-nitro-modules': {
+      platforms: {
+        android: null,
+        ios: {},
+      },
+    },
+    // Disable audio libraries on iOS - they're incompatible with New Architecture
     'react-native-live-audio-stream': {
       platforms: {
         ios: null,
@@ -20,13 +24,13 @@ module.exports = {
     'react-native-audio-recorder-player': {
       platforms: {
         ios: null,
-        android: null, // Disabled on both platforms - using custom audio implementation
+        android: null,
       },
     },
     'react-native-sound': {
       platforms: {
-        ios: null, // iOS uses NativeAudioModule for playback
-        // Android: enable so TTS and Audio playback work
+        ios: null,
+        android: null,
       },
     },
     'react-native-tts': {

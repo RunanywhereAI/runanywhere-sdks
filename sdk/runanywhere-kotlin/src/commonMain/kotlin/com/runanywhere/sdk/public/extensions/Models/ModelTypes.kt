@@ -70,6 +70,12 @@ enum class ModelSelectionContext(
     /** Select models for voice agent (all 3 types) */
     VOICE("voice"),
 
+    /** Select an embedding model for RAG (ONNX) */
+    RAG_EMBEDDING("ragEmbedding"),
+
+    /** Select an LLM for RAG generation (llama.cpp) */
+    RAG_LLM("ragLLM"),
+
     /** Select a vision language model (VLM) */
     VLM("vlm"),
     ;
@@ -82,6 +88,8 @@ enum class ModelSelectionContext(
                 STT -> "Select STT Model"
                 TTS -> "Select TTS Voice"
                 VOICE -> "Select Voice Models"
+                RAG_EMBEDDING -> "Select Embedding Model"
+                RAG_LLM -> "Select LLM Model"
                 VLM -> "Select Vision Model"
             }
 
@@ -95,6 +103,8 @@ enum class ModelSelectionContext(
                 category == ModelCategory.LANGUAGE ||
                     category == ModelCategory.SPEECH_RECOGNITION ||
                     category == ModelCategory.SPEECH_SYNTHESIS
+            RAG_EMBEDDING -> category == ModelCategory.EMBEDDING
+            RAG_LLM -> category == ModelCategory.LANGUAGE
             VLM ->
                 category == ModelCategory.MULTIMODAL ||
                     category == ModelCategory.VISION
@@ -106,7 +116,8 @@ enum class ModelSelectionContext(
             LLM ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
                     framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
-            STT -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+            STT ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
             TTS ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
                     framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS ||
@@ -115,7 +126,12 @@ enum class ModelSelectionContext(
                 LLM.isFrameworkRelevant(framework) ||
                     STT.isFrameworkRelevant(framework) ||
                     TTS.isFrameworkRelevant(framework)
-            VLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
+            RAG_EMBEDDING ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+            RAG_LLM ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
+            VLM ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
         }
 }
 
@@ -136,6 +152,7 @@ enum class ModelCategory(
     IMAGE_GENERATION("image-generation"), // Text-to-image models
     MULTIMODAL("multimodal"), // Models that handle multiple modalities
     AUDIO("audio"), // Audio processing (diarization, etc.)
+    EMBEDDING("embedding"), // Embedding models (RAG, semantic search)
     ;
 
     /** Whether this category typically requires context length */

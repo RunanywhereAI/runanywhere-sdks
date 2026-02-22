@@ -199,7 +199,9 @@ bool extractBoolValue(const std::string& json, const std::string& key, bool defa
 rac_inference_framework_t frameworkFromString(const std::string& framework) {
     if (framework == "LlamaCpp" || framework == "llamacpp") return RAC_FRAMEWORK_LLAMACPP;
     if (framework == "ONNX" || framework == "onnx") return RAC_FRAMEWORK_ONNX;
+#ifdef __APPLE__
     if (framework == "CoreML" || framework == "coreml") return RAC_FRAMEWORK_COREML;
+#endif
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
     return RAC_FRAMEWORK_UNKNOWN;
@@ -216,6 +218,7 @@ rac_model_category_t categoryFromString(const std::string& category) {
     if (category == "ImageGeneration" || category == "image-generation" || category == "image_generation") return RAC_MODEL_CATEGORY_IMAGE_GENERATION;
     if (category == "Multimodal" || category == "multimodal") return RAC_MODEL_CATEGORY_MULTIMODAL;
     if (category == "Audio" || category == "audio") return RAC_MODEL_CATEGORY_AUDIO;
+    if (category == "Embedding" || category == "embedding") return RAC_MODEL_CATEGORY_EMBEDDING;
     return RAC_MODEL_CATEGORY_UNKNOWN;
 }
 
@@ -815,6 +818,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
                 case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
                 case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
                 case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+                case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
                 default: categoryStr = "unknown"; break;
             }
             std::string formatStr = "unknown";
@@ -829,7 +833,9 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
             switch (m.framework) {
                 case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
                 case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+#ifdef __APPLE__
                 case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
+#endif
                 case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
                 case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
                 default: frameworkStr = "unknown"; break;
@@ -878,6 +884,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
             case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
             case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
             case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+            case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
             default: categoryStr = "unknown"; break;
         }
         std::string formatStr = "unknown";
@@ -892,7 +899,9 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
         switch (m.framework) {
             case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
             case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+#ifdef __APPLE__
             case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
+#endif
             case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
             case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
             default: frameworkStr = "unknown"; break;
@@ -2575,6 +2584,34 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::secureStorageExists(
     });
 }
 
+// Semantic aliases for set/get (forward to actual implementations)
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::secureStorageStore(
+    const std::string& key,
+    const std::string& value) {
+    // Direct implementation (no double-wrapping of promises)
+    return Promise<void>::async([key, value]() -> void {
+        LOGI("Secure storage store: key=%s", key.c_str());
+        bool success = InitBridge::shared().secureSet(key, value);
+        if (!success) {
+            LOGE("Failed to store value for key: %s", key.c_str());
+            throw std::runtime_error("Failed to store value for key: " + key);
+        }
+    });
+}
+
+std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> HybridRunAnywhereCore::secureStorageRetrieve(
+    const std::string& key) {
+    // Direct implementation (reuse exact same logic as secureStorageGet)
+    return Promise<std::variant<nitro::NullType, std::string>>::async([key]() -> std::variant<nitro::NullType, std::string> {
+        LOGI("Secure storage retrieve: key=%s", key.c_str());
+        std::string value;
+        if (InitBridge::shared().secureGet(key, value)) {
+            return value;
+        }
+        return nitro::NullType();
+    });
+}
+
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getPersistentDeviceUUID() {
     return Promise<std::string>::async([]() -> std::string {
         LOGI("Getting persistent device UUID...");
@@ -2629,9 +2666,14 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOu
     return Promise<std::string>::async([llmOutput]() -> std::string {
         LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
 
+        // TODO: Re-enable when commons includes rac_tool_call_* functions
         // Use ToolCallingBridge for parsing - single source of truth
         // This ensures consistent <tool_call> tag parsing across all platforms
-        return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
+        // return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
+        
+        // Temporary stub - return empty JSON for now
+        LOGW("parseToolCallFromOutput: ToolCallingBridge disabled, returning empty JSON");
+        return "{}";
     });
 }
 
@@ -2642,9 +2684,14 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPromp
     return Promise<std::string>::async([toolsJson, format]() -> std::string {
         LOGD("formatToolsForPrompt: tools length=%zu, format=%s", toolsJson.length(), format.c_str());
 
+        // TODO: Re-enable when commons includes rac_tool_call_* functions
         // Use C++ single source of truth for prompt formatting
         // This eliminates duplicate TypeScript implementation
-        return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
+        // return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
+        
+        // Temporary stub - return empty string for now
+        LOGW("formatToolsForPrompt: ToolCallingBridge disabled, returning empty string");
+        return "";
     });
 }
 
@@ -2656,8 +2703,13 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
     return Promise<std::string>::async([userPrompt, toolsJson, optionsJson]() -> std::string {
         LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu", userPrompt.length(), toolsJson.length());
 
+        // TODO: Re-enable when commons includes rac_tool_call_* functions
         // Use C++ single source of truth for initial prompt building
-        return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
+        // return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
+        
+        // Temporary stub - return user prompt as-is
+        LOGW("buildInitialPrompt: ToolCallingBridge disabled, returning user prompt");
+        return userPrompt;
     });
 }
 
@@ -2671,9 +2723,14 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt
     return Promise<std::string>::async([originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable]() -> std::string {
         LOGD("buildFollowupPrompt: tool=%s, keepTools=%d", toolName.c_str(), keepToolsAvailable);
 
+        // TODO: Re-enable when commons includes rac_tool_call_* functions
         // Use C++ single source of truth for follow-up prompt building
-        return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
-            originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
+        // return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
+        //     originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
+        
+        // Temporary stub - return original prompt
+        LOGW("buildFollowupPrompt: ToolCallingBridge disabled, returning original prompt");
+        return originalPrompt;
     });
 }
 

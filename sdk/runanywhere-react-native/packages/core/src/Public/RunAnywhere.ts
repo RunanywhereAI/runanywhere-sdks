@@ -619,6 +619,7 @@ export const RunAnywhere = {
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
+  getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
 
   // ============================================================================

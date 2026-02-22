@@ -538,6 +538,20 @@ export interface RunAnywhereCore
   secureStorageExists(key: string): Promise<boolean>;
 
   /**
+   * Store a string value securely (semantic alias for secureStorageSet)
+   * @param key Storage key
+   * @param value String value to store
+   */
+  secureStorageStore(key: string, value: string): Promise<void>;
+
+  /**
+   * Retrieve a string value from secure storage (semantic alias for secureStorageGet)
+   * @param key Storage key
+   * @returns Stored value or null if not found
+   */
+  secureStorageRetrieve(key: string): Promise<string | null>;
+
+  /**
    * Get persistent device UUID
    * This UUID survives app reinstalls (stored in Keychain/Keystore)
    * Matches Swift: DeviceIdentity.persistentUUID

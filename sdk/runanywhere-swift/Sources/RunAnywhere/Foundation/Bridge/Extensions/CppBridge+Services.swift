@@ -294,6 +294,9 @@ extension SDKComponent {
             return RAC_CAPABILITY_TEXT_GENERATION
         case .diffusion:
             return RAC_CAPABILITY_DIFFUSION
+        case .rag:
+            // RAG uses text generation capability for C++ routing
+            return RAC_CAPABILITY_TEXT_GENERATION
         }
     }
 

@@ -17,6 +17,7 @@ import com.runanywhere.runanywhereai.presentation.common.InitializationErrorView
 import com.runanywhere.runanywhereai.presentation.common.InitializationLoadingView
 import com.runanywhere.runanywhereai.presentation.navigation.AppNavigation
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.launch
 
 /**
@@ -30,7 +31,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Setup edge-to-edge display
+        // 1. Initialize PDFBox Resource Loader (REQUIRED for RAG/PDF extraction)
+        // This must be called before any PDFBox methods are used
+        PDFBoxResourceLoader.init(applicationContext)
+
+        // 2. Setup edge-to-edge display
         enableEdgeToEdge()
 
         setContent {

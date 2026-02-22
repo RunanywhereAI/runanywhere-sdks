@@ -231,6 +231,13 @@ public:
     const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
+  
+  // Aliases for semantic clarity (forward to Set/Get implementations)
+  std::shared_ptr<Promise<void>> secureStorageStore(
+    const std::string& key,
+    const std::string& value) override;
+  std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageRetrieve(
+    const std::string& key) override;
   std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() override;
 
   // ============================================================================
