@@ -32,7 +32,7 @@ extension CppBridge {
                 throw SDKError.general(.initializationFailed, "Failed to set base directory")
             }
 
-            logger.debug("Base directory set to: \(baseDir.path)")
+            logger.debug("Base directory set to: \(baseDir.lastPathComponent)")
         }
 
         /// Get the configured base directory

@@ -11,7 +11,9 @@ import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +28,6 @@ import kotlinx.coroutines.withContext
 
 /**
  * Represents the SDK initialization state.
- * Matches iOS pattern: isSDKInitialized + initializationError conditional rendering.
  */
 sealed class SDKInitializationState {
     /** SDK is currently initializing */
@@ -60,7 +61,7 @@ class RunAnywhereApplication : Application() {
     @Volatile
     private var initializationError: Throwable? = null
 
-    /** Observable SDK initialization state for Compose UI - matches iOS pattern */
+    /** Observable SDK initialization state for Compose UI */
     private val _initializationState = MutableStateFlow<SDKInitializationState>(SDKInitializationState.Loading)
     val initializationState: StateFlow<SDKInitializationState> = _initializationState.asStateFlow()
 
@@ -151,8 +152,8 @@ class RunAnywhereApplication : Application() {
             } else {
                 // PRODUCTION mode - requires API key and base URL
                 // Configure these via Settings screen or set environment variables
-                val apiKey = "YOUR_API_KEY_HERE"
-                val baseURL = "YOUR_BASE_URL_HERE"
+                val apiKey = "runa_prod_PJ8ZbRGeoGUVMsP_x1MhCvovmYyX5X36EJo-pHyWvtI"
+                val baseURL = "https://runanywhere-backend-production.up.railway.app"
 
                 // Detect placeholder credentials and abort production initialization
                 if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
@@ -202,7 +203,7 @@ class RunAnywhereApplication : Application() {
             }
         }
 
-        // Register modules and models (matching iOS registerModulesAndModels pattern)
+        // Register modules and models
         registerModulesAndModels()
 
         Log.i("RunAnywhereApp", "✅ SDK initialization complete")
@@ -213,7 +214,7 @@ class RunAnywhereApplication : Application() {
 
         isSDKInitialized = RunAnywhere.isInitialized
 
-        // Update observable state for Compose UI - matches iOS conditional rendering
+        // Update observable state for Compose UI
         if (isSDKInitialized) {
             _initializationState.value = SDKInitializationState.Ready
             Log.i("RunAnywhereApp", "🎉 App is ready to use!")
@@ -237,7 +238,7 @@ class RunAnywhereApplication : Application() {
     fun getInitializationError(): Throwable? = initializationError
 
     /**
-     * Retry SDK initialization - matches iOS retryInitialization() pattern
+     * Retry SDK initialization
      */
     suspend fun retryInitialization() {
         _initializationState.value = SDKInitializationState.Loading
@@ -250,16 +251,13 @@ class RunAnywhereApplication : Application() {
      * Register modules with their associated models.
      * Each module explicitly owns its models - the framework is determined by the module.
      *
-     * Mirrors iOS RunAnywhereAIApp.registerModulesAndModels() exactly.
-     *
      * Backend registration MUST happen before model registration.
-     * This follows the same pattern as iOS where backends are registered first.
      */
     @Suppress("LongMethod")
     private fun registerModulesAndModels() {
         Log.i("RunAnywhereApp", "📦 Registering backends and models...")
 
-        // Register backends first (matching iOS pattern)
+        // Register backends first
         // These call the C++ rac_backend_xxx_register() functions via JNI
         Log.i("RunAnywhereApp", "🔧 Registering LlamaCPP backend...")
         LlamaCPP.register(priority = 100)
@@ -357,6 +355,56 @@ class RunAnywhereApplication : Application() {
             memoryRequirement = 65_000_000,
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
+
+        // Register VLM (Vision Language Model) models — matching iOS exactly
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total, archive)
+        RunAnywhere.registerModel(
+            id = "smolvlm-500m-instruct-q8_0",
+            name = "SmolVLM 500M Instruct",
+            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 600_000_000,
+        )
+        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+        // Uses multi-file download: main model + mmproj from HuggingFace
+        RunAnywhere.registerMultiFileModel(
+            id = "lfm2-vl-450m-q8_0",
+            name = "LFM2-VL 450M",
+            files = listOf(
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
+                    filename = "LFM2-VL-450M-Q8_0.gguf",
+                ),
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
+                    filename = "mmproj-LFM2-VL-450M-Q8_0.gguf",
+                ),
+            ),
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 600_000_000,
+        )
+        // Qwen2-VL 2B - Capable VLM, requires powerful hardware (~1.6GB total)
+        // Uses multi-file download: main model (986MB) + mmproj (710MB)
+        RunAnywhere.registerMultiFileModel(
+            id = "qwen2-vl-2b-instruct-q4_k_m",
+            name = "Qwen2-VL 2B Instruct",
+            files = listOf(
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                    filename = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                ),
+                ModelFileDescriptor(
+                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                    filename = "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                ),
+            ),
+            framework = InferenceFramework.LLAMA_CPP,
+            modality = ModelCategory.MULTIMODAL,
+            memoryRequirement = 1_800_000_000,
+        )
+        Log.i("RunAnywhereApp", "✅ VLM models registered")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }

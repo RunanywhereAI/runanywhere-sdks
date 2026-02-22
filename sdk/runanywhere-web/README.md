@@ -116,9 +116,11 @@ The pre-built WASM includes llama.cpp (LLM/VLM), whisper.cpp (STT), and sherpa-o
 npm install @runanywhere/web
 ```
 
-### Serve WASM Files
+### Serve WASM Files + Cross-Origin Isolation
 
 The package includes pre-built WASM files in `node_modules/@runanywhere/web/wasm/`. Configure your bundler to serve these as static assets.
+
+> **Important:** Your server **must** set Cross-Origin Isolation headers for `SharedArrayBuffer` and multi-threaded WASM to work. Without these headers the SDK falls back to single-threaded mode, which is significantly slower. See [Cross-Origin Isolation Headers](#cross-origin-isolation-headers) for all platforms (Nginx, Vercel, Netlify, Cloudflare, AWS, Apache).
 
 **Vite:**
 
@@ -128,6 +130,7 @@ export default defineConfig({
   assetsInclude: ['**/*.wasm'],
   server: {
     headers: {
+      // Required for SharedArrayBuffer / multi-threaded WASM
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless',
     },
@@ -145,8 +148,70 @@ module.exports = {
       { test: /\.wasm$/, type: 'asset/resource' },
     ],
   },
+  devServer: {
+    headers: {
+      // Required for SharedArrayBuffer / multi-threaded WASM
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
+  },
 };
 ```
+
+> **Safari/iOS:** Safari does not support `credentialless` COEP. Use the COI service worker pattern shown in the [demo app](../../examples/web/RunAnywhereAI/) — it intercepts responses and injects `require-corp` headers at runtime. See `public/coi-serviceworker.js` and the `ensureCrossOriginIsolation()` call in `src/main.ts`.
+
+---
+
+## TypeScript Usage
+
+`@runanywhere/web` ships with full TypeScript definitions. No `@types/` package is needed.
+
+```typescript
+import {
+  RunAnywhere,
+  SDKEnvironment,
+  SDKError,
+  SDKErrorCode,
+  isSDKError,
+  type SDKInitOptions,    // canonical name (or InitializeOptions alias)
+  type GenerationOptions, // canonical name (or GenerateOptions alias)
+  type ChatMessage,
+  type ModelDescriptor,
+} from '@runanywhere/web';
+
+// Fully typed initialization
+const options: SDKInitOptions = {
+  environment: SDKEnvironment.Development,
+};
+await RunAnywhere.initialize(options);
+
+// Typed generation options (used by backend packages: LlamaCPP, ONNX)
+const genOptions: GenerationOptions = {
+  systemPrompt: 'You are a helpful assistant.',
+  maxTokens: 256,
+  temperature: 0.7,
+};
+
+// Typed error handling
+try {
+  // ... any SDK call (e.g. loadModel, or backend TextGeneration.generate, etc.)
+} catch (error) {
+  if (isSDKError(error)) {
+    switch (error.code) {
+      case SDKErrorCode.NotInitialized:
+        console.error('Call RunAnywhere.initialize() first.');
+        break;
+      case SDKErrorCode.ModelNotLoaded:
+        console.error('Load a model first.');
+        break;
+      default:
+        console.error('SDK error:', error.message);
+    }
+  }
+}
+```
+
+Note: `InitializeOptions` is a convenience alias for `SDKInitOptions`; `GenerateOptions` for `GenerationOptions`. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
 
 ---
 

@@ -194,6 +194,17 @@ export class ModelRegistry {
     return this.getModels();
   }
 
+  /**
+   * Add a single model to the registry without replacing existing ones.
+   * Used for importing models via file picker or drag-and-drop.
+   * If a model with the same ID already exists, this is a no-op.
+   */
+  addModel(model: ManagedModel): void {
+    if (this.models.some((m) => m.id === model.id)) return;
+    this.models.push(model);
+    this.notifyListeners();
+  }
+
   // --- Queries ---
 
   getModels(): ManagedModel[] {

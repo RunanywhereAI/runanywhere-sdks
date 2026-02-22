@@ -21,11 +21,9 @@
 #
 # OPTIONS:
 #   --llamacpp          Include llama.cpp LLM backend
-#   --whispercpp        Include whisper.cpp STT backend
-#   --onnx              Include sherpa-onnx TTS/VAD backend
 #   --vlm               Include VLM (Vision Language Model) via llama.cpp mtmd
 #   --webgpu            Enable WebGPU GPU acceleration
-#   --all-backends      Enable all backends (llama.cpp + VLM + whisper.cpp + onnx)
+#   --all-backends      Enable WASM-compatible backends (llama.cpp + VLM)
 #   --debug             Debug WASM build with assertions and safe heap
 #   --pthreads          Enable pthreads (requires Cross-Origin Isolation)
 #   --clean             Clean all build artifacts before building
@@ -39,7 +37,7 @@
 #   ./scripts/build-web.sh
 #
 #   # Build WASM with specific backends
-#   ./scripts/build-web.sh --build-wasm --llamacpp --onnx
+#   ./scripts/build-web.sh --build-wasm --llamacpp --vlm
 #
 #   # Build only TypeScript (after WASM is already built)
 #   ./scripts/build-web.sh --build-ts
@@ -67,7 +65,7 @@ WASM_DIR="${WEB_SDK_DIR}/wasm"
 WASM_BUILD_SCRIPT="${WASM_DIR}/scripts/build.sh"
 WASM_SETUP_SCRIPT="${WASM_DIR}/scripts/setup-emsdk.sh"
 WASM_SHERPA_SCRIPT="${WASM_DIR}/scripts/build-sherpa-onnx.sh"
-WASM_OUTPUT_DIR="${WEB_SDK_DIR}/packages/core/wasm"
+WASM_OUTPUT_DIR="${WEB_SDK_DIR}/packages/llamacpp/wasm"
 TS_OUTPUT_DIR="${WEB_SDK_DIR}/packages/core/dist"
 
 # Defaults
@@ -120,7 +118,39 @@ log_error() {
 # =============================================================================
 
 show_help() {
-    head -56 "$0" | tail -51
+    cat <<'HELPEOF'
+RunAnywhere Web SDK — Build Script
+
+FIRST TIME SETUP:
+  cd sdk/runanywhere-web
+  ./scripts/build-web.sh --setup
+
+COMMANDS:
+  --setup             First-time setup: install emsdk, npm install, build all
+                      (CPU WASM + WebGPU WASM + Sherpa-ONNX + TypeScript)
+  --build-wasm        Build WASM module only (core racommons)
+  --build-ts          Build TypeScript only
+  --build-sherpa      Build sherpa-onnx WASM module (STT/TTS/VAD)
+
+OPTIONS:
+  --llamacpp          Include llama.cpp LLM backend
+  --vlm               Include VLM (Vision Language Model) via llama.cpp mtmd
+  --webgpu            Enable WebGPU GPU acceleration
+  --all-backends      Enable WASM-compatible backends (llama.cpp + VLM)
+  --debug             Debug WASM build with assertions and safe heap
+  --pthreads          Enable pthreads (requires Cross-Origin Isolation)
+  --clean             Clean all build artifacts before building
+  --help              Show this help message
+
+EXAMPLES:
+  ./scripts/build-web.sh --setup                    # First-time full build
+  ./scripts/build-web.sh                            # Rebuild all (WASM + TS)
+  ./scripts/build-web.sh --build-wasm --llamacpp    # WASM with llama.cpp only
+  ./scripts/build-web.sh --build-ts                 # TypeScript only
+  ./scripts/build-web.sh --build-sherpa             # Sherpa-ONNX only
+  ./scripts/build-web.sh --clean --all-backends     # Clean rebuild
+  ./scripts/build-web.sh --debug --llamacpp         # Debug build
+HELPEOF
     exit 0
 }
 
@@ -153,12 +183,6 @@ for arg in "$@"; do
             ;;
         --llamacpp)
             WASM_FLAGS+=("--llamacpp")
-            ;;
-        --whispercpp)
-            WASM_FLAGS+=("--whispercpp")
-            ;;
-        --onnx)
-            WASM_FLAGS+=("--onnx")
             ;;
         --vlm)
             WASM_FLAGS+=("--vlm")
@@ -296,17 +320,26 @@ clean_all() {
         rm -rf "${WASM_DIR}/build-sherpa-onnx"
     fi
 
-    # Clean WASM output
+    # Clean WASM output (llamacpp)
     if [ -d "${WASM_OUTPUT_DIR}" ]; then
-        log_step "Cleaning WASM outputs (packages/core/wasm/)"
+        log_step "Cleaning WASM outputs (packages/llamacpp/wasm/)"
         rm -f "${WASM_OUTPUT_DIR}"/*.wasm "${WASM_OUTPUT_DIR}"/*.js 2>/dev/null || true
     fi
 
-    # Clean TypeScript output
-    if [ -d "${TS_OUTPUT_DIR}" ]; then
-        log_step "Removing TypeScript output (packages/core/dist/)"
-        rm -rf "${TS_OUTPUT_DIR}"
+    # Clean sherpa-onnx WASM output
+    local sherpa_output="${WEB_SDK_DIR}/packages/onnx/wasm/sherpa"
+    if [ -d "${sherpa_output}" ]; then
+        log_step "Cleaning sherpa-onnx outputs (packages/onnx/wasm/sherpa/)"
+        rm -f "${sherpa_output}"/sherpa-onnx.wasm "${sherpa_output}"/sherpa-onnx-glue.js 2>/dev/null || true
     fi
+
+    # Clean TypeScript output for all packages
+    for pkg_dist in "${WEB_SDK_DIR}/packages/core/dist" "${WEB_SDK_DIR}/packages/llamacpp/dist" "${WEB_SDK_DIR}/packages/onnx/dist"; do
+        if [ -d "${pkg_dist}" ]; then
+            log_step "Removing ${pkg_dist#"${WEB_SDK_DIR}"/}"
+            rm -rf "${pkg_dist}"
+        fi
+    done
 
     log_info "All build artifacts cleaned"
 }
@@ -327,11 +360,11 @@ build_wasm() {
     log_step "Running wasm/scripts/build.sh ${flags[*]}"
     bash "${WASM_BUILD_SCRIPT}" "${flags[@]}"
 
-    # Verify output
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.wasm" ]; then
+    # Verify output — check for either CPU or WebGPU variant
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" ] || [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" ]; then
         log_info "WASM build successful"
     else
-        log_error "WASM build failed - racommons.wasm not found"
+        log_error "WASM build failed - no racommons-llamacpp*.wasm found in ${WASM_OUTPUT_DIR}"
         exit 1
     fi
 }
@@ -350,13 +383,22 @@ build_typescript() {
     log_step "Compiling TypeScript..."
     npm run build:ts
 
-    # Verify output
-    if [ -d "${TS_OUTPUT_DIR}" ]; then
-        log_info "TypeScript build successful"
-    else
-        log_error "TypeScript build failed - dist/ not found"
+    # Verify output for all packages
+    local ts_ok=true
+    if [ ! -d "${TS_OUTPUT_DIR}" ]; then
+        log_error "TypeScript build failed - core dist/ not found"
+        ts_ok=false
+    fi
+    if [ ! -d "${WEB_SDK_DIR}/packages/llamacpp/dist" ]; then
+        log_warn "llamacpp dist/ not found — may not have been built"
+    fi
+    if [ ! -d "${WEB_SDK_DIR}/packages/onnx/dist" ]; then
+        log_warn "onnx dist/ not found — may not have been built"
+    fi
+    if [ "$ts_ok" = false ]; then
         exit 1
     fi
+    log_info "TypeScript build successful"
 }
 
 build_sherpa() {
@@ -388,26 +430,29 @@ print_summary() {
     echo ""
     echo "  Artifacts:"
 
-    # WASM artifacts
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.wasm" ]; then
+    # WASM artifacts (llamacpp backend)
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" ]; then
         local wasm_size
-        wasm_size=$(du -h "${WASM_OUTPUT_DIR}/racommons.wasm" | cut -f1)
-        echo "    racommons.wasm:       ${wasm_size}"
+        wasm_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp.wasm" | cut -f1)
+        echo "    racommons-llamacpp.wasm:       ${wasm_size}"
     fi
-    if [ -f "${WASM_OUTPUT_DIR}/racommons.js" ]; then
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp.js" ]; then
         local js_size
-        js_size=$(du -h "${WASM_OUTPUT_DIR}/racommons.js" | cut -f1)
-        echo "    racommons.js:         ${js_size}"
+        js_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp.js" | cut -f1)
+        echo "    racommons-llamacpp.js:         ${js_size}"
     fi
-    if [ -f "${WASM_OUTPUT_DIR}/racommons-webgpu.wasm" ]; then
+    if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" ]; then
         local webgpu_size
-        webgpu_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-webgpu.wasm" | cut -f1)
-        echo "    racommons-webgpu.wasm: ${webgpu_size}"
+        webgpu_size=$(du -h "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" | cut -f1)
+        echo "    racommons-llamacpp-webgpu.wasm: ${webgpu_size}"
     fi
-    if [ -f "${WASM_OUTPUT_DIR}/sherpa/sherpa-onnx.wasm" ]; then
+    local sherpa_wasm="${WEB_SDK_DIR}/packages/onnx/wasm/sherpa/sherpa-onnx.wasm"
+    if [ -f "${sherpa_wasm}" ]; then
         local sherpa_size
-        sherpa_size=$(du -h "${WASM_OUTPUT_DIR}/sherpa/sherpa-onnx.wasm" | cut -f1)
-        echo "    sherpa-onnx.wasm:     ${sherpa_size}"
+        sherpa_size=$(du -h "${sherpa_wasm}" | cut -f1)
+        echo "    sherpa-onnx.wasm:              ${sherpa_size}"
+    else
+        echo "    sherpa-onnx.wasm:              (not built — STT/TTS/VAD unavailable)"
     fi
 
     # TypeScript artifacts
@@ -419,15 +464,21 @@ print_summary() {
 
     echo ""
     echo "  Output locations:"
-    echo "    WASM:       packages/core/wasm/"
-    echo "    TypeScript: packages/core/dist/"
+    echo "    LLM/VLM WASM:   packages/llamacpp/wasm/"
+    echo "    STT/TTS/VAD:    packages/onnx/wasm/sherpa/"
+    echo "    TypeScript:     packages/core/dist/ + packages/llamacpp/dist/ + packages/onnx/dist/"
     echo ""
 
     if [ "$SETUP_MODE" = true ]; then
-        echo "  Next steps:"
-        echo "    1. Activate emsdk (if not already): source emsdk/emsdk_env.sh"
-        echo "    2. Run the example app:  cd ../../examples/web/RunAnywhereAI && npm run dev"
-        echo "    3. Rebuild after C++ changes: ./scripts/build-web.sh --build-wasm --all-backends"
+        echo "  Next steps — run the example app:"
+        echo "    cd ../../examples/web/RunAnywhereAI"
+        echo "    npm install"
+        echo "    npm run dev"
+        echo ""
+        echo "  Rebuild commands:"
+        echo "    WASM only:        ./scripts/build-web.sh --build-wasm --all-backends"
+        echo "    TypeScript only:  ./scripts/build-web.sh --build-ts"
+        echo "    Sherpa-ONNX only: ./scripts/build-web.sh --build-sherpa"
         echo ""
     fi
 }
@@ -466,7 +517,37 @@ main() {
         if [ ${#WASM_FLAGS[@]} -eq 0 ]; then
             WASM_FLAGS+=("--all-backends")
         fi
+
+        # Build CPU variant
         build_wasm
+
+        # Build WebGPU variant (separate build dir, separate output binary)
+        log_header "Building WebGPU WASM Variant"
+        local webgpu_flags=("${WASM_FLAGS[@]}" "--webgpu")
+        if [ "$CLEAN_BUILD" = true ]; then
+            webgpu_flags+=("--clean")
+        fi
+        log_step "Running wasm/scripts/build.sh ${webgpu_flags[*]}"
+        bash "${WASM_BUILD_SCRIPT}" "${webgpu_flags[@]}"
+        if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" ]; then
+            log_info "WebGPU WASM build successful"
+        else
+            log_warn "WebGPU WASM build failed — app will fall back to CPU"
+        fi
+
+        # Build sherpa-onnx WASM (STT/TTS/VAD). Non-fatal — LLM/VLM still work without it.
+        if [ -f "${WASM_SHERPA_SCRIPT}" ]; then
+            log_header "Building Sherpa-ONNX WASM Module (STT/TTS/VAD)"
+            if bash "${WASM_SHERPA_SCRIPT}"; then
+                log_info "Sherpa-ONNX WASM build successful"
+            else
+                log_warn "Sherpa-ONNX build failed — STT/TTS/VAD will not be available"
+                log_warn "You can retry later with: ./scripts/build-web.sh --build-sherpa"
+            fi
+        else
+            log_warn "Sherpa-ONNX build script not found — skipping STT/TTS/VAD build"
+        fi
+
         build_typescript
         print_summary
         return 0
@@ -475,6 +556,30 @@ main() {
     # Individual build commands
     if [ "$BUILD_WASM" = true ]; then
         build_wasm
+
+        # When building with default flags (--all-backends), also build WebGPU variant
+        # so both CPU fallback and GPU-accelerated binaries are available.
+        local has_webgpu=false
+        for f in "${WASM_FLAGS[@]}"; do
+            [[ "$f" == "--webgpu" ]] && has_webgpu=true
+        done
+        if [ "$has_webgpu" = false ]; then
+            log_header "Building WebGPU WASM Variant"
+            local webgpu_flags=("${WASM_FLAGS[@]}" "--webgpu")
+            if [ "$CLEAN_BUILD" = true ]; then
+                webgpu_flags+=("--clean")
+            fi
+            log_step "Running wasm/scripts/build.sh ${webgpu_flags[*]}"
+            if bash "${WASM_BUILD_SCRIPT}" "${webgpu_flags[@]}"; then
+                if [ -f "${WASM_OUTPUT_DIR}/racommons-llamacpp-webgpu.wasm" ]; then
+                    log_info "WebGPU WASM build successful"
+                else
+                    log_warn "WebGPU WASM build produced no output — app will fall back to CPU"
+                fi
+            else
+                log_warn "WebGPU WASM build failed — app will fall back to CPU"
+            fi
+        fi
     fi
 
     if [ "$BUILD_SHERPA" = true ]; then

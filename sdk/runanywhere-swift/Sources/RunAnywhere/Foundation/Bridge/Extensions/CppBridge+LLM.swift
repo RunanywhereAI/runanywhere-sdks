@@ -88,6 +88,71 @@ extension CppBridge {
             rac_llm_component_cancel(handle)
         }
 
+        // MARK: - LoRA Adapter Management
+
+        /// Load and apply a LoRA adapter to the currently loaded model
+        public func loadLoraAdapter(_ config: LoRAAdapterConfig) throws {
+            let handle = try getHandle()
+            let result = config.path.withCString { pathPtr in
+                rac_llm_component_load_lora(handle, pathPtr, config.scale)
+            }
+            guard result == RAC_SUCCESS else {
+                throw SDKError.llm(.modelLoadFailed, "Failed to load LoRA adapter: \(result)")
+            }
+            logger.info("LoRA adapter loaded: \(config.path) (scale=\(config.scale))")
+        }
+
+        /// Remove a specific LoRA adapter by path
+        public func removeLoraAdapter(_ path: String) throws {
+            guard let handle = handle else {
+                throw SDKError.llm(.invalidState, "No LLM component active")
+            }
+            let result = path.withCString { pathPtr in
+                rac_llm_component_remove_lora(handle, pathPtr)
+            }
+            guard result == RAC_SUCCESS else {
+                throw SDKError.llm(.invalidState, "Failed to remove LoRA adapter: \(result)")
+            }
+            logger.info("LoRA adapter removed: \(path)")
+        }
+
+        /// Remove all LoRA adapters
+        public func clearLoraAdapters() throws {
+            guard let handle = handle else {
+                throw SDKError.llm(.invalidState, "No LLM component active")
+            }
+            let result = rac_llm_component_clear_lora(handle)
+            guard result == RAC_SUCCESS else {
+                throw SDKError.llm(.invalidState, "Failed to clear LoRA adapters: \(result)")
+            }
+            logger.info("All LoRA adapters cleared")
+        }
+
+        /// Get info about all loaded LoRA adapters
+        public func getLoadedLoraAdapters() throws -> [LoRAAdapterInfo] {
+            guard let handle = handle else { return [] }
+            var jsonPtr: UnsafeMutablePointer<CChar>?
+            let result = rac_llm_component_get_lora_info(handle, &jsonPtr)
+            guard result == RAC_SUCCESS, let ptr = jsonPtr else {
+                return []
+            }
+            defer { rac_free(ptr) }
+
+            let jsonString = String(cString: ptr)
+            guard let data = jsonString.data(using: .utf8),
+                  let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                logger.error("Failed to parse LoRA info JSON")
+                return []
+            }
+
+            return array.compactMap { dict in
+                guard let path = dict["path"] as? String,
+                      let scale = dict["scale"] as? Double,
+                      let applied = dict["applied"] as? Bool else { return nil }
+                return LoRAAdapterInfo(path: path, scale: Float(scale), applied: applied)
+            }
+        }
+
         // MARK: - Cleanup
 
         /// Destroy the component

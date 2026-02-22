@@ -3,11 +3,10 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    "declarationDir": "./dist/types",
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "wasm"]
+  "exclude": ["node_modules", "dist", "wasm", "**/*.test.ts", "**/*.spec.ts", "**/*.test-d.ts"]
 }

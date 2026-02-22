@@ -1206,6 +1206,28 @@ abstract class RacToolParamType {
 }
 
 // =============================================================================
+// Structured Output FFI Types (from rac_llm_types.h)
+// =============================================================================
+
+/// Structured output config struct - matches rac_structured_output_config_t
+final class RacStructuredOutputConfigStruct extends Struct {
+  external Pointer<Utf8> jsonSchema;
+
+  @Int32()
+  external int includeSchemaInPrompt;
+}
+
+/// Structured output validation struct - matches rac_structured_output_validation_t
+final class RacStructuredOutputValidationStruct extends Struct {
+  @Int32()
+  external int isValid;
+
+  external Pointer<Utf8> errorMessage;
+
+  external Pointer<Utf8> extractedJson;
+}
+
+// =============================================================================
 // Backward Compatibility Aliases
 // =============================================================================
 

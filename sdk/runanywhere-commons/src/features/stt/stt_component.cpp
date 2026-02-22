@@ -44,7 +44,10 @@ struct rac_stt_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    rac_stt_component() : lifecycle(nullptr) {
+    /** Resolved inference framework (defaults to ONNX, the primary STT backend) */
+    rac_inference_framework_t actual_framework;
+
+    rac_stt_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_ONNX) {
         // Initialize with defaults - matches rac_stt_types.h rac_stt_config_t
         config = RAC_STT_CONFIG_DEFAULT;
 
@@ -174,6 +177,14 @@ extern "C" rac_result_t rac_stt_component_configure(rac_handle_t handle,
 
     component->config = *config;
 
+    // Resolve actual framework: if caller explicitly set one (not -1=auto), use it;
+    // otherwise keep the default (RAC_FRAMEWORK_ONNX for STT components)
+    if (config->preferred_framework >= 0 &&
+        config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
+        component->actual_framework =
+            static_cast<rac_inference_framework_t>(config->preferred_framework);
+    }
+
     // Update default options based on config
     if (config->language) {
         component->default_options.language = config->language;
@@ -230,8 +241,50 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Emit model load started event
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_MODEL_LOAD_STARTED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_STARTED, &event);
+    }
+
+    auto load_start = std::chrono::steady_clock::now();
+
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
+    rac_result_t result =
+        rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
+
+    double load_duration_ms = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                              load_start)
+            .count());
+
+    if (result != RAC_SUCCESS) {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_MODEL_LOAD_FAILED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = result;
+        event.data.llm_model.error_message = "Model load failed";
+        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_FAILED, &event);
+    } else {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_STT_MODEL_LOAD_COMPLETED;
+        event.data.llm_model.model_id = model_id;
+        event.data.llm_model.model_name = model_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_STT_MODEL_LOAD_COMPLETED, &event);
+    }
+
+    return result;
 }
 
 extern "C" rac_result_t rac_stt_component_unload(rac_handle_t handle) {
@@ -325,8 +378,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription.language = effective_options->language;
         event.data.stt_transcription.is_streaming = RAC_FALSE;
         event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.stt_transcription.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
     }
 
@@ -384,8 +436,7 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription.real_time_factor = real_time_factor;
         event.data.stt_transcription.language = effective_options->language;
         event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.stt_transcription.framework = component->actual_framework;
         event.data.stt_transcription.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
     }
@@ -477,8 +528,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         event.data.stt_transcription.language = effective_options->language;
         event.data.stt_transcription.is_streaming = RAC_TRUE;  // Streaming mode!
         event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.stt_transcription.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
     }
 
@@ -527,8 +577,7 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
         event.data.stt_transcription.real_time_factor = real_time_factor;
         // word_count not available for streaming - text is delivered via callbacks
         event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.stt_transcription.framework = component->actual_framework;
         event.data.stt_transcription.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
     }

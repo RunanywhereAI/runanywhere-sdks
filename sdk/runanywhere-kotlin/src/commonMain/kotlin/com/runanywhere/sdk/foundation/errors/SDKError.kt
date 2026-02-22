@@ -629,6 +629,47 @@ data class SDKError(
         }
 
         // ========================================================================
+        // VLM ERROR FACTORIES
+        // ========================================================================
+
+        /**
+         * Create a VLM (Vision Language Model) error.
+         *
+         * @param message The error message
+         * @param code The specific error code (defaults to VLM_PROCESSING_FAILED)
+         * @param cause The underlying throwable cause
+         * @return An SDKError with VLM category
+         */
+        fun vlm(
+            message: String,
+            code: ErrorCode = ErrorCode.VLM_PROCESSING_FAILED,
+            cause: Throwable? = null,
+        ): SDKError =
+            SDKError(
+                code = code,
+                category = ErrorCategory.VLM,
+                message = message,
+                cause = cause,
+            )
+
+        /**
+         * Create a VLM processing failed error.
+         *
+         * @param reason The reason for the failure (optional)
+         * @param cause The underlying throwable cause
+         * @return An SDKError with VLM_PROCESSING_FAILED code
+         */
+        fun vlmProcessingFailed(reason: String? = null, cause: Throwable? = null): SDKError {
+            val message =
+                if (reason != null) {
+                    "VLM processing failed: $reason"
+                } else {
+                    "VLM processing failed"
+                }
+            return vlm(message, ErrorCode.VLM_PROCESSING_FAILED, cause)
+        }
+
+        // ========================================================================
         // VOICE AGENT ERROR FACTORIES
         // ========================================================================
 

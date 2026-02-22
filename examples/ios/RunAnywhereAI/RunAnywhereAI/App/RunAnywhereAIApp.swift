@@ -192,6 +192,17 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 600_000_000
             )
         }
+        // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
+        // TODO: [Portal Integration] Remove once portal delivers model + adapter pairings
+        if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-1.5b-instruct-q4_k_m",
+                name: "Qwen 2.5 1.5B Instruct Q4_K_M",
+                url: qwen15BURL,
+                framework: .llamaCpp,
+                memoryRequirement: 2_500_000_000
+            )
+        }
         if let lfm2Q4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "lfm2-350m-q4_k_m",
@@ -265,6 +276,22 @@ struct RunAnywhereAIApp: App {
                 framework: .llamaCpp,
                 modality: .multimodal,
                 memoryRequirement: 1_800_000_000
+            )
+        }
+        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+        // Uses multi-file download: main model + mmproj from HuggingFace
+        if let lfm2MainURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf"),
+           let lfm2MmprojURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
+                id: "lfm2-vl-450m-q8_0",
+                name: "LFM2-VL 450M",
+                files: [
+                    ModelFileDescriptor(url: lfm2MainURL, filename: "LFM2-VL-450M-Q8_0.gguf"),
+                    ModelFileDescriptor(url: lfm2MmprojURL, filename: "mmproj-LFM2-VL-450M-Q8_0.gguf")
+                ],
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 600_000_000
             )
         }
         logger.info("✅ VLM models registered")

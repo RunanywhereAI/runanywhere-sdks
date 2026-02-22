@@ -249,14 +249,42 @@ Full-featured demo applications demonstrating SDK capabilities:
 
 ---
 
+## Starter Examples
+
+Minimal starter projects to get up and running with RunAnywhere on each platform:
+
+| Platform | Repository |
+|----------|------------|
+| Kotlin (Android) | [RunanywhereAI/kotlin-starter-example](https://github.com/RunanywhereAI/kotlin-starter-example) |
+| Swift (iOS) | [RunanywhereAI/swift-starter-example](https://github.com/RunanywhereAI/swift-starter-example) |
+| Flutter | [RunanywhereAI/flutter-starter-example](https://github.com/RunanywhereAI/flutter-starter-example) |
+| React Native | [RunanywhereAI/react-native-starter-app](https://github.com/RunanywhereAI/react-native-starter-app) |
+
+---
+
 ## Playground
 
-Standalone demo projects showcasing what you can build with RunAnywhere:
+Real-world projects built with RunAnywhere that push the boundaries of on-device AI. Each one ships as a standalone app you can build and run.
 
-| Project | Description | Platform |
-|---------|-------------|----------|
-| [swift-starter-app](Playground/swift-starter-app/) | Privacy-first AI demo — LLM Chat, STT, TTS, and Voice Pipeline | iOS (Swift/SwiftUI) |
-| [on-device-browser-agent](Playground/on-device-browser-agent/) | On-device AI browser automation — no cloud, no API keys | Chrome Extension |
+### [Android Use Agent](Playground/android-use-agent/)
+
+A fully on-device autonomous Android agent that controls your phone. Give it a goal like "Open YouTube and search for lofi music" and it reads the screen via the Accessibility API, reasons about the next action with an on-device LLM (Qwen3-4B), and executes taps, swipes, and text input -- all without any cloud calls. Includes a Samsung foreground boost that delivers a 15x inference speedup, smart pre-launch via Android intents, and loop detection with automatic recovery. Benchmarked across four LLM models on a Galaxy S24. **[Full benchmarks](Playground/android-use-agent/ASSESSMENT.md)**
+
+### [On-Device Browser Agent](Playground/on-device-browser-agent/)
+
+A Chrome extension that automates browser tasks entirely on-device using WebLLM and WebGPU. Uses a two-agent architecture -- a Planner that breaks down goals into steps and a Navigator that interacts with page elements -- with both DOM-based and vision-based page understanding. Includes site-specific workflows for Amazon, YouTube, and more. All AI inference runs locally on your GPU after the initial model download.
+
+### [Swift Starter App](Playground/swift-starter-app/)
+
+A full-featured iOS app demonstrating the RunAnywhere SDK's core AI capabilities in a clean SwiftUI interface. Includes LLM chat with on-device language models, Whisper-powered speech-to-text, neural text-to-speech, and a complete voice pipeline that chains STT, LLM, and TTS together with voice activity detection. A good starting point for building privacy-first AI features on iOS.
+
+### [Linux Voice Assistant](Playground/linux-voice-assistant/)
+
+A complete on-device voice AI pipeline for Linux (Raspberry Pi 5, x86_64, ARM64). Say "Hey Jarvis" to activate, speak naturally, and get responses -- all running locally with zero cloud dependency. Chains Wake Word detection (openWakeWord), Voice Activity Detection (Silero VAD), Speech-to-Text (Whisper Tiny EN), LLM reasoning (Qwen2.5 0.5B Q4), and Text-to-Speech (Piper neural TTS) in a single C++ binary.
+
+### [OpenClaw Hybrid Assistant](Playground/openclaw-hybrid-assistant/)
+
+A hybrid voice assistant that keeps latency-sensitive components on-device (wake word, VAD, STT, TTS) while routing reasoning to a cloud LLM via OpenClaw WebSocket. Supports barge-in (interrupt TTS by saying the wake word), waiting chimes for cloud response feedback, and noise-robust VAD with burst filtering. Built for scenarios where on-device LLMs are too slow but you still want private audio processing.
 
 ---
 
@@ -326,7 +354,10 @@ runanywhere-sdks/
 │
 ├── Playground/
 │   ├── swift-starter-app/          # iOS AI playground app
-│   └── on-device-browser-agent/    # Chrome browser automation agent
+│   ├── on-device-browser-agent/    # Chrome browser automation agent
+│   ├── android-use-agent/          # On-device autonomous Android agent
+│   ├── linux-voice-assistant/      # Linux on-device voice assistant
+│   └── openclaw-hybrid-assistant/  # Hybrid voice assistant (on-device + cloud)
 │
 └── docs/                           # Documentation
 ```

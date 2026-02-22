@@ -441,7 +441,7 @@ class VoiceAssistantViewModel(
         isPlayingAudio = true
 
         _uiState.update {
-            it.copy(sessionState = SessionState.PROCESSING) // Show as "speaking"
+            it.copy(sessionState = SessionState.SPEAKING)
         }
 
         audioPlaybackJob =
@@ -906,7 +906,7 @@ class VoiceAssistantViewModel(
 
             is VoiceSessionEvent.Speaking -> {
                 Log.d(TAG, "Playing TTS audio")
-                _uiState.update { it.copy(sessionState = SessionState.PROCESSING) }
+                _uiState.update { it.copy(sessionState = SessionState.SPEAKING) }
             }
 
             is VoiceSessionEvent.TurnCompleted -> {

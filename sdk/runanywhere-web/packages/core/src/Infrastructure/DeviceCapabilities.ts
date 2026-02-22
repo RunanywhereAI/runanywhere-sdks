@@ -38,12 +38,9 @@ export interface WebCapabilities {
  * Detect all browser capabilities relevant to AI inference.
  */
 export async function detectCapabilities(): Promise<WebCapabilities> {
-  // Import WASMBridge lazily to avoid circular imports at module level
-  const { WASMBridge } = await import('../Foundation/WASMBridge');
-
   const capabilities: WebCapabilities = {
     hasWebGPU: false,
-    activeAcceleration: WASMBridge.shared.isLoaded ? WASMBridge.shared.accelerationMode : 'cpu',
+    activeAcceleration: 'cpu',
     hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
     isCrossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : false,
     hasWASMSIMD: detectWASMSIMD(),
@@ -82,6 +79,16 @@ export async function detectCapabilities(): Promise<WebCapabilities> {
     `Memory=${capabilities.deviceMemoryGB}GB, ` +
     `Cores=${capabilities.hardwareConcurrency}`,
   );
+
+  if (!capabilities.isCrossOriginIsolated) {
+    logger.warning(
+      'Cross-Origin Isolation is NOT enabled. SharedArrayBuffer and multi-threaded WASM ' +
+      'will be unavailable. Set these HTTP headers on your server:\n' +
+      '  Cross-Origin-Opener-Policy: same-origin\n' +
+      '  Cross-Origin-Embedder-Policy: credentialless\n' +
+      'See: https://github.com/AnywhereAI/runanywhere-sdks/tree/main/sdk/runanywhere-web#cross-origin-isolation-headers',
+    );
+  }
 
   return capabilities;
 }
