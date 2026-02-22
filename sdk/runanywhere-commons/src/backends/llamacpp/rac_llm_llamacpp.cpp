@@ -294,6 +294,58 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
 }
 
+rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+                                                          const rac_llm_options_t* options,
+                                                          rac_llm_llamacpp_stream_callback_fn callback,
+                                                          void* user_data,
+                                                          rac_benchmark_timing_t* timing_out) {
+    if (handle == nullptr || prompt == nullptr || callback == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    runanywhere::TextGenerationRequest request;
+    request.prompt = prompt;
+    if (options != nullptr) {
+        request.max_tokens = options->max_tokens;
+        request.temperature = options->temperature;
+        request.top_p = options->top_p;
+        if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
+            for (int32_t i = 0; i < options->num_stop_sequences; i++) {
+                if (options->stop_sequences[i]) {
+                    request.stop_sequences.push_back(options->stop_sequences[i]);
+                }
+            }
+        }
+    }
+
+    // Stream using C++ class with timing
+    int prompt_tokens = 0;
+    bool success = h->text_gen->generate_stream_with_timing(
+        request,
+        [callback, user_data](const std::string& token) -> bool {
+            return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+        },
+        &prompt_tokens,
+        timing_out
+    );
+
+    // Capture prompt token count in timing struct
+    if (timing_out != nullptr && prompt_tokens > 0) {
+        timing_out->prompt_tokens = static_cast<int32_t>(prompt_tokens);
+    }
+
+    if (success) {
+        callback("", RAC_TRUE, user_data);  // Final token
+    }
+
+    return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+}
+
 void rac_llm_llamacpp_cancel(rac_handle_t handle) {
     if (handle == nullptr) {
         return;

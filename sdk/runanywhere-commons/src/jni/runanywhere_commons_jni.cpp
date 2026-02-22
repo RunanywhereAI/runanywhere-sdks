@@ -25,6 +25,7 @@
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -1050,6 +1051,137 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     std::string json = json_obj.dump();
 
     LOGi("racLlmComponentGenerateStreamWithCallback returning JSON: %zu bytes", json.length());
+
+    return env->NewStringUTF(json.c_str());
+}
+
+// ========================================================================
+// STREAMING WITH KOTLIN CALLBACK AND BENCHMARK TIMING
+// ========================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerateStreamWithTiming(
+    JNIEnv* env, jclass clazz, jlong handle, jstring prompt, jstring configJson,
+    jobject tokenCallback) {
+    LOGi("racLlmComponentGenerateStreamWithTiming called with handle=%lld", (long long)handle);
+
+    if (handle == 0) {
+        LOGe("racLlmComponentGenerateStreamWithTiming: invalid handle");
+        return nullptr;
+    }
+
+    if (!tokenCallback) {
+        LOGe("racLlmComponentGenerateStreamWithTiming: null callback");
+        return nullptr;
+    }
+
+    std::string promptStr = getCString(env, prompt);
+    LOGi("racLlmComponentGenerateStreamWithTiming prompt length=%zu", promptStr.length());
+
+    std::string configStorage;
+    const char* config = getNullableCString(env, configJson, configStorage);
+
+    // Get JVM and callback method
+    JavaVM* jvm = nullptr;
+    env->GetJavaVM(&jvm);
+
+    jclass callbackClass = env->GetObjectClass(tokenCallback);
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+    env->DeleteLocalRef(callbackClass);
+
+    if (!onTokenMethod) {
+        LOGe("racLlmComponentGenerateStreamWithTiming: could not find onToken method");
+        return nullptr;
+    }
+
+    // Create global ref to callback to ensure it survives across threads
+    jobject globalCallback = env->NewGlobalRef(tokenCallback);
+
+    // Parse config for options
+    rac_llm_options_t options = {};
+    options.max_tokens = 512;
+    options.temperature = 0.7f;
+    options.top_p = 1.0f;
+    options.streaming_enabled = RAC_TRUE;
+
+    // Create streaming callback context
+    LLMStreamCallbackContext ctx;
+    ctx.jvm = jvm;
+    ctx.callback = globalCallback;
+    ctx.onTokenMethod = onTokenMethod;
+
+    // Initialize benchmark timing struct
+    rac_benchmark_timing_t timing = {};
+    rac_benchmark_timing_init(&timing);
+
+    LOGi("racLlmComponentGenerateStreamWithTiming calling rac_llm_component_generate_stream_with_timing...");
+
+    rac_result_t status = rac_llm_component_generate_stream_with_timing(
+        reinterpret_cast<rac_handle_t>(handle), promptStr.c_str(), &options,
+        llm_stream_callback_token, llm_stream_callback_complete, llm_stream_callback_error, &ctx,
+        &timing);
+
+    // Clean up global ref
+    env->DeleteGlobalRef(globalCallback);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("rac_llm_component_generate_stream_with_timing failed with status=%d", status);
+        return nullptr;
+    }
+
+    if (ctx.has_error) {
+        LOGe("Streaming with timing failed: %s", ctx.error_message.c_str());
+        return nullptr;
+    }
+
+    LOGi("racLlmComponentGenerateStreamWithTiming result text length=%zu, tokens=%d",
+         ctx.accumulated_text.length(), ctx.token_count);
+
+    // Build JSON result with timing
+    std::string json = "{";
+    json += "\"text\":\"";
+    for (char c : ctx.accumulated_text) {
+        switch (c) {
+            case '"':
+                json += "\\\"";
+                break;
+            case '\\':
+                json += "\\\\";
+                break;
+            case '\n':
+                json += "\\n";
+                break;
+            case '\r':
+                json += "\\r";
+                break;
+            case '\t':
+                json += "\\t";
+                break;
+            default:
+                json += c;
+                break;
+        }
+    }
+    json += "\",";
+    json += "\"tokens_generated\":" + std::to_string(ctx.final_result.completion_tokens) + ",";
+    json += "\"tokens_evaluated\":" + std::to_string(ctx.final_result.prompt_tokens) + ",";
+    json += "\"stop_reason\":" + std::to_string(0) + ",";
+    json += "\"total_time_ms\":" + std::to_string(ctx.final_result.total_time_ms) + ",";
+    json += "\"tokens_per_second\":" + std::to_string(ctx.final_result.tokens_per_second) + ",";
+    // Add benchmark timing fields
+    json += "\"t0_request_start_ms\":" + std::to_string(timing.t0_request_start_ms) + ",";
+    json += "\"t2_prefill_start_ms\":" + std::to_string(timing.t2_prefill_start_ms) + ",";
+    json += "\"t3_prefill_end_ms\":" + std::to_string(timing.t3_prefill_end_ms) + ",";
+    json += "\"t4_first_token_ms\":" + std::to_string(timing.t4_first_token_ms) + ",";
+    json += "\"t5_last_token_ms\":" + std::to_string(timing.t5_last_token_ms) + ",";
+    json += "\"t6_request_end_ms\":" + std::to_string(timing.t6_request_end_ms) + ",";
+    json += "\"prompt_tokens\":" + std::to_string(timing.prompt_tokens) + ",";
+    json += "\"output_tokens\":" + std::to_string(timing.output_tokens) + ",";
+    json += "\"benchmark_status\":" + std::to_string(timing.status) + ",";
+    json += "\"benchmark_error_code\":" + std::to_string(timing.error_code);
+    json += "}";
+
+    LOGi("racLlmComponentGenerateStreamWithTiming returning JSON: %zu bytes", json.length());
 
     return env->NewStringUTF(json.c_str());
 }
