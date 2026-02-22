@@ -29,8 +29,8 @@ data class RAGConfiguration(
     /** Number of top chunks to retrieve per query (default: 3) */
     val topK: Int = 3,
 
-    /** Minimum cosine similarity threshold 0.0–1.0 (default: 0.3) */
-    val similarityThreshold: Float = 0.3f,
+    /** Minimum cosine similarity threshold 0.0–1.0 (default: 0.15) */
+    val similarityThreshold: Float = 0.15f,
 
     /** Maximum tokens to use for context sent to the LLM (default: 2048) */
     val maxContextTokens: Int = 2048,
