@@ -6,6 +6,7 @@
 //  Conforms to SwiftSTTHandler so RunAnywhere core can route to it.
 //
 
+import Accelerate
 import CoreML
 import Foundation
 import RunAnywhere
@@ -23,6 +24,16 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
 
     private let logger = SDKLogger(category: "WhisperKitSTTService")
 
+    /// Peak amplitude target for normalization. Audio with peaks below
+    /// `normalizationThreshold` is scaled so its peak reaches this level.
+    /// 0.9 leaves headroom to avoid clipping.
+    private let normalizationTarget: Float = 0.9
+
+    /// Audio quieter than this peak amplitude is considered too quiet and
+    /// will be normalized. The `.measurement` audio session mode disables
+    /// AGC, so normal-volume speech often arrives at ~0.03-0.05 peak.
+    private let normalizationThreshold: Float = 0.1
+
     private var whisperKit: WhisperKit?
     public private(set) var currentModelId: String?
 
@@ -33,7 +44,6 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
     // MARK: - Model Loading
 
     public func loadModel(modelId: String, modelFolder: String) async throws {
-        // Unload existing model if one is loaded
         if whisperKit != nil {
             await unloadModel()
         }
@@ -74,28 +84,34 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
         let startTime = Date()
         let modelId = currentModelId ?? "unknown"
 
-        // Convert Int16 PCM data to [Float] normalized to [-1.0, 1.0]
-        let floatSamples = convertInt16PCMToFloat(audioData)
+        var floatSamples = convertInt16PCMToFloat(audioData)
 
-        // Build decode options from STTOptions
+        // Normalize quiet audio so Whisper's mel spectrogram has enough energy.
+        // The AudioCaptureManager uses .measurement mode which disables AGC,
+        // causing normal-volume speech to arrive at ~0.03-0.05 peak amplitude.
+        let peakAmplitude = peakAbs(floatSamples)
+        if peakAmplitude > 0 && peakAmplitude < normalizationThreshold {
+            let gain = normalizationTarget / peakAmplitude
+            applyGain(&floatSamples, gain: gain)
+            logger.info("Normalized audio: peak \(String(format: "%.4f", peakAmplitude)) → \(String(format: "%.4f", peakAmplitude * gain)) (gain \(String(format: "%.1f", gain))x)")
+        }
+
+        let audioDurationSec = Double(floatSamples.count) / 16000.0
+        logger.info("Transcribing \(String(format: "%.2f", audioDurationSec))s audio, peak=\(String(format: "%.4f", peakAmplitude))")
+
         var decodeOptions = DecodingOptions()
         decodeOptions.language = options.language
 
-        // Transcribe
         let results = try await kit.transcribe(
             audioArray: floatSamples,
             decodeOptions: decodeOptions
         )
 
-        let endTime = Date()
-        let processingTimeSec = endTime.timeIntervalSince(startTime)
-        let audioLengthSec = Double(floatSamples.count) / 16000.0
+        let processingTimeSec = Date().timeIntervalSince(startTime)
 
-        // Extract text from results
         let transcribedText = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
         let detectedLanguage = results.first?.language
 
-        // Extract word timestamps if available
         let wordTimestamps: [WordTimestamp]? = results.first?.segments.flatMap { segment in
             (segment.words ?? []).map { word in
                 WordTimestamp(
@@ -107,11 +123,9 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
             }
         }
 
-        // Extract confidence from segments
         let confidence: Float = {
             let segments = results.flatMap(\.segments)
             guard !segments.isEmpty else { return 0.0 }
-            // Use average no-speech probability inverted as a rough confidence
             let avgNoSpeechProb = segments.map(\.noSpeechProb).reduce(0, +) / Float(segments.count)
             return 1.0 - avgNoSpeechProb
         }()
@@ -119,8 +133,10 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
         let metadata = TranscriptionMetadata(
             modelId: modelId,
             processingTime: processingTimeSec,
-            audioLength: audioLengthSec
+            audioLength: audioDurationSec
         )
+
+        logger.info("Transcription complete (\(String(format: "%.2f", processingTimeSec))s): '\(transcribedText.prefix(80))'")
 
         return STTOutput(
             text: transcribedText,
@@ -143,13 +159,25 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
 
     // MARK: - Private Helpers
 
-    /// Convert Int16 PCM audio data to Float array normalized to [-1.0, 1.0].
-    /// Assumes 16kHz mono 16-bit PCM input (standard RunAnywhere audio format).
     private func convertInt16PCMToFloat(_ data: Data) -> [Float] {
         let sampleCount = data.count / MemoryLayout<Int16>.size
         return data.withUnsafeBytes { rawBuffer in
             let int16Buffer = rawBuffer.bindMemory(to: Int16.self)
             return (0..<sampleCount).map { Float(int16Buffer[$0]) / 32768.0 }
         }
+    }
+
+    /// Peak absolute amplitude using Accelerate (O(n) vectorized).
+    private func peakAbs(_ samples: [Float]) -> Float {
+        guard !samples.isEmpty else { return 0 }
+        var result: Float = 0
+        vDSP_maxmgv(samples, 1, &result, vDSP_Length(samples.count))
+        return result
+    }
+
+    /// In-place gain using Accelerate (O(n) vectorized).
+    private func applyGain(_ samples: inout [Float], gain: Float) {
+        var g = gain
+        vDSP_vsmul(samples, 1, &g, &samples, 1, vDSP_Length(samples.count))
     }
 }
