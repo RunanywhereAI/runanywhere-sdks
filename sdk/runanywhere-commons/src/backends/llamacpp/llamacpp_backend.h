@@ -142,6 +142,10 @@ class LlamaCppTextGeneration {
     void clear_lora_adapters();
     nlohmann::json get_lora_info() const;
 
+    // LoRA compatibility checking
+    bool check_lora_compatibility(const std::string& lora_path, std::string& error_message) const;
+    static nlohmann::json read_gguf_metadata(const std::string& path);
+
    private:
     bool unload_model_internal();
     bool recreate_context();

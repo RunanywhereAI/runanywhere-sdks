@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+#include <gguf.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -841,6 +843,101 @@ bool LlamaCppTextGeneration::apply_lora_adapters() {
     return true;
 }
 
+nlohmann::json LlamaCppTextGeneration::read_gguf_metadata(const std::string& path) {
+    nlohmann::json result;
+
+    struct gguf_init_params params = {
+        /*.no_alloc =*/ true,
+        /*.ctx      =*/ nullptr,
+    };
+
+    struct gguf_context* ctx = gguf_init_from_file(path.c_str(), params);
+    if (!ctx) {
+        return result;
+    }
+
+    int64_t n_kv = gguf_get_n_kv(ctx);
+    for (int64_t i = 0; i < n_kv; i++) {
+        const char* key = gguf_get_key(ctx, i);
+        enum gguf_type type = gguf_get_kv_type(ctx, i);
+
+        if (type == GGUF_TYPE_STRING) {
+            result[key] = gguf_get_val_str(ctx, i);
+        } else if (type == GGUF_TYPE_UINT32) {
+            result[key] = gguf_get_val_u32(ctx, i);
+        } else if (type == GGUF_TYPE_INT32) {
+            result[key] = gguf_get_val_i32(ctx, i);
+        } else if (type == GGUF_TYPE_FLOAT32) {
+            result[key] = gguf_get_val_f32(ctx, i);
+        } else if (type == GGUF_TYPE_BOOL) {
+            result[key] = gguf_get_val_bool(ctx, i);
+        } else if (type == GGUF_TYPE_UINT64) {
+            result[key] = gguf_get_val_u64(ctx, i);
+        } else if (type == GGUF_TYPE_INT64) {
+            result[key] = gguf_get_val_i64(ctx, i);
+        } else if (type == GGUF_TYPE_FLOAT64) {
+            result[key] = gguf_get_val_f64(ctx, i);
+        }
+    }
+
+    result["_tensor_count"] = gguf_get_n_tensors(ctx);
+
+    gguf_free(ctx);
+    return result;
+}
+
+bool LlamaCppTextGeneration::check_lora_compatibility(
+        const std::string& lora_path, std::string& error_message) const {
+    if (!model_loaded_ || !model_) {
+        error_message = "No model loaded";
+        return false;
+    }
+
+    struct gguf_init_params params = {
+        /*.no_alloc =*/ true,
+        /*.ctx      =*/ nullptr,
+    };
+
+    struct gguf_context* lora_ctx = gguf_init_from_file(lora_path.c_str(), params);
+    if (!lora_ctx) {
+        error_message = "Failed to read LoRA file: " + lora_path;
+        return false;
+    }
+
+    // Read architecture from LoRA GGUF
+    std::string lora_arch;
+    int64_t arch_key = gguf_find_key(lora_ctx, "general.architecture");
+    if (arch_key >= 0) {
+        lora_arch = gguf_get_val_str(lora_ctx, arch_key);
+    }
+
+    gguf_free(lora_ctx);
+
+    // Read architecture from loaded model
+    char model_arch_buf[256] = {};
+    int len = llama_model_meta_val_str(model_, "general.architecture", model_arch_buf, sizeof(model_arch_buf));
+    std::string model_arch = (len > 0) ? std::string(model_arch_buf) : "";
+
+    if (lora_arch.empty()) {
+        LOGI("LoRA file has no general.architecture key, skipping architecture check");
+        return true;
+    }
+
+    if (model_arch.empty()) {
+        LOGI("Loaded model has no general.architecture key, skipping architecture check");
+        return true;
+    }
+
+    if (lora_arch != model_arch) {
+        error_message = "Architecture mismatch: model=" + model_arch + ", lora=" + lora_arch;
+        LOGE("LoRA compatibility check failed: %s", error_message.c_str());
+        return false;
+    }
+
+    LOGI("LoRA compatibility check passed: architecture=%s", model_arch.c_str());
+    return true;
+}
+
 bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, float scale) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -855,6 +952,13 @@ bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, 
             LOGE("LoRA adapter already loaded: %s", adapter_path.c_str());
             return false;
         }
+    }
+
+    // Check compatibility before attempting to load
+    std::string compat_error;
+    if (!check_lora_compatibility(adapter_path, compat_error)) {
+        LOGE("LoRA adapter incompatible: %s", compat_error.c_str());
+        return false;
     }
 
     LOGI("Loading LoRA adapter: %s (scale=%.2f)", adapter_path.c_str(), scale);

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +52,8 @@ import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
+import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import com.runanywhere.sdk.temp.LoraAdapterEntry
 import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
@@ -74,6 +77,9 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     var showingConversationList by remember { mutableStateOf(false) }
     var showingModelSelection by remember { mutableStateOf(false) }
     var showingChatDetails by remember { mutableStateOf(false) }
+    var showLoraDialog by remember { mutableStateOf(false) }
+    var pendingLoraPath by remember { mutableStateOf<String?>(null) }
+    var loraScale by remember { mutableFloatStateOf(1.0f) }
     var showDebugAlert by remember { mutableStateOf(false) }
     var debugMessage by remember { mutableStateOf("") }
 
@@ -95,6 +101,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     hasMessages = uiState.messages.isNotEmpty(),
                     modelName = uiState.loadedModelName,
                     supportsStreaming = uiState.useStreaming,
+                    loraCount = uiState.loraAdapters.size,
                     onHistoryClick = {
                         viewModel.ensureCurrentConversationInHistory()
                         showingConversationList = true
@@ -158,6 +165,9 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         onSend = viewModel::sendMessage,
                         isGenerating = uiState.isGenerating,
                         isModelLoaded = true,
+                        isLoraCompatible = uiState.isLoraCompatibleModel,
+                        hasLoraLoaded = uiState.loraAdapters.isNotEmpty(),
+                        onLoraClick = { showLoraDialog = true },
                     )
                 }
             }
@@ -238,6 +248,54 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         )
     }
 
+    // LoRA download/load dialog
+    if (showLoraDialog) {
+        LoraDialog(
+            catalogAdapters = uiState.catalogAdapters,
+            downloadedAdapters = uiState.downloadedAdapters,
+            loadedAdapters = uiState.loraAdapters,
+            downloadState = uiState.loraDownload,
+            onDownload = { entry -> viewModel.downloadLoraFromCatalog(entry) },
+            onLoad = { adapter ->
+                pendingLoraPath = adapter.localPath
+                showLoraDialog = false
+            },
+            onClearAll = {
+                viewModel.clearLoraAdapters()
+            },
+            onDismiss = {
+                showLoraDialog = false
+                viewModel.clearLoraDownloadState()
+            },
+        )
+    }
+
+    // LoRA scale dialog
+    if (pendingLoraPath != null) {
+        LoraScaleDialog(
+            filename = pendingLoraPath!!.substringAfterLast('/'),
+            scale = loraScale,
+            onScaleChange = { loraScale = it },
+            onConfirm = {
+                viewModel.loadLoraAdapter(pendingLoraPath!!, loraScale)
+                pendingLoraPath = null
+                loraScale = 1.0f
+            },
+            onDismiss = {
+                pendingLoraPath = null
+                loraScale = 1.0f
+            },
+        )
+    }
+
+    // When LoRA download completes, refresh and show load option
+    LaunchedEffect(uiState.loraDownload.downloadedPath) {
+        if (uiState.loraDownload.downloadedPath != null) {
+            viewModel.scanDownloadedAdapters()
+            viewModel.clearLoraDownloadState()
+        }
+    }
+
     LaunchedEffect(uiState.error) {
         if (uiState.error != null) {
             debugMessage = "Error occurred: ${uiState.error?.localizedMessage}"
@@ -282,6 +340,7 @@ fun ChatTopBar(
     hasMessages: Boolean,
     modelName: String?,
     supportsStreaming: Boolean,
+    loraCount: Int = 0,
     onHistoryClick: () -> Unit,
     onInfoClick: () -> Unit,
     onModelClick: () -> Unit,
@@ -411,6 +470,17 @@ fun ChatTopBar(
                                     ),
                                     color = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
                                 )
+                                if (loraCount > 0) {
+                                    Spacer(modifier = Modifier.width(2.dp))
+                                    Text(
+                                        text = "LoRA",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                        color = AppColors.primaryPurple,
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -1240,6 +1310,9 @@ fun ChatInputView(
     onSend: () -> Unit,
     isGenerating: Boolean,
     isModelLoaded: Boolean,
+    isLoraCompatible: Boolean = false,
+    hasLoraLoaded: Boolean = false,
+    onLoraClick: () -> Unit = {},
 ) {
     val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
 
@@ -1251,6 +1324,22 @@ fun ChatInputView(
             horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
             verticalAlignment = Alignment.Bottom,
     ) {
+        // LoRA button — visible when model supports LoRA
+        if (isLoraCompatible) {
+            IconButton(
+                onClick = onLoraClick,
+                enabled = !isGenerating,
+                modifier = Modifier.size(Dimensions.buttonHeightRegular),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Extension,
+                    contentDescription = "LoRA",
+                    tint = if (hasLoraLoaded) AppColors.primaryPurple else AppColors.statusGray,
+                    modifier = Modifier.size(Dimensions.iconMedium),
+                )
+            }
+        }
+
         // Plain text field -  .textFieldStyle(.plain)
         TextField(
             value = value,
@@ -1893,4 +1982,237 @@ private fun SelectableTextDialog(
             }
         }
     }
+}
+
+// ====================
+// LORA DIALOG
+// ====================
+
+@Composable
+private fun LoraDialog(
+    catalogAdapters: List<LoraAdapterEntry>,
+    downloadedAdapters: List<DownloadedLoraInfo>,
+    loadedAdapters: List<LoRAAdapterInfo>,
+    downloadState: LoraDownloadUiState,
+    onDownload: (LoraAdapterEntry) -> Unit,
+    onLoad: (DownloadedLoraInfo) -> Unit,
+    onClearAll: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!downloadState.isDownloading) onDismiss() },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Extension,
+                    contentDescription = null,
+                    tint = AppColors.primaryPurple,
+                    modifier = Modifier.size(24.dp),
+                )
+                Text("LoRA Adapters")
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                // Download progress
+                if (downloadState.isDownloading) {
+                    Text(
+                        text = "Downloading... ${(downloadState.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { downloadState.progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (downloadState.error != null) {
+                    Text(
+                        text = downloadState.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Loaded adapters info
+                if (loadedAdapters.isNotEmpty()) {
+                    Text(
+                        text = "Active (${loadedAdapters.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AppColors.primaryPurple,
+                    )
+                    for (adapter in loadedAdapters) {
+                        Text(
+                            text = "${adapter.path.substringAfterLast('/')} x${adapter.scale}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppColors.primaryPurple,
+                        )
+                    }
+                    TextButton(onClick = onClearAll) {
+                        Text("Clear All", color = AppColors.primaryRed)
+                    }
+                    HorizontalDivider()
+                }
+
+                // Catalog entries
+                if (!downloadState.isDownloading) {
+                    Text(
+                        text = "Available Adapters",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+
+                    if (catalogAdapters.isEmpty()) {
+                        Text(
+                            text = "No adapters available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        )
+                    } else {
+                        val loadedPaths = loadedAdapters.map { it.path }.toSet()
+
+                        for (entry in catalogAdapters) {
+                            val downloaded = downloadedAdapters.find { it.id == entry.id }
+                            val isLoaded = downloaded != null && loadedPaths.contains(downloaded.localPath)
+
+                            LoraAdapterCard(
+                                name = entry.name,
+                                description = entry.description,
+                                isDownloaded = downloaded != null,
+                                isLoaded = isLoaded,
+                                onAction = {
+                                    if (downloaded != null) {
+                                        onLoad(downloaded)
+                                    } else {
+                                        onDownload(entry)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            if (!downloadState.isDownloading) {
+                TextButton(onClick = onDismiss) { Text("Close") }
+            }
+        },
+    )
+}
+
+@Composable
+private fun LoraAdapterCard(
+    name: String,
+    description: String,
+    isDownloaded: Boolean,
+    isLoaded: Boolean,
+    onAction: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            when {
+                isLoaded -> {
+                    Text(
+                        text = "Loaded",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppColors.primaryPurple,
+                    )
+                }
+                isDownloaded -> {
+                    TextButton(onClick = onAction) {
+                        Text("Load", color = AppColors.primaryPurple)
+                    }
+                }
+                else -> {
+                    IconButton(onClick = onAction) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download",
+                            tint = AppColors.primaryAccent,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoraScaleDialog(
+    filename: String,
+    scale: Float,
+    onScaleChange: (Float) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Load LoRA Adapter") },
+        text = {
+            Column {
+                Text(
+                    text = filename,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Scale: %.2f".format(scale),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Slider(
+                    value = scale,
+                    onValueChange = onScaleChange,
+                    valueRange = 0f..2f,
+                    steps = 19,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text("Load") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }

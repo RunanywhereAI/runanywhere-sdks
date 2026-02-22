@@ -126,6 +126,11 @@ static rac_result_t llamacpp_vtable_get_lora_info(void* impl, char** out_json) {
     return rac_llm_llamacpp_get_lora_info(impl, out_json);
 }
 
+static rac_result_t llamacpp_vtable_check_lora_compat(void* impl, const char* lora_path, char** out_error) {
+    rac_bool_t result = rac_llm_llamacpp_check_lora_compat(impl, lora_path, out_error);
+    return (result == RAC_TRUE) ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED;
+}
+
 // Static vtable for LlamaCpp
 static const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
@@ -139,6 +144,7 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .remove_lora = llamacpp_vtable_remove_lora,
     .clear_lora = llamacpp_vtable_clear_lora,
     .get_lora_info = llamacpp_vtable_get_lora_info,
+    .check_lora_compat = llamacpp_vtable_check_lora_compat,
 };
 
 // =============================================================================

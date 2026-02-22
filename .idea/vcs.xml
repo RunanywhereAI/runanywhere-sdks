@@ -2,10 +2,17 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/sdcpp/arm64-v8a/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/sdcpp/arm64-v8a/_deps/opencl_headers-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/sdcpp/arm64-v8a/_deps/stable_diffusion_cpp-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/sdcpp/arm64-v8a/_deps/stable_diffusion_cpp-src/ggml" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/arm64-v8a/_deps/llamacpp-src" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/arm64-v8a/_deps/nlohmann_json-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev-core/_deps/nlohmann_json-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev/_deps/llamacpp-src" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/dev/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/x86_64/_deps/llamacpp-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-commons/build/android/unified/x86_64/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-web/emsdk" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-web/wasm/build-webgpu/_deps/llamacpp-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-web/wasm/build-webgpu/_deps/nlohmann_json-src" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-web/wasm/build-webgpu/_deps/whispercpp-src" vcs="Git" />
   </component>
 </project>

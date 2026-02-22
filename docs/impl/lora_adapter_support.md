@@ -7,9 +7,11 @@
   - [Prerequisites](#prerequisites)
   - [Data Types](#data-types)
   - [Loading a LoRA Adapter](#loading-a-lora-adapter)
+  - [Compatibility Checking](#compatibility-checking)
   - [Stacking Multiple Adapters](#stacking-multiple-adapters)
   - [Removing Adapters](#removing-adapters)
   - [Querying Loaded Adapters](#querying-loaded-adapters)
+  - [Downloading Adapters](#downloading-adapters)
   - [Error Handling](#error-handling)
   - [Android ViewModel Example](#android-viewmodel-example)
 - [C/C++ API Reference](#cc-api-reference-for-other-sdk-implementations)
@@ -22,6 +24,8 @@
 - [Architecture](#architecture)
   - [Layer Diagram](#layer-diagram)
   - [Vtable Dispatch](#vtable-dispatch)
+  - [Compatibility Check Flow](#compatibility-check-flow)
+  - [Download Flow](#download-flow)
 - [llama.cpp LoRA API (b8011)](#llamacpp-lora-api-b8011)
 - [Optimizations and Design Decisions](#optimizations-and-design-decisions)
   - [Context Recreation](#context-recreation)
@@ -30,6 +34,8 @@
   - [Duplicate Detection](#duplicate-detection)
   - [Rollback on Failure](#rollback-on-failure)
   - [Adapter Memory Lifecycle](#adapter-memory-lifecycle)
+  - [GGUF Metadata-Only Reading](#gguf-metadata-only-reading)
+  - [Atomic Downloads](#atomic-downloads)
 - [Files Changed](#files-changed)
 - [How to Extend](#how-to-extend)
 - [Build Verification](#build-verification)
@@ -41,12 +47,18 @@
 
 LoRA (Low-Rank Adaptation) adapter support was added to the RunAnywhere SDK across
 two modules: `sdk/runanywhere-commons` (C/C++) and `sdk/runanywhere-kotlin` (Kotlin
-Multiplatform). This enables users to load fine-tuned LoRA adapters (GGUF format)
-alongside a base model, hot-swap adapters without reloading the base model, stack
-multiple adapters with individual scales, and remove adapters at runtime.
+Multiplatform). This enables users to:
+
+- Load fine-tuned LoRA adapters (GGUF format) alongside a base model
+- Hot-swap adapters without reloading the base model
+- Stack multiple adapters with individual scales
+- Remove adapters at runtime
+- Check adapter compatibility before loading (architecture match validation)
+- Download adapters from URLs or a built-in catalog
 
 The implementation spans 6 layers, bottom-up: C++ internal, C API, component,
-JNI bridge, Kotlin bridge, and Kotlin public API.
+JNI bridge, Kotlin bridge, and Kotlin public API. Compatibility checking and
+downloading add additional functionality at each layer.
 
 ---
 
@@ -67,8 +79,15 @@ import com.runanywhere.sdk.public.extensions.loadLoraAdapter
 import com.runanywhere.sdk.public.extensions.removeLoraAdapter
 import com.runanywhere.sdk.public.extensions.clearLoraAdapters
 import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
+import com.runanywhere.sdk.public.extensions.checkLoraCompatibility
+import com.runanywhere.sdk.public.extensions.downloadLoraAdapter
+import com.runanywhere.sdk.public.extensions.downloadLoraFromCatalog
+import com.runanywhere.sdk.public.extensions.availableLoraAdapters
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import com.runanywhere.sdk.public.extensions.LoraCompatibilityResult
+import com.runanywhere.sdk.public.extensions.LoraDownloadProgress
+import com.runanywhere.sdk.public.extensions.LoraDownloadState
 ```
 
 ### Data Types
@@ -92,6 +111,43 @@ data class LoRAAdapterInfo(
 )
 ```
 
+**LoraCompatibilityResult** -- Returned by the compatibility check.
+
+```kotlin
+data class LoraCompatibilityResult(
+    val isCompatible: Boolean,  // true if the adapter matches the loaded model
+    val error: String? = null,  // Human-readable reason if incompatible
+)
+```
+
+**LoraDownloadProgress** -- Emitted during adapter downloads.
+
+```kotlin
+enum class LoraDownloadState { PENDING, DOWNLOADING, COMPLETED, ERROR }
+
+data class LoraDownloadProgress(
+    val progress: Float,           // 0.0 to 1.0
+    val bytesDownloaded: Long,
+    val totalBytes: Long?,         // null if server doesn't provide Content-Length
+    val state: LoraDownloadState,
+    val localPath: String? = null, // Set when state == COMPLETED
+    val error: String? = null,     // Set when state == ERROR
+)
+```
+
+**LoraAdapterEntry** -- A catalog entry describing a downloadable adapter.
+
+```kotlin
+data class LoraAdapterEntry(
+    val id: String,
+    val name: String,
+    val description: String,
+    val url: String,
+    val sizeBytes: Long = 0,
+    val filename: String = "$id.gguf",
+)
+```
+
 ### Loading a LoRA Adapter
 
 Load a GGUF LoRA file and apply it to the current model. The SDK recreates the
@@ -108,6 +164,33 @@ RunAnywhere.loadLoraAdapter(
 ```
 
 All functions are `suspend` -- call them from a coroutine scope.
+
+### Compatibility Checking
+
+Before loading an adapter, you can verify that its architecture matches the
+loaded base model. This reads GGUF metadata from the adapter file without
+loading weights, so it is fast and safe to call at any time.
+
+```kotlin
+val result = RunAnywhere.checkLoraCompatibility("/path/to/adapter.gguf")
+
+if (!result.isCompatible) {
+    println("Adapter incompatible: ${result.error}")
+    // e.g. "Architecture mismatch: LoRA targets 'llama' but model is 'phi3'"
+} else {
+    // Safe to load
+    RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path = "/path/to/adapter.gguf"))
+}
+```
+
+The check compares the `general.architecture` GGUF metadata key between the
+adapter and the currently loaded model. If either file is missing this key,
+compatibility is assumed (returns `isCompatible = true`).
+
+Note: `checkLoraCompatibility` is a regular function (not `suspend`) since
+the GGUF metadata read is lightweight. The C++ layer also runs this check
+automatically inside `load_lora_adapter()`, so loading an incompatible
+adapter will fail with an error even without an explicit check.
 
 ### Stacking Multiple Adapters
 
@@ -157,6 +240,65 @@ for (adapter in adapters) {
 
 Returns an empty list if no adapters are loaded or if no model is loaded.
 
+### Downloading Adapters
+
+There are three ways to obtain LoRA adapter files:
+
+**1. Load from a local file** -- If the `.gguf` file is already on device,
+pass its path directly to `loadLoraAdapter`.
+
+**2. Download from a URL** -- Downloads any GGUF file from a URL into the
+SDK's managed `lora/` directory.
+
+```kotlin
+RunAnywhere.downloadLoraAdapter(
+    url = "https://huggingface.co/user/repo/resolve/main/adapter.gguf",
+    filename = "my-adapter.gguf"
+).collect { progress ->
+    when (progress.state) {
+        LoraDownloadState.DOWNLOADING -> {
+            println("Progress: ${(progress.progress * 100).toInt()}%")
+        }
+        LoraDownloadState.COMPLETED -> {
+            val path = progress.localPath!!
+            println("Downloaded to: $path")
+            // Now load it
+            RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path = path))
+        }
+        LoraDownloadState.ERROR -> {
+            println("Download failed: ${progress.error}")
+        }
+        else -> {}
+    }
+}
+```
+
+The filename is sanitized to end with `.gguf`. Downloads use a temp file with
+atomic rename to prevent partial files from being used.
+
+**3. Download from the built-in catalog** -- The SDK ships with a hardcoded
+catalog of known adapters.
+
+```kotlin
+// List available adapters
+val catalog: List<LoraAdapterEntry> = RunAnywhere.availableLoraAdapters()
+
+for (entry in catalog) {
+    println("${entry.name}: ${entry.description}")
+}
+
+// Download a catalog entry
+RunAnywhere.downloadLoraFromCatalog(catalog.first()).collect { progress ->
+    if (progress.state == LoraDownloadState.COMPLETED) {
+        RunAnywhere.loadLoraAdapter(
+            LoRAAdapterConfig(path = progress.localPath!!)
+        )
+    }
+}
+```
+
+Downloads are stored in `{SDK models dir}/lora/`.
+
 ### Error Handling
 
 All LoRA functions throw `SDKError` on failure:
@@ -176,7 +318,7 @@ Common failure causes:
 - No model loaded (`SDKError.llm` with "no model loaded")
 - Invalid adapter file or path (`SDKError.llm`)
 - Adapter already loaded with same path (`SDKError.llm` with duplicate detection)
-- Adapter incompatible with base model (`SDKError.llm`)
+- Adapter incompatible with base model architecture (`SDKError.llm`)
 
 ### Android ViewModel Example
 
@@ -197,7 +339,18 @@ class LlmViewModel : ViewModel() {
     fun loadLoraAdapter(path: String, scale: Float = 1.0f) {
         viewModelScope.launch {
             try {
-                RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path, scale))
+                // Check compatibility first
+                val compat = withContext(Dispatchers.IO) {
+                    RunAnywhere.checkLoraCompatibility(path)
+                }
+                if (!compat.isCompatible) {
+                    _state.update { it.copy(error = "Incompatible LoRA: ${compat.error}") }
+                    return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path, scale))
+                }
                 refreshAdapterList()
             } catch (e: SDKError) {
                 _state.update { it.copy(error = e.message) }
@@ -249,6 +402,7 @@ to call the backend directly.
 // Loads a GGUF LoRA file and applies it to the current model.
 // Context is recreated internally. KV cache is cleared.
 // Duplicate paths are rejected.
+// Runs an architecture compatibility check before loading.
 //
 // Returns: RAC_SUCCESS, RAC_ERROR_INVALID_HANDLE, RAC_ERROR_INVALID_ARGUMENT,
 //          RAC_ERROR_COMPONENT_NOT_READY, RAC_ERROR_NOT_SUPPORTED,
@@ -287,6 +441,19 @@ rac_result_t rac_llm_component_get_lora_info(
     rac_handle_t handle,
     char** out_json            // Output: heap-allocated JSON string
 );
+
+// ---- Check compatibility ----
+// Reads GGUF metadata from the adapter and compares general.architecture
+// with the loaded model. Does NOT load the adapter.
+// out_error is set to a heap-allocated error string if incompatible.
+// Caller MUST free *out_error if non-NULL.
+//
+// Returns: RAC_SUCCESS if compatible, RAC_ERROR_VALIDATION_FAILED if not
+rac_result_t rac_llm_component_check_lora_compat(
+    rac_handle_t handle,
+    const char* lora_path,     // Path to the LoRA GGUF file
+    char** out_error           // Output: NULL if compatible, error string if not
+);
 ```
 
 **JNI mapping** (for reference -- how the Kotlin bridge calls these):
@@ -297,6 +464,7 @@ rac_result_t rac_llm_component_get_lora_info(
 | `racLlmComponentRemoveLora(long handle, String path)` | `rac_llm_component_remove_lora(handle, path)` | Returns `int` |
 | `racLlmComponentClearLora(long handle)` | `rac_llm_component_clear_lora(handle)` | Returns `int` |
 | `racLlmComponentGetLoraInfo(long handle)` | `rac_llm_component_get_lora_info(handle, &json)` | Returns `String?` (JSON) |
+| `racLlmComponentCheckLoraCompat(long handle, String path)` | `rac_llm_component_check_lora_compat(handle, path, &error)` | Returns `String?` (null = compatible, string = error) |
 
 ### API Level 2: Backend API (LlamaCPP-specific)
 
@@ -336,12 +504,27 @@ rac_result_t rac_llm_llamacpp_get_lora_info(
     rac_handle_t handle,
     char** out_json
 );
+
+// Check compatibility. Returns RAC_TRUE if compatible.
+// out_error is set to a heap-allocated string if incompatible. Caller frees.
+rac_bool_t rac_llm_llamacpp_check_lora_compat(
+    rac_handle_t handle,
+    const char* lora_path,
+    char** out_error
+);
+
+// Read all GGUF metadata as JSON (static -- does not require a loaded model).
+// Caller must free(*out_json).
+rac_result_t rac_llm_llamacpp_read_gguf_info(
+    const char* path,
+    char** out_json
+);
 ```
 
 ### Vtable Integration (for new backends)
 
 If you are adding LoRA support to a different backend (not LlamaCPP), implement
-these 4 function pointers in your `rac_llm_service_ops_t` vtable:
+these 5 function pointers in your `rac_llm_service_ops_t` vtable:
 
 ```c
 #include "rac/features/llm/rac_llm_service.h"
@@ -354,6 +537,7 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*remove_lora)(void* impl, const char* adapter_path);
     rac_result_t (*clear_lora)(void* impl);
     rac_result_t (*get_lora_info)(void* impl, char** out_json);
+    rac_result_t (*check_lora_compat)(void* impl, const char* lora_path, char** out_error);
 } rac_llm_service_ops_t;
 ```
 
@@ -381,7 +565,17 @@ int main() {
     rac_llm_component_load_model(component, "/path/to/model.gguf",
                                   "my-model", "My Model", NULL);
 
-    // 3. Load LoRA adapter (scale = 0.8)
+    // 3. Check adapter compatibility
+    char* compat_error = NULL;
+    rac_result_t cr = rac_llm_component_check_lora_compat(
+        component, "/path/to/adapter.gguf", &compat_error);
+    if (cr != RAC_SUCCESS) {
+        printf("Incompatible: %s\n", compat_error);
+        free(compat_error);
+        return 1;
+    }
+
+    // 4. Load LoRA adapter (scale = 0.8)
     rac_result_t r = rac_llm_component_load_lora(
         component, "/path/to/adapter.gguf", 0.8f);
     if (r != RAC_SUCCESS) {
@@ -389,10 +583,10 @@ int main() {
         return 1;
     }
 
-    // 4. Stack a second adapter
+    // 5. Stack a second adapter
     rac_llm_component_load_lora(component, "/path/to/adapter2.gguf", 0.5f);
 
-    // 5. Query what's loaded
+    // 6. Query what's loaded
     char* json = NULL;
     rac_llm_component_get_lora_info(component, &json);
     if (json) {
@@ -402,20 +596,20 @@ int main() {
         free(json);
     }
 
-    // 6. Generate text (adapters are applied automatically)
+    // 7. Generate text (adapters are applied automatically)
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
     rac_llm_result_t result = {0};
     rac_llm_component_generate(component, "Hello, world!", &opts, &result);
     printf("Response: %s\n", result.text);
     rac_llm_result_free(&result);
 
-    // 7. Remove one adapter
+    // 8. Remove one adapter
     rac_llm_component_remove_lora(component, "/path/to/adapter.gguf");
 
-    // 8. Clear all adapters
+    // 9. Clear all adapters
     rac_llm_component_clear_lora(component);
 
-    // 9. Cleanup
+    // 10. Cleanup
     rac_llm_component_destroy(component);
     rac_shutdown();
     return 0;
@@ -429,6 +623,16 @@ For Swift SDK implementers, the pattern would be:
 ```swift
 // The C functions are imported via CRACommons module
 import CRACommons
+
+// Check compatibility
+var compatError: UnsafeMutablePointer<CChar>? = nil
+let compatResult = rac_llm_component_check_lora_compat(
+    componentHandle, path, &compatError)
+if compatResult != RAC_SUCCESS {
+    let errorMsg = String(cString: compatError!)
+    free(compatError)
+    throw SDKError.llm("Incompatible LoRA: \(errorMsg)")
+}
 
 // Load adapter
 let result = rac_llm_component_load_lora(componentHandle, path, scale)
@@ -452,11 +656,12 @@ if let json = jsonPtr {
 |------|----------|---------|
 | 0 | `RAC_SUCCESS` | Operation succeeded |
 | -1 | `RAC_ERROR_INVALID_HANDLE` | NULL or invalid component handle |
-| -2 | `RAC_ERROR_INVALID_ARGUMENT` | NULL adapter_path |
+| -2 | `RAC_ERROR_INVALID_ARGUMENT` | NULL adapter_path or lora_path |
 | -236 | `RAC_ERROR_NOT_SUPPORTED` | Backend does not implement LoRA (vtable entry is NULL) |
 | -230 | `RAC_ERROR_COMPONENT_NOT_READY` | No model loaded |
 | -110 | `RAC_ERROR_MODEL_NOT_FOUND` | Adapter file path doesn't exist |
-| -600+ | Backend-specific | Duplicate path, incompatible adapter, context recreation failure |
+| -250 | `RAC_ERROR_VALIDATION_FAILED` | Compatibility check failed (architecture mismatch) |
+| -600+ | Backend-specific | Duplicate path, context recreation failure |
 
 ---
 
@@ -465,28 +670,28 @@ if let json = jsonPtr {
 ### Layer Diagram
 
 ```
-Kotlin Public API (RunAnywhere.loadLoraAdapter)
+Kotlin Public API (RunAnywhere.loadLoraAdapter / checkLoraCompatibility)
        |
        v
-Kotlin Bridge (CppBridgeLLM.loadLoraAdapter)
+Kotlin Bridge (CppBridgeLLM.loadLoraAdapter / checkLoraCompatibility)
        |
        v
-JNI Native (RunAnywhereBridge.racLlmComponentLoadLora)
+JNI Native (RunAnywhereBridge.racLlmComponentLoadLora / racLlmComponentCheckLoraCompat)
        |
        v
-Component C API (rac_llm_component_load_lora)
+Component C API (rac_llm_component_load_lora / rac_llm_component_check_lora_compat)
        |
-       v  [vtable dispatch: llm_service->ops->load_lora()]
+       v  [vtable dispatch: llm_service->ops->load_lora() / check_lora_compat()]
 Service Vtable (rac_llm_service_ops_t)
        |
        v
-Backend C API (rac_llm_llamacpp_load_lora)
+Backend C API (rac_llm_llamacpp_load_lora / rac_llm_llamacpp_check_lora_compat)
        |
        v
-C++ Internal (LlamaCppTextGeneration::load_lora_adapter)
+C++ Internal (LlamaCppTextGeneration::load_lora_adapter / check_lora_compatibility)
        |
        v
-llama.cpp API (llama_adapter_lora_init + llama_set_adapter_lora)
+llama.cpp / GGUF API (llama_adapter_lora_init + gguf_init_from_file)
 ```
 
 Each layer only talks to the one directly below it. No layer skips.
@@ -510,6 +715,43 @@ these pointers as NULL, and the component returns `RAC_ERROR_NOT_SUPPORTED`.
 
 This keeps `librac_commons.so` decoupled from `librac_backend_llamacpp.so`.
 
+### Compatibility Check Flow
+
+```
+1. Kotlin calls RunAnywhere.checkLoraCompatibility(path)
+2. CppBridgeLLM.checkLoraCompatibility(path)
+   - synchronized(lock), validates LLM state == READY
+3. JNI: racLlmComponentCheckLoraCompat(handle, path)
+   - Returns null (compatible) or error string (incompatible)
+4. rac_llm_component_check_lora_compat(handle, path, &out_error)
+   - Dispatches through vtable: ops->check_lora_compat()
+5. Backend wrapper converts rac_bool_t to rac_result_t
+6. rac_llm_llamacpp_check_lora_compat(handle, path, &out_error)
+   - Casts to C++ impl
+7. LlamaCppTextGeneration::check_lora_compatibility(path, error_msg)
+   - gguf_init_from_file(lora_path, {.no_alloc=true})
+   - gguf_find_key() for "general.architecture"
+   - llama_model_meta_val_str() for model architecture
+   - Compare strings, return false with error if mismatch
+```
+
+### Download Flow
+
+Downloads are handled entirely in Kotlin (no C++ involvement):
+
+```
+1. RunAnywhere.downloadLoraAdapter(url, filename) returns Flow<LoraDownloadProgress>
+2. Opens HttpURLConnection to the URL
+3. Streams to temp file: {models_dir}/lora/{filename}.tmp
+4. Emits progress updates every 150ms
+5. On completion, atomic rename: .tmp -> .gguf
+6. Final emission with state=COMPLETED and localPath set
+
+For catalog downloads:
+1. RunAnywhere.availableLoraAdapters() returns hardcoded catalog
+2. RunAnywhere.downloadLoraFromCatalog(entry) delegates to downloadLoraAdapter(entry.url, entry.filename)
+```
+
 ---
 
 ## llama.cpp LoRA API (b8011)
@@ -523,6 +765,19 @@ The implementation uses these llama.cpp functions:
 | `llama_rm_adapter_lora(ctx, adapter)` | Remove specific adapter from context |
 | `llama_clear_adapter_lora(ctx)` | Remove all adapters from context |
 | `llama_memory_clear(memory, true)` | Clear KV cache after adapter changes |
+| `llama_model_meta_val_str(model, key, buf, len)` | Read model metadata (for compat check) |
+
+For GGUF metadata reading (compatibility check):
+
+| Function | Purpose |
+|----------|---------|
+| `gguf_init_from_file(path, params)` | Open GGUF file (metadata-only with `no_alloc=true`) |
+| `gguf_get_n_kv(ctx)` | Get number of KV metadata entries |
+| `gguf_get_key(ctx, i)` | Get key name at index |
+| `gguf_get_kv_type(ctx, i)` | Get value type at index |
+| `gguf_get_val_str(ctx, i)` | Get string value at index |
+| `gguf_find_key(ctx, key)` | Find index of a specific key |
+| `gguf_free(ctx)` | Free GGUF context |
 
 Note: `llama_adapter_lora_free()` is deprecated. Adapters are freed automatically
 when the model is freed.
@@ -584,6 +839,24 @@ Adapters are stored in a `std::vector<LoraAdapterEntry>` on the
 adapters are cleared from the context first, then the vector is cleared, then
 the context and model are freed. This ordering prevents use-after-free.
 
+### GGUF Metadata-Only Reading
+
+The compatibility check uses `gguf_init_from_file()` with
+`{.no_alloc = true, .ctx = nullptr}`. This reads only the GGUF header and
+KV metadata -- no tensor data is loaded into memory. This makes the check
+fast (< 1ms for typical LoRA files) and safe to call repeatedly.
+
+The `read_gguf_metadata()` static method reads all scalar KV pairs (strings,
+integers, floats, booleans) and returns them as a JSON object. It also includes
+a `_tensor_count` field. This is exposed via `rac_llm_llamacpp_read_gguf_info()`
+for future use (e.g., displaying adapter metadata in a UI).
+
+### Atomic Downloads
+
+The download implementation writes to a `.tmp` file first, then renames to the
+final filename on completion. This prevents partially downloaded files from
+being accidentally loaded as adapters.
+
 ---
 
 ## Files Changed
@@ -592,45 +865,59 @@ the context and model are freed. This ordering prevents use-after-free.
 
 | File | Changes |
 |------|---------|
-| `sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.h` | Added `LoraAdapterEntry` struct, 4 public methods (`load_lora_adapter`, `remove_lora_adapter`, `clear_lora_adapters`, `get_lora_info`), 2 private helpers (`recreate_context`, `apply_lora_adapters`), `lora_adapters_` vector member |
-| `sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.cpp` | Implemented 6 new methods. Modified `unload_model_internal()` to clear adapters before freeing context/model |
+| `sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.h` | Added `LoraAdapterEntry` struct, 4 public LoRA management methods, 2 private helpers (`recreate_context`, `apply_lora_adapters`), `lora_adapters_` vector member, `check_lora_compatibility()` method, `read_gguf_metadata()` static method |
+| `sdk/runanywhere-commons/src/backends/llamacpp/llamacpp_backend.cpp` | Added `#include <gguf.h>`. Implemented `read_gguf_metadata()` (GGUF KV reading), `check_lora_compatibility()` (architecture comparison), and integrated compat check into `load_lora_adapter()`. Modified `unload_model_internal()` to clear adapters before freeing context/model |
 
 ### Layer 2: Backend C API
 
 | File | Changes |
 |------|---------|
-| `sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h` | Added 4 C function declarations: `rac_llm_llamacpp_load_lora`, `rac_llm_llamacpp_remove_lora`, `rac_llm_llamacpp_clear_lora`, `rac_llm_llamacpp_get_lora_info` |
-| `sdk/runanywhere-commons/src/backends/llamacpp/rac_llm_llamacpp.cpp` | Implemented 4 C functions. Pattern: validate handle, cast to impl, call C++ method, return result |
+| `sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h` | Added 6 C function declarations: `rac_llm_llamacpp_load_lora`, `_remove_lora`, `_clear_lora`, `_get_lora_info`, `_check_lora_compat`, `_read_gguf_info` |
+| `sdk/runanywhere-commons/src/backends/llamacpp/rac_llm_llamacpp.cpp` | Implemented 6 C functions. `check_lora_compat` returns `rac_bool_t` with optional error string. `read_gguf_info` is static (no handle needed) |
 
 ### Layer 3: Vtable + Component Wrappers
 
 | File | Changes |
 |------|---------|
-| `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h` | Added 4 optional LoRA function pointers to `rac_llm_service_ops_t` vtable: `load_lora`, `remove_lora`, `clear_lora`, `get_lora_info` |
-| `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_component.h` | Added 4 component-level function declarations |
-| `sdk/runanywhere-commons/src/features/llm/llm_component.cpp` | Implemented 4 component functions. Dispatches through vtable with NULL checks (returns `RAC_ERROR_NOT_SUPPORTED` if backend doesn't implement LoRA) |
-| `sdk/runanywhere-commons/src/backends/llamacpp/rac_backend_llamacpp_register.cpp` | Added 4 vtable wrapper functions and wired them into `g_llamacpp_ops` |
+| `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h` | Added 5 optional LoRA function pointers to `rac_llm_service_ops_t` vtable: `load_lora`, `remove_lora`, `clear_lora`, `get_lora_info`, `check_lora_compat` |
+| `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_component.h` | Added 5 component-level function declarations |
+| `sdk/runanywhere-commons/src/features/llm/llm_component.cpp` | Implemented 5 component functions. Dispatches through vtable with NULL checks (returns `RAC_ERROR_NOT_SUPPORTED` if backend doesn't implement LoRA). `check_lora_compat` returns `RAC_SUCCESS` when vtable entry is NULL (assumes compatible) |
+| `sdk/runanywhere-commons/src/backends/llamacpp/rac_backend_llamacpp_register.cpp` | Added 5 vtable wrapper functions and wired them into `g_llamacpp_ops`. `check_lora_compat` wrapper converts `rac_bool_t` to `RAC_SUCCESS`/`RAC_ERROR_VALIDATION_FAILED` |
 
 ### Layer 4: JNI Bridge
 
 | File | Changes |
 |------|---------|
-| `sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp` | Added 4 JNI functions: `racLlmComponentLoadLora`, `racLlmComponentRemoveLora`, `racLlmComponentClearLora`, `racLlmComponentGetLoraInfo` |
+| `sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp` | Added 5 JNI functions: `racLlmComponentLoadLora`, `racLlmComponentRemoveLora`, `racLlmComponentClearLora`, `racLlmComponentGetLoraInfo`, `racLlmComponentCheckLoraCompat`. Compat check returns `null` (compatible) or error string |
 
 ### Layer 5: Kotlin Bridge
 
 | File | Changes |
 |------|---------|
-| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhereBridge.kt` | Added 4 `external` JNI method declarations |
-| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../CppBridgeLLM.kt` | Added 4 bridge methods with synchronized access, state validation, and logging |
+| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhereBridge.kt` | Added 5 `external` JNI method declarations including `racLlmComponentCheckLoraCompat` |
+| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../CppBridgeLLM.kt` | Added 5 bridge methods with synchronized access, state validation, and logging. `checkLoraCompatibility()` returns null (compatible) or error string |
 
 ### Layer 6: Kotlin Public API
 
 | File | Changes |
 |------|---------|
 | `sdk/runanywhere-kotlin/src/commonMain/.../LLMTypes.kt` | Added `LoRAAdapterConfig` and `LoRAAdapterInfo` data classes |
-| `sdk/runanywhere-kotlin/src/commonMain/.../RunAnywhere+LoRA.kt` | NEW file. `expect` declarations for 4 public API functions |
-| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhere+LoRA.jvmAndroid.kt` | NEW file. `actual` implementations with init checks, CppBridgeLLM delegation, JSON parsing for adapter info |
+| `sdk/runanywhere-kotlin/src/commonMain/.../RunAnywhere+LoRA.kt` | `expect` declarations for 5 public API functions (4 suspend + `checkLoraCompatibility`). Added `LoraCompatibilityResult` data class |
+| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhere+LoRA.jvmAndroid.kt` | `actual` implementations with init checks, CppBridgeLLM delegation, JSON parsing for adapter info. `checkLoraCompatibility` wraps JNI null/string into `LoraCompatibilityResult` |
+
+### Layer 7: Kotlin Download API
+
+| File | Changes |
+|------|---------|
+| `sdk/runanywhere-kotlin/src/commonMain/.../RunAnywhere+LoRADownload.kt` | `LoraDownloadState` enum, `LoraDownloadProgress` data class, `expect fun downloadLoraAdapter()`, `fun availableLoraAdapters()`, `fun downloadLoraFromCatalog()` |
+| `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhere+LoRADownload.jvmAndroid.kt` | `actual` implementation using `HttpURLConnection`. Downloads to `{models_dir}/lora/`. Temp file + atomic rename. 150ms progress throttling |
+| `sdk/runanywhere-kotlin/src/commonMain/.../temp/LoraAdapterCatalog.kt` | `LoraAdapterEntry` data class and `LoraAdapterCatalog` object with hardcoded catalog entries |
+
+### Example App
+
+| File | Changes |
+|------|---------|
+| `examples/android/RunAnyWhereLora/app/src/main/java/.../LoraViewModel.kt` | Added compatibility check before loading in `loadLoraAdapter()`. Added download support with `downloadLoraFromUrl()`, `downloadLoraFromCatalog()`, `loadCatalog()`. Added `LoraDownloadUiState` and catalog state |
 
 ---
 
@@ -653,6 +940,19 @@ Follow the same 6-layer pattern:
 
 Could be done by calling `llama_set_adapter_lora(ctx, adapter, new_scale)`
 directly without context recreation. Would need a new method at each layer.
+
+### Adding new catalog entries
+
+Add new `LoraAdapterEntry` instances to `LoraAdapterCatalog.entries` in
+`sdk/runanywhere-kotlin/src/commonMain/.../temp/LoraAdapterCatalog.kt`.
+
+### iOS compatibility checking
+
+The C functions (`rac_llm_component_check_lora_compat`, `rac_llm_llamacpp_read_gguf_info`)
+are available in `RACommons.xcframework`. The Swift SDK would need:
+
+1. A wrapper in the Swift bridge layer
+2. A public API function matching the Kotlin `checkLoraCompatibility`
 
 ---
 
@@ -698,3 +998,6 @@ cd sdk/runanywhere-kotlin
 | 2026-02-19 | Claude | Initial implementation of LoRA adapter support across all 6 layers (C++ through Kotlin public API). C++ desktop build verified. |
 | 2026-02-19 | Claude | Fixed architecture: Component layer now dispatches LoRA ops through vtable (`rac_llm_service_ops_t`) instead of calling backend directly. This decouples `librac_commons.so` from `librac_backend_llamacpp.so`. Added 4 vtable entries and wrapper functions. Fixed `AttachCurrentThread` cast for Android NDK C++ build. Android native build verified. |
 | 2026-02-19 | Claude | Added detailed Kotlin SDK usage guide with data types, code examples, error handling, Android ViewModel pattern, and table of contents with section links. Updated "How to Extend" to include vtable step. |
+| 2026-02-22 | Claude | Added LoRA compatibility checking: C++ reads GGUF metadata via `gguf_init_from_file()` (no_alloc) and compares `general.architecture` with loaded model. Full stack: C++ method, C API (`rac_llm_llamacpp_check_lora_compat` + `rac_llm_llamacpp_read_gguf_info`), vtable entry, component API, JNI, Kotlin bridge, public API (`checkLoraCompatibility`). Integrated into `load_lora_adapter()` for automatic early-fail. |
+| 2026-02-22 | Claude | Added LoRA download support: `downloadLoraAdapter()` (from URL), `downloadLoraFromCatalog()` (from built-in catalog), `availableLoraAdapters()`. Kotlin-only implementation using `HttpURLConnection` with temp file + atomic rename. Added `LoraDownloadProgress`, `LoraDownloadState`, `LoraAdapterEntry` types. |
+| 2026-02-22 | Claude | Updated documentation with compatibility checking and download sections, updated architecture diagrams, vtable info (5 entries), files changed tables, and extension guide. |

@@ -863,6 +863,32 @@ extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
     return llm_service->ops->get_lora_info(llm_service->impl, out_json);
 }
 
+extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
+                                                             const char* lora_path,
+                                                             char** out_error) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!lora_path || !out_error)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    *out_error = nullptr;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        *out_error = strdup("No model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->check_lora_compat)
+        return RAC_SUCCESS;  // If backend doesn't support checking, allow it
+
+    return llm_service->ops->check_lora_compat(llm_service->impl, lora_path, out_error);
+}
+
 // =============================================================================
 // STATE QUERY API
 // =============================================================================

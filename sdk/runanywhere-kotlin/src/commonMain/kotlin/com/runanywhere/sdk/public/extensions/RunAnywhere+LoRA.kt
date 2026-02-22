@@ -14,6 +14,15 @@ package com.runanywhere.sdk.public.extensions
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import kotlinx.serialization.Serializable
+
+// MARK: - LoRA Compatibility
+
+@Serializable
+data class LoraCompatibilityResult(
+    val isCompatible: Boolean,
+    val error: String? = null,
+)
 
 // MARK: - LoRA Adapter Management
 
@@ -47,3 +56,14 @@ expect suspend fun RunAnywhere.clearLoraAdapters()
  * @return List of loaded adapter info (path, scale, applied status)
  */
 expect suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo>
+
+/**
+ * Check if a LoRA adapter file is compatible with the currently loaded model.
+ *
+ * Reads GGUF metadata from the LoRA file and compares architecture
+ * with the loaded model. Does not load the adapter.
+ *
+ * @param loraPath Path to the LoRA adapter GGUF file
+ * @return Compatibility result with isCompatible flag and optional error
+ */
+expect fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibilityResult

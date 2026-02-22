@@ -26,11 +26,27 @@ import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
+import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.sdk.public.extensions.LoraDownloadState
+import com.runanywhere.sdk.public.extensions.availableLoraAdapters
+import com.runanywhere.sdk.public.extensions.checkLoraCompatibility
+import com.runanywhere.sdk.public.extensions.clearLoraAdapters
+import com.runanywhere.sdk.public.extensions.downloadLoraFromCatalog
+import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
+import com.runanywhere.sdk.public.extensions.loadLoraAdapter
+import com.runanywhere.sdk.public.extensions.removeLoraAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
+import com.runanywhere.sdk.temp.LoraAdapterCatalog
+import com.runanywhere.sdk.temp.LoraAdapterEntry
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -45,6 +61,19 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 
+data class LoraDownloadUiState(
+    val isDownloading: Boolean = false,
+    val progress: Float = 0f,
+    val error: String? = null,
+    val downloadedPath: String? = null,
+)
+
+data class DownloadedLoraInfo(
+    val id: String,
+    val name: String,
+    val localPath: String,
+)
+
 /**
  * Enhanced ChatUiState  functionality
  */
@@ -57,6 +86,11 @@ data class ChatUiState(
     val error: Throwable? = null,
     val useStreaming: Boolean = true,
     val currentConversation: Conversation? = null,
+    val isLoraCompatibleModel: Boolean = false,
+    val loraAdapters: List<LoRAAdapterInfo> = emptyList(),
+    val catalogAdapters: List<LoraAdapterEntry> = emptyList(),
+    val downloadedAdapters: List<DownloadedLoraInfo> = emptyList(),
+    val loraDownload: LoraDownloadUiState = LoraDownloadUiState(),
 ) {
     val canSend: Boolean
         get() = currentInput.trim().isNotEmpty() && !isGenerating && isModelLoaded
@@ -710,7 +744,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Ensures the app bar shows the correct model icon immediately.
      */
     fun setLoadedModelName(modelName: String) {
-        _uiState.value = _uiState.value.copy(loadedModelName = modelName)
+        val nameLower = modelName.lowercase()
+        val loraCompat = nameLower.contains("lfm2") && nameLower.contains("350m")
+        _uiState.value = _uiState.value.copy(
+            loadedModelName = modelName,
+            isLoraCompatibleModel = loraCompat,
+            // Clear previous LoRA state when switching models
+            loraAdapters = emptyList(),
+        )
+        if (loraCompat) {
+            loadLoraCatalog()
+            scanDownloadedAdapters()
+        }
     }
 
     /**
@@ -723,12 +768,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (RunAnywhere.isLLMModelLoaded()) {
                     val currentModel = RunAnywhere.currentLLMModel()
                     val displayName = currentModel?.name ?: RunAnywhere.currentLLMModelId
-                    Log.i(TAG, "✅ LLM model already loaded: $displayName")
+                    val nameLower = (displayName ?: "").lowercase()
+                    val loraCompat = nameLower.contains("lfm2") && nameLower.contains("350m")
+                    Log.i(TAG, "✅ LLM model already loaded: $displayName (loraCompat=$loraCompat)")
                     _uiState.value =
                         _uiState.value.copy(
                             isModelLoaded = true,
                             loadedModelName = displayName,
+                            isLoraCompatibleModel = loraCompat,
                         )
+                    if (loraCompat) {
+                        loadLoraCatalog()
+                        scanDownloadedAdapters()
+                    }
                     addSystemMessageIfNeeded()
                     return
                 }
@@ -747,12 +799,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         // Load the chat model into memory
                         RunAnywhere.loadLLMModel(chatModel.id)
 
+                        val nameLower = chatModel.name.lowercase()
+                        val loraCompat = nameLower.contains("lfm2") && nameLower.contains("350m")
                         _uiState.value =
                             _uiState.value.copy(
                                 isModelLoaded = true,
                                 loadedModelName = chatModel.name,
+                                isLoraCompatibleModel = loraCompat,
                             )
-                        Log.i(TAG, "✅ Chat model loaded successfully: ${chatModel.name}")
+                        if (loraCompat) {
+                            loadLoraCatalog()
+                            scanDownloadedAdapters()
+                        }
+                        Log.i(TAG, "✅ Chat model loaded successfully: ${chatModel.name} (loraCompat=$loraCompat)")
                     } catch (e: Throwable) {
                         // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
                         Log.e(TAG, "❌ Failed to load chat model: ${e.message}", e)
@@ -898,6 +957,136 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ToolValue.ObjectValue -> buildJsonObject {
                 value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
             }
+        }
+    }
+
+    // ── LoRA Support ──
+
+    private var loraDownloadJob: Job? = null
+
+    fun loadLoraCatalog() {
+        val adapters = RunAnywhere.availableLoraAdapters()
+        _uiState.value = _uiState.value.copy(catalogAdapters = adapters)
+    }
+
+    fun scanDownloadedAdapters() {
+        viewModelScope.launch {
+            try {
+                val loraDir = withContext(Dispatchers.IO) {
+                    File(CppBridgeModelPaths.getModelsDirectory(), "lora")
+                }
+                if (!loraDir.exists()) return@launch
+
+                val catalogEntries = LoraAdapterCatalog.adapters
+                val downloaded = withContext(Dispatchers.IO) {
+                    loraDir.listFiles { file -> file.extension == "gguf" }
+                        ?.map { file ->
+                            val catalogEntry = catalogEntries.find { it.filename == file.name }
+                            DownloadedLoraInfo(
+                                id = catalogEntry?.id ?: file.nameWithoutExtension,
+                                name = catalogEntry?.name ?: file.nameWithoutExtension,
+                                localPath = file.absolutePath,
+                            )
+                        } ?: emptyList()
+                }
+
+                _uiState.value = _uiState.value.copy(downloadedAdapters = downloaded)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to scan downloaded adapters: ${e.message}", e)
+            }
+        }
+    }
+
+    fun downloadLoraFromCatalog(entry: LoraAdapterEntry) {
+        loraDownloadJob?.cancel()
+        loraDownloadJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                loraDownload = LoraDownloadUiState(isDownloading = true),
+            )
+            try {
+                RunAnywhere.downloadLoraFromCatalog(entry).collect { progress ->
+                    _uiState.value = _uiState.value.copy(
+                        loraDownload = _uiState.value.loraDownload.copy(
+                            progress = progress.progress,
+                            error = progress.error,
+                            isDownloading = progress.state == LoraDownloadState.DOWNLOADING ||
+                                progress.state == LoraDownloadState.PENDING,
+                            downloadedPath = progress.localPath,
+                        ),
+                    )
+
+                    if (progress.state == LoraDownloadState.COMPLETED && progress.localPath != null) {
+                        val existing = _uiState.value.downloadedAdapters.any { it.id == entry.id }
+                        if (!existing) {
+                            _uiState.value = _uiState.value.copy(
+                                downloadedAdapters = _uiState.value.downloadedAdapters + DownloadedLoraInfo(
+                                    id = entry.id,
+                                    name = entry.name,
+                                    localPath = progress.localPath!!,
+                                ),
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "LoRA catalog download failed: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    loraDownload = LoraDownloadUiState(error = "Download failed: ${e.message}"),
+                )
+            }
+        }
+    }
+
+    fun loadLoraAdapter(path: String, scale: Float) {
+        viewModelScope.launch {
+            try {
+                val compat = withContext(Dispatchers.IO) {
+                    RunAnywhere.checkLoraCompatibility(path)
+                }
+                if (!compat.isCompatible) {
+                    _uiState.value = _uiState.value.copy(
+                        error = Exception("Incompatible LoRA: ${compat.error}"),
+                    )
+                    return@launch
+                }
+
+                withContext(Dispatchers.IO) {
+                    RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path = path, scale = scale))
+                }
+                refreshLoraAdapters()
+                Log.i(TAG, "LoRA adapter loaded: ${path.substringAfterLast('/')} (scale=$scale)")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load LoRA adapter: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(error = e)
+            }
+        }
+    }
+
+    fun clearLoraAdapters() {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    RunAnywhere.clearLoraAdapters()
+                }
+                _uiState.value = _uiState.value.copy(loraAdapters = emptyList())
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to clear LoRA adapters: ${e.message}", e)
+            }
+        }
+    }
+
+    fun clearLoraDownloadState() {
+        _uiState.value = _uiState.value.copy(loraDownload = LoraDownloadUiState())
+    }
+
+    private suspend fun refreshLoraAdapters() {
+        try {
+            val adapters = withContext(Dispatchers.IO) {
+                RunAnywhere.getLoadedLoraAdapters()
+            }
+            _uiState.value = _uiState.value.copy(loraAdapters = adapters)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to refresh adapters: ${e.message}", e)
         }
     }
 

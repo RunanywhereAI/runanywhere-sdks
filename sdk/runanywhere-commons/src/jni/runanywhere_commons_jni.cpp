@@ -1181,6 +1181,35 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraI
     return jresult;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentCheckLoraCompat(
+    JNIEnv* env, jclass clazz, jlong handle, jstring loraPath) {
+    if (handle == 0)
+        return env->NewStringUTF("Invalid handle");
+    if (loraPath == nullptr)
+        return env->NewStringUTF("Invalid path");
+
+    std::string path = getCString(env, loraPath);
+
+    char* error = nullptr;
+    rac_result_t result = rac_llm_component_check_lora_compat(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str(), &error);
+
+    if (result == RAC_SUCCESS) {
+        if (error) rac_free(error);
+        return nullptr;
+    }
+
+    jstring jresult = nullptr;
+    if (error) {
+        jresult = env->NewStringUTF(error);
+        rac_free(error);
+    } else {
+        jresult = env->NewStringUTF("Incompatible LoRA adapter");
+    }
+    return jresult;
+}
+
 // =============================================================================
 // JNI FUNCTIONS - STT Component
 // =============================================================================

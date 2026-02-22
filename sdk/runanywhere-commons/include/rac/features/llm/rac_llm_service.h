@@ -61,6 +61,10 @@ typedef struct rac_llm_service_ops {
 
     /** Get loaded LoRA adapters info as JSON (optional, NULL if not supported) */
     rac_result_t (*get_lora_info)(void* impl, char** out_json);
+
+    /** Check LoRA adapter compatibility (optional, NULL if not supported).
+     *  Returns RAC_SUCCESS if compatible. out_error is set on incompatibility. */
+    rac_result_t (*check_lora_compat)(void* impl, const char* lora_path, char** out_error);
 } rac_llm_service_ops_t;
 
 /**

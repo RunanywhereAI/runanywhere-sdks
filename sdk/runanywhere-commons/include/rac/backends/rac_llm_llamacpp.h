@@ -241,6 +241,39 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle
                                                               char** out_json);
 
 // =============================================================================
+// LORA COMPATIBILITY CHECK
+// =============================================================================
+
+/**
+ * Check if a LoRA adapter is compatible with the currently loaded model.
+ *
+ * Reads the GGUF metadata header of the LoRA file and compares
+ * general.architecture with the loaded model.
+ *
+ * @param handle Service handle (must have a model loaded)
+ * @param lora_path Path to the LoRA adapter GGUF file
+ * @param out_error Output: error message if incompatible (caller must free with free()).
+ *                  Set to NULL if compatible.
+ * @return RAC_TRUE if compatible, RAC_FALSE if not
+ */
+RAC_LLAMACPP_API rac_bool_t rac_llm_llamacpp_check_lora_compat(rac_handle_t handle,
+                                                                 const char* lora_path,
+                                                                 char** out_error);
+
+/**
+ * Read GGUF metadata from a file without loading the model weights.
+ *
+ * Returns a JSON object containing all scalar metadata key-value pairs
+ * and tensor count. Useful for inspecting LoRA adapter properties.
+ *
+ * @param path Path to the GGUF file
+ * @param out_json Output: JSON string (caller must free with free())
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_read_gguf_info(const char* path,
+                                                               char** out_json);
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 

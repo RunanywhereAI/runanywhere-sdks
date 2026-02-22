@@ -402,6 +402,52 @@ rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json
     return RAC_SUCCESS;
 }
 
+// =============================================================================
+// LORA COMPATIBILITY CHECK
+// =============================================================================
+
+rac_bool_t rac_llm_llamacpp_check_lora_compat(rac_handle_t handle,
+                                                const char* lora_path,
+                                                char** out_error) {
+    if (handle == nullptr || lora_path == nullptr || out_error == nullptr) {
+        return RAC_FALSE;
+    }
+
+    *out_error = nullptr;
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        *out_error = strdup("No text generation component");
+        return RAC_FALSE;
+    }
+
+    std::string error_message;
+    bool compatible = h->text_gen->check_lora_compatibility(lora_path, error_message);
+
+    if (!compatible && !error_message.empty()) {
+        *out_error = strdup(error_message.c_str());
+    }
+
+    return compatible ? RAC_TRUE : RAC_FALSE;
+}
+
+rac_result_t rac_llm_llamacpp_read_gguf_info(const char* path, char** out_json) {
+    if (path == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto info = runanywhere::LlamaCppTextGeneration::read_gguf_metadata(path);
+    if (info.empty()) {
+        rac_error_set_details("Failed to read GGUF metadata");
+        return RAC_ERROR_MODEL_LOAD_FAILED;
+    }
+
+    std::string json_str = info.dump();
+    *out_json = strdup(json_str.c_str());
+
+    return RAC_SUCCESS;
+}
+
 void rac_llm_llamacpp_destroy(rac_handle_t handle) {
     if (handle == nullptr) {
         return;

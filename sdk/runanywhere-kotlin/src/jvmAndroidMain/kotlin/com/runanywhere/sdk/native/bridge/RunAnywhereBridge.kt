@@ -206,6 +206,9 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentGetLoraInfo(handle: Long): String?
 
+    @JvmStatic
+    external fun racLlmComponentCheckLoraCompat(handle: Long, loraPath: String): String?
+
     // ========================================================================
     // STT COMPONENT (rac_stt_component.h)
     // ========================================================================

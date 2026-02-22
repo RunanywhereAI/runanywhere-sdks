@@ -81,3 +81,16 @@ actual suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo> {
         emptyList()
     }
 }
+
+actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibilityResult {
+    if (!isInitialized) {
+        return LoraCompatibilityResult(isCompatible = false, error = "SDK not initialized")
+    }
+
+    val error = CppBridgeLLM.checkLoraCompatibility(loraPath)
+    return if (error == null) {
+        LoraCompatibilityResult(isCompatible = true)
+    } else {
+        LoraCompatibilityResult(isCompatible = false, error = error)
+    }
+}

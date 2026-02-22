@@ -263,6 +263,22 @@ RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
 RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
                                                       char** out_json);
 
+/**
+ * @brief Check if a LoRA adapter is compatible with the loaded model
+ *
+ * Reads GGUF metadata from the LoRA file and compares architecture
+ * with the currently loaded model.
+ *
+ * @param handle Component handle
+ * @param lora_path Path to the LoRA adapter GGUF file
+ * @param out_error Output: error message if incompatible (caller must free with rac_free).
+ *                  Set to NULL if compatible.
+ * @return RAC_SUCCESS if compatible, error code if not
+ */
+RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
+                                                          const char* lora_path,
+                                                          char** out_error);
+
 // =============================================================================
 // DESTRUCTION
 // =============================================================================
