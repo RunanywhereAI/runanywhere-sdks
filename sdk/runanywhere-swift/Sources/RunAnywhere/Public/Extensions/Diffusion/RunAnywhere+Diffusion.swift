@@ -185,7 +185,7 @@ public extension RunAnywhere {
         try await ensureServicesReady()
 
         SDKLogger.shared.info("[Diffusion] Loading model '\(modelId)' via C++ component layer")
-        SDKLogger.shared.info("[Diffusion] Model path: \(URL(fileURLWithPath: modelPath).lastPathComponent)")
+        SDKLogger.shared.info("[Diffusion] Model path: \(URL(filePath: modelPath).lastPathComponent)")
 
         // Configure the component if configuration is provided
         if let config = configuration {

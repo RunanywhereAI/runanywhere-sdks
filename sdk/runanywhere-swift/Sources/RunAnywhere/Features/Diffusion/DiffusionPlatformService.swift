@@ -54,12 +54,12 @@ public actor DiffusionPlatformService {
         disableSafetyChecker: Bool = false,
         tokenizerSource: DiffusionTokenizerSource = .sd15
     ) async throws {
-        logger.info("Initializing diffusion pipeline from: \(URL(fileURLWithPath: modelPath).lastPathComponent)")
+        logger.info("Initializing diffusion pipeline from: \(URL(filePath: modelPath).lastPathComponent)")
         logger.info("Tokenizer source: \(tokenizerSource.description)")
 
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelPath)")
+            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(URL(filePath: modelPath).lastPathComponent)")
         }
 
         // Find the actual model directory (handles nested directory structure from zip extraction)
