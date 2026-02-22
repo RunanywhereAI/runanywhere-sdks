@@ -80,6 +80,7 @@ public extension RunAnywhere {
 
         // Transcribe (C++ emits events)
         var sttResult = rac_stt_result_t()
+        defer { rac_stt_result_free(&sttResult) }
         let transcribeResult = options.withCOptions { cOptionsPtr in
             audioData.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe(
@@ -289,6 +290,7 @@ public extension RunAnywhere {
 
         // sttResult is intentionally unused: the C layer delivers results via CppEventBridge events.
         var sttResult = rac_stt_result_t()
+        defer { rac_stt_result_free(&sttResult) }
         let transcribeResult = options.withCOptions { cOptionsPtr in
             data.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe(

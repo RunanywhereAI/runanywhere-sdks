@@ -9,11 +9,15 @@
 //  The extension gets this file via the manual pbxproj wiring (same pattern as SharedConstants.swift).
 //
 
+#if os(iOS)
 import ActivityKit
+#endif
 import Foundation
 
 /// The static attributes for a dictation flow session.
 /// These do not change after the activity is started.
+#if os(iOS)
+@available(iOS 16.1, *)
 struct DictationActivityAttributes: ActivityAttributes {
 
     /// The dynamic / live state updated throughout the session.
@@ -31,3 +35,4 @@ struct DictationActivityAttributes: ActivityAttributes {
     /// Session identifier — set once at start
     var sessionId: String
 }
+#endif

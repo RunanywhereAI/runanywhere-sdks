@@ -146,6 +146,20 @@ void rac_stt_result_free(rac_stt_result_t* result) {
         free(result->text);
         result->text = nullptr;
     }
+    if (result->detected_language) {
+        free(result->detected_language);
+        result->detected_language = nullptr;
+    }
+    if (result->words) {
+        for (size_t i = 0; i < result->num_words; i++) {
+            if (result->words[i].text) {
+                free(const_cast<char*>(result->words[i].text));
+            }
+        }
+        free(result->words);
+        result->words = nullptr;
+        result->num_words = 0;
+    }
 }
 
 }  // extern "C"
