@@ -4,7 +4,7 @@
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
       <option name="taskNames">
         <list>
-          <option value="test" />
+          <option value=":runanywhere-kotlin:test" />
         </list>
       </option>
     </ExternalSystemSettings>

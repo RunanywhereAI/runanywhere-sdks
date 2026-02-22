@@ -1,15 +1,15 @@
 # IntelliJ Run Configurations
 
-This folder contains the default IntelliJ run configurations scoped securely to ensure clean, isolated workflows across our composite builds (SDK, Android Example, and IntelliJ Plugin).
+This folder contains the default IntelliJ run configurations scoped to ensure clean, isolated workflows across our composite builds (SDK, Android Example, and IntelliJ Plugin).
 
 ## Naming Convention
-Configurations are organized explicitly to allow correct alphabetical and grouped sorting without relying on arbitrary platform-specific features (like Emojis).
+Configurations are organized explicitly to allow correct alphabetical and grouped sorting without relying on arbitrary platform-specific features (like emojis).
 
 **Format:** `{Project}__{Number}_{Action}.xml`
 * **Prefix:** The overarching project section (e.g. `SDK`, `Android`, `IntelliJ`, `Utility`)
 * **Separator:** Double underscore `__`
 * **Number:** A single digit explicitly sorting the steps chronologically
-* **Name:** A specific short name describing the action (e.g. `Build_App`)
+* **Action:** A specific short name describing the action (e.g. `Build_App`)
 
 ## Available Configurations
 
