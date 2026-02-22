@@ -94,8 +94,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // Core SDK dependency for interfaces and models
-                api(project(":runanywhere-kotlin"))
+                // Core SDK — resolve by finding the project whose dir matches the SDK root
+                api(
+                    rootProject.allprojects.firstOrNull {
+                        it.projectDir.canonicalPath == projectDir.resolve("../..").canonicalPath
+                    } ?: error("Cannot find core SDK project at ${projectDir.resolve("../..")}"),
+                )
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }
