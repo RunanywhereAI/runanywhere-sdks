@@ -92,6 +92,35 @@ public:
   std::shared_ptr<Promise<std::string>> getLastError() override;
   std::shared_ptr<Promise<double>> getMemoryUsage() override;
 
+  // ============================================================================
+  // VLM (Vision Language Model)
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> registerVLMBackend() override;
+  std::shared_ptr<Promise<bool>> loadVLMModel(
+    const std::string& modelPath,
+    const std::string& mmprojPath,
+    const std::optional<std::string>& modelId,
+    const std::optional<std::string>& modelName) override;
+  std::shared_ptr<Promise<bool>> isVLMModelLoaded() override;
+  std::shared_ptr<Promise<bool>> unloadVLMModel() override;
+  std::shared_ptr<Promise<std::string>> processVLMImage(
+    double imageFormat,
+    const std::string& imageData,
+    double imageWidth,
+    double imageHeight,
+    const std::string& prompt,
+    const std::optional<std::string>& optionsJson) override;
+  std::shared_ptr<Promise<std::string>> processVLMImageStream(
+    double imageFormat,
+    const std::string& imageData,
+    double imageWidth,
+    double imageHeight,
+    const std::string& prompt,
+    const std::string& optionsJson,
+    const std::function<void(const std::string&, bool)>& callback) override;
+  std::shared_ptr<Promise<bool>> cancelVLMGeneration() override;
+
 private:
   // Thread safety
   std::mutex modelMutex_;
@@ -99,6 +128,7 @@ private:
   // State tracking
   std::string lastError_;
   bool isRegistered_ = false;
+  bool isVLMRegistered_ = false;
 
   // Helper methods
   void setLastError(const std::string& error);

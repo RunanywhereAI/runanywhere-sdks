@@ -176,6 +176,17 @@ const App: React.FC = () => {
       memoryRequirement: 1_400_000_000,
     });
 
+    // VLM (Vision Language) models
+    // VLM models require 2 files: main model + mmproj (vision projector)
+    // Bundled as tar.gz archives for easy download/extraction
+    // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+    await LlamaCPP.addVLMModel({
+      id: 'smolvlm-500m-instruct-q8_0',
+      name: 'SmolVLM 500M Instruct',
+      url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz',
+      memoryRequirement: 600_000_000,
+    });
+
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
     // Using explicit IDs ensures models are recognized after download across app restarts

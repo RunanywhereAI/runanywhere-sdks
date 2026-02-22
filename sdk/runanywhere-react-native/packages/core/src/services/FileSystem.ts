@@ -416,7 +416,10 @@ export const FileSystem = {
 
     // Determine destination path
     let destPath: string;
-    if (fw === 'LlamaCpp') {
+    const archiveType = inferArchiveType(url);
+
+    if (fw === 'LlamaCpp' && archiveType === null) {
+      // Single GGUF/BIN file (not an archive)
       const ext =
         modelId.includes('.gguf') || url.includes('.gguf')
           ? '.gguf'
@@ -425,7 +428,7 @@ export const FileSystem = {
             : '.gguf';
       destPath = `${folder}/${baseId}${ext}`;
     } else {
-      // For archives, download to temp first
+      // For archives (ONNX or LlamaCpp VLM tar.gz), download to temp first
       const tempName = `${baseId}_${Date.now()}.tmp`;
       destPath = `${RNFS.CachesDirectoryPath}/${tempName}`;
     }
@@ -475,10 +478,9 @@ export const FileSystem = {
 
     logger.info(`Download completed: ${result.bytesWritten} bytes`);
 
-    // For ONNX archives, extract to final location
-    const archiveType = inferArchiveType(url);
-    if (fw === 'ONNX' && archiveType !== null) {
-      logger.info(`Extracting ${archiveType} archive...`);
+    // For archives (ONNX or LlamaCpp VLM), extract to final location
+    if (archiveType !== null) {
+      logger.info(`Extracting ${archiveType} archive for ${fw}...`);
 
       try {
         const extractionResult = await this.extractArchive(destPath, folder, archiveType);
@@ -487,8 +489,14 @@ export const FileSystem = {
         // Clean up the temporary archive file
         await RNFS.unlink(destPath);
 
-        // Return the extracted folder path
-        destPath = extractionResult.modelPath;
+        // For LlamaCpp VLM, find the .gguf file in extracted folder
+        if (fw === 'LlamaCpp') {
+          destPath = await this.findGGUFInDirectory(extractionResult.modelPath);
+          logger.info(`Found GGUF model at: ${destPath}`);
+        } else {
+          // For ONNX, return the extracted folder path
+          destPath = extractionResult.modelPath;
+        }
       } catch (extractError) {
         logger.error(`Archive extraction failed: ${extractError}`);
         // Clean up temp file on failure
@@ -613,6 +621,74 @@ export const FileSystem = {
     } catch (error) {
       logger.error(`Error finding model path: ${error}`);
       return extractedFolder;
+    }
+  },
+
+  /**
+   * Find GGUF file in extracted directory (for VLM models)
+   * Recursively searches for the main model .gguf file
+   */
+  async findGGUFInDirectory(directory: string): Promise<string> {
+    if (!RNFS) {
+      throw new Error('react-native-fs not available');
+    }
+
+    try {
+      const contents = await RNFS.readDir(directory);
+
+      // Look for .gguf files (not mmproj)
+      for (const item of contents) {
+        if (item.isFile() && item.name.endsWith('.gguf') && !item.name.includes('mmproj')) {
+          logger.info(`Found main GGUF model: ${item.name}`);
+          return item.path;
+        }
+      }
+
+      // If not found, check nested directories
+      for (const item of contents) {
+        if (item.isDirectory()) {
+          try {
+            return await this.findGGUFInDirectory(item.path);
+          } catch {
+            // Continue searching other directories
+          }
+        }
+      }
+
+      throw new Error(`No GGUF model file found in ${directory}`);
+    } catch (error) {
+      logger.error(`Error finding GGUF file: ${error}`);
+      throw error;
+    }
+  },
+
+  /**
+   * Find mmproj file in same directory as model (for VLM models)
+   * Returns path to mmproj file if found, undefined otherwise
+   */
+  async findMmprojForModel(modelPath: string): Promise<string | undefined> {
+    if (!RNFS) {
+      return undefined;
+    }
+
+    try {
+      // Get directory containing the model
+      const directory = modelPath.substring(0, modelPath.lastIndexOf('/'));
+      const contents = await RNFS.readDir(directory);
+
+      // Look for mmproj files
+      for (const item of contents) {
+        if (item.isFile() && item.name.endsWith('.gguf') && item.name.includes('mmproj')) {
+          logger.info(`Found mmproj file: ${item.name}`);
+          return item.path;
+        }
+      }
+
+      logger.info('No mmproj file found - VLM backend will auto-detect if needed');
+      return undefined;
+    } catch (error) {
+      logger.warning(`Error finding mmproj file: ${error}`);
+      return undefined;
     }
   },
 
