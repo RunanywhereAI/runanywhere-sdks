@@ -33,11 +33,13 @@ export function requireNativeLlamaModule(): NativeRunAnywhereLlamaModule {
 }
 
 /**
- * Check if the native Llama module is available
+ * Check if the native Llama module is available.
+ * Uses the singleton getter to avoid creating throwaway HybridObject instances
+ * whose C++ destructors could tear down shared bridge state.
  */
 export function isNativeLlamaModuleAvailable(): boolean {
   try {
-    requireNativeLlamaModule();
+    getNativeLlamaModule();
     return true;
   } catch {
     return false;

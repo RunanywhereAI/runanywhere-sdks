@@ -237,6 +237,23 @@ export {
 export type { NativeRunAnywhereCoreModule, FileSystemModule } from './native/NativeRunAnywhereCore';
 
 // =============================================================================
+// Public Extensions (standalone function exports)
+// These are also available via RunAnywhere.* but exported here for direct import
+// =============================================================================
+
+export {
+  getMmprojPath,
+  getModelPath,
+  getAvailableModels,
+  getModelInfo,
+  isModelDownloaded,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  registerModel,
+} from './Public/Extensions/RunAnywhere+Models';
+
+// =============================================================================
 // Nitrogen Spec Types
 // =============================================================================
 
