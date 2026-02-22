@@ -12,9 +12,42 @@ import CRACommons
 import Foundation
 import os
 
+// MARK: - Swift STT Event
+
+/// Lightweight event emitted when WhisperKit (or other Swift-only STT backends)
+/// load/unload models. Matches the event types that C++ emits for ONNX models
+/// so the UI event pipeline works consistently regardless of backend.
+struct SwiftSTTEvent: SDKEvent {
+    let type: String
+    let category: EventCategory = .stt
+    let properties: [String: String]
+
+    init(type: String, modelId: String?) {
+        self.type = type
+        self.properties = modelId.map { ["model_id": $0] } ?? [:]
+    }
+}
+
+// MARK: - Swift STT Handler Protocol
+
+/// Protocol for Swift-only STT backends that bypass the C++ bridge.
+/// Modules like WhisperKitRuntime conform to this and register via
+/// `RunAnywhere.swiftSTTHandler` during `register()`.
+public protocol SwiftSTTHandler: Sendable {
+    func transcribe(_ audioData: Data, options: STTOptions) async throws -> STTOutput
+    func loadModel(modelId: String, modelFolder: String) async throws
+    func unloadModel() async
+    var isModelLoaded: Bool { get async }
+    var currentModelId: String? { get async }
+}
+
 // MARK: - STT Operations
 
 public extension RunAnywhere {
+
+    /// Handler for Swift-only STT backends (e.g., WhisperKit).
+    /// Set by the module's `register()` call; nil if no Swift backend is registered.
+    static var swiftSTTHandler: (any SwiftSTTHandler)?
 
     // MARK: - Simple Transcription
 
@@ -39,13 +72,23 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        // Unload Swift STT handler if it has a loaded model
+        if let handler = swiftSTTHandler, await handler.isModelLoaded {
+            await handler.unloadModel()
+            EventBus.shared.publish(SwiftSTTEvent(type: "stt_model_unloaded", modelId: nil))
+            return
+        }
+
         await CppBridge.STT.shared.unload()
     }
 
     /// Check if an STT model is loaded
     static var isSTTModelLoaded: Bool {
         get async {
-            await CppBridge.STT.shared.isLoaded
+            if let handler = swiftSTTHandler, await handler.isModelLoaded {
+                return true
+            }
+            return await CppBridge.STT.shared.isLoaded
         }
     }
 
@@ -62,6 +105,11 @@ public extension RunAnywhere {
     ) async throws -> STTOutput {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        // Route to Swift STT handler if it has a loaded model
+        if let handler = swiftSTTHandler, await handler.isModelLoaded {
+            return try await handler.transcribe(audioData, options: options)
         }
 
         // Get handle from CppBridge.STT

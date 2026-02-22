@@ -1,5 +1,35 @@
 import Foundation
 
+// MARK: - Pending Registration Tracking
+
+extension RunAnywhere {
+
+    private static let pendingRegistrationsLock = NSLock()
+    private static var _pendingRegistrations: [Task<Void, Never>] = []
+
+    static func trackPendingRegistration(_ task: Task<Void, Never>) {
+        pendingRegistrationsLock.lock()
+        _pendingRegistrations.append(task)
+        pendingRegistrationsLock.unlock()
+    }
+
+    /// Await all pending `registerModel()` saves to the C++ registry.
+    ///
+    /// `registerModel()` is synchronous and saves to the registry asynchronously.
+    /// Call this before `discoverDownloadedModels()` to ensure all models are in
+    /// the registry so discovery can match them to files on disk.
+    public static func flushPendingRegistrations() async {
+        pendingRegistrationsLock.lock()
+        let tasks = _pendingRegistrations
+        _pendingRegistrations.removeAll()
+        pendingRegistrationsLock.unlock()
+
+        for task in tasks {
+            _ = await task.result
+        }
+    }
+}
+
 // MARK: - Model Registration API
 
 public extension RunAnywhere {
@@ -50,10 +80,9 @@ public extension RunAnywhere {
             source: .local
         )
 
-        // Save to C++ registry (fire-and-forget)
         let logger = SDKLogger(category: "RunAnywhere.Models")
         logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
-        Task {
+        let task = Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
                 logger.info("Model saved to registry: \(modelId)")
@@ -61,6 +90,7 @@ public extension RunAnywhere {
                 logger.error("Failed to register model: \(error)")
             }
         }
+        trackPendingRegistration(task)
 
         return modelInfo
     }
@@ -157,14 +187,14 @@ public extension RunAnywhere {
             source: .local
         )
 
-        // Save to C++ registry (fire-and-forget)
-        Task {
+        let task = Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
             } catch {
                 SDKLogger(category: "RunAnywhere.Models").error("Failed to register multi-file model: \(error)")
             }
         }
+        trackPendingRegistration(task)
 
         return modelInfo
     }

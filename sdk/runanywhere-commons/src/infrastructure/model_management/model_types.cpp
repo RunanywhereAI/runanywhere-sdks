@@ -178,7 +178,8 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
-        case RAC_FRAMEWORK_COREML:  // CoreML compiled models (.mlmodelc) are directories
+        case RAC_FRAMEWORK_COREML:      // CoreML compiled models (.mlmodelc) are directories
+        case RAC_FRAMEWORK_WHISPERKIT:   // WhisperKit models are directories of .mlmodelc files
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -201,6 +202,7 @@ rac_bool_t rac_framework_supports_stt(rac_inference_framework_t framework) {
     // Mirrors Swift's InferenceFramework.supportsSTT
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
+        case RAC_FRAMEWORK_WHISPERKIT:
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -233,6 +235,8 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "System TTS";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
+        case RAC_FRAMEWORK_WHISPERKIT:
+            return "WhisperKit";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -259,6 +263,8 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "system_tts";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "fluid_audio";
+        case RAC_FRAMEWORK_WHISPERKIT:
+            return "whisper_kit";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:

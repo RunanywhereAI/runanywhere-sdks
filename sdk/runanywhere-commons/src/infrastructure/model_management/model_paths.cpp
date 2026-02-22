@@ -110,6 +110,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "SystemTTS";
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
+        case RAC_FRAMEWORK_WHISPERKIT:
+            return "WhisperKit";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
         case RAC_FRAMEWORK_NONE:
@@ -405,6 +407,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
         return RAC_SUCCESS;
     } else if (nextComponent == "FluidAudio") {
         *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "WhisperKit") {
+        *out_framework = RAC_FRAMEWORK_WHISPERKIT;
         return RAC_SUCCESS;
     } else if (nextComponent == "BuiltIn") {
         *out_framework = RAC_FRAMEWORK_BUILTIN;

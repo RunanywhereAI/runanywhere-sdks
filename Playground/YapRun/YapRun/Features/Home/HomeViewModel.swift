@@ -247,6 +247,7 @@ extension ModelInfo {
         case .llamaCpp:         return .purple
         case .foundationModels: return .blue
         case .coreml:           return .cyan
+        case .whisperKit:       return .green
         default:                return .gray
         }
     }

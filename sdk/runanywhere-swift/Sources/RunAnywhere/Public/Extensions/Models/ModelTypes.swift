@@ -80,6 +80,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case fluidAudio = "FluidAudio"
     case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
     case mlx = "MLX"              // MLX (Apple Silicon VLM via MLX C++)
+    case whisperKit = "WhisperKit" // WhisperKit (Apple Neural Engine) for STT
 
     // Special cases
     case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
@@ -96,6 +97,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .fluidAudio: return "FluidAudio"
         case .coreml: return "Core ML"
         case .mlx: return "MLX"
+        case .whisperKit: return "WhisperKit"
         case .builtIn: return "Built-in"
         case .none: return "None"
         case .unknown: return "Unknown"
@@ -112,6 +114,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .fluidAudio: return "fluid_audio"
         case .coreml: return "coreml"
         case .mlx: return "mlx"
+        case .whisperKit: return "whisper_kit"
         case .builtIn: return "built_in"
         case .none: return "none"
         case .unknown: return "unknown"
@@ -132,6 +135,7 @@ public extension InferenceFramework {
         case .fluidAudio: return RAC_FRAMEWORK_FLUID_AUDIO
         case .coreml: return RAC_FRAMEWORK_COREML
         case .mlx: return RAC_FRAMEWORK_MLX
+        case .whisperKit: return RAC_FRAMEWORK_WHISPERKIT
         case .builtIn: return RAC_FRAMEWORK_BUILTIN
         case .none: return RAC_FRAMEWORK_NONE
         case .unknown: return RAC_FRAMEWORK_UNKNOWN
@@ -148,6 +152,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_FLUID_AUDIO: return .fluidAudio
         case RAC_FRAMEWORK_COREML: return .coreml
         case RAC_FRAMEWORK_MLX: return .mlx
+        case RAC_FRAMEWORK_WHISPERKIT: return .whisperKit
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none
         default: return .unknown

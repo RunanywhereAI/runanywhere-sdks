@@ -73,6 +73,14 @@ let package = Package(
             name: "RunAnywhereLlamaCPP",
             targets: ["LlamaCPPRuntime"]
         ),
+
+        // =================================================================
+        // WhisperKit Backend - adds STT via Apple Neural Engine
+        // =================================================================
+        .library(
+            name: "RunAnywhereWhisperKit",
+            targets: ["WhisperKitRuntime"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -84,6 +92,8 @@ let package = Package(
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
         // ml-stable-diffusion for CoreML-based image generation
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
+        // WhisperKit for Neural Engine STT
+        .package(path: "EXTERNAL/WhisperKit"),
     ],
     targets: [
         // =================================================================
@@ -178,6 +188,22 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // =================================================================
+        // WhisperKit Runtime Backend (Apple Neural Engine STT)
+        // =================================================================
+        .target(
+            name: "WhisperKitRuntime",
+            dependencies: [
+                "RunAnywhere",
+                .product(name: "WhisperKit", package: "whisperkit"),
+            ],
+            path: "sdk/runanywhere-swift/Sources/WhisperKitRuntime",
+            linkerSettings: [
+                .linkedFramework("CoreML"),
+                .linkedFramework("Accelerate"),
             ]
         ),
 

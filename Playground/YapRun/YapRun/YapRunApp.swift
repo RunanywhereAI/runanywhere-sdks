@@ -10,6 +10,7 @@
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
+import WhisperKitRuntime
 import os
 
 @main
@@ -131,12 +132,20 @@ struct YapRunApp: App {
     func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
 
             try RunAnywhere.initialize()
             logger.info("SDK initialized in development mode")
 
             ModelRegistry.registerAll()
             logger.info("ASR models registered")
+
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("Discovered \(discovered) previously downloaded models")
+            }
+
             await MainActor.run { isSDKInitialized = true }
         } catch {
             logger.error("SDK initialization failed: \(error.localizedDescription)")

@@ -57,6 +57,11 @@ extension RunAnywhere {
             return resolveONNXModelPath(modelFolder: modelFolder, modelId: model.id)
         }
 
+        // For WhisperKit models (directory-based), find the folder with .mlmodelc files
+        if model.framework == .whisperKit {
+            return resolveWhisperKitModelPath(modelFolder: modelFolder, modelId: model.id)
+        }
+
         // For single-file models (LlamaCpp), find the actual model file
         return try resolveSingleFileModelPath(modelFolder: modelFolder, model: model)
     }
@@ -103,6 +108,47 @@ extension RunAnywhere {
         // Fallback to model folder
         logger.warning("No ONNX model files found, falling back to: \(modelFolder.path)")
         return modelFolder
+    }
+
+    /// Resolve WhisperKit model directory path (handles nested archive extraction)
+    /// WhisperKit expects a folder containing AudioEncoder.mlmodelc, TextDecoder.mlmodelc, MelSpectrogram.mlmodelc
+    private static func resolveWhisperKitModelPath(modelFolder: URL, modelId: String) -> URL {
+        let logger = SDKLogger(category: "ModelPathResolver")
+
+        // Check if .mlmodelc files exist directly in the model folder
+        if hasWhisperKitModelFiles(at: modelFolder) {
+            logger.info("Found WhisperKit model at folder: \(modelFolder.path)")
+            return modelFolder
+        }
+
+        // Check nested folder with the model name (from archive extraction)
+        let nestedFolder = modelFolder.appendingPathComponent(modelId)
+        if hasWhisperKitModelFiles(at: nestedFolder) {
+            logger.info("Found WhisperKit model at nested path: \(nestedFolder.path)")
+            return nestedFolder
+        }
+
+        // Scan one level of subdirectories for .mlmodelc files
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for item in contents {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
+                    if hasWhisperKitModelFiles(at: item) {
+                        logger.info("Found WhisperKit model in subdirectory: \(item.path)")
+                        return item
+                    }
+                }
+            }
+        }
+
+        logger.warning("No WhisperKit model files found, falling back to: \(modelFolder.path)")
+        return modelFolder
+    }
+
+    /// Check if a directory contains WhisperKit model files (AudioEncoder.mlmodelc is the key indicator)
+    private static func hasWhisperKitModelFiles(at directory: URL) -> Bool {
+        let audioEncoder = directory.appendingPathComponent("AudioEncoder.mlmodelc")
+        return FileManager.default.fileExists(atPath: audioEncoder.path)
     }
 
     /// Check if a directory contains ONNX model files
@@ -244,6 +290,27 @@ extension RunAnywhere {
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.STT")
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
+
+        // Route to Swift STT handler for frameworks like WhisperKit
+        if modelInfo.framework == .whisperKit {
+            guard let handler = swiftSTTHandler else {
+                throw SDKError.stt(.notInitialized, "WhisperKit module not registered. Call WhisperKitSTT.register() first.")
+            }
+            // Unload C++ model if one is loaded
+            if await CppBridge.STT.shared.isLoaded {
+                await CppBridge.STT.shared.unload()
+            }
+            try await handler.loadModel(modelId: modelId, modelFolder: modelPath.path)
+            // Emit event so UI gets notified (WhisperKit bypasses C++ event pipeline)
+            EventBus.shared.publish(SwiftSTTEvent(type: "stt_model_load_completed", modelId: modelId))
+            return
+        }
+
+        // Unload Swift STT handler if it has a model loaded (switching to C++ backend)
+        if let handler = swiftSTTHandler, await handler.isModelLoaded {
+            await handler.unloadModel()
+        }
+
         try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
@@ -318,6 +385,13 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
+
+            // Check Swift STT handler first (e.g., WhisperKit)
+            if let handler = swiftSTTHandler, let handlerModelId = await handler.currentModelId {
+                let models = (try? await availableModels()) ?? []
+                return models.first { $0.id == handlerModelId }
+            }
+
             guard let modelId = await CppBridge.STT.shared.currentModelId else { return nil }
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
@@ -342,5 +416,20 @@ extension RunAnywhere {
     public static func cancelGeneration() async {
         guard isInitialized else { return }
         await CppBridge.LLM.shared.cancel()
+    }
+
+    /// Scan the file system for previously downloaded models and link them to the registry.
+    ///
+    /// Call this **after** all `registerModel()` calls are complete. The `registerModel()` API
+    /// saves to the registry asynchronously, so calling this immediately after registration
+    /// ensures discovery runs only once all models are registered and can be matched to files on disk.
+    ///
+    /// - Returns: Number of models discovered on disk
+    @discardableResult
+    public static func discoverDownloadedModels() async -> Int {
+        guard isInitialized else { return 0 }
+        try? await ensureServicesReady()
+        let result = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+        return result.discoveredCount
     }
 }

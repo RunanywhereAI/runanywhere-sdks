@@ -15,6 +15,7 @@ enum ModelRegistry {
         let name: String
         let url: URL
         let archiveType: ArchiveType
+        let framework: InferenceFramework
         let sizeBytes: Int64
     }
 
@@ -23,11 +24,13 @@ enum ModelRegistry {
 
     /// All available ASR models (tar.gz for fast native gzip extraction on iOS/macOS).
     static let asrModels: [ASRModel] = [
+        // ONNX models (CPU via sherpa-onnx)
         ASRModel(
             id: "asr-moonshine-tiny-en-int8",
             name: "Moonshine Tiny EN (int8)",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-moonshine-tiny-en-int8.tar.gz")!,
             archiveType: .tarGz,
+            framework: .onnx,
             sizeBytes: 118_000_000
         ),
         ASRModel(
@@ -35,6 +38,7 @@ enum ModelRegistry {
             name: "Moonshine Base EN (int8)",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-moonshine-base-en-int8.tar.gz")!,
             archiveType: .tarGz,
+            framework: .onnx,
             sizeBytes: 273_000_000
         ),
         ASRModel(
@@ -42,6 +46,7 @@ enum ModelRegistry {
             name: "Whisper Tiny EN",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-whisper-tiny.en.tar.gz")!,
             archiveType: .tarGz,
+            framework: .onnx,
             sizeBytes: 75_000_000
         ),
         ASRModel(
@@ -49,7 +54,26 @@ enum ModelRegistry {
             name: "Parakeet TDT-CTC 110M EN (int8)",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/sherpa-onnx-nemo-parakeet_tdt_ctc_110m-en-36000-int8.tar.gz")!,
             archiveType: .tarGz,
+            framework: .onnx,
             sizeBytes: 126_000_000
+        ),
+
+        // WhisperKit models (Apple Neural Engine via Core ML)
+        ASRModel(
+            id: "whisperkit-tiny.en",
+            name: "Whisper Tiny EN (WhisperKit)",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz")!,
+            archiveType: .tarGz,
+            framework: .whisperKit,
+            sizeBytes: 70_000_000
+        ),
+        ASRModel(
+            id: "whisperkit-base.en",
+            name: "Whisper Base EN (WhisperKit)",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz")!,
+            archiveType: .tarGz,
+            framework: .whisperKit,
+            sizeBytes: 134_000_000
         ),
     ]
 
@@ -60,7 +84,7 @@ enum ModelRegistry {
                 id: model.id,
                 name: model.name,
                 url: model.url,
-                framework: .onnx,
+                framework: model.framework,
                 modality: .speechRecognition,
                 artifactType: .archive(model.archiveType, structure: .nestedDirectory),
                 memoryRequirement: model.sizeBytes
