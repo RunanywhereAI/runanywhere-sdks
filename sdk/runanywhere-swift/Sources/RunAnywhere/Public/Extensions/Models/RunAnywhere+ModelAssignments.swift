@@ -1,16 +1,14 @@
 import Foundation
+import os
 
 // MARK: - Pending Registration Tracking
 
 extension RunAnywhere {
 
-    private static let pendingRegistrationsLock = NSLock()
-    private static var _pendingRegistrations: [Task<Void, Never>] = []
+    private static let pendingRegistrationsLock = OSAllocatedUnfairLock(initialState: [Task<Void, Never>]())
 
     static func trackPendingRegistration(_ task: Task<Void, Never>) {
-        pendingRegistrationsLock.lock()
-        _pendingRegistrations.append(task)
-        pendingRegistrationsLock.unlock()
+        pendingRegistrationsLock.withLock { $0.append(task) }
     }
 
     /// Await all pending `registerModel()` saves to the C++ registry.
@@ -19,10 +17,11 @@ extension RunAnywhere {
     /// Call this before `discoverDownloadedModels()` to ensure all models are in
     /// the registry so discovery can match them to files on disk.
     public static func flushPendingRegistrations() async {
-        pendingRegistrationsLock.lock()
-        let tasks = _pendingRegistrations
-        _pendingRegistrations.removeAll()
-        pendingRegistrationsLock.unlock()
+        let tasks = pendingRegistrationsLock.withLock { state -> [Task<Void, Never>] in
+            let current = state
+            state.removeAll()
+            return current
+        }
 
         for task in tasks {
             _ = await task.result

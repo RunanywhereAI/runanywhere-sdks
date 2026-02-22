@@ -614,7 +614,7 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
     rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP,   RAC_FRAMEWORK_ONNX,
                                               RAC_FRAMEWORK_COREML,     RAC_FRAMEWORK_MLX,
                                               RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-                                              RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_WHISPERKIT,
+                                              RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_WHISPERKIT_COREML,
                                               RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 

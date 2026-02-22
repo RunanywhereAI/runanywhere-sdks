@@ -58,7 +58,7 @@ extension RunAnywhere {
         }
 
         // For WhisperKit models (directory-based), find the folder with .mlmodelc files
-        if model.framework == .whisperKit {
+        if model.framework == .whisperKitCoreML {
             return resolveWhisperKitModelPath(modelFolder: modelFolder, modelId: model.id)
         }
 
@@ -292,7 +292,7 @@ extension RunAnywhere {
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
 
         // Route to Swift STT handler for frameworks like WhisperKit
-        if modelInfo.framework == .whisperKit {
+        if modelInfo.framework == .whisperKitCoreML {
             guard let handler = swiftSTTHandler else {
                 throw SDKError.stt(.notInitialized, "WhisperKit module not registered. Call WhisperKitSTT.register() first.")
             }

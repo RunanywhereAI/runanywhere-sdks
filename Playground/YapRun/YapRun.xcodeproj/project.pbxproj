@@ -373,7 +373,7 @@
 			mainGroup = 54398FB12F4979D2009D6B51;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				543991CB2F498152009D6B51 /* XCLocalSwiftPackageReference "runanywhere-sdks" */,
+				543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 54398FBB2F4979D2009D6B51 /* Products */;
@@ -992,24 +992,31 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		543991CB2F498152009D6B51 /* XCLocalSwiftPackageReference "runanywhere-sdks" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../..";
+/* Begin XCRemoteSwiftPackageReference section */
+		543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.19.2;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		543991CC2F498152009D6B51 /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
 		543991CE2F498152009D6B51 /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereONNX;
 		};
 		543991D02F498152009D6B51 /* RunAnywhereWhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -175,17 +175,8 @@ struct RunAnywhereAIApp: App {
     private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
         logger.info("📦 Registering modules with their models...")
 
-        // Register LlamaCPP backend with C++ commons
-        LlamaCPP.register(priority: 100)
-        logger.info("✅ LlamaCPP backend registered")
-
-        // Register ONNX backend service providers
-        ONNX.register(priority: 100)
-        logger.info("✅ ONNX backend registered")
-
-        // Register WhisperKit (Apple Neural Engine STT)
-        WhisperKitSTT.register(priority: 200)
-        logger.info("✅ WhisperKit STT backend registered")
+        // NOTE: LlamaCPP, ONNX, and WhisperKitSTT backends are registered once
+        // in initializeSDK() before any await. No duplicate registration needed here.
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
@@ -362,7 +353,7 @@ struct RunAnywhereAIApp: App {
                 id: "whisperkit-tiny.en",
                 name: "Whisper Tiny EN (WhisperKit)",
                 url: whisperKitTinyURL,
-                framework: .whisperKit,
+                framework: .whisperKitCoreML,
                 modality: .speechRecognition,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 70_000_000
@@ -373,7 +364,7 @@ struct RunAnywhereAIApp: App {
                 id: "whisperkit-base.en",
                 name: "Whisper Base EN (WhisperKit)",
                 url: whisperKitBaseURL,
-                framework: .whisperKit,
+                framework: .whisperKitCoreML,
                 modality: .speechRecognition,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 134_000_000

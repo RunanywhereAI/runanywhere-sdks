@@ -1,5 +1,5 @@
 {
-  "originHash" : "3460a3a28d41ad2e683d917ec52c81d360e2e01615debdddb4f13b7b027f04df",
+  "originHash" : "df2c22e2bf1660344df01f01888e18403c2afd516088d5b4b0323762ac78ee1f",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "5a170d29cf38e674b80541d7ce22929c6a11cdde",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "runanywhere-sdks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RunanywhereAI/runanywhere-sdks",
+      "state" : {
+        "revision" : "92d76c90b0389c52b7ccfbe6723c4cde5a6ebd92",
+        "version" : "0.19.2"
       }
     },
     {
@@ -116,6 +125,15 @@
       "state" : {
         "revision" : "573e5c9036c2f136b3a8a071da8e8907322403d0",
         "version" : "1.1.6"
+      }
+    },
+    {
+      "identity" : "whisperkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/argmaxinc/WhisperKit.git",
+      "state" : {
+        "revision" : "664e1b5a65296cd957dfdf262cd120ca88f3b24b",
+        "version" : "0.15.0"
       }
     },
     {

@@ -47,7 +47,8 @@ public extension RunAnywhere {
 
     /// Handler for Swift-only STT backends (e.g., WhisperKit).
     /// Set by the module's `register()` call; nil if no Swift backend is registered.
-    static var swiftSTTHandler: (any SwiftSTTHandler)?
+    /// Written once at startup from `@MainActor` before any reads occur.
+    nonisolated(unsafe) static var swiftSTTHandler: (any SwiftSTTHandler)?
 
     // MARK: - Simple Transcription
 

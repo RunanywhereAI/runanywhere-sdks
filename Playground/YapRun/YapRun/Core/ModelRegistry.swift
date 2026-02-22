@@ -64,7 +64,7 @@ enum ModelRegistry {
             name: "Whisper Tiny EN (WhisperKit)",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz")!,
             archiveType: .tarGz,
-            framework: .whisperKit,
+            framework: .whisperKitCoreML,
             sizeBytes: 70_000_000
         ),
         ASRModel(
@@ -72,7 +72,7 @@ enum ModelRegistry {
             name: "Whisper Base EN (WhisperKit)",
             url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz")!,
             archiveType: .tarGz,
-            framework: .whisperKit,
+            framework: .whisperKitCoreML,
             sizeBytes: 134_000_000
         ),
     ]

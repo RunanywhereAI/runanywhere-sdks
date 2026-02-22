@@ -93,7 +93,10 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
         if peakAmplitude > 0 && peakAmplitude < normalizationThreshold {
             let gain = normalizationTarget / peakAmplitude
             applyGain(&floatSamples, gain: gain)
-            logger.info("Normalized audio: peak \(String(format: "%.4f", peakAmplitude)) → \(String(format: "%.4f", peakAmplitude * gain)) (gain \(String(format: "%.1f", gain))x)")
+            let before = String(format: "%.4f", peakAmplitude)
+            let after = String(format: "%.4f", peakAmplitude * gain)
+            let factor = String(format: "%.1f", gain)
+            logger.info("Normalized audio: peak \(before) → \(after) (gain \(factor)x)")
         }
 
         let audioDurationSec = Double(floatSamples.count) / 16000.0
@@ -177,7 +180,7 @@ public actor WhisperKitSTTService: SwiftSTTHandler {
 
     /// In-place gain using Accelerate (O(n) vectorized).
     private func applyGain(_ samples: inout [Float], gain: Float) {
-        var g = gain
-        vDSP_vsmul(samples, 1, &g, &samples, 1, vDSP_Length(samples.count))
+        var gainValue = gain
+        vDSP_vsmul(samples, 1, &gainValue, &samples, 1, vDSP_Length(samples.count))
     }
 }

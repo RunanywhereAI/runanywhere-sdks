@@ -47,7 +47,7 @@ public enum WhisperKitSTT: RunAnywhereModule {
     public static let moduleName = "WhisperKit"
     public static let capabilities: Set<SDKComponent> = [.stt]
     public static let defaultPriority: Int = 200
-    public static let inferenceFramework: InferenceFramework = .whisperKit
+    public static let inferenceFramework: InferenceFramework = .whisperKitCoreML
 
     // MARK: - Registration State
 
@@ -76,6 +76,7 @@ public enum WhisperKitSTT: RunAnywhereModule {
     }
 
     /// Unregister the WhisperKit backend.
+    @MainActor
     public static func unregister() {
         guard isRegistered else { return }
 
