@@ -37,11 +37,11 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = true //  Toggle: true for local dev, false for release
+let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.1"
+let sdkVersion = "0.19.2"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -93,7 +93,7 @@ let package = Package(
         // ml-stable-diffusion for CoreML-based image generation
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
         // WhisperKit for Neural Engine STT
-        .package(path: "EXTERNAL/WhisperKit"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
     ],
     targets: [
         // =================================================================
@@ -268,22 +268,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
-                checksum: "f6bc152b1689d7549d6a7b5e692f6babb0efc44fe334c0e60acfc0c12d848c44"
+                checksum: "ab6b15e52983f7f5706fc167ae79f5935042a23915a3ff56af49a19a92d48ebb"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-v\(sdkVersion).zip",
-                checksum: "ba150fd924f71c2137d6cad0a294c3f9c2da5bc748b547cced87bc0910a9b327"
+                checksum: "063e4c53718e9b5367b58009039b9f3c401c0ffde8f8646036bb0b55a2625a3e"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
-                checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
+                checksum: "108b897dbb6c51a372641c0a46e2c8db8419724cf3ad3388dc886b8c121036bf"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
-                checksum: "e0180262bd1b10fcda95aaf9aac595af5e6819bd454312b6fc8ffc3828db239f"
+                checksum: "394550455ac5f0c2ac0fa8f7a93be5a4eaec43a9c52772ed83179f3ae151dd6a"
             ),
         ]
     }
