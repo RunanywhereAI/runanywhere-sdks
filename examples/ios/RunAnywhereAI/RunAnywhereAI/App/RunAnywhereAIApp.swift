@@ -267,6 +267,22 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 1_800_000_000
             )
         }
+        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+        // Uses multi-file download: main model + mmproj from HuggingFace
+        if let lfm2MainURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf"),
+           let lfm2MmprojURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
+                id: "lfm2-vl-450m-q8_0",
+                name: "LFM2-VL 450M",
+                files: [
+                    ModelFileDescriptor(url: lfm2MainURL, filename: "LFM2-VL-450M-Q8_0.gguf"),
+                    ModelFileDescriptor(url: lfm2MmprojURL, filename: "mmproj-LFM2-VL-450M-Q8_0.gguf")
+                ],
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 600_000_000
+            )
+        }
         logger.info("✅ VLM models registered")
 
         // Register ONNX STT and TTS models

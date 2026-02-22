@@ -322,6 +322,14 @@ dependencies {
     implementation(libs.accompanist.permissions)
 
     // ========================================
+    // CameraX (for VLM camera preview)
+    // ========================================
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // ========================================
     // Database
     // ========================================
     implementation(libs.androidx.room.runtime)

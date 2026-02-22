@@ -233,17 +233,19 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
         ModelSelectionContext.VOICE -> Icons.Default.Mic
         ModelSelectionContext.RAG_EMBEDDING,
         ModelSelectionContext.RAG_LLM -> Icons.Default.Description
+        ModelSelectionContext.VLM -> Icons.Default.Visibility
     }
 }
 
 private fun getModalityColor(modality: ModelSelectionContext): Color {
     return when (modality) {
         ModelSelectionContext.LLM -> AppColors.primaryAccent
-        ModelSelectionContext.STT -> Color(0xFF4CAF50) // Green
+        ModelSelectionContext.STT -> Color(0xFF4CAF50)
         ModelSelectionContext.TTS -> AppColors.primaryPurple
         ModelSelectionContext.VOICE -> AppColors.primaryAccent
         ModelSelectionContext.RAG_EMBEDDING,
-        ModelSelectionContext.RAG_LLM -> Color(0xFF2196F3) // Blue
+        ModelSelectionContext.RAG_LLM -> Color(0xFF2196F3)
+        ModelSelectionContext.VLM -> AppColors.primaryPurple
     }
 }
 
@@ -255,16 +257,25 @@ private fun getModalityTitle(modality: ModelSelectionContext): String {
         ModelSelectionContext.VOICE -> "Voice Assistant"
         ModelSelectionContext.RAG_EMBEDDING -> "Document Search"
         ModelSelectionContext.RAG_LLM -> "Document Chat"
+        ModelSelectionContext.VLM -> "Vision Chat"
     }
 }
 
 private fun getModalityDescription(modality: ModelSelectionContext): String {
     return when (modality) {
-        ModelSelectionContext.LLM -> "Choose your AI assistant and start chatting. Everything runs privately on your device."
-        ModelSelectionContext.STT -> "Transcribe your speech to text with powerful on-device voice recognition."
-        ModelSelectionContext.TTS -> "Have any text read aloud with natural-sounding voices."
-        ModelSelectionContext.VOICE -> "Talk naturally with your AI assistant. Let's set up the components together."
-        ModelSelectionContext.RAG_EMBEDDING -> "Choose an embedding model to index and search your documents on-device."
-        ModelSelectionContext.RAG_LLM -> "Choose an AI model to answer questions about your documents."
+        ModelSelectionContext.LLM ->
+            "Choose your AI assistant and start chatting. Everything runs privately on your device."
+        ModelSelectionContext.STT ->
+            "Transcribe your speech to text with powerful on-device voice recognition."
+        ModelSelectionContext.TTS ->
+            "Have any text read aloud with natural-sounding voices."
+        ModelSelectionContext.VOICE ->
+            "Talk naturally with your AI assistant. Let's set up the components together."
+        ModelSelectionContext.RAG_EMBEDDING ->
+            "Choose an embedding model to index and search your documents on-device."
+        ModelSelectionContext.RAG_LLM ->
+            "Choose an AI model to answer questions about your documents."
+        ModelSelectionContext.VLM ->
+            "Chat with images using your device's camera or photo library."
     }
 }

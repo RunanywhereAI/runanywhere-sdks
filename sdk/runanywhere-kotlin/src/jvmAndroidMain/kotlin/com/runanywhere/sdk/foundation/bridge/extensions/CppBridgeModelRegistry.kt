@@ -39,8 +39,8 @@ object CppBridgeModelRegistry {
         const val SPEECH_SYNTHESIS = 2 // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
         const val AUDIO = 3 // RAC_MODEL_CATEGORY_AUDIO
         const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
+        const val IMAGE_GENERATION = 5 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
         const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed in API
     }
 
     /**
@@ -272,13 +272,22 @@ object CppBridgeModelRegistry {
         }
 
         val typeDirectories =
-            mapOf(
-                "llm" to ModelCategory.LANGUAGE,
-                "stt" to ModelCategory.SPEECH_RECOGNITION,
-                "tts" to ModelCategory.SPEECH_SYNTHESIS,
-                "vad" to ModelCategory.AUDIO,
-                "embedding" to ModelType.EMBEDDING,
-            )
+    mapOf(
+        "llm" to ModelCategory.LANGUAGE,
+        "stt" to ModelCategory.SPEECH_RECOGNITION,
+        "tts" to ModelCategory.SPEECH_SYNTHESIS,
+        "vad" to ModelCategory.AUDIO,
+
+        // RAG
+        "embedding" to ModelType.EMBEDDING,
+
+        // Vision / VLM
+        "vision" to ModelCategory.VISION,
+        "multimodal" to ModelCategory.MULTIMODAL,
+
+        // Backward compatibility
+        "other" to -1,
+    )
 
         var restoredCount = 0
 

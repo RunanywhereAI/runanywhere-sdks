@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -22,13 +21,11 @@ import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
+import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
+import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
-/**
- * Main navigation component matching iOS app structure
- * 5 tabs: Chat, STT, TTS, Voice, Settings
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation() {
@@ -48,6 +45,40 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
+            composable(NavigationRoute.VISION) {
+                VisionHubScreen(
+                    onNavigateToVLM = {
+                        navController.navigate(NavigationRoute.VLM)
+                    },
+                    onNavigateToImageGeneration = {
+                        // Future
+                    },
+                )
+            }
+
+            composable(NavigationRoute.VLM) {
+                VLMScreen()
+            }
+
+            composable(NavigationRoute.VOICE) {
+                VoiceAssistantScreen()
+            }
+
+            // ✅ More hub now includes RAG
+            composable(NavigationRoute.MORE) {
+                MoreHubScreen(
+                    onNavigateToSTT = {
+                        navController.navigate(NavigationRoute.STT)
+                    },
+                    onNavigateToTTS = {
+                        navController.navigate(NavigationRoute.TTS)
+                    },
+                    onNavigateToRAG = {
+                        navController.navigate(NavigationRoute.RAG)
+                    },
+                )
+            }
+
             composable(NavigationRoute.STT) {
                 SpeechToTextScreen()
             }
@@ -56,35 +87,44 @@ fun AppNavigation() {
                 TextToSpeechScreen()
             }
 
-            composable(NavigationRoute.VOICE) {
-                VoiceAssistantScreen()
+            composable(NavigationRoute.RAG) {
+                DocumentRAGScreen()
             }
 
             composable(NavigationRoute.SETTINGS) {
                 SettingsScreen()
-            }
-
-            composable(NavigationRoute.RAG) {
-                DocumentRAGScreen()
             }
         }
     }
 }
 
 /**
- * Bottom navigation bar
- * - Chat (message icon)
- * - STT (waveform icon)
- * - TTS (speaker.wave.2 icon)
- * - Voice (mic icon)
- * - Settings (gear icon)
+ * Ensures nested routes highlight correct tab
  */
+private fun isRouteSelectedForTab(currentRoute: String?, tabRoute: String): Boolean {
+    if (currentRoute == null) return false
+    if (currentRoute == tabRoute) return true
+
+    return when (tabRoute) {
+        NavigationRoute.VISION ->
+            currentRoute in listOf(NavigationRoute.VLM)
+
+        NavigationRoute.MORE ->
+            currentRoute in listOf(
+                NavigationRoute.STT,
+                NavigationRoute.TTS,
+                NavigationRoute.RAG, // ✅ RAG mapped under More
+            )
+
+        else -> false
+    }
+}
+
 @Composable
 fun RunAnywhereBottomNav(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
+    val currentRoute = navBackStackEntry?.destination?.route
 
-    // Tab labels and icons: Chat, Transcribe, Speak, Voice, Settings
     val items =
         listOf(
             BottomNavItem(
@@ -94,16 +134,10 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 selectedIcon = Icons.Filled.Chat,
             ),
             BottomNavItem(
-                route = NavigationRoute.STT,
-                label = "Transcribe",
-                icon = Icons.Outlined.GraphicEq,
-                selectedIcon = Icons.Filled.GraphicEq,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.TTS,
-                label = "Speak",
-                icon = Icons.Outlined.VolumeUp,
-                selectedIcon = Icons.Filled.VolumeUp,
+                route = NavigationRoute.VISION,
+                label = "Vision",
+                icon = Icons.Outlined.Visibility,
+                selectedIcon = Icons.Filled.Visibility,
             ),
             BottomNavItem(
                 route = NavigationRoute.VOICE,
@@ -112,10 +146,10 @@ fun RunAnywhereBottomNav(navController: NavController) {
                 selectedIcon = Icons.Filled.Mic,
             ),
             BottomNavItem(
-                route = NavigationRoute.RAG,
-                label = "Doc Q&A",
-                icon = Icons.Outlined.Description,
-                selectedIcon = Icons.Filled.Description,
+                route = NavigationRoute.MORE,
+                label = "More",
+                icon = Icons.Outlined.MoreHoriz,
+                selectedIcon = Icons.Filled.MoreHoriz,
             ),
             BottomNavItem(
                 route = NavigationRoute.SETTINGS,
@@ -125,13 +159,12 @@ fun RunAnywhereBottomNav(navController: NavController) {
             ),
         )
 
-    // Selected tab uses primary accent
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         items.forEach { item ->
-            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+            val selected = isRouteSelectedForTab(currentRoute, item.route)
 
             NavigationBarItem(
                 icon = {
@@ -152,13 +185,10 @@ fun RunAnywhereBottomNav(navController: NavController) {
                     ),
                 onClick = {
                     navController.navigate(item.route) {
-                        // Pop up to the start destination to avoid building up a large stack
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination
                         launchSingleTop = true
-                        // Restore state when reselecting a previously selected item
                         restoreState = true
                     }
                 },
@@ -167,21 +197,18 @@ fun RunAnywhereBottomNav(navController: NavController) {
     }
 }
 
-/**
- * Navigation routes
- */
 object NavigationRoute {
     const val CHAT = "chat"
+    const val VISION = "vision"
+    const val VLM = "vlm"
+    const val VOICE = "voice"
+    const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
-    const val VOICE = "voice"
     const val RAG = "rag"
     const val SETTINGS = "settings"
 }
 
-/**
- * Bottom navigation item data
- */
 data class BottomNavItem(
     val route: String,
     val label: String,

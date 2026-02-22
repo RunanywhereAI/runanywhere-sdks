@@ -229,6 +229,8 @@ kotlin {
                 implementation(libs.ktor.client.okhttp)
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)
+                // org.json - available on Android via SDK, needed explicitly for JVM
+                implementation("org.json:json:20240303")
             }
         }
 

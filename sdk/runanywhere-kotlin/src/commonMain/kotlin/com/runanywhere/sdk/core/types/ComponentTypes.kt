@@ -85,6 +85,7 @@ enum class SDKComponent(
     VOICE("VOICE"),
     EMBEDDING("EMBEDDING"),
     RAG("RAG"),
+    VLM("VLM"),
     ;
 
     /** Human-readable display name */
@@ -98,6 +99,7 @@ enum class SDKComponent(
                 VOICE -> "Voice Agent"
                 EMBEDDING -> "Embedding"
                 RAG -> "Retrieval-Augmented Generation"
+                VLM -> "Vision Language Model"
             }
 
     /** Analytics key for the component (lowercase) */

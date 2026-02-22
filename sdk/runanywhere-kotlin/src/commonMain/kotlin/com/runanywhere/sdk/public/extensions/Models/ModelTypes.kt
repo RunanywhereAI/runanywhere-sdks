@@ -75,6 +75,9 @@ enum class ModelSelectionContext(
 
     /** Select an LLM for RAG generation (llama.cpp) */
     RAG_LLM("ragLLM"),
+
+    /** Select a vision language model (VLM) */
+    VLM("vlm"),
     ;
 
     /** Human-readable title for the selection context */
@@ -87,6 +90,7 @@ enum class ModelSelectionContext(
                 VOICE -> "Select Voice Models"
                 RAG_EMBEDDING -> "Select Embedding Model"
                 RAG_LLM -> "Select LLM Model"
+                VLM -> "Select Vision Model"
             }
 
     /** Check if a category is relevant for this selection context */
@@ -101,6 +105,9 @@ enum class ModelSelectionContext(
                     category == ModelCategory.SPEECH_SYNTHESIS
             RAG_EMBEDDING -> category == ModelCategory.EMBEDDING
             RAG_LLM -> category == ModelCategory.LANGUAGE
+            VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
         }
 
     /** Check if a framework is relevant for this selection context */
@@ -109,7 +116,8 @@ enum class ModelSelectionContext(
             LLM ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
                     framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
-            STT -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+            STT ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
             TTS ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX ||
                     framework == com.runanywhere.sdk.core.types.InferenceFramework.SYSTEM_TTS ||
@@ -118,8 +126,12 @@ enum class ModelSelectionContext(
                 LLM.isFrameworkRelevant(framework) ||
                     STT.isFrameworkRelevant(framework) ||
                     TTS.isFrameworkRelevant(framework)
-            RAG_EMBEDDING -> framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
-            RAG_LLM -> framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
+            RAG_EMBEDDING ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX
+            RAG_LLM ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
+            VLM ->
+                framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP
         }
 }
 
@@ -137,6 +149,7 @@ enum class ModelCategory(
     SPEECH_RECOGNITION("speech-recognition"), // Voice-to-text models (ASR)
     SPEECH_SYNTHESIS("speech-synthesis"), // Text-to-voice models (TTS)
     VISION("vision"), // Image understanding models
+    IMAGE_GENERATION("image-generation"), // Text-to-image models
     MULTIMODAL("multimodal"), // Models that handle multiple modalities
     AUDIO("audio"), // Audio processing (diarization, etc.)
     EMBEDDING("embedding"), // Embedding models (RAG, semantic search)
@@ -222,10 +235,17 @@ data class ExpectedModelFiles(
  */
 @Serializable
 data class ModelFileDescriptor(
-    val relativePath: String,
-    val destinationPath: String,
+    /** Full URL to download this file from */
+    val url: String,
+    /** Filename to save as (e.g., "model.gguf" or "mmproj.gguf") */
+    val filename: String,
+    /** Whether this file is required for the model to work */
     val isRequired: Boolean = true,
-)
+) {
+    /** Legacy compatibility */
+    val relativePath: String get() = url.substringAfterLast('/').substringBefore('?')
+    val destinationPath: String get() = filename
+}
 
 // MARK: - Model Artifact Type
 
