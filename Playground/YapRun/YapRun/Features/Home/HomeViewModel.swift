@@ -238,7 +238,19 @@ extension ModelInfo {
     }
 
     var frameworkBadge: String {
-        framework.rawValue
+        switch framework {
+        case .whisperKit: return "Neural Engine"
+        case .onnx:       return "ONNX CPU"
+        default:          return framework.rawValue
+        }
+    }
+
+    var engineNote: String {
+        switch framework {
+        case .whisperKit: return "Optimized - runs on Apple Neural Engine with low CPU and memory usage"
+        case .onnx:       return "High CPU usage - runs entirely on CPU with higher memory consumption"
+        default:          return ""
+        }
     }
 
     var frameworkColor: Color {
@@ -247,7 +259,7 @@ extension ModelInfo {
         case .llamaCpp:         return .purple
         case .foundationModels: return .blue
         case .coreml:           return .cyan
-        case .whisperKitCoreML:  return .green
+        case .whisperKit:       return .green
         default:                return .gray
         }
     }

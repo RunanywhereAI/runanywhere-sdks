@@ -20,7 +20,7 @@ struct ModelCardView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Icon
-            Image(systemName: "waveform")
+            Image(systemName: model.framework == .whisperKit ? "brain" : "cpu")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(model.frameworkColor)
                 .frame(width: 40, height: 40)
@@ -42,9 +42,21 @@ struct ModelCardView: View {
                         .background(model.frameworkColor.opacity(0.15), in: Capsule())
                 }
 
-                Text(model.sizeLabel)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textTertiary)
+                HStack(spacing: 6) {
+                    Text(model.sizeLabel)
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textTertiary)
+
+                    if !model.engineNote.isEmpty {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundStyle(AppColors.textTertiary)
+
+                        Text(model.framework == .whisperKit ? "Optimized" : "High CPU")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(model.framework == .whisperKit ? .green : .orange)
+                    }
+                }
             }
 
             Spacer()

@@ -20,11 +20,33 @@ enum ModelRegistry {
     }
 
     /// Default model used during onboarding.
-    static let defaultModelId = "asr-moonshine-tiny-en-int8"
+    static let defaultModelId = "whisperkit-tiny.en"
 
     /// All available ASR models (tar.gz for fast native gzip extraction on iOS/macOS).
     static let asrModels: [ASRModel] = [
-        // ONNX models (CPU via sherpa-onnx)
+        // ─── WhisperKit (Apple Neural Engine via Core ML) ───────────────
+        // Optimized: runs on the Neural Engine, freeing CPU for other tasks.
+        // Lower memory footprint and better battery efficiency.
+        ASRModel(
+            id: "whisperkit-tiny.en",
+            name: "Whisper Tiny EN",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz")!,
+            archiveType: .tarGz,
+            framework: .whisperKit,
+            sizeBytes: 70_000_000
+        ),
+        ASRModel(
+            id: "whisperkit-base.en",
+            name: "Whisper Base EN",
+            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz")!,
+            archiveType: .tarGz,
+            framework: .whisperKit,
+            sizeBytes: 134_000_000
+        ),
+
+        // ─── ONNX (CPU via sherpa-onnx) ────────────────────────────────
+        // CPU-intensive: runs entirely on CPU cores.
+        // Higher memory usage and battery consumption.
         ASRModel(
             id: "asr-moonshine-tiny-en-int8",
             name: "Moonshine Tiny EN (int8)",
@@ -56,24 +78,6 @@ enum ModelRegistry {
             archiveType: .tarGz,
             framework: .onnx,
             sizeBytes: 126_000_000
-        ),
-
-        // WhisperKit models (Apple Neural Engine via Core ML)
-        ASRModel(
-            id: "whisperkit-tiny.en",
-            name: "Whisper Tiny EN (WhisperKit)",
-            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz")!,
-            archiveType: .tarGz,
-            framework: .whisperKitCoreML,
-            sizeBytes: 70_000_000
-        ),
-        ASRModel(
-            id: "whisperkit-base.en",
-            name: "Whisper Base EN (WhisperKit)",
-            url: URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz")!,
-            archiveType: .tarGz,
-            framework: .whisperKitCoreML,
-            sizeBytes: 134_000_000
         ),
     ]
 
