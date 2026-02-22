@@ -109,8 +109,8 @@ struct ChatInterfaceView: View {
                 guard let url = pendingLoRAURL else { return }
                 let accessed = url.startAccessingSecurityScopedResource()
                 Task {
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
                     await viewModel.loadLoraAdapter(path: url.path, scale: loraScale)
-                    if accessed { url.stopAccessingSecurityScopedResource() }
                     showingLoRAScaleSheet = false
                 }
             } onCancel: {

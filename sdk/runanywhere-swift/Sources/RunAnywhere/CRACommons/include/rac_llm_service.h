@@ -50,7 +50,8 @@ typedef struct rac_llm_service_ops {
     /** Destroy the service */
     void (*destroy)(void* impl);
 
-    /** Load a LoRA adapter (optional, NULL if not supported) */
+    /** Load a LoRA adapter (optional, NULL if not supported).
+     *  scale: 0.0-2.0, default 1.0; lower values recommended for F16 adapters on quantized models */
     rac_result_t (*load_lora)(void* impl, const char* adapter_path, float scale);
 
     /** Remove a LoRA adapter by path (optional, NULL if not supported) */
@@ -59,7 +60,8 @@ typedef struct rac_llm_service_ops {
     /** Clear all LoRA adapters (optional, NULL if not supported) */
     rac_result_t (*clear_lora)(void* impl);
 
-    /** Get loaded LoRA adapters info as JSON (optional, NULL if not supported) */
+    /** Get loaded LoRA adapters info as JSON (optional, NULL if not supported).
+     *  out_json is allocated by the implementation; caller must free with rac_free */
     rac_result_t (*get_lora_info)(void* impl, char** out_json);
 } rac_llm_service_ops_t;
 

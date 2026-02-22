@@ -226,7 +226,7 @@ RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
  *
  * @param handle Component handle
  * @param adapter_path Path to the LoRA adapter GGUF file
- * @param scale Adapter scale factor (0.0-1.0, default 1.0)
+ * @param scale Adapter scale factor (0.0-2.0, default 1.0; lower values recommended for F16 adapters on quantized models)
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle,

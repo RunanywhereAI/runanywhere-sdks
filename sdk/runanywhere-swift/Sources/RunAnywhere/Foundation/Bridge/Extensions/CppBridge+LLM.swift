@@ -104,7 +104,9 @@ extension CppBridge {
 
         /// Remove a specific LoRA adapter by path
         public func removeLoraAdapter(_ path: String) throws {
-            let handle = try getHandle()
+            guard let handle = handle else {
+                throw SDKError.llm(.invalidState, "No LLM component active")
+            }
             let result = path.withCString { pathPtr in
                 rac_llm_component_remove_lora(handle, pathPtr)
             }
@@ -116,7 +118,9 @@ extension CppBridge {
 
         /// Remove all LoRA adapters
         public func clearLoraAdapters() throws {
-            let handle = try getHandle()
+            guard let handle = handle else {
+                throw SDKError.llm(.invalidState, "No LLM component active")
+            }
             let result = rac_llm_component_clear_lora(handle)
             guard result == RAC_SUCCESS else {
                 throw SDKError.llm(.invalidState, "Failed to clear LoRA adapters: \(result)")
@@ -126,7 +130,7 @@ extension CppBridge {
 
         /// Get info about all loaded LoRA adapters
         public func getLoadedLoraAdapters() throws -> [LoRAAdapterInfo] {
-            let handle = try getHandle()
+            guard let handle = handle else { return [] }
             var jsonPtr: UnsafeMutablePointer<CChar>?
             let result = rac_llm_component_get_lora_info(handle, &jsonPtr)
             guard result == RAC_SUCCESS, let ptr = jsonPtr else {
