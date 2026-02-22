@@ -153,8 +153,8 @@ class RunAnywhereApplication : Application() {
             } else {
                 // PRODUCTION mode - requires API key and base URL
                 // Configure these via Settings screen or set environment variables
-                val apiKey = "REDACTED_API_KEY"
-                val baseURL = "https://REDACTED_URL"
+                val apiKey = "YOUR_PRODUCTION_API_KEY"
+                val baseURL = "YOUR_PRODUCTION_BASE_URL"
 
                 // Detect placeholder credentials and abort production initialization
                 if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
