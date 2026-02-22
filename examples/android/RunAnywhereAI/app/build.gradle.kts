@@ -11,6 +11,8 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
+    ndkVersion = "27.0.12077973"
+
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
         val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -290,7 +292,7 @@ dependencies {
     // ========================================
     // PDF Text Extraction (RAG document ingestion)
     // ========================================
-    implementation("com.tom_roush:pdfbox-android:2.0.27.0")
+    implementation(libs.pdfbox.android)
 
     // ========================================
     // Background Work

@@ -94,6 +94,57 @@ fun RunAnywhere.registerModel(
  */
 internal expect fun registerModelInternal(modelInfo: ModelInfo)
 
+/**
+ * Describes a companion file to download alongside the primary model file.
+ * Mirrors iOS ModelFileDescriptor (url + filename variant) for multi-file models.
+ */
+data class ModelCompanionFile(
+    val url: String,
+    val filename: String,
+)
+
+/**
+ * Register a multi-file model where multiple files must be downloaded together
+ * into the same directory (e.g., model.onnx + vocab.txt for embedding models).
+ *
+ * Mirrors iOS RunAnywhere.registerMultiFileModel() exactly.
+ *
+ * @param id Explicit model ID
+ * @param name Display name for the model
+ * @param primaryUrl Download URL for the primary model file
+ * @param companionFiles Additional files to download alongside the primary file
+ * @param framework Target inference framework
+ * @param modality Model category
+ * @param memoryRequirement Estimated memory usage in bytes
+ * @return The created ModelInfo
+ */
+fun RunAnywhere.registerMultiFileModel(
+    id: String,
+    name: String,
+    primaryUrl: String,
+    companionFiles: List<ModelCompanionFile>,
+    framework: InferenceFramework,
+    modality: ModelCategory = ModelCategory.LANGUAGE,
+    memoryRequirement: Long? = null,
+): ModelInfo {
+    val modelInfo = registerModel(
+        id = id,
+        name = name,
+        url = primaryUrl,
+        framework = framework,
+        modality = modality,
+        memoryRequirement = memoryRequirement,
+    )
+    registerCompanionFilesInternal(id, companionFiles.map { it.url to it.filename })
+    return modelInfo
+}
+
+/**
+ * Internal implementation to store companion file URLs for a multi-file model.
+ * Implemented via expect/actual for platform-specific behavior.
+ */
+internal expect fun registerCompanionFilesInternal(modelId: String, companionFiles: List<Pair<String, String>>)
+
 // MARK: - Helper Functions
 
 private fun generateModelIdFromUrl(url: String): String {

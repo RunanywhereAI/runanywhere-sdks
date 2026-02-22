@@ -277,6 +277,7 @@ object CppBridgeModelRegistry {
                 "stt" to ModelCategory.SPEECH_RECOGNITION,
                 "tts" to ModelCategory.SPEECH_SYNTHESIS,
                 "vad" to ModelCategory.AUDIO,
+                "embedding" to ModelType.EMBEDDING,
             )
 
         var restoredCount = 0

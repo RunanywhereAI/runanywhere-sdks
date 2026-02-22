@@ -14,14 +14,17 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        mavenLocal() // Add Maven Local to use the published SDK
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") } // For android-vad and other JitPack libraries
+        maven { url = uri("https://jitpack.io") }
+        // Keep this for the PDFBox-Android library
+        maven { url = uri("https://oss.sonatype.org/content/repositories/releases/") }
+        mavenLocal()
     }
     versionCatalogs {
         create("libs") {
-            from(files("../../../gradle/libs.versions.toml"))
+            // Using File(settingsDir, ...) makes the relative path absolute
+            from(files(File(settingsDir, "../../../gradle/libs.versions.toml")))
         }
     }
 }
@@ -54,3 +57,7 @@ project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp").projectDir 
 // ONNX module - STT, TTS, VAD adapter
 include(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")
 project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
+
+// RAG module - Retrieval-Augmented Generation adapter
+include(":sdk:runanywhere-kotlin:modules:runanywhere-core-rag")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-core-rag").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-rag")

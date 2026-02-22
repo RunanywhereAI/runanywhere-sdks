@@ -608,6 +608,17 @@ for ABI in "${ABI_ARRAY[@]}"; do
         echo "  Copied: librac_backend_rag.so -> rag/${ABI}/"
     fi
 
+    # Copy JNI bridge library for RAG
+    if [ -f "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
+        echo "  Copied: librac_backend_rag_jni.so -> rag/${ABI}/"
+    elif [ -f "${ABI_BUILD_DIR}/backends/rag/librac_backend_rag_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/backends/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
+        echo "  Copied: librac_backend_rag_jni.so -> rag/${ABI}/"
+    else
+        print_warning "librac_backend_rag_jni.so not found - JNI bridge not built by CMake"
+    fi
+
     # TFLite backend
     if [ "$BUILD_TFLITE" = "ON" ]; then
         mkdir -p "${DIST_DIR}/tflite/${ABI}"
@@ -718,7 +729,8 @@ fi
 echo "├── rag/                      # RAG backend libraries"
 for ABI in "${ABI_ARRAY[@]}"; do
     echo "│   └── ${ABI}/"
-    echo "│       └── librac_backend_rag.so"
+    echo "│       ├── librac_backend_rag.so"
+    echo "│       └── librac_backend_rag_jni.so"
 done
 
 if [ "$BUILD_TFLITE" = "ON" ]; then

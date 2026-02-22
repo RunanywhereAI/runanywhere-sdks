@@ -10,6 +10,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.rag.RAGBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.RAGEvent
@@ -19,70 +20,6 @@ import com.runanywhere.sdk.public.extensions.RAG.RAGResult
 import com.runanywhere.sdk.public.extensions.RAG.RAGSearchResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-
-// MARK: - Native library loading
-
-/**
- * Ensures the RAG JNI library is loaded.
- * Loads librac_backend_rag_jni.so which provides the rac_rag_* C++ backend.
- */
-private object RagNativeLib {
-    @Volatile
-    private var loaded = false
-    private val lock = Any()
-
-    fun ensureLoaded(): Boolean {
-        if (loaded) return true
-        synchronized(lock) {
-            if (loaded) return true
-            return try {
-                System.loadLibrary("rac_backend_rag_jni")
-                loaded = true
-                true
-            } catch (_: UnsatisfiedLinkError) {
-                false
-            }
-        }
-    }
-}
-
-// MARK: - JNI external declarations (mirrors RAGBridge JNI externals)
-
-private external fun nativeCreatePipeline(
-    embeddingModelPath: String,
-    llmModelPath: String,
-    embeddingDimension: Int,
-    topK: Int,
-    similarityThreshold: Float,
-    maxContextTokens: Int,
-    chunkSize: Int,
-    chunkOverlap: Int,
-    promptTemplate: String?,
-    embeddingConfigJson: String?,
-    llmConfigJson: String?,
-): Long
-
-private external fun nativeDestroyPipeline(pipelineHandle: Long)
-
-private external fun nativeAddDocument(
-    pipelineHandle: Long,
-    text: String,
-    metadataJson: String?,
-): Int
-
-private external fun nativeQuery(
-    pipelineHandle: Long,
-    question: String,
-    systemPrompt: String?,
-    maxTokens: Int,
-    temperature: Float,
-    topP: Float,
-    topK: Int,
-): String
-
-private external fun nativeClearDocuments(pipelineHandle: Long): Int
-
-private external fun nativeGetDocumentCount(pipelineHandle: Long): Int
 
 // MARK: - File-level pipeline handle (mirrors Swift CppBridge.RAG actor's pipeline pointer)
 
@@ -114,9 +51,21 @@ private val ragJson = Json { ignoreUnknownKeys = true }
 // MARK: - Pipeline Lifecycle
 
 actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
-    RagNativeLib.ensureLoaded()
+    // 1. Ensure the library is loaded
+    if (!RAGBridge.ensureNativeLibraryLoaded()) {
+        throw IllegalStateException("Failed to load RAG native libraries.")
+    }
 
-    val handle = nativeCreatePipeline(
+    // 2. Ensure the backend is registered with the C++ service locator
+    if (!RAGBridge.nativeIsRegistered()) {
+        val regResult = RAGBridge.nativeRegister()
+        if (regResult != 0) { // 0 is RAC_SUCCESS
+            throw IllegalStateException("Failed to register RAG backend. Error code: $regResult")
+        }
+    }
+
+    // 3. Create the pipeline
+    val handle = RAGBridge.nativeCreatePipeline(
         embeddingModelPath = config.embeddingModelPath,
         llmModelPath = config.llmModelPath,
         embeddingDimension = config.embeddingDimension,
@@ -141,7 +90,7 @@ actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
 actual suspend fun RunAnywhere.ragDestroyPipeline() {
     val handle = pipelineHandle
     if (handle != 0L) {
-        nativeDestroyPipeline(handle)
+        RAGBridge.nativeDestroyPipeline(handle)
         pipelineHandle = 0L
     }
     EventBus.publish(RAGEvent.pipelineDestroyed())
@@ -158,13 +107,13 @@ actual suspend fun RunAnywhere.ragIngest(text: String, metadataJson: String?) {
     EventBus.publish(RAGEvent.ingestionStarted(text.length))
     val startMs = System.currentTimeMillis()
 
-    val result = nativeAddDocument(handle, text, metadataJson)
+    val result = RAGBridge.nativeAddDocument(handle, text, metadataJson)
     if (result != 0) {
         throw IllegalStateException("RAG document ingestion failed with error code: $result")
     }
 
     val durationMs = (System.currentTimeMillis() - startMs).toDouble()
-    val chunkCount = nativeGetDocumentCount(handle)
+    val chunkCount = RAGBridge.nativeGetDocumentCount(handle)
     EventBus.publish(RAGEvent.ingestionComplete(chunkCount, durationMs))
 }
 
@@ -173,7 +122,7 @@ actual suspend fun RunAnywhere.ragClearDocuments() {
     if (handle == 0L) {
         throw IllegalStateException("RAG pipeline not created — call ragCreatePipeline first")
     }
-    nativeClearDocuments(handle)
+    RAGBridge.nativeClearDocuments(handle)
 }
 
 // MARK: - Document Count
@@ -181,7 +130,7 @@ actual suspend fun RunAnywhere.ragClearDocuments() {
 actual val RunAnywhere.ragDocumentCount: Int
     get() {
         val handle = pipelineHandle
-        return if (handle != 0L) nativeGetDocumentCount(handle) else 0
+        return if (handle != 0L) RAGBridge.nativeGetDocumentCount(handle) else 0
     }
 
 // MARK: - Query
@@ -195,7 +144,7 @@ actual suspend fun RunAnywhere.ragQuery(question: String, options: RAGQueryOptio
     val queryOptions = options ?: RAGQueryOptions(question = question)
     EventBus.publish(RAGEvent.queryStarted(question))
 
-    val jsonString = nativeQuery(
+    val jsonString = RAGBridge.nativeQuery(
         pipelineHandle = handle,
         question = queryOptions.question,
         systemPrompt = queryOptions.systemPrompt,

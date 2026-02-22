@@ -10,8 +10,10 @@ import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.registerModel
+import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -357,6 +359,27 @@ class RunAnywhereApplication : Application() {
             memoryRequirement = 65_000_000,
         )
         Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
+
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        // Mirrors iOS RunAnywhereAIApp.registerMultiFileModel() exactly.
+        RunAnywhere.registerMultiFileModel(
+            id = "all-minilm-l6-v2",
+            name = "All MiniLM L6 v2 (Embedding)",
+            primaryUrl = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
+            companionFiles = listOf(
+                ModelCompanionFile(
+                    url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt",
+                    filename = "vocab.txt",
+                ),
+            ),
+            framework = InferenceFramework.ONNX,
+            modality = ModelCategory.EMBEDDING,
+            memoryRequirement = 25_500_000,
+        )
+        Log.i("RunAnywhereApp", "✅ ONNX Embedding models registered")
 
         Log.i("RunAnywhereApp", "🎉 All modules and models registered")
     }

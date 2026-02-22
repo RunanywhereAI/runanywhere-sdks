@@ -175,3 +175,31 @@ message(STATUS "RAG Backend Configuration:")
 message(STATUS "  USearch: v2.15.2 (HNSW vector search)")
 message(STATUS "  Vector dimension: Configurable (default 384)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
+
+# =============================================================================
+# JNI Bridge for Android
+# =============================================================================
+
+if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
+    if(ANDROID)
+        message(STATUS "Building RAG JNI bridge for Android")
+
+        get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+
+        add_library(rac_backend_rag_jni SHARED jni/rac_backend_rag_jni.cpp)
+
+        target_include_directories(rac_backend_rag_jni PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${RAC_COMMONS_ROOT_DIR}/include
+        )
+
+        target_link_libraries(rac_backend_rag_jni PRIVATE
+            rac_backend_rag
+            log
+        )
+
+        target_compile_options(rac_backend_rag_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
+        # 16KB page alignment for Android 15+ (API 35) compliance
+        target_link_options(rac_backend_rag_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+    endif()
+endif()
