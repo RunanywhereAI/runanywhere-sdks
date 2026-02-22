@@ -35,7 +35,7 @@ struct GenerationMetricsFromSDK: Sendable {
 // MARK: - Download Progress Delegate
 
 /// URLSession delegate that reports download progress via a callback.
-final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate {
+final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let onProgress: @Sendable (Double) -> Void
 
     init(onProgress: @escaping @Sendable (Double) -> Void) {

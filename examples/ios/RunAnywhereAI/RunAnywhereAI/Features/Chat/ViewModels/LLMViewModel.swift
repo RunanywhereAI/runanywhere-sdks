@@ -431,6 +431,9 @@ final class LLMViewModel {
         }
 
         let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
         try FileManager.default.moveItem(at: tempURL, to: destinationURL)
 
         downloadedAdapterPaths[adapter.id] = destinationURL.path
