@@ -293,7 +293,7 @@ public final class ArchiveUtility {
             progressHandler?(0.4 + progress * 0.6)
         })
 
-        logger.info("tar.xz extraction completed to: \(destinationURL.path)")
+        logger.info("tar.xz extraction completed to: \(destinationURL.lastPathComponent)")
         progressHandler?(1.0)
     }
 
@@ -338,7 +338,7 @@ public final class ArchiveUtility {
                 pathEncoding: .utf8
             )
 
-            logger.info("zip extraction completed to: \(destinationURL.path)")
+            logger.info("zip extraction completed to: \(destinationURL.lastPathComponent)")
             progressHandler?(1.0)
         } catch {
             logger.error("Zip extraction failed: \(error)")
@@ -440,7 +440,7 @@ public final class ArchiveUtility {
                 compressionMethod: .deflate,
                 progress: nil
             )
-            logger.info("Created zip archive at: \(destinationURL.path)")
+            logger.info("Created zip archive at: \(destinationURL.lastPathComponent)")
         } catch {
             logger.error("Failed to create zip archive: \(error)")
             throw SDKError.download(.extractionFailed, "Failed to create archive: \(error.localizedDescription)", underlying: error)
