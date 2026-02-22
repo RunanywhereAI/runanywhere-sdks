@@ -120,24 +120,18 @@ struct ChatInterfaceView: View {
         }
         .sheet(isPresented: $showingLoRAManagement) {
             LoRAManagementSheetView(
-                adapters: viewModel.loraAdapters,
-                onAddAdapter: {
+                viewModel: viewModel,
+                onOpenFilePicker: {
                     showingLoRAManagement = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         showingLoRAFilePicker = true
                     }
                 },
-                onRemoveAdapter: { path in
-                    Task { await viewModel.removeLoraAdapter(path: path) }
-                },
-                onClearAll: {
-                    Task {
-                        await viewModel.clearLoraAdapters()
-                        showingLoRAManagement = false
-                    }
+                onDismiss: {
+                    showingLoRAManagement = false
                 }
             )
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
     }
 }
@@ -515,6 +509,7 @@ extension ChatInterfaceView {
 
     var loraAdapterBadge: some View {
         Button {
+            viewModel.refreshAvailableDemoAdapters()
             showingLoRAManagement = true
         } label: {
             HStack(spacing: 6) {
@@ -533,7 +528,8 @@ extension ChatInterfaceView {
 
     var loraAddButton: some View {
         Button {
-            showingLoRAFilePicker = true
+            viewModel.refreshAvailableDemoAdapters()
+            showingLoRAManagement = true
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: "plus")
@@ -624,74 +620,189 @@ private struct LoRAScaleSheetView: View {
     }
 }
 
-// MARK: - LoRA Management Sheet
+// MARK: - LoRA Management Sheet (Redesigned)
 
 private struct LoRAManagementSheetView: View {
-    let adapters: [LoRAAdapterInfo]
-    let onAddAdapter: () -> Void
-    let onRemoveAdapter: (String) -> Void
-    let onClearAll: () -> Void
+    @Bindable var viewModel: LLMViewModel
+    let onOpenFilePicker: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var selectedAdapterScale: [String: Float] = [:]
 
     var body: some View {
         NavigationView {
             List {
-                if adapters.isEmpty {
-                    Section {
-                        Text("No LoRA adapters loaded")
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    Section("Loaded Adapters") {
-                        ForEach(adapters, id: \.path) { adapter in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
-                                        .font(.subheadline)
-                                        .lineLimit(1)
-                                    HStack(spacing: 8) {
-                                        Text("Scale: \(String(format: "%.1f", adapter.scale))")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        if adapter.applied {
-                                            Text("Applied")
-                                                .font(.caption)
-                                                .foregroundColor(.green)
-                                        }
-                                    }
-                                }
-
-                                Spacer()
-
-                                Button {
-                                    onRemoveAdapter(adapter.path)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    Button {
-                        onAddAdapter()
-                    } label: {
-                        Label("Add LoRA Adapter", systemImage: "plus.circle")
-                    }
-
-                    if !adapters.isEmpty {
-                        Button(role: .destructive) {
-                            onClearAll()
-                        } label: {
-                            Label("Clear All Adapters", systemImage: "trash")
-                        }
-                    }
-                }
+                availableAdaptersSection
+                loadedAdaptersSection
+                customAdapterSection
             }
             .navigationTitle("LoRA Adapters")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { onDismiss() }
+                }
+            }
+        }
+    }
+
+    // MARK: - Available Adapters (OTA Download)
+    // TODO: [Portal Integration] Replace demo adapter section with portal-provided adapter catalog.
+
+    @ViewBuilder
+    private var availableAdaptersSection: some View {
+        if !viewModel.availableDemoAdapters.isEmpty {
+            Section {
+                ForEach(viewModel.availableDemoAdapters) { adapter in
+                    availableAdapterRow(adapter)
+                }
+            } header: {
+                Text("Available for This Model")
+            } footer: {
+                Text("These adapters are downloaded from HuggingFace and stored locally.")
+            }
+        }
+    }
+
+    private func availableAdapterRow(_ adapter: DemoLoRAAdapter) -> some View {
+        let isDownloaded = viewModel.isAdapterDownloaded(adapter)
+        let isDownloading = viewModel.isDownloadingAdapter[adapter.id] == true
+        let progress = viewModel.adapterDownloadProgress[adapter.id] ?? 0.0
+        let scale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
+        let isAlreadyApplied = viewModel.loraAdapters.contains {
+            $0.path == viewModel.localPath(for: adapter)
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(adapter.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(adapter.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(adapter.fileSizeFormatted)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if isAlreadyApplied {
+                    Label("Applied", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                } else if isDownloaded {
+                    Label("Downloaded", systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+
+            if isDownloading {
+                VStack(spacing: 4) {
+                    ProgressView(value: progress)
+                        .tint(.purple)
+                    Text("Downloading... \(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            } else if !isAlreadyApplied {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Scale: \(String(format: "%.1f", scale))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Slider(
+                            value: Binding(
+                                get: { selectedAdapterScale[adapter.id] ?? adapter.defaultScale },
+                                set: { selectedAdapterScale[adapter.id] = $0 }
+                            ),
+                            in: 0...2,
+                            step: 0.1
+                        )
+                        .tint(.purple)
+                    }
+
+                    Button {
+                        let applyScale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
+                        Task {
+                            await viewModel.downloadAndLoadAdapter(adapter, scale: applyScale)
+                        }
+                    } label: {
+                        Text(isDownloaded ? "Apply" : "Download & Apply")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .frame(minWidth: 60)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .disabled(viewModel.isLoadingLoRA)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Loaded Adapters
+
+    @ViewBuilder
+    private var loadedAdaptersSection: some View {
+        if !viewModel.loraAdapters.isEmpty {
+            Section("Loaded Adapters") {
+                ForEach(viewModel.loraAdapters, id: \.path) { adapter in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                            HStack(spacing: 8) {
+                                Text("Scale: \(String(format: "%.1f", adapter.scale))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                if adapter.applied {
+                                    Text("Applied")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        Button {
+                            Task { await viewModel.removeLoraAdapter(path: adapter.path) }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button(role: .destructive) {
+                    Task {
+                        await viewModel.clearLoraAdapters()
+                    }
+                } label: {
+                    Label("Clear All Adapters", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    // MARK: - Custom File Picker
+
+    private var customAdapterSection: some View {
+        Section {
+            Button {
+                onOpenFilePicker()
+            } label: {
+                Label("Load from Files...", systemImage: "folder")
+            }
+        } footer: {
+            Text("Select a .gguf LoRA adapter file from your device.")
         }
     }
 }
