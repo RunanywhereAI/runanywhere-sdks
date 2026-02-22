@@ -113,6 +113,19 @@ export async function getModelPath(modelId: string): Promise<string | null> {
 }
 
 /**
+ * Get mmproj path for a VLM model
+ * Searches for mmproj file in the same directory as the main model
+ * Returns undefined if not found (backend will auto-detect)
+ */
+export async function getMmprojPath(modelId: string): Promise<string | undefined> {
+  const modelPath = await getModelPath(modelId);
+  if (!modelPath) {
+    return undefined;
+  }
+  return FileSystem.findMmprojForModel(modelPath);
+}
+
+/**
  * Get list of downloaded models
  */
 export async function getDownloadedModels(): Promise<ModelInfo[]> {
@@ -308,6 +321,10 @@ export async function downloadModel(
   activeDownloads.set(modelId, 1);
   let lastLoggedProgress = -1;
 
+  // Use preferredFramework from modelInfo to ensure correct directory structure
+  // This prevents VLM models (tar.gz with GGUF) from being misclassified as ONNX
+  const framework = modelInfo.preferredFramework;
+
   try {
     const destPath = await FileSystem.downloadModel(
       fileName,
@@ -327,7 +344,8 @@ export async function downloadModel(
             progress: progress.progress,
           });
         }
-      }
+      },
+      framework
     );
 
     logger.info('Download completed:', {

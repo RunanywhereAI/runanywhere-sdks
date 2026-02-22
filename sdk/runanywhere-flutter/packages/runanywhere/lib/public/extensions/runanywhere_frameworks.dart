@@ -35,30 +35,53 @@ extension RunAnywhereFrameworks on RunAnywhere {
   /// - Parameter capability: The capability/component type to filter by
   /// - Returns: List of frameworks that provide the specified capability
   static Future<List<InferenceFramework>> getFrameworks(
-      SDKComponent capability) async {
-    final frameworks = <InferenceFramework>{};
+    SDKComponent capability) async {
+  final frameworks = <InferenceFramework>{};
 
-    // Map capability to model categories
-    final Set<ModelCategory> relevantCategories;
-    switch (capability) {
-      case SDKComponent.llm:
-        relevantCategories = {ModelCategory.language, ModelCategory.multimodal};
-      case SDKComponent.stt:
-        relevantCategories = {ModelCategory.speechRecognition};
-      case SDKComponent.tts:
-        relevantCategories = {ModelCategory.speechSynthesis};
-      case SDKComponent.vad:
-        relevantCategories = {ModelCategory.audio};
-      case SDKComponent.voice:
-        relevantCategories = {
-          ModelCategory.language,
-          ModelCategory.speechRecognition,
-          ModelCategory.speechSynthesis
-        };
-      case SDKComponent.embedding:
-        // Embedding models could be language or multimodal
-        relevantCategories = {ModelCategory.language, ModelCategory.multimodal};
-    }
+  // Map capability to model categories
+  final Set<ModelCategory> relevantCategories;
+
+  switch (capability) {
+    case SDKComponent.llm:
+      relevantCategories = {
+        ModelCategory.language,
+        ModelCategory.multimodal
+      };
+      break;
+
+    case SDKComponent.stt:
+      relevantCategories = {ModelCategory.speechRecognition};
+      break;
+
+    case SDKComponent.tts:
+      relevantCategories = {ModelCategory.speechSynthesis};
+      break;
+
+    case SDKComponent.vad:
+      relevantCategories = {ModelCategory.audio};
+      break;
+
+    case SDKComponent.voice:
+      relevantCategories = {
+        ModelCategory.language,
+        ModelCategory.speechRecognition,
+        ModelCategory.speechSynthesis
+      };
+      break;
+
+    case SDKComponent.embedding:
+      relevantCategories = {
+        ModelCategory.language,
+        ModelCategory.multimodal
+      };
+      break;
+
+    case SDKComponent.vlm:
+      relevantCategories = {ModelCategory.multimodal};
+      break;
+  }
+
+    
 
     final allModels = await RunAnywhere.availableModels();
     for (final model in allModels) {

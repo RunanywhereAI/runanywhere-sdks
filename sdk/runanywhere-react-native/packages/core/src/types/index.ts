@@ -157,3 +157,12 @@ export type {
   ToolCallingOptions,
   ToolCallingResult,
 } from './ToolCallingTypes';
+
+// VLM Types
+export type {
+  VLMResult,
+  VLMStreamingResult,
+  VLMGenerationOptions,
+  VLMImage,
+} from './VLMTypes';
+export { VLMImageFormat, VLMErrorCode } from './VLMTypes';

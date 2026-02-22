@@ -211,6 +211,28 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // Yield between module registrations
     await Future<void>.delayed(Duration.zero);
 
+    // Register VLM (Vision Language) models
+    // VLM models require 2 files: main model + mmproj (vision projector)
+    // Bundled as tar.gz archives for easy download/extraction
+
+    // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+    RunAnywhere.registerModel(
+      id: 'smolvlm-500m-instruct-q8_0',
+      name: 'SmolVLM 500M Instruct',
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz'),
+      framework: InferenceFramework.llamaCpp,
+      modality: ModelCategory.multimodal,
+      artifactType: ModelArtifactType.tarGzArchive(
+        structure: ArchiveStructure.directoryBased,
+      ),
+      memoryRequirement: 600000000,
+    );
+    debugPrint('✅ VLM models registered');
+
+    // Yield between module registrations
+    await Future<void>.delayed(Duration.zero);
+
     // Diffusion (image generation) is not registered here. CoreML diffusion is supported
     // only in the Swift SDK and Swift example app; Flutter/RN do not register diffusion.
 
