@@ -308,8 +308,12 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
         // 3-7B models: use 4096 context
         adaptive_max_context = 4096;
         LOGI("Medium model detected (%.1fB params), limiting context to %d", params_billions, adaptive_max_context);
+    } else if (params_billions >= 1.0) {
+        // 1-3B models: use 2048 context (higher values OOM on mobile, especially with LoRA)
+        adaptive_max_context = 2048;
+        LOGI("Small-medium model detected (%.1fB params), limiting context to %d", params_billions, adaptive_max_context);
     } else {
-        // Small models (<3B): can use larger context
+        // Tiny models (<1B): can use larger context
         adaptive_max_context = max_default_context_;
     }
 
