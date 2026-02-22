@@ -291,26 +291,6 @@ extension RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.STT")
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
 
-        // Route to Swift STT handler for frameworks like WhisperKit
-        if modelInfo.framework == .whisperKitCoreML {
-            guard let handler = swiftSTTHandler else {
-                throw SDKError.stt(.notInitialized, "WhisperKit module not registered. Call WhisperKitSTT.register() first.")
-            }
-            // Unload C++ model if one is loaded
-            if await CppBridge.STT.shared.isLoaded {
-                await CppBridge.STT.shared.unload()
-            }
-            try await handler.loadModel(modelId: modelId, modelFolder: modelPath.path)
-            // Emit event so UI gets notified (WhisperKit bypasses C++ event pipeline)
-            EventBus.shared.publish(SwiftSTTEvent(type: "stt_model_load_completed", modelId: modelId))
-            return
-        }
-
-        // Unload Swift STT handler if it has a model loaded (switching to C++ backend)
-        if let handler = swiftSTTHandler, await handler.isModelLoaded {
-            await handler.unloadModel()
-        }
-
         try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
@@ -385,12 +365,6 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
-
-            // Check Swift STT handler first (e.g., WhisperKit)
-            if let handler = swiftSTTHandler, let handlerModelId = await handler.currentModelId {
-                let models = (try? await availableModels()) ?? []
-                return models.first { $0.id == handlerModelId }
-            }
 
             guard let modelId = await CppBridge.STT.shared.currentModelId else { return nil }
             let models = (try? await availableModels()) ?? []

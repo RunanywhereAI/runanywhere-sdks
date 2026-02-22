@@ -285,6 +285,65 @@ install_frameworks() {
 }
 
 # =============================================================================
+# Sync CRACommons Bridge Headers
+# =============================================================================
+
+sync_headers() {
+    log_header "Syncing CRACommons bridge headers"
+
+    local BRIDGE_INCLUDE="$SWIFT_SDK_DIR/Sources/RunAnywhere/CRACommons/include"
+    local COMMONS_INCLUDE="$COMMONS_DIR/include/rac"
+
+    if [[ ! -d "$BRIDGE_INCLUDE" ]]; then
+        log_warn "CRACommons include dir not found: $BRIDGE_INCLUDE"
+        return 0
+    fi
+
+    local synced=0
+
+    # Backend headers that need to be exposed to Swift via CRACommons
+    local BACKEND_HEADERS=(
+        "backends/rac_stt_whisperkit_coreml.h"
+    )
+
+    for rel_path in "${BACKEND_HEADERS[@]}"; do
+        local src="$COMMONS_INCLUDE/$rel_path"
+        local filename="$(basename "$rel_path")"
+        local dest="$BRIDGE_INCLUDE/$filename"
+
+        if [[ -f "$src" ]]; then
+            # Copy and fix include paths (CRACommons uses flat includes)
+            sed -e 's|#include "rac/[^"]*/"||' \
+                -e 's|#include "rac/core/\(.*\)"|#include "\1"|' \
+                -e 's|#include "rac/features/[^"]*/"||' \
+                -e 's|#include "rac/features/stt/\(.*\)"|#include "\1"|' \
+                "$src" > "${dest}.tmp"
+
+            # Use sed to fix the nested path includes properly
+            sed -e 's|#include "rac/core/rac_types.h"|#include "rac_types.h"|g' \
+                -e 's|#include "rac/features/stt/rac_stt_types.h"|#include "rac_stt_types.h"|g' \
+                "$src" > "${dest}.tmp"
+
+            if ! diff -q "$dest" "${dest}.tmp" >/dev/null 2>&1; then
+                mv "${dest}.tmp" "$dest"
+                log_info "  Synced: $filename"
+                synced=$((synced + 1))
+            else
+                rm -f "${dest}.tmp"
+            fi
+        else
+            log_warn "  Source not found: $src"
+        fi
+    done
+
+    if [[ $synced -eq 0 ]]; then
+        log_info "All bridge headers up to date"
+    else
+        log_info "Synced $synced header(s)"
+    fi
+}
+
+# =============================================================================
 # Build Swift SDK
 # =============================================================================
 
@@ -375,6 +434,9 @@ main() {
     elif [[ "$MODE" == "remote" ]]; then
         set_package_mode "remote"
     fi
+
+    # Sync backend headers to CRACommons bridge
+    sync_headers
 
     # Build the SDK
     if ! $SKIP_BUILD; then

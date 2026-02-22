@@ -3,7 +3,7 @@
 //  WhisperKitRuntime Module
 //
 //  Actor wrapping WhisperKit for model loading and transcription.
-//  Conforms to SwiftSTTHandler so RunAnywhere core can route to it.
+//  Called from C++ via callbacks registered in WhisperKitSTT.swift.
 //
 
 import Accelerate
@@ -19,7 +19,7 @@ import WhisperKit
 /// Uses `.cpuAndNeuralEngine` compute units for all pipeline stages,
 /// ensuring minimal CPU load and full Neural Engine utilization.
 /// This makes it ideal for background STT on iOS.
-public actor WhisperKitSTTService: SwiftSTTHandler {
+public actor WhisperKitSTTService {
     public static let shared = WhisperKitSTTService()
 
     private let logger = SDKLogger(category: "WhisperKitSTTService")

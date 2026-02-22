@@ -2,20 +2,21 @@
 //  WhisperKitSTT.swift
 //  WhisperKitRuntime Module
 //
-//  Standalone WhisperKit module for STT via Apple Neural Engine.
-//  Mirrors the ONNXRuntime/ONNX.swift pattern.
+//  Standalone WhisperKit CoreML module for STT via Apple Neural Engine.
+//  Registers as a C++ backend via callbacks so all transcription
+//  flows through stt_component.cpp for automatic telemetry.
 //
 
+import CRACommons
 import Foundation
 import RunAnywhere
 
-// MARK: - WhisperKit Module
+// MARK: - WhisperKit CoreML Module
 
-/// WhisperKit module for Speech-to-Text using Apple Neural Engine.
+/// WhisperKit CoreML module for Speech-to-Text using Apple Neural Engine.
 ///
-/// Provides high-efficiency STT using Core ML models running on the
-/// Neural Engine (`.cpuAndNeuralEngine`), ideal for background transcription
-/// on iOS where GPU access is restricted.
+/// Registers with the C++ backend system via callbacks, so transcription
+/// goes through `rac_stt_component_transcribe` and gets automatic telemetry.
 ///
 /// ## Registration
 ///
@@ -35,7 +36,7 @@ import RunAnywhere
 /// let text = try await RunAnywhere.transcribe(audioData)
 /// ```
 public enum WhisperKitSTT: RunAnywhereModule {
-    private static let logger = SDKLogger(category: "WhisperKit")
+    private static let logger = SDKLogger(category: "WhisperKitCoreML")
 
     // MARK: - Module Info
 
@@ -43,8 +44,8 @@ public enum WhisperKitSTT: RunAnywhereModule {
 
     // MARK: - RunAnywhereModule Conformance
 
-    public static let moduleId = "whisperkit"
-    public static let moduleName = "WhisperKit"
+    public static let moduleId = "whisperkit_coreml"
+    public static let moduleName = "WhisperKit CoreML"
     public static let capabilities: Set<SDKComponent> = [.stt]
     public static let defaultPriority: Int = 200
     public static let inferenceFramework: InferenceFramework = .whisperKitCoreML
@@ -55,10 +56,11 @@ public enum WhisperKitSTT: RunAnywhereModule {
 
     // MARK: - Registration
 
-    /// Register WhisperKit STT backend.
+    /// Register WhisperKit CoreML STT backend with the C++ module/service registry.
     ///
-    /// Sets the `swiftSTTHandler` on `RunAnywhere` so that WhisperKit models
-    /// are loaded and transcribed via the Swift-only path (no C++ bridge).
+    /// Sets up C callbacks that bridge to `WhisperKitSTTService`, then
+    /// calls `rac_backend_whisperkit_coreml_register()` to register with the
+    /// service registry at priority 200.
     ///
     /// Safe to call multiple times - subsequent calls are no-ops.
     ///
@@ -66,30 +68,161 @@ public enum WhisperKitSTT: RunAnywhereModule {
     @MainActor
     public static func register(priority _: Int = 200) {
         guard !isRegistered else {
-            logger.debug("WhisperKit already registered, returning")
+            logger.debug("WhisperKit CoreML already registered, returning")
             return
         }
 
-        RunAnywhere.swiftSTTHandler = WhisperKitSTTService.shared
+        var callbacks = rac_whisperkit_coreml_stt_callbacks_t()
+        callbacks.can_handle = whisperKitCoreMLCanHandle
+        callbacks.create = whisperKitCoreMLCreate
+        callbacks.transcribe = whisperKitCoreMLTranscribe
+        callbacks.destroy = whisperKitCoreMLDestroy
+        callbacks.user_data = nil
+
+        let cbResult = rac_whisperkit_coreml_stt_set_callbacks(&callbacks)
+        guard cbResult == RAC_SUCCESS else {
+            logger.error("Failed to set WhisperKit CoreML callbacks: \(cbResult)")
+            return
+        }
+
+        let regResult = rac_backend_whisperkit_coreml_register()
+        guard regResult == RAC_SUCCESS || regResult == RAC_ERROR_MODULE_ALREADY_REGISTERED else {
+            logger.error("Failed to register WhisperKit CoreML backend: \(regResult)")
+            return
+        }
+
         isRegistered = true
-        logger.info("WhisperKit STT registered (Neural Engine)")
+        logger.info("WhisperKit CoreML STT registered (Neural Engine, priority=200)")
     }
 
-    /// Unregister the WhisperKit backend.
+    /// Unregister the WhisperKit CoreML backend.
     @MainActor
     public static func unregister() {
         guard isRegistered else { return }
 
-        RunAnywhere.swiftSTTHandler = nil
+        rac_backend_whisperkit_coreml_unregister()
         isRegistered = false
-        logger.info("WhisperKit STT unregistered")
+        logger.info("WhisperKit CoreML STT unregistered")
     }
 
     // MARK: - Model Handling
 
-    /// Check if WhisperKit can handle a given model for STT
+    /// Check if WhisperKit CoreML can handle a given model for STT
     public static func canHandleSTT(modelId: String?) -> Bool {
         guard let modelId = modelId else { return false }
         return modelId.lowercased().contains("whisperkit")
     }
+}
+
+// MARK: - C Callback Implementations
+
+/// These are `@convention(c)` functions that bridge from the C++ vtable
+/// dispatch into the Swift `WhisperKitSTTService` actor via CoreML.
+
+private func whisperKitCoreMLCanHandle(
+    _ modelId: UnsafePointer<CChar>?,
+    _ userData: UnsafeMutableRawPointer?
+) -> rac_bool_t {
+    _ = userData
+    guard let modelId = modelId else { return RAC_FALSE }
+    let id = String(cString: modelId)
+    return WhisperKitSTT.canHandleSTT(modelId: id) ? RAC_TRUE : RAC_FALSE
+}
+
+private func whisperKitCoreMLCreate(
+    _ modelPath: UnsafePointer<CChar>?,
+    _ modelId: UnsafePointer<CChar>?,
+    _ userData: UnsafeMutableRawPointer?
+) -> rac_handle_t? {
+    _ = userData
+    guard let modelPath = modelPath else { return nil }
+
+    let path = String(cString: modelPath)
+    let id = modelId.map { String(cString: $0) } ?? "unknown"
+
+    var handle: rac_handle_t?
+    let semaphore = DispatchSemaphore(value: 0)
+
+    Task {
+        do {
+            try await WhisperKitSTTService.shared.loadModel(modelId: id, modelFolder: path)
+            handle = Unmanaged.passRetained(WhisperKitSTTService.shared).toOpaque()
+        } catch {
+            let logger = SDKLogger(category: "WhisperKitCoreML")
+            logger.error("Failed to load WhisperKit CoreML model: \(error)")
+            handle = nil
+        }
+        semaphore.signal()
+    }
+
+    semaphore.wait()
+    return handle
+}
+
+private func whisperKitCoreMLTranscribe(
+    _ handle: rac_handle_t?,
+    _ audioData: UnsafeRawPointer?,
+    _ audioSize: Int,
+    _ options: UnsafePointer<rac_stt_options_t>?,
+    _ outResult: UnsafeMutablePointer<rac_stt_result_t>?,
+    _ userData: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    _ = userData
+    guard let handle = handle, let audioData = audioData, let outResult = outResult else {
+        return RAC_ERROR_NULL_POINTER
+    }
+
+    let data = Data(bytes: audioData, count: audioSize)
+    let sttOptions: STTOptions
+    if let opts = options, let langPtr = opts.pointee.language {
+        sttOptions = STTOptions(language: String(cString: langPtr))
+    } else {
+        sttOptions = STTOptions()
+    }
+
+    var result: rac_result_t = RAC_ERROR_INTERNAL
+    let semaphore = DispatchSemaphore(value: 0)
+
+    Task {
+        do {
+            let service = Unmanaged<WhisperKitSTTService>.fromOpaque(handle).takeUnretainedValue()
+            let output = try await service.transcribe(data, options: sttOptions)
+
+            outResult.pointee.text = output.text.isEmpty ? nil : strdup(output.text)
+            outResult.pointee.confidence = output.confidence
+            outResult.pointee.processing_time_ms = Int64(output.metadata.processingTime * 1000)
+
+            if let lang = output.detectedLanguage {
+                outResult.pointee.detected_language = strdup(lang)
+            }
+
+            result = RAC_SUCCESS
+        } catch {
+            let logger = SDKLogger(category: "WhisperKitCoreML")
+            logger.error("WhisperKit CoreML transcribe failed: \(error)")
+            result = RAC_ERROR_INTERNAL
+        }
+        semaphore.signal()
+    }
+
+    semaphore.wait()
+    return result
+}
+
+private func whisperKitCoreMLDestroy(
+    _ handle: rac_handle_t?,
+    _ userData: UnsafeMutableRawPointer?
+) {
+    _ = userData
+    guard let handle = handle else { return }
+
+    let semaphore = DispatchSemaphore(value: 0)
+
+    Task {
+        let service = Unmanaged<WhisperKitSTTService>.fromOpaque(handle).takeRetainedValue()
+        await service.unloadModel()
+        semaphore.signal()
+    }
+
+    semaphore.wait()
 }

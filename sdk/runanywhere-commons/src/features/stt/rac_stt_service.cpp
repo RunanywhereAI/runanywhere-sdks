@@ -36,7 +36,7 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     rac_service_request_t request = {};
     request.identifier = model_path;
     request.capability = RAC_CAPABILITY_STT;
-    request.framework = RAC_FRAMEWORK_ONNX;  // Default to ONNX for STT
+    request.framework = RAC_FRAMEWORK_UNKNOWN;  // Let service registry dispatch via can_handle
     request.model_path = model_path;
 
     // Service registry returns an rac_stt_service_t* with vtable already set
