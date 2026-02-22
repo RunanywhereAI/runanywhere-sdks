@@ -92,6 +92,7 @@ public:
   std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) override;
   std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) override;
+  std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) override;
 
   // ============================================================================
   // Download Service - Delegates to DownloadBridge

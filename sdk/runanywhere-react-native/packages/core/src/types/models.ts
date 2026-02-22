@@ -124,6 +124,36 @@ export interface ModelInfo {
 }
 
 // ============================================================================
+// Model Compatibility
+// ============================================================================
+
+/**
+ * Result of a model compatibility check
+ */
+export interface ModelCompatibilityResult {
+  /** Overall compatibility (canRun AND canFit) */
+  isCompatible: boolean;
+
+  /** Whether the device has enough RAM to run the model */
+  canRun: boolean;
+
+  /** Whether the device has enough free storage to store the model */
+  canFit: boolean;
+
+  /** Model's required RAM in bytes */
+  requiredMemory: number;
+
+  /** Device's available RAM in bytes */
+  availableMemory: number;
+
+  /** Model's required storage in bytes */
+  requiredStorage: number;
+
+  /** Device's available storage in bytes */
+  availableStorage: number;
+}
+
+// ============================================================================
 // Generation Types
 // ============================================================================
 

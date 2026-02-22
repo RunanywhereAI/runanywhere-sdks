@@ -205,6 +205,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_paths.cpp
     src/infrastructure/model_management/model_strategy.cpp
     src/infrastructure/model_management/model_assignment.cpp
+    src/infrastructure/model_management/model_compatibility.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/endpoints.cpp

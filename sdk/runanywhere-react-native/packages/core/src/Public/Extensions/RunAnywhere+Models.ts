@@ -12,7 +12,7 @@ import {
 import { ModelRegistry } from '../../services/ModelRegistry';
 import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import type { ModelInfo, LLMFramework } from '../../types';
+import type { ModelInfo, LLMFramework, ModelCompatibilityResult } from '../../types';
 import { ModelCategory } from '../../types';
 
 const logger = new SDKLogger('RunAnywhere.Models');
@@ -414,4 +414,12 @@ export async function deleteModel(modelId: string): Promise<boolean> {
     logger.error('Delete model error:', { error });
     return false;
   }
+}
+
+/**
+ * Check if a model is compatible with the current device
+ * Returns RAM and storage compatibility info
+ */
+export async function checkCompatibility(modelId: string): Promise<ModelCompatibilityResult> {
+  return ModelRegistry.checkCompatibility(modelId);
 }

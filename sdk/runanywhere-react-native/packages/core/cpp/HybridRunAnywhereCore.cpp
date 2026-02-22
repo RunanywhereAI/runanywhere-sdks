@@ -31,6 +31,7 @@
 #include "bridges/AuthBridge.hpp"
 #include "bridges/StorageBridge.hpp"
 #include "bridges/ModelRegistryBridge.hpp"
+#include "bridges/CompatibilityBridge.hpp"
 #include "bridges/EventBridge.hpp"
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
@@ -1008,8 +1009,36 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::registerModel(
 }
 
 // ============================================================================
+// Compatibility Service
+// ============================================================================
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::checkCompatibility(
+    const std::string& modelId) {
+    return Promise<std::string>::async([modelId]() -> std::string {
+        auto registryHandle = ModelRegistryBridge::shared().getHandle();
+        if (!registryHandle) {
+            LOGE("Model registry not initialized");
+            return "{}";
+        }
+
+        // Delegate to CompatibilityBridge - it handles querying device capabilities
+        auto result = CompatibilityBridge::checkCompatibility(modelId, registryHandle);
+
+        return buildJsonObject({
+            {"isCompatible", result.isCompatible ? "true" : "false"},
+            {"canRun", result.canRun ? "true" : "false"},
+            {"canFit", result.canFit ? "true" : "false"},
+            {"requiredMemory", std::to_string(result.requiredMemory)},
+            {"availableMemory", std::to_string(result.availableMemory)},
+            {"requiredStorage", std::to_string(result.requiredStorage)},
+            {"availableStorage", std::to_string(result.availableStorage)}
+        });
+    });
+}
+// ============================================================================
 // Download Service
 // ============================================================================
+
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::downloadModel(
     const std::string& modelId,

@@ -168,6 +168,14 @@ export interface RunAnywhereCore
    */
   registerModel(modelJson: string): Promise<boolean>;
 
+  /**
+   * Check if a model is compatible with the current device
+   * Compares model RAM/storage requirements against device capabilities
+   * @param modelId Model identifier
+   * @returns JSON with isCompatible, canRun, canFit, and resource details
+   */
+  checkCompatibility(modelId: string): Promise<string>;
+
   // ============================================================================
   // Download Service
   // Matches Swift: CppBridge+Download.swift

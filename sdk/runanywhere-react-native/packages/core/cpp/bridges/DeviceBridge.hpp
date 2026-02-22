@@ -57,6 +57,8 @@ struct DeviceRegistrationResult {
     std::string error;
 };
 
+
+
 /**
  * Platform callbacks for device operations
  */
@@ -132,6 +134,13 @@ public:
      * Get the device ID
      */
     std::string getDeviceId() const;
+
+    /**
+     * Get device info
+     */
+    DeviceInfo getDeviceInfo() const;
+
+
 
     /**
      * Check if callbacks are registered
