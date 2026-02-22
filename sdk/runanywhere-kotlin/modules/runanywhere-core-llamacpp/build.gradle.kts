@@ -24,20 +24,14 @@ plugins {
     signing
 }
 
-// =============================================================================
-// Configuration
-// =============================================================================
-// Note: This module does NOT handle native libs - main SDK bundles everything
 val testLocal: Boolean =
     rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: false
 
-logger.lifecycle("LlamaCPP Module: testLocal=$testLocal (native libs handled by main SDK)")
+logger.lifecycle("LlamaCPP Module: testLocal=$testLocal")
 
-// =============================================================================
-// Detekt Configuration
-// =============================================================================
+// Detekt
 detekt {
     buildUponDefaultConfig = true
     allRules = false
@@ -50,9 +44,7 @@ detekt {
     )
 }
 
-// =============================================================================
-// ktlint Configuration
-// =============================================================================
+// ktlint
 ktlint {
     version.set("1.5.0")
     android.set(true)
@@ -65,10 +57,6 @@ ktlint {
     }
 }
 
-// =============================================================================
-// Kotlin Multiplatform Configuration
-// =============================================================================
-
 kotlin {
     jvm {
         compilations.all {
@@ -77,10 +65,8 @@ kotlin {
     }
 
     androidTarget {
-        // Enable publishing Android AAR to Maven
         publishLibraryVariants("release")
 
-        // Set correct artifact ID for Android publication
         mavenPublication {
             artifactId = "runanywhere-llamacpp-android"
         }
@@ -93,8 +79,12 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // Core SDK dependency for interfaces and models
-                api(project.parent!!.parent!!)
+                // Core SDK — resolve by finding the project whose dir matches the SDK root
+                api(
+                    rootProject.allprojects.firstOrNull {
+                        it.projectDir.canonicalPath == projectDir.resolve("../..").canonicalPath
+                    } ?: error("Cannot find core SDK project at ${projectDir.resolve("../..")}"),
+                )
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }
@@ -107,7 +97,6 @@ kotlin {
             }
         }
 
-        // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
         }
@@ -125,21 +114,15 @@ kotlin {
     }
 }
 
-// =============================================================================
-// Android Configuration
-// =============================================================================
-
 android {
     namespace = "com.runanywhere.sdk.core.llamacpp"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 24
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            // Support ARM64 devices and x86_64 emulators
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
     }
@@ -163,44 +146,103 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        // Prevent duplicate native library conflicts from KMP source set hierarchy
-        jniLibs {
-            pickFirsts += setOf("**/*.so")
-        }
     }
 
-    // ==========================================================================
-    // JNI Libraries - Handled by Main SDK
-    // ==========================================================================
-    // Backend modules do NOT bundle their own native libs.
-    // All native libs are bundled by the main SDK (runanywhere-kotlin).
-    // This module only contains Kotlin code for the LlamaCPP backend.
-    // ==========================================================================
+    // Native libs: librac_backend_llamacpp.so, librac_backend_llamacpp_jni.so
+    // Downloaded from RABackendLLAMACPP-android GitHub release assets, or built locally.
 }
 
-// =============================================================================
-// JNI Library Download Task - DISABLED for backend modules
-// =============================================================================
-// Backend modules do NOT download their own native libs.
-// The main SDK's downloadJniLibs task downloads ALL native libs (including backend libs)
-// to src/androidMain/jniLibs/ which is shared across all modules.
-//
-// This task is kept as a no-op for backwards compatibility.
-// =============================================================================
+// Native lib version for downloads
+val nativeLibVersion: String =
+    rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
+        ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
+
+// Download LlamaCPP backend libs from GitHub releases (testLocal=false)
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "No-op: Main SDK handles all native library downloads"
+    description = "Download LlamaCPP backend JNI libraries from GitHub releases"
+
+    onlyIf { !testLocal }
+
+    val outputDir = file("src/androidMain/jniLibs")
+    val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
+
+    val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
+    val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+    val packageType = "RABackendLLAMACPP-android"
+
+    val llamacppLibs = setOf(
+        "librac_backend_llamacpp.so",
+        "librac_backend_llamacpp_jni.so",
+    )
+
+    outputs.dir(outputDir)
 
     doLast {
-        logger.lifecycle("LlamaCPP Module: Skipping downloadJniLibs (main SDK handles all native libs)")
+        val existingLibs = outputDir.walkTopDown().filter { it.extension == "so" }.count()
+        if (existingLibs > 0) {
+            logger.lifecycle("LlamaCPP: Skipping download, $existingLibs .so files already present")
+            return@doLast
+        }
+
+        outputDir.deleteRecursively()
+        tempDir.deleteRecursively()
+        outputDir.mkdirs()
+        tempDir.mkdirs()
+
+        logger.lifecycle("LlamaCPP Module: Downloading backend JNI libraries")
+
+        var totalDownloaded = 0
+
+        targetAbis.forEach { abi ->
+            val abiOutputDir = file("$outputDir/$abi")
+            abiOutputDir.mkdirs()
+
+            val packageName = "$packageType-$abi-v$nativeLibVersion.zip"
+            val zipUrl = "$releaseBaseUrl/$packageName"
+            val tempZip = file("$tempDir/$packageName")
+
+            logger.lifecycle("  Downloading: $packageName")
+
+            try {
+                ant.withGroovyBuilder {
+                    "get"("src" to zipUrl, "dest" to tempZip, "verbose" to false)
+                }
+
+                val extractDir = file("$tempDir/extracted-${packageName.replace(".zip", "")}")
+                extractDir.mkdirs()
+                ant.withGroovyBuilder {
+                    "unzip"("src" to tempZip, "dest" to extractDir)
+                }
+
+                extractDir
+                    .walkTopDown()
+                    .filter { it.extension == "so" && it.name in llamacppLibs }
+                    .forEach { soFile ->
+                        val targetFile = file("$abiOutputDir/${soFile.name}")
+                        soFile.copyTo(targetFile, overwrite = true)
+                        logger.lifecycle("    ${soFile.name}")
+                        totalDownloaded++
+                    }
+
+                tempZip.delete()
+            } catch (e: Exception) {
+                logger.warn("  Failed to download $packageName: ${e.message}")
+            }
+        }
+
+        tempDir.deleteRecursively()
+        logger.lifecycle("LlamaCPP: $totalDownloaded .so files downloaded")
     }
 }
 
-// Note: JNI libs are handled by the main SDK, not by backend modules
-
-// =============================================================================
-// Include third-party licenses in JVM JAR
-// =============================================================================
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    if (!testLocal) dependsOn("downloadJniLibs")
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    if (!testLocal) dependsOn("downloadJniLibs")
+}
 
 tasks.named<Jar>("jvmJar") {
     from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
@@ -208,29 +250,22 @@ tasks.named<Jar>("jvmJar") {
     }
 }
 
-// =============================================================================
-// Maven Central Publishing Configuration
-// =============================================================================
-// Consumer usage (after publishing):
-//   implementation("com.runanywhere:runanywhere-llamacpp:1.0.0")
-// =============================================================================
+// Maven Central publishing
+// Usage: implementation("com.runanywhere:runanywhere-llamacpp:1.0.0")
 
-// Maven Central group ID - using verified namespace
 val isJitPack = System.getenv("JITPACK") == "true"
 val usePendingNamespace = System.getenv("USE_RUNANYWHERE_NAMESPACE")?.toBoolean() ?: false
 group =
     when {
         isJitPack -> "com.github.RunanywhereAI.runanywhere-sdks"
         usePendingNamespace -> "com.runanywhere"
-        else -> "io.github.sanchitmonga22" // Currently verified namespace
+        else -> "io.github.sanchitmonga22"
     }
 
-// Version: SDK_VERSION (our CI), VERSION (JitPack), or fallback
 version = System.getenv("SDK_VERSION")?.removePrefix("v")
     ?: System.getenv("VERSION")?.removePrefix("v")
     ?: "0.1.5-SNAPSHOT"
 
-// Get publishing credentials
 val mavenCentralUsername: String? =
     System.getenv("MAVEN_CENTRAL_USERNAME")
         ?: project.findProperty("mavenCentral.username") as String?
@@ -249,7 +284,6 @@ val signingKey: String? =
 
 publishing {
     publications.withType<MavenPublication> {
-        // Maven Central artifact naming
         artifactId =
             when (name) {
                 "kotlinMultiplatform" -> "runanywhere-llamacpp"
@@ -260,7 +294,7 @@ publishing {
 
         pom {
             name.set("RunAnywhere LlamaCPP Backend")
-            description.set("LlamaCPP backend for RunAnywhere SDK - enables on-device LLM text generation using llama.cpp. Includes LlamaCPP-specific native libraries.")
+            description.set("LlamaCPP backend for RunAnywhere SDK - on-device LLM text generation using llama.cpp.")
             url.set("https://runanywhere.ai")
             inceptionYear.set("2024")
 
@@ -291,7 +325,6 @@ publishing {
     }
 
     repositories {
-        // Maven Central (Sonatype Central Portal - new API)
         maven {
             name = "MavenCentral"
             url = uri("https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/")
@@ -300,8 +333,6 @@ publishing {
                 password = mavenCentralPassword
             }
         }
-
-        // GitHub Packages (backup)
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/RunanywhereAI/runanywhere-sdks")
@@ -313,7 +344,6 @@ publishing {
     }
 }
 
-// Configure signing
 signing {
     if (signingKey != null && signingKey.contains("BEGIN PGP")) {
         useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
@@ -323,15 +353,13 @@ signing {
     sign(publishing.publications)
 }
 
-// Only sign when needed
 tasks.withType<Sign>().configureEach {
     onlyIf {
         project.hasProperty("signing.gnupg.keyName") || signingKey != null
     }
 }
 
-// Disable JVM and debug publications - only publish Android release and metadata
+// Only publish Android release and metadata (skip JVM and debug)
 tasks.withType<PublishToMavenRepository>().configureEach {
     onlyIf { publication.name !in listOf("jvm", "androidDebug") }
 }
-

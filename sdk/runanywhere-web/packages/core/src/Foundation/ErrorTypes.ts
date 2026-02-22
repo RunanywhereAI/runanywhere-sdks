@@ -103,6 +103,14 @@ export class SDKError extends Error {
     );
   }
 
+  static componentNotReady(component: string, details?: string): SDKError {
+    return new SDKError(
+      SDKErrorCode.ComponentNotReady,
+      `Component not ready: ${component}`,
+      details,
+    );
+  }
+
   static generationFailed(details?: string): SDKError {
     return new SDKError(
       SDKErrorCode.GenerationFailed,
@@ -110,4 +118,9 @@ export class SDKError extends Error {
       details,
     );
   }
+}
+
+/** Type guard: returns true if the value is an SDKError instance. */
+export function isSDKError(error: unknown): error is SDKError {
+  return error instanceof SDKError;
 }

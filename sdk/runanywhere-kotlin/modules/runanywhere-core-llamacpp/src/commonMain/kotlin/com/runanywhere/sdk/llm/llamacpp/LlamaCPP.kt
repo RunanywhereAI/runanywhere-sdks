@@ -117,21 +117,32 @@ object LlamaCPP : RunAnywhereModule {
     /**
      * Register VLM (Vision Language Model) backend.
      * Matches iOS LlamaCPP.registerVLM() exactly.
+     *
+     * Wrapped in UnsatisfiedLinkError handling because the VLM JNI symbols
+     * may not be present in older native library builds. In that case, LLM
+     * features continue to work normally — only VLM is unavailable.
      */
     private fun registerVLM() {
         if (isVlmRegistered) return
 
         logger.info("Registering LlamaCPP VLM backend...")
 
-        val vlmResult = registerVlmNative()
+        try {
+            val vlmResult = registerVlmNative()
 
-        if (vlmResult != 0 && vlmResult != -4) { // RAC_ERROR_MODULE_ALREADY_REGISTERED = -4
-            logger.warning("LlamaCPP VLM registration failed with code: $vlmResult (VLM features may not be available)")
-            return
+            if (vlmResult != 0 && vlmResult != -4) { // RAC_ERROR_MODULE_ALREADY_REGISTERED = -4
+                logger.warning("LlamaCPP VLM registration failed with code: $vlmResult (VLM features may not be available)")
+                return
+            }
+
+            isVlmRegistered = true
+            logger.info("LlamaCPP VLM backend registered successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warning(
+                "LlamaCPP VLM native symbols not found — native library does not include VLM support. " +
+                    "LLM features work normally. VLM will be available when native libs are rebuilt with VLM support.",
+            )
         }
-
-        isVlmRegistered = true
-        logger.info("LlamaCPP VLM backend registered successfully")
     }
 
     /**
@@ -142,9 +153,14 @@ object LlamaCPP : RunAnywhereModule {
 
         // Unregister VLM backend first (matches iOS unregister order)
         if (isVlmRegistered) {
-            unregisterVlmNative()
-            isVlmRegistered = false
-            logger.info("LlamaCPP VLM backend unregistered")
+            try {
+                unregisterVlmNative()
+                isVlmRegistered = false
+                logger.info("LlamaCPP VLM backend unregistered")
+            } catch (e: UnsatisfiedLinkError) {
+                isVlmRegistered = false
+                logger.warning("LlamaCPP VLM unregister skipped — native symbols not available")
+            }
         }
 
         unregisterNative()

@@ -59,8 +59,8 @@ export class OPFSStorage {
    */
   static get isSupported(): boolean {
     return typeof navigator !== 'undefined' &&
-           'storage' in navigator &&
-           'getDirectory' in (navigator.storage || {});
+      'storage' in navigator &&
+      'getDirectory' in (navigator.storage || {});
   }
 
   /**
@@ -134,6 +134,38 @@ export class OPFSStorage {
   }
 
   /**
+   * Save model data to OPFS from a ReadableStream.
+   * Streams data directly to disk without buffering the entire file in memory.
+   *
+   * @param key - Model identifier or nested path
+   * @param stream - Readable stream of model data
+   */
+  async saveModelFromStream(key: string, stream: ReadableStream<Uint8Array>): Promise<void> {
+    if (!this.modelsDir) throw new Error('OPFS not initialized. Call initialize() first.');
+
+    const dir = await this.resolveParentDir(key, /* create */ true);
+    const filename = this.resolveFilename(key);
+
+    const fileHandle = await dir.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+
+    try {
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value as unknown as ArrayBuffer);
+      }
+      await writable.close();
+      logger.info(`Model streamed to OPFS: ${key}`);
+    } catch (writeError) {
+      try { await writable.abort(); } catch { /* ignore */ }
+      try { await dir.removeEntry(filename); } catch { /* ignore */ }
+      throw writeError;
+    }
+  }
+
+  /**
    * Load model data from OPFS.
    *
    * @param key - Model identifier or nested path
@@ -151,6 +183,46 @@ export class OPFSStorage {
       return await file.arrayBuffer();
     } catch {
       return null; // File not found
+    }
+  }
+
+  /**
+   * Load model data from OPFS as a ReadableStream.
+   *
+   * @param key - Model identifier or nested path
+   * @returns Readable stream of the model data, or null if not found
+   */
+  async loadModelStream(key: string): Promise<ReadableStream<Uint8Array> | null> {
+    if (!this.modelsDir) return null;
+
+    try {
+      const dir = await this.resolveParentDir(key, /* create */ false);
+      const filename = this.resolveFilename(key);
+      const fileHandle = await dir.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      logger.info(`Loading model stream from OPFS: ${key} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+      return file.stream() as unknown as ReadableStream<Uint8Array>;
+    } catch {
+      return null; // File not found
+    }
+  }
+
+  /**
+   * Load model file object from OPFS without reading contents into memory.
+   *
+   * @param key - Model identifier or nested path
+   * @returns File object, or null if not found
+   */
+  async loadModelFile(key: string): Promise<File | null> {
+    if (!this.modelsDir) return null;
+
+    try {
+      const dir = await this.resolveParentDir(key, /* create */ false);
+      const filename = this.resolveFilename(key);
+      const fileHandle = await dir.getFileHandle(filename);
+      return await fileHandle.getFile();
+    } catch {
+      return null;
     }
   }
 
@@ -222,7 +294,7 @@ export class OPFSStorage {
 
     const models: StoredModelInfo[] = [];
 
-    for await (const [name, handle] of (this.modelsDir as any).entries()) {
+    for await (const [name, handle] of this.modelsDir.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

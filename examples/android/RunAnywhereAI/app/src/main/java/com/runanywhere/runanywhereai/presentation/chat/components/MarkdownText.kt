@@ -72,9 +72,9 @@ fun MarkdownText(
 
                 is MarkdownBlock.Header -> {
                     val headerStyle = when (block.level) {
-                        1 -> style.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        2 -> style.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
-                        3 -> style.copy(fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                        1 -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        2 -> MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                        3 -> MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                         else -> style.copy(fontWeight = FontWeight.SemiBold)
                     }
                     val annotated = parseInlineMarkdown(block.text, color)
@@ -244,9 +244,8 @@ private fun CodeBlockView(
         ) {
             Text(
                 text = code,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = MaterialTheme.typography.bodySmall.copy(
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
                     lineHeight = 20.sp,
                 ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -431,7 +430,7 @@ private fun parseInlineMarkdown(text: String, defaultColor: Color): AnnotatedStr
                         withStyle(
                             SpanStyle(
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 13.sp,
+                                fontSize = 13.sp, // matches MaterialTheme.typography.bodySmall (iOS footnote)
                                 background = defaultColor.copy(alpha = 0.08f),
                             ),
                         ) {

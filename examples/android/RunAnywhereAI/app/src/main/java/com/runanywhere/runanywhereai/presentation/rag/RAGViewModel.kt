@@ -13,11 +13,13 @@ import com.runanywhere.sdk.public.extensions.ragCreatePipeline
 import com.runanywhere.sdk.public.extensions.ragDestroyPipeline
 import com.runanywhere.sdk.public.extensions.ragIngest
 import com.runanywhere.sdk.public.extensions.ragQuery
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // MARK: - Message Role
 
@@ -126,7 +128,9 @@ class RAGViewModel : ViewModel() {
             try {
                 val fileName = DocumentService.getFileName(context, uri) ?: "Document"
                 Log.i(TAG, "Extracting text from document: $fileName")
-                val extractedText = DocumentService.extractText(context, uri)
+                val extractedText = withContext(Dispatchers.IO) {
+                    DocumentService.extractText(context, uri)
+                }
 
                 Log.i(TAG, "Creating RAG pipeline")
                 RunAnywhere.ragCreatePipeline(config)

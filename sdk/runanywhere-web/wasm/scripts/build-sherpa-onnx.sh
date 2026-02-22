@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${WASM_DIR}/build-sherpa-onnx"
 SHERPA_SRC="${WASM_DIR}/third_party/sherpa-onnx"
-OUTPUT_DIR="${WASM_DIR}/../packages/core/wasm/sherpa"
+OUTPUT_DIR="${WASM_DIR}/../packages/onnx/wasm/sherpa"
 
 SHERPA_VERSION="v1.12.20"
 CLEAN=false
@@ -182,6 +182,42 @@ for wrapper in sherpa-onnx-asr.js sherpa-onnx-tts.js sherpa-onnx-vad.js sherpa-o
     fi
 done
 
+# NOTE: The sherpa-onnx wrapper files (sherpa-onnx-asr.js, -tts.js, -vad.js)
+# are CJS and contain implicit globals that break in ESM strict mode.
+# These are handled at runtime by SherpaHelperLoader.ts in the SDK, which
+# loads the files via Blob URLs with the necessary fixes applied in-memory.
+# No build-time patching is needed.
+
+# =============================================================================
+# Step 3.5: Post-compile patches for browser compatibility
+# =============================================================================
+#
+# The nodejs WASM target produces Emscripten glue code with Node.js assumptions
+# that break in browsers. We run a Node.js patch script to fix:
+#
+#   1. Force ENVIRONMENT_IS_NODE = false  (use browser code paths)
+#   2. require("node:path") → browser shim (provides isAbsolute/normalize/join)
+#   3. NODERAWFS error throw → skip        (avoid "not supported" crash)
+#   4. NODERAWFS FS patching → skip        (use MEMFS instead)
+#   5. ESM default export appended         (for dynamic import() in browser)
+#
+# See packages/onnx/src/Foundation/SherpaONNXBridge.ts for the loader that
+# consumes this patched file.
+# =============================================================================
+
+echo ""
+echo ">>> Applying browser compatibility patches to sherpa-onnx-glue.js..."
+
+PATCH_SCRIPT="${SCRIPT_DIR}/patch-sherpa-glue.js"
+GLUE_FILE="${OUTPUT_DIR}/sherpa-onnx-glue.js"
+
+if [ ! -f "$PATCH_SCRIPT" ]; then
+    echo "ERROR: Patch script not found at ${PATCH_SCRIPT}"
+    exit 1
+fi
+
+node "$PATCH_SCRIPT" "$GLUE_FILE"
+
 # =============================================================================
 # Step 4: Verify outputs
 # =============================================================================
@@ -195,7 +231,7 @@ JS_FILE="${OUTPUT_DIR}/sherpa-onnx-glue.js"
 if [ -f "${WASM_FILE}" ] && [ -f "${JS_FILE}" ]; then
     WASM_SIZE=$(du -h "${WASM_FILE}" | cut -f1)
     JS_SIZE=$(du -h "${JS_FILE}" | cut -f1)
-    echo "SUCCESS: Sherpa-ONNX WASM build complete"
+    echo "SUCCESS: Sherpa-ONNX WASM build complete (with browser patches)"
     echo "  sherpa-onnx.wasm:       ${WASM_SIZE}"
     echo "  sherpa-onnx-glue.js:    ${JS_SIZE}"
 
@@ -212,6 +248,3 @@ fi
 
 echo ""
 echo "Sherpa-ONNX WASM ready at: ${OUTPUT_DIR}/"
-echo ""
-echo "Note: The nodejs build uses NODERAWFS. For browser use, the SherpaONNXBridge.ts"
-echo "adapter handles filesystem abstraction via Emscripten MEMFS."

@@ -777,7 +777,7 @@ private:
     
     bool ready_ = false;
     size_t embedding_dim_ = 384;  // all-MiniLM-L6-v2 dimension
-    size_t max_seq_length_ = 256;  // Reduced from 512 for mobile performance
+    size_t max_seq_length_ = 512;  // all-MiniLM-L6-v2 max_position_embeddings=512
 };
 
 // =============================================================================

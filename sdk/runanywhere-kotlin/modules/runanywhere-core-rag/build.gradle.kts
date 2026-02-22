@@ -95,7 +95,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // Core SDK dependency for interfaces and models
-                api(project.parent!!.parent!!)
+                api(project(":runanywhere-kotlin"))
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }

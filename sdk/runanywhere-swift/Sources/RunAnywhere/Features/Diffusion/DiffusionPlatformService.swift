@@ -54,17 +54,18 @@ public actor DiffusionPlatformService {
         disableSafetyChecker: Bool = false,
         tokenizerSource: DiffusionTokenizerSource = .sd15
     ) async throws {
-        logger.info("Initializing diffusion pipeline from: \(modelPath)")
+        let modelURL = URL(filePath: modelPath)
+        logger.info("Initializing diffusion pipeline from: \(modelURL.lastPathComponent)")
         logger.info("Tokenizer source: \(tokenizerSource.description)")
 
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelPath)")
+            throw SDKError.diffusion(.modelNotFound, "Model directory not found: \(modelURL.lastPathComponent)")
         }
 
         // Find the actual model directory (handles nested directory structure from zip extraction)
-        let resourceURL = try findModelResourceDirectory(at: URL(fileURLWithPath: modelPath))
-        logger.info("Using model resources from: \(resourceURL.path)")
+        let resourceURL = try findModelResourceDirectory(at: modelURL)
+        logger.info("Using model resources from: \(resourceURL.lastPathComponent)")
 
         // Ensure tokenizer files exist (Apple's compiled models don't include them)
         try await ensureTokenizerFiles(at: resourceURL, source: tokenizerSource)
@@ -135,7 +136,7 @@ public actor DiffusionPlatformService {
         }
 
         // If we get here, we couldn't find the model files - return base URL and let the pipeline report the error
-        logger.warning("Could not find Unet.mlmodelc in \(baseURL.path) or its subdirectories")
+        logger.warning("Could not find Unet.mlmodelc in \(baseURL.lastPathComponent) or its subdirectories")
         return baseURL
     }
 

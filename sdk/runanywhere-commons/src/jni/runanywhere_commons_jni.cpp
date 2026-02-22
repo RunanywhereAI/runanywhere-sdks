@@ -567,6 +567,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     if (status != RAC_SUCCESS) {
         LOGe("racLlmComponentGenerate failed with status=%d", status);
+        rac_llm_result_free(&result);
+        const char* msg = rac_error_message(status);
+        jclass exClass = env->FindClass("java/lang/RuntimeException");
+        if (exClass) {
+            char fallback[64];
+            if (!msg || !*msg) {
+                snprintf(fallback, sizeof(fallback), "LLM generation failed (status=%d)", status);
+                msg = fallback;
+            }
+            env->ThrowNew(exClass, msg);
+            env->DeleteLocalRef(exClass);
+        }
         return nullptr;
     }
 
@@ -679,6 +691,9 @@ struct LLMStreamCallbackContext {
     JavaVM* jvm = nullptr;
     jobject callback = nullptr;
     jmethodID onTokenMethod = nullptr;
+    bool onTokenExpectsBytes = true;
+    std::mutex mtx;
+    std::condition_variable cv;
     std::string accumulated_text;
     int token_count = 0;
     bool is_complete = false;
@@ -694,9 +709,12 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
     auto* ctx = static_cast<LLMStreamCallbackContext*>(user_data);
 
-    // Accumulate token
-    ctx->accumulated_text += token;
-    ctx->token_count++;
+    // Accumulate token (thread-safe)
+    {
+        std::lock_guard<std::mutex> lock(ctx->mtx);
+        ctx->accumulated_text += token;
+        ctx->token_count++;
+    }
 
     // Call back to Kotlin
     if (ctx->jvm && ctx->callback && ctx->onTokenMethod) {
@@ -714,27 +732,38 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
         }
 
         if (env) {
-            jsize len = static_cast<jsize>(strlen(token));
+            jboolean continueGen = JNI_TRUE;
 
-            jbyteArray jToken = env->NewByteArray(len);
-            env->SetByteArrayRegion(
-                jToken,
-                0,
-                len,
-                reinterpret_cast<const jbyte*>(token)
-            );
+            if (ctx->onTokenExpectsBytes) {
+                jsize len = static_cast<jsize>(strlen(token));
+                jbyteArray jToken = env->NewByteArray(len);
+                env->SetByteArrayRegion(
+                    jToken,
+                    0,
+                    len,
+                    reinterpret_cast<const jbyte*>(token)
+                );
+                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
+                env->DeleteLocalRef(jToken);
+            } else {
+                jstring jToken = env->NewStringUTF(token);
+                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
+                env->DeleteLocalRef(jToken);
+            }
 
-            jboolean continueGen =
-                env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
-            env->DeleteLocalRef(jToken);
-
-            if (env->ExceptionCheck()) {
+            const bool hadException = env->ExceptionCheck();
+            if (hadException) {
                 env->ExceptionDescribe();
                 env->ExceptionClear();
             }
 
             if (needsDetach) {
                 ctx->jvm->DetachCurrentThread();
+            }
+
+            if (hadException) {
+                // Ignore callback return value when JNI exception was thrown.
+                return RAC_TRUE;
             }
 
             if (!continueGen) {
@@ -752,6 +781,7 @@ static void llm_stream_callback_complete(const rac_llm_result_t* result, void* u
         return;
 
     auto* ctx = static_cast<LLMStreamCallbackContext*>(user_data);
+    std::lock_guard<std::mutex> lock(ctx->mtx);
 
     LOGi("Streaming with callback complete: %d tokens", ctx->token_count);
 
@@ -767,6 +797,7 @@ static void llm_stream_callback_complete(const rac_llm_result_t* result, void* u
     }
 
     ctx->is_complete = true;
+    ctx->cv.notify_one();
 }
 
 static void llm_stream_callback_error(rac_result_t error_code, const char* error_message,
@@ -775,6 +806,7 @@ static void llm_stream_callback_error(rac_result_t error_code, const char* error
         return;
 
     auto* ctx = static_cast<LLMStreamCallbackContext*>(user_data);
+    std::lock_guard<std::mutex> lock(ctx->mtx);
 
     LOGe("Streaming with callback error: %d - %s", error_code,
          error_message ? error_message : "Unknown");
@@ -783,6 +815,7 @@ static void llm_stream_callback_error(rac_result_t error_code, const char* error
     ctx->error_code = error_code;
     ctx->error_message = error_message ? error_message : "Unknown error";
     ctx->is_complete = true;
+    ctx->cv.notify_one();
 }
 
 JNIEXPORT jstring JNICALL
@@ -841,13 +874,29 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     if (status != RAC_SUCCESS) {
         LOGe("rac_llm_component_generate_stream failed with status=%d", status);
+        const char* msg = rac_error_message(status);
+        jclass exClass = env->FindClass("java/lang/RuntimeException");
+        if (exClass) {
+            char fallback[64];
+            if (!msg || !*msg) {
+                snprintf(fallback, sizeof(fallback), "LLM stream generation failed (status=%d)", status);
+                msg = fallback;
+            }
+            env->ThrowNew(exClass, msg);
+            env->DeleteLocalRef(exClass);
+        }
         return nullptr;
     }
 
     // Wait for streaming to complete
     {
         std::unique_lock<std::mutex> lock(ctx.mtx);
-        ctx.cv.wait(lock, [&ctx] { return ctx.is_complete; });
+        constexpr auto kStreamWaitTimeout = std::chrono::minutes(10);
+        if (!ctx.cv.wait_for(lock, kStreamWaitTimeout, [&ctx] { return ctx.is_complete; })) {
+            ctx.has_error = true;
+            ctx.error_message = "Streaming timed out waiting for completion callback";
+            ctx.is_complete = true;
+        }
     }
 
     if (ctx.has_error) {
@@ -904,7 +953,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     env->GetJavaVM(&jvm);
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
+    bool onTokenExpectsBytes = true;
     jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
+    if (!onTokenMethod) {
+        env->ExceptionClear();
+        onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+        onTokenExpectsBytes = false;
+    }
 
     if (!onTokenMethod) {
         LOGe("racLlmComponentGenerateStreamWithCallback: could not find onToken method");
@@ -948,6 +1003,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     ctx.jvm = jvm;
     ctx.callback = globalCallback;
     ctx.onTokenMethod = onTokenMethod;
+    ctx.onTokenExpectsBytes = onTokenExpectsBytes;
 
     LOGi("racLlmComponentGenerateStreamWithCallback calling rac_llm_component_generate_stream...");
 
@@ -955,13 +1011,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
         reinterpret_cast<rac_handle_t>(handle), promptStr.c_str(), &options,
         llm_stream_callback_token, llm_stream_callback_complete, llm_stream_callback_error, &ctx);
 
-    // Clean up global ref
-    env->DeleteGlobalRef(globalCallback);
-
     if (status != RAC_SUCCESS) {
+        env->DeleteGlobalRef(globalCallback);
         LOGe("rac_llm_component_generate_stream failed with status=%d", status);
         return nullptr;
     }
+
+    // Wait until completion/error before releasing callback/context.
+    {
+        std::unique_lock<std::mutex> lock(ctx.mtx);
+        constexpr auto kStreamWaitTimeout = std::chrono::minutes(10);
+        if (!ctx.cv.wait_for(lock, kStreamWaitTimeout, [&ctx] { return ctx.is_complete; })) {
+            ctx.has_error = true;
+            ctx.error_message = "Streaming timed out waiting for completion callback";
+            ctx.is_complete = true;
+        }
+    }
+
+    // Clean up global ref after callbacks have finished.
+    env->DeleteGlobalRef(globalCallback);
 
     if (ctx.has_error) {
         LOGe("Streaming failed: %s", ctx.error_message.c_str());
@@ -1039,6 +1107,78 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentIsLoaded
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetCallbacks(
     JNIEnv* env, jclass clazz, jobject streamCallback, jobject progressCallback) {
     // TODO: Implement callback registration
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLM LoRA Adapter Management
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath, jfloat scale) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    std::string path = getCString(env, adapterPath);
+
+    LOGi("racLlmComponentLoadLora: handle=%lld, path=%s, scale=%.2f",
+         (long long)handle, path.c_str(), (float)scale);
+
+    rac_result_t result = rac_llm_component_load_lora(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str(), static_cast<float>(scale));
+
+    LOGi("racLlmComponentLoadLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentRemoveLora(
+    JNIEnv* env, jclass clazz, jlong handle, jstring adapterPath) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (adapterPath == nullptr)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    std::string path = getCString(env, adapterPath);
+
+    rac_result_t result = rac_llm_component_remove_lora(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str());
+
+    LOGi("racLlmComponentRemoveLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentClearLora(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    rac_result_t result = rac_llm_component_clear_lora(reinterpret_cast<rac_handle_t>(handle));
+    LOGi("racLlmComponentClearLora result=%d", result);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraInfo(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    if (handle == 0) {
+        return nullptr;
+    }
+
+    char* json = nullptr;
+    rac_result_t result = rac_llm_component_get_lora_info(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+
+    if (result != RAC_SUCCESS || !json) {
+        return nullptr;
+    }
+
+    jstring jresult = env->NewStringUTF(json);
+    rac_free(json);
+    return jresult;
 }
 
 // =============================================================================

@@ -44,7 +44,9 @@ struct ContentView: View {
             // Tab 4: Settings
             Group {
                 #if os(macOS)
-                CombinedSettingsView()
+                NavigationStack {
+                    CombinedSettingsView()
+                }
                 #else
                 NavigationView {
                     CombinedSettingsView()

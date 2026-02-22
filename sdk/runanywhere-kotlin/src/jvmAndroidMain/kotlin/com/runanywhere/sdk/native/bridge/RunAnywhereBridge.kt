@@ -191,6 +191,22 @@ object RunAnywhereBridge {
     external fun racLlmSetCallbacks(streamCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
+    // LLM LORA ADAPTER (rac_llm_component.h - LoRA section)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racLlmComponentLoadLora(handle: Long, adapterPath: String, scale: Float): Int
+
+    @JvmStatic
+    external fun racLlmComponentRemoveLora(handle: Long, adapterPath: String): Int
+
+    @JvmStatic
+    external fun racLlmComponentClearLora(handle: Long): Int
+
+    @JvmStatic
+    external fun racLlmComponentGetLoraInfo(handle: Long): String?
+
+    // ========================================================================
     // STT COMPONENT (rac_stt_component.h)
     // ========================================================================
 

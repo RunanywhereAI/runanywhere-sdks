@@ -4,13 +4,18 @@ package-lock.json
 
 # Build output
 packages/core/dist/
+packages/llamacpp/dist/
+packages/onnx/dist/
 
-# WASM build artifacts
+# WASM build artifacts (built by scripts/build-web.sh)
 wasm/build/
 wasm/build-sherpa-onnx/
 wasm/build-webgpu/
 wasm/third_party/
 packages/core/wasm/
+packages/llamacpp/wasm/*.wasm
+packages/llamacpp/wasm/*.js
+packages/onnx/wasm/sherpa/
 a.out.*
 
 # IDE

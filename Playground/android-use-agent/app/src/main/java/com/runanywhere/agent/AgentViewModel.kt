@@ -1,6 +1,9 @@
 package com.runanywhere.agent
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -11,9 +14,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.agent.accessibility.AgentAccessibilityService
 import com.runanywhere.agent.kernel.AgentKernel
+import com.runanywhere.agent.providers.OnDeviceVisionProvider
+import com.runanywhere.agent.providers.ProviderMode
 import com.runanywhere.agent.tts.TTSManager
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +28,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -44,22 +51,40 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val status: Status = Status.IDLE,
         val logs: List<String> = emptyList(),
         val isServiceEnabled: Boolean = false,
-        val selectedModelIndex: Int = 1, // Default to Qwen (best)
+        val selectedModelIndex: Int = 0, // Default to LFM2.5 1.2B (on-device)
         val availableModels: List<ModelInfo> = AgentApplication.AVAILABLE_MODELS,
+        // Provider mode
+        val providerMode: ProviderMode = ProviderMode.LOCAL,
+        // STT state
         val isRecording: Boolean = false,
         val isTranscribing: Boolean = false,
         val isSTTModelLoaded: Boolean = false,
         val isSTTModelLoading: Boolean = false,
         val sttDownloadProgress: Float = 0f,
+        // VLM state
+        val isVLMLoaded: Boolean = false,
+        val isVLMDownloading: Boolean = false,
+        val vlmDownloadProgress: Float = 0f,
+        // Voice
         val isVoiceMode: Boolean = false,
-        val isSpeaking: Boolean = false
+        val isSpeaking: Boolean = false,
+        // Live LLM streaming text (cleared after each step)
+        val thinkingText: String = "",
+        // Whether logs were copied to clipboard (briefly true for feedback)
+        val logsCopied: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private val visionProvider = OnDeviceVisionProvider(
+        vlmModelId = AgentApplication.VLM_MODEL_ID,
+        context = application
+    )
+
     private val agentKernel = AgentKernel(
         context = application,
+        visionProvider = visionProvider,
         onLog = { log -> addLog(log) }
     )
 
@@ -76,6 +101,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         checkServiceStatus()
+        refreshVLMState()
     }
 
     fun checkServiceStatus() {
@@ -105,6 +131,43 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(isVoiceMode = !_uiState.value.isVoiceMode)
     }
 
+    // ========== VLM Model Management ==========
+
+    private fun refreshVLMState() {
+        try {
+            _uiState.value = _uiState.value.copy(isVLMLoaded = RunAnywhere.isVLMModelLoaded)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error refreshing VLM state", e)
+        }
+    }
+
+    fun loadVLMModel() {
+        if (_uiState.value.isVLMLoaded || _uiState.value.isVLMDownloading) return
+
+        _uiState.value = _uiState.value.copy(isVLMDownloading = true, vlmDownloadProgress = 0f)
+
+        viewModelScope.launch {
+            try {
+                visionProvider.ensureModelReady(
+                    onProgress = { progress ->
+                        _uiState.value = _uiState.value.copy(vlmDownloadProgress = progress)
+                    },
+                    onLog = { msg -> addLog(msg) }
+                )
+                _uiState.value = _uiState.value.copy(
+                    isVLMLoaded = true,
+                    isVLMDownloading = false
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "VLM model load failed: ${e.message}", e)
+                addLog("VLM model load failed: ${e.message}")
+                _uiState.value = _uiState.value.copy(isVLMDownloading = false)
+            }
+        }
+    }
+
+    // ========== Agent Control ==========
+
     fun startAgent() {
         val goal = _uiState.value.goal.trim()
         if (goal.isEmpty()) {
@@ -119,28 +182,58 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.value = _uiState.value.copy(
             status = Status.RUNNING,
+            providerMode = ProviderMode.LOCAL,
             logs = listOf("Starting: $goal")
         )
 
+        // Start foreground service to prevent Android from freezing/killing the process
+        AgentForegroundService.start(getApplication())
+
         agentJob = viewModelScope.launch {
-            agentKernel.run(goal).collect { event ->
-                when (event) {
-                    is AgentKernel.AgentEvent.Log -> addLog(event.message)
-                    is AgentKernel.AgentEvent.Step -> addLog("${event.action}: ${event.result}")
-                    is AgentKernel.AgentEvent.Done -> {
-                        addLog(event.message)
-                        _uiState.value = _uiState.value.copy(status = Status.DONE)
-                    }
-                    is AgentKernel.AgentEvent.Error -> {
-                        addLog("ERROR: ${event.message}")
-                        _uiState.value = _uiState.value.copy(status = Status.ERROR)
-                    }
-                    is AgentKernel.AgentEvent.Speak -> {
-                        if (_uiState.value.isVoiceMode) {
-                            ttsManager.speak(event.text)
+            try {
+                agentKernel.run(goal).flowOn(Dispatchers.IO).collect { event ->
+                    when (event) {
+                        is AgentKernel.AgentEvent.Log -> {
+                            // Clear thinking text when a new step begins
+                            if (event.message.startsWith("Step ")) {
+                                _uiState.value = _uiState.value.copy(thinkingText = "")
+                            }
+                            addLog(event.message)
+                        }
+                        is AgentKernel.AgentEvent.Step -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
+                            addLog("${event.action}: ${event.result}")
+                        }
+                        is AgentKernel.AgentEvent.Done -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
+                            addLog(event.message)
+                            _uiState.value = _uiState.value.copy(status = Status.DONE)
+                        }
+                        is AgentKernel.AgentEvent.Error -> {
+                            _uiState.value = _uiState.value.copy(thinkingText = "")
+                            addLog("ERROR: ${event.message}")
+                            _uiState.value = _uiState.value.copy(status = Status.ERROR)
+                        }
+                        is AgentKernel.AgentEvent.Speak -> {
+                            if (_uiState.value.isVoiceMode) {
+                                ttsManager.speak(event.text)
+                            }
+                        }
+                        is AgentKernel.AgentEvent.ProviderChanged -> {
+                            _uiState.value = _uiState.value.copy(providerMode = event.mode)
+                        }
+                        is AgentKernel.AgentEvent.ThinkingToken -> {
+                            _uiState.value = _uiState.value.copy(
+                                thinkingText = _uiState.value.thinkingText + event.token
+                            )
+                        }
+                        is AgentKernel.AgentEvent.PerfMetrics -> {
+                            // thinkingText already cleared by the [PERF] log line above
                         }
                     }
                 }
+            } finally {
+                AgentForegroundService.stop(getApplication())
             }
         }
     }
@@ -150,12 +243,55 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         agentJob?.cancel()
         agentJob = null
         ttsManager.stop()
+        AgentForegroundService.stop(getApplication())
         addLog("Agent stopped")
         _uiState.value = _uiState.value.copy(status = Status.IDLE)
     }
 
     fun clearLogs() {
-        _uiState.value = _uiState.value.copy(logs = emptyList())
+        _uiState.value = _uiState.value.copy(logs = emptyList(), thinkingText = "")
+    }
+
+    /** Build a human-readable export of the full run: logs + per-step LLM I/O + perf. */
+    fun buildExportText(): String {
+        val state = _uiState.value
+        val sb = StringBuilder()
+        sb.appendLine("=== RunAnywhere Agent Run Log ===")
+        sb.appendLine("Goal: ${state.goal}")
+        sb.appendLine("Model: ${state.availableModels.getOrNull(state.selectedModelIndex)?.name ?: "Unknown"}")
+        sb.appendLine()
+
+        // Full event log
+        sb.appendLine("--- Event Log ---")
+        state.logs.forEach { sb.appendLine(it) }
+
+        // Per-step structured records
+        val records = agentKernel.getStepRecords()
+        if (records.isNotEmpty()) {
+            sb.appendLine()
+            sb.appendLine("--- Per-Step Details ---")
+            records.forEach { r ->
+                sb.appendLine("Step ${r.step} | action=${r.action} | duration=${r.durationMs}ms | ${r.tokensPerSecond.let { if (it > 0) "%.1f tok/s".format(it) else "" }}")
+                sb.appendLine("  prompt (first 200ch): ${r.promptSnippet}")
+                sb.appendLine("  output: ${r.rawOutput.take(300)}")
+                r.thinkingContent?.let { sb.appendLine("  thinking: ${it.take(200)}") }
+            }
+        }
+
+        sb.appendLine()
+        sb.appendLine("=== End of Log ===")
+        return sb.toString()
+    }
+
+    fun copyLogsToClipboard() {
+        val text = buildExportText()
+        val clipboard = getApplication<Application>().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("Agent Run Log", text))
+        _uiState.value = _uiState.value.copy(logsCopied = true)
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(2000)
+            _uiState.value = _uiState.value.copy(logsCopied = false)
+        }
     }
 
     // ========== STT Methods ==========
@@ -167,7 +303,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             try {
-                // Download model if needed
                 var downloadFailed = false
                 RunAnywhere.downloadModel(AgentApplication.STT_MODEL_ID)
                     .catch { e ->
@@ -184,7 +319,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Load model
                 RunAnywhere.loadSTTModel(AgentApplication.STT_MODEL_ID)
                 _uiState.value = _uiState.value.copy(
                     isSTTModelLoaded = true,
@@ -230,7 +364,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             isCapturing = true
             _uiState.value = _uiState.value.copy(isRecording = true)
 
-            // Capture audio in background thread
             viewModelScope.launch(Dispatchers.IO) {
                 val buffer = ByteArray(bufferSize)
                 while (isCapturing) {
@@ -253,7 +386,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     fun stopRecordingAndTranscribe() {
         if (!_uiState.value.isRecording) return
 
-        // Stop capturing
         isCapturing = false
         audioRecord?.let { record ->
             if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
@@ -287,7 +419,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         goal = result.trim(),
                         isTranscribing = false
                     )
-                    // Auto-start agent in voice mode
                     if (_uiState.value.isVoiceMode) {
                         startAgent()
                     }
@@ -308,9 +439,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        // Clean up TTS
         ttsManager.shutdown()
-        // Clean up audio resources
         isCapturing = false
         audioRecord?.let { record ->
             try {
@@ -326,7 +455,6 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private fun addLog(message: String) {
         val current = _uiState.value.logs.toMutableList()
         current.add(message)
-        // Keep last 50 logs
         if (current.size > 50) {
             current.removeAt(0)
         }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhere
+import UniformTypeIdentifiers
 import os.log
 #if canImport(UIKit)
 import UIKit
@@ -25,6 +26,11 @@ struct ChatInterfaceView: View {
     @State private var showDebugAlert = false
     @State private var debugMessage = ""
     @State private var showModelLoadedToast = false
+    @State private var showingLoRAFilePicker = false
+    @State private var showingLoRAScaleSheet = false
+    @State private var showingLoRAManagement = false
+    @State private var pendingLoRAURL: URL?
+    @State private var loraScale: Float = 1.0
     @FocusState private var isTextFieldFocused: Bool
 
     private let logger = Logger(
@@ -83,6 +89,50 @@ struct ChatInterfaceView: View {
             isShowing: $showModelLoadedToast,
             modelName: viewModel.loadedModelName ?? "Model"
         )
+        .fileImporter(
+            isPresented: $showingLoRAFilePicker,
+            allowedContentTypes: [.data],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                pendingLoRAURL = url
+                loraScale = 1.0
+                showingLoRAScaleSheet = true
+            }
+        }
+        .sheet(isPresented: $showingLoRAScaleSheet) {
+            LoRAScaleSheetView(
+                url: pendingLoRAURL,
+                scale: $loraScale,
+                isLoading: viewModel.isLoadingLoRA
+            ) {
+                guard let url = pendingLoRAURL else { return }
+                let accessed = url.startAccessingSecurityScopedResource()
+                Task {
+                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                    await viewModel.loadLoraAdapter(path: url.path, scale: loraScale)
+                    showingLoRAScaleSheet = false
+                }
+            } onCancel: {
+                showingLoRAScaleSheet = false
+            }
+            .presentationDetents([.height(280)])
+        }
+        .sheet(isPresented: $showingLoRAManagement) {
+            LoRAManagementSheetView(
+                viewModel: viewModel,
+                onOpenFilePicker: {
+                    showingLoRAManagement = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        showingLoRAFilePicker = true
+                    }
+                },
+                onDismiss: {
+                    showingLoRAManagement = false
+                }
+            )
+            .presentationDetents([.large])
+        }
     }
 }
 
@@ -395,10 +445,21 @@ extension ChatInterfaceView {
         VStack(spacing: 0) {
             Divider()
 
-            // Tool calling indicator
-            if viewModel.useToolCalling {
-                toolCallingBadge
+            // Status badges (tool calling + LoRA)
+            HStack(spacing: 8) {
+                if viewModel.useToolCalling {
+                    toolCallingBadge
+                }
+
+                if !viewModel.loraAdapters.isEmpty {
+                    loraAdapterBadge
+                }
+
+                if hasModelSelected {
+                    loraAddButton
+                }
             }
+            .padding(.top, (viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
 
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
@@ -444,7 +505,305 @@ extension ChatInterfaceView {
         .padding(.vertical, 4)
         .background(AppColors.primaryAccent.opacity(0.1))
         .cornerRadius(6)
-        .padding(.top, 8)
+    }
+
+    var loraAdapterBadge: some View {
+        Button {
+            viewModel.refreshAvailableDemoAdapters()
+            showingLoRAManagement = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10))
+                Text("LoRA x\(viewModel.loraAdapters.count)")
+                    .font(AppTypography.caption2)
+            }
+            .foregroundColor(.purple)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color.purple.opacity(0.1))
+            .cornerRadius(6)
+        }
+    }
+
+    var loraAddButton: some View {
+        Button {
+            viewModel.refreshAvailableDemoAdapters()
+            showingLoRAManagement = true
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 9, weight: .bold))
+                Text("LoRA")
+                    .font(AppTypography.caption2)
+            }
+            .foregroundColor(AppColors.textSecondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(AppColors.backgroundSecondary)
+            .cornerRadius(6)
+        }
+    }
+}
+
+// MARK: - LoRA Scale Sheet
+
+private struct LoRAScaleSheetView: View {
+    let url: URL?
+    @Binding var scale: Float
+    let isLoading: Bool
+    let onLoad: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                VStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 32))
+                        .foregroundColor(.purple)
+
+                    Text(url?.lastPathComponent ?? "LoRA Adapter")
+                        .font(.headline)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+
+                VStack(spacing: 8) {
+                    Text("Scale: \(String(format: "%.1f", scale))")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Slider(value: $scale, in: 0...2, step: 0.1)
+                        .tint(.purple)
+
+                    HStack {
+                        Text("0.0")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("1.0")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("2.0")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+
+                HStack(spacing: 16) {
+                    Button("Cancel") { onCancel() }
+                        .buttonStyle(.bordered)
+
+                    Button {
+                        onLoad()
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                                .frame(width: 60)
+                        } else {
+                            Text("Load")
+                                .frame(width: 60)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .disabled(isLoading)
+                }
+            }
+            .padding()
+            .navigationTitle("Load LoRA Adapter")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+// MARK: - LoRA Management Sheet (Redesigned)
+
+private struct LoRAManagementSheetView: View {
+    @Bindable var viewModel: LLMViewModel
+    let onOpenFilePicker: () -> Void
+    let onDismiss: () -> Void
+
+    @State private var selectedAdapterScale: [String: Float] = [:]
+
+    var body: some View {
+        NavigationView {
+            List {
+                availableAdaptersSection
+                loadedAdaptersSection
+                customAdapterSection
+            }
+            .navigationTitle("LoRA Adapters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { onDismiss() }
+                }
+            }
+        }
+    }
+
+    // MARK: - Available Adapters (OTA Download)
+    // TODO: [Portal Integration] Replace demo adapter section with portal-provided adapter catalog.
+
+    @ViewBuilder
+    private var availableAdaptersSection: some View {
+        if !viewModel.availableDemoAdapters.isEmpty {
+            Section {
+                ForEach(viewModel.availableDemoAdapters) { adapter in
+                    availableAdapterRow(adapter)
+                }
+            } header: {
+                Text("Available for This Model")
+            } footer: {
+                Text("These adapters are downloaded from HuggingFace and stored locally.")
+            }
+        }
+    }
+
+    private func availableAdapterRow(_ adapter: DemoLoRAAdapter) -> some View {
+        let isDownloaded = viewModel.isAdapterDownloaded(adapter)
+        let isDownloading = viewModel.isDownloadingAdapter[adapter.id] == true
+        let progress = viewModel.adapterDownloadProgress[adapter.id] ?? 0.0
+        let scale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
+        let isAlreadyApplied = viewModel.loraAdapters.contains {
+            $0.path == viewModel.localPath(for: adapter)
+        }
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(adapter.name)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Text(adapter.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(adapter.fileSizeFormatted)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                if isAlreadyApplied {
+                    Label("Applied", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                } else if isDownloaded {
+                    Label("Downloaded", systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+
+            if isDownloading {
+                VStack(spacing: 4) {
+                    ProgressView(value: progress)
+                        .tint(.purple)
+                    Text("Downloading... \(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            } else if !isAlreadyApplied {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Scale: \(String(format: "%.1f", scale))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Slider(
+                            value: Binding(
+                                get: { selectedAdapterScale[adapter.id] ?? adapter.defaultScale },
+                                set: { selectedAdapterScale[adapter.id] = $0 }
+                            ),
+                            in: 0...2,
+                            step: 0.1
+                        )
+                        .tint(.purple)
+                    }
+
+                    Button {
+                        let applyScale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
+                        Task {
+                            await viewModel.downloadAndLoadAdapter(adapter, scale: applyScale)
+                        }
+                    } label: {
+                        Text(isDownloaded ? "Apply" : "Download & Apply")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .frame(minWidth: 60)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.purple)
+                    .disabled(viewModel.isLoadingLoRA)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Loaded Adapters
+
+    @ViewBuilder
+    private var loadedAdaptersSection: some View {
+        if !viewModel.loraAdapters.isEmpty {
+            Section("Loaded Adapters") {
+                ForEach(viewModel.loraAdapters, id: \.path) { adapter in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                            HStack(spacing: 8) {
+                                Text("Scale: \(String(format: "%.1f", adapter.scale))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                if adapter.applied {
+                                    Text("Applied")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        Button {
+                            Task { await viewModel.removeLoraAdapter(path: adapter.path) }
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button(role: .destructive) {
+                    Task {
+                        await viewModel.clearLoraAdapters()
+                    }
+                } label: {
+                    Label("Clear All Adapters", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    // MARK: - Custom File Picker
+
+    private var customAdapterSection: some View {
+        Section {
+            Button {
+                onOpenFilePicker()
+            } label: {
+                Label("Load from Files...", systemImage: "folder")
+            }
+        } footer: {
+            Text("Select a .gguf LoRA adapter file from your device.")
+        }
     }
 }
 

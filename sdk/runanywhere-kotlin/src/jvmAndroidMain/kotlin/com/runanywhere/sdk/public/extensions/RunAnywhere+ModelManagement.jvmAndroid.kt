@@ -83,6 +83,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
                         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
                         ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                        ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
                         ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
                         ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                     },
@@ -250,6 +251,7 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
             ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
             ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
             ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
+            ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
         }
     return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
 }
@@ -391,6 +393,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                 ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
                 ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
             }
 
         // 4. Emit download started event and record start time

@@ -686,11 +686,18 @@ private fun InputBar(
  */
 private fun resolveEmbeddingFilePath(localPath: String): String {
     val file = File(localPath)
-    return if (file.isDirectory) {
-        "$localPath/model.onnx"
-    } else {
-        localPath
-    }
+
+    // 1. If it's already a file, we are good to go
+    if (!file.isDirectory) return localPath
+
+    val files = file.listFiles() ?: return localPath
+
+    // 2. Try to find a file that explicitly has the .onnx extension
+    val onnxFile = files.firstOrNull { it.extension.lowercase() == "onnx" }
+    if (onnxFile != null) return onnxFile.absolutePath
+
+    // 3. Fallback to conventional name
+    return "$localPath/model.onnx"
 }
 
 /**
@@ -700,9 +707,22 @@ private fun resolveEmbeddingFilePath(localPath: String): String {
  */
 private fun resolveLLMFilePath(localPath: String): String {
     val file = File(localPath)
+    
+    // 1. If it's already a file, we are good to go
     if (!file.isDirectory) return localPath
-    val ggufFile = file.listFiles()?.firstOrNull { it.extension.lowercase() == "gguf" }
-    return ggufFile?.absolutePath ?: localPath
+    
+    val files = file.listFiles() ?: return localPath
+    
+    // 2. Try to find a file that explicitly has the .gguf extension
+    val ggufFile = files.firstOrNull { it.extension.lowercase() == "gguf" }
+    if (ggufFile != null) return ggufFile.absolutePath
+    
+    // 3. THE BULLETPROOF FALLBACK: 
+    // If the downloader stripped the extension, grab the largest file in the directory.
+    // The LLM weights will always be the largest file by a massive margin.
+    val largestFile = files.filter { it.isFile }.maxByOrNull { it.length() }
+    
+    return largestFile?.absolutePath ?: localPath
 }
 
 /**

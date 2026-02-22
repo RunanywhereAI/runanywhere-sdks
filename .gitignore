@@ -136,6 +136,9 @@ sdk/runanywhere-kotlin/.idea/
 # Claude
 .claude/
 
+# Playwright MCP
+.playwright-mcp/
+
 # Project-specific excludes
 .no_push_backup.json
 SHARED_TASK_NOTES.md
@@ -180,7 +183,7 @@ lint/tmp/
 lint/reports/
 .kotlin/
 *.jar
-!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
@@ -220,8 +223,12 @@ local/
 # Web SDK build artifacts (source is tracked)
 sdk/runanywhere-web/node_modules/
 sdk/runanywhere-web/packages/core/dist/
+sdk/runanywhere-web/packages/llamacpp/dist/
+sdk/runanywhere-web/packages/onnx/dist/
 sdk/runanywhere-web/wasm/build/
 sdk/runanywhere-web/packages/core/wasm/
+sdk/runanywhere-web/packages/onnx/wasm/
+sdk/runanywhere-web/emsdk/
 sdk/runanywhere-web/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
 

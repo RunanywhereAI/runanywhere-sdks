@@ -453,10 +453,10 @@ set_gradle_mode() {
     log_step "Setting testLocal=${mode} in gradle.properties"
 
     if [ "$mode" = "local" ]; then
-        sed -i '' 's/runanywhere.testLocal=false/runanywhere.testLocal=true/' "$properties_file"
+        sed -i.bak 's/runanywhere.testLocal=false/runanywhere.testLocal=true/' "$properties_file" && rm -f "${properties_file}.bak"
         log_info "Switched to LOCAL mode (using jniLibs/)"
     else
-        sed -i '' 's/runanywhere.testLocal=true/runanywhere.testLocal=false/' "$properties_file"
+        sed -i.bak 's/runanywhere.testLocal=true/runanywhere.testLocal=false/' "$properties_file" && rm -f "${properties_file}.bak"
         log_info "Switched to REMOTE mode (downloading from GitHub)"
     fi
 }

@@ -41,6 +41,7 @@ object CppBridgeModelRegistry {
         const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
         const val IMAGE_GENERATION = 5 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
         const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val EMBEDDING = 7
     }
 
     /**

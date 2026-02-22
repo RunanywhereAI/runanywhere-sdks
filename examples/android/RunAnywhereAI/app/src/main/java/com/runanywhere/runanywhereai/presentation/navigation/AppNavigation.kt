@@ -1,22 +1,21 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDashboardScreen
+import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
+import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
+import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
 import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
@@ -24,16 +23,30 @@ import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
 import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
 import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
-import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+    val selectedTab = routeToBottomNavTab(currentDestination?.route)
 
     Scaffold(
         bottomBar = {
-            RunAnywhereBottomNav(navController = navController)
+            AppBottomNavigationBar(
+                selectedTab = selectedTab,
+                onTabSelected = { tab ->
+                    val route = bottomNavTabToRoute(tab)
+                    navController.navigate(route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+            )
         },
     ) { paddingValues ->
         NavHost(
@@ -64,7 +77,7 @@ fun AppNavigation() {
                 VoiceAssistantScreen()
             }
 
-            // ✅ More hub now includes RAG
+            // "More" hub routes — STT, TTS, RAG, and Benchmarks here to match iOS structure
             composable(NavigationRoute.MORE) {
                 MoreHubScreen(
                     onNavigateToSTT = {
@@ -75,6 +88,9 @@ fun AppNavigation() {
                     },
                     onNavigateToRAG = {
                         navController.navigate(NavigationRoute.RAG)
+                    },
+                    onNavigateToBenchmarks = {
+                        navController.navigate(NavigationRoute.BENCHMARKS)
                     },
                 )
             }
@@ -91,6 +107,19 @@ fun AppNavigation() {
                 DocumentRAGScreen()
             }
 
+            composable(NavigationRoute.BENCHMARKS) {
+                BenchmarkDashboardScreen(
+                    onNavigateToDetail = { runId ->
+                        navController.navigate("${NavigationRoute.BENCHMARK_DETAIL}/$runId")
+                    },
+                )
+            }
+
+            composable("${NavigationRoute.BENCHMARK_DETAIL}/{runId}") { backStackEntry ->
+                val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
+                BenchmarkDetailScreen(runId = runId)
+            }
+
             composable(NavigationRoute.SETTINGS) {
                 SettingsScreen()
             }
@@ -99,101 +128,33 @@ fun AppNavigation() {
 }
 
 /**
- * Ensures nested routes highlight correct tab
+ * Maps current route to bottom nav tab, including nested/child routes.
  */
-private fun isRouteSelectedForTab(currentRoute: String?, tabRoute: String): Boolean {
-    if (currentRoute == null) return false
-    if (currentRoute == tabRoute) return true
-
-    return when (tabRoute) {
-        NavigationRoute.VISION ->
-            currentRoute in listOf(NavigationRoute.VLM)
-
-        NavigationRoute.MORE ->
-            currentRoute in listOf(
-                NavigationRoute.STT,
-                NavigationRoute.TTS,
-                NavigationRoute.RAG, // ✅ RAG mapped under More
-            )
-
-        else -> false
+private fun routeToBottomNavTab(route: String?): BottomNavTab {
+    return when {
+        route == null -> BottomNavTab.Chat
+        route == NavigationRoute.CHAT -> BottomNavTab.Chat
+        route == NavigationRoute.VISION || route == NavigationRoute.VLM -> BottomNavTab.Vision
+        route == NavigationRoute.VOICE -> BottomNavTab.Voice
+        route in listOf(
+            NavigationRoute.MORE,
+            NavigationRoute.STT,
+            NavigationRoute.TTS,
+            NavigationRoute.RAG,
+            NavigationRoute.BENCHMARKS,
+        ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
+        route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
+        else -> BottomNavTab.Chat
     }
 }
 
-@Composable
-fun RunAnywhereBottomNav(navController: NavController) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
-
-    val items =
-        listOf(
-            BottomNavItem(
-                route = NavigationRoute.CHAT,
-                label = "Chat",
-                icon = Icons.Outlined.Chat,
-                selectedIcon = Icons.Filled.Chat,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.VISION,
-                label = "Vision",
-                icon = Icons.Outlined.Visibility,
-                selectedIcon = Icons.Filled.Visibility,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.VOICE,
-                label = "Voice",
-                icon = Icons.Outlined.Mic,
-                selectedIcon = Icons.Filled.Mic,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.MORE,
-                label = "More",
-                icon = Icons.Outlined.MoreHoriz,
-                selectedIcon = Icons.Filled.MoreHoriz,
-            ),
-            BottomNavItem(
-                route = NavigationRoute.SETTINGS,
-                label = "Settings",
-                icon = Icons.Outlined.Settings,
-                selectedIcon = Icons.Filled.Settings,
-            ),
-        )
-
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-    ) {
-        items.forEach { item ->
-            val selected = isRouteSelectedForTab(currentRoute, item.route)
-
-            NavigationBarItem(
-                icon = {
-                    Icon(
-                        imageVector = if (selected) item.selectedIcon else item.icon,
-                        contentDescription = item.label,
-                    )
-                },
-                label = { Text(item.label) },
-                selected = selected,
-                colors =
-                    NavigationBarItemDefaults.colors(
-                        selectedIconColor = AppColors.primaryAccent,
-                        selectedTextColor = AppColors.primaryAccent,
-                        indicatorColor = AppColors.primaryAccent.copy(alpha = 0.12f),
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-            )
-        }
+private fun bottomNavTabToRoute(tab: BottomNavTab): String {
+    return when (tab) {
+        BottomNavTab.Chat -> NavigationRoute.CHAT
+        BottomNavTab.Vision -> NavigationRoute.VISION
+        BottomNavTab.Voice -> NavigationRoute.VOICE
+        BottomNavTab.More -> NavigationRoute.MORE
+        BottomNavTab.Settings -> NavigationRoute.SETTINGS
     }
 }
 
@@ -206,12 +167,7 @@ object NavigationRoute {
     const val STT = "stt"
     const val TTS = "tts"
     const val RAG = "rag"
+    const val BENCHMARKS = "benchmarks"
+    const val BENCHMARK_DETAIL = "benchmark_detail"
     const val SETTINGS = "settings"
 }
-
-data class BottomNavItem(
-    val route: String,
-    val label: String,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector = icon,
-)

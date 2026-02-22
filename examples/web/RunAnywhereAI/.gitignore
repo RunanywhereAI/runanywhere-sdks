@@ -1,2 +1,6 @@
 .vercel
 .env*.local
+
+# Emscripten test compile outputs
+a.out.js
+a.out.wasm

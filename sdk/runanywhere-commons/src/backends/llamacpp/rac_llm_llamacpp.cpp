@@ -207,6 +207,13 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
     RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
 
+    // finish_reason is std::string; TODO: migrate to enum if TextGenerationResult gains one
+    if (result.finish_reason == "error") {
+        RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generation failed (e.g. llama_decode error)");
+        rac_error_set_details("Generation failed: llama_decode returned non-zero");
+        return RAC_ERROR_GENERATION_FAILED;
+    }
+
     // Fill RAC result struct
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
     out_result->completion_tokens = result.tokens_generated;
@@ -316,6 +323,79 @@ rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
         return RAC_ERROR_BACKEND_NOT_READY;
     }
 
+    std::string json_str = info.dump();
+    *out_json = strdup(json_str.c_str());
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
+// LORA ADAPTER API IMPLEMENTATION
+// =============================================================================
+
+rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
+                                         const char* adapter_path,
+                                         float scale) {
+    if (handle == nullptr || adapter_path == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    if (!h->text_gen->load_lora_adapter(adapter_path, scale)) {
+        rac_error_set_details("Failed to load LoRA adapter");
+        return RAC_ERROR_MODEL_LOAD_FAILED;
+    }
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
+                                           const char* adapter_path) {
+    if (handle == nullptr || adapter_path == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    if (!h->text_gen->remove_lora_adapter(adapter_path)) {
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    h->text_gen->clear_lora_adapters();
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json) {
+    if (handle == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    auto info = h->text_gen->get_lora_info();
     std::string json_str = info.dump();
     *out_json = strdup(json_str.c_str());
 

@@ -192,6 +192,17 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 600_000_000
             )
         }
+        // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
+        // TODO: [Portal Integration] Remove once portal delivers model + adapter pairings
+        if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-1.5b-instruct-q4_k_m",
+                name: "Qwen 2.5 1.5B Instruct Q4_K_M",
+                url: qwen15BURL,
+                framework: .llamaCpp,
+                memoryRequirement: 2_500_000_000
+            )
+        }
         if let lfm2Q4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "lfm2-350m-q4_k_m",

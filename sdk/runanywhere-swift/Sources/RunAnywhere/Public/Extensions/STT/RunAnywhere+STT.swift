@@ -10,6 +10,7 @@
 @preconcurrency import AVFoundation
 import CRACommons
 import Foundation
+import os
 
 // MARK: - STT Operations
 
@@ -77,21 +78,18 @@ public extension RunAnywhere {
         let audioSizeBytes = audioData.count
         let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
 
-        // Build C options
-        var cOptions = rac_stt_options_t()
-        cOptions.language = (options.language as NSString).utf8String
-        cOptions.sample_rate = Int32(options.sampleRate)
-
         // Transcribe (C++ emits events)
         var sttResult = rac_stt_result_t()
-        let transcribeResult = audioData.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe(
-                handle,
-                audioPtr.baseAddress,
-                audioData.count,
-                &cOptions,
-                &sttResult
-            )
+        let transcribeResult = options.withCOptions { cOptionsPtr in
+            audioData.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe(
+                    handle,
+                    audioPtr.baseAddress,
+                    audioData.count,
+                    cOptionsPtr,
+                    &sttResult
+                )
+            }
         }
 
         guard transcribeResult == RAC_SUCCESS else {
@@ -213,39 +211,36 @@ public extension RunAnywhere {
         let context = STTStreamingContext(onPartialResult: onPartialResult)
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
-        // Build C options
-        var cOptions = rac_stt_options_t()
-        cOptions.language = (options.language as NSString).utf8String
-        cOptions.sample_rate = Int32(options.sampleRate)
-
         // Stream transcription with callback
-        let result = audioData.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe_stream(
-                handle,
-                audioPtr.baseAddress,
-                audioData.count,
-                &cOptions,
-                { partialText, isFinal, userData in
-                    guard let userData = userData else { return }
-                    let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
+        let result = options.withCOptions { cOptionsPtr in
+            audioData.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe_stream(
+                    handle,
+                    audioPtr.baseAddress,
+                    audioData.count,
+                    cOptionsPtr,
+                    { partialText, isFinal, userData in
+                        guard let userData = userData else { return }
+                        let ctx = Unmanaged<STTStreamingContext>.fromOpaque(userData).takeUnretainedValue()
 
-                    let text = partialText.map { String(cString: $0) } ?? ""
-                    let partialResult = STTTranscriptionResult(
-                        transcript: text,
-                        confidence: nil,
-                        timestamps: nil,
-                        language: nil,
-                        alternatives: nil
-                    )
+                        let text = partialText.map { String(cString: $0) } ?? ""
+                        let partialResult = STTTranscriptionResult(
+                            transcript: text,
+                            confidence: nil,
+                            timestamps: nil,
+                            language: nil,
+                            alternatives: nil
+                        )
 
-                    ctx.onPartialResult(partialResult)
+                        ctx.onPartialResult(partialResult)
 
-                    if isFinal == RAC_TRUE {
-                        ctx.finalText = text
-                    }
-                },
-                contextPtr
-            )
+                        if isFinal == RAC_TRUE {
+                            ctx.finalText = text
+                        }
+                    },
+                    contextPtr
+                )
+            }
         }
 
         // Release context
@@ -276,30 +271,34 @@ public extension RunAnywhere {
     }
 
     /// Process audio samples for streaming transcription
-    /// - Parameter samples: Audio samples
-    static func processStreamingAudio(_ samples: [Float]) async throws {
+    /// - Parameters:
+    ///   - samples: Audio samples
+    ///   - options: Transcription options (default: STTOptions())
+    static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
         let handle = try await CppBridge.STT.shared.getHandle()
 
-        var cOptions = rac_stt_options_t()
-        cOptions.sample_rate = Int32(RAC_STT_DEFAULT_SAMPLE_RATE)
-
-        let data = samples.withUnsafeBufferPointer { buffer in
-            Data(buffer: buffer)
+        guard await CppBridge.STT.shared.isLoaded else {
+            throw SDKError.stt(.notInitialized, "STT model not loaded")
         }
 
+        let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+
+        // sttResult is intentionally unused: the C layer delivers results via CppEventBridge events.
         var sttResult = rac_stt_result_t()
-        let transcribeResult = data.withUnsafeBytes { audioPtr in
-            rac_stt_component_transcribe(
-                handle,
-                audioPtr.baseAddress,
-                data.count,
-                &cOptions,
-                &sttResult
-            )
+        let transcribeResult = options.withCOptions { cOptionsPtr in
+            data.withUnsafeBytes { audioPtr in
+                rac_stt_component_transcribe(
+                    handle,
+                    audioPtr.baseAddress,
+                    data.count,
+                    cOptionsPtr,
+                    &sttResult
+                )
+            }
         }
 
         if transcribeResult != RAC_SUCCESS {
@@ -325,12 +324,19 @@ public extension RunAnywhere {
 
 // MARK: - Streaming Context Helper
 
-/// Context class for bridging C callbacks to Swift closures
-private final class STTStreamingContext: @unchecked Sendable {
-    let onPartialResult: (STTTranscriptionResult) -> Void
-    var finalText: String = ""
+/// Context class for bridging C callbacks to Swift closures.
+/// `finalText` is written by the C callback thread and read by the async
+/// continuation — protected by OSAllocatedUnfairLock to prevent data races.
+private final class STTStreamingContext: Sendable {
+    let onPartialResult: @Sendable (STTTranscriptionResult) -> Void
+    private let _finalText = OSAllocatedUnfairLock(initialState: "")
 
-    init(onPartialResult: @escaping (STTTranscriptionResult) -> Void) {
+    var finalText: String {
+        get { _finalText.withLock { $0 } }
+        set { _finalText.withLock { $0 = newValue } }
+    }
+
+    init(onPartialResult: @Sendable @escaping (STTTranscriptionResult) -> Void) {
         self.onPartialResult = onPartialResult
     }
 }

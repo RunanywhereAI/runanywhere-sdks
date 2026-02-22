@@ -18,6 +18,8 @@ import com.runanywhere.sdk.public.extensions.RAG.RAGConfiguration
 import com.runanywhere.sdk.public.extensions.RAG.RAGQueryOptions
 import com.runanywhere.sdk.public.extensions.RAG.RAGResult
 import com.runanywhere.sdk.public.extensions.RAG.RAGSearchResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -51,33 +53,35 @@ private val ragJson = Json { ignoreUnknownKeys = true }
 // MARK: - Pipeline Lifecycle
 
 actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
-    // 1. Ensure the library is loaded
-    if (!RAGBridge.ensureNativeLibraryLoaded()) {
-        throw IllegalStateException("Failed to load RAG native libraries.")
-    }
-
-    // 2. Ensure the backend is registered with the C++ service locator
-    if (!RAGBridge.nativeIsRegistered()) {
-        val regResult = RAGBridge.nativeRegister()
-        if (regResult != 0) { // 0 is RAC_SUCCESS
-            throw IllegalStateException("Failed to register RAG backend. Error code: $regResult")
+    val handle = withContext(Dispatchers.IO) {
+        // 1. Ensure the library is loaded
+        if (!RAGBridge.ensureNativeLibraryLoaded()) {
+            throw IllegalStateException("Failed to load RAG native libraries.")
         }
-    }
 
-    // 3. Create the pipeline
-    val handle = RAGBridge.nativeCreatePipeline(
-        embeddingModelPath = config.embeddingModelPath,
-        llmModelPath = config.llmModelPath,
-        embeddingDimension = config.embeddingDimension,
-        topK = config.topK,
-        similarityThreshold = config.similarityThreshold,
-        maxContextTokens = config.maxContextTokens,
-        chunkSize = config.chunkSize,
-        chunkOverlap = config.chunkOverlap,
-        promptTemplate = config.promptTemplate,
-        embeddingConfigJson = config.embeddingConfigJson,
-        llmConfigJson = config.llmConfigJson,
-    )
+        // 2. Ensure the backend is registered with the C++ service locator
+        if (!RAGBridge.nativeIsRegistered()) {
+            val regResult = RAGBridge.nativeRegister()
+            if (regResult != 0) { // 0 is RAC_SUCCESS
+                throw IllegalStateException("Failed to register RAG backend. Error code: $regResult")
+            }
+        }
+
+        // 3. Create the pipeline
+        RAGBridge.nativeCreatePipeline(
+            embeddingModelPath = config.embeddingModelPath,
+            llmModelPath = config.llmModelPath,
+            embeddingDimension = config.embeddingDimension,
+            topK = config.topK,
+            similarityThreshold = config.similarityThreshold,
+            maxContextTokens = config.maxContextTokens,
+            chunkSize = config.chunkSize,
+            chunkOverlap = config.chunkOverlap,
+            promptTemplate = config.promptTemplate,
+            embeddingConfigJson = config.embeddingConfigJson,
+            llmConfigJson = config.llmConfigJson,
+        )
+    }
 
     if (handle == 0L) {
         throw IllegalStateException("RAG pipeline creation failed")
@@ -90,7 +94,9 @@ actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
 actual suspend fun RunAnywhere.ragDestroyPipeline() {
     val handle = pipelineHandle
     if (handle != 0L) {
-        RAGBridge.nativeDestroyPipeline(handle)
+        withContext(Dispatchers.IO) {
+            RAGBridge.nativeDestroyPipeline(handle)
+        }
         pipelineHandle = 0L
     }
     EventBus.publish(RAGEvent.pipelineDestroyed())
@@ -107,13 +113,17 @@ actual suspend fun RunAnywhere.ragIngest(text: String, metadataJson: String?) {
     EventBus.publish(RAGEvent.ingestionStarted(text.length))
     val startMs = System.currentTimeMillis()
 
-    val result = RAGBridge.nativeAddDocument(handle, text, metadataJson)
+    val (result, chunkCount) = withContext(Dispatchers.IO) {
+        val res = RAGBridge.nativeAddDocument(handle, text, metadataJson)
+        val count = if (res == 0) RAGBridge.nativeGetDocumentCount(handle) else 0
+        res to count
+    }
+
     if (result != 0) {
         throw IllegalStateException("RAG document ingestion failed with error code: $result")
     }
 
     val durationMs = (System.currentTimeMillis() - startMs).toDouble()
-    val chunkCount = RAGBridge.nativeGetDocumentCount(handle)
     EventBus.publish(RAGEvent.ingestionComplete(chunkCount, durationMs))
 }
 
@@ -122,7 +132,9 @@ actual suspend fun RunAnywhere.ragClearDocuments() {
     if (handle == 0L) {
         throw IllegalStateException("RAG pipeline not created — call ragCreatePipeline first")
     }
-    RAGBridge.nativeClearDocuments(handle)
+    withContext(Dispatchers.IO) {
+        RAGBridge.nativeClearDocuments(handle)
+    }
 }
 
 // MARK: - Document Count
@@ -144,21 +156,23 @@ actual suspend fun RunAnywhere.ragQuery(question: String, options: RAGQueryOptio
     val queryOptions = options ?: RAGQueryOptions(question = question)
     EventBus.publish(RAGEvent.queryStarted(question))
 
-    val jsonString = RAGBridge.nativeQuery(
-        pipelineHandle = handle,
-        question = queryOptions.question,
-        systemPrompt = queryOptions.systemPrompt,
-        maxTokens = queryOptions.maxTokens,
-        temperature = queryOptions.temperature,
-        topP = queryOptions.topP,
-        topK = queryOptions.topK,
-    )
+    val raw = withContext(Dispatchers.IO) {
+        val jsonString = RAGBridge.nativeQuery(
+            pipelineHandle = handle,
+            question = queryOptions.question,
+            systemPrompt = queryOptions.systemPrompt,
+            maxTokens = queryOptions.maxTokens,
+            temperature = queryOptions.temperature,
+            topP = queryOptions.topP,
+            topK = queryOptions.topK,
+        )
 
-    if (jsonString.isBlank()) {
-        throw IllegalStateException("RAG query failed — empty response from native backend")
+        if (jsonString.isBlank()) {
+            throw IllegalStateException("RAG query failed — empty response from native backend")
+        }
+
+        ragJson.decodeFromString<RawRAGResult>(jsonString)
     }
-
-    val raw = ragJson.decodeFromString<RawRAGResult>(jsonString)
 
     val result = RAGResult(
         answer = raw.answer,

@@ -6,7 +6,7 @@ import org.json.JSONObject
 object ToolPromptFormatter {
 
     /**
-     * Format tools for injection into local model system prompts.
+     * Format tools for injection into local model system prompts (verbose version).
      */
     fun formatForLocalPrompt(tools: List<ToolDefinition>): String {
         if (tools.isEmpty()) return ""
@@ -36,6 +36,35 @@ object ToolPromptFormatter {
         sb.appendLine("- Only call ONE tool at a time. Wait for the result before proceeding.")
         sb.appendLine("- After receiving tool results, decide your next action: another tool call, a UI action, or \"done\".")
         sb.appendLine("- For UI navigation tasks, use UI actions (tap, type, swipe) NOT tool calls.")
+        return sb.toString()
+    }
+
+    /**
+     * Ultra-compact tool format for on-device 1.2B models.
+     * Minimizes token usage (~80 tokens total for 8 tools).
+     */
+    fun formatCompactForLocal(tools: List<ToolDefinition>): String {
+        if (tools.isEmpty()) return ""
+
+        val sb = StringBuilder()
+        sb.appendLine("TOOLS (call ONE per turn):")
+        sb.appendLine("Format: <tool_call>{\"tool\":\"name\",\"arguments\":{...}}</tool_call>")
+
+        tools.forEach { tool ->
+            val params = if (tool.parameters.isNotEmpty()) {
+                tool.parameters.joinToString(",") { p ->
+                    val typeStr = p.type.name.lowercase().take(3)
+                    "${p.name}:$typeStr"
+                }
+                    .let { "($it)" }
+            } else {
+                "()"
+            }
+            // One-liner: tool_name(params) — short description
+            val shortDesc = tool.description.take(50)
+            sb.appendLine("- ${tool.name}$params — $shortDesc")
+        }
+
         return sb.toString()
     }
 

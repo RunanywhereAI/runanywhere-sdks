@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.runanywhere.agent.AgentViewModel
 import com.runanywhere.agent.ui.components.ModelSelector
+import com.runanywhere.agent.ui.components.ProviderBadge
 import com.runanywhere.agent.ui.components.StatusBadge
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,7 +52,6 @@ fun AgentScreen(viewModel: AgentViewModel) {
     ) { isGranted ->
         hasMicPermission = isGranted
         if (isGranted) {
-            // Permission just granted — load STT model and start recording
             viewModel.loadSTTModelIfNeeded()
         }
     }
@@ -80,7 +81,7 @@ fun AgentScreen(viewModel: AgentViewModel) {
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Service Status
             if (!uiState.isServiceEnabled) {
@@ -108,7 +109,7 @@ fun AgentScreen(viewModel: AgentViewModel) {
                 }
             }
 
-            // Voice Mode Toggle + Model Selector
+            // Model Selector + Voice Mode + VLM Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -138,6 +139,15 @@ fun AgentScreen(viewModel: AgentViewModel) {
                 }
             }
 
+            // VLM Model Status
+            VLMModelCard(
+                isVLMLoaded = uiState.isVLMLoaded,
+                isVLMDownloading = uiState.isVLMDownloading,
+                vlmDownloadProgress = uiState.vlmDownloadProgress,
+                isAgentRunning = uiState.status == AgentViewModel.Status.RUNNING,
+                onLoadVLM = viewModel::loadVLMModel
+            )
+
             if (uiState.isVoiceMode) {
                 // ===== Voice Mode UI =====
                 Column(
@@ -145,7 +155,6 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Status text
                     val voiceStatusText = when {
                         uiState.status == AgentViewModel.Status.RUNNING -> "Working..."
                         uiState.isTranscribing -> "Transcribing..."
@@ -162,7 +171,6 @@ fun AgentScreen(viewModel: AgentViewModel) {
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Large Mic Button
                     val micEnabled = !uiState.isTranscribing &&
                             !uiState.isSTTModelLoading &&
                             uiState.status != AgentViewModel.Status.RUNNING
@@ -215,17 +223,15 @@ fun AgentScreen(viewModel: AgentViewModel) {
                         }
                     }
 
-                    // STT model loading progress
                     if (uiState.isSTTModelLoading) {
                         LinearProgressIndicator(
-                            progress = uiState.sttDownloadProgress,
+                            progress = { uiState.sttDownloadProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 32.dp),
                         )
                     }
 
-                    // Stop button when running
                     if (uiState.status == AgentViewModel.Status.RUNNING) {
                         Button(
                             onClick = viewModel::stopAgent,
@@ -239,9 +245,8 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     }
                 }
             } else {
-                // ===== Text Mode UI (existing) =====
+                // ===== Text Mode UI =====
 
-                // Goal Input with Mic Button
                 OutlinedTextField(
                     value = uiState.goal,
                     onValueChange = viewModel::setGoal,
@@ -278,7 +283,6 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     }
                 )
 
-                // STT model loading progress
                 if (uiState.isSTTModelLoading) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -286,7 +290,7 @@ fun AgentScreen(viewModel: AgentViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         LinearProgressIndicator(
-                            progress = uiState.sttDownloadProgress,
+                            progress = { uiState.sttDownloadProgress },
                             modifier = Modifier.weight(1f),
                         )
                         Text(
@@ -296,7 +300,6 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     }
                 }
 
-                // Control Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -325,19 +328,45 @@ fun AgentScreen(viewModel: AgentViewModel) {
                 }
             }
 
-            // Status Badge
+            // Status + Provider Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                StatusBadge(status = uiState.status)
-
-                if (uiState.logs.isNotEmpty()) {
-                    TextButton(onClick = viewModel::clearLogs) {
-                        Text("Clear Logs")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatusBadge(status = uiState.status)
+                    if (uiState.status == AgentViewModel.Status.RUNNING) {
+                        ProviderBadge(mode = uiState.providerMode)
                     }
                 }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (uiState.logs.isNotEmpty()) {
+                        TextButton(onClick = viewModel::copyLogsToClipboard) {
+                            Text(if (uiState.logsCopied) "Copied!" else "Export")
+                        }
+                        TextButton(onClick = viewModel::clearLogs) {
+                            Text("Clear Logs")
+                        }
+                    }
+                }
+            }
+
+            // Live Thinking Overlay — shows streaming tokens while LLM is reasoning
+            if (uiState.thinkingText.isNotEmpty()) {
+                ThinkingPanel(
+                    text = uiState.thinkingText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 120.dp)
+                )
             }
 
             // Log Output
@@ -347,6 +376,84 @@ fun AgentScreen(viewModel: AgentViewModel) {
                     .fillMaxWidth()
                     .weight(1f)
             )
+        }
+    }
+}
+
+@Composable
+private fun VLMModelCard(
+    isVLMLoaded: Boolean,
+    isVLMDownloading: Boolean,
+    vlmDownloadProgress: Float,
+    isAgentRunning: Boolean,
+    onLoadVLM: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isVLMLoaded)
+                Color(0xFF198754).copy(alpha = 0.1f)
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Visibility,
+                    contentDescription = null,
+                    tint = if (isVLMLoaded) Color(0xFF198754) else Color.Gray,
+                    modifier = Modifier.size(20.dp)
+                )
+                Column {
+                    Text(
+                        text = if (isVLMLoaded) "VLM Ready" else "Vision Model",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isVLMLoaded) Color(0xFF198754) else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "LFM2-VL 450M (~323 MB)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            if (!isVLMLoaded && !isVLMDownloading) {
+                Button(
+                    onClick = onLoadVLM,
+                    enabled = !isAgentRunning,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text("Load", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+
+            if (isVLMDownloading) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(
+                        progress = { vlmDownloadProgress },
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "${(vlmDownloadProgress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
         }
     }
 }
@@ -382,6 +489,44 @@ private fun MicButton(
                 imageVector = Icons.Rounded.Mic,
                 contentDescription = "Start recording",
                 tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+/**
+ * Shows streaming LLM tokens in real-time while the model is reasoning.
+ * Styled in amber/yellow to visually distinguish from the completed log panel.
+ */
+@Composable
+fun ThinkingPanel(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1200)),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text(
+                text = "▶ ",
+                color = Color(0xFFFFD43B),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                text = text,
+                color = Color(0xFFFFD43B),
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 16.sp,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -430,6 +575,8 @@ fun LogPanel(
                 items(logs) { log ->
                     val color = when {
                         log.startsWith("ERROR") -> Color(0xFFFF6B6B)
+                        log.startsWith("[LOCAL]") -> Color(0xFF69DB7C)
+                        log.startsWith("[CLOUD]") -> Color(0xFF74C0FC)
                         log.startsWith("Step") -> Color(0xFF69DB7C)
                         log.contains("Downloading") -> Color(0xFF74C0FC)
                         log.contains("done", ignoreCase = true) -> Color(0xFF69DB7C)

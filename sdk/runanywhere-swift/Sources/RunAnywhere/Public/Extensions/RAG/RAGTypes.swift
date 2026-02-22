@@ -53,7 +53,7 @@ public struct RAGConfiguration: Sendable {
         llmModelPath: String,
         embeddingDimension: Int = 384,
         topK: Int = 3,
-        similarityThreshold: Float = 0.7,
+        similarityThreshold: Float = 0.3,
         maxContextTokens: Int = 2048,
         chunkSize: Int = 512,
         chunkOverlap: Int = 50,

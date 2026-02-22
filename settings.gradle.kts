@@ -17,18 +17,27 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url = uri("https://jitpack.io") } // Add JitPack for android-vad
+        maven { url = uri("https://jitpack.io") }
         mavenLocal()
     }
 }
 
+rootProject.name = "RunAnywhere"
 
-rootProject.name = "RunAnywhere-Android"
-
-// Include SDK modules
+// Kotlin Multiplatform SDK
 include(":runanywhere-kotlin")
-include(":runanywhere-kotlin:jni")
+project(":runanywhere-kotlin").projectDir = file("sdk/runanywhere-kotlin")
 
-// Include example apps as composite builds to keep them self-contained
+// Backend modules
+include(":runanywhere-core-llamacpp")
+project(":runanywhere-core-llamacpp").projectDir =
+    file("sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
+
+include(":runanywhere-core-onnx")
+project(":runanywhere-core-onnx").projectDir =
+    file("sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
+
+// Example apps (composite builds for IDE support)
 includeBuild("examples/android/RunAnywhereAI")
+includeBuild("examples/android/RunAnyWhereLora")
 includeBuild("examples/intellij-plugin-demo/plugin")

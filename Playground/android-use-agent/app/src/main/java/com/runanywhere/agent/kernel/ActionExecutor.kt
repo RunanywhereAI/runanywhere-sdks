@@ -51,15 +51,30 @@ class ActionExecutor(
         decision: Decision,
         indexToCoords: Map<Int, Pair<Int, Int>>
     ): ExecutionResult {
-        val coords = indexToCoords[decision.elementIndex]
-            ?: return ExecutionResult(false, "Invalid element index: ${decision.elementIndex}")
+        val filteredIdx = decision.elementIndex
+            ?: return ExecutionResult(false, "No element index provided")
 
-        onLog("Tapping element ${decision.elementIndex} at (${coords.first}, ${coords.second})")
+        // originalElementIndex is the position in the original accessibility tree (used by performClickAtIndex).
+        // elementIndex may be a re-indexed filtered index — use origIdx for ACTION_CLICK.
+        val origIdx = decision.originalElementIndex ?: filteredIdx
+
+        // Try ACTION_CLICK first — bypasses gesture interceptor overlays (e.g., X's fab_menu_background_overlay)
+        val clickSuccess = service.performClickAtIndex(origIdx)
+        if (clickSuccess) {
+            onLog("Clicked element orig=$origIdx (filtered=$filteredIdx) via accessibility action")
+            return ExecutionResult(true, "Clicked element $filteredIdx")
+        }
+
+        // Fall back to coordinate gesture — use filteredIdx for coord lookup (mappedCoords is keyed by filteredIdx)
+        val coords = indexToCoords[filteredIdx]
+            ?: return ExecutionResult(false, "Invalid element index: $filteredIdx")
+
+        onLog("Tapping element $filteredIdx at (${coords.first}, ${coords.second})")
 
         return suspendCancellableCoroutine { cont ->
             service.tap(coords.first, coords.second) { success ->
                 if (success) {
-                    cont.resume(ExecutionResult(true, "Tapped element ${decision.elementIndex}"))
+                    cont.resume(ExecutionResult(true, "Tapped element $filteredIdx"))
                 } else {
                     cont.resume(ExecutionResult(false, "Tap failed"))
                 }
@@ -222,6 +237,8 @@ class ActionExecutor(
                 AppActions.openApp(context, AppActions.Packages.CALCULATOR) || AppActions.openApp(context, AppActions.Packages.CALCULATOR_SAMSUNG)
             appLower.contains("files") || appLower.contains("file manager") ->
                 AppActions.openApp(context, AppActions.Packages.FILES) || AppActions.openApp(context, AppActions.Packages.FILES_SAMSUNG)
+            appLower == "notes" || appLower == "note" || appLower == "samsung notes" || appLower == "google keep" ->
+                AppActions.openNotes(context)
             appLower.contains("setting") -> {
                 openSettings()
                 true
@@ -246,6 +263,17 @@ class ActionExecutor(
             "sound", "audio" -> android.provider.Settings.ACTION_SOUND_SETTINGS
             "battery" -> android.provider.Settings.ACTION_BATTERY_SAVER_SETTINGS
             "location" -> android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS
+            "notification", "notifications" -> android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+            "storage" -> android.provider.Settings.ACTION_INTERNAL_STORAGE_SETTINGS
+            "security", "privacy" -> android.provider.Settings.ACTION_SECURITY_SETTINGS
+            "accessibility" -> android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS
+            "about" -> android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS
+            "developer", "dev" -> android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
+            "date", "time" -> android.provider.Settings.ACTION_DATE_SETTINGS
+            "language" -> android.provider.Settings.ACTION_LOCALE_SETTINGS
+            "airplane", "flight" -> android.provider.Settings.ACTION_AIRPLANE_MODE_SETTINGS
+            "nfc" -> android.provider.Settings.ACTION_NFC_SETTINGS
+            "apps", "applications" -> android.provider.Settings.ACTION_APPLICATION_SETTINGS
             else -> android.provider.Settings.ACTION_SETTINGS
         }
 
@@ -266,6 +294,9 @@ class ActionExecutor(
 data class Decision(
     val action: String,
     val elementIndex: Int? = null,
+    /** Original accessibility-tree index when elementIndex is a filtered index.
+     *  If set, performClickAtIndex uses this; elementIndex is used for coordinate lookup. */
+    val originalElementIndex: Int? = null,
     val text: String? = null,
     val direction: String? = null,
     val url: String? = null,
