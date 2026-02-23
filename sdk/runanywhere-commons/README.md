@@ -251,6 +251,27 @@ rac_shutdown();
 ./scripts/build-ios.sh --package          # Create XCFramework ZIPs
 ```
 
+#### iOS Simulator Support
+
+All XCFrameworks produced by `build-ios.sh` include a fat simulator slice containing both `arm64` (Apple Silicon Mac) and `x86_64` (Intel Mac) architectures. The build script validates this automatically after each framework is created — a failure means one of the simulator builds did not produce a valid library.
+
+**Troubleshooting simulator build failures:**
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `lipo failed to combine simulator slices` | SIMULATORARM64 or SIMULATOR build produced no output | Check CMake output for that platform; re-run without `--skip-download` |
+| `missing a simulator slice` | XCFramework was created without simulator platform | Delete `build/ios/` and `dist/` then re-run `build-ios.sh` |
+| `missing arm64` in simulator slice | Sherpa-ONNX or llama.cpp dependency was downloaded without simulator support | Delete `third_party/` and re-run (dependency will be re-fetched) |
+| App crashes on simulator, not device | Simulator slice is present but empty/corrupt (was previously silently produced by `lipo || true`) | Clean and rebuild: `./scripts/build-ios.sh --clean` |
+
+**Verifying XCFramework simulator slices manually:**
+```bash
+# Should report: Architectures in the fat file: ... are: x86_64 arm64
+lipo -info dist/RABackendLLAMACPP.xcframework/ios-arm64_x86_64-simulator/RABackendLLAMACPP.framework/RABackendLLAMACPP
+lipo -info dist/RABackendONNX.xcframework/ios-arm64_x86_64-simulator/RABackendONNX.framework/RABackendONNX
+lipo -info dist/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/RACommons
+```
+
 #### Android
 ```bash
 ./scripts/build-android.sh                     # All backends, all ABIs
