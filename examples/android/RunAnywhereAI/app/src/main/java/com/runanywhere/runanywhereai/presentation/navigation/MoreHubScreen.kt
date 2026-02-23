@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,6 +46,7 @@ fun MoreHubScreen(
     onNavigateToTTS: () -> Unit,
     onNavigateToRAG: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
+    onNavigateToLoraManager: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -108,7 +110,25 @@ fun MoreHubScreen(
                 onClick = onNavigateToRAG,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Model Customization section
+            Text(
+                "Model Customization",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
+
+            MoreFeatureCard(
+                icon = Icons.Filled.Tune,
+                iconColor = Color(0xFF8B5CF6), // Purple
+                title = "LoRA Adapters",
+                subtitle = "Manage and apply LoRA fine-tuning adapters to models",
+                onClick = onNavigateToLoraManager,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Performance section
             Text(

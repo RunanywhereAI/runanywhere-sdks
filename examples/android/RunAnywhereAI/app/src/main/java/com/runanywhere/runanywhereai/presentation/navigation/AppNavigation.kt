@@ -16,6 +16,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDeta
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
+import com.runanywhere.runanywhereai.presentation.lora.LoraManagerScreen
 import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
@@ -77,7 +78,7 @@ fun AppNavigation() {
                 VoiceAssistantScreen()
             }
 
-            // "More" hub routes — STT, TTS, RAG, and Benchmarks here to match iOS structure
+            // "More" hub routes — STT, TTS, RAG, Benchmarks, LoRA here to match iOS structure
             composable(NavigationRoute.MORE) {
                 MoreHubScreen(
                     onNavigateToSTT = {
@@ -91,6 +92,9 @@ fun AppNavigation() {
                     },
                     onNavigateToBenchmarks = {
                         navController.navigate(NavigationRoute.BENCHMARKS)
+                    },
+                    onNavigateToLoraManager = {
+                        navController.navigate(NavigationRoute.LORA_MANAGER)
                     },
                 )
             }
@@ -120,6 +124,10 @@ fun AppNavigation() {
                 BenchmarkDetailScreen(runId = runId)
             }
 
+            composable(NavigationRoute.LORA_MANAGER) {
+                LoraManagerScreen()
+            }
+
             composable(NavigationRoute.SETTINGS) {
                 SettingsScreen()
             }
@@ -142,6 +150,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
             NavigationRoute.TTS,
             NavigationRoute.RAG,
             NavigationRoute.BENCHMARKS,
+            NavigationRoute.LORA_MANAGER,
         ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
         else -> BottomNavTab.Chat
@@ -169,5 +178,6 @@ object NavigationRoute {
     const val RAG = "rag"
     const val BENCHMARKS = "benchmarks"
     const val BENCHMARK_DETAIL = "benchmark_detail"
+    const val LORA_MANAGER = "lora_manager"
     const val SETTINGS = "settings"
 }

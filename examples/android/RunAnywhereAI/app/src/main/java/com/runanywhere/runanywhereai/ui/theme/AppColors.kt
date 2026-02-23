@@ -69,6 +69,25 @@ object AppColors {
     val messageBubbleAssistantDark = backgroundGray5Dark // Dark gray
 
     // ====================
+    // USER BUBBLE — ChatGPT-style solid colors
+    // ====================
+    val userBubbleSolid = Color(0xFFEFEFEF) // Light mode: light gray
+    val userBubbleSolidDark = Color(0xFF2F3541) // Dark mode: slightly lighter
+
+    /**
+     * Theme-aware solid color for user message bubbles (no gradient).
+     */
+    @Composable
+    fun userBubbleColor(): Color {
+        return if (isSystemInDarkTheme()) userBubbleSolidDark else userBubbleSolid
+    }
+
+    // ====================
+    // LORA COLORS
+    // ====================
+    val loraBadgeBg = primaryPurple.copy(alpha = 0.10f)
+
+    // ====================
     // BADGE/TAG COLORS
     // ====================
     val badgePrimary = primaryAccent.copy(alpha = 0.2f) // Brand primary (orange-red)

@@ -58,31 +58,26 @@ class MainActivity : ComponentActivity() {
         val initState by app.initializationState.collectAsState()
         val scope = rememberCoroutineScope()
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            when (initState) {
-                is SDKInitializationState.Loading -> {
-                    InitializationLoadingView()
-                }
+        when (initState) {
+            is SDKInitializationState.Loading -> {
+                InitializationLoadingView()
+            }
 
-                is SDKInitializationState.Error -> {
-                    val error = (initState as SDKInitializationState.Error).error
-                    InitializationErrorView(
-                        error = error,
-                        onRetry = {
-                            scope.launch {
-                                app.retryInitialization()
-                            }
-                        },
-                    )
-                }
+            is SDKInitializationState.Error -> {
+                val error = (initState as SDKInitializationState.Error).error
+                InitializationErrorView(
+                    error = error,
+                    onRetry = {
+                        scope.launch {
+                            app.retryInitialization()
+                        }
+                    },
+                )
+            }
 
-                is SDKInitializationState.Ready -> {
-                    Log.i("MainActivity", "App is ready to use!")
-                    AppNavigation()
-                }
+            is SDKInitializationState.Ready -> {
+                Log.i("MainActivity", "App is ready to use!")
+                AppNavigation()
             }
         }
     }

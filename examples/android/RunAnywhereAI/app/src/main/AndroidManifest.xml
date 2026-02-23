@@ -26,6 +26,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.RunAnywhereAI"
+        android:windowSoftInputMode="adjustResize"
         android:largeHeap="true"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">

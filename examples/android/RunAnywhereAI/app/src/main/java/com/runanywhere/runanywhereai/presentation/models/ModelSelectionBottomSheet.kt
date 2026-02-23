@@ -78,6 +78,7 @@ private data class AIModel(
     val formatColor: Color,
     val size: String,
     val isDownloaded: Boolean,
+    val supportsLora: Boolean = false,
 )
 
 /**
@@ -255,6 +256,7 @@ private fun toAIModel(m: ModelInfo): AIModel {
         formatColor = formatColor,
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
+        supportsLora = m.supportsLora,
     )
 }
 
@@ -511,6 +513,15 @@ private fun ModelCard(
                 textColor = model.formatColor,
                 backgroundColor = model.formatColor.copy(alpha = 0.10f),
             )
+
+            if (model.supportsLora) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Badge(
+                    text = "LoRA",
+                    textColor = AppColors.primaryPurple,
+                    backgroundColor = AppColors.loraBadgeBg,
+                )
+            }
 
             Spacer(modifier = Modifier.width(8.dp))
 

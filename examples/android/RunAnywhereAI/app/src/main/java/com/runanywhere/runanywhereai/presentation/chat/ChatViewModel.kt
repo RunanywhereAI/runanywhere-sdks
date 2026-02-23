@@ -25,6 +25,7 @@ import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
+import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
@@ -57,6 +58,8 @@ data class ChatUiState(
     val error: Throwable? = null,
     val useStreaming: Boolean = true,
     val currentConversation: Conversation? = null,
+    val currentModelSupportsLora: Boolean = false,
+    val hasActiveLoraAdapter: Boolean = false,
 ) {
     val canSend: Boolean
         get() = currentInput.trim().isNotEmpty() && !isGenerating && isModelLoaded
@@ -728,7 +731,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value.copy(
                             isModelLoaded = true,
                             loadedModelName = displayName,
+                            currentModelSupportsLora = currentModel?.supportsLora == true,
                         )
+                    refreshLoraState()
                     addSystemMessageIfNeeded()
                     return
                 }
@@ -751,7 +756,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             _uiState.value.copy(
                                 isModelLoaded = true,
                                 loadedModelName = chatModel.name,
+                                currentModelSupportsLora = chatModel.supportsLora,
                             )
+                        refreshLoraState()
                         Log.i(TAG, "✅ Chat model loaded successfully: ${chatModel.name}")
                     } catch (e: Throwable) {
                         // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
@@ -790,6 +797,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     loadedModelName = null,
                     error = if (e is Exception) e else Exception("Failed to check model status: ${e.message}", e),
                 )
+        }
+    }
+
+    /** Refresh LoRA loaded state for the active adapters indicator. */
+    private fun refreshLoraState() {
+        viewModelScope.launch {
+            try {
+                val loaded = RunAnywhere.getLoadedLoraAdapters()
+                _uiState.value = _uiState.value.copy(hasActiveLoraAdapter = loaded.isNotEmpty())
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to refresh LoRA state", e)
+            }
         }
     }
 

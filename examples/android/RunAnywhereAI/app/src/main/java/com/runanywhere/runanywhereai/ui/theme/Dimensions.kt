@@ -96,13 +96,21 @@ object Dimensions {
     // CHAT-SPECIFIC DIMENSIONS
     // ====================
 
-    // Message Bubbles
+    // Message Bubbles — ChatGPT-style
     val messageBubbleCornerRadius = cornerRadiusBubble // 18.dp
     val messageBubblePaddingHorizontal = padding16 // 16.dp
     val messageBubblePaddingVertical = padding12 // 12.dp
     val messageBubbleShadowRadius = shadowLarge // 4.dp
-    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment)
-    val messageSpacingBetween = large // 16.dp
+    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment, legacy)
+    val messageSpacingBetween = xLarge // 20.dp
+    val messageMaxWidthFraction = 0.85f // fraction-based width for user messages
+
+    // Assistant message icon
+    val assistantIconSize = 20.dp
+    val assistantIconSpacing = 10.dp
+
+    // User bubble (simplified)
+    val userBubbleCornerRadius = cornerRadiusBubble // 18.dp
 
     // Thinking Section
     val thinkingSectionCornerRadius = mediumLarge // 12.dp
@@ -155,4 +163,9 @@ object Dimensions {
     val messageBubbleMaxWidth = 280.dp
     val maxContentWidth = 700.dp
     val contextMenuMaxWidth = 280.dp
+
+    // ====================
+    // LORA
+    // ====================
+    val loraScaleSliderHeight = 32.dp
 }
