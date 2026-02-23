@@ -17,20 +17,18 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
+import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.ui.theme.Dimensions
 
 /**
  * Vision Hub Screen — Matches iOS VisionHubView exactly.
@@ -41,63 +39,55 @@ import androidx.compose.ui.unit.sp
  *
  * iOS Reference: examples/ios/RunAnywhereAI/.../App/ContentView.swift — VisionHubView
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VisionHubScreen(
     onNavigateToVLM: () -> Unit,
     onNavigateToImageGeneration: () -> Unit = {},
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Vision") },
-            )
-        },
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
+    ConfigureTopBar(title = "Vision")
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
+    ) {
             // Section header
             Text(
                 "Vision AI",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
             )
 
             // Vision Chat (VLM)
             FeatureCard(
                 icon = Icons.Filled.CameraAlt,
-                iconColor = Color(0xFF9C27B0), // Purple
+                iconColor = AppColors.featureCamera,
                 title = "Vision Chat",
                 subtitle = "Chat with images using your camera or photos",
                 onClick = onNavigateToVLM,
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
 
             // Image Generation (placeholder for future diffusion model support)
             FeatureCard(
                 icon = Icons.Filled.PhotoLibrary,
-                iconColor = Color(0xFFE91E63), // Pink
+                iconColor = AppColors.featurePink,
                 title = "Image Generation",
                 subtitle = "Create images from text prompts",
                 onClick = onNavigateToImageGeneration,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Dimensions.large))
 
             // Footer
             Text(
                 "Understand and create visual content with AI",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall),
             )
-        }
     }
 }
 
@@ -116,7 +106,7 @@ private fun FeatureCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
@@ -124,7 +114,7 @@ private fun FeatureCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Dimensions.large),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -133,16 +123,15 @@ private fun FeatureCard(
                 tint = iconColor,
                 modifier = Modifier.size(32.dp),
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Dimensions.large))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     subtitle,
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

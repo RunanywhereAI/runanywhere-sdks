@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai
 import android.app.Application
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import com.runanywhere.runanywhereai.data.ModelList
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /**
  * Represents the SDK initialization state.
@@ -63,7 +63,11 @@ class RunAnywhereApplication : Application() {
         super.onCreate()
         instance = this
 
-        Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
+
+        Timber.i("App launched, initializing SDK...")
 
         // Post initialization to main thread's message queue to ensure system is ready
         // This prevents crashes on devices where device-encrypted storage hasn't mounted yet
@@ -75,7 +79,7 @@ class RunAnywhereApplication : Application() {
                     delay(200)
                     initializeSDK()
                 } catch (e: Exception) {
-                    Log.e("RunAnywhereApp", "❌ Fatal error during SDK initialization: ${e.message}", e)
+                    Timber.e(e, "❌ Fatal error during SDK initialization: ${e.message}")
                     // Don't crash the app - let it continue without SDK
                 }
             }
@@ -90,14 +94,14 @@ class RunAnywhereApplication : Application() {
 
     private suspend fun initializeSDK() {
         initializationError = null
-        Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
-        Log.w("RunAnywhereApp", "=======================================================")
-        Log.w("RunAnywhereApp", "🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
-        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")
-        Log.w("RunAnywhereApp", "   BuildConfig.DEBUG_MODE = ${BuildConfig.DEBUG_MODE}")
-        Log.w("RunAnywhereApp", "   BuildConfig.BUILD_TYPE = ${BuildConfig.BUILD_TYPE}")
-        Log.w("RunAnywhereApp", "   Package name = ${applicationContext.packageName}")
-        Log.w("RunAnywhereApp", "=======================================================")
+        Timber.i("🎯 Starting SDK initialization...")
+        Timber.w("=======================================================")
+        Timber.w("🔍 BUILD INFO - CHECK THIS FOR ANALYTICS DEBUGGING:")
+        Timber.w("   BuildConfig.DEBUG = ${BuildConfig.DEBUG}")
+        Timber.w("   BuildConfig.DEBUG_MODE = ${BuildConfig.DEBUG_MODE}")
+        Timber.w("   BuildConfig.BUILD_TYPE = ${BuildConfig.BUILD_TYPE}")
+        Timber.w("   Package name = ${applicationContext.packageName}")
+        Timber.w("=======================================================")
 
         val startTime = System.currentTimeMillis()
 
@@ -107,8 +111,8 @@ class RunAnywhereApplication : Application() {
         val hasCustomConfig = customApiKey != null && customBaseURL != null
 
         if (hasCustomConfig) {
-            Log.i("RunAnywhereApp", "🔧 Found custom API configuration")
-            Log.i("RunAnywhereApp", "   Base URL: $customBaseURL")
+            Timber.i("🔧 Found custom API configuration")
+            Timber.i("   Base URL: $customBaseURL")
         }
 
         // Determine environment based on DEBUG_MODE (NOT BuildConfig.DEBUG!)
@@ -136,13 +140,13 @@ class RunAnywhereApplication : Application() {
                     baseURL = customBaseURL!!,
                     environment = environment,
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized with CUSTOM configuration (${environment.name.lowercase()})")
+                Timber.i("✅ SDK initialized with CUSTOM configuration (${environment.name.lowercase()})")
             } else if (environment == SDKEnvironment.DEVELOPMENT) {
                 // DEVELOPMENT mode: Don't pass baseURL - SDK uses Supabase URL from C++ dev config
                 RunAnywhere.initialize(
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
+                Timber.i("✅ SDK initialized in DEVELOPMENT mode (using Supabase from dev config)")
             } else {
                 // PRODUCTION mode - requires API key and base URL
                 // Configure these via Settings screen or set environment variables
@@ -151,31 +155,30 @@ class RunAnywhereApplication : Application() {
 
                 // Detect placeholder credentials and abort production initialization
                 if (apiKey.startsWith("YOUR_") || baseURL.startsWith("YOUR_")) {
-                    Log.e(
-                        "RunAnywhereApp",
+                    Timber.e(
                         "❌ RunAnywhere.initialize with SDKEnvironment.PRODUCTION failed: " +
                             "placeholder credentials detected. Configure via Settings screen or replace placeholders.",
                     )
                     // Fall back to development mode
                     RunAnywhere.initialize(environment = SDKEnvironment.DEVELOPMENT)
-                    Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
+                    Timber.i("✅ SDK initialized in DEVELOPMENT mode (production credentials not configured)")
                 } else {
                     RunAnywhere.initialize(
                         apiKey = apiKey,
                         baseURL = baseURL,
                         environment = SDKEnvironment.PRODUCTION,
                     )
-                    Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
+                    Timber.i("✅ SDK initialized in PRODUCTION mode")
                 }
             }
 
             // Phase 2: Complete services initialization (device registration, etc.)
             // This triggers device registration with the backend
             RunAnywhere.completeServicesInitialization()
-            Log.i("RunAnywhereApp", "✅ SDK services initialization complete (device registered)")
+            Timber.i("✅ SDK services initialization complete (device registered)")
         } catch (e: Exception) {
             // Log the failure but continue
-            Log.w("RunAnywhereApp", "⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
+            Timber.w("⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")
             initializationError = e
 
             // Fall back to development mode
@@ -184,36 +187,36 @@ class RunAnywhereApplication : Application() {
                 RunAnywhere.initialize(
                     environment = SDKEnvironment.DEVELOPMENT,
                 )
-                Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
+                Timber.i("✅ SDK initialized in OFFLINE mode (local models only)")
 
                 // Still try Phase 2 in offline mode
                 RunAnywhere.completeServicesInitialization()
             } catch (fallbackError: Exception) {
-                Log.e("RunAnywhereApp", "❌ Fallback initialization also failed: ${fallbackError.message}")
+                Timber.e("❌ Fallback initialization also failed: ${fallbackError.message}")
             }
         }
 
         // Register modules and models
         registerModulesAndModels()
 
-        Log.i("RunAnywhereApp", "✅ SDK initialization complete")
+        Timber.i("✅ SDK initialization complete")
 
         val initTime = System.currentTimeMillis() - startTime
-        Log.i("RunAnywhereApp", "✅ SDK setup completed in ${initTime}ms")
-        Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
+        Timber.i("✅ SDK setup completed in ${initTime}ms")
+        Timber.i("🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
 
         isSDKInitialized = RunAnywhere.isInitialized
 
         // Update observable state for Compose UI
         if (isSDKInitialized) {
             _initializationState.value = SDKInitializationState.Ready
-            Log.i("RunAnywhereApp", "🎉 App is ready to use!")
+            Timber.i("🎉 App is ready to use!")
         } else if (initializationError != null) {
             _initializationState.value = SDKInitializationState.Error(initializationError!!)
         } else {
             // SDK reported not initialized but no error - treat as ready for offline mode
             _initializationState.value = SDKInitializationState.Ready
-            Log.i("RunAnywhereApp", "🎉 App is ready to use (offline mode)!")
+            Timber.i("🎉 App is ready to use (offline mode)!")
         }
     }
 

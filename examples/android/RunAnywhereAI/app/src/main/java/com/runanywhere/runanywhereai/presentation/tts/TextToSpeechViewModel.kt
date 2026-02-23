@@ -6,7 +6,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.core.types.InferenceFramework
@@ -36,7 +36,6 @@ import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-private const val TAG = "TTSViewModel"
 private const val SYSTEM_TTS_MODEL_ID = "system-tts"
 
 /**
@@ -155,7 +154,7 @@ class TextToSpeechViewModel(
     private var systemTtsInit: CompletableDeferred<Boolean>? = null
 
     init {
-        Log.i(TAG, "Initializing TTS ViewModel...")
+        Timber.i("Initializing TTS ViewModel...")
 
         // Subscribe to SDK events for TTS model state
         viewModelScope.launch {
@@ -182,13 +181,13 @@ class TextToSpeechViewModel(
     private fun handleTTSEvent(event: TTSEvent) {
         when (event.eventType) {
             TTSEvent.TTSEventType.SYNTHESIS_STARTED -> {
-                Log.d(TAG, "Synthesis started")
+                Timber.d("Synthesis started")
             }
             TTSEvent.TTSEventType.SYNTHESIS_COMPLETED -> {
-                Log.i(TAG, "Synthesis completed: ${event.durationMs}ms")
+                Timber.i("Synthesis completed: ${event.durationMs}ms")
             }
             TTSEvent.TTSEventType.SYNTHESIS_FAILED -> {
-                Log.e(TAG, "Synthesis failed: ${event.error}")
+                Timber.e("Synthesis failed: ${event.error}")
                 _uiState.update {
                     it.copy(
                         isGenerating = false,
@@ -197,10 +196,10 @@ class TextToSpeechViewModel(
                 }
             }
             TTSEvent.TTSEventType.PLAYBACK_STARTED -> {
-                Log.d(TAG, "Playback started")
+                Timber.d("Playback started")
             }
             TTSEvent.TTSEventType.PLAYBACK_COMPLETED -> {
-                Log.d(TAG, "Playback completed")
+                Timber.d("Playback completed")
             }
         }
     }
@@ -211,7 +210,7 @@ class TextToSpeechViewModel(
     private fun handleModelEvent(event: ModelEvent) {
         when (event.eventType) {
             ModelEvent.ModelEventType.LOADED -> {
-                Log.i(TAG, "✅ TTS model loaded: ${event.modelId}")
+                Timber.i("✅ TTS model loaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
@@ -223,7 +222,7 @@ class TextToSpeechViewModel(
                 shuffleSampleText()
             }
             ModelEvent.ModelEventType.UNLOADED -> {
-                Log.d(TAG, "TTS model unloaded: ${event.modelId}")
+                Timber.d("TTS model unloaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -233,13 +232,13 @@ class TextToSpeechViewModel(
                 }
             }
             ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
-                Log.d(TAG, "TTS model download started: ${event.modelId}")
+                Timber.d("TTS model download started: ${event.modelId}")
             }
             ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                Log.d(TAG, "TTS model download completed: ${event.modelId}")
+                Timber.d("TTS model download completed: ${event.modelId}")
             }
             ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                Log.e(TAG, "TTS model download failed: ${event.modelId} - ${event.error}")
+                Timber.e("TTS model download failed: ${event.modelId} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Download failed: ${event.error}",
@@ -273,11 +272,11 @@ class TextToSpeechViewModel(
     fun loadVoice(voiceId: String) {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Loading TTS voice: $voiceId")
+                Timber.i("Loading TTS voice: $voiceId")
                 RunAnywhere.loadTTSVoice(voiceId)
                 updateTTSState()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load TTS voice: ${e.message}", e)
+                Timber.e(e, "Failed to load TTS voice: ${e.message}")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to load voice: ${e.message}")
                 }
@@ -294,7 +293,7 @@ class TextToSpeechViewModel(
         modelId: String,
         framework: InferenceFramework?,
     ) {
-        Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
+        Timber.i("Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
 
         val isSystem = modelId == SYSTEM_TTS_MODEL_ID || framework == InferenceFramework.SYSTEM_TTS
 
@@ -318,7 +317,7 @@ class TextToSpeechViewModel(
      * iOS Reference: initialize() in TTSViewModel
      */
     fun initialize() {
-        Log.i(TAG, "Initializing TTS ViewModel...")
+        Timber.i("Initializing TTS ViewModel...")
         updateTTSState()
     }
 
@@ -393,7 +392,7 @@ class TextToSpeechViewModel(
             }
 
             try {
-                Log.i(TAG, "Generating speech for text: ${text.take(50)}...")
+                Timber.i("Generating speech for text: ${text.take(50)}...")
 
                 val startTime = System.currentTimeMillis()
 
@@ -430,7 +429,7 @@ class TextToSpeechViewModel(
                     val processingTime = System.currentTimeMillis() - startTime
 
                     if (result.audioData.isEmpty()) {
-                        Log.i(TAG, "TTS synthesis returned empty audio")
+                        Timber.i("TTS synthesis returned empty audio")
                         _uiState.update {
                             it.copy(
                                 isGenerating = false,
@@ -443,7 +442,7 @@ class TextToSpeechViewModel(
                         }
                     } else {
                         // ONNX/Piper TTS returns audio data for playback
-                        Log.i(TAG, "✅ Speech generation complete: ${result.audioData.size} bytes, duration: ${result.duration}s")
+                        Timber.i("✅ Speech generation complete: ${result.audioData.size} bytes, duration: ${result.duration}s")
 
                         generatedAudioData = result.audioData
 
@@ -461,7 +460,7 @@ class TextToSpeechViewModel(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Speech generation failed: ${e.message}", e)
+                Timber.e(e, "Speech generation failed: ${e.message}")
                 _uiState.update {
                     it.copy(
                         isGenerating = false,
@@ -492,11 +491,11 @@ class TextToSpeechViewModel(
     private fun startPlayback() {
         val audioData = generatedAudioData
         if (audioData == null || audioData.isEmpty()) {
-            Log.w(TAG, "No audio data to play")
+            Timber.w("No audio data to play")
             return
         }
 
-        Log.i(TAG, "Starting playback of ${audioData.size} bytes")
+        Timber.i("Starting playback of ${audioData.size} bytes")
         _uiState.update { it.copy(isPlaying = true) }
 
         playbackJob =
@@ -574,7 +573,7 @@ class TextToSpeechViewModel(
                         stopPlayback()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Playback error: ${e.message}", e)
+                    Timber.e(e, "Playback error: ${e.message}")
                     withContext(Dispatchers.Main) {
                         _uiState.update {
                             it.copy(
@@ -610,7 +609,7 @@ class TextToSpeechViewModel(
         audioTrack?.release()
         audioTrack = null
 
-        Log.d(TAG, "Playback stopped")
+        Timber.d("Playback stopped")
     }
 
     /**
@@ -626,7 +625,7 @@ class TextToSpeechViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        Log.i(TAG, "ViewModel cleared, cleaning up resources")
+        Timber.i("ViewModel cleared, cleaning up resources")
         stopPlayback()
         generatedAudioData = null
         systemTts?.shutdown()
@@ -662,7 +661,7 @@ class TextToSpeechViewModel(
             tts.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
-                        Log.d(TAG, "System TTS started")
+                        Timber.d("System TTS started")
                     }
 
                     override fun onDone(utteranceId: String?) {

@@ -25,13 +25,13 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -53,6 +53,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
@@ -76,6 +77,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         viewModel.refreshStorage()
     }
 
+    ConfigureTopBar(title = "Settings")
+
     Column(
         modifier =
             Modifier
@@ -83,28 +86,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState()),
     ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimensions.padding16, vertical = Dimensions.padding20),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.padding16),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Settings,
-                contentDescription = null,
-                tint = AppColors.primaryOrange,
-                modifier = Modifier.size(22.dp),
-            )
-            Text(
-                text = "Settings",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
-        }
-
         // 1. API Configuration (Testing)
         SettingsSection(title = "API Configuration (Testing)", icon = null) {
             Row(
@@ -405,7 +386,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Icon(
-                    Icons.Filled.MenuBook,
+                    Icons.AutoMirrored.Filled.MenuBook,
                     contentDescription = null,
                     tint = AppColors.primaryOrange,
                     modifier = Modifier.size(22.dp),
@@ -417,7 +398,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 Icon(
-                    Icons.Filled.OpenInNew,
+                    Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = "Open link",
                     modifier = Modifier.size(22.dp),
                     tint = AppColors.primaryOrange,

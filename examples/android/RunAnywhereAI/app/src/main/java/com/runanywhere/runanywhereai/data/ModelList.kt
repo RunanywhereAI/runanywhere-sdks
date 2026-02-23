@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.data
 
-import android.util.Log
+import timber.log.Timber
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
@@ -15,8 +15,6 @@ import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 
 object ModelList {
-    private const val TAG = "ModelList"
-
     // LLM Models
     private val llmModels = listOf(
         AppModel(id = "smollm2-360m-q8_0", name = "SmolLM2 360M Q8_0",
@@ -150,13 +148,13 @@ object ModelList {
     )
 
     fun setupModels() {
-        Log.i(TAG, "Registering backends and models...")
+        Timber.i("Registering backends and models...")
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
-            Log.i(TAG, "Backends registered")
+            Timber.i("Backends registered")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register backends", e)
+            Timber.e(e, "Failed to register backends")
             return
         }
 
@@ -190,20 +188,20 @@ object ModelList {
                         )
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to register model: ${model.id}", e)
+                    Timber.e(e, "Failed to register model: ${model.id}")
                 }
             }
-            Log.i(TAG, "$label models registered (${models.size})")
+            Timber.i("$label models registered (${models.size})")
         }
 
         for (adapter in loraAdapters) {
             try {
                 RunAnywhere.registerLoraAdapter(adapter)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to register LoRA adapter: ${adapter.id}", e)
+                Timber.e(e, "Failed to register LoRA adapter: ${adapter.id}")
             }
         }
-        Log.i(TAG, "LoRA adapters registered (${loraAdapters.size})")
-        Log.i(TAG, "All models registered")
+        Timber.i("LoRA adapters registered (${loraAdapters.size})")
+        Timber.i("All models registered")
     }
 }

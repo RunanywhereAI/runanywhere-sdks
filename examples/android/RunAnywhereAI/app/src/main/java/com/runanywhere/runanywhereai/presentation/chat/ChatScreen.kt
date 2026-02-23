@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,6 +56,8 @@ import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
+import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.lora.LoraAdapterPickerSheet
 import com.runanywhere.runanywhereai.presentation.lora.LoraViewModel
 import com.runanywhere.sdk.public.RunAnywhere
@@ -94,34 +97,39 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         }
     }
 
+    if (uiState.isModelLoaded) {
+        ConfigureCustomTopBar {
+            ChatTopBar(
+                hasMessages = uiState.messages.isNotEmpty(),
+                modelName = uiState.loadedModelName,
+                supportsStreaming = uiState.useStreaming,
+                supportsLora = uiState.currentModelSupportsLora,
+                hasActiveLoraAdapter = uiState.hasActiveLoraAdapter,
+                onHistoryClick = {
+                    viewModel.ensureCurrentConversationInHistory()
+                    showingConversationList = true
+                },
+                onInfoClick = { showingChatDetails = true },
+                onModelClick = { showingModelSelection = true },
+                onLoraClick = {
+                    RunAnywhere.currentLLMModelId?.let { modelId ->
+                        loraViewModel.refreshForModel(modelId)
+                    }
+                    showingLoraAdapterPicker = true
+                },
+            )
+        }
+    } else {
+        ConfigureTopBar(title = "Chat")
+    }
+
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (uiState.isModelLoaded) {
-                ChatTopBar(
-                    hasMessages = uiState.messages.isNotEmpty(),
-                    modelName = uiState.loadedModelName,
-                    supportsStreaming = uiState.useStreaming,
-                    supportsLora = uiState.currentModelSupportsLora,
-                    hasActiveLoraAdapter = uiState.hasActiveLoraAdapter,
-                    onHistoryClick = {
-                        viewModel.ensureCurrentConversationInHistory()
-                        showingConversationList = true
-                    },
-                    onInfoClick = { showingChatDetails = true },
-                    onModelClick = { showingModelSelection = true },
-                    onLoraClick = {
-                        RunAnywhere.currentLLMModelId?.let { modelId ->
-                            loraViewModel.refreshForModel(modelId)
-                        }
-                        showingLoraAdapterPicker = true
-                    },
-                )
-            }
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
                 if (uiState.isModelLoaded) {
                     if (uiState.messages.isEmpty() && !uiState.isGenerating) {
                         EmptyStateView(modifier = Modifier.weight(1f))
@@ -890,7 +898,7 @@ fun ThinkingToggle(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowRight,
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
                     tint = AppColors.primaryPurple.copy(alpha = 0.6f),

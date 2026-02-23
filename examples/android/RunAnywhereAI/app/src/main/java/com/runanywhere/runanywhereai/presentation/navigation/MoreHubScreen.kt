@@ -17,29 +17,26 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
+import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.ui.theme.Dimensions
 
 /**
  * More Hub Screen — matches iOS MoreHubView.
  * Contains additional utility features: STT, TTS, RAG.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoreHubScreen(
     onNavigateToSTT: () -> Unit,
@@ -48,115 +45,102 @@ fun MoreHubScreen(
     onNavigateToBenchmarks: () -> Unit,
     onNavigateToLoraManager: () -> Unit = {},
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("More") },
-            )
-        },
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            // Section header
+    ConfigureTopBar(title = "More")
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
+    ) {
+            // Audio AI section
             Text(
                 "Audio AI",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
             )
 
-            // Speech to Text
             MoreFeatureCard(
                 icon = Icons.Filled.GraphicEq,
-                iconColor = Color(0xFF2196F3), // Blue
+                iconColor = AppColors.featureBlue,
                 title = "Speech to Text",
                 subtitle = "Transcribe audio to text using on-device models",
                 onClick = onNavigateToSTT,
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
 
-            // Text to Speech
             MoreFeatureCard(
-                icon = Icons.Filled.VolumeUp,
-                iconColor = Color(0xFF4CAF50), // Green
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
+                iconColor = AppColors.featureGreen,
                 title = "Text to Speech",
                 subtitle = "Convert text to natural-sounding speech",
                 onClick = onNavigateToTTS,
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
-            // =========================
-            // Document Section (RAG)
-            // =========================
-
+            // Document AI section
             Text(
                 "Document AI",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
             )
 
             MoreFeatureCard(
                 icon = Icons.Filled.Description,
-                iconColor = Color(0xFF673AB7), // Purple
+                iconColor = AppColors.featureDeepPurple,
                 title = "Document Q&A",
                 subtitle = "Ask questions about your documents using on-device AI",
                 onClick = onNavigateToRAG,
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
             // Model Customization section
             Text(
                 "Model Customization",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
             )
 
             MoreFeatureCard(
                 icon = Icons.Filled.Tune,
-                iconColor = Color(0xFF8B5CF6), // Purple
+                iconColor = AppColors.primaryPurple,
                 title = "LoRA Adapters",
                 subtitle = "Manage and apply LoRA fine-tuning adapters to models",
                 onClick = onNavigateToLoraManager,
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
             // Performance section
             Text(
                 "Performance",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
             )
 
-            // Benchmarks
             MoreFeatureCard(
                 icon = Icons.Filled.Speed,
-                iconColor = Color(0xFFFF5500), // Brand orange
+                iconColor = AppColors.primaryAccent,
                 title = "Benchmarks",
                 subtitle = "Measure on-device AI performance across models",
                 onClick = onNavigateToBenchmarks,
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Dimensions.large))
 
             // Footer
             Text(
                 "Additional AI utilities and tools",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp),
+                modifier = Modifier.padding(start = Dimensions.xSmall),
             )
-        }
     }
 }
 
@@ -172,7 +156,7 @@ private fun MoreFeatureCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
@@ -180,7 +164,7 @@ private fun MoreFeatureCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Dimensions.large),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -189,16 +173,15 @@ private fun MoreFeatureCard(
                 tint = iconColor,
                 modifier = Modifier.size(32.dp),
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Dimensions.large))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     title,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 16.sp,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     subtitle,
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

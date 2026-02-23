@@ -12,9 +12,7 @@ import androidx.compose.ui.graphics.Color
  * Dark theme backgrounds: Deep dark blue-gray matching website aesthetic
  */
 object AppColors {
-    // ====================
-    // PRIMARY ACCENT COLORS - RunAnywhere Brand Colors
-    // ====================
+    // Primary Accent Colors
     // Primary brand color - vibrant orange/red from RunAnywhere.ai website
     val primaryAccent = Color(0xFFFF5500) // Vibrant orange-red - primary brand color
     val primaryOrange = Color(0xFFFF5500) // Same as primary accent
@@ -24,17 +22,20 @@ object AppColors {
     val primaryYellow = Color(0xFFEAB308) // Yellow-500
     val primaryPurple = Color(0xFF8B5CF6) // Violet-500 - purple accent
 
-    // ====================
-    // TEXT COLORS - RunAnywhere Theme
-    // ====================
+    // Feature icon colors (hub screens)
+    val featureBlue = Color(0xFF2196F3)
+    val featureGreen = Color(0xFF4CAF50)
+    val featureDeepPurple = Color(0xFF673AB7)
+    val featurePink = Color(0xFFE91E63)
+    val featureCamera = Color(0xFF9C27B0)
+
+    // Text Colors
     val textPrimary = Color(0xFF0F172A) // Slate-900 - dark text for light mode
     val textSecondary = Color(0xFF475569) // Slate-600 - secondary text
     val textTertiary = Color(0xFF94A3B8) // Slate-400 - tertiary text
     val textWhite = Color.White
 
-    // ====================
-    // BACKGROUND COLORS - RunAnywhere Theme
-    // ====================
+    // Background Colors
     // Light mode - clean, modern backgrounds
     val backgroundPrimary = Color(0xFFFFFFFF) // Pure white
     val backgroundSecondary = Color(0xFFF8FAFC) // Slate-50 - very light gray
@@ -51,9 +52,7 @@ object AppColors {
     val backgroundGray5Dark = Color(0xFF2A3142) // Medium dark gray
     val backgroundGray6Dark = Color(0xFF353B4A) // Lighter dark gray
 
-    // ====================
-    // MESSAGE BUBBLE COLORS - RunAnywhere Theme
-    // ====================
+    // Message Bubble Colors
     // User bubbles (with gradient support) - using vibrant orange/red brand color
     val userBubbleGradientStart = primaryAccent // Vibrant orange-red
     val userBubbleGradientEnd = Color(0xFFE64500) // Slightly darker orange-red
@@ -68,9 +67,7 @@ object AppColors {
     val messageBubbleUserDark = Color(0xFFCC4400) // Darker orange-red (80% brightness of primaryAccent)
     val messageBubbleAssistantDark = backgroundGray5Dark // Dark gray
 
-    // ====================
-    // USER BUBBLE — ChatGPT-style solid colors
-    // ====================
+    // User Bubble — ChatGPT-style solid colors
     val userBubbleSolid = Color(0xFFEFEFEF) // Light mode: light gray
     val userBubbleSolidDark = Color(0xFF2F3541) // Dark mode: slightly lighter
 
@@ -82,14 +79,10 @@ object AppColors {
         return if (isSystemInDarkTheme()) userBubbleSolidDark else userBubbleSolid
     }
 
-    // ====================
-    // LORA COLORS
-    // ====================
+    // LoRA Colors
     val loraBadgeBg = primaryPurple.copy(alpha = 0.10f)
 
-    // ====================
-    // BADGE/TAG COLORS
-    // ====================
+    // Badge/Tag Colors
     val badgePrimary = primaryAccent.copy(alpha = 0.2f) // Brand primary (orange-red)
     val badgeGreen = primaryGreen.copy(alpha = 0.2f)
     val badgePurple = primaryPurple.copy(alpha = 0.2f)
@@ -98,15 +91,11 @@ object AppColors {
     val badgeRed = primaryRed.copy(alpha = 0.2f)
     val badgeGray = Color.Gray.copy(alpha = 0.2f)
 
-    // ====================
-    // MODEL INFO COLORS - RunAnywhere Theme
-    // ====================
+    // Model Info Colors
     val modelFrameworkBg = primaryAccent.copy(alpha = 0.1f) // Brand primary orange-red
     val modelThinkingBg = primaryAccent.copy(alpha = 0.1f) // Brand primary orange-red
 
-    // ====================
-    // THINKING MODE COLORS - RunAnywhere Theme
-    // ====================
+    // Thinking Mode Colors
     // Using brand orange for thinking mode to match website aesthetic
     val thinkingBackground = primaryAccent.copy(alpha = 0.1f) // 10% orange-red
     val thinkingBackgroundGradientStart = primaryAccent.copy(alpha = 0.1f)
@@ -120,9 +109,7 @@ object AppColors {
     val thinkingBackgroundDark = primaryAccent.copy(alpha = 0.15f)
     val thinkingContentBackgroundDark = backgroundGray6Dark
 
-    // ====================
-    // STATUS COLORS - RunAnywhere Theme
-    // ====================
+    // Status Colors
     val statusGreen = primaryGreen
     val statusOrange = primaryOrange
     val statusRed = primaryRed
@@ -132,9 +119,7 @@ object AppColors {
     // Warning color - matches iOS orange for error states
     val warningOrange = primaryOrange
 
-    // ====================
-    // SHADOW COLORS
-    // ====================
+    // Shadow Colors
     val shadowDefault = Color.Black.copy(alpha = 0.1f)
     val shadowLight = Color.Black.copy(alpha = 0.1f)
     val shadowMedium = Color.Black.copy(alpha = 0.12f)
@@ -146,43 +131,31 @@ object AppColors {
     val shadowModelBadge = primaryAccent.copy(alpha = 0.3f) // Brand primary
     val shadowTypingIndicator = shadowLight
 
-    // ====================
-    // OVERLAY COLORS
-    // ====================
+    // Overlay Colors
     val overlayLight = Color.Black.copy(alpha = 0.3f)
     val overlayMedium = Color.Black.copy(alpha = 0.4f)
     val overlayDark = Color.Black.copy(alpha = 0.7f)
 
-    // ====================
-    // BORDER COLORS - RunAnywhere Theme
-    // ====================
+    // Border Colors
     val borderLight = Color.White.copy(alpha = 0.3f)
     val borderMedium = Color.Black.copy(alpha = 0.05f)
     val separator = Color(0xFFE2E8F0) // Slate-200 - modern separator
 
-    // ====================
-    // DIVIDERS - RunAnywhere Theme
-    // ====================
+    // Dividers
     val divider = Color(0xFFCBD5E1) // Slate-300 - light divider
     val dividerDark = Color(0xFF2A3142) // Dark divider matching website
 
-    // ====================
-    // CARDS & SURFACES
-    // ====================
+    // Cards & Surfaces
     val cardBackground = backgroundSecondary
     val cardBackgroundDark = backgroundSecondaryDark
 
-    // ====================
-    // TYPING INDICATOR - RunAnywhere Theme
-    // ====================
+    // Typing Indicator
     val typingIndicatorDots = primaryAccent.copy(alpha = 0.7f) // Brand primary
     val typingIndicatorBackground = backgroundGray5
     val typingIndicatorBorder = borderLight
     val typingIndicatorText = textSecondary.copy(alpha = 0.8f)
 
-    // ====================
-    // GRADIENT HELPERS
-    // ====================
+    // Gradient Helpers
 
     /**
      * User message bubble gradient (orange-red brand color)
@@ -254,9 +227,7 @@ object AppColors {
             colors = listOf(thinkingProgressBackground, thinkingProgressBackgroundGradientEnd),
         )
 
-    // ====================
-    // HELPER FUNCTIONS
-    // ====================
+    // Helper Functions
 
     /**
      * Get framework-specific badge color

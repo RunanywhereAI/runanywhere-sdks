@@ -282,7 +282,7 @@ private fun formatBytes(bytes: Long): String {
     return if (gb >= 1.0) String.format("%.2f GB", gb) else String.format("%.0f MB", bytes / (1024.0 * 1024.0))
 }
 
-// ── Header ──
+// Header
 
 @Composable
 private fun SheetHeader(
@@ -314,7 +314,7 @@ private fun SheetHeader(
     }
 }
 
-// ── Section Label ──
+// Section Label
 
 @Composable
 private fun SectionLabel(text: String) {
@@ -327,7 +327,7 @@ private fun SectionLabel(text: String) {
     )
 }
 
-// ── Device Status Card ──
+// Device Status Card
 
 @Composable
 private fun DeviceStatusCard(status: DeviceStatus) {
@@ -371,7 +371,7 @@ private fun DeviceStatusCard(status: DeviceStatus) {
                             imageVector = Icons.Outlined.CheckCircle,
                             contentDescription = "Available",
                             modifier = Modifier.size(22.dp),
-                            tint = Color(0xFF34C759),
+                            tint = AppColors.primaryGreen,
                         )
                     } else {
                         Text(
@@ -446,7 +446,7 @@ private fun RowDivider() {
     )
 }
 
-// ── Model Card ──
+// Model Card
 
 @Composable
 private fun ModelCard(
@@ -528,8 +528,8 @@ private fun ModelCard(
             if (model.isDownloaded) {
                 Badge(
                     text = "Use",
-                    textColor = Color(0xFF34C759),
-                    backgroundColor = Color(0xFF34C759).copy(alpha = 0.10f),
+                    textColor = AppColors.primaryGreen,
+                    backgroundColor = AppColors.primaryGreen.copy(alpha = 0.10f),
                     icon = null,
                 )
             } else {
@@ -553,7 +553,7 @@ private fun ModelCard(
     }
 }
 
-// ── Badge ──
+// Badge
 
 @Composable
 private fun Badge(
@@ -592,9 +592,7 @@ private fun Badge(
     }
 }
 
-// ====================
-// SYSTEM TTS ROW
-// ====================
+// System TTS Row
 
 // SystemTTSRow: card-style row matching ModelCard, "Use" action
 @Composable
@@ -641,12 +639,12 @@ private fun SystemTTSRow(
                         imageVector = Icons.Outlined.CheckCircle,
                         contentDescription = null,
                         modifier = Modifier.size(12.dp),
-                        tint = Color(0xFF34C759),
+                        tint = AppColors.primaryGreen,
                     )
                     Text(
                         text = "Built-in - Always available",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF34C759),
+                        color = AppColors.primaryGreen,
                     )
                 }
             }

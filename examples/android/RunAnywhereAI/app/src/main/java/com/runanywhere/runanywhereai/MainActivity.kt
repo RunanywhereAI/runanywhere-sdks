@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai
 
 import android.os.Bundle
-import android.util.Log
+import timber.log.Timber
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
             }
 
             is SDKInitializationState.Ready -> {
-                Log.i("MainActivity", "App is ready to use!")
+                Timber.i("App is ready to use!")
                 AppNavigation()
             }
         }

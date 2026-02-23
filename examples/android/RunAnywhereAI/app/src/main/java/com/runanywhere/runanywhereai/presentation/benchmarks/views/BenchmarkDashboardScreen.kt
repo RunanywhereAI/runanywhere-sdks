@@ -22,7 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
@@ -31,16 +31,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,6 +55,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRunStatus
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.runanywhereai.presentation.benchmarks.viewmodel.BenchmarkViewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppSpacing
 import com.runanywhere.sdk.models.DeviceInfo
@@ -69,98 +67,95 @@ import java.time.format.DateTimeFormatter
  * Main benchmarking screen: device info, category filters, run controls, and history.
  * Matches iOS BenchmarkDashboardView exactly.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BenchmarkDashboardScreen(
     onNavigateToDetail: (String) -> Unit,
+    onBack: () -> Unit = {},
     benchmarkViewModel: BenchmarkViewModel = viewModel(),
 ) {
     val uiState by benchmarkViewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Benchmarks") },
-                actions = {
-                    if (uiState.pastRuns.isNotEmpty()) {
-                        IconButton(onClick = { benchmarkViewModel.showClearConfirmation() }) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = "Clear All",
-                                tint = AppColors.statusRed,
-                            )
-                        }
-                    }
-                },
-            )
-        },
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = AppSpacing.large),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.large),
-        ) {
-            // Device Info
-            item { DeviceInfoSection() }
-
-            // Benchmark Suite Info
-            item { BenchmarkSuiteInfoSection() }
-
-            // Category Selection
-            item { CategorySelectionSection(uiState.selectedCategories, benchmarkViewModel) }
-
-            // Scenario descriptions
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
-                    BenchmarkCategory.entries
-                        .filter { it in uiState.selectedCategories }
-                        .forEach { category ->
-                            CategoryScenarioRow(category)
-                        }
-                }
-            }
-
-            // Run Controls
-            item {
-                RunControlsSection(
-                    selectedCategories = uiState.selectedCategories,
-                    isRunning = uiState.isRunning,
-                    onRunAll = {
-                        benchmarkViewModel.selectAllCategories()
-                        benchmarkViewModel.runBenchmarks()
-                    },
-                    onRunSelected = { benchmarkViewModel.runBenchmarks() },
-                )
-            }
-
-            // Skipped categories warning
-            uiState.skippedCategoriesMessage?.let { msg ->
-                item { SkippedWarning(msg) }
-            }
-
-            // Past Runs or Empty State
+    ConfigureTopBar(
+        title = "Benchmarks",
+        showBack = true,
+        onBack = onBack,
+        actions = {
             if (uiState.pastRuns.isNotEmpty()) {
-                item {
-                    Text(
-                        "History",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = AppSpacing.small),
+                IconButton(onClick = { benchmarkViewModel.showClearConfirmation() }) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Clear All",
+                        tint = AppColors.statusRed,
                     )
                 }
-                items(uiState.pastRuns, key = { it.id }) { run ->
-                    RunRow(run = run, onClick = { onNavigateToDetail(run.id) })
-                }
-            } else {
-                item { EmptyState() }
             }
+        },
+    )
 
-            item { Spacer(modifier = Modifier.height(AppSpacing.xxLarge)) }
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = AppSpacing.large),
+        verticalArrangement = Arrangement.spacedBy(AppSpacing.large),
+    ) {
+        // Device Info
+        item { DeviceInfoSection() }
+
+        // Benchmark Suite Info
+        item { BenchmarkSuiteInfoSection() }
+
+        // Category Selection
+        item { CategorySelectionSection(uiState.selectedCategories, benchmarkViewModel) }
+
+        // Scenario descriptions
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
+                BenchmarkCategory.entries
+                    .filter { it in uiState.selectedCategories }
+                    .forEach { category ->
+                        CategoryScenarioRow(category)
+                    }
+            }
         }
-    }
 
+        // Run Controls
+        item {
+            RunControlsSection(
+                selectedCategories = uiState.selectedCategories,
+                isRunning = uiState.isRunning,
+                onRunAll = {
+                    benchmarkViewModel.selectAllCategories()
+                    benchmarkViewModel.runBenchmarks()
+                },
+                onRunSelected = { benchmarkViewModel.runBenchmarks() },
+            )
+        }
+
+        // Skipped categories warning
+        uiState.skippedCategoriesMessage?.let { msg ->
+            item { SkippedWarning(msg) }
+        }
+
+        // Past Runs or Empty State
+        if (uiState.pastRuns.isNotEmpty()) {
+            item {
+                Text(
+                    "History",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = AppSpacing.small),
+                )
+            }
+            items(uiState.pastRuns, key = { it.id }) { run ->
+                RunRow(run = run, onClick = { onNavigateToDetail(run.id) })
+            }
+        } else {
+            item { EmptyState() }
+        }
+
+        item { Spacer(modifier = Modifier.height(AppSpacing.xxLarge)) }
+    }
+    
     // Progress Dialog
     if (uiState.isRunning) {
         BenchmarkProgressDialog(
@@ -172,7 +167,7 @@ fun BenchmarkDashboardScreen(
             onCancel = { benchmarkViewModel.cancel() },
         )
     }
-
+    
     // Clear Confirmation Dialog
     if (uiState.showClearConfirmation) {
         AlertDialog(
@@ -190,7 +185,7 @@ fun BenchmarkDashboardScreen(
             },
         )
     }
-
+    
     // Error Dialog
     uiState.errorMessage?.let { error ->
         AlertDialog(
@@ -200,8 +195,8 @@ fun BenchmarkDashboardScreen(
             confirmButton = {
                 TextButton(onClick = { benchmarkViewModel.dismissError() }) { Text("OK") }
             },
-        )
-    }
+            )
+        }
 }
 
 // -- Device Info Section --
@@ -462,7 +457,7 @@ private fun RunRow(run: BenchmarkRun, onClick: () -> Unit) {
             }
             Spacer(modifier = Modifier.width(AppSpacing.small))
             Icon(
-                Icons.Filled.KeyboardArrowRight,
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

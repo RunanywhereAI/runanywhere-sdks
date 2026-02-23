@@ -4,7 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
@@ -34,7 +34,7 @@ enum class BenchmarkCategory(val value: String) {
         get() = when (this) {
             LLM -> Icons.Filled.ChatBubble
             STT -> Icons.Filled.GraphicEq
-            TTS -> Icons.Filled.VolumeUp
+            TTS -> Icons.AutoMirrored.Filled.VolumeUp
             VLM -> Icons.Filled.Visibility
         }
 

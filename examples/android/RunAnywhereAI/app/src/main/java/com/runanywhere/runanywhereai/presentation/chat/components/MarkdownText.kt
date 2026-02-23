@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.chat.components
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -14,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,15 +20,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,7 +57,6 @@ fun MarkdownText(
     color: Color = Color.Unspecified,
 ) {
     val blocks = remember(markdown) { parseMarkdownBlocks(markdown) }
-    val context = LocalContext.current
 
     Column(modifier = modifier) {
         blocks.forEachIndexed { index, block ->
@@ -78,16 +76,9 @@ fun MarkdownText(
                         else -> style.copy(fontWeight = FontWeight.SemiBold)
                     }
                     val annotated = parseInlineMarkdown(block.text, color)
-                    ClickableText(
+                    Text(
                         text = annotated,
                         style = headerStyle.merge(TextStyle(color = color)),
-                        onClick = { offset ->
-                            annotated.getStringAnnotations("URL", offset, offset)
-                                .firstOrNull()?.let { annotation ->
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                                    context.startActivity(intent)
-                                }
-                        },
                     )
                 }
 
@@ -100,17 +91,10 @@ fun MarkdownText(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         val annotated = parseInlineMarkdown(block.text, color)
-                        ClickableText(
+                        Text(
                             text = annotated,
                             style = style.merge(TextStyle(color = color)),
                             modifier = Modifier.weight(1f),
-                            onClick = { offset ->
-                                annotated.getStringAnnotations("URL", offset, offset)
-                                    .firstOrNull()?.let { annotation ->
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                                        context.startActivity(intent)
-                                    }
-                            },
                         )
                     }
                 }
@@ -124,17 +108,10 @@ fun MarkdownText(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         val annotated = parseInlineMarkdown(block.text, color)
-                        ClickableText(
+                        Text(
                             text = annotated,
                             style = style.merge(TextStyle(color = color)),
                             modifier = Modifier.weight(1f),
-                            onClick = { offset ->
-                                annotated.getStringAnnotations("URL", offset, offset)
-                                    .firstOrNull()?.let { annotation ->
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                                        context.startActivity(intent)
-                                    }
-                            },
                         )
                     }
                 }
@@ -157,33 +134,19 @@ fun MarkdownText(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         val annotated = parseInlineMarkdown(block.text, color)
-                        ClickableText(
+                        Text(
                             text = annotated,
                             style = style.copy(fontStyle = FontStyle.Italic).merge(TextStyle(color = color)),
                             modifier = Modifier.weight(1f),
-                            onClick = { offset ->
-                                annotated.getStringAnnotations("URL", offset, offset)
-                                    .firstOrNull()?.let { annotation ->
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                                        context.startActivity(intent)
-                                    }
-                            },
                         )
                     }
                 }
 
                 is MarkdownBlock.Paragraph -> {
                     val annotated = parseInlineMarkdown(block.text, color)
-                    ClickableText(
+                    Text(
                         text = annotated,
                         style = style.merge(TextStyle(color = color)),
-                        onClick = { offset ->
-                            annotated.getStringAnnotations("URL", offset, offset)
-                                .firstOrNull()?.let { annotation ->
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(annotation.item))
-                                    context.startActivity(intent)
-                                }
-                        },
                     )
                 }
             }
@@ -254,9 +217,7 @@ private fun CodeBlockView(
     }
 }
 
-// ============================================================
 // Markdown Parsing
-// ============================================================
 
 private sealed class MarkdownBlock {
     data class Paragraph(val text: String) : MarkdownBlock()
@@ -451,16 +412,19 @@ private fun parseInlineMarkdown(text: String, defaultColor: Color): AnnotatedStr
                         if (closeParen != -1) {
                             val linkText = text.substring(i + 1, closeBracket)
                             val url = text.substring(closeBracket + 2, closeParen)
-                            pushStringAnnotation("URL", url)
-                            withStyle(
-                                SpanStyle(
-                                    color = Color(0xFF3B82F6),
-                                    textDecoration = TextDecoration.Underline,
+                            withLink(
+                                LinkAnnotation.Url(
+                                    url,
+                                    TextLinkStyles(
+                                        style = SpanStyle(
+                                            color = Color(0xFF3B82F6),
+                                            textDecoration = TextDecoration.Underline,
+                                        ),
+                                    ),
                                 ),
                             ) {
                                 append(linkText)
                             }
-                            pop()
                             i = closeParen + 1
                         } else {
                             append('[')

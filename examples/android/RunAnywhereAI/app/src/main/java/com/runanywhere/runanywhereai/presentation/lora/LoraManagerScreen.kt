@@ -23,13 +23,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,6 +36,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
@@ -47,27 +45,21 @@ import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
  * Full LoRA adapter manager screen — accessible from More hub.
  * Shows currently loaded adapters and all registered adapters with download/delete.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoraManagerScreen(
+    onBack: () -> Unit = {},
     loraViewModel: LoraViewModel = viewModel(),
 ) {
     val state by loraViewModel.uiState.collectAsState()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("LoRA Adapters") },
-            )
-        },
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = Dimensions.large),
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
-        ) {
+    ConfigureTopBar(title = "LoRA Adapters", showBack = true, onBack = onBack)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Dimensions.large),
+        verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
+    ) {
             // Currently loaded section
             if (state.loadedAdapters.isNotEmpty()) {
                 item {
@@ -179,7 +171,6 @@ fun LoraManagerScreen(
             }
 
             item { Spacer(modifier = Modifier.height(Dimensions.xxLarge)) }
-        }
     }
 }
 

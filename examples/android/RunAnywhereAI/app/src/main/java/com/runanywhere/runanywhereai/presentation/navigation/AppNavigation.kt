@@ -1,10 +1,26 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -16,6 +32,8 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.views.BenchmarkDeta
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
 import com.runanywhere.runanywhereai.presentation.components.AppBottomNavigationBar
 import com.runanywhere.runanywhereai.presentation.components.BottomNavTab
+import com.runanywhere.runanywhereai.presentation.components.LocalTopBarState
+import com.runanywhere.runanywhereai.presentation.components.TopBarState
 import com.runanywhere.runanywhereai.presentation.lora.LoraManagerScreen
 import com.runanywhere.runanywhereai.presentation.rag.DocumentRAGScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
@@ -25,6 +43,9 @@ import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
 import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
+private const val TRANSITION_DURATION = 300
+private const val SLIDE_OFFSET_FRACTION = 4 // 1/4 of width
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation() {
@@ -32,104 +53,169 @@ fun AppNavigation() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val selectedTab = routeToBottomNavTab(currentDestination?.route)
+    val topBarState = remember { TopBarState() }
 
-    Scaffold(
-        bottomBar = {
-            AppBottomNavigationBar(
-                selectedTab = selectedTab,
-                onTabSelected = { tab ->
-                    val route = bottomNavTabToRoute(tab)
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
+    CompositionLocalProvider(LocalTopBarState provides topBarState) {
+        Scaffold(
+            topBar = {
+                val custom = topBarState.customTopBar
+                if (custom != null) {
+                    custom()
+                } else {
+                    TopAppBar(
+                        title = { Text(topBarState.title) },
+                        navigationIcon = {
+                            if (topBarState.showBack) {
+                                IconButton(onClick = { topBarState.onBack?.invoke() }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back",
+                                    )
+                                }
+                            }
+                        },
+                        actions = topBarState.actions,
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                        ),
+                    )
+                }
+            },
+            bottomBar = {
+                AppBottomNavigationBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        val route = bottomNavTabToRoute(tab)
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+                    },
+                )
+            },
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = NavigationRoute.CHAT,
+                modifier = Modifier.padding(paddingValues),
+                enterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { it / SLIDE_OFFSET_FRACTION },
+                        animationSpec = tween(TRANSITION_DURATION, easing = FastOutSlowInEasing),
+                    ) + fadeIn(animationSpec = tween(TRANSITION_DURATION))
                 },
-            )
-        },
-    ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = NavigationRoute.CHAT,
-            modifier = Modifier.padding(paddingValues),
-        ) {
-            composable(NavigationRoute.CHAT) {
-                ChatScreen()
-            }
+                exitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { -it / SLIDE_OFFSET_FRACTION },
+                        animationSpec = tween(TRANSITION_DURATION, easing = FastOutSlowInEasing),
+                    ) + fadeOut(animationSpec = tween(TRANSITION_DURATION))
+                },
+                popEnterTransition = {
+                    slideInHorizontally(
+                        initialOffsetX = { -it / SLIDE_OFFSET_FRACTION },
+                        animationSpec = tween(TRANSITION_DURATION, easing = FastOutSlowInEasing),
+                    ) + fadeIn(animationSpec = tween(TRANSITION_DURATION))
+                },
+                popExitTransition = {
+                    slideOutHorizontally(
+                        targetOffsetX = { it / SLIDE_OFFSET_FRACTION },
+                        animationSpec = tween(TRANSITION_DURATION, easing = FastOutSlowInEasing),
+                    ) + fadeOut(animationSpec = tween(TRANSITION_DURATION))
+                },
+            ) {
+                composable(NavigationRoute.CHAT) {
+                    ChatScreen()
+                }
 
-            composable(NavigationRoute.VISION) {
-                VisionHubScreen(
-                    onNavigateToVLM = {
-                        navController.navigate(NavigationRoute.VLM)
-                    },
-                    onNavigateToImageGeneration = {
-                        // Future
-                    },
-                )
-            }
+                composable(NavigationRoute.VISION) {
+                    VisionHubScreen(
+                        onNavigateToVLM = {
+                            navController.navigate(NavigationRoute.VLM)
+                        },
+                        onNavigateToImageGeneration = {
+                            // Future
+                        },
+                    )
+                }
 
-            composable(NavigationRoute.VLM) {
-                VLMScreen()
-            }
+                composable(NavigationRoute.VLM) {
+                    VLMScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.VOICE) {
-                VoiceAssistantScreen()
-            }
+                composable(NavigationRoute.VOICE) {
+                    VoiceAssistantScreen()
+                }
 
-            // "More" hub routes — STT, TTS, RAG, Benchmarks, LoRA here to match iOS structure
-            composable(NavigationRoute.MORE) {
-                MoreHubScreen(
-                    onNavigateToSTT = {
-                        navController.navigate(NavigationRoute.STT)
-                    },
-                    onNavigateToTTS = {
-                        navController.navigate(NavigationRoute.TTS)
-                    },
-                    onNavigateToRAG = {
-                        navController.navigate(NavigationRoute.RAG)
-                    },
-                    onNavigateToBenchmarks = {
-                        navController.navigate(NavigationRoute.BENCHMARKS)
-                    },
-                    onNavigateToLoraManager = {
-                        navController.navigate(NavigationRoute.LORA_MANAGER)
-                    },
-                )
-            }
+                // "More" hub routes
+                composable(NavigationRoute.MORE) {
+                    MoreHubScreen(
+                        onNavigateToSTT = {
+                            navController.navigate(NavigationRoute.STT)
+                        },
+                        onNavigateToTTS = {
+                            navController.navigate(NavigationRoute.TTS)
+                        },
+                        onNavigateToRAG = {
+                            navController.navigate(NavigationRoute.RAG)
+                        },
+                        onNavigateToBenchmarks = {
+                            navController.navigate(NavigationRoute.BENCHMARKS)
+                        },
+                        onNavigateToLoraManager = {
+                            navController.navigate(NavigationRoute.LORA_MANAGER)
+                        },
+                    )
+                }
 
-            composable(NavigationRoute.STT) {
-                SpeechToTextScreen()
-            }
+                composable(NavigationRoute.STT) {
+                    SpeechToTextScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.TTS) {
-                TextToSpeechScreen()
-            }
+                composable(NavigationRoute.TTS) {
+                    TextToSpeechScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.RAG) {
-                DocumentRAGScreen()
-            }
+                composable(NavigationRoute.RAG) {
+                    DocumentRAGScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.BENCHMARKS) {
-                BenchmarkDashboardScreen(
-                    onNavigateToDetail = { runId ->
-                        navController.navigate("${NavigationRoute.BENCHMARK_DETAIL}/$runId")
-                    },
-                )
-            }
+                composable(NavigationRoute.BENCHMARKS) {
+                    BenchmarkDashboardScreen(
+                        onNavigateToDetail = { runId ->
+                            navController.navigate("${NavigationRoute.BENCHMARK_DETAIL}/$runId")
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable("${NavigationRoute.BENCHMARK_DETAIL}/{runId}") { backStackEntry ->
-                val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
-                BenchmarkDetailScreen(runId = runId)
-            }
+                composable("${NavigationRoute.BENCHMARK_DETAIL}/{runId}") { backStackEntry ->
+                    val runId = backStackEntry.arguments?.getString("runId") ?: return@composable
+                    BenchmarkDetailScreen(
+                        runId = runId,
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.LORA_MANAGER) {
-                LoraManagerScreen()
-            }
+                composable(NavigationRoute.LORA_MANAGER) {
+                    LoraManagerScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
 
-            composable(NavigationRoute.SETTINGS) {
-                SettingsScreen()
+                composable(NavigationRoute.SETTINGS) {
+                    SettingsScreen()
+                }
             }
         }
     }
