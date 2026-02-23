@@ -320,111 +320,20 @@ fun ChatTopBar(
     TopAppBar(
         modifier = modifier,
         title = {
-            Text(
-                text = "Chat",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-        },
-        actions = {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(4.dp),
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = onHistoryClick,
-                            ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "History",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .then(
-                                if (hasMessages) {
-                                    Modifier
-                                        .background(AppColors.primaryAccent, CircleShape)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = onInfoClick,
-                                        )
-                                } else {
-                                    Modifier
-                                }
-                            ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            modifier = Modifier.size(20.dp),
-                            tint = if (hasMessages) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            // LoRA button — only shown when model supports LoRA
-            if (supportsLora) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Surface(
-                    onClick = onLoraClick,
-                    shape = RoundedCornerShape(50),
-                    color = if (hasActiveLoraAdapter) AppColors.primaryPurple.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.size(34.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = "LoRA",
-                            modifier = Modifier.size(18.dp),
-                            tint = if (hasActiveLoraAdapter) AppColors.primaryPurple else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
+            // Model chip as the title — clickable to switch model
             Surface(
                 onClick = onModelClick,
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(
-                        start = 6.dp,
-                        end = 12.dp,
-                        top = 6.dp,
-                        bottom = 6.dp,
-                    ),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                 ) {
                     if (modelName != null) {
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .size(26.dp)
                                 .clip(RoundedCornerShape(6.dp)),
                         ) {
                             Image(
@@ -434,34 +343,54 @@ fun ChatTopBar(
                                 contentScale = ContentScale.Fit,
                             )
                         }
-
                         Spacer(modifier = Modifier.width(8.dp))
-
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(
-                                text = shortModelName(modelName, maxLength = 12),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                Icon(
-                                    imageVector = if (supportsStreaming) Icons.Default.Bolt else Icons.Default.Stop,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
-                                    tint = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                Text(
+                                    text = shortModelName(modelName, maxLength = 14),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                // LoRA active badge — inline next to model name
+                                if (hasActiveLoraAdapter) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = AppColors.primaryPurple,
+                                    ) {
+                                        Text(
+                                            text = "LoRA",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp,
+                                                letterSpacing = 0.3.sp,
+                                            ),
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                        ),
                                 )
                                 Text(
                                     text = if (supportsStreaming) "Streaming" else "Batch",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                    ),
-                                    color = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -475,11 +404,52 @@ fun ChatTopBar(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Select Model",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Medium,
                         )
                     }
                 }
+            }
+        },
+        actions = {
+            // LoRA button — ghost when no adapter, hidden when not supported
+            if (supportsLora && !hasActiveLoraAdapter) {
+                TextButton(
+                    onClick = onLoraClick,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        text = "+ LoRA",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.3.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // History
+            IconButton(onClick = onHistoryClick) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "History",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Info — highlighted when there are messages
+            IconButton(
+                onClick = onInfoClick,
+                enabled = hasMessages,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    modifier = Modifier.size(20.dp),
+                    tint = if (hasMessages) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                )
             }
 
             Spacer(modifier = Modifier.width(4.dp))
