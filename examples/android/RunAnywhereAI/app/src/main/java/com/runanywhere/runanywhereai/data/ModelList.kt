@@ -125,16 +125,6 @@ object ModelList {
             fileSize = 690_176,
             defaultScale = 1.0f,
         ),
-        LoraAdapterCatalogEntry(
-            id = "uncensored-chat-lora",
-            name = "Uncensored Chat",
-            description = "Removes safety guardrails for uncensored responses",
-            downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/uncensored_chat-lora-Q8_0.gguf",
-            filename = "uncensored_chat-lora-Q8_0.gguf",
-            compatibleModelIds = listOf("lfm2-350m-q4_k_m", "lfm2-350m-q8_0"),
-            fileSize = 1_372_160,
-            defaultScale = 1.0f,
-        ),
     )
 
     // VLM
@@ -161,51 +151,57 @@ object ModelList {
 
     fun setupModels() {
         Log.i(TAG, "Registering backends and models...")
-        LlamaCPP.register(priority = 100)
-        ONNX.register(priority = 100)
-        Log.i(TAG, "Backends registered")
-
-        val singleFileModels = llmModels + sttModels + ttsModels
-        for (model in singleFileModels) {
-            RunAnywhere.registerModel(
-                id = model.id, name = model.name, url = model.url,
-                framework = model.framework, modality = model.category,
-                memoryRequirement = model.memoryRequirement,
-                supportsLora = model.supportsLoraAdapters,
-            )
+        try {
+            LlamaCPP.register(priority = 100)
+            ONNX.register(priority = 100)
+            Log.i(TAG, "Backends registered")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register backends", e)
+            return
         }
-        Log.i(TAG, "LLM/STT/TTS models registered (${singleFileModels.size})")
 
-        for (model in embeddingModels) {
-            RunAnywhere.registerMultiFileModel(
-                id = model.id, name = model.name, primaryUrl = model.url,
-                companionFiles = model.companionFiles,
-                framework = model.framework, modality = model.category,
-                memoryRequirement = model.memoryRequirement,
-            )
-        }
-        Log.i(TAG, "Embedding models registered (${embeddingModels.size})")
-
-        for (model in vlmModels) {
-            if (model.files.isNotEmpty()) {
-                RunAnywhere.registerMultiFileModel(
-                    id = model.id, name = model.name, files = model.files,
-                    framework = model.framework, modality = model.category,
-                    memoryRequirement = model.memoryRequirement,
-                )
-            } else {
-                RunAnywhere.registerModel(
-                    id = model.id, name = model.name, url = model.url,
-                    framework = model.framework, modality = model.category,
-                    memoryRequirement = model.memoryRequirement,
-                )
+        val allModels = listOf(
+            "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
+            "Embedding" to embeddingModels,
+            "VLM" to vlmModels,
+        )
+        for ((label, models) in allModels) {
+            for (model in models) {
+                try {
+                    if (model.files.isNotEmpty()) {
+                        RunAnywhere.registerMultiFileModel(
+                            id = model.id, name = model.name, files = model.files,
+                            framework = model.framework, modality = model.category,
+                            memoryRequirement = model.memoryRequirement,
+                        )
+                    } else if (model.companionFiles.isNotEmpty()) {
+                        RunAnywhere.registerMultiFileModel(
+                            id = model.id, name = model.name, primaryUrl = model.url,
+                            companionFiles = model.companionFiles,
+                            framework = model.framework, modality = model.category,
+                            memoryRequirement = model.memoryRequirement,
+                        )
+                    } else {
+                        RunAnywhere.registerModel(
+                            id = model.id, name = model.name, url = model.url,
+                            framework = model.framework, modality = model.category,
+                            memoryRequirement = model.memoryRequirement,
+                            supportsLora = model.supportsLoraAdapters,
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to register model: ${model.id}", e)
+                }
             }
+            Log.i(TAG, "$label models registered (${models.size})")
         }
-        Log.i(TAG, "VLM models registered (${vlmModels.size})")
 
-        // Register LoRA adapters
         for (adapter in loraAdapters) {
-            RunAnywhere.registerLoraAdapter(adapter)
+            try {
+                RunAnywhere.registerLoraAdapter(adapter)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to register LoRA adapter: ${adapter.id}", e)
+            }
         }
         Log.i(TAG, "LoRA adapters registered (${loraAdapters.size})")
         Log.i(TAG, "All models registered")
