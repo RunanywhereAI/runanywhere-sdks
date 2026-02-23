@@ -483,7 +483,12 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       setState(() {
         _isLoadingModel = false;
       });
-      Navigator.pop(context);
+      // Defer Navigator.pop until after the current frame completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      });
     }
   }
 
@@ -511,7 +516,14 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       await widget.onModelSelected(model);
 
       if (mounted) {
-        Navigator.pop(context);
+        // Defer Navigator.pop until after the current frame completes
+        // This prevents the !_debugLocked assertion when the callback triggers
+        // navigation (e.g., loading a VLM model may trigger state changes)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
       }
     } catch (e) {
       debugPrint('❌ Failed to load model: $e');

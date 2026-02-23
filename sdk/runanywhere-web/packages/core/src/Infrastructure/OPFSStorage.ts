@@ -294,7 +294,7 @@ export class OPFSStorage {
 
     const models: StoredModelInfo[] = [];
 
-    for await (const [name, handle] of (this.modelsDir as any).entries()) {
+    for await (const [name, handle] of this.modelsDir.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

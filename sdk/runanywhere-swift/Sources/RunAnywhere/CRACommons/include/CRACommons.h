@@ -89,6 +89,10 @@
 // Voice Agent
 #include "rac_voice_agent.h"
 
+// RAG (Retrieval-Augmented Generation)
+#include "rac_rag_pipeline.h"
+#include "rac_rag.h"
+
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
 // =============================================================================

@@ -78,6 +78,7 @@ export enum ModelCategory {
   ImageGeneration = 'image-generation',
   Multimodal = 'multimodal',
   Audio = 'audio',
+  Embedding = 'embedding',
 }
 
 /**
@@ -91,6 +92,7 @@ export const ModelCategoryDisplayNames: Record<ModelCategory, string> = {
   [ModelCategory.ImageGeneration]: 'Image Generation',
   [ModelCategory.Multimodal]: 'Multimodal',
   [ModelCategory.Audio]: 'Audio Processing',
+  [ModelCategory.Embedding]: 'Embedding Model',
 };
 
 /**

@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
@@ -36,7 +37,24 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.HttpURLConnection
 import java.util.zip.ZipInputStream
+
+// MARK: - Multi-File Model Companion Storage
+
+/** Stores companion file (url → filename) pairs for multi-file models, keyed by modelId. */
+private val modelCompanionFiles = mutableMapOf<String, List<Pair<String, String>>>()
+private val companionFilesLock = Any()
+
+internal actual fun registerCompanionFilesInternal(modelId: String, companionFiles: List<Pair<String, String>>) {
+    synchronized(companionFilesLock) {
+        modelCompanionFiles[modelId] = companionFiles
+    }
+}
+
+private fun getCompanionFiles(modelId: String): List<Pair<String, String>>? =
+    synchronized(companionFilesLock) { modelCompanionFiles[modelId]?.toList() }
 
 // MARK: - Model Registration Implementation
 
@@ -65,6 +83,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
                         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
                         ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                        ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
                         ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
                         ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                     },
@@ -232,6 +251,7 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
             ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
             ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
             ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
+            ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
         }
     return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
 }
@@ -304,8 +324,26 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
  * @param modelId The model ID to download
  * @return Flow of DownloadProgress updates
  */
-actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
-    callbackFlow {
+actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
+    // EMBEDDING models: return a simple flow that uses direct HTTP download.
+    // All files (model.onnx + companion vocab.txt) are co-located in one directory,
+    // matching iOS multi-file model download behaviour.
+    val registeredModel = getRegisteredModels().find { it.id == modelId }
+    if (registeredModel?.category == ModelCategory.EMBEDDING) {
+        val downloadUrl = registeredModel.downloadURL
+            ?: return flow { throw SDKError.model("Model '$modelId' has no download URL") }
+        val companions = getCompanionFiles(modelId) ?: emptyList()
+        return flow {
+            SDKLogger.download.info("EMBEDDING download: $modelId (${companions.size} companion file(s))")
+            downloadEmbeddingModelFiles(
+                modelId = modelId,
+                primaryUrl = downloadUrl,
+                companionFiles = companions,
+                totalSize = registeredModel.downloadSize,
+            ) { emit(it) }
+        }
+    }
+    return callbackFlow {
         val downloadLogger = SDKLogger.download
 
         // 0. Check network connectivity first (for better user experience)
@@ -355,6 +393,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                 ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
                 ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
             }
 
         // 4. Emit download started event and record start time
@@ -714,6 +753,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
             downloadLogger.debug("Download flow closed for: $modelId")
         }
     }
+}
 
 /**
  * Check if URL requires extraction (is an archive).
@@ -953,6 +993,130 @@ private fun extractZip(archiveFile: File, destDir: File, logger: SDKLogger) {
 
         logger.info("Extracted $fileCount files from zip")
     }
+}
+
+// MARK: - Embedding Model Direct HTTP Download
+
+/**
+ * Download an embedding model and its companion files (e.g., vocab.txt) using direct HTTP.
+ * All files are saved into the same directory: {base}/models/embedding/{modelId}/
+ *
+ * Mirrors iOS multi-file model download behaviour: model.onnx + vocab.txt co-located.
+ * The C++ RAG pipeline looks for vocab.txt next to model.onnx, so they must be in the same dir.
+ */
+private suspend fun downloadEmbeddingModelFiles(
+    modelId: String,
+    primaryUrl: String,
+    companionFiles: List<Pair<String, String>>,
+    totalSize: Long?,
+    emit: suspend (DownloadProgress) -> Unit,
+) {
+    val logger = SDKLogger.download
+
+    // Target directory: {base}/models/embedding/{modelId}/
+    val embeddingDir = File(File(CppBridgeModelPaths.getBaseDirectory(), "models/embedding"), modelId)
+    withContext(Dispatchers.IO) { embeddingDir.mkdirs() }
+
+    emit(
+        DownloadProgress(
+            modelId = modelId,
+            progress = 0f,
+            bytesDownloaded = 0,
+            totalBytes = totalSize,
+            state = DownloadState.DOWNLOADING,
+        ),
+    )
+
+    val allFiles = listOf(primaryUrl to "model.onnx") + companionFiles
+    val fileCount = allFiles.size
+
+    allFiles.forEachIndexed { index, (url, filename) ->
+        val destFile = File(embeddingDir, filename)
+        logger.info("Downloading [$filename] from: $url")
+
+        withContext(Dispatchers.IO) {
+            downloadFileWithHttpURLConnection(url, destFile) { _ -> }
+        }
+
+        val overallProgress = (index + 1f) / fileCount
+        emit(
+            DownloadProgress(
+                modelId = modelId,
+                progress = overallProgress,
+                bytesDownloaded = 0,
+                totalBytes = totalSize,
+                state = if (overallProgress >= 1f) DownloadState.COMPLETED else DownloadState.DOWNLOADING,
+            ),
+        )
+        logger.info("Downloaded [$filename] to ${destFile.absolutePath}")
+    }
+
+    val dirPath = embeddingDir.absolutePath
+
+    // Update in-memory cache with local path
+    synchronized(modelCacheLock) {
+        val idx = registeredModels.indexOfFirst { it.id == modelId }
+        if (idx >= 0) {
+            registeredModels[idx] = registeredModels[idx].copy(localPath = dirPath)
+        }
+    }
+    CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
+    CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
+
+    logger.info("Embedding model ready at: $dirPath")
+}
+
+/**
+ * Download a file using HttpURLConnection with redirect support.
+ */
+private fun downloadFileWithHttpURLConnection(
+    url: String,
+    destFile: File,
+    progressCallback: (Float) -> Unit,
+) {
+    var currentUrl = url
+    var remainingRedirects = 10
+
+    while (remainingRedirects-- > 0) {
+        val connection = java.net.URL(currentUrl).openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 120_000
+        connection.instanceFollowRedirects = false
+        connection.connect()
+
+        val responseCode = connection.responseCode
+        if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+            responseCode == 307 ||
+            responseCode == 308
+        ) {
+            val location = connection.getHeaderField("Location")
+            connection.disconnect()
+            if (location.isNullOrBlank()) throw IOException("Redirect with no Location header from: $currentUrl")
+            currentUrl = location
+            continue
+        }
+
+        val totalBytes = connection.contentLengthLong
+        var bytesDownloaded = 0L
+
+        connection.inputStream.use { input ->
+            destFile.outputStream().use { output ->
+                val buffer = ByteArray(8 * 1024)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    bytesDownloaded += bytesRead
+                    if (totalBytes > 0) {
+                        progressCallback(bytesDownloaded.toFloat() / totalBytes.toFloat())
+                    }
+                }
+            }
+        }
+        connection.disconnect()
+        return
+    }
+    throw IOException("Too many redirects for URL: $url")
 }
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {

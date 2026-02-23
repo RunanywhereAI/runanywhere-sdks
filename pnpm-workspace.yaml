@@ -1,0 +1,27 @@
+packages:
+  # React Native SDK Packages
+  - 'sdk/runanywhere-react-native/packages/*'
+  
+  # Example Applications
+  - 'examples/react-native/RunAnywhereAI'
+  - 'examples/react-native/RAGDemo'
+  
+  # Playground Applications
+  - 'Playground/on-device-browser-agent'
+  - 'Playground/android-use-agent'
+
+# Strict peer dependency checking
+strict-peer-dependencies: false
+
+# Use node-modules linker instead of pnpm's default symlink approach
+# This is better for React Native
+nodeLinker: node-modules
+
+# Enable hoisting for faster resolution
+hoist-pattern: ['*', '*/**']
+
+# Manage versions from top level
+shamefully-hoist: true
+
+# Prefer workspace packages over external ones
+prefer-workspace: true

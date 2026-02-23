@@ -192,6 +192,12 @@ lint/reports/
 *.rar
 hs_err_pid*
 
+# Node.js / NPM / Yarn
+node_modules/
+.npm
+.yarn/cache
+.yarn/install-state.gz
+
 # Flutter/Dart
 .dart_tool/
 .flutter-plugins
@@ -378,6 +384,8 @@ sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
+tools/
+sdk/runanywhere-react-native/packages/rag/ios/.testlocal
 
 
 # Node

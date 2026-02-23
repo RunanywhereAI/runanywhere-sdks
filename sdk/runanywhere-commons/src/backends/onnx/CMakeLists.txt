@@ -23,7 +23,18 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json)
+
+# Workaround: nlohmann_json may use target_compile_features which fails with Xcode generator
+# Override to use set_target_properties instead
+if(TARGET nlohmann_json AND RAC_PLATFORM_IOS)
+    set_target_properties(nlohmann_json PROPERTIES
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+    )
+endif()
 
 # =============================================================================
 # ONNX Runtime
@@ -206,7 +217,11 @@ else()
     target_compile_definitions(rac_backend_onnx PUBLIC SHERPA_ONNX_AVAILABLE=0)
 endif()
 
-target_compile_features(rac_backend_onnx PUBLIC cxx_std_17)
+set_target_properties(rac_backend_onnx PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
+)
 
 # =============================================================================
 # Platform-specific configuration
@@ -231,6 +246,8 @@ elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_onnx PRIVATE log)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_onnx PRIVATE -O3 -ffunction-sections -fdata-sections)
+        # Ensure ORT_API_VERSION matches bundled libonnxruntime (1.17.x -> API 17)
+        target_compile_definitions(rac_backend_onnx PRIVATE ORT_API_VERSION=17)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
     target_link_options(rac_backend_onnx PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
     # NNAPI Execution Provider for Android NPU acceleration

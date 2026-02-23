@@ -123,7 +123,8 @@ enum ModelSelectionContext {
   llm,
   stt,
   tts,
-  voice;
+  voice,
+  vlm;
 
   String get title {
     switch (this) {
@@ -135,6 +136,8 @@ enum ModelSelectionContext {
         return 'Select TTS Model';
       case ModelSelectionContext.voice:
         return 'Select Model';
+      case ModelSelectionContext.vlm:
+        return 'Select VLM Model';
     }
   }
 
@@ -153,6 +156,8 @@ enum ModelSelectionContext {
           ModelCategory.speechRecognition,
           ModelCategory.speechSynthesis,
         };
+      case ModelSelectionContext.vlm:
+        return {ModelCategory.vision, ModelCategory.multimodal};
     }
   }
 }

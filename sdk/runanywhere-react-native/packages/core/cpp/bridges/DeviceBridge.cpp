@@ -253,5 +253,17 @@ std::string DeviceBridge::getDeviceId() const {
     return id ? std::string(id) : "";
 }
 
+DeviceInfo DeviceBridge::getDeviceInfo() const {
+    if (!g_deviceCallbacks || !g_deviceCallbacks->getDeviceInfo) {
+        LOGE("getDeviceInfo callback not available");
+        return DeviceInfo{};
+    }
+    
+    DeviceInfo info = g_deviceCallbacks->getDeviceInfo();
+    LOGD("Device info retrieved: availableMemory=%lld bytes", 
+         static_cast<long long>(info.availableMemory));
+    return info;
+}
+
 } // namespace bridges
 } // namespace runanywhere

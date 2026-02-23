@@ -23,6 +23,7 @@ import ChatScreen from '../screens/ChatScreen';
 import STTScreen from '../screens/STTScreen';
 import TTSScreen from '../screens/TTSScreen';
 import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
+import RAGScreen from '../screens/RAGScreen';
 import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -41,7 +42,8 @@ const tabIcons: Record<
   STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
   TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
   Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
-  Vision: { focused: 'camera', unfocused: 'camera-outline' },
+  RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
+  Vision: { focused: 'eye', unfocused: 'eye-outline' }, // eye for vision/VLM
   Settings: { focused: 'settings', unfocused: 'settings-outline' },
 };
 
@@ -54,6 +56,7 @@ const tabLabels: Record<keyof RootTabParamList, string> = {
   STT: 'Transcribe',
   TTS: 'Speak',
   Voice: 'Voice',
+  RAG: 'RAG',
   Vision: 'Vision',
   Settings: 'Settings',
 };
@@ -115,13 +118,19 @@ export const TabNavigator: React.FC = () => {
         component={VoiceAssistantScreen}
         options={{ tabBarLabel: tabLabels.Voice }}
       />
-      {/* Tab 4: Vision (hub -> VLM) */}
+      {/* Tab 4: RAG (Retrieval-Augmented Generation) */}
+      <Tab.Screen
+        name="RAG"
+        component={RAGScreen}
+        options={{ tabBarLabel: tabLabels.RAG }}
+      />
+      {/* Tab 5: Vision (hub -> VLM) */}
       <Tab.Screen
         name="Vision"
         component={VisionStackScreen}
         options={{ tabBarLabel: tabLabels.Vision }}
       />
-      {/* Tab 5: Settings (includes Tool Settings) */}
+      {/* Tab 6: Settings */}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

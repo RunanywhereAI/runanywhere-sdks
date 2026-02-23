@@ -35,7 +35,6 @@ const logger = new SDKLogger('LocalFileStorage');
 // (Not yet in standard TypeScript DOM lib)
 // ---------------------------------------------------------------------------
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 interface FileSystemPermissionDescriptor {
   mode: 'read' | 'readwrite';
 }
@@ -44,7 +43,6 @@ interface FileSystemHandlePermissionMethods {
   queryPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
   requestPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ---------------------------------------------------------------------------
 // IndexedDB Constants
@@ -128,8 +126,8 @@ export class LocalFileStorage {
 
     try {
       // showDirectoryPicker requires user gesture (button click)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.dirHandle = await (window as any).showDirectoryPicker({
+      const win = window as Window & { showDirectoryPicker?(options?: { mode?: 'read' | 'readwrite' }): Promise<FileSystemDirectoryHandle> };
+      this.dirHandle = await win.showDirectoryPicker!({
         mode: 'readwrite',
       });
 
@@ -423,8 +421,7 @@ export class LocalFileStorage {
 
     const models: Array<{ id: string; sizeBytes: number; lastModified: number }> = [];
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for await (const [name, handle] of (this.dirHandle as any).entries()) {
+    for await (const [name, handle] of this.dirHandle.entries()) {
       if (handle.kind === 'file') {
         const file = await (handle as FileSystemFileHandle).getFile();
         models.push({

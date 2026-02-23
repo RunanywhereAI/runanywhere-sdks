@@ -66,6 +66,7 @@ COMMONS_BUILD_SCRIPT="${COMMONS_DIR}/scripts/build-android.sh"
 MAIN_JNILIBS_DIR="${KOTLIN_SDK_DIR}/src/androidMain/jniLibs"
 LLAMACPP_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"
 ONNX_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-onnx/src/androidMain/jniLibs"
+RAG_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-rag/src/androidMain/jniLibs"
 
 # Defaults
 MODE="local"
@@ -206,6 +207,11 @@ check_libs_exist() {
     if [ ! -f "${ONNX_JNILIBS_DIR}/${abi}/librac_backend_onnx_jni.so" ]; then
         return 1
     fi
+    
+    # Check RAG module
+    if [ ! -f "${RAG_JNILIBS_DIR}/${abi}/librac_backend_rag_jni.so" ]; then
+        return 1
+    fi
 
     return 0
 }
@@ -294,6 +300,7 @@ copy_jni_libs() {
         rm -rf "${MAIN_JNILIBS_DIR}"
         rm -rf "${LLAMACPP_JNILIBS_DIR}"
         rm -rf "${ONNX_JNILIBS_DIR}"
+        rm -rf "${RAG_JNILIBS_DIR}"
     fi
 
     # Parse ABIs
@@ -311,6 +318,7 @@ copy_jni_libs() {
         mkdir -p "${MAIN_JNILIBS_DIR}/${ABI}"
         mkdir -p "${LLAMACPP_JNILIBS_DIR}/${ABI}"
         mkdir -p "${ONNX_JNILIBS_DIR}/${ABI}"
+        mkdir -p "${RAG_JNILIBS_DIR}/${ABI}"
 
         # =======================================================================
         # Main SDK (Commons): Core JNI + libc++_shared.so + librac_commons.so
@@ -409,6 +417,30 @@ copy_jni_libs() {
                 fi
             done
         fi
+        
+        # =======================================================================
+        # RAG Module: Backend + JNI bridge
+        # =======================================================================
+        # Copy backend library
+        if [ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]; then
+            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so"
+        elif [ -f "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag.so" ]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so (from build)"
+        fi
+
+        # Copy JNI bridge
+        if [ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" ]; then
+            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+            log_info "RAG: librac_backend_rag_jni.so"
+        elif [ -f "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag_jni.so" ]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag_jni.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+            log_info "RAG: librac_backend_rag_jni.so (from build)"
+        else
+            log_warn "RAG: librac_backend_rag_jni.so NOT FOUND - JNI bridge missing!"
+        fi
+        
     done
 
     log_info "JNI libraries installed"
@@ -547,7 +579,7 @@ main() {
 
     echo ""
     echo "JNI Libraries:"
-    for dir in "$MAIN_JNILIBS_DIR" "$LLAMACPP_JNILIBS_DIR" "$ONNX_JNILIBS_DIR"; do
+    for dir in "$MAIN_JNILIBS_DIR" "$LLAMACPP_JNILIBS_DIR" "$ONNX_JNILIBS_DIR" "$RAG_JNILIBS_DIR"; do
         if [ -d "$dir" ]; then
             local count=$(find "$dir" -name "*.so" 2>/dev/null | wc -l | tr -d ' ')
             local size=$(du -sh "$dir" 2>/dev/null | cut -f1)

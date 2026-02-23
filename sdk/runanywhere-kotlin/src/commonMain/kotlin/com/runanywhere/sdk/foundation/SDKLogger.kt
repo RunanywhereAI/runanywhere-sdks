@@ -759,6 +759,9 @@ class SDKLogger(
         /** Logger for LlamaCpp operations */
         val llamacpp = SDKLogger("LlamaCpp")
 
+        /** Logger for RAG (Retrieval-Augmented Generation) operations */
+        val rag = SDKLogger("RAG")
+
         /** Logger for VoiceAgent operations */
         val voiceAgent = SDKLogger("VoiceAgent")
 

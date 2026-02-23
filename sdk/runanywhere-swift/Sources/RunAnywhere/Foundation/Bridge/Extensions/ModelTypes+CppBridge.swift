@@ -29,6 +29,8 @@ extension ModelCategory {
             return RAC_MODEL_CATEGORY_MULTIMODAL
         case .audio:
             return RAC_MODEL_CATEGORY_AUDIO
+        case .embedding:
+            return RAC_MODEL_CATEGORY_EMBEDDING
         }
     }
 
@@ -49,8 +51,10 @@ extension ModelCategory {
             self = .multimodal
         case RAC_MODEL_CATEGORY_AUDIO:
             self = .audio
+        case RAC_MODEL_CATEGORY_EMBEDDING:
+            self = .embedding
         default:
-            self = .audio  // Default fallback
+            self = .language  // Default fallback
         }
     }
 }

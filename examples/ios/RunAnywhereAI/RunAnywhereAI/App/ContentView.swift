@@ -120,6 +120,17 @@ struct MoreHubView: View {
             List {
                 Section {
                     NavigationLink {
+                        DocumentRAGView()
+                    } label: {
+                        FeatureRow(
+                            icon: "doc.text.magnifyingglass",
+                            iconColor: .indigo,
+                            title: "Document Q&A",
+                            subtitle: "Ask questions about PDF and JSON documents"
+                        )
+                    }
+
+                    NavigationLink {
                         SpeechToTextView()
                     } label: {
                         FeatureRow(

@@ -47,6 +47,24 @@ export interface LlamaCPPModelOptions {
 }
 
 /**
+ * VLM model registration options for LlamaCPP VLM models
+ *
+ * Matches iOS: LlamaCPP.addVLMModel() parameter structure
+ */
+export interface LlamaCPPVLMModelOptions {
+  /** Unique model ID */
+  id?: string;
+  /** Display name */
+  name: string;
+  /** Download URL for main model */
+  url: string;
+  /** Download URL for mmproj vision projector (optional - auto-detected if in same directory) */
+  mmprojUrl?: string;
+  /** Memory requirement in bytes */
+  memoryRequirement?: number;
+}
+
+/**
  * LlamaCPP Module
  *
  * Public API for registering LlamaCPP module and declaring GGUF models.
@@ -79,7 +97,7 @@ export const LlamaCPP = {
   moduleId: 'llamacpp',
   moduleName: 'LlamaCPP',
   inferenceFramework: LLMFramework.LlamaCpp,
-  capabilities: ['llm'] as const,
+  capabilities: ['llm', 'vlm'] as const,
   defaultPriority: 100,
 
   /**
@@ -182,6 +200,97 @@ export const LlamaCPP = {
     log.info(`Added model: ${modelId} (${options.name})`, {
       modelId,
       isDownloaded,
+    });
+
+    return modelInfo;
+  },
+
+  /**
+   * Add a VLM model to this module
+   *
+   * Registers a VLM GGUF model with the ModelRegistry.
+   * The model will use LlamaCPP framework automatically.
+   *
+   * Matches iOS: static func addVLMModel(id:name:url:mmprojUrl:memoryRequirement:)
+   *
+   * @param options - VLM model registration options
+   * @returns Promise resolving to the created ModelInfo
+   *
+   * @example
+   * ```typescript
+   * await LlamaCPP.addVLMModel({
+   *   id: 'llava-1.5-7b-q4_k_m',
+   *   name: 'LLaVA 1.5 7B Q4_K_M',
+   *   url: 'https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/ggml-model-q4_k.gguf',
+   *   mmprojUrl: 'https://huggingface.co/mys/ggml_llava-v1.5-7b/resolve/main/mmproj-model-f16.gguf',
+   *   memoryRequirement: 5_000_000_000
+   * });
+   * ```
+   */
+  async addVLMModel(options: LlamaCPPVLMModelOptions): Promise<ModelInfo> {
+    // Generate stable ID from URL if not provided
+    const modelId = options.id ?? this._generateModelId(options.url);
+
+    // VLM models are Multimodal category (matches iOS: modality: .multimodal)
+    const category = ModelCategory.Multimodal;
+
+    // Infer format from URL
+    const format = options.url.toLowerCase().includes('.gguf')
+      ? ModelFormat.GGUF
+      : ModelFormat.GGML;
+
+    const now = new Date().toISOString();
+
+    // Check if model already exists on disk (persistence across sessions)
+    let isDownloaded = false;
+    let localPath: string | undefined;
+
+    if (FileSystem.isAvailable()) {
+      try {
+        const exists = await FileSystem.modelExists(modelId, 'LlamaCpp');
+        if (exists) {
+          localPath = await FileSystem.getModelPath(modelId, 'LlamaCpp');
+          isDownloaded = true;
+          log.debug(`VLM model ${modelId} found on disk: ${localPath}`);
+        }
+      } catch (error) {
+        // Ignore errors checking for existing model
+        log.debug(`Could not check for existing VLM model ${modelId}: ${error}`);
+      }
+    }
+
+    const modelInfo: ModelInfo = {
+      id: modelId,
+      name: options.name,
+      category,
+      format,
+      downloadURL: options.url,
+      localPath,
+      downloadSize: undefined,
+      memoryRequired: options.memoryRequirement,
+      compatibleFrameworks: [LLMFramework.LlamaCpp],
+      preferredFramework: LLMFramework.LlamaCpp,
+      supportsThinking: false,
+      metadata: {
+        tags: [],
+        mmprojUrl: options.mmprojUrl,  // Store mmproj URL in metadata for download
+      },
+      source: ConfigurationSource.Local,
+      createdAt: now,
+      updatedAt: now,
+      syncPending: false,
+      usageCount: 0,
+      isDownloaded,
+      isAvailable: true,
+    };
+
+    // Register with ModelRegistry and wait for completion
+    await ModelRegistry.registerModel(modelInfo);
+
+    log.info(`Added VLM model: ${modelId} (${options.name})`, {
+      modelId,
+      isDownloaded,
+      hasMmproj: !!options.mmprojUrl,
     });
 
     return modelInfo;

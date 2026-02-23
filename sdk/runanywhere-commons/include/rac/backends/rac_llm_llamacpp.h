@@ -189,6 +189,58 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handl
 RAC_LLAMACPP_API void rac_llm_llamacpp_destroy(rac_handle_t handle);
 
 // =============================================================================
+// LORA ADAPTER API
+// =============================================================================
+
+/**
+ * Load a LoRA adapter from a GGUF file and apply it.
+ *
+ * The adapter is loaded against the current model and applied to the context.
+ * Context is recreated internally to accommodate the new adapter.
+ * KV cache is cleared automatically.
+ *
+ * @param handle Service handle (from rac_llm_llamacpp_create)
+ * @param adapter_path Path to the LoRA adapter GGUF file
+ * @param scale Adapter scale factor (0.0-1.0, default 1.0)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
+                                                          const char* adapter_path,
+                                                          float scale);
+
+/**
+ * Remove a specific LoRA adapter by path.
+ * KV cache is cleared automatically.
+ *
+ * @param handle Service handle
+ * @param adapter_path Path used when loading the adapter
+ * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
+                                                            const char* adapter_path);
+
+/**
+ * Remove all LoRA adapters from the context.
+ * KV cache is cleared automatically.
+ *
+ * @param handle Service handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
+
+/**
+ * Get info about loaded LoRA adapters as JSON.
+ *
+ * Returns JSON array: [{"path":"...", "scale":1.0, "applied":true}, ...]
+ *
+ * @param handle Service handle
+ * @param out_json Output: JSON string (caller must free with rac_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle,
+                                                              char** out_json);
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 

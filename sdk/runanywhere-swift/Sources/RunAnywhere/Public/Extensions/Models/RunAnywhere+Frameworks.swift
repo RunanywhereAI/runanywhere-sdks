@@ -49,10 +49,11 @@ public extension RunAnywhere {
         case .voice:
             relevantCategories = [.language, .speechRecognition, .speechSynthesis]
         case .embedding:
-            // Embedding models could be language or multimodal
-            relevantCategories = [.language, .multimodal]
+            relevantCategories = [.embedding]
         case .diffusion:
             relevantCategories = [.imageGeneration]
+        case .rag:
+            relevantCategories = [.language]
         }
 
         for model in allModels where relevantCategories.contains(model.category) {

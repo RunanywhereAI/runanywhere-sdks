@@ -147,6 +147,7 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_IMAGE_GENERATION = 4,   /**< Text-to-image models */
     RAC_MODEL_CATEGORY_MULTIMODAL = 5,         /**< Multi-modality models */
     RAC_MODEL_CATEGORY_AUDIO = 6,              /**< Audio processing (diarization, etc.) */
+    RAC_MODEL_CATEGORY_EMBEDDING = 7,          /**< Embedding models (RAG, semantic search) */
     RAC_MODEL_CATEGORY_UNKNOWN = 99            /**< Unknown category */
 } rac_model_category_t;
 

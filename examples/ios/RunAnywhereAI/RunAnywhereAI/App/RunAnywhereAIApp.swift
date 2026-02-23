@@ -216,6 +216,17 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 600_000_000
             )
         }
+        // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
+        // TODO: [Portal Integration] Remove once portal delivers model + adapter pairings
+        if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-1.5b-instruct-q4_k_m",
+                name: "Qwen 2.5 1.5B Instruct Q4_K_M",
+                url: qwen15BURL,
+                framework: .llamaCpp,
+                memoryRequirement: 2_500_000_000
+            )
+        }
         if let lfm2Q4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "lfm2-350m-q4_k_m",
@@ -371,6 +382,26 @@ struct RunAnywhereAIApp: App {
             )
         }
         logger.info("✅ WhisperKit STT models registered")
+
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        if let miniLMModelURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"),
+           let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
+            RunAnywhere.registerMultiFileModel(
+                id: "all-minilm-l6-v2",
+                name: "All MiniLM L6 v2 (Embedding)",
+                files: [
+                    ModelFileDescriptor(url: miniLMModelURL, filename: "model.onnx"),
+                    ModelFileDescriptor(url: miniLMVocabURL, filename: "vocab.txt")
+                ],
+                framework: .onnx,
+                modality: .embedding,
+                memoryRequirement: 25_500_000
+            )
+        }
+        logger.info("✅ ONNX Embedding models registered")
 
         // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
         // ============================================================================

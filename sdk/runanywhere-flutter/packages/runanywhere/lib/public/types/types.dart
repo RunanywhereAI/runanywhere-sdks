@@ -10,4 +10,5 @@ export 'generation_types.dart';
 export 'message_types.dart';
 export 'structured_output_types.dart';
 export 'tool_calling_types.dart';
+export 'vlm_types.dart';
 export 'voice_agent_types.dart';

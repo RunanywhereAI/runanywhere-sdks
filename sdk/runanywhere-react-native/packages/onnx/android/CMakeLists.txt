@@ -181,7 +181,7 @@ if(TARGET sherpa_onnx_jni)
 endif()
 
 # HAS_ONNX is always defined since ONNX backend is required
-target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1)
+target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1 ORT_API_VERSION=17)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)

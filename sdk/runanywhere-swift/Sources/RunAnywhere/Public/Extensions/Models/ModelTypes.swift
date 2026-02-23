@@ -44,6 +44,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
     case imageGeneration = "image-generation"      // Text-to-image models
     case multimodal = "multimodal"          // Models that handle multiple modalities
     case audio = "audio"                    // Audio processing (diarization, etc.)
+    case embedding = "embedding"            // Embedding models (RAG, semantic search)
 
     /// Whether this category typically requires context length
     /// Note: C++ equivalent is rac_model_category_requires_context_length()
@@ -51,7 +52,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio:
+        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio, .embedding:
             return false
         }
     }
@@ -62,7 +63,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio:
+        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio, .embedding:
             return false
         }
     }

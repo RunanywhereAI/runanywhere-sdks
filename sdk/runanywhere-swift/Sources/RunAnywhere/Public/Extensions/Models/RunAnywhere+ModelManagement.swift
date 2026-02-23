@@ -35,11 +35,12 @@ extension RunAnywhere {
 
         // Log model info for debugging
         let logger = SDKLogger(category: "ModelManagement")
-        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(modelInfo.localPath?.path ?? "nil")")
+        let localName = modelInfo.localPath?.lastPathComponent ?? "nil"
+        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(localName)")
 
         // Resolve actual model file path
         let modelPath = try resolveModelFilePath(for: modelInfo)
-        logger.info("Resolved model path: \(modelPath.path)")
+        logger.info("Resolved model path: \(modelPath.lastPathComponent)")
         try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
@@ -72,14 +73,14 @@ extension RunAnywhere {
 
         // Check if there's a nested folder with the model name (from archive extraction)
         let nestedFolder = modelFolder.appendingPathComponent(modelId)
-        logger.debug("Checking nested folder: \(nestedFolder.path)")
+        logger.debug("Checking nested folder: \(nestedFolder.lastPathComponent)")
 
         if FileManager.default.fileExists(atPath: nestedFolder.path) {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: nestedFolder.path, isDirectory: &isDir), isDir.boolValue {
                 // Check if this nested folder contains model files
                 if hasONNXModelFiles(at: nestedFolder) {
-                    logger.info("Found ONNX model at nested path: \(nestedFolder.path)")
+                    logger.info("Found ONNX model at nested path: \(nestedFolder.lastPathComponent)")
                     return nestedFolder
                 }
             }
@@ -87,7 +88,7 @@ extension RunAnywhere {
 
         // Check if model files exist directly in the model folder
         if hasONNXModelFiles(at: modelFolder) {
-            logger.info("Found ONNX model at folder: \(modelFolder.path)")
+            logger.info("Found ONNX model at folder: \(modelFolder.lastPathComponent)")
             return modelFolder
         }
 
@@ -98,7 +99,7 @@ extension RunAnywhere {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
                     if hasONNXModelFiles(at: item) {
-                        logger.info("Found ONNX model in subdirectory: \(item.path)")
+                        logger.info("Found ONNX model in subdirectory: \(item.lastPathComponent)")
                         return item
                     }
                 }
@@ -106,7 +107,7 @@ extension RunAnywhere {
         }
 
         // Fallback to model folder
-        logger.warning("No ONNX model files found, falling back to: \(modelFolder.path)")
+        logger.warning("No ONNX model files found, falling back to: \(modelFolder.lastPathComponent)")
         return modelFolder
     }
 
@@ -184,29 +185,29 @@ extension RunAnywhere {
             format: model.format
         )
 
-        logger.debug("Expected model path: \(expectedPath.path)")
+        logger.debug("Expected model path: \(expectedPath.lastPathComponent)")
 
         // If expected path exists, use it
         if FileManager.default.fileExists(atPath: expectedPath.path) {
-            logger.info("Found model at expected path: \(expectedPath.path)")
+            logger.info("Found model at expected path: \(expectedPath.lastPathComponent)")
             return expectedPath
         }
 
         // Find files with the expected extension in model folder
         let expectedExtension = model.format.rawValue.lowercased()
         if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
-            logger.info("Found model file: \(modelFile.path)")
+            logger.info("Found model file: \(modelFile.lastPathComponent)")
             return modelFile
         }
         
         // Search in nested subdirectories (archives often create nested folders)
-        logger.debug("Searching nested directories in: \(modelFolder.path)")
+        logger.debug("Searching nested directories in: \(modelFolder.lastPathComponent)")
         if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
             for item in contents {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
                     if let modelFile = findModelFile(in: item, extensions: [expectedExtension, "gguf", "bin"]) {
-                        logger.info("Found model file in nested directory: \(modelFile.path)")
+                        logger.info("Found model file in nested directory: \(modelFile.lastPathComponent)")
                         return modelFile
                     }
                 }
@@ -214,7 +215,7 @@ extension RunAnywhere {
         }
 
         // Fallback to expected path
-        logger.warning("Model file not found, falling back to: \(expectedPath.path)")
+        logger.warning("Model file not found, falling back to: \(expectedPath.lastPathComponent)")
         return expectedPath
     }
     
@@ -330,7 +331,7 @@ extension RunAnywhere {
         // Resolve actual model path
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.TTS")
-        logger.info("Loading TTS voice from resolved path: \(modelPath.path)")
+        logger.info("Loading TTS voice from resolved path: \(modelPath.lastPathComponent)")
         try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId, voiceName: modelInfo.name)
     }
 

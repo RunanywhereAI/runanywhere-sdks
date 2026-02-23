@@ -12,7 +12,7 @@ import {
 import { ModelRegistry } from '../../services/ModelRegistry';
 import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import type { ModelInfo, LLMFramework } from '../../types';
+import type { ModelInfo, LLMFramework, ModelCompatibilityResult } from '../../types';
 import { ModelCategory } from '../../types';
 
 const logger = new SDKLogger('RunAnywhere.Models');
@@ -110,6 +110,19 @@ export async function getModelPath(modelId: string): Promise<string | null> {
   }
   const native = requireNativeModule();
   return native.getModelPath(modelId);
+}
+
+/**
+ * Get mmproj path for a VLM model
+ * Searches for mmproj file in the same directory as the main model
+ * Returns undefined if not found (backend will auto-detect)
+ */
+export async function getMmprojPath(modelId: string): Promise<string | undefined> {
+  const modelPath = await getModelPath(modelId);
+  if (!modelPath) {
+    return undefined;
+  }
+  return FileSystem.findMmprojForModel(modelPath);
 }
 
 /**
@@ -289,6 +302,8 @@ export async function downloadModel(
   let extension = '';
   if (modelInfo.downloadURL.includes('.gguf')) {
     extension = '.gguf';
+  } else if (modelInfo.downloadURL.includes('.onnx')) {
+    extension = '.onnx';
   } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
     extension = '.tar.bz2';
   } else if (modelInfo.downloadURL.includes('.tar.gz')) {
@@ -305,6 +320,10 @@ export async function downloadModel(
 
   activeDownloads.set(modelId, 1);
   let lastLoggedProgress = -1;
+
+  // Use preferredFramework from modelInfo to ensure correct directory structure
+  // This prevents VLM models (tar.gz with GGUF) from being misclassified as ONNX
+  const framework = modelInfo.preferredFramework;
 
   try {
     const destPath = await FileSystem.downloadModel(
@@ -325,7 +344,8 @@ export async function downloadModel(
             progress: progress.progress,
           });
         }
-      }
+      },
+      framework
     );
 
     logger.info('Download completed:', {
@@ -394,4 +414,12 @@ export async function deleteModel(modelId: string): Promise<boolean> {
     logger.error('Delete model error:', { error });
     return false;
   }
+}
+
+/**
+ * Check if a model is compatible with the current device
+ * Returns RAM and storage compatibility info
+ */
+export async function checkCompatibility(modelId: string): Promise<ModelCompatibilityResult> {
+  return ModelRegistry.checkCompatibility(modelId);
 }

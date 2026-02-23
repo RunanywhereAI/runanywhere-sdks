@@ -157,4 +157,58 @@ export interface RunAnywhereLlama
    * @returns Memory usage in bytes
    */
   getMemoryUsage(): Promise<number>;
+
+  // ============================================================================
+  // VLM (Vision Language Model)
+  // Matches Swift SDK: RunAnywhere+VisionLanguage.swift + CppBridge+VLM.swift
+  // ============================================================================
+
+  /**
+   * Register the LlamaCPP VLM backend with C++ registry.
+   * Calls rac_backend_llamacpp_vlm_register() - separate from LLM registration.
+   */
+  registerVLMBackend(): Promise<boolean>;
+
+  /**
+   * Load a VLM model
+   * @param modelPath Path to main model file (.gguf)
+   * @param mmprojPath Path to mmproj vision projector file (.gguf), empty string if not needed
+   * @param modelId Model identifier for telemetry
+   * @param modelName Human-readable model name
+   */
+  loadVLMModel(modelPath: string, mmprojPath: string, modelId?: string, modelName?: string): Promise<boolean>;
+
+  /** Check if a VLM model is loaded */
+  isVLMModelLoaded(): Promise<boolean>;
+
+  /** Unload the current VLM model */
+  unloadVLMModel(): Promise<boolean>;
+
+  /**
+   * Process an image with VLM (non-streaming)
+   * @param imageFormat 0=filePath, 1=rgbPixels, 2=base64
+   * @param imageData The image data (file path string, or base64 string)
+   * @param imageWidth Width in pixels (for rgbPixels format, 0 otherwise)
+   * @param imageHeight Height in pixels (for rgbPixels format, 0 otherwise)
+   * @param prompt Text prompt
+   * @param optionsJson Optional JSON with max_tokens, temperature, top_p
+   * @returns JSON string with result: text, promptTokens, completionTokens, totalTimeMs, tokensPerSecond
+   */
+  processVLMImage(imageFormat: number, imageData: string, imageWidth: number, imageHeight: number, prompt: string, optionsJson?: string): Promise<string>;
+
+  /**
+   * Process an image with streaming
+   * @param imageFormat Image format enum value
+   * @param imageData Image data string
+   * @param imageWidth Width (for rgbPixels)
+   * @param imageHeight Height (for rgbPixels)
+   * @param prompt Text prompt
+   * @param optionsJson Generation options JSON
+   * @param callback Token callback (token, isComplete)
+   * @returns Full generated text
+   */
+  processVLMImageStream(imageFormat: number, imageData: string, imageWidth: number, imageHeight: number, prompt: string, optionsJson: string, callback: (token: string, isComplete: boolean) => void): Promise<string>;
+
+  /** Cancel ongoing VLM generation */
+  cancelVLMGeneration(): Promise<boolean>;
 }
