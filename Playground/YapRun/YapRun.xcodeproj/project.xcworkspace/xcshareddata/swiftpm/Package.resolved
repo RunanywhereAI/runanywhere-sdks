@@ -51,7 +51,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RunanywhereAI/runanywhere-sdks",
       "state" : {
-        "revision" : "9dea1d1ff79a2ba33d068740fd8da52a5570b81d",
+        "revision" : "4533a99882dd5a6ad3a6ad4c55e3cade49062489",
         "version" : "0.19.5"
       }
     },
@@ -123,8 +123,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers.git",
       "state" : {
-        "revision" : "573e5c9036c2f136b3a8a071da8e8907322403d0",
-        "version" : "1.1.6"
+        "revision" : "3aecdf18e62303fb5a5543f8e87502b13474573f",
+        "version" : "1.1.7"
       }
     },
     {
@@ -134,6 +134,15 @@
       "state" : {
         "revision" : "664e1b5a65296cd957dfdf262cd120ca88f3b24b",
         "version" : "0.15.0"
+      }
+    },
+    {
+      "identity" : "yyjson",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ibireme/yyjson.git",
+      "state" : {
+        "revision" : "8b4a38dc994a110abaec8a400615567bd996105f",
+        "version" : "0.12.0"
       }
     },
     {
