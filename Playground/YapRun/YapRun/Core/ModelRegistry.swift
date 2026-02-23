@@ -20,8 +20,14 @@ enum ModelRegistry {
         let sizeBytes: Int64
     }
 
-    /// Default model used during onboarding.
+    /// Default model used during onboarding and auto-load.
+    /// macOS uses the larger "Accurate" model (Neural Engine handles it easily).
+    /// iOS uses the smaller "Fast" model to conserve battery/memory.
+    #if os(macOS)
+    static let defaultModelId = "whisperkit-base.en"
+    #else
     static let defaultModelId = "whisperkit-tiny.en"
+    #endif
 
     /// Curated ASR models with consumer-friendly names (tar.gz for fast native gzip extraction on iOS/macOS).
     static let asrModels: [ASRModel] = [

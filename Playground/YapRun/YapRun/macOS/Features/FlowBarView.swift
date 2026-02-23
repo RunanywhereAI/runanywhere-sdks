@@ -21,6 +21,8 @@ struct FlowBarView: View {
             switch dictation.phase {
             case .idle:
                 idleContent
+            case .loadingModel:
+                loadingModelContent
             case .recording:
                 recordingContent
             case .transcribing:
@@ -50,6 +52,16 @@ struct FlowBarView: View {
     }
 
     // MARK: - States
+
+    private var loadingModelContent: some View {
+        HStack(spacing: 6) {
+            ProgressView()
+                .scaleEffect(0.6)
+            Text("Loading model...")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.7))
+        }
+    }
 
     private var idleContent: some View {
         HStack(spacing: 6) {

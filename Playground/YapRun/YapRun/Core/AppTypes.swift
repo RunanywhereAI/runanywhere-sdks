@@ -11,6 +11,7 @@ import SwiftUI
 
 enum DictationPhase: Equatable {
     case idle
+    case loadingModel
     case recording
     case transcribing
     case inserting

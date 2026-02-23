@@ -102,6 +102,18 @@ final class FlowSessionManager: ObservableObject {
         transition(to: .idle)
     }
 
+    /// Hard kill: tears down everything and immediately removes all live activities.
+    func killSession() async {
+        logger.info("Flow session killing — immediate teardown")
+
+        elapsedTask?.cancel()
+        audioCapture.stopRecording()
+
+        if #available(iOS 16.1, *) { await endAllLiveActivitiesImmediately() }
+        SharedDataBridge.shared.clearSession()
+        transition(to: .idle)
+    }
+
     // MARK: - Session Activation
 
     private func activateSession() async {
@@ -295,6 +307,13 @@ final class FlowSessionManager: ObservableObject {
             logger.info("Live Activities not enabled — skipping")
             return
         }
+
+        // End any orphaned live activities from previous sessions to prevent stacking
+        for orphan in Activity<DictationActivityAttributes>.activities {
+            logger.info("Ending orphaned Live Activity: \(orphan.id)")
+            Task { await orphan.end(nil, dismissalPolicy: .immediate) }
+        }
+
         let attributes = DictationActivityAttributes(sessionId: UUID().uuidString)
         let state = DictationActivityAttributes.ContentState(
             phase: "ready", elapsedSeconds: 0, transcript: "", wordCount: 0
@@ -331,6 +350,21 @@ final class FlowSessionManager: ObservableObject {
         await activity.end(.init(state: finalState, staleDate: nil), dismissalPolicy: .after(.now + 4))
         liveActivity = nil
         logger.info("Live Activity ended")
+    }
+
+    /// Immediately ends the tracked live activity AND any orphaned activities.
+    @available(iOS 16.1, *)
+    private func endAllLiveActivitiesImmediately() async {
+        // End the tracked activity
+        if let activity = liveActivity {
+            await activity.end(nil, dismissalPolicy: .immediate)
+            liveActivity = nil
+        }
+        // Also sweep any orphans (e.g. from a previous crash)
+        for activity in Activity<DictationActivityAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+        logger.info("All Live Activities ended immediately")
     }
 
     // MARK: - Elapsed Timer + Heartbeat

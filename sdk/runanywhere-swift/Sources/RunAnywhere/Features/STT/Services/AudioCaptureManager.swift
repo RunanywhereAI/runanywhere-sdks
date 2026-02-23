@@ -10,6 +10,11 @@ import AVFoundation
 import CRACommons
 import Foundation
 
+#if os(macOS)
+import AudioToolbox
+import CoreAudio
+#endif
+
 /// Manages audio capture from microphone for STT services.
 ///
 /// This is a shared utility that works with any STT backend (ONNX, etc.).
@@ -93,9 +98,10 @@ public class AudioCaptureManager: ObservableObject {
         let inputNode = engine.inputNode
 
         #if os(macOS)
-        // On macOS there is no AVAudioSession. Preparing the engine before
-        // reading the input node format establishes the audio-unit graph
-        // connections and avoids kAudioUnitErr_NoConnection (-10877).
+        // On macOS, Bluetooth input devices (AirPods, etc.) frequently fail to
+        // start their SCO mic connection, producing silence. Detect this and
+        // override to the built-in microphone before preparing the engine.
+        configureMacOSInputDevice(engine: engine)
         engine.prepare()
         #endif
 
@@ -285,6 +291,206 @@ public class AudioCaptureManager: ObservableObject {
         stopRecording()
     }
 }
+
+// MARK: - macOS Input Device Selection
+
+#if os(macOS)
+
+extension AudioCaptureManager {
+
+    /// Detects if the default input device is Bluetooth and overrides to the
+    /// built-in microphone. Bluetooth SCO mic frequently fails on macOS,
+    /// producing silence. Must be called after accessing `engine.inputNode`
+    /// (which creates the audio unit) but before `engine.prepare()`.
+    fileprivate func configureMacOSInputDevice(engine: AVAudioEngine) {
+        guard let defaultInput = MacAudioDeviceQuery.defaultInputDevice() else {
+            logger.warning("Could not determine default input device")
+            return
+        }
+
+        logger.info("Default input: \(defaultInput.name) (bluetooth=\(defaultInput.isBluetooth))")
+
+        guard defaultInput.isBluetooth else { return }
+
+        logger.warning("Default input is Bluetooth (\(defaultInput.name)) — Bluetooth SCO mic is unreliable for STT. Switching to wired input.")
+
+        // Prefer the built-in mic
+        if let builtIn = MacAudioDeviceQuery.builtInInputDevice() {
+            let status = engine.setInputDevice(builtIn.deviceID)
+            if status == noErr {
+                logger.info("Switched input to: \(builtIn.name)")
+                return
+            }
+            logger.error("Failed to set built-in mic (OSStatus \(status))")
+        }
+
+        // Fall back to any non-Bluetooth input device
+        for device in MacAudioDeviceQuery.nonBluetoothInputDevices() {
+            let status = engine.setInputDevice(device.deviceID)
+            if status == noErr {
+                logger.info("Switched input to: \(device.name)")
+                return
+            }
+        }
+
+        logger.warning("No non-Bluetooth input available — using Bluetooth as last resort")
+    }
+}
+
+// MARK: - AVAudioEngine Device Override
+
+private extension AVAudioEngine {
+
+    /// Sets the input device for this engine via the underlying AudioUnit.
+    /// Must be called after accessing `inputNode` and before `prepare()`.
+    func setInputDevice(_ deviceID: AudioDeviceID) -> OSStatus {
+        guard let audioUnit = inputNode.audioUnit else {
+            return kAudioUnitErr_NoConnection
+        }
+        var mutableDeviceID = deviceID
+        return AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &mutableDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+    }
+}
+
+// MARK: - CoreAudio Device Query
+
+/// Lightweight CoreAudio HAL queries for input device detection.
+private enum MacAudioDeviceQuery {
+
+    struct InputDeviceInfo {
+        let deviceID: AudioDeviceID
+        let name: String
+        let transportType: UInt32
+
+        var isBluetooth: Bool {
+            transportType == kAudioDeviceTransportTypeBluetooth
+                || transportType == kAudioDeviceTransportTypeBluetoothLE
+        }
+
+        var isBuiltIn: Bool {
+            transportType == kAudioDeviceTransportTypeBuiltIn
+        }
+    }
+
+    // MARK: Queries
+
+    static func defaultInputDevice() -> InputDeviceInfo? {
+        var deviceID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, 0, nil, &size, &deviceID
+        )
+        guard status == noErr, deviceID != kAudioObjectUnknown else { return nil }
+        return deviceInfo(for: deviceID)
+    }
+
+    static func builtInInputDevice() -> InputDeviceInfo? {
+        allInputDevices().first { $0.isBuiltIn }
+    }
+
+    static func nonBluetoothInputDevices() -> [InputDeviceInfo] {
+        allInputDevices().filter { !$0.isBluetooth }
+    }
+
+    // MARK: Internal
+
+    private static func allInputDevices() -> [InputDeviceInfo] {
+        var size = UInt32(0)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, 0, nil, &size
+        ) == noErr else { return [] }
+
+        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address, 0, nil, &size, &deviceIDs
+        ) == noErr else { return [] }
+
+        return deviceIDs.compactMap { id in
+            guard hasInputChannels(id) else { return nil }
+            return deviceInfo(for: id)
+        }
+    }
+
+    private static func deviceInfo(for deviceID: AudioDeviceID) -> InputDeviceInfo? {
+        guard let name = deviceName(deviceID) else { return nil }
+        return InputDeviceInfo(
+            deviceID: deviceID,
+            name: name,
+            transportType: transportType(deviceID)
+        )
+    }
+
+    private static func deviceName(_ deviceID: AudioDeviceID) -> String? {
+        var name = "" as CFString
+        var size = UInt32(MemoryLayout<CFString>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceNameCFString,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &name)
+        return status == noErr ? name as String : nil
+    }
+
+    private static func transportType(_ deviceID: AudioDeviceID) -> UInt32 {
+        var transport = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transport)
+        return transport
+    }
+
+    private static func hasInputChannels(_ deviceID: AudioDeviceID) -> Bool {
+        var size = UInt32(0)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr,
+              size > 0 else { return false }
+
+        let bufferListPointer = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(size),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { bufferListPointer.deallocate() }
+
+        guard AudioObjectGetPropertyData(
+            deviceID, &address, 0, nil, &size, bufferListPointer
+        ) == noErr else { return false }
+
+        let bufferList = bufferListPointer.assumingMemoryBound(to: AudioBufferList.self).pointee
+        return bufferList.mNumberBuffers > 0 && bufferList.mBuffers.mNumberChannels > 0
+    }
+}
+
+#endif
 
 // MARK: - Errors
 
