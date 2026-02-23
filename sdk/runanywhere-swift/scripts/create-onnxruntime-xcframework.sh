@@ -1,22 +1,25 @@
 #!/bin/bash
 # =============================================================================
-# Create Combined ONNX Runtime XCFramework (iOS + macOS)
+# Create ONNX Runtime XCFrameworks (iOS + macOS, separate)
 # =============================================================================
 #
-# Combines the iOS ONNX Runtime xcframework (from pod archive) with
-# the macOS ONNX Runtime dylib into a single xcframework.
+# Creates TWO separate xcframeworks:
+#   - onnxruntime-ios.xcframework  (library format, static .a)
+#   - onnxruntime-macos.xcframework (framework format, dynamic dylib)
 #
-# This is needed because:
-# - The pod archive from onnxruntime.ai only contains iOS slices
-# - The macOS release from GitHub only contains macOS dylibs
-# - SPM needs a single xcframework binary target for both platforms
+# Why separate?
+#   - iOS uses static libraries → library format prevents SPM from embedding
+#   - macOS uses dynamic library → framework format allows proper embedding
+#   - xcframeworks can't mix static/dynamic or library/framework formats
+#   - Package.swift uses platform-conditional dependencies to pick the right one
 #
 # Prerequisites:
 #   - iOS ONNX Runtime: sdk/runanywhere-commons/third_party/onnxruntime-ios/
 #   - macOS ONNX Runtime: sdk/runanywhere-commons/third_party/onnxruntime-macos/
 #
 # Output:
-#   sdk/runanywhere-swift/Binaries/onnxruntime.xcframework
+#   sdk/runanywhere-swift/Binaries/onnxruntime-ios.xcframework
+#   sdk/runanywhere-swift/Binaries/onnxruntime-macos.xcframework
 #
 # =============================================================================
 
@@ -46,7 +49,7 @@ log_step()  { echo -e "${BLUE}==>${NC} $1"; }
 
 echo ""
 echo "═══════════════════════════════════════════"
-echo " ONNX Runtime - Combined XCFramework"
+echo " ONNX Runtime - Split XCFrameworks"
 echo "═══════════════════════════════════════════"
 echo ""
 
@@ -61,13 +64,14 @@ if [[ ! -d "${MACOS_ONNX}/lib" ]]; then
 fi
 
 TEMP_DIR=$(mktemp -d)
+mkdir -p "${OUTPUT_DIR}"
 
 # ============================================================================
-# Step 1: Extract iOS frameworks from existing xcframework
+# Step 1: Create iOS xcframework (library format, static)
 # ============================================================================
-log_step "Extracting iOS frameworks from existing xcframework..."
+log_step "Creating onnxruntime-ios.xcframework (library format)..."
 
-# Copy iOS device framework
+# Find iOS slices from existing xcframework
 IOS_DEVICE_DIR=""
 IOS_SIM_DIR=""
 for dir in "${IOS_ONNX}"/*/; do
@@ -83,10 +87,41 @@ if [[ -z "$IOS_DEVICE_DIR" ]]; then
     log_error "Could not find ios-arm64 slice in ${IOS_ONNX}"
 fi
 
+# Extract static libraries and headers from .framework wrappers
+XCFW_ARGS=()
+
+for SLICE_DIR in "$IOS_DEVICE_DIR" "$IOS_SIM_DIR"; do
+    [[ -z "$SLICE_DIR" ]] && continue
+    SLICE_NAME=$(basename "$SLICE_DIR")
+    DEST="${TEMP_DIR}/ios/${SLICE_NAME}"
+    mkdir -p "$DEST"
+
+    if [[ -d "${SLICE_DIR}/onnxruntime.framework" ]]; then
+        # Extract .a from .framework wrapper
+        cp "${SLICE_DIR}/onnxruntime.framework/onnxruntime" "${DEST}/libonnxruntime.a"
+        cp -R "${SLICE_DIR}/onnxruntime.framework/Headers" "${DEST}/Headers" 2>/dev/null || true
+    elif [[ -f "${SLICE_DIR}/libonnxruntime.a" ]]; then
+        # Already in library format
+        cp "${SLICE_DIR}/libonnxruntime.a" "${DEST}/libonnxruntime.a"
+        [[ -d "${SLICE_DIR}/Headers" ]] && cp -R "${SLICE_DIR}/Headers" "${DEST}/Headers"
+    else
+        log_error "Could not find onnxruntime binary in ${SLICE_DIR}"
+    fi
+
+    XCFW_ARGS+=(-library "${DEST}/libonnxruntime.a")
+    [[ -d "${DEST}/Headers" ]] && XCFW_ARGS+=(-headers "${DEST}/Headers")
+    log_info "  Prepared ${SLICE_NAME} slice"
+done
+
+IOS_XCFW="${OUTPUT_DIR}/onnxruntime-ios.xcframework"
+rm -rf "${IOS_XCFW}"
+xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${IOS_XCFW}"
+log_info "Created onnxruntime-ios.xcframework"
+
 # ============================================================================
-# Step 2: Create macOS framework from dylib
+# Step 2: Create macOS xcframework (framework format, dynamic)
 # ============================================================================
-log_step "Creating macOS framework from dylib..."
+log_step "Creating onnxruntime-macos.xcframework (framework format)..."
 
 MACOS_FW="${TEMP_DIR}/macos-arm64/onnxruntime.framework"
 # macOS frameworks require versioned bundle layout
@@ -97,7 +132,6 @@ mkdir -p "${MACOS_FW}/Versions/A/Resources"
 # Find the actual dylib
 DYLIB_PATH="${MACOS_ONNX}/lib/libonnxruntime.dylib"
 if [[ ! -f "${DYLIB_PATH}" ]]; then
-    # Try to find a versioned dylib
     DYLIB_PATH=$(find "${MACOS_ONNX}/lib" -name "libonnxruntime*.dylib" -not -name "*_providers*" | head -1)
 fi
 
@@ -105,13 +139,13 @@ if [[ -z "${DYLIB_PATH}" || ! -f "${DYLIB_PATH}" ]]; then
     log_error "Could not find ONNX Runtime dylib in ${MACOS_ONNX}/lib/"
 fi
 
-# Copy the dylib as the framework binary (into versioned dir)
+# Copy the dylib as the framework binary
 cp "${DYLIB_PATH}" "${MACOS_FW}/Versions/A/onnxruntime"
 
 # Fix the install name to be framework-relative
 install_name_tool -id "@rpath/onnxruntime.framework/Versions/A/onnxruntime" "${MACOS_FW}/Versions/A/onnxruntime" 2>/dev/null || true
 
-# Ad-hoc sign the dylib so Xcode can codesign the app bundle
+# Ad-hoc sign the dylib
 codesign --force --sign - "${MACOS_FW}/Versions/A/onnxruntime"
 log_info "Ad-hoc signed macOS onnxruntime binary"
 
@@ -154,64 +188,34 @@ ln -sf Versions/Current/Modules Modules
 ln -sf Versions/Current/Resources Resources
 cd "${SCRIPT_DIR}"
 
-log_info "Created macOS framework"
-
-# ============================================================================
-# Step 3: Create combined XCFramework
-# ============================================================================
-log_step "Creating combined xcframework..."
-
-XCFW_OUTPUT="${OUTPUT_DIR}/onnxruntime.xcframework"
-rm -rf "${XCFW_OUTPUT}"
-mkdir -p "${OUTPUT_DIR}"
-
-# Build the xcframework command args
-XCFW_ARGS=()
-
-# Add iOS device framework (from existing xcframework)
-if [[ -n "$IOS_DEVICE_DIR" ]]; then
-    # Check if it's a framework or static lib
-    if [[ -d "${IOS_DEVICE_DIR}/onnxruntime.framework" ]]; then
-        XCFW_ARGS+=(-framework "${IOS_DEVICE_DIR}/onnxruntime.framework")
-    elif [[ -f "${IOS_DEVICE_DIR}/libonnxruntime.a" ]]; then
-        XCFW_ARGS+=(-library "${IOS_DEVICE_DIR}/libonnxruntime.a")
-        if [[ -d "${IOS_DEVICE_DIR}/Headers" ]]; then
-            XCFW_ARGS+=(-headers "${IOS_DEVICE_DIR}/Headers")
-        fi
-    fi
-fi
-
-# Add iOS simulator framework
-if [[ -n "$IOS_SIM_DIR" ]]; then
-    if [[ -d "${IOS_SIM_DIR}/onnxruntime.framework" ]]; then
-        XCFW_ARGS+=(-framework "${IOS_SIM_DIR}/onnxruntime.framework")
-    elif [[ -f "${IOS_SIM_DIR}/libonnxruntime.a" ]]; then
-        XCFW_ARGS+=(-library "${IOS_SIM_DIR}/libonnxruntime.a")
-        if [[ -d "${IOS_SIM_DIR}/Headers" ]]; then
-            XCFW_ARGS+=(-headers "${IOS_SIM_DIR}/Headers")
-        fi
-    fi
-fi
-
-# Add macOS framework
-XCFW_ARGS+=(-framework "${MACOS_FW}")
-
-xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_OUTPUT}"
+MACOS_XCFW="${OUTPUT_DIR}/onnxruntime-macos.xcframework"
+rm -rf "${MACOS_XCFW}"
+xcodebuild -create-xcframework -framework "${MACOS_FW}" -output "${MACOS_XCFW}"
+log_info "Created onnxruntime-macos.xcframework"
 
 # Clean up
 rm -rf "${TEMP_DIR}"
 
+# ============================================================================
 # Verify
-if [[ -d "${XCFW_OUTPUT}" ]]; then
-    log_info "Combined ONNX Runtime xcframework created!"
-    echo ""
-    echo "Output: ${XCFW_OUTPUT}"
-    echo "Size: $(du -sh "${XCFW_OUTPUT}" | cut -f1)"
-    echo ""
-    echo "Slices:"
-    for dir in "${XCFW_OUTPUT}"/*/; do
-        [[ -d "$dir" ]] && echo "  $(basename "$dir")"
-    done
-else
-    log_error "Failed to create combined xcframework"
-fi
+# ============================================================================
+echo ""
+log_step "Verification"
+
+for XCFW_NAME in "onnxruntime-ios" "onnxruntime-macos"; do
+    XCFW="${OUTPUT_DIR}/${XCFW_NAME}.xcframework"
+    if [[ -d "${XCFW}" ]]; then
+        echo ""
+        echo "  ${XCFW_NAME}.xcframework:"
+        echo "    Size: $(du -sh "${XCFW}" | cut -f1)"
+        echo "    Slices:"
+        for dir in "${XCFW}"/*/; do
+            [[ -d "$dir" ]] && echo "      $(basename "$dir")"
+        done
+    else
+        log_error "Failed to create ${XCFW_NAME}.xcframework"
+    fi
+done
+
+echo ""
+log_info "Done! Both xcframeworks created in ${OUTPUT_DIR}"

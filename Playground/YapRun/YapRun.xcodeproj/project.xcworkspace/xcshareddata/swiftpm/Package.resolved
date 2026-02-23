@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RunanywhereAI/runanywhere-sdks",
       "state" : {
-        "revision" : "39c24dc6a45519d607729bd5c9eecf26d188540e",
-        "version" : "0.19.3"
+        "revision" : "1baf03b244daec07fca48192fe66af6f8c78eede",
+        "version" : "0.19.4"
       }
     },
     {

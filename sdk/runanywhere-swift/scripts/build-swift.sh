@@ -258,24 +258,42 @@ install_frameworks() {
         fi
     done
 
-    # Install ONNX Runtime xcframework
+    # Install ONNX Runtime xcframeworks (split: iOS static library + macOS dynamic framework)
+    # Remove old combined xcframework if present
+    rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
+
     if [[ "$INCLUDE_MACOS" == true ]]; then
-        # macOS included: create combined iOS + macOS xcframework
+        # macOS included: create split iOS + macOS xcframeworks
         local ONNX_SCRIPT="$SWIFT_SDK_DIR/scripts/create-onnxruntime-xcframework.sh"
         if [[ -x "$ONNX_SCRIPT" ]]; then
-            log_step "Creating combined ONNX Runtime xcframework (iOS + macOS)..."
+            log_step "Creating split ONNX Runtime xcframeworks (iOS + macOS)..."
             "$ONNX_SCRIPT"
         else
-            log_warn "create-onnxruntime-xcframework.sh not found, skipping combined ONNX Runtime"
+            log_warn "create-onnxruntime-xcframework.sh not found, skipping ONNX Runtime"
         fi
     else
-        # iOS only: copy the pre-built iOS onnxruntime xcframework directly
+        # iOS only: create library-format xcframework from pre-built iOS onnxruntime
         local ONNX_SRC="$COMMONS_DIR/third_party/onnxruntime-ios/onnxruntime.xcframework"
         if [[ -d "$ONNX_SRC" ]]; then
-            log_step "Copying onnxruntime.xcframework (iOS only)"
-            rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
-            cp -r "$ONNX_SRC" "$BINARIES_DIR/"
-            log_info "  onnxruntime.xcframework ($(du -sh "$ONNX_SRC" | cut -f1))"
+            log_step "Creating onnxruntime-ios.xcframework (library format)"
+            local ONNX_TEMP=$(mktemp -d)
+            local XCFW_ARGS=()
+            for SLICE_DIR in "${ONNX_SRC}"/*/; do
+                local SLICE_NAME=$(basename "$SLICE_DIR")
+                [[ "$SLICE_NAME" == "Info.plist" ]] && continue
+                local DEST="${ONNX_TEMP}/${SLICE_NAME}"
+                mkdir -p "$DEST"
+                if [[ -d "${SLICE_DIR}/onnxruntime.framework" ]]; then
+                    cp "${SLICE_DIR}/onnxruntime.framework/onnxruntime" "${DEST}/libonnxruntime.a"
+                    cp -R "${SLICE_DIR}/onnxruntime.framework/Headers" "${DEST}/Headers" 2>/dev/null || true
+                fi
+                XCFW_ARGS+=(-library "${DEST}/libonnxruntime.a")
+                [[ -d "${DEST}/Headers" ]] && XCFW_ARGS+=(-headers "${DEST}/Headers")
+            done
+            rm -rf "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            rm -rf "$ONNX_TEMP"
+            log_info "  onnxruntime-ios.xcframework created"
         else
             log_warn "onnxruntime.xcframework not found at $ONNX_SRC"
         fi
