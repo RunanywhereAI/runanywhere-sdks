@@ -114,7 +114,6 @@ validate_xcframework() {
     # Locate the simulator slice directory
     local SIM_SLICE=""
     for d in "${XCFW_PATH}"/ios-arm64_x86_64-simulator \
-              "${XCFW_PATH}"/ios-arm64_x86_64-simulator.xcarchive \
               "${XCFW_PATH}"/ios-arm64-simulator; do
         [[ -d "$d" ]] && SIM_SLICE="$d" && break
     done
@@ -180,11 +179,10 @@ validate_third_party_deps() {
         if ! echo "$ARCH_INFO" | grep -q "arm64"; then
             log_error "Sherpa-ONNX simulator library is missing arm64 — ONNX backend will not work on Apple Silicon simulators. Re-download dependencies."
         fi
+        log_info "Third-party dependency pre-validation passed"
     else
         log_warn "Could not locate Sherpa-ONNX simulator binary for pre-validation — proceeding anyway."
     fi
-
-    log_info "Third-party dependency pre-validation passed"
 }
 
 show_help() {
@@ -810,7 +808,7 @@ main() {
 
     # Step 1b: Pre-validate third-party dependencies have simulator architecture support.
     # Catches missing or broken xcframeworks before any build time is spent (fixes: #273).
-    if [[ "$SKIP_BACKENDS" != true && ("$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx") ]]; then
+    if [[ "$SKIP_BACKENDS" != true && ("$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" || "$BUILD_BACKEND" == "rag") ]]; then
         validate_third_party_deps
     fi
 

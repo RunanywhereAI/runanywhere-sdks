@@ -262,7 +262,7 @@ All XCFrameworks produced by `build-ios.sh` include a fat simulator slice contai
 | `lipo failed to combine simulator slices` | SIMULATORARM64 or SIMULATOR build produced no output | Check CMake output for that platform; re-run without `--skip-download` |
 | `missing a simulator slice` | XCFramework was created without simulator platform | Delete `build/ios/` and `dist/` then re-run `build-ios.sh` |
 | `missing arm64` in simulator slice | Sherpa-ONNX or llama.cpp dependency was downloaded without simulator support | Delete `third_party/` and re-run (dependency will be re-fetched) |
-| App crashes on simulator, not device | Simulator slice is present but empty/corrupt (was previously silently produced by `lipo || true`) | Clean and rebuild: `./scripts/build-ios.sh --clean` |
+| App crashes on simulator, not device | Simulator slice is present but empty/corrupt (was previously silently produced by `lipo \|\| true`) | Clean and rebuild: `./scripts/build-ios.sh --clean` |
 
 **Verifying XCFramework simulator slices manually:**
 ```bash
