@@ -15,7 +15,12 @@
 
 extern "C" {
 
+#if defined(_WIN32) && defined(_MSC_VER)
+// MSVC doesn't support weak symbols, so we just define them normally
+void rac_llm_result_free(rac_llm_result_t* result) {
+#else
 __attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
+#endif
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -24,7 +29,12 @@ __attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
+#if defined(_WIN32) && defined(_MSC_VER)
+// MSVC doesn't support weak symbols, so we just define them normally
+void rac_stt_result_free(rac_stt_result_t* result) {
+#else
 __attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
+#endif
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -48,7 +58,12 @@ __attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
     }
 }
 
+#if defined(_WIN32) && defined(_MSC_VER)
+// MSVC doesn't support weak symbols, so we just define them normally
+void rac_tts_result_free(rac_tts_result_t* result) {
+#else
 __attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
+#endif
     if (result) {
         if (result->audio_data) {
             free(result->audio_data);
@@ -58,7 +73,12 @@ __attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
     }
 }
 
+#if defined(_WIN32) && defined(_MSC_VER)
+// MSVC doesn't support weak symbols, so we just define them normally
+void rac_embeddings_result_free(rac_embeddings_result_t* result) {
+#else
 __attribute__((weak)) void rac_embeddings_result_free(rac_embeddings_result_t* result) {
+#endif
     if (result) {
         if (result->embeddings) {
             for (size_t i = 0; i < result->num_embeddings; i++) {

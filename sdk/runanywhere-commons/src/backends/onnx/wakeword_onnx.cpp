@@ -20,6 +20,10 @@
 #include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_logger.h"
 
+#if defined(_WIN32)
+#include "rac_str_trans.h"
+#endif
+
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
 #endif
@@ -486,6 +490,18 @@ static bool run_vad(WakewordOnnxBackend* backend,
     return true;
 }
 
+static std::unique_ptr<Ort::Session>
+create_onnx_session(const Ort::Env& env, const char* model_path,
+                    const Ort::SessionOptions& session_options) {
+    // see constructor of Ort::Session in onnxruntime_cxx_api.h, ORTCHAR_T is defined as wchar_t on
+    // Windows, so we need to convert the model_path to wchar_t
+#if defined(_WIN32)
+    std::wstring wmodel_path = runanywhere::RacStrTrans::utf8_to_unicode(model_path);
+    return std::make_unique<Ort::Session>(env, wmodel_path.c_str(), session_options);
+#else
+    return std::make_unique<Ort::Session>(env, model_path, session_options);
+#endif
+}
 #endif // RAC_HAS_ONNX
 
 // =============================================================================
@@ -566,7 +582,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
     try {
         // Load melspectrogram model (required for proper pipeline)
         if (melspec_model_path) {
-            backend->melspec_session = std::make_unique<Ort::Session>(
+            backend->melspec_session = create_onnx_session(
                 *backend->env, melspec_model_path, *backend->session_options);
 
             // Get input/output names
@@ -583,7 +599,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 
         // Load embedding model (required)
         if (embedding_model_path) {
-            backend->embedding_session = std::make_unique<Ort::Session>(
+            backend->embedding_session = create_onnx_session(
                 *backend->env, embedding_model_path, *backend->session_options);
 
             // Get input/output names
@@ -650,7 +666,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
         model.model_path = model_path;
         model.threshold = backend->global_threshold;
 
-        model.session = std::make_unique<Ort::Session>(
+        model.session = create_onnx_session(
             *backend->env, model_path, *backend->session_options);
 
         // Get input/output names

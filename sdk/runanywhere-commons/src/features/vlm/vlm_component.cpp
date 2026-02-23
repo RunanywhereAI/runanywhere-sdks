@@ -9,7 +9,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
+#include <filesystem>
 #include <mutex>
 #include <string>
 #include <sys/stat.h>
@@ -23,6 +23,15 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 static const char* LOG_CAT = "VLM.Component";
+
+#if defined(_WIN32)
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
+#endif
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -142,6 +151,37 @@ static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t
 // MODEL FILE RESOLUTION
 // =============================================================================
 
+namespace {
+
+/** Return true if string ends with ".gguf" (case-insensitive). */
+bool ends_with_gguf(const std::string& name) {
+    if (name.size() < 5) return false;
+    std::string ext(5, '\0');
+    for (size_t i = 0; i < 5; i++) {
+        char c = name[name.size() - 5 + i];
+        ext[i] = (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+    }
+    return ext == ".gguf";
+}
+
+/** Return true if string contains "mmproj" (case-insensitive). */
+bool contains_mmproj(const std::string& name) {
+    if (name.size() < 6) return false;
+    for (size_t i = 0; i + 6 <= name.size(); i++) {
+        bool match = true;
+        for (size_t j = 0; j < 6 && match; j++) {
+            char c = name[i + j];
+            char e = "mmproj"[j];
+            if (c >= 'A' && c <= 'Z') c = static_cast<char>(c + 32);
+            if (c != e) match = false;
+        }
+        if (match) return true;
+    }
+    return false;
+}
+
+}  // namespace
+
 /**
  * Resolve VLM model files within a directory.
  *
@@ -149,7 +189,7 @@ static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t
  * - Main model file: first .gguf NOT containing "mmproj" in its name
  * - Vision projector file: first .gguf containing "mmproj" in its name
  *
- * Uses POSIX opendir/readdir (works on iOS, Android, macOS, Linux).
+ * Uses C++17 std::filesystem for cross-platform directory iteration.
  */
 extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* out_model_path,
                                                     size_t model_path_size, char* out_mmproj_path,
@@ -161,44 +201,29 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
     out_model_path[0] = '\0';
     out_mmproj_path[0] = '\0';
 
-    DIR* dir = opendir(model_dir);
-    if (!dir) {
+    std::error_code ec;
+    std::filesystem::directory_iterator it(std::filesystem::path(model_dir), ec);
+    if (ec) {
         RAC_LOG_ERROR(LOG_CAT, "Cannot open model directory: %s", model_dir);
         return RAC_ERROR_NOT_FOUND;
     }
 
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        const char* name = entry->d_name;
-        size_t name_len = strlen(name);
+    for (const auto& entry : it) {
+        if (!entry.is_regular_file(ec)) continue;
+        std::string name = entry.path().filename().string();
+        if (!ends_with_gguf(name)) continue;
 
-        // Must end with .gguf (case-insensitive)
-        if (name_len < 5) continue;
-        const char* ext = name + name_len - 5;
-        if (strcasecmp(ext, ".gguf") != 0) continue;
-
-        // Check if this is an mmproj file
-        bool is_mmproj = false;
-        for (size_t i = 0; i + 5 < name_len; i++) {
-            if (strncasecmp(name + i, "mmproj", 6) == 0) {
-                is_mmproj = true;
-                break;
-            }
-        }
+        bool is_mmproj = contains_mmproj(name);
+        std::string full_path = entry.path().string();
 
         if (is_mmproj && out_mmproj_path[0] == '\0') {
-            snprintf(out_mmproj_path, mmproj_path_size, "%s/%s", model_dir, name);
+            snprintf(out_mmproj_path, mmproj_path_size, "%s", full_path.c_str());
         } else if (!is_mmproj && out_model_path[0] == '\0') {
-            snprintf(out_model_path, model_path_size, "%s/%s", model_dir, name);
+            snprintf(out_model_path, model_path_size, "%s", full_path.c_str());
         }
 
-        // Stop once both are found
-        if (out_model_path[0] != '\0' && out_mmproj_path[0] != '\0') {
-            break;
-        }
+        if (out_model_path[0] != '\0' && out_mmproj_path[0] != '\0') break;
     }
-
-    closedir(dir);
 
     if (out_model_path[0] == '\0') {
         RAC_LOG_ERROR(LOG_CAT, "No .gguf model file found in: %s", model_dir);

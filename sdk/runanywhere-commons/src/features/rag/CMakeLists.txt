@@ -95,7 +95,6 @@ target_link_libraries(rac_backend_rag PUBLIC
 target_compile_definitions(rac_backend_rag PRIVATE RAC_RAG_BUILDING)
 
 set_target_properties(rac_backend_rag PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
