@@ -37,11 +37,11 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.3"
+let sdkVersion = "0.19.4"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -268,22 +268,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
-                checksum: "b2bb724a880da4a9373bde20042800e9cb42f216ade17bfb7d57552c249c5bad"
+                checksum: "31c071d35904d2de76981d8b10588373e421ace483def7161495847f0e9bb244"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-v\(sdkVersion).zip",
-                checksum: "b515c758155d6f49f8f8dbeea95b7ea6cf08c69dbec730f5dd72b623b8cf310e"
+                checksum: "c29a7013a59b10ff00fe8170563ec3d5a0c4dea7b22ddc0efb87ae332793cc73"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
-                checksum: "a76dd2f3d4a5db40852574c4764b27fca15245ce3c231f07674c5bfdd0424c56"
+                checksum: "2d77027c7a0b62366dd4c8d0420c24dc29f44f5a55e4e81cd78066026649b4f2"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
-                checksum: "c2393b597ec29f0a71575e8ac17658de92c871726a152d2d4239735d1d5611b6"
+                checksum: "35ed4f213ccd6d8472ded74dbccb8f6a6614977584604b042563761f20613fe7"
             ),
         ]
     }

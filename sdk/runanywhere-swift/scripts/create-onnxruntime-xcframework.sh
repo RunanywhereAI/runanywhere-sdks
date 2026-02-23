@@ -138,6 +138,8 @@ cat > "${MACOS_FW}/Versions/A/Resources/Info.plist" << 'EOF'
     <key>CFBundleExecutable</key><string>onnxruntime</string>
     <key>CFBundleIdentifier</key><string>ai.onnxruntime</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>1.17.1</string>
+    <key>CFBundleVersion</key><string>1.17.1</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict>
 </plist>
