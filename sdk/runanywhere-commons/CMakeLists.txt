@@ -3,6 +3,11 @@ cmake_minimum_required(VERSION 3.22)
 # Read version from VERSION file
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION_CONTENT)
 string(STRIP "${VERSION_CONTENT}" RAC_VERSION)
+# Split version into major, minor, patch
+string(REGEX MATCH "^([0-9]+)\\.([0-9]+)\\.([0-9]+)$" RAC_VERSION_MATCH "${RAC_VERSION}")
+set(RAC_VERSION_MAJOR "${CMAKE_MATCH_1}")
+set(RAC_VERSION_MINOR "${CMAKE_MATCH_2}")
+set(RAC_VERSION_PATCH "${CMAKE_MATCH_3}")
 
 project(RunAnywhereCommons
     VERSION ${RAC_VERSION}
@@ -41,7 +46,7 @@ option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server
 # C++ CONFIGURATION
 # =============================================================================
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -52,6 +57,13 @@ if(ANDROID)
     add_compile_definitions(YG_ENABLE_STANDARD_LIBRARY_SUPPORT=0)
     # Suppress std::format usage by adding this flag
     add_compile_options(-fno-strict-aliasing)
+endif()
+
+# Set default build type for single-config generators (Unix Makefiles, Ninja)
+# Note: Multi-config generators (Visual Studio, Xcode) ignore this
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
 # Export compile commands for clang-tidy
@@ -65,6 +77,9 @@ include(LoadVersions)
 
 # Make project version available to subdirectories
 set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
+set(RAC_PROJECT_VERSION_MAJOR "${RAC_VERSION_MAJOR}" CACHE STRING "Project version major" FORCE)
+set(RAC_PROJECT_VERSION_MINOR "${RAC_VERSION_MINOR}" CACHE STRING "Project version minor" FORCE)
+set(RAC_PROJECT_VERSION_PATCH "${RAC_VERSION_PATCH}" CACHE STRING "Project version patch" FORCE)
 
 # =============================================================================
 # PLATFORM DETECTION
@@ -82,6 +97,9 @@ elseif(ANDROID)
 elseif(APPLE)
     set(RAC_PLATFORM_MACOS TRUE)
     set(RAC_PLATFORM_NAME "macOS")
+elseif(WIN32)
+    set(RAC_PLATFORM_WINDOWS TRUE)
+    set(RAC_PLATFORM_NAME "Windows")
 elseif(UNIX)
     set(RAC_PLATFORM_LINUX TRUE)
     set(RAC_PLATFORM_NAME "Linux")
@@ -143,6 +161,34 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_options(-fvisibility=hidden)
         add_compile_options(-ffunction-sections -fdata-sections)
     endif()
+elseif(MSVC)
+    # MSVC compiler flags (shared across configs)
+    add_compile_options(/W4 /WX- /wd4996 /wd4576 /FS)  # W4 = level 4 warnings, WX- = warnings as errors off, 4996 = deprecated function warnings, 4576 = non-standard cast syntax, FS = force synchronous PDB writes
+    # Per-config flags: use generator expressions so multi-config generators (e.g. Visual Studio) get correct flags per config. /O2 and /RTC1 are incompatible.
+    add_compile_options("$<$<CONFIG:Release>:/O2 /DNDEBUG /GL /MP>")       # O2 = optimize for speed, GL = whole program optimization, MP = multi-processor
+    add_compile_options("$<$<CONFIG:RelWithDebInfo>:/O2 /DNDEBUG /GL /MP>")
+    add_compile_options("$<$<CONFIG:MinSizeRel>:/O1 /DNDEBUG /GL /MP>")
+    add_compile_options("$<$<CONFIG:Debug>:/Od /Zi>")  # Od = disable optimizations, Zi = debug information (no /RTC1 here; let CMake default or use /RTC1 only if desired)
+    # Disable MSVC-specific warnings that are common in cross-platform code
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+    add_compile_definitions(NOMINMAX)  # Prevent Windows.h from defining min/max macros
+    # Use Unicode character set: Windows API and CRT use wide-char (UTF-16) variants
+    add_compile_definitions(UNICODE _UNICODE)
+    # https://learn.microsoft.com/en-us/cpp/build/reference/debug-generate-debug-info?view=msvc-170
+    # The /DEBUG option puts the debugging information from linked object and library files 
+    # into a program database (PDB) file. It updates the PDB during subsequent builds of the program.
+    #
+    # An executable (an EXE or DLL file) created for debugging contains the name and path of the corresponding PDB. 
+    # The debugger reads the embedded name and uses the PDB when you debug the program. 
+    # The linker uses the base name of the program and the extension .pdb to name the program database, 
+    # and embeds the path where it was created. To override this default, set the /PDB option and specify a different file name.
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG")
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
+        /Zi \
+        /arch:SSE2")
 endif()
 
 # =============================================================================
@@ -305,11 +351,16 @@ target_include_directories(rac_commons PRIVATE
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
     target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_SHARED=1)
-    set_target_properties(rac_commons PROPERTIES
-        C_VISIBILITY_PRESET hidden
-        CXX_VISIBILITY_PRESET hidden
-        VISIBILITY_INLINES_HIDDEN ON
-    )
+    if(WIN32)
+        # Windows DLL export/import is handled via __declspec in headers
+        # No need for visibility presets on Windows
+    else()
+        set_target_properties(rac_commons PROPERTIES
+            C_VISIBILITY_PRESET hidden
+            CXX_VISIBILITY_PRESET hidden
+            VISIBILITY_INLINES_HIDDEN ON
+        )
+    endif()
 endif()
 
 # Platform-specific linking
@@ -329,8 +380,43 @@ if(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_commons PUBLIC log)
 endif()
 
+if(WIN32)
+    # Windows-specific libraries
+    # ws2_32 for networking (if needed)
+    # winmm for multimedia (if needed)
+    # No specific libraries required by default, add as needed
+    
+    # Set Windows-specific properties
+    if(MSVC)
+        # Set runtime library (use /MD for Release, /MDd for Debug)
+        if(CMAKE_BUILD_TYPE STREQUAL "Release")
+            set_property(TARGET rac_commons PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+            # Enable link-time code generation for Release builds
+            set_target_properties(rac_commons PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION ON
+            )
+        else()
+            set_property(TARGET rac_commons PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDebugDLL")
+        endif()
+        
+        # Force synchronous PDB writes for parallel compilation and disable C4576 warning
+        target_compile_options(rac_commons PRIVATE /FS /wd4576)
+        
+        # Set output file names for Windows
+        if(RAC_BUILD_SHARED)
+            set_target_properties(rac_commons PROPERTIES
+                OUTPUT_NAME "rac_commons"
+                PREFIX ""
+            )
+        else()
+            set_target_properties(rac_commons PROPERTIES
+                OUTPUT_NAME "rac_commons"
+            )
+        endif()
+    endif()
+endif()
+
 set_target_properties(rac_commons PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
@@ -423,7 +509,12 @@ endif()
 
 if(RAC_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt")
+        message(STATUS "Building unit tests")
+        add_subdirectory(tests)
+    else()
+        message(WARNING "RAC_BUILD_TESTS is ON but tests/CMakeLists.txt not found. Skipping tests.")
+    endif()
 endif()
 
 # =============================================================================
@@ -433,6 +524,7 @@ endif()
 install(TARGETS rac_commons
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin  # Windows DLLs go to bin
 )
 
 install(DIRECTORY include/
@@ -451,7 +543,11 @@ message(STATUS "====================================")
 message(STATUS "Platform:       ${RAC_PLATFORM_NAME}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "Compiler:       ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "C++ Standard:   C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Shared libs:    ${RAC_BUILD_SHARED}")
+if(WIN32)
+    message(STATUS "Architecture:   ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 message(STATUS "")
 message(STATUS "Components:")
 message(STATUS "  Core:         Logging, errors, events, memory")

@@ -165,6 +165,20 @@ elseif(RAC_PLATFORM_LINUX)
     else()
         message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
     endif()
+
+elseif(RAC_PLATFORM_WINDOWS)
+    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-windows")
+    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
+        set(SHERPA_ONNX_AVAILABLE ON)
+
+        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
+        set_target_properties(sherpa_onnx PROPERTIES
+            IMPORTED_IMPLIB "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib"
+            IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.dll"
+            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_ONNX_ROOT}/include"
+        )
+        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
+    endif()
 endif()
 
 # =============================================================================
@@ -178,6 +192,10 @@ set(ONNX_BACKEND_SOURCES
     rac_backend_onnx_register.cpp
     wakeword_onnx.cpp
 )
+
+if(RAC_PLATFORM_WINDOWS)
+    list(APPEND ONNX_BACKEND_SOURCES rac_str_trans.cpp)
+endif()
 
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
@@ -217,7 +235,6 @@ else()
 endif()
 
 set_target_properties(rac_backend_onnx PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
