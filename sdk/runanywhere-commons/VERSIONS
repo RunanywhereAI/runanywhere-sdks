@@ -49,6 +49,9 @@ ONNX_VERSION_MACOS=1.23.2
 # Linux version (can use latest)
 ONNX_VERSION_LINUX=1.23.2
 
+# Windows version (can use latest)
+ONNX_VERSION_WINDOWS=1.23.2
+
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)
 # =============================================================================
@@ -68,6 +71,9 @@ SHERPA_ONNX_VERSION_MACOS=1.12.18
 
 # Linux version
 SHERPA_ONNX_VERSION_LINUX=1.12.23
+
+# Windows version
+SHERPA_ONNX_VERSION_WINDOWS=1.12.20
 
 # =============================================================================
 # llama.cpp (LLM inference)
