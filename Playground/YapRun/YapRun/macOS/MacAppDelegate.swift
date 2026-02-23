@@ -10,6 +10,7 @@ import AppKit
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
+import WhisperKitRuntime
 import os
 
 @MainActor
@@ -63,11 +64,19 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
+
             try RunAnywhere.initialize()
             logger.info("SDK initialized")
 
             ModelRegistry.registerAll()
             logger.info("ASR models registered")
+
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("Discovered \(discovered) previously downloaded models")
+            }
         } catch {
             logger.error("SDK initialization failed: \(error.localizedDescription)")
         }

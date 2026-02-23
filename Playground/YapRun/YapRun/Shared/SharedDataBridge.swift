@@ -141,17 +141,32 @@ final class SharedDataBridge {
         }
     }
 
+    // MARK: - Undo Text (saved for redo after undo)
+
+    var undoText: String? {
+        get { defaults?.string(forKey: SharedConstants.Keys.undoText) }
+        set {
+            if let value = newValue {
+                defaults?.set(value, forKey: SharedConstants.Keys.undoText)
+            } else {
+                defaults?.removeObject(forKey: SharedConstants.Keys.undoText)
+            }
+        }
+    }
+
     // MARK: - Cleanup
 
     func clearAfterInsertion() {
         defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
         defaults?.removeObject(forKey: SharedConstants.Keys.lastInsertedText)
+        defaults?.removeObject(forKey: SharedConstants.Keys.undoText)
         sessionState = "ready"
     }
 
     func clearSession() {
         defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
         defaults?.removeObject(forKey: SharedConstants.Keys.lastInsertedText)
+        defaults?.removeObject(forKey: SharedConstants.Keys.undoText)
         defaults?.set(Float(0), forKey: SharedConstants.Keys.audioLevel)
         defaults?.set(Double(0), forKey: SharedConstants.Keys.lastHeartbeat)
         sessionState = "idle"

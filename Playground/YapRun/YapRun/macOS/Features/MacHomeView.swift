@@ -196,6 +196,7 @@ struct MacHomeView: View {
                         model: model,
                         isActive: model.id == viewModel.currentSTTModelId,
                         downloadProgress: viewModel.downloadProgress[model.id],
+                        modelDescription: ModelRegistry.description(for: model.id),
                         onDownload: { Task { await viewModel.downloadModel(model.id) } },
                         onLoad: { Task { await viewModel.loadModel(model.id) } },
                         onDelete: { Task { await viewModel.deleteModel(model.id) } }

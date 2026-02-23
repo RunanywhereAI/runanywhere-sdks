@@ -25,6 +25,7 @@ enum SharedConstants {
         static let dictationHistory    = "dictationHistory"
         static let audioLevel          = "audioLevel"
         static let lastInsertedText    = "lastInsertedText"
+        static let undoText            = "undoText"
         static let lastHeartbeat       = "lastHeartbeat"
     }
 

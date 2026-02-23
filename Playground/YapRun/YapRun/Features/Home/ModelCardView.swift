@@ -13,6 +13,7 @@ struct ModelCardView: View {
     let model: ModelInfo
     let isActive: Bool
     let downloadProgress: Double?
+    let modelDescription: String?
     let onDownload: () -> Void
     let onLoad: () -> Void
     let onDelete: () -> Void
@@ -20,7 +21,7 @@ struct ModelCardView: View {
     var body: some View {
         HStack(spacing: 12) {
             // Icon
-            Image(systemName: model.framework == .whisperKit ? "brain" : "cpu")
+            Image(systemName: model.framework == .whisperKitCoreML ? "brain" : "cpu")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(model.frameworkColor)
                 .frame(width: 40, height: 40)
@@ -52,10 +53,17 @@ struct ModelCardView: View {
                             .font(.caption)
                             .foregroundStyle(AppColors.textTertiary)
 
-                        Text(model.framework == .whisperKit ? "Optimized" : "High CPU")
+                        Text(model.framework == .whisperKitCoreML ? "Optimized" : "High CPU")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(model.framework == .whisperKit ? .green : .orange)
+                            .foregroundStyle(model.framework == .whisperKitCoreML ? .green : .orange)
                     }
+                }
+
+                if let modelDescription {
+                    Text(modelDescription)
+                        .font(.caption2)
+                        .foregroundStyle(AppColors.textTertiary)
+                        .lineLimit(2)
                 }
             }
 
