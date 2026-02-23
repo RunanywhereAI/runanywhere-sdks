@@ -52,8 +52,24 @@ abstract class DownloadAndVerifyNativeLibTask @Inject constructor(
 
         logger.lifecycle("Fetching expected SHA256 from $shaUrl...")
 
-        // Grab the first sequence of non-whitespace characters (the hash itself)
-        val expectedHash = URL(shaUrl).readText().trim().split("\\s+".toRegex()).first()
+        // Fetch the expected SHA256 checksum from the provided URL, with error handling for network issues and invalid responses
+        val expectedHash = try {
+            val shaConnection = URL(shaUrl).openConnection() as HttpURLConnection
+            shaConnection.connectTimeout = 30_000
+            shaConnection.readTimeout = 30_000
+            
+            val responseCode = shaConnection.responseCode
+            if (responseCode !in 200..299) {
+                error("Failed to fetch SHA256 checksum from $shaUrl - HTTP $responseCode. Ensure checksum files are published to the release.")
+            }
+            
+            shaConnection.inputStream.bufferedReader().use { it.readText() }
+                .trim()
+                .split("\\s+".toRegex())
+                .first()
+        } catch (e: Exception) {
+            error("Error fetching SHA256 checksum: ${e.message}")
+        }
 
         logger.lifecycle("Downloading $url...")
         var connection: HttpURLConnection? = null
@@ -64,6 +80,11 @@ abstract class DownloadAndVerifyNativeLibTask @Inject constructor(
             connection.connectTimeout = 30_000   // 30 seconds connect timeout
             connection.readTimeout = 120_000     // 2 minutes read timeout for large files
             
+            val responseCode = connection.responseCode
+            if (responseCode !in 200..299) {
+                error("Download failed for $url — HTTP $responseCode")
+            }
+
             // Stream the download directly to a temp file while updating the digest
             connection.inputStream.use { input ->
                 tempFile.outputStream().use { output ->
@@ -82,37 +103,40 @@ abstract class DownloadAndVerifyNativeLibTask @Inject constructor(
 
         // Verify Checksum
         val calculatedHash = digest.digest().joinToString("") { "%02x".format(it) } // Convert to hex string
-        check(calculatedHash.equals(expectedHash, ignoreCase = true)) {
-            tempFile.delete() // Nuke the bad file
-            "Security failure: Checksum mismatch for $url!\nExpected: $expectedHash\nGot:      $calculatedHash"
+        if (!calculatedHash.equals(expectedHash, ignoreCase = true)) {
+            tempFile.delete()
+            error("Security failure: Checksum mismatch for $url!\nExpected: $expectedHash\nGot:      $calculatedHash")
         }
 
         logger.lifecycle("Checksum verified! Extracting...")
         
-        // Extract only the allowed .so files, flattening the directory structure
-        fsOps.copy {
-            from(archiveOps.zipTree(tempFile))
-            into(destDir)
-        
-            include("**/*.so")
-            eachFile {
-                if (validFiles.contains(name)) {
+        // Extract the archive, but only include the allowed .so files to prevent zip slip vulnerabilities. Use Gradle's built-in archive handling for safety.
+        try {
+            fsOps.copy {
+                from(archiveOps.zipTree(tempFile))
+                into(destDir)
+            
+                // Fix: Explicitly include only the valid files to avoid eachFile exclude() bugs
+                validFiles.forEach { fileName ->
+                    include("**/$fileName")
+                }
+                
+                eachFile {
                     // Flatten the directory structure
                     relativePath = RelativePath(true, name)
-                } else {
-                    exclude()
                 }
+                includeEmptyDirs = false
             }
-            includeEmptyDirs = false
+        } finally {
+            tempFile.delete()
         }
         
-        tempFile.delete()
         logger.lifecycle("Successfully extracted to $destDir")
     }
 }
 
 class NativeLibraryDownloadPlugin : Plugin<Project> {
     override fun apply(project: Project) {
-        
+        // Plugin registration logic if required
     }
 }

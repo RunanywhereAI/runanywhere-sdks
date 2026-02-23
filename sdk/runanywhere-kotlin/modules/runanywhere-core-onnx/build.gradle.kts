@@ -168,7 +168,7 @@ val nativeLibVersion: String =
         ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
 
 val releaseBaseUrl = "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v$nativeLibVersion"
-val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+val targetAbis = listOf("arm64-v8a", "x86_64")
 val packageType = "RABackendONNX-android"
 val onnxLibs = listOf(
     "librac_backend_onnx.so",
