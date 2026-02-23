@@ -182,6 +182,7 @@ void rac_embeddings_destroy(rac_handle_t handle) {
     free(service);
 }
 
+#if !defined(_WIN32)
 void rac_embeddings_result_free(rac_embeddings_result_t* result) {
     if (!result)
         return;
@@ -200,5 +201,6 @@ void rac_embeddings_result_free(rac_embeddings_result_t* result) {
     result->num_embeddings = 0;
     result->dimension = 0;
 }
+#endif
 
 }  // extern "C"

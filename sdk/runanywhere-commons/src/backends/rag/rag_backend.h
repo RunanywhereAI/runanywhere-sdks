@@ -39,7 +39,7 @@ struct RAGBackendConfig {
  * Uses strategy pattern with pluggable embedding and generation providers.
  * Thread-safe for all operations.
  */
-class __attribute__((visibility("default"))) RAGBackend {
+class RAGBackend {
 public:
     /**
      * @brief Construct RAG backend with configuration
