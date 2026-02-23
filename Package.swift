@@ -41,7 +41,7 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.5"
+let sdkVersion = "0.19.6"
 
 // RAG binary is only available in local dev mode until the release artifact is published.
 // In remote mode, the RAG xcframework zip + checksum don't exist yet, so including the
@@ -358,7 +358,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "ONNXRuntimeiOSBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-ios-v\(sdkVersion).zip",
-                checksum: "c0605841898d3f9e337010f4e5d25d12a905a32361725b0345579cba1f8b27e2"
+                checksum: "310022d76a16b2d2d106577a1aa84a9e608c721bb6221c4ba47bf962a88bd9fd"
             ),
             .binaryTarget(
                 name: "ONNXRuntimemacOSBinary",
