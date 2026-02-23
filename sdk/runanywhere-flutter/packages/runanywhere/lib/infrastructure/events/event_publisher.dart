@@ -96,6 +96,9 @@ class EventPublisher {
       case EventCategory.vad:
         _trackVADEvent(event);
         break;
+      case EventCategory.rag:
+        // RAG events are logged locally but not sent to telemetry
+        break;
       case EventCategory.network:
       case EventCategory.error:
         // These are logged but not sent to telemetry

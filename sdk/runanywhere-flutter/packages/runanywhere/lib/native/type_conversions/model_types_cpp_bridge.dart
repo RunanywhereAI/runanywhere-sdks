@@ -21,6 +21,7 @@ abstract class RacModelCategory {
   static const int imageGeneration = 4;
   static const int multimodal = 5;
   static const int audio = 6;
+  static const int embedding = 7;
   static const int unknown = 99;
 }
 
@@ -100,6 +101,8 @@ extension ModelCategoryCppBridge on ModelCategory {
         return RacModelCategory.multimodal;
       case ModelCategory.audio:
         return RacModelCategory.audio;
+      case ModelCategory.embedding:
+        return RacModelCategory.embedding;
     }
   }
 
@@ -120,8 +123,10 @@ extension ModelCategoryCppBridge on ModelCategory {
         return ModelCategory.multimodal;
       case RacModelCategory.audio:
         return ModelCategory.audio;
+      case RacModelCategory.embedding:
+        return ModelCategory.embedding;
       default:
-        return ModelCategory.audio; // Default fallback
+        return ModelCategory.language; // Default fallback
     }
   }
 }

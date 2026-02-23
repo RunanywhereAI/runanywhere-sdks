@@ -133,6 +133,74 @@ class ModelDownloadService {
       await destDir.create(recursive: true);
       _logger.info('Download destination: ${destDir.path}');
 
+      // Handle multi-file models (e.g. embedding model + vocab.txt)
+      if (model.artifactType is MultiFileArtifact) {
+        final multiFile = model.artifactType as MultiFileArtifact;
+        final client = http.Client();
+        _activeDownloads[modelId] = client;
+
+        try {
+          final totalFiles = multiFile.files.length;
+          _logger.info('Multi-file model: downloading $totalFiles files');
+          yield ModelDownloadProgress.started(modelId, model.downloadSize ?? 0);
+
+          for (var i = 0; i < multiFile.files.length; i++) {
+            final descriptor = multiFile.files[i];
+            final fileUrl = descriptor.url;
+            if (fileUrl == null) {
+              _logger.warning('No URL for file descriptor: ${descriptor.destinationPath}');
+              continue;
+            }
+
+            final destPath = p.join(destDir.path, descriptor.destinationPath);
+            _logger.info('Downloading file ${i + 1}/$totalFiles: ${descriptor.destinationPath}');
+
+            final request = http.Request('GET', fileUrl);
+            final response = await client.send(request);
+
+            if (response.statusCode < 200 || response.statusCode >= 300) {
+              throw Exception('HTTP ${response.statusCode} for ${descriptor.destinationPath}');
+            }
+
+            final file = File(destPath);
+            await file.create(recursive: true);
+            final sink = file.openWrite();
+            var downloaded = 0;
+
+            await for (final chunk in response.stream) {
+              sink.add(chunk);
+              downloaded += chunk.length;
+
+              // Report progress proportionally across all files
+              final fileProgress = downloaded.toDouble() / (model.downloadSize ?? 1);
+              final overallProgress = (i + fileProgress) / totalFiles;
+              yield ModelDownloadProgress(
+                modelId: modelId,
+                bytesDownloaded: downloaded,
+                totalBytes: model.downloadSize ?? 0,
+                stage: ModelDownloadStage.downloading,
+                overallProgress: overallProgress * 0.9,
+              );
+            }
+
+            await sink.flush();
+            await sink.close();
+            _logger.info('Downloaded: ${descriptor.destinationPath}');
+          }
+        } finally {
+          client.close();
+          _activeDownloads.remove(modelId);
+        }
+
+        // Local path is the directory containing all files
+        await _updateModelLocalPath(model, destDir.path);
+        EventBus.shared.publish(SDKModelEvent.downloadCompleted(modelId: modelId));
+        yield ModelDownloadProgress.completed(modelId);
+        _logger.info('Multi-file model download completed: $modelId -> ${destDir.path}');
+        return;
+      }
+
+      // Single-file / archive download
       // Determine if extraction is needed
       final requiresExtraction = model.artifactType.requiresExtraction;
       _logger.info('Requires extraction: $requiresExtraction');

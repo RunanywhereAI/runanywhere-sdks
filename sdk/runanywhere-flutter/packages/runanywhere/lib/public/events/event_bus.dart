@@ -21,6 +21,7 @@ class EventBus {
   final _voiceController = StreamController<SDKVoiceEvent>.broadcast();
   final _storageController = StreamController<SDKStorageEvent>.broadcast();
   final _deviceController = StreamController<SDKDeviceEvent>.broadcast();
+  final _ragController = StreamController<SDKRAGEvent>.broadcast();
   final _allEventsController = StreamController<SDKEvent>.broadcast();
 
   /// Public streams for subscribing to events
@@ -40,6 +41,8 @@ class EventBus {
   Stream<SDKStorageEvent> get storageEvents => _storageController.stream;
 
   Stream<SDKDeviceEvent> get deviceEvents => _deviceController.stream;
+
+  Stream<SDKRAGEvent> get ragEvents => _ragController.stream;
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
@@ -61,6 +64,8 @@ class EventBus {
       _storageController.add(event);
     } else if (event is SDKDeviceEvent) {
       _deviceController.add(event);
+    } else if (event is SDKRAGEvent) {
+      _ragController.add(event);
     }
   }
 
@@ -73,6 +78,7 @@ class EventBus {
     await _voiceController.close();
     await _storageController.close();
     await _deviceController.close();
+    await _ragController.close();
     await _allEventsController.close();
   }
 }

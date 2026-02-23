@@ -13,9 +13,7 @@ dependencies:
   # RunAnywhere SDK - Core
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
-  # RunAnywhere SDK - ONNX Backend (STT, TTS, VAD, LLM)
-  runanywhere_onnx:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+    
   # RunAnywhere SDK - LlamaCpp Backend (LLM)
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
@@ -45,6 +43,10 @@ dependencies:
   image_picker: ^1.0.0
   # Image manipulation (BGRA to RGB pixel conversion)
   image: ^4.0.0
+  # File picker for PDF/JSON document selection (RAG)
+  file_picker: ^8.0.0
+  # PDF text extraction (RAG)
+  syncfusion_flutter_pdf: ^27.1.48
 
 dev_dependencies:
   flutter_test:

@@ -16,6 +16,10 @@
 #   --rebuild-commons   Force rebuild of runanywhere-commons
 #   --ios               Build for iOS only
 #   --android           Build for Android only (default: both)
+#   --llamacpp          Include LlamaCPP backend
+#   --onnx              Include ONNX backend
+#   --rag               Include RAG backend
+#   --all-backends      Include all backends (default if none specified)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
 #   --help              Show this help message
@@ -32,6 +36,12 @@
 #
 #   # iOS only setup
 #   ./scripts/build-flutter.sh --setup --ios
+#
+#   # Build only llamacpp and onnx backends (skip RAG)
+#   ./scripts/build-flutter.sh --local --rebuild-commons --llamacpp --onnx
+#
+#   # Build only RAG backend
+#   ./scripts/build-flutter.sh --local --rebuild-commons --rag
 #
 # =============================================================================
 
@@ -72,6 +82,10 @@ SKIP_BUILD=false
 BUILD_IOS=true
 BUILD_ANDROID=true
 ABIS="arm64-v8a,x86_64"
+BACKEND_LLAMACPP=false
+BACKEND_ONNX=false
+BACKEND_RAG=false
+BACKENDS_SPECIFIED=false
 
 # =============================================================================
 # Colors & Logging
@@ -139,6 +153,24 @@ for arg in "$@"; do
             BUILD_IOS=false
             BUILD_ANDROID=true
             ;;
+        --llamacpp)
+            BACKEND_LLAMACPP=true
+            BACKENDS_SPECIFIED=true
+            ;;
+        --onnx)
+            BACKEND_ONNX=true
+            BACKENDS_SPECIFIED=true
+            ;;
+        --rag)
+            BACKEND_RAG=true
+            BACKENDS_SPECIFIED=true
+            ;;
+        --all-backends)
+            BACKEND_LLAMACPP=true
+            BACKEND_ONNX=true
+            BACKEND_RAG=true
+            BACKENDS_SPECIFIED=true
+            ;;
         --clean)
             CLEAN_BUILD=true
             ;;
@@ -157,6 +189,20 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Default to all backends if none specified
+if [[ "$BACKENDS_SPECIFIED" == false ]]; then
+    BACKEND_LLAMACPP=true
+    BACKEND_ONNX=true
+    BACKEND_RAG=true
+fi
+
+# Build comma-separated BACKENDS string for build-android.sh
+BACKENDS_LIST=()
+[[ "$BACKEND_LLAMACPP" == true ]] && BACKENDS_LIST+=("llamacpp")
+[[ "$BACKEND_ONNX" == true ]] && BACKENDS_LIST+=("onnx")
+[[ "$BACKEND_RAG" == true ]] && BACKENDS_LIST+=("rag")
+BACKENDS=$(IFS=','; echo "${BACKENDS_LIST[*]}")
 
 # =============================================================================
 # Setup Environment
@@ -221,9 +267,6 @@ build_commons_android() {
     fi
 
     # build-android.sh takes positional args: BACKENDS ABIS
-    # Use "llamacpp,onnx" for backends to get both LlamaCPP and ONNX
-    local BACKENDS="llamacpp,onnx"
-
     log_step "Running: build-android.sh $BACKENDS $ABIS"
     "$COMMONS_ANDROID_SCRIPT" "$BACKENDS" "$ABIS"
 
@@ -269,6 +312,15 @@ copy_ios_frameworks() {
         log_info "ONNX: RABackendONNX.xcframework"
     else
         log_warn "RABackendONNX.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
+    # Copy RABackendRAG.xcframework to core package (RAG uses ONNX + LlamaCPP)
+    if [[ -d "${COMMONS_DIST}/RABackendRAG.xcframework" ]]; then
+        rm -rf "${CORE_IOS_FRAMEWORKS}/RABackendRAG.xcframework"
+        cp -R "${COMMONS_DIST}/RABackendRAG.xcframework" "${CORE_IOS_FRAMEWORKS}/"
+        log_info "Core: RABackendRAG.xcframework"
+    else
+        log_warn "RABackendRAG.xcframework not found at ${COMMONS_DIST}/"
     fi
 
     # Copy onnxruntime.xcframework to onnx package (required dependency)
@@ -487,6 +539,28 @@ copy_android_jnilibs() {
                 log_info "ONNX: ${lib} (from Sherpa-ONNX)"
             fi
         done
+
+        # =======================================================================
+        # RAG Package: RABackendRAG (lives in core package alongside RACommons)
+        # =======================================================================
+
+        # Copy backend library
+        if [[ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]]; then
+            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so (from build)"
+        fi
+
+        # Copy JNI bridge (if exists)
+        if [[ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" ]]; then
+            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag_jni.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag_jni.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/backends/rag/librac_backend_rag_jni.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag_jni.so (from build)"
+        fi
     done
 
     log_info "Android JNI libraries copied"
@@ -625,6 +699,7 @@ main() {
     echo "Rebuild Commons: $REBUILD_COMMONS"
     echo "iOS:            $BUILD_IOS"
     echo "Android:        $BUILD_ANDROID"
+    echo "Backends:       $BACKENDS"
     echo "ABIs:           $ABIS"
     echo ""
 

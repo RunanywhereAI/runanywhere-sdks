@@ -2429,6 +2429,70 @@ class RunAnywhere {
     return model;
   }
 
+  /// Register a multi-file model with the SDK.
+  ///
+  /// Matches Swift `RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)`.
+  ///
+  /// Use this for models that consist of multiple files that must be downloaded
+  /// together into the same directory (e.g. embedding model.onnx + vocab.txt).
+  ///
+  /// Each [ModelFileDescriptor] must specify both its [url] and [destinationPath].
+  ///
+  /// ```dart
+  /// RunAnywhere.registerMultiFileModel(
+  ///   id: 'all-minilm-l6-v2',
+  ///   name: 'All MiniLM L6 v2 (Embedding)',
+  ///   files: [
+  ///     ModelFileDescriptor(
+  ///       relativePath: 'model.onnx',
+  ///       destinationPath: 'model.onnx',
+  ///       url: Uri.parse('https://.../model.onnx'),
+  ///     ),
+  ///     ModelFileDescriptor(
+  ///       relativePath: 'vocab.txt',
+  ///       destinationPath: 'vocab.txt',
+  ///       url: Uri.parse('https://.../vocab.txt'),
+  ///     ),
+  ///   ],
+  ///   framework: InferenceFramework.onnx,
+  ///   modality: ModelCategory.embedding,
+  ///   memoryRequirement: 25500000,
+  /// );
+  /// ```
+  static ModelInfo registerMultiFileModel({
+    String? id,
+    required String name,
+    required List<ModelFileDescriptor> files,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.embedding,
+    int? memoryRequirement,
+  }) {
+    final modelId =
+        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
+
+    // Primary download URL is the first file's URL (used for display/size queries)
+    final primaryUrl = files.isNotEmpty ? files.first.url : null;
+
+    final model = ModelInfo(
+      id: modelId,
+      name: name,
+      category: modality,
+      format: ModelFormat.onnx,
+      framework: framework,
+      downloadURL: primaryUrl,
+      artifactType: MultiFileArtifact(files: files),
+      downloadSize: memoryRequirement,
+      source: ModelSource.local,
+    );
+
+    _registeredModels.add(model);
+
+    // Save to C++ registry (fire-and-forget, matches Swift pattern)
+    _saveToCppRegistry(model);
+
+    return model;
+  }
+
   /// Save model to C++ registry (fire-and-forget).
   /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
   static void _saveToCppRegistry(ModelInfo model) {

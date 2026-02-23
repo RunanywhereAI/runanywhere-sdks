@@ -1,7 +1,8 @@
 // RunAnywhere Core SDK - Android
 //
-// This plugin bundles RACommons native libraries (.so files) for Android.
+// This plugin bundles RACommons and RABackendRAG native libraries (.so files) for Android.
 // RACommons provides the core infrastructure for on-device AI capabilities.
+// RABackendRAG provides the RAG pipeline for document ingestion and querying.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -96,7 +97,7 @@ def calculateChecksum(File file) {
 }
 
 // =============================================================================
-// Binary Download Task (runs when testLocal = false)
+// Binary Download Task: RACommons (runs when testLocal = false)
 // =============================================================================
 task downloadNativeLibs {
     group = 'runanywhere'
@@ -180,5 +181,91 @@ task downloadNativeLibs {
     }
 }
 
-// Run downloadNativeLibs before preBuild
+// =============================================================================
+// Binary Download Task: RABackendRAG (runs when testLocal = false)
+// =============================================================================
+task downloadRagNativeLibs {
+    group = 'runanywhere'
+    description = 'Download RABackendRAG native libraries from GitHub releases'
+
+    doLast {
+        if (shouldDownloadAndroidLibs()) {
+            println "📦 Remote mode: Downloading RABackendRAG Android native libraries..."
+
+            def jniLibsDir = file('build/jniLibs')
+            jniLibsDir.mkdirs()
+
+            // Ensure build directory exists
+            buildDir.mkdirs()
+
+            def downloadUrl = ragAndroidUrl
+            def zipFile = file("${buildDir}/rag-android.zip")
+
+            println "Downloading from: ${downloadUrl}"
+
+            // Download the zip file
+            ant.get(src: downloadUrl, dest: zipFile)
+
+            println "✅ Downloaded successfully"
+
+            // Extract to temp directory first
+            def tempDir = file("${buildDir}/rag-temp")
+            if (tempDir.exists()) {
+                delete(tempDir)
+            }
+            tempDir.mkdirs()
+
+            copy {
+                from zipTree(zipFile)
+                into tempDir
+            }
+
+            // Common libs that should NOT be duplicated (they're in the core SDK via downloadNativeLibs)
+            def commonLibs = ['libc++_shared.so', 'librac_commons.so', 'librac_commons_jni.so']
+
+            // Copy .so files from jniLibs structure (excluding common libs)
+            tempDir.eachFileRecurse { file ->
+                if (file.isDirectory() && file.name in ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86']) {
+                    def targetAbiDir = new File(jniLibsDir, file.name)
+                    targetAbiDir.mkdirs()
+                    file.eachFile { soFile ->
+                        if (soFile.name.endsWith('.so') && !(soFile.name in commonLibs)) {
+                            copy {
+                                from soFile
+                                into targetAbiDir
+                            }
+                            println "  ✓ ${file.name}/${soFile.name}"
+                        }
+                    }
+                }
+            }
+
+            // Clean up
+            zipFile.delete()
+            if (tempDir.exists()) {
+                delete(tempDir)
+            }
+
+            println "✅ RABackendRAG native libraries downloaded successfully"
+        } else {
+            println "🔧 Local mode: Using RAG native libraries from src/main/jniLibs/"
+
+            if (!checkLocalRagLibsExist()) {
+                throw new GradleException("""
+                    ⚠️  RAG native libraries not found in src/main/jniLibs/!
+                    For local mode, please build and copy the libraries:
+                      1. cd runanywhere-commons && ./scripts/build-android.sh --rag
+                      2. Copy the .so files to packages/runanywhere/android/src/main/jniLibs/
+                    Or switch to remote mode by editing binary_config.gradle:
+                      testLocal = false
+                """)
+            } else {
+                println "✅ Using local RAG native libraries"
+            }
+        }
+    }
+}
+
+// Run downloadNativeLibs and downloadRagNativeLibs before preBuild
 preBuild.dependsOn downloadNativeLibs
+preBuild.dependsOn downloadRagNativeLibs

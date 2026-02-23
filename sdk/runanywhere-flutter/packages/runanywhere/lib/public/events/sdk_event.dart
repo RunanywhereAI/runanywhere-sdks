@@ -13,6 +13,7 @@ enum EventCategory {
   network,
   storage,
   error,
+  rag,
 }
 
 /// Event destination for routing
@@ -682,4 +683,189 @@ class SDKStorageCacheCleared extends SDKStorageEvent {
 class SDKStorageTempFilesCleaned extends SDKStorageEvent {
   @override
   String get type => 'storage.temp_files.cleaned';
+}
+
+// ============================================================================
+// SDK RAG Events
+// ============================================================================
+
+/// SDK RAG (Retrieval-Augmented Generation) events.
+///
+/// Mirrors iOS `RAGEvents` from RunAnywhere SDK.
+/// Published during the RAG pipeline lifecycle — creation, ingestion, and query.
+abstract class SDKRAGEvent with SDKEventDefaults {
+  @override
+  EventCategory get category => EventCategory.rag;
+
+  /// Pipeline created successfully.
+  static SDKRAGPipelineCreated pipelineCreated() {
+    return SDKRAGPipelineCreated();
+  }
+
+  /// Pipeline destroyed and resources released.
+  static SDKRAGPipelineDestroyed pipelineDestroyed() {
+    return SDKRAGPipelineDestroyed();
+  }
+
+  /// Document ingestion started.
+  ///
+  /// [documentLength] — character count of the document being ingested.
+  static SDKRAGIngestionStarted ingestionStarted({
+    required int documentLength,
+  }) {
+    return SDKRAGIngestionStarted(documentLength: documentLength);
+  }
+
+  /// Document ingestion completed.
+  ///
+  /// [chunkCount] — number of chunks created from the document.
+  /// [durationMs] — time taken for ingestion in milliseconds.
+  static SDKRAGIngestionComplete ingestionComplete({
+    required int chunkCount,
+    required double durationMs,
+  }) {
+    return SDKRAGIngestionComplete(
+      chunkCount: chunkCount,
+      durationMs: durationMs,
+    );
+  }
+
+  /// RAG query started.
+  ///
+  /// [questionLength] — character count of the question (not the raw text).
+  static SDKRAGQueryStarted queryStarted({required int questionLength}) {
+    return SDKRAGQueryStarted(questionLength: questionLength);
+  }
+
+  /// RAG query completed with results.
+  ///
+  /// [answerLength] — character count of the generated answer.
+  /// [chunksRetrieved] — number of chunks used as context.
+  /// [retrievalTimeMs] — time taken for vector retrieval.
+  /// [generationTimeMs] — time taken for LLM generation.
+  /// [totalTimeMs] — total query time.
+  static SDKRAGQueryComplete queryComplete({
+    required int answerLength,
+    required int chunksRetrieved,
+    required double retrievalTimeMs,
+    required double generationTimeMs,
+    required double totalTimeMs,
+  }) {
+    return SDKRAGQueryComplete(
+      answerLength: answerLength,
+      chunksRetrieved: chunksRetrieved,
+      retrievalTimeMs: retrievalTimeMs,
+      generationTimeMs: generationTimeMs,
+      totalTimeMs: totalTimeMs,
+    );
+  }
+
+  /// RAG pipeline encountered an error.
+  ///
+  /// [message] — human-readable error description.
+  static SDKRAGError error({required String message}) {
+    return SDKRAGError(message: message);
+  }
+}
+
+class SDKRAGPipelineCreated extends SDKRAGEvent {
+  @override
+  String get type => 'rag.pipeline.created';
+}
+
+class SDKRAGPipelineDestroyed extends SDKRAGEvent {
+  @override
+  String get type => 'rag.pipeline.destroyed';
+}
+
+class SDKRAGIngestionStarted extends SDKRAGEvent {
+  final int documentLength;
+
+  SDKRAGIngestionStarted({required this.documentLength});
+
+  @override
+  String get type => 'rag.ingestion.started';
+
+  @override
+  Map<String, String> get properties => {
+        'document_length': '$documentLength',
+      };
+}
+
+class SDKRAGIngestionComplete extends SDKRAGEvent {
+  final int chunkCount;
+  final double durationMs;
+
+  SDKRAGIngestionComplete({
+    required this.chunkCount,
+    required this.durationMs,
+  });
+
+  @override
+  String get type => 'rag.ingestion.complete';
+
+  @override
+  Map<String, String> get properties => {
+        'chunk_count': '$chunkCount',
+        'duration_ms': durationMs.toStringAsFixed(1),
+      };
+}
+
+class SDKRAGQueryStarted extends SDKRAGEvent {
+  final int questionLength;
+
+  SDKRAGQueryStarted({required this.questionLength});
+
+  @override
+  String get type => 'rag.query.started';
+
+  @override
+  Map<String, String> get properties => {
+        'question_length': '$questionLength',
+      };
+}
+
+class SDKRAGQueryComplete extends SDKRAGEvent {
+  final int answerLength;
+  final int chunksRetrieved;
+  final double retrievalTimeMs;
+  final double generationTimeMs;
+  final double totalTimeMs;
+
+  SDKRAGQueryComplete({
+    required this.answerLength,
+    required this.chunksRetrieved,
+    required this.retrievalTimeMs,
+    required this.generationTimeMs,
+    required this.totalTimeMs,
+  });
+
+  @override
+  String get type => 'rag.query.complete';
+
+  @override
+  Map<String, String> get properties => {
+        'answer_length': '$answerLength',
+        'chunks_retrieved': '$chunksRetrieved',
+        'retrieval_time_ms': retrievalTimeMs.toStringAsFixed(1),
+        'generation_time_ms': generationTimeMs.toStringAsFixed(1),
+        'total_time_ms': totalTimeMs.toStringAsFixed(1),
+      };
+}
+
+class SDKRAGError extends SDKRAGEvent {
+  final String message;
+
+  SDKRAGError({required this.message});
+
+  @override
+  String get type => 'rag.error';
+
+  @override
+  EventDestination get destination => EventDestination.all;
+
+  @override
+  Map<String, String> get properties => {
+        'error': message,
+      };
 }
