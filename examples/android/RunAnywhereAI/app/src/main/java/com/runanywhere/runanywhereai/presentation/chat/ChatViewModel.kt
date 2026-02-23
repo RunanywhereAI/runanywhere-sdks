@@ -801,7 +801,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Refresh LoRA loaded state for the active adapters indicator. */
-    private fun refreshLoraState() {
+    fun refreshLoraState() {
         viewModelScope.launch {
             try {
                 val loaded = RunAnywhere.getLoadedLoraAdapters()

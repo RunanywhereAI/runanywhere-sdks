@@ -41,18 +41,14 @@ for arg in "$@"; do
     esac
 done
 
-# Build flags for build-kotlin.sh
-FLAGS=(--local)
+if [ "$SKIP_CPP" = true ] && [ "$CPP_ONLY" = true ]; then
+    echo "Cannot use --skip-cpp and --cpp-only together"
+    exit 1
+fi
 
 if [ "$SKIP_CPP" = true ]; then
-    # Just copy .so files and build Kotlin
-    FLAGS+=(--skip-build)
-    if [ "$CPP_ONLY" = true ]; then
-        echo "Cannot use --skip-cpp and --cpp-only together"
-        exit 1
-    fi
-    # Run copy + Kotlin build
-    exec "${SCRIPT_DIR}/build-kotlin.sh" --local "${PASSTHROUGH_ARGS[@]}"
+    # Skip C++ build, just copy .so files and build Kotlin
+    exec "${SCRIPT_DIR}/build-kotlin.sh" --local --skip-build "${PASSTHROUGH_ARGS[@]}"
 elif [ "$CPP_ONLY" = true ]; then
     # Build C++ + copy, skip Kotlin Gradle build
     exec "${SCRIPT_DIR}/build-kotlin.sh" --local --rebuild-commons --skip-build "${PASSTHROUGH_ARGS[@]}"

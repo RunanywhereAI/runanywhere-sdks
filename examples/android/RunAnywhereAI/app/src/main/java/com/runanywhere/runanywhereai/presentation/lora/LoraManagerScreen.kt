@@ -98,7 +98,7 @@ fun LoraManagerScreen(
                                     fontWeight = FontWeight.Medium,
                                 )
                                 Text(
-                                    "Scale: %.2f  |  ${if (adapter.applied) "Applied" else "Pending"}",
+                                    "Scale: ${"%.2f".format(adapter.scale)}  |  ${if (adapter.applied) "Applied" else "Pending"}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

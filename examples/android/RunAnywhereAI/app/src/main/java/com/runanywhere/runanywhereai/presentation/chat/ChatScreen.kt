@@ -218,7 +218,10 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     if (showingLoraAdapterPicker) {
         LoraAdapterPickerSheet(
             loraViewModel = loraViewModel,
-            onDismiss = { showingLoraAdapterPicker = false },
+            onDismiss = {
+                showingLoraAdapterPicker = false
+                viewModel.refreshLoraState()
+            },
         )
     }
 

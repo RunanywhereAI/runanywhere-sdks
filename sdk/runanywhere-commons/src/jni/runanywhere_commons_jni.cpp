@@ -1243,12 +1243,23 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegistryRegister
     jsize model_count = compatibleModelIds ? env->GetArrayLength(compatibleModelIds) : 0;
     if (model_count > 0) {
         entry.compatible_model_ids = static_cast<char**>(malloc(sizeof(char*) * model_count));
+        if (!entry.compatible_model_ids) {
+            free(entry.id); free(entry.name); free(entry.description);
+            free(entry.download_url); free(entry.filename);
+            if (id_str) env->ReleaseStringUTFChars(id, id_str);
+            if (name_str) env->ReleaseStringUTFChars(name, name_str);
+            if (desc_str) env->ReleaseStringUTFChars(description, desc_str);
+            if (url_str) env->ReleaseStringUTFChars(downloadUrl, url_str);
+            if (file_str) env->ReleaseStringUTFChars(filename, file_str);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
         entry.compatible_model_count = model_count;
         for (jsize i = 0; i < model_count; ++i) {
             jstring jModelId = static_cast<jstring>(env->GetObjectArrayElement(compatibleModelIds, i));
             const char* mid_str = jModelId ? env->GetStringUTFChars(jModelId, nullptr) : nullptr;
             entry.compatible_model_ids[i] = mid_str ? strdup(mid_str) : nullptr;
             if (mid_str) env->ReleaseStringUTFChars(jModelId, mid_str);
+            if (jModelId) env->DeleteLocalRef(jModelId);
         }
     }
 

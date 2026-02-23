@@ -26,7 +26,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.RunAnywhereAI"
-        android:windowSoftInputMode="adjustResize"
         android:largeHeap="true"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
@@ -41,6 +40,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.RunAnywhereAI">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

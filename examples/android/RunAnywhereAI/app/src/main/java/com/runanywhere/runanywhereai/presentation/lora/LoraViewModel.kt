@@ -17,6 +17,7 @@ import com.runanywhere.sdk.public.extensions.loadLoraAdapter
 import com.runanywhere.sdk.public.extensions.loraAdaptersForModel
 import com.runanywhere.sdk.public.extensions.removeLoraAdapter
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +43,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(LoraUiState())
     val uiState: StateFlow<LoraUiState> = _uiState.asStateFlow()
+    private var downloadJob: Job? = null
 
     private val loraDir: File by lazy {
         File(application.filesDir, "lora_adapters").also { it.mkdirs() }
@@ -133,8 +135,13 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Check if a LoRA adapter file is compatible with the current model. */
-    fun checkCompatibility(loraPath: String): LoraCompatibilityResult {
-        return RunAnywhere.checkLoraCompatibility(loraPath)
+    fun checkCompatibility(loraPath: String, onResult: (LoraCompatibilityResult) -> Unit) {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                RunAnywhere.checkLoraCompatibility(loraPath)
+            }
+            onResult(result)
+        }
     }
 
     /** Get the local file path for a catalog entry, or null if not downloaded. */
@@ -164,17 +171,21 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             error = null,
         )
 
-        viewModelScope.launch {
+        downloadJob = viewModelScope.launch {
             try {
                 val destFile = File(loraDir, entry.filename)
+                val tmpFile = File(loraDir, "${entry.filename}.tmp")
                 withContext(Dispatchers.IO) {
-                    val connection = URL(entry.downloadUrl).openConnection()
+                    val connection = URL(entry.downloadUrl).openConnection().apply {
+                        connectTimeout = 30_000
+                        readTimeout = 60_000
+                    }
                     connection.connect()
                     val totalSize = connection.contentLengthLong.takeIf { it > 0 } ?: entry.fileSize
                     var downloaded = 0L
 
                     connection.getInputStream().buffered().use { input ->
-                        destFile.outputStream().buffered().use { output ->
+                        tmpFile.outputStream().buffered().use { output ->
                             val buffer = ByteArray(8192)
                             var bytesRead: Int
                             while (input.read(buffer).also { bytesRead = it } != -1) {
@@ -187,6 +198,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
+                    tmpFile.renameTo(destFile)
                 }
 
                 Log.i(TAG, "Downloaded LoRA adapter: ${entry.name} -> ${destFile.absolutePath}")
@@ -205,12 +217,36 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Delete a downloaded adapter file. */
+    /** Cancel an in-progress download. */
+    fun cancelDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        _uiState.value = _uiState.value.copy(
+            downloadingAdapterId = null,
+            downloadProgress = 0f,
+        )
+    }
+
+    /** Delete a downloaded adapter file. Unloads the adapter first if loaded. */
     fun deleteAdapter(entry: LoraAdapterCatalogEntry) {
-        val file = File(loraDir, entry.filename)
-        if (file.exists()) {
-            file.delete()
-            Log.i(TAG, "Deleted LoRA adapter file: ${entry.filename}")
+        viewModelScope.launch {
+            try {
+                val file = File(loraDir, entry.filename)
+                // Unload first if currently loaded
+                if (isLoaded(entry)) {
+                    file.absolutePath.let { RunAnywhere.removeLoraAdapter(it) }
+                    Log.i(TAG, "Unloaded LoRA adapter before delete: ${entry.filename}")
+                }
+                if (file.exists()) {
+                    file.delete()
+                    Log.i(TAG, "Deleted LoRA adapter file: ${entry.filename}")
+                }
+                val loaded = RunAnywhere.getLoadedLoraAdapters()
+                _uiState.value = _uiState.value.copy(loadedAdapters = loaded)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete adapter: ${entry.filename}", e)
+                _uiState.value = _uiState.value.copy(error = "Delete failed: ${e.message}")
+            }
         }
     }
 
