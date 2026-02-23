@@ -123,7 +123,6 @@ target_compile_definitions(rac_backend_rag PRIVATE RAC_RAG_BUILDING)
 
 # USearch requires C++17 - set via properties for better Xcode compatibility
 set_target_properties(rac_backend_rag PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

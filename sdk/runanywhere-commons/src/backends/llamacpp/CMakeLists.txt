@@ -203,7 +203,6 @@ target_link_libraries(rac_backend_llamacpp PUBLIC
 )
 
 set_target_properties(rac_backend_llamacpp PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
