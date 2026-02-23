@@ -291,7 +291,12 @@ extension RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.STT")
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
 
-        try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
+        try await CppBridge.STT.shared.loadModel(
+            modelPath.path,
+            modelId: modelId,
+            modelName: modelInfo.name,
+            framework: modelInfo.framework.toCFramework()
+        )
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID

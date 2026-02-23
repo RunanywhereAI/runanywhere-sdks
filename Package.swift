@@ -41,7 +41,7 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.2"
+let sdkVersion = "0.19.3"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -268,22 +268,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
-                checksum: "ab6b15e52983f7f5706fc167ae79f5935042a23915a3ff56af49a19a92d48ebb"
+                checksum: "b2bb724a880da4a9373bde20042800e9cb42f216ade17bfb7d57552c249c5bad"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-v\(sdkVersion).zip",
-                checksum: "063e4c53718e9b5367b58009039b9f3c401c0ffde8f8646036bb0b55a2625a3e"
+                checksum: "b515c758155d6f49f8f8dbeea95b7ea6cf08c69dbec730f5dd72b623b8cf310e"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
-                checksum: "108b897dbb6c51a372641c0a46e2c8db8419724cf3ad3388dc886b8c121036bf"
+                checksum: "a76dd2f3d4a5db40852574c4764b27fca15245ce3c231f07674c5bfdd0424c56"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
-                checksum: "394550455ac5f0c2ac0fa8f7a93be5a4eaec43a9c52772ed83179f3ae151dd6a"
+                checksum: "c2393b597ec29f0a71575e8ac17658de92c871726a152d2d4239735d1d5611b6"
             ),
         ]
     }
