@@ -4,17 +4,10 @@ import android.app.Application
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.runanywhere.runanywhereai.data.ModelList
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
-import com.runanywhere.sdk.core.onnx.ONNX
-import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.SDKEnvironment
-import com.runanywhere.sdk.public.extensions.ModelCompanionFile
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
-import com.runanywhere.sdk.public.extensions.registerModel
-import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 import com.runanywhere.sdk.storage.AndroidPlatformContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -178,9 +171,7 @@ class RunAnywhereApplication : Application() {
 
             // Phase 2: Complete services initialization (device registration, etc.)
             // This triggers device registration with the backend
-            kotlinx.coroutines.runBlocking {
-                RunAnywhere.completeServicesInitialization()
-            }
+            RunAnywhere.completeServicesInitialization()
             Log.i("RunAnywhereApp", "✅ SDK services initialization complete (device registered)")
         } catch (e: Exception) {
             // Log the failure but continue
@@ -196,9 +187,7 @@ class RunAnywhereApplication : Application() {
                 Log.i("RunAnywhereApp", "✅ SDK initialized in OFFLINE mode (local models only)")
 
                 // Still try Phase 2 in offline mode
-                kotlinx.coroutines.runBlocking {
-                    RunAnywhere.completeServicesInitialization()
-                }
+                RunAnywhere.completeServicesInitialization()
             } catch (fallbackError: Exception) {
                 Log.e("RunAnywhereApp", "❌ Fallback initialization also failed: ${fallbackError.message}")
             }
@@ -248,192 +237,7 @@ class RunAnywhereApplication : Application() {
         }
     }
 
-    /**
-     * Register modules with their associated models.
-     * Each module explicitly owns its models - the framework is determined by the module.
-     *
-     * Backend registration MUST happen before model registration.
-     */
-    @Suppress("LongMethod")
     private fun registerModulesAndModels() {
-        Log.i("RunAnywhereApp", "📦 Registering backends and models...")
-
-        // Register backends first
-        // These call the C++ rac_backend_xxx_register() functions via JNI
-        Log.i("RunAnywhereApp", "🔧 Registering LlamaCPP backend...")
-        LlamaCPP.register(priority = 100)
-
-        Log.i("RunAnywhereApp", "🔧 Registering ONNX backend...")
-        ONNX.register(priority = 100)
-
-        Log.i("RunAnywhereApp", "✅ Backends registered, now registering models...")
-
-        // Register LLM models using the new RunAnywhere.registerModel API
-        // Using explicit IDs ensures models are recognized after download across app restarts
-        RunAnywhere.registerModel(
-            id = "smollm2-360m-q8_0",
-            name = "SmolLM2 360M Q8_0",
-            url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 500_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "llama-2-7b-chat-q4_k_m",
-            name = "Llama 2 7B Chat Q4_K_M",
-            url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 4_000_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "mistral-7b-instruct-q4_k_m",
-            name = "Mistral 7B Instruct Q4_K_M",
-            url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 4_000_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "qwen2.5-0.5b-instruct-q6_k",
-            name = "Qwen 2.5 0.5B Instruct Q6_K",
-            url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 600_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "lfm2-350m-q4_k_m",
-            name = "LiquidAI LFM2 350M Q4_K_M",
-            url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 250_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "lfm2-350m-q8_0",
-            name = "LiquidAI LFM2 350M Q8_0",
-            url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 400_000_000,
-        )
-        // LFM2-Tool models - For tool calling / function calling support
-        RunAnywhere.registerModel(
-            id = "lfm2-1.2b-tool-q4_k_m",
-            name = "LiquidAI LFM2 1.2B Tool Q4_K_M",
-            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 800_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "lfm2-1.2b-tool-q8_0",
-            name = "LiquidAI LFM2 1.2B Tool Q8_0",
-            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP,
-            memoryRequirement = 1_400_000_000,
-        )
-        Log.i("RunAnywhereApp", "✅ LLM models registered")
-
-        // Register ONNX STT and TTS models
-        // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
-        RunAnywhere.registerModel(
-            id = "sherpa-onnx-whisper-tiny.en",
-            name = "Sherpa Whisper Tiny (ONNX)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-            framework = InferenceFramework.ONNX,
-            modality = ModelCategory.SPEECH_RECOGNITION,
-            memoryRequirement = 75_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "vits-piper-en_US-lessac-medium",
-            name = "Piper TTS (US English - Medium)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-            framework = InferenceFramework.ONNX,
-            modality = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000,
-        )
-        RunAnywhere.registerModel(
-            id = "vits-piper-en_GB-alba-medium",
-            name = "Piper TTS (British English)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
-            framework = InferenceFramework.ONNX,
-            modality = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000,
-        )
-        Log.i("RunAnywhereApp", "✅ ONNX STT/TTS models registered")
-
-
-        // Register ONNX Embedding models for RAG
-        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
-        // download into the same folder - C++ RAG pipeline looks for vocab.txt
-        // next to model.onnx, so they must be co-located.
-        // Mirrors iOS RunAnywhereAIApp.registerMultiFileModel() exactly.
-        RunAnywhere.registerMultiFileModel(
-            id = "all-minilm-l6-v2",
-            name = "All MiniLM L6 v2 (Embedding)",
-            primaryUrl = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx", // .onnx keeps resolve (LFS binary)
-            companionFiles = listOf(
-                ModelCompanionFile(
-                    url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/vocab.txt", // Changed to raw
-                    filename = "vocab.txt",
-                ),
-                ModelCompanionFile(
-                    url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/tokenizer.json", // Added tokenizer and used raw
-                    filename = "tokenizer.json",
-                ),
-            ),
-            framework = InferenceFramework.ONNX,
-            modality = ModelCategory.EMBEDDING,
-            memoryRequirement = 25_500_000,
-        )
-        Log.i("RunAnywhereApp", "✅ ONNX Embedding models registered")
-
-        // Register VLM (Vision Language Model) models — matching iOS exactly
-        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total, archive)
-        RunAnywhere.registerModel(
-            id = "smolvlm-500m-instruct-q8_0",
-            name = "SmolVLM 500M Instruct",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
-            framework = InferenceFramework.LLAMA_CPP,
-            modality = ModelCategory.MULTIMODAL,
-            memoryRequirement = 600_000_000,
-        )
-        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
-        // Uses multi-file download: main model + mmproj from HuggingFace
-        RunAnywhere.registerMultiFileModel(
-            id = "lfm2-vl-450m-q8_0",
-            name = "LFM2-VL 450M",
-            files = listOf(
-                ModelFileDescriptor(
-                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
-                    filename = "LFM2-VL-450M-Q8_0.gguf",
-                ),
-                ModelFileDescriptor(
-                    url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
-                    filename = "mmproj-LFM2-VL-450M-Q8_0.gguf",
-                ),
-            ),
-            framework = InferenceFramework.LLAMA_CPP,
-            modality = ModelCategory.MULTIMODAL,
-            memoryRequirement = 600_000_000,
-        )
-        // Qwen2-VL 2B - Capable VLM, requires powerful hardware (~1.6GB total)
-        // Uses multi-file download: main model (986MB) + mmproj (710MB)
-        RunAnywhere.registerMultiFileModel(
-            id = "qwen2-vl-2b-instruct-q4_k_m",
-            name = "Qwen2-VL 2B Instruct",
-            files = listOf(
-                ModelFileDescriptor(
-                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
-                    filename = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
-                ),
-                ModelFileDescriptor(
-                    url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
-                    filename = "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
-                ),
-            ),
-            framework = InferenceFramework.LLAMA_CPP,
-            modality = ModelCategory.MULTIMODAL,
-            memoryRequirement = 1_800_000_000,
-        )
-        Log.i("RunAnywhereApp", "✅ VLM models registered")
-
-
-        Log.i("RunAnywhereApp", "🎉 All modules and models registered")
+        ModelList.setupModels()
     }
 }

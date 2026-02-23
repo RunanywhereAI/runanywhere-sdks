@@ -49,10 +49,7 @@ android {
         //     }
         // }
 
-        ndk {
-            // arm64-v8a for physical devices, x86_64 for emulators
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
+        // Note: ndk.abiFilters removed — splits.abi handles ABI filtering
     }
 
     buildTypes {
@@ -108,21 +105,14 @@ android {
     // Signing configurations
     // Using default debug keystore for now
 
-    // APK splits disabled for now to focus on basic functionality
-    // splits {
-    //     abi {
-    //         isEnable = true
-    //         reset()
-    //         include("armeabi-v7a", "arm64-v8a")  // Focus on ARM architectures for mobile
-    //         isUniversalApk = true  // Also generate a universal APK
-    //     }
-    //
-    //     density {
-    //         isEnable = true
-    //         reset()
-    //         include("ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
-    //     }
-    // }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
+    }
 
     // Packaging options
     packaging {

@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="10. Clean All" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="10. Run IntelliJ Plugin" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="cleanAll" />
+          <option value="runIntellijPlugin" />
         </list>
       </option>
       <option name="vmOptions" />

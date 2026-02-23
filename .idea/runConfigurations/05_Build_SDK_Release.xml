@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="1. Setup" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="5. Build SDK Release" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="setup" />
+          <option value="buildSdkRelease" />
         </list>
       </option>
       <option name="vmOptions" />

@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="3. Build SDK Release" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="4. Copy Native Libs" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="buildSdkRelease" />
+          <option value="copyNativeLibs" />
         </list>
       </option>
       <option name="vmOptions" />

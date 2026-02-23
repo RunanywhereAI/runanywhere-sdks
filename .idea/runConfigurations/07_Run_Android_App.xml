@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="9. Build All" type="GradleRunConfiguration" factoryName="Gradle">
+  <configuration default="false" name="7. Run Android App" type="GradleRunConfiguration" factoryName="Gradle">
     <ExternalSystemSettings>
       <option name="executionName" />
       <option name="externalProjectPath" value="$PROJECT_DIR$" />
@@ -10,7 +10,7 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="buildAll" />
+          <option value="runAndroidApp" />
         </list>
       </option>
       <option name="vmOptions" />
