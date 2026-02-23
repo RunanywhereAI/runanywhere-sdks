@@ -47,3 +47,61 @@ expect suspend fun RunAnywhere.clearLoraAdapters()
  * @return List of loaded adapter info (path, scale, applied status)
  */
 expect suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo>
+
+// MARK: - LoRA Compatibility Check
+
+/**
+ * Result of a LoRA compatibility check.
+ */
+data class LoraCompatibilityResult(
+    val isCompatible: Boolean,
+    val error: String? = null,
+)
+
+/**
+ * Check if a LoRA adapter file is compatible with the currently loaded model.
+ *
+ * @param loraPath Path to the LoRA adapter GGUF file
+ * @return Compatibility result with error message if incompatible
+ */
+expect fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibilityResult
+
+// MARK: - LoRA Adapter Catalog (Registry)
+
+/**
+ * A LoRA adapter entry in the catalog registry.
+ * Contains metadata about a LoRA adapter and its compatible base models.
+ */
+data class LoraAdapterCatalogEntry(
+    val id: String,
+    val name: String,
+    val description: String,
+    val downloadUrl: String,
+    val filename: String,
+    val compatibleModelIds: List<String>,
+    val fileSize: Long = 0,
+    val defaultScale: Float = 1.0f,
+)
+
+/**
+ * Register a LoRA adapter in the catalog.
+ * The adapter metadata is stored in the C++ LoRA registry.
+ *
+ * @param entry The adapter catalog entry with metadata
+ */
+expect fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry)
+
+/**
+ * Get LoRA adapters compatible with a specific model.
+ *
+ * @param modelId The base model ID to find adapters for
+ * @return List of compatible adapter catalog entries
+ */
+expect fun RunAnywhere.loraAdaptersForModel(modelId: String): List<LoraAdapterCatalogEntry>
+
+/**
+ * Get all registered LoRA adapters.
+ *
+ * @return List of all adapter catalog entries
+ */
+expect fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry>

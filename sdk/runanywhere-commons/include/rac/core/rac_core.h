@@ -335,6 +335,16 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
  */
 RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
 
+// =============================================================================
+// GLOBAL LORA REGISTRY API
+// =============================================================================
+
+RAC_API struct rac_lora_registry* rac_get_lora_registry(void);
+RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
+RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
+                                             struct rac_lora_entry*** out_entries,
+                                             size_t* out_count);
+
 #ifdef __cplusplus
 }
 #endif

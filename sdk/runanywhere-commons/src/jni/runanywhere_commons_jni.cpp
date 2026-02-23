@@ -38,6 +38,7 @@
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
@@ -1181,6 +1182,140 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGetLoraI
     return jresult;
 }
 
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentCheckLoraCompat(
+    JNIEnv* env, jclass clazz, jlong handle, jstring loraPath) {
+    if (handle == 0) return env->NewStringUTF("Invalid handle");
+    if (loraPath == nullptr) return env->NewStringUTF("Invalid path");
+    std::string path = getCString(env, loraPath);
+    char* error = nullptr;
+    rac_result_t result = rac_llm_component_check_lora_compat(
+        reinterpret_cast<rac_handle_t>(handle), path.c_str(), &error);
+    if (result == RAC_SUCCESS) {
+        if (error) rac_free(error);
+        return nullptr;  // null = compatible
+    }
+    jstring jresult = nullptr;
+    if (error) {
+        jresult = env->NewStringUTF(error);
+        rac_free(error);
+    } else {
+        jresult = env->NewStringUTF("Incompatible LoRA adapter");
+    }
+    return jresult;
+}
+
+// ========================================================================
+// LORA REGISTRY JNI
+// ========================================================================
+
+// Forward declaration (defined later alongside modelInfoToJson)
+static std::string loraEntryToJson(const rac_lora_entry_t* entry);
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegistryRegister(
+    JNIEnv* env, jclass clazz, jstring id, jstring name, jstring description,
+    jstring downloadUrl, jstring filename, jobjectArray compatibleModelIds,
+    jlong fileSize, jfloat defaultScale) {
+    LOGi("racLoraRegistryRegister called");
+
+    if (!id) {
+        LOGe("LoRA adapter id is required");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const char* id_str = env->GetStringUTFChars(id, nullptr);
+    const char* name_str = name ? env->GetStringUTFChars(name, nullptr) : nullptr;
+    const char* desc_str = description ? env->GetStringUTFChars(description, nullptr) : nullptr;
+    const char* url_str = downloadUrl ? env->GetStringUTFChars(downloadUrl, nullptr) : nullptr;
+    const char* file_str = filename ? env->GetStringUTFChars(filename, nullptr) : nullptr;
+
+    rac_lora_entry_t entry;
+    memset(&entry, 0, sizeof(entry));
+    entry.id = id_str ? strdup(id_str) : nullptr;
+    entry.name = name_str ? strdup(name_str) : nullptr;
+    entry.description = desc_str ? strdup(desc_str) : nullptr;
+    entry.download_url = url_str ? strdup(url_str) : nullptr;
+    entry.filename = file_str ? strdup(file_str) : nullptr;
+    entry.file_size = fileSize;
+    entry.default_scale = defaultScale;
+
+    jsize model_count = compatibleModelIds ? env->GetArrayLength(compatibleModelIds) : 0;
+    if (model_count > 0) {
+        entry.compatible_model_ids = static_cast<char**>(malloc(sizeof(char*) * model_count));
+        entry.compatible_model_count = model_count;
+        for (jsize i = 0; i < model_count; ++i) {
+            jstring jModelId = static_cast<jstring>(env->GetObjectArrayElement(compatibleModelIds, i));
+            const char* mid_str = jModelId ? env->GetStringUTFChars(jModelId, nullptr) : nullptr;
+            entry.compatible_model_ids[i] = mid_str ? strdup(mid_str) : nullptr;
+            if (mid_str) env->ReleaseStringUTFChars(jModelId, mid_str);
+        }
+    }
+
+    if (id_str) env->ReleaseStringUTFChars(id, id_str);
+    if (name_str) env->ReleaseStringUTFChars(name, name_str);
+    if (desc_str) env->ReleaseStringUTFChars(description, desc_str);
+    if (url_str) env->ReleaseStringUTFChars(downloadUrl, url_str);
+    if (file_str) env->ReleaseStringUTFChars(filename, file_str);
+
+    LOGi("Registering LoRA adapter: %s", entry.id);
+    rac_result_t result = rac_register_lora(&entry);
+
+    // Free local copy (registry made a deep copy)
+    free(entry.id); free(entry.name); free(entry.description);
+    free(entry.download_url); free(entry.filename);
+    if (entry.compatible_model_ids) {
+        for (size_t i = 0; i < entry.compatible_model_count; ++i) free(entry.compatible_model_ids[i]);
+        free(entry.compatible_model_ids);
+    }
+
+    if (result != RAC_SUCCESS) LOGe("Failed to register LoRA adapter: %d", result);
+    else LOGi("LoRA adapter registered successfully");
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegistryGetForModel(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    if (!modelId) return env->NewStringUTF("[]");
+    const char* id_str = env->GetStringUTFChars(modelId, nullptr);
+    rac_lora_entry_t** entries = nullptr;
+    size_t count = 0;
+    rac_result_t result = rac_get_lora_for_model(id_str, &entries, &count);
+    env->ReleaseStringUTFChars(modelId, id_str);
+    if (result != RAC_SUCCESS || !entries || count == 0) return env->NewStringUTF("[]");
+    std::string json = "[";
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) json += ",";
+        json += loraEntryToJson(entries[i]);
+    }
+    json += "]";
+    rac_lora_entry_array_free(entries, count);
+    return env->NewStringUTF(json.c_str());
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegistryGetAll(
+    JNIEnv* env, jclass clazz) {
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) {
+        LOGe("LoRA registry not initialized");
+        return env->NewStringUTF("[]");
+    }
+    rac_lora_entry_t** entries = nullptr;
+    size_t count = 0;
+    rac_result_t result = rac_lora_registry_get_all(registry, &entries, &count);
+    if (result != RAC_SUCCESS || !entries || count == 0) return env->NewStringUTF("[]");
+    std::string json = "[";
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) json += ",";
+        json += loraEntryToJson(entries[i]);
+    }
+    json += "]";
+    rac_lora_entry_array_free(entries, count);
+    return env->NewStringUTF(json.c_str());
+}
+
 // =============================================================================
 // JNI FUNCTIONS - STT Component
 // =============================================================================
@@ -1799,7 +1934,27 @@ static std::string modelInfoToJson(const rac_model_info_t* model) {
     j["download_size"] = model->download_size;
     j["context_length"] = model->context_length;
     j["supports_thinking"] = static_cast<bool>(model->supports_thinking);
+    j["supports_lora"] = static_cast<bool>(model->supports_lora);
     j["description"] = model->description ? nlohmann::json(model->description) : nlohmann::json(nullptr);
+    return j.dump();
+}
+
+static std::string loraEntryToJson(const rac_lora_entry_t* entry) {
+    if (!entry) return "null";
+    nlohmann::json j;
+    j["id"] = entry->id ? entry->id : "";
+    j["name"] = entry->name ? entry->name : "";
+    j["description"] = entry->description ? entry->description : "";
+    j["download_url"] = entry->download_url ? entry->download_url : "";
+    j["filename"] = entry->filename ? entry->filename : "";
+    j["file_size"] = entry->file_size;
+    j["default_scale"] = entry->default_scale;
+    nlohmann::json ids = nlohmann::json::array();
+    for (size_t i = 0; i < entry->compatible_model_count; ++i) {
+        if (entry->compatible_model_ids[i])
+            ids.push_back(entry->compatible_model_ids[i]);
+    }
+    j["compatible_model_ids"] = ids;
     return j.dump();
 }
 
@@ -1807,7 +1962,7 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistrySave(
     JNIEnv* env, jclass clazz, jstring modelId, jstring name, jint category, jint format,
     jint framework, jstring downloadUrl, jstring localPath, jlong downloadSize, jint contextLength,
-    jboolean supportsThinking, jstring description) {
+    jboolean supportsThinking, jboolean supportsLora, jstring description) {
     LOGi("racModelRegistrySave called");
 
     rac_model_registry_handle_t registry = rac_get_model_registry();
@@ -1840,6 +1995,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistrySave(
     model->download_size = downloadSize;
     model->context_length = contextLength;
     model->supports_thinking = supportsThinking ? RAC_TRUE : RAC_FALSE;
+    model->supports_lora = supportsLora ? RAC_TRUE : RAC_FALSE;
     model->description = desc_str ? strdup(desc_str) : nullptr;
 
     // Release Java strings

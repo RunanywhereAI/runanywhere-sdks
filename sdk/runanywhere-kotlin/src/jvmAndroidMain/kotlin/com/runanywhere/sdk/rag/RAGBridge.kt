@@ -15,9 +15,7 @@
 
 package com.runanywhere.sdk.rag
 
-import com.runanywhere.sdk.rag.RAGBridge
 import com.runanywhere.sdk.foundation.SDKLogger
-import androidx.annotation.Keep
 
 /**
  * Native bridge for RAG backend registration and pipeline operations.
@@ -31,8 +29,7 @@ import androidx.annotation.Keep
  * - Links to librac_backend_rag.so - RAG C++ backend
  * - Links to librac_commons.so - Commons library with service registry
  */
-@Keep
- object RAGBridge {
+object RAGBridge {
     private val logger = SDKLogger.rag
 
     @Volatile
