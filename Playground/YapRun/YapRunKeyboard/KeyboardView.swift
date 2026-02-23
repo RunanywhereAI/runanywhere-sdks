@@ -40,9 +40,6 @@ private enum Brand {
     static func dividerColor(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.1)
     }
-    static func yapBtnBg(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(white: 0.22) : Color(white: 0.85)
-    }
 }
 
 struct KeyboardView: View {
@@ -51,6 +48,7 @@ struct KeyboardView: View {
     let onStopTap: () -> Void
     let onCancelTap: () -> Void
     let onUndoTap: () -> Void
+    let onRedoTap: () -> Void
     let onNextKeyboard: () -> Void
     let onSpace: () -> Void
     let onReturn: () -> Void
@@ -63,11 +61,16 @@ struct KeyboardView: View {
     @State private var sessionState: String = "idle"
     @State private var audioLevel: Float = 0
     @State private var barPhase: Double = 0
-    @State private var showUndo = false
+    @State private var checkmarkTapped = false
+    @State private var canUndo = false
+    @State private var canRedo = false
     @State private var showStats = false
+    @State private var isDeleting = false
+    @State private var deleteStartTime: Date?
 
     private let stateTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
     private let waveformTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
+    private let deleteRepeatTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
 
     // MARK: - Body
 
@@ -93,20 +96,37 @@ struct KeyboardView: View {
             )
             .allowsHitTesting(false)
         )
-        .onAppear { refreshState() }
+        .onAppear {
+            refreshState()
+            canUndo = SharedDataBridge.shared.lastInsertedText != nil
+            canRedo = SharedDataBridge.shared.undoText != nil
+        }
         .onReceive(stateTimer) { _ in refreshState() }
         .onReceive(waveformTimer) { _ in
-            guard sessionState == "listening" else { return }
+            guard sessionState == "listening" || (checkmarkTapped && sessionState != "done") else { return }
             audioLevel = SharedDataBridge.shared.audioLevel
             barPhase += 0.15
         }
         .onChange(of: sessionState) { _, newState in
-            if newState == "done" {
-                showUndo = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    withAnimation { showUndo = false }
-                }
+            switch newState {
+            case "done":
+                checkmarkTapped = false
+                canUndo = true
+                canRedo = false
+            case "listening":
+                checkmarkTapped = false
+                canUndo = false
+                canRedo = false
+            case "idle", "ready":
+                checkmarkTapped = false
+            default:
+                break
             }
+        }
+        .onReceive(deleteRepeatTimer) { _ in
+            guard isDeleting, let start = deleteStartTime,
+                  Date().timeIntervalSince(start) > 0.35 else { return }
+            onDelete()
         }
     }
 
@@ -127,9 +147,14 @@ struct KeyboardView: View {
 
     private var toolbarRow: some View {
         HStack(spacing: 0) {
-            iconButton(systemImage: "slider.horizontal.3") {
+            Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showStats = true }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 20, weight: .medium))
+                    .frame(width: 48, height: 48)
             }
+            .foregroundColor(Brand.textSecondary(colorScheme))
             .padding(.leading, 4)
 
             Spacer()
@@ -137,17 +162,21 @@ struct KeyboardView: View {
             switch sessionState {
             case "idle":
                 Button(action: onRunTap) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Image(systemName: "waveform")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold))
                         Text("Yap")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 20, weight: .bold))
                     }
-                    .foregroundColor(Brand.textPrimary(colorScheme))
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 8)
-                    .background(Brand.yapBtnBg(colorScheme))
-                    .cornerRadius(8)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(
+                        colorScheme == .dark
+                            ? Color(white: 0.28)
+                            : Color(white: 0.18)
+                    )
+                    .cornerRadius(14)
                 }
                 .padding(.trailing, 8)
 
@@ -158,17 +187,12 @@ struct KeyboardView: View {
                     .padding(.trailing, 12)
 
             case "ready":
-                HStack(spacing: 6) {
-                    Text("Using iPhone Microphone")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Brand.textSecondary(colorScheme))
-                    Button(action: onMicTap) {
-                        Image(systemName: "waveform")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(Brand.accent(colorScheme))
-                            .padding(8)
-                            .background(Brand.accent(colorScheme).opacity(0.15), in: Circle())
-                    }
+                Button(action: onMicTap) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 50, height: 50)
+                        .background(Brand.green, in: Circle())
                 }
                 .padding(.trailing, 8)
 
@@ -176,7 +200,7 @@ struct KeyboardView: View {
                 EmptyView()
             }
         }
-        .frame(height: 44)
+        .frame(height: 58)
     }
 
     // MARK: Number Row
@@ -212,16 +236,29 @@ struct KeyboardView: View {
             ForEach([".","," ,"?","!","'"], id: \.self) { char in
                 characterKey(char)
             }
-            Button(action: onDelete) {
-                Image(systemName: "delete.left")
-                    .font(.system(size: 14))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Brand.keyCard(colorScheme))
-                    .cornerRadius(6)
-            }
-            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
-            .padding(3)
-            .frame(maxWidth: .infinity, minHeight: 42)
+            Image(systemName: "delete.left")
+                .font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Brand.keyCard(colorScheme))
+                .cornerRadius(6)
+                .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
+                .padding(3)
+                .frame(maxWidth: .infinity, minHeight: 50)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in
+                            if !isDeleting {
+                                isDeleting = true
+                                deleteStartTime = Date()
+                                onDelete()
+                            }
+                        }
+                        .onEnded { _ in
+                            isDeleting = false
+                            deleteStartTime = nil
+                        }
+                )
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 4)
@@ -232,19 +269,9 @@ struct KeyboardView: View {
     private var bottomRow: some View {
         HStack(spacing: 0) {
             Button(action: onNextKeyboard) {
-                Image(systemName: "globe")
-                    .font(.system(size: 18))
-                    .frame(width: 46, height: 42)
-                    .background(Brand.keyCard(colorScheme))
-                    .cornerRadius(6)
-            }
-            .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
-            .padding(3)
-
-            Button(action: onNextKeyboard) {
                 Text("ABC")
-                    .font(.system(size: 14, weight: .medium))
-                    .frame(width: 52, height: 42)
+                    .font(.system(size: 16, weight: .medium))
+                    .frame(width: 56, height: 50)
                     .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
@@ -256,22 +283,54 @@ struct KeyboardView: View {
                     Image("yaprun_icon")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 20, height: 20)
                         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                     Text("YapRun")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.9))
                 }
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .frame(maxWidth: .infinity, minHeight: 50)
                 .background(Brand.keySurface(colorScheme))
                 .cornerRadius(6)
             }
             .padding(3)
 
+            if canUndo {
+                Button {
+                    onUndoTap()
+                    canUndo = false
+                    canRedo = true
+                } label: {
+                    Image(systemName: "arrow.uturn.backward.circle")
+                        .font(.system(size: 20))
+                        .frame(width: 44, height: 50)
+                        .background(Brand.keyCard(colorScheme))
+                        .cornerRadius(6)
+                }
+                .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
+                .padding(3)
+            }
+
+            if canRedo {
+                Button {
+                    onRedoTap()
+                    canRedo = false
+                    canUndo = true
+                } label: {
+                    Image(systemName: "arrow.uturn.forward.circle")
+                        .font(.system(size: 20))
+                        .frame(width: 44, height: 50)
+                        .background(Brand.keyCard(colorScheme))
+                        .cornerRadius(6)
+                }
+                .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
+                .padding(3)
+            }
+
             Button(action: onReturn) {
                 Image(systemName: "return")
-                    .font(.system(size: 16))
-                    .frame(width: 52, height: 42)
+                    .font(.system(size: 18))
+                    .frame(width: 56, height: 50)
                     .background(Brand.keyCard(colorScheme))
                     .cornerRadius(6)
             }
@@ -332,124 +391,145 @@ struct KeyboardView: View {
 
     // MARK: - Waveform View
 
+    private var isTranscribing: Bool {
+        checkmarkTapped || sessionState == "transcribing"
+    }
+
     private var waveformView: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            if sessionState != "transcribing" {
-                HStack {
-                    Button(action: sessionState == "done" ? {} : onCancelTap) {
-                        Image(systemName: "xmark")
+            // Top bar — always visible across listening/transcribing/done
+            HStack {
+                // Left: Cancel (hidden during transcribing/done)
+                Button(action: onCancelTap) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.8))
+                        .frame(width: 44, height: 44)
+                }
+                .padding(.leading, 20)
+                .opacity(sessionState == "done" || isTranscribing ? 0 : 1)
+                .disabled(sessionState == "done" || isTranscribing)
+
+                Spacer()
+
+                // Center: Status indicator
+                VStack(spacing: 2) {
+                    if sessionState == "done" {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(Brand.green)
+                    } else if isTranscribing {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .tint(Brand.accent(colorScheme))
+                                .scaleEffect(0.75)
+                            Text("Transcribing")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Brand.textPrimary(colorScheme))
+                        }
+                    } else {
+                        HStack(spacing: 6) {
+                            Image(systemName: "waveform")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Brand.accent(colorScheme))
+                            Text("Listening")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Brand.textPrimary(colorScheme))
+                        }
+                        Text("iPhone Microphone")
+                            .font(.caption)
+                            .foregroundStyle(Brand.textSecondary(colorScheme))
+                    }
+                }
+
+                Spacer()
+
+                // Right: Checkmark / Spinner / Undo+Redo
+                if sessionState == "done" {
+                    HStack(spacing: 12) {
+                        if canUndo {
+                            Button {
+                                onUndoTap()
+                                canUndo = false
+                                canRedo = true
+                            } label: {
+                                Image(systemName: "arrow.uturn.backward.circle")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.8))
+                            }
+                        }
+                        if canRedo {
+                            Button {
+                                onRedoTap()
+                                canRedo = false
+                                canUndo = true
+                            } label: {
+                                Image(systemName: "arrow.uturn.forward.circle")
+                                    .font(.system(size: 22))
+                                    .foregroundStyle(Brand.textPrimary(colorScheme).opacity(0.8))
+                            }
+                        }
+                    }
+                    .padding(.trailing, 20)
+                    .frame(width: 84, alignment: .trailing)
+                } else if isTranscribing {
+                    ProgressView()
+                        .tint(Brand.accent(colorScheme))
+                        .scaleEffect(0.85)
+                        .frame(width: 44, height: 44)
+                        .padding(.trailing, 20)
+                } else {
+                    Button {
+                        checkmarkTapped = true
+                        onStopTap()
+                    } label: {
+                        Image(systemName: "checkmark")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(sessionState == "done" ? Color.clear : Brand.textPrimary(colorScheme).opacity(0.8))
+                            .foregroundStyle(Brand.accent(colorScheme))
                             .frame(width: 44, height: 44)
                     }
-                    .padding(.leading, 20)
-
-                    Spacer()
-
-                    VStack(spacing: 2) {
-                        if sessionState == "done" {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(Brand.green)
-                        } else {
-                            HStack(spacing: 6) {
-                                Image(systemName: "waveform")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Brand.accent(colorScheme))
-                                Text("Listening")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Brand.textPrimary(colorScheme))
-                            }
-                            Text("iPhone Microphone")
-                                .font(.caption)
-                                .foregroundStyle(Brand.textSecondary(colorScheme))
-                        }
-                    }
-
-                    Spacer()
-
-                    if sessionState == "done" && showUndo {
-                        Button(action: onUndoTap) {
-                            Image(systemName: "arrow.uturn.backward.circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(Brand.textSecondary(colorScheme))
-                        }
-                        .padding(.trailing, 20)
-                    } else {
-                        Button(action: onStopTap) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Brand.accent(colorScheme))
-                                .frame(width: 44, height: 44)
-                        }
-                        .padding(.trailing, 20)
-                        .opacity(sessionState == "done" ? 0 : 1)
-                    }
+                    .padding(.trailing, 20)
                 }
             }
 
             waveformBars
-                .frame(height: 56)
+                .frame(maxHeight: .infinity)
                 .padding(.horizontal, 20)
 
-            if sessionState == "transcribing" {
-                VStack(spacing: 4) {
-                    ProgressView()
-                        .tint(Brand.accent(colorScheme))
-                        .scaleEffect(0.9)
-                    Text("Transcribing...")
-                        .font(.caption)
-                        .foregroundStyle(Brand.textSecondary(colorScheme))
-                }
-                .padding(.vertical, 8)
-            }
-
             Spacer()
-
-            HStack {
-                Button(action: onNextKeyboard) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 18))
-                        .frame(width: 46, height: 40)
-                        .background(Brand.keyCard(colorScheme))
-                        .cornerRadius(6)
-                }
-                .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.8))
-                .padding(.leading, 7)
-                .padding(.bottom, 6)
-                Spacer()
-            }
         }
-        .frame(minHeight: 180)
+        .frame(minHeight: 300)
     }
 
     // MARK: Waveform Bars
 
     private var waveformBars: some View {
         HStack(spacing: 3) {
-            ForEach(0..<30, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2)
+            ForEach(0..<40, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 2.5)
                     .fill(barGradient)
-                    .frame(width: 3, height: barHeight(for: index))
+                    .frame(width: 4, height: barHeight(for: index))
                     .animation(.easeOut(duration: 0.08), value: audioLevel)
             }
         }
     }
 
     private func barHeight(for index: Int) -> CGFloat {
-        let base: CGFloat = 4
-        let maxH: CGFloat = 50
+        let base: CGFloat = 12
+        let maxH: CGFloat = 200
         if sessionState == "transcribing" {
             let wave = CGFloat(sin(Double(index) * 0.5 + barPhase))
-            return base + (maxH * 0.25) * (0.5 + 0.5 * wave)
+            return base + (maxH * 0.3) * (0.5 + 0.5 * wave)
         }
         if sessionState == "done" {
-            return base + 8
+            return base + 30
         }
         let wave = CGFloat(sin(Double(index) * 0.45 + barPhase))
-        let level = CGFloat(min(max(audioLevel, 0), 1))
+        let raw = CGFloat(min(max(audioLevel, 0), 1))
+        // Boost low audio levels so bars are visually prominent
+        let level = min(raw * 3.0 + 0.15, 1.0)
         let dynamic = (maxH - base) * level * (0.6 + 0.4 * ((wave + 1) / 2))
         return base + dynamic
     }
@@ -474,22 +554,13 @@ struct KeyboardView: View {
     private func characterKey(_ char: String) -> some View {
         Button(action: { onInsertCharacter(char.trimmingCharacters(in: .whitespaces)) }) {
             Text(char)
-                .font(.system(size: 14))
-                .frame(maxWidth: .infinity, minHeight: 42)
+                .font(.system(size: 17))
+                .frame(maxWidth: .infinity, minHeight: 50)
                 .background(Brand.keySurface(colorScheme))
                 .cornerRadius(6)
         }
         .foregroundColor(Brand.textPrimary(colorScheme).opacity(0.9))
         .padding(3)
-    }
-
-    private func iconButton(systemImage: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16))
-                .padding(10)
-        }
-        .foregroundColor(Brand.textSecondary(colorScheme))
     }
 
     // MARK: - Stats Loading

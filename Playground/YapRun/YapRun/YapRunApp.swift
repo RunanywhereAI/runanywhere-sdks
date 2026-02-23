@@ -10,6 +10,7 @@
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
+import WhisperKitRuntime
 import os
 
 @main
@@ -105,10 +106,9 @@ struct YapRunApp: App {
                 showFlowActivation = true
                 Task { await flowSession.handleStartFlow() }
             case "kill":
-                logger.info("Received kill deep link — ending session and terminating")
+                logger.info("Received kill deep link — killing session and terminating")
                 Task {
-                    await flowSession.endSession()
-                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    await flowSession.killSession()
                     exit(0)
                 }
             case "playground":
@@ -131,12 +131,20 @@ struct YapRunApp: App {
     func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
 
             try RunAnywhere.initialize()
             logger.info("SDK initialized in development mode")
 
             ModelRegistry.registerAll()
             logger.info("ASR models registered")
+
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("Discovered \(discovered) previously downloaded models")
+            }
+
             await MainActor.run { isSDKInitialized = true }
         } catch {
             logger.error("SDK initialization failed: \(error.localizedDescription)")

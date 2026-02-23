@@ -39,6 +39,7 @@ final class KeyboardViewController: UIInputViewController {
             onStopTap:         { DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.stopListening) },
             onCancelTap:       { DarwinNotificationCenter.shared.post(name: SharedConstants.DarwinNotifications.cancelListening) },
             onUndoTap:         { [weak self] in self?.handleUndo() },
+            onRedoTap:         { [weak self] in self?.handleRedo() },
             onNextKeyboard:    { [weak self] in self?.advanceToNextInputMode() },
             onSpace:           { [weak self] in self?.textDocumentProxy.insertText(" ") },
             onReturn:          { [weak self] in self?.textDocumentProxy.insertText("\n") },
@@ -73,14 +74,36 @@ final class KeyboardViewController: UIInputViewController {
         openURL(url)
     }
 
-    // MARK: - Undo
+    // MARK: - Undo / Redo
 
     private func handleUndo() {
         guard let text = SharedDataBridge.shared.lastInsertedText, !text.isEmpty else { return }
-        for _ in text {
+        SharedDataBridge.shared.undoText = text
+        SharedDataBridge.shared.lastInsertedText = nil
+        batchDelete(count: text.count)
+    }
+
+    private func handleRedo() {
+        guard let text = SharedDataBridge.shared.undoText, !text.isEmpty else { return }
+        textDocumentProxy.insertText(text)
+        SharedDataBridge.shared.lastInsertedText = text
+        SharedDataBridge.shared.undoText = nil
+    }
+
+    /// Delete `count` characters in chunks, yielding to the run loop between
+    /// batches so the keyboard UI stays responsive during long deletions.
+    private func batchDelete(count: Int, chunkSize: Int = 50) {
+        guard count > 0 else { return }
+        let toDelete = min(count, chunkSize)
+        for _ in 0..<toDelete {
             textDocumentProxy.deleteBackward()
         }
-        SharedDataBridge.shared.lastInsertedText = nil
+        let remaining = count - toDelete
+        if remaining > 0 {
+            DispatchQueue.main.async { [weak self] in
+                self?.batchDelete(count: remaining, chunkSize: chunkSize)
+            }
+        }
     }
 
     // MARK: - Transcription Result
@@ -88,6 +111,7 @@ final class KeyboardViewController: UIInputViewController {
     private func handleTranscriptionReady() {
         guard let text = SharedDataBridge.shared.transcribedText, !text.isEmpty else { return }
         textDocumentProxy.insertText(text)
+        SharedDataBridge.shared.lastInsertedText = text
         SharedDataBridge.shared.transcribedText = nil
     }
 

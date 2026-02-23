@@ -11,8 +11,9 @@
 		54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFB2F497A34009D6B51 /* WidgetKit.framework */; };
 		54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFD2F497A34009D6B51 /* SwiftUI.framework */; };
 		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		543991CD2F498152009D6B51 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CC2F498152009D6B51 /* RunAnywhere */; };
-		543991CF2F498152009D6B51 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 543991CE2F498152009D6B51 /* RunAnywhereONNX */; };
+		54BE95652F4C419600B9011C /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 54BE95642F4C419600B9011C /* RunAnywhere */; };
+		54BE95672F4C419600B9011C /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 54BE95662F4C419600B9011C /* RunAnywhereONNX */; };
+		54BE95692F4C419600B9011C /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54BE95682F4C419600B9011C /* RunAnywhereWhisperKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -138,8 +139,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				543991CF2F498152009D6B51 /* RunAnywhereONNX in Frameworks */,
-				543991CD2F498152009D6B51 /* RunAnywhere in Frameworks */,
+				54BE95692F4C419600B9011C /* RunAnywhereWhisperKit in Frameworks */,
+				54BE95672F4C419600B9011C /* RunAnywhereONNX in Frameworks */,
+				54BE95652F4C419600B9011C /* RunAnywhere in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,6 +224,7 @@
 				54398FB72F4979D2009D6B51 /* Frameworks */,
 				54398FB82F4979D2009D6B51 /* Resources */,
 				54398FF42F497A03009D6B51 /* Embed Foundation Extensions */,
+				AA000001STRIPSTATICFWS /* Strip Static Frameworks */,
 			);
 			buildRules = (
 			);
@@ -234,8 +237,9 @@
 			);
 			name = YapRun;
 			packageProductDependencies = (
-				543991CC2F498152009D6B51 /* RunAnywhere */,
-				543991CE2F498152009D6B51 /* RunAnywhereONNX */,
+				54BE95642F4C419600B9011C /* RunAnywhere */,
+				54BE95662F4C419600B9011C /* RunAnywhereONNX */,
+				54BE95682F4C419600B9011C /* RunAnywhereWhisperKit */,
 			);
 			productName = YapRun;
 			productReference = 54398FBA2F4979D2009D6B51 /* YapRun.app */;
@@ -370,7 +374,7 @@
 			mainGroup = 54398FB12F4979D2009D6B51;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
+				54BE95632F4C419600B9011C /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 54398FBB2F4979D2009D6B51 /* Products */;
@@ -423,6 +427,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AA000001STRIPSTATICFWS /* Strip Static Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Static Frameworks";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Remove SPM-generated framework stubs for our static libraries.\n# These are statically linked into the app binary (verified: no @rpath references).\n# SPM creates these empty dynamic framework wrappers but they are not needed\n# and cause App Store validation failures.\nFRAMEWORKS_TO_STRIP=\"RACommons RABackendONNX RABackendLLAMACPP onnxruntime\"\nfor FW_DIR in \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\" \"${CODESIGNING_FOLDER_PATH}/Frameworks\" \"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}\"; do\n  if [ -d \"${FW_DIR}\" ]; then\n    for fw in $FRAMEWORKS_TO_STRIP; do\n      if [ -d \"${FW_DIR}/${fw}.framework\" ]; then\n        echo \"Removing unnecessary framework stub: ${fw}.framework\"\n        rm -rf \"${FW_DIR}/${fw}.framework\"\n      fi\n    done\n  fi\ndone\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		54398FB62F4979D2009D6B51 /* Sources */ = {
@@ -526,7 +547,7 @@
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -588,7 +609,7 @@
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -634,7 +655,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -681,7 +702,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -708,7 +729,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -734,7 +755,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -759,7 +780,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -784,7 +805,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				MACOSX_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRunUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -817,7 +838,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunKeyboard;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -848,7 +869,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunKeyboard;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -882,7 +903,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -915,7 +936,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun.YapRunActivity;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -990,26 +1011,31 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+		54BE95632F4C419600B9011C /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.19.1;
+				minimumVersion = 0.19.5;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		543991CC2F498152009D6B51 /* RunAnywhere */ = {
+		54BE95642F4C419600B9011C /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 54BE95632F4C419600B9011C /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
-		543991CE2F498152009D6B51 /* RunAnywhereONNX */ = {
+		54BE95662F4C419600B9011C /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 543991CB2F498152009D6B51 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 54BE95632F4C419600B9011C /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereONNX;
+		};
+		54BE95682F4C419600B9011C /* RunAnywhereWhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 54BE95632F4C419600B9011C /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

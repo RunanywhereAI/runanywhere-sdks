@@ -3,8 +3,8 @@
 //  RunAnywhere SDK
 //
 //  Public API for Speech-to-Text operations.
-//  Calls C++ directly via CppBridge.STT for all operations.
-//  Events are emitted by C++ layer via CppEventBridge.
+//  All transcription flows through C++ via CppBridge.STT / rac_stt_component,
+//  which provides automatic telemetry for every backend (ONNX, WhisperKit, etc.).
 //
 
 @preconcurrency import AVFoundation
@@ -45,7 +45,7 @@ public extension RunAnywhere {
     /// Check if an STT model is loaded
     static var isSTTModelLoaded: Bool {
         get async {
-            await CppBridge.STT.shared.isLoaded
+            return await CppBridge.STT.shared.isLoaded
         }
     }
 
@@ -64,7 +64,6 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Get handle from CppBridge.STT
         let handle = try await CppBridge.STT.shared.getHandle()
 
         guard await CppBridge.STT.shared.isLoaded else {
@@ -74,11 +73,9 @@ public extension RunAnywhere {
         let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
         let startTime = Date()
 
-        // Calculate audio metrics
         let audioSizeBytes = audioData.count
         let audioLengthSec = estimateAudioLength(dataSize: audioSizeBytes)
 
-        // Transcribe (C++ emits events)
         var sttResult = rac_stt_result_t()
         defer { rac_stt_result_free(&sttResult) }
         let transcribeResult = options.withCOptions { cOptionsPtr in
@@ -100,7 +97,6 @@ public extension RunAnywhere {
         let endTime = Date()
         let processingTimeSec = endTime.timeIntervalSince(startTime)
 
-        // Extract result
         let transcribedText: String
         if let textPtr = sttResult.text {
             transcribedText = String(cString: textPtr)
@@ -115,7 +111,6 @@ public extension RunAnywhere {
         }
         let confidence = sttResult.confidence
 
-        // Create metadata
         let metadata = TranscriptionMetadata(
             modelId: modelId,
             processingTime: processingTimeSec,
@@ -145,7 +140,6 @@ public extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
-        // Convert AVAudioPCMBuffer to Data
         guard let channelData = buffer.floatChannelData else {
             throw SDKError.stt(.emptyAudioBuffer, "Audio buffer has no channel data")
         }
@@ -153,7 +147,6 @@ public extension RunAnywhere {
         let frameLength = Int(buffer.frameLength)
         let audioData = Data(bytes: channelData[0], count: frameLength * MemoryLayout<Float>.size)
 
-        // Build options with language if provided
         let options: STTOptions
         if let language = language {
             options = STTOptions(language: language)
@@ -165,11 +158,6 @@ public extension RunAnywhere {
     }
 
     /// Start streaming transcription
-    /// - Parameters:
-    ///   - options: Transcription options
-    ///   - onPartialResult: Callback for partial transcription results
-    ///   - onFinalResult: Callback for final transcription result
-    ///   - onError: Callback for errors
     @available(*, deprecated, message: "Use transcribeStream(audioData:options:onPartialResult:) instead")
     static func startStreamingTranscription(
         options _: STTOptions = STTOptions(),
@@ -181,11 +169,6 @@ public extension RunAnywhere {
     }
 
     /// Transcribe audio with streaming callbacks
-    /// - Parameters:
-    ///   - audioData: Audio data to transcribe
-    ///   - options: Transcription options
-    ///   - onPartialResult: Callback for partial results
-    /// - Returns: Final transcription output
     static func transcribeStream(
         audioData: Data,
         options: STTOptions = STTOptions(),
@@ -208,11 +191,9 @@ public extension RunAnywhere {
         let modelId = await CppBridge.STT.shared.currentModelId ?? "unknown"
         let startTime = Date()
 
-        // Create context for callback bridging
         let context = STTStreamingContext(onPartialResult: onPartialResult)
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
-        // Stream transcription with callback
         let result = options.withCOptions { cOptionsPtr in
             audioData.withUnsafeBytes { audioPtr in
                 rac_stt_component_transcribe_stream(
@@ -244,7 +225,6 @@ public extension RunAnywhere {
             }
         }
 
-        // Release context
         let finalContext = Unmanaged<STTStreamingContext>.fromOpaque(contextPtr).takeRetainedValue()
 
         guard result == RAC_SUCCESS else {
@@ -272,9 +252,6 @@ public extension RunAnywhere {
     }
 
     /// Process audio samples for streaming transcription
-    /// - Parameters:
-    ///   - samples: Audio samples
-    ///   - options: Transcription options (default: STTOptions())
     static func processStreamingAudio(_ samples: [Float], options: STTOptions = STTOptions()) async throws {
         guard isSDKInitialized else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
@@ -288,7 +265,6 @@ public extension RunAnywhere {
 
         let data = samples.withUnsafeBufferPointer { Data(buffer: $0) }
 
-        // sttResult is intentionally unused: the C layer delivers results via CppEventBridge events.
         var sttResult = rac_stt_result_t()
         defer { rac_stt_result_free(&sttResult) }
         let transcribeResult = options.withCOptions { cOptionsPtr in
@@ -327,8 +303,6 @@ public extension RunAnywhere {
 // MARK: - Streaming Context Helper
 
 /// Context class for bridging C callbacks to Swift closures.
-/// `finalText` is written by the C callback thread and read by the async
-/// continuation — protected by OSAllocatedUnfairLock to prevent data races.
 private final class STTStreamingContext: Sendable {
     let onPartialResult: @Sendable (STTTranscriptionResult) -> Void
     private let _finalText = OSAllocatedUnfairLock(initialState: "")

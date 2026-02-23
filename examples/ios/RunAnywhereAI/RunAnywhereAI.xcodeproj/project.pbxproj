@@ -8,12 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 541C59D92E63772A00DD7839 /* RunAnywhere */; };
-		54398AC52F492D1D009D6B51 /* RunAnywhereKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54398AC52F492D1D009D6B51 /* RunAnywhereKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		54398D222F4939A7009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D212F4939A7009D6B51 /* WidgetKit.framework */; };
 		54398D242F4939A7009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D232F4939A7009D6B51 /* SwiftUI.framework */; };
-		54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
+		58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */; };
 		RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */; };
 		RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };
 		RACSHARED03RACSHARED03RACS /* SharedDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */; };
@@ -167,6 +168,7 @@
 				58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
+				58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,6 +308,7 @@
 				541C59D92E63772A00DD7839 /* RunAnywhere */,
 				58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */,
 				58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */,
+				58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -539,11 +542,17 @@
 /* Begin PBXTargetDependency section */
 		54398AC42F492D1D009D6B51 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
 			target = 54398ABD2F492D1D009D6B51 /* RunAnywhereKeyboard */;
 			targetProxy = 54398AC32F492D1D009D6B51 /* PBXContainerItemProxy */;
 		};
 		54398D322F4939A7009D6B51 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
 			target = 54398D1F2F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension */;
 			targetProxy = 54398D312F4939A7009D6B51 /* PBXContainerItemProxy */;
 		};
@@ -837,6 +846,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 0.17.2;
+				OTHER_LDFLAGS = "-all_load";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -881,6 +891,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 0.17.2;
+				OTHER_LDFLAGS = "-all_load";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1062,6 +1073,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereLlamaCPP;
+		};
+		58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

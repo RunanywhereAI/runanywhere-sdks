@@ -52,6 +52,7 @@
 #include "rac_stt_component.h"
 #include "rac_stt_analytics.h"
 #include "rac_stt_events.h"
+#include "rac_stt_whisperkit_coreml.h"
 
 // TTS (Text-to-Speech)
 #include "rac_tts.h"

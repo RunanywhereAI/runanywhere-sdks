@@ -44,10 +44,10 @@ struct rac_stt_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    /** Resolved inference framework (defaults to ONNX, the primary STT backend) */
+    /** Resolved inference framework (determined by service registry at load time) */
     rac_inference_framework_t actual_framework;
 
-    rac_stt_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_ONNX) {
+    rac_stt_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_UNKNOWN) {
         // Initialize with defaults - matches rac_stt_types.h rac_stt_config_t
         config = RAC_STT_CONFIG_DEFAULT;
 
@@ -178,7 +178,7 @@ extern "C" rac_result_t rac_stt_component_configure(rac_handle_t handle,
     component->config = *config;
 
     // Resolve actual framework: if caller explicitly set one (not -1=auto), use it;
-    // otherwise keep the default (RAC_FRAMEWORK_ONNX for STT components)
+    // otherwise keep the default (UNKNOWN – resolved by service registry at load time)
     if (config->preferred_framework >= 0 &&
         config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
         component->actual_framework =

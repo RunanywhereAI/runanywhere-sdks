@@ -30,6 +30,8 @@ final class MacDictationService {
     private let audioCapture = AudioCaptureManager()
     private var audioBuffer = Foundation.Data()
     private var timerTask: Task<Void, Never>?
+    private var modelLoadTask: Task<Void, Never>?
+    private var hotkeyIsDown = false
     private var cancellables = Set<AnyCancellable>()
     private let logger = Logger(subsystem: "com.runanywhere.yaprun", category: "Dictation")
 
@@ -45,6 +47,7 @@ final class MacDictationService {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 guard let self else { return }
+                self.hotkeyIsDown = true
                 Task { await self.beginRecording() }
             }
             .store(in: &cancellables)
@@ -53,6 +56,7 @@ final class MacDictationService {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 guard let self else { return }
+                self.hotkeyIsDown = false
                 Task { await self.finishRecordingAndTranscribe() }
             }
             .store(in: &cancellables)
@@ -70,9 +74,13 @@ final class MacDictationService {
     func toggleFromFlowBar() async {
         switch phase {
         case .idle:
+            hotkeyIsDown = true
             await beginRecording()
         case .recording:
+            hotkeyIsDown = false
             await finishRecordingAndTranscribe()
+        case .loadingModel:
+            cancelModelLoad()
         default:
             break
         }
@@ -83,16 +91,73 @@ final class MacDictationService {
     private func beginRecording() async {
         guard phase == .idle else { return }
 
-        guard await RunAnywhere.currentSTTModel != nil else {
-            phase = .error("No STT model loaded")
-            resetAfterDelay()
-            return
+        // If no model loaded, auto-download/load the default
+        if await RunAnywhere.currentSTTModel == nil {
+            await ensureModelLoaded()
+            // If model load failed or user released the key, stop here
+            guard phase == .loadingModel else { return }
+            // Model is now loaded — continue to recording
         }
 
+        await startMicAndRecord()
+    }
+
+    /// Downloads (if needed) and loads the preferred STT model.
+    /// Sets phase to `.loadingModel` during the process.
+    private func ensureModelLoaded() async {
+        phase = .loadingModel
+        logger.info("No STT model loaded — auto-loading default")
+
+        let modelId = UserDefaults.standard.string(forKey: "preferredSTTModelId")
+            ?? ModelRegistry.defaultModelId
+
+        do {
+            let allModels = try await RunAnywhere.availableModels()
+            guard let model = allModels.first(where: { $0.id == modelId }) else {
+                phase = .error("Model not found")
+                resetAfterDelay()
+                return
+            }
+
+            // Download if not already on disk
+            if model.localPath == nil {
+                logger.info("Downloading model: \(modelId)")
+                let stream = try await RunAnywhere.downloadModel(modelId)
+                for await progress in stream {
+                    // Bail out if user released hotkey during download
+                    guard phase == .loadingModel else { return }
+                    if progress.stage == .completed { break }
+                }
+            }
+
+            // Bail out if user released hotkey during download
+            guard phase == .loadingModel else { return }
+
+            // Load the model
+            logger.info("Loading model: \(modelId)")
+            try await RunAnywhere.loadSTTModel(modelId)
+            UserDefaults.standard.set(modelId, forKey: "preferredSTTModelId")
+            logger.info("Model \(modelId) auto-loaded successfully")
+        } catch {
+            guard phase == .loadingModel else { return }
+            phase = .error("Model load failed")
+            logger.error("Auto-load failed: \(error.localizedDescription)")
+            resetAfterDelay()
+        }
+    }
+
+    /// Starts the microphone and transitions to the recording phase.
+    private func startMicAndRecord() async {
         let permitted = await audioCapture.requestPermission()
         guard permitted else {
             phase = .error("Microphone access required")
             resetAfterDelay()
+            return
+        }
+
+        // Check if user released key while we were requesting permission
+        guard hotkeyIsDown || phase == .loadingModel else {
+            phase = .idle
             return
         }
 
@@ -117,6 +182,12 @@ final class MacDictationService {
     }
 
     private func finishRecordingAndTranscribe() async {
+        // If still loading model, cancel the load and go idle
+        if phase == .loadingModel {
+            cancelModelLoad()
+            return
+        }
+
         guard phase == .recording else { return }
 
         audioCapture.stopRecording()
@@ -153,11 +224,20 @@ final class MacDictationService {
         }
     }
 
+    private func cancelModelLoad() {
+        modelLoadTask?.cancel()
+        modelLoadTask = nil
+        phase = .idle
+        logger.info("Model load cancelled")
+    }
+
     private func cancelRecording() {
         audioCapture.stopRecording()
         audioLevel = 0
         timerTask?.cancel()
         timerTask = nil
+        modelLoadTask?.cancel()
+        modelLoadTask = nil
         audioBuffer = Foundation.Data()
         phase = .idle
     }

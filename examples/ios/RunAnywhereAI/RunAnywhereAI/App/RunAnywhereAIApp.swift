@@ -9,6 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
+import WhisperKitRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -82,6 +83,7 @@ struct RunAnywhereAIApp: App {
             // → only Platform is registered → -422 "No provider could handle the request".
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -130,6 +132,15 @@ struct RunAnywhereAIApp: App {
             // Register modules and models
             await registerModulesAndModels()
 
+            // Wait for all registerModel() saves to complete, then scan disk
+            // for previously downloaded models. Order matters: flush ensures every
+            // model is in the C++ registry so discovery can match files to entries.
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("📂 Discovered \(discovered) previously downloaded models")
+            }
+
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized!")
             logger.info("⚡ Initialization time: \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
@@ -164,13 +175,8 @@ struct RunAnywhereAIApp: App {
     private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
         logger.info("📦 Registering modules with their models...")
 
-        // Register LlamaCPP backend with C++ commons
-        LlamaCPP.register(priority: 100)
-        logger.info("✅ LlamaCPP backend registered")
-
-        // Register ONNX backend service providers
-        ONNX.register(priority: 100)
-        logger.info("✅ ONNX backend registered")
+        // NOTE: LlamaCPP, ONNX, and WhisperKitSTT backends are registered once
+        // in initializeSDK() before any await. No duplicate registration needed here.
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
@@ -339,6 +345,32 @@ struct RunAnywhereAIApp: App {
             )
         }
         logger.info("✅ ONNX STT/TTS models registered")
+
+        // Register WhisperKit STT models (Apple Neural Engine via Core ML)
+        // These run on the ANE, freeing up CPU for other tasks — ideal for background STT on iOS
+        if let whisperKitTinyURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisperkit-tiny.en",
+                name: "Whisper Tiny EN (WhisperKit)",
+                url: whisperKitTinyURL,
+                framework: .whisperKitCoreML,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 70_000_000
+            )
+        }
+        if let whisperKitBaseURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisperkit-base.en",
+                name: "Whisper Base EN (WhisperKit)",
+                url: whisperKitBaseURL,
+                framework: .whisperKitCoreML,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 134_000_000
+            )
+        }
+        logger.info("✅ WhisperKit STT models registered")
 
         // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
         // ============================================================================

@@ -410,6 +410,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>
@@ -426,18 +427,26 @@ EOF
         "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
         -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
 
-    # Create XCFramework (iOS + optionally macOS)
+    # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
     rm -rf "${XCFW_PATH}"
 
+    # Prepare library files (rename binary to lib*.a for library format)
+    local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
+    cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
+
+    local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+    cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+
     local XCFW_ARGS=(
-        -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework"
-        -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework"
+        -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
+        -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
     )
 
     if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
-        create_macos_versioned_framework "${BUILD_DIR}/MACOS" "${FRAMEWORK_NAME}"
-        XCFW_ARGS+=(-framework "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework")
+        local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
+        cp "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${MACOS_LIB}"
+        XCFW_ARGS+=(-library "${MACOS_LIB}" -headers "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/Headers")
         log_info "Including macOS slice in ${FRAMEWORK_NAME}.xcframework"
     fi
 
@@ -586,6 +595,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>
@@ -608,19 +618,27 @@ EOF
         "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" \
         -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" 2>/dev/null || true
 
-    # Create XCFramework (iOS + optionally macOS)
+    # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
     rm -rf "${XCFW_PATH}"
 
     if [[ -f "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+        # Prepare library files (rename binary to lib*.a for library format)
+        local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
+        cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
+
+        local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+        cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+
         local XCFW_ARGS=(
-            -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework"
-            -framework "${SIM_FAT}/${FRAMEWORK_NAME}.framework"
+            -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
+            -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
         )
 
         if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
-            create_macos_versioned_framework "${BUILD_DIR}/MACOS" "${FRAMEWORK_NAME}"
-            XCFW_ARGS+=(-framework "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework")
+            local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
+            cp "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${MACOS_LIB}"
+            XCFW_ARGS+=(-library "${MACOS_LIB}" -headers "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/Headers")
             log_info "Including macOS slice in ${FRAMEWORK_NAME}.xcframework"
         fi
 

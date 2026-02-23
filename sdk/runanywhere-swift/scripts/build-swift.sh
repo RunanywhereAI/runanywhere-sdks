@@ -258,30 +258,107 @@ install_frameworks() {
         fi
     done
 
-    # Install ONNX Runtime xcframework
+    # Install ONNX Runtime xcframeworks (split: iOS static library + macOS dynamic framework)
+    # Remove old combined xcframework if present
+    rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
+
     if [[ "$INCLUDE_MACOS" == true ]]; then
-        # macOS included: create combined iOS + macOS xcframework
+        # macOS included: create split iOS + macOS xcframeworks
         local ONNX_SCRIPT="$SWIFT_SDK_DIR/scripts/create-onnxruntime-xcframework.sh"
         if [[ -x "$ONNX_SCRIPT" ]]; then
-            log_step "Creating combined ONNX Runtime xcframework (iOS + macOS)..."
+            log_step "Creating split ONNX Runtime xcframeworks (iOS + macOS)..."
             "$ONNX_SCRIPT"
         else
-            log_warn "create-onnxruntime-xcframework.sh not found, skipping combined ONNX Runtime"
+            log_warn "create-onnxruntime-xcframework.sh not found, skipping ONNX Runtime"
         fi
     else
-        # iOS only: copy the pre-built iOS onnxruntime xcframework directly
+        # iOS only: create library-format xcframework from pre-built iOS onnxruntime
         local ONNX_SRC="$COMMONS_DIR/third_party/onnxruntime-ios/onnxruntime.xcframework"
         if [[ -d "$ONNX_SRC" ]]; then
-            log_step "Copying onnxruntime.xcframework (iOS only)"
-            rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
-            cp -r "$ONNX_SRC" "$BINARIES_DIR/"
-            log_info "  onnxruntime.xcframework ($(du -sh "$ONNX_SRC" | cut -f1))"
+            log_step "Creating onnxruntime-ios.xcframework (library format)"
+            local ONNX_TEMP=$(mktemp -d)
+            local XCFW_ARGS=()
+            for SLICE_DIR in "${ONNX_SRC}"/*/; do
+                local SLICE_NAME=$(basename "$SLICE_DIR")
+                [[ "$SLICE_NAME" == "Info.plist" ]] && continue
+                local DEST="${ONNX_TEMP}/${SLICE_NAME}"
+                mkdir -p "$DEST"
+                if [[ -d "${SLICE_DIR}/onnxruntime.framework" ]]; then
+                    cp "${SLICE_DIR}/onnxruntime.framework/onnxruntime" "${DEST}/libonnxruntime.a"
+                    cp -R "${SLICE_DIR}/onnxruntime.framework/Headers" "${DEST}/Headers" 2>/dev/null || true
+                fi
+                XCFW_ARGS+=(-library "${DEST}/libonnxruntime.a")
+                [[ -d "${DEST}/Headers" ]] && XCFW_ARGS+=(-headers "${DEST}/Headers")
+            done
+            rm -rf "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            rm -rf "$ONNX_TEMP"
+            log_info "  onnxruntime-ios.xcframework created"
         else
             log_warn "onnxruntime.xcframework not found at $ONNX_SRC"
         fi
     fi
 
     log_info "Frameworks installed to: $BINARIES_DIR"
+}
+
+# =============================================================================
+# Sync CRACommons Bridge Headers
+# =============================================================================
+
+sync_headers() {
+    log_header "Syncing CRACommons bridge headers"
+
+    local BRIDGE_INCLUDE="$SWIFT_SDK_DIR/Sources/RunAnywhere/CRACommons/include"
+    local COMMONS_INCLUDE="$COMMONS_DIR/include/rac"
+
+    if [[ ! -d "$BRIDGE_INCLUDE" ]]; then
+        log_warn "CRACommons include dir not found: $BRIDGE_INCLUDE"
+        return 0
+    fi
+
+    local synced=0
+
+    # Backend headers that need to be exposed to Swift via CRACommons
+    local BACKEND_HEADERS=(
+        "backends/rac_stt_whisperkit_coreml.h"
+    )
+
+    for rel_path in "${BACKEND_HEADERS[@]}"; do
+        local src="$COMMONS_INCLUDE/$rel_path"
+        local filename="$(basename "$rel_path")"
+        local dest="$BRIDGE_INCLUDE/$filename"
+
+        if [[ -f "$src" ]]; then
+            # Copy and fix include paths (CRACommons uses flat includes)
+            sed -e 's|#include "rac/[^"]*/"||' \
+                -e 's|#include "rac/core/\(.*\)"|#include "\1"|' \
+                -e 's|#include "rac/features/[^"]*/"||' \
+                -e 's|#include "rac/features/stt/\(.*\)"|#include "\1"|' \
+                "$src" > "${dest}.tmp"
+
+            # Use sed to fix the nested path includes properly
+            sed -e 's|#include "rac/core/rac_types.h"|#include "rac_types.h"|g' \
+                -e 's|#include "rac/features/stt/rac_stt_types.h"|#include "rac_stt_types.h"|g' \
+                "$src" > "${dest}.tmp"
+
+            if ! diff -q "$dest" "${dest}.tmp" >/dev/null 2>&1; then
+                mv "${dest}.tmp" "$dest"
+                log_info "  Synced: $filename"
+                synced=$((synced + 1))
+            else
+                rm -f "${dest}.tmp"
+            fi
+        else
+            log_warn "  Source not found: $src"
+        fi
+    done
+
+    if [[ $synced -eq 0 ]]; then
+        log_info "All bridge headers up to date"
+    else
+        log_info "Synced $synced header(s)"
+    fi
 }
 
 # =============================================================================
@@ -375,6 +452,9 @@ main() {
     elif [[ "$MODE" == "remote" ]]; then
         set_package_mode "remote"
     fi
+
+    # Sync backend headers to CRACommons bridge
+    sync_headers
 
     # Build the SDK
     if ! $SKIP_BUILD; then

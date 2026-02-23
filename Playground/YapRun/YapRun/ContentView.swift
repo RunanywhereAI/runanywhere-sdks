@@ -203,27 +203,14 @@ struct ContentView: View {
 
     private var modelSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Models")
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Voice Model")
                     .font(.headline)
                     .foregroundStyle(AppColors.textPrimary)
 
-                Spacer()
-
-                Button {
-                    viewModel.showAddModelSheet = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Add URL")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(AppColors.overlayLight, in: Capsule())
-                }
+                Text("Your selection is auto-used when you tap Yap from the keyboard.")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textTertiary)
             }
 
             if viewModel.models.isEmpty {
@@ -238,6 +225,7 @@ struct ContentView: View {
                         model: model,
                         isActive: model.id == viewModel.currentSTTModelId,
                         downloadProgress: viewModel.downloadProgress[model.id],
+                        modelDescription: ModelRegistry.description(for: model.id),
                         onDownload: { Task { await viewModel.downloadModel(model.id) } },
                         onLoad: { Task { await viewModel.loadModel(model.id) } },
                         onDelete: { Task { await viewModel.deleteModel(model.id) } }

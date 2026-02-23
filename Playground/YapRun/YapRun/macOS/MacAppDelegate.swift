@@ -10,6 +10,7 @@ import AppKit
 import SwiftUI
 import RunAnywhere
 import ONNXRuntime
+import WhisperKitRuntime
 import os
 
 @MainActor
@@ -63,13 +64,42 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private func initializeSDK() async {
         do {
             ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
+
             try RunAnywhere.initialize()
             logger.info("SDK initialized")
 
             ModelRegistry.registerAll()
             logger.info("ASR models registered")
+
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("Discovered \(discovered) previously downloaded models")
+            }
+
+            // Auto-load preferred model so dictation is ready immediately
+            await autoLoadPreferredModel()
         } catch {
             logger.error("SDK initialization failed: \(error.localizedDescription)")
+        }
+    }
+
+    private func autoLoadPreferredModel() async {
+        let preferredId = UserDefaults.standard.string(forKey: "preferredSTTModelId")
+            ?? ModelRegistry.defaultModelId
+
+        guard let allModels = try? await RunAnywhere.availableModels(),
+              let model = allModels.first(where: { $0.id == preferredId }),
+              model.localPath != nil else {
+            return
+        }
+
+        do {
+            try await RunAnywhere.loadSTTModel(preferredId)
+            logger.info("Auto-loaded STT model: \(preferredId)")
+        } catch {
+            logger.error("Auto-load STT model failed: \(error.localizedDescription)")
         }
     }
 
