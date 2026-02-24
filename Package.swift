@@ -37,11 +37,11 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = true //  Toggle: true for local dev, false for release
+let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.1"
+let sdkVersion = "0.19.6"
 
 // RAG binary is only available in local dev mode until the release artifact is published.
 // In remote mode, the RAG xcframework zip + checksum don't exist yet, so including the
@@ -80,6 +80,13 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
+        // =================================================================
+        // WhisperKit Backend - adds STT via Apple Neural Engine
+        // =================================================================
+        .library(
+            name: "RunAnywhereWhisperKit",
+            targets: ["WhisperKitRuntime"]
+        ),
     ] + ragProducts(),
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -91,6 +98,8 @@ let package = Package(
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
         // ml-stable-diffusion for CoreML-based image generation
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
+        // WhisperKit for Neural Engine STT
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
     ],
     targets: [
         // =================================================================
@@ -118,7 +127,11 @@ let package = Package(
         // =================================================================
         .target(
             name: "ONNXBackend",
-            dependencies: ["RABackendONNXBinary"],
+            dependencies: [
+                "RABackendONNXBinary",
+                .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
+                .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
+            ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
         ),
@@ -159,7 +172,8 @@ let package = Package(
                 "RunAnywhere",
                 "ONNXBackend",
                 "RABackendONNXBinary",
-                "ONNXRuntimeBinary",
+                .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
+                .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include"],
@@ -189,6 +203,22 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // =================================================================
+        // WhisperKit Runtime Backend (Apple Neural Engine STT)
+        // =================================================================
+        .target(
+            name: "WhisperKitRuntime",
+            dependencies: [
+                "RunAnywhere",
+                .product(name: "WhisperKit", package: "whisperkit"),
+            ],
+            path: "sdk/runanywhere-swift/Sources/WhisperKitRuntime",
+            linkerSettings: [
+                .linkedFramework("CoreML"),
+                .linkedFramework("Accelerate"),
             ]
         ),
 
@@ -289,14 +319,19 @@ func binaryTargets() -> [Target] {
             ),
         ]
 
-        // Local combined ONNX Runtime xcframework (iOS + macOS)
-        // Created by: cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
-        // targets.append(
-        //     .binaryTarget(
-        //         name: "ONNXRuntimeBinary",
-        //         path: "sdk/runanywhere-swift/Binaries/onnxruntime.xcframework"
-        //     )
-        // )
+        // ONNX Runtime xcframeworks - split by platform
+        // iOS: static library format (not embedded in app bundle)
+        // macOS: dynamic framework format (embedded in app bundle)
+        targets.append(contentsOf: [
+            .binaryTarget(
+                name: "ONNXRuntimeiOSBinary",
+                path: "sdk/runanywhere-swift/Binaries/onnxruntime-ios.xcframework"
+            ),
+            .binaryTarget(
+                name: "ONNXRuntimemacOSBinary",
+                path: "sdk/runanywhere-swift/Binaries/onnxruntime-macos.xcframework"
+            ),
+        ])
 
         return targets
     } else {
@@ -309,22 +344,27 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-v\(sdkVersion).zip",
-                checksum: "f6bc152b1689d7549d6a7b5e692f6babb0efc44fe334c0e60acfc0c12d848c44"
+                checksum: "40ea84cf054f59fbc65e87d92550d4acb2bcbf433041438822c6b30985e3db24"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-v\(sdkVersion).zip",
-                checksum: "ba150fd924f71c2137d6cad0a294c3f9c2da5bc748b547cced87bc0910a9b327"
+                checksum: "314dddb242caf3d2d0b19c0f919c35187023c6c66cc861de741d071faddbf58b"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
-                checksum: "00b28c0542ab25585c534b4e33ddacd4a1d24447aa8c2178949aad89eb56cb1f"
+                checksum: "809e2510da49f71f6d019e77bcc0a7e12e967f3b739ba0b9eea7adb77936edc0"
             ),
             .binaryTarget(
-                name: "ONNXRuntimeBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-v\(sdkVersion).zip",
-                checksum: "e0180262bd1b10fcda95aaf9aac595af5e6819bd454312b6fc8ffc3828db239f"
+                name: "ONNXRuntimeiOSBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-ios-v\(sdkVersion).zip",
+                checksum: "310022d76a16b2d2d106577a1aa84a9e608c721bb6221c4ba47bf962a88bd9fd"
+            ),
+            .binaryTarget(
+                name: "ONNXRuntimemacOSBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-macos-v\(sdkVersion).zip",
+                checksum: "f73db9dc09012325b35fd3da74de794a75f4e9971d9b923af0805d6ab1dfc243"
             ),
         ]
 

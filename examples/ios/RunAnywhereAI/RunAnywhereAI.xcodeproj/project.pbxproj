@@ -8,11 +8,33 @@
 
 /* Begin PBXBuildFile section */
 		541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 541C59D92E63772A00DD7839 /* RunAnywhere */; };
+		54398AC52F492D1D009D6B51 /* RunAnywhereKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		54398D222F4939A7009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D212F4939A7009D6B51 /* WidgetKit.framework */; };
+		54398D242F4939A7009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398D232F4939A7009D6B51 /* SwiftUI.framework */; };
+		54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
+		58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */; };
+		RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */; };
+		RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };
+		RACSHARED03RACSHARED03RACS /* SharedDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		54398AC32F492D1D009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5480A1E82E2F250200337F2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398ABD2F492D1D009D6B51;
+			remoteInfo = RunAnywhereKeyboard;
+		};
+		54398D312F4939A7009D6B51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5480A1E82E2F250200337F2F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 54398D1F2F4939A7009D6B51;
+			remoteInfo = RunAnywhereActivityExtensionExtension;
+		};
 		5480A1FF2E2F250400337F2F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5480A1E82E2F250200337F2F /* Project object */;
@@ -29,19 +51,84 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		54398AC62F492D1D009D6B51 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				54398D332F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex in Embed Foundation Extensions */,
+				54398AC52F492D1D009D6B51 /* RunAnywhereKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		0C5E8414EC72B380DADD6717 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		0D23254BCD6273187BD2441C /* libbz2.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		502F1BAB2C2556A11E24EA6F /* libc++.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "usr/lib/libc++.tbd"; sourceTree = SDKROOT; };
+		54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RunAnywhereKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RunAnywhereActivityExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		54398D212F4939A7009D6B51 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		54398D232F4939A7009D6B51 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		5480A1F02E2F250200337F2F /* RunAnywhereAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RunAnywhereAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A1FE2E2F250400337F2F /* RunAnywhereAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A2082E2F250400337F2F /* RunAnywhereAIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8388285B0D64126DD4540F8 /* libarchive.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libarchive.tbd; path = usr/lib/libarchive.tbd; sourceTree = SDKROOT; };
+		RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DictationActivityAttributes.swift; path = RunAnywhereAI/Features/VoiceKeyboard/DictationActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
+		RACSHARED02RACSHARED02RACS /* SharedConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SharedConstants.swift; path = RunAnywhereAI/Shared/SharedConstants.swift; sourceTree = SOURCE_ROOT; };
+		RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SharedDataBridge.swift; path = RunAnywhereAI/Shared/SharedDataBridge.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		54398AC92F492D1D009D6B51 /* Exceptions for "RunAnywhereKeyboard" folder in "RunAnywhereKeyboard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54398ABD2F492D1D009D6B51 /* RunAnywhereKeyboard */;
+		};
+		54398ACD2F492DE7009D6B51 /* Exceptions for "RunAnywhereAI" folder in "RunAnywhereAI" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5480A1EF2E2F250200337F2F /* RunAnywhereAI */;
+		};
+		54398D372F4939A7009D6B51 /* Exceptions for "RunAnywhereActivityExtension" folder in "RunAnywhereActivityExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 54398D1F2F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		54398ABF2F492D1D009D6B51 /* RunAnywhereKeyboard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				54398AC92F492D1D009D6B51 /* Exceptions for "RunAnywhereKeyboard" folder in "RunAnywhereKeyboard" target */,
+			);
+			path = RunAnywhereKeyboard;
+			sourceTree = "<group>";
+		};
+		54398D252F4939A7009D6B51 /* RunAnywhereActivityExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				54398D372F4939A7009D6B51 /* Exceptions for "RunAnywhereActivityExtension" folder in "RunAnywhereActivityExtensionExtension" target */,
+			);
+			path = RunAnywhereActivityExtension;
+			sourceTree = "<group>";
+		};
 		5480A1F22E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				54398ACD2F492DE7009D6B51 /* Exceptions for "RunAnywhereAI" folder in "RunAnywhereAI" target */,
+			);
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
@@ -58,6 +145,22 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		54398ABB2F492D1D009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398D1D2F4939A7009D6B51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				54398D242F4939A7009D6B51 /* SwiftUI.framework in Frameworks */,
+				54398D222F4939A7009D6B51 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5480A1ED2E2F250200337F2F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,6 +168,7 @@
 				58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */,
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
+				58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +189,16 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		54398C522F493174009D6B51 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				RACSHARED02RACSHARED02RACS /* SharedConstants.swift */,
+				RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */,
+				RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		547A6C002E6374D1005EF0C7 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -92,6 +206,8 @@
 				0D23254BCD6273187BD2441C /* libbz2.tbd */,
 				502F1BAB2C2556A11E24EA6F /* libc++.tbd */,
 				0C5E8414EC72B380DADD6717 /* Accelerate.framework */,
+				54398D212F4939A7009D6B51 /* WidgetKit.framework */,
+				54398D232F4939A7009D6B51 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -102,8 +218,11 @@
 				5480A1F22E2F250200337F2F /* RunAnywhereAI */,
 				5480A2012E2F250400337F2F /* RunAnywhereAITests */,
 				5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */,
+				54398ABF2F492D1D009D6B51 /* RunAnywhereKeyboard */,
+				54398D252F4939A7009D6B51 /* RunAnywhereActivityExtension */,
 				547A6C002E6374D1005EF0C7 /* Frameworks */,
 				5480A1F12E2F250200337F2F /* Products */,
+				54398C522F493174009D6B51 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -113,6 +232,8 @@
 				5480A1F02E2F250200337F2F /* RunAnywhereAI.app */,
 				5480A1FE2E2F250400337F2F /* RunAnywhereAITests.xctest */,
 				5480A2082E2F250400337F2F /* RunAnywhereAIUITests.xctest */,
+				54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */,
+				54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -120,6 +241,50 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		54398ABD2F492D1D009D6B51 /* RunAnywhereKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398ACA2F492D1D009D6B51 /* Build configuration list for PBXNativeTarget "RunAnywhereKeyboard" */;
+			buildPhases = (
+				54398ABA2F492D1D009D6B51 /* Sources */,
+				54398ABB2F492D1D009D6B51 /* Frameworks */,
+				54398ABC2F492D1D009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				54398ABF2F492D1D009D6B51 /* RunAnywhereKeyboard */,
+			);
+			name = RunAnywhereKeyboard;
+			packageProductDependencies = (
+			);
+			productName = RunAnywhereKeyboard;
+			productReference = 54398ABE2F492D1D009D6B51 /* RunAnywhereKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		54398D1F2F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54398D342F4939A7009D6B51 /* Build configuration list for PBXNativeTarget "RunAnywhereActivityExtensionExtension" */;
+			buildPhases = (
+				54398D1C2F4939A7009D6B51 /* Sources */,
+				54398D1D2F4939A7009D6B51 /* Frameworks */,
+				54398D1E2F4939A7009D6B51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				54398D252F4939A7009D6B51 /* RunAnywhereActivityExtension */,
+			);
+			name = RunAnywhereActivityExtensionExtension;
+			packageProductDependencies = (
+			);
+			productName = RunAnywhereActivityExtensionExtension;
+			productReference = 54398D202F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		5480A1EF2E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2122E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAI" */;
@@ -127,10 +292,13 @@
 				5480A1EC2E2F250200337F2F /* Sources */,
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
+				54398AC62F492D1D009D6B51 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				54398AC42F492D1D009D6B51 /* PBXTargetDependency */,
+				54398D322F4939A7009D6B51 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				5480A1F22E2F250200337F2F /* RunAnywhereAI */,
@@ -140,6 +308,7 @@
 				541C59D92E63772A00DD7839 /* RunAnywhere */,
 				58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */,
 				58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */,
+				58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -196,9 +365,15 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1640;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 1640;
 				TargetAttributes = {
+					54398ABD2F492D1D009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					54398D1F2F4939A7009D6B51 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					5480A1EF2E2F250200337F2F = {
 						CreatedOnToolsVersion = 16.4;
 					};
@@ -232,11 +407,27 @@
 				5480A1EF2E2F250200337F2F /* RunAnywhereAI */,
 				5480A1FD2E2F250400337F2F /* RunAnywhereAITests */,
 				5480A2072E2F250400337F2F /* RunAnywhereAIUITests */,
+				54398ABD2F492D1D009D6B51 /* RunAnywhereKeyboard */,
+				54398D1F2F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		54398ABC2F492D1D009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398D1E2F4939A7009D6B51 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5480A1EE2E2F250200337F2F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -308,6 +499,23 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		54398ABA2F492D1D009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */,
+				RACSHARED03RACSHARED03RACS /* SharedDataBridge.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		54398D1C2F4939A7009D6B51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5480A1EC2E2F250200337F2F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -332,6 +540,22 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		54398AC42F492D1D009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
+			target = 54398ABD2F492D1D009D6B51 /* RunAnywhereKeyboard */;
+			targetProxy = 54398AC32F492D1D009D6B51 /* PBXContainerItemProxy */;
+		};
+		54398D322F4939A7009D6B51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+			);
+			target = 54398D1F2F4939A7009D6B51 /* RunAnywhereActivityExtensionExtension */;
+			targetProxy = 54398D312F4939A7009D6B51 /* PBXContainerItemProxy */;
+		};
 		5480A2002E2F250400337F2F /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5480A1EF2E2F250200337F2F /* RunAnywhereAI */;
@@ -345,6 +569,134 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		54398AC72F492D1D009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RunAnywhereKeyboard/RunAnywhereKeyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhereKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		54398AC82F492D1D009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = RunAnywhereKeyboard/RunAnywhereKeyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhereKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		54398D352F4939A7009D6B51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereActivityExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhereActivityExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		54398D362F4939A7009D6B51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L86FH3K93L;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereActivityExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhereActivityExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere.RunAnywhereActivityExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		5480A2102E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -476,6 +828,7 @@
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
@@ -496,6 +849,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
 				MARKETING_VERSION = 0.17.2;
+				OTHER_LDFLAGS = "-all_load";
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.RunAnywhere;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -521,6 +875,7 @@
 				DEVELOPMENT_TEAM = L86FH3K93L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = RunAnywhereAI/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
@@ -645,6 +1000,24 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		54398ACA2F492D1D009D6B51 /* Build configuration list for PBXNativeTarget "RunAnywhereKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398AC72F492D1D009D6B51 /* Debug */,
+				54398AC82F492D1D009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		54398D342F4939A7009D6B51 /* Build configuration list for PBXNativeTarget "RunAnywhereActivityExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				54398D352F4939A7009D6B51 /* Debug */,
+				54398D362F4939A7009D6B51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5480A1EB2E2F250200337F2F /* Build configuration list for PBXProject "RunAnywhereAI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -705,6 +1078,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereLlamaCPP;
+		};
+		58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
+			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
