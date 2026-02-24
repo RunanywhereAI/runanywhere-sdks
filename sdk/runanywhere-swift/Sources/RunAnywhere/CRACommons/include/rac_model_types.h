@@ -80,11 +80,11 @@ typedef struct rac_expected_model_files {
  * Mirrors Swift's ModelFileDescriptor struct.
  */
 typedef struct rac_model_file_descriptor {
-    /** Full URL to download this file from */
-    const char* url;
+    /** Relative path from base URL to this file */
+    const char* relative_path;
 
-    /** Filename to save as (e.g., "model.gguf") */
-    const char* filename;
+    /** Destination path relative to model folder */
+    const char* destination_path;
 
     /** Whether this file is required (vs optional) */
     rac_bool_t is_required;
@@ -186,6 +186,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
+    RAC_FRAMEWORK_WHISPERKIT_COREML = 9,  /**< WhisperKit CoreML (Apple Neural Engine STT) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 

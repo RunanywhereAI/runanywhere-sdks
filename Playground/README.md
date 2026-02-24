@@ -4,11 +4,33 @@ Interactive demo projects showcasing what you can build with RunAnywhere.
 
 | Project | Description | Platform |
 |---------|-------------|----------|
+| [YapRun](YapRun/) | On-device voice dictation — custom keyboard, multiple Whisper backends, Live Activity, offline-ready — [Website](https://runanywhere.ai/yaprun) · [TestFlight](https://testflight.apple.com/join/6N7nBeG8) | iOS & macOS (Swift/SwiftUI) |
 | [swift-starter-app](swift-starter-app/) | Privacy-first AI demo — LLM Chat, Speech-to-Text, Text-to-Speech, and Voice Pipeline with VAD | iOS (Swift/SwiftUI) |
 | [on-device-browser-agent](on-device-browser-agent/) | On-device AI browser automation using WebLLM — no cloud, no API keys, fully private | Chrome Extension (TypeScript/React) |
 | [android-use-agent](android-use-agent/) | Fully on-device autonomous Android agent — navigates phone UI via accessibility + on-device LLM (Qwen3-4B). See [benchmarks](android-use-agent/ASSESSMENT.md) | Android (Kotlin/Jetpack Compose) |
 | [linux-voice-assistant](linux-voice-assistant/) | Fully on-device voice assistant — Wake Word, VAD, STT, LLM, and TTS with zero cloud dependency | Linux (C++/ALSA) |
 | [openclaw-hybrid-assistant](openclaw-hybrid-assistant/) | Hybrid voice assistant — on-device Wake Word, VAD, STT, and TTS with cloud LLM via OpenClaw WebSocket | Linux (C++/ALSA) |
+
+## YapRun
+
+On-device voice dictation for iOS and macOS. All speech recognition runs locally — your voice never leaves your device.
+
+<p align="center">
+  <img src="YapRun/screenshots/01_welcome.png" width="160" />
+  <img src="YapRun/screenshots/03_home.png" width="160" />
+  <img src="YapRun/screenshots/04_keyboard.png" width="160" />
+  <img src="YapRun/screenshots/05_playground.png" width="160" />
+  <img src="YapRun/screenshots/06_notepad.png" width="160" />
+</p>
+
+- **Custom Keyboard** — Tap "Yap" from any text field in any app to dictate
+- **Multiple Whisper Backends** — WhisperKit (Neural Engine) and ONNX (CPU) with one-tap model switching
+- **Live Activity** — Real-time transcription status on the Lock Screen and Dynamic Island
+- **ASR Playground** — Record and transcribe in-app to test speed and accuracy
+- **macOS Agent** — Menu bar icon, global hotkey dictation, floating flow bar
+- **Offline-Ready** — Download once, run without a network connection
+
+**[runanywhere.ai/yaprun](https://runanywhere.ai/yaprun)** | [TestFlight Beta](https://testflight.apple.com/join/6N7nBeG8) | Free on the App Store — iOS 16.0+ / macOS 14.0+, Xcode 15.0+
 
 ## linux-voice-assistant
 
