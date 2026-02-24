@@ -30,14 +30,23 @@ static rac_lora_entry_t* deep_copy_lora_entry(const rac_lora_entry_t* src) {
     copy->description = rac_strdup(src->description);
     copy->download_url = rac_strdup(src->download_url);
     copy->filename = rac_strdup(src->filename);
+
+    // id is required — if it failed to copy, the entry is unusable
+    if (src->id && !copy->id) {
+        free_lora_entry(copy);
+        return nullptr;
+    }
+
     if (src->compatible_model_ids && src->compatible_model_count > 0) {
         copy->compatible_model_ids = static_cast<char**>(malloc(sizeof(char*) * src->compatible_model_count));
-        if (copy->compatible_model_ids) {
-            for (size_t i = 0; i < src->compatible_model_count; ++i) {
-                copy->compatible_model_ids[i] = rac_strdup(src->compatible_model_ids[i]);
-            }
-            copy->compatible_model_count = src->compatible_model_count;
+        if (!copy->compatible_model_ids) {
+            free_lora_entry(copy);
+            return nullptr;
         }
+        for (size_t i = 0; i < src->compatible_model_count; ++i) {
+            copy->compatible_model_ids[i] = rac_strdup(src->compatible_model_ids[i]);
+        }
+        copy->compatible_model_count = src->compatible_model_count;
     }
     copy->file_size = src->file_size;
     copy->default_scale = src->default_scale;

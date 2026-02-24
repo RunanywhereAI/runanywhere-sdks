@@ -31,6 +31,7 @@ data class LoraUiState(
     val registeredAdapters: List<LoraAdapterCatalogEntry> = emptyList(),
     val loadedAdapters: List<LoRAAdapterInfo> = emptyList(),
     val compatibleAdapters: List<LoraAdapterCatalogEntry> = emptyList(),
+    val downloadedAdapterPaths: Map<String, String> = emptyMap(),
     val downloadingAdapterId: String? = null,
     val downloadProgress: Float = 0f,
     val error: String? = null,
@@ -58,13 +59,15 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() {
         viewModelScope.launch {
             try {
-                val (registered, loaded) = withContext(Dispatchers.IO) {
-                    RunAnywhere.allRegisteredLoraAdapters() to RunAnywhere.getLoadedLoraAdapters()
+                val (registered, loaded, downloaded) = withContext(Dispatchers.IO) {
+                    val reg = RunAnywhere.allRegisteredLoraAdapters()
+                    Triple(reg, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(reg))
                 }
                 _uiState.update {
                     it.copy(
                         registeredAdapters = registered,
                         loadedAdapters = loaded,
+                        downloadedAdapterPaths = downloaded,
                         error = null,
                     )
                 }
@@ -79,13 +82,15 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshForModel(modelId: String) {
         viewModelScope.launch {
             try {
-                val (compatible, loaded) = withContext(Dispatchers.IO) {
-                    RunAnywhere.loraAdaptersForModel(modelId) to RunAnywhere.getLoadedLoraAdapters()
+                val (compatible, loaded, downloaded) = withContext(Dispatchers.IO) {
+                    val compat = RunAnywhere.loraAdaptersForModel(modelId)
+                    Triple(compat, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(compat))
                 }
                 _uiState.update {
                     it.copy(
                         compatibleAdapters = compatible,
                         loadedAdapters = loaded,
+                        downloadedAdapterPaths = it.downloadedAdapterPaths + downloaded,
                         error = null,
                     )
                 }
@@ -151,21 +156,28 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Get the local file path for a catalog entry, or null if not downloaded. */
+    /** Get the local file path for a catalog entry, or null if not downloaded (reads from cached state). */
     fun localPath(entry: LoraAdapterCatalogEntry): String? {
-        val file = File(loraDir, entry.filename)
-        return if (file.exists()) file.absolutePath else null
+        return _uiState.value.downloadedAdapterPaths[entry.id]
     }
 
-    /** Check if a catalog entry is already downloaded. */
+    /** Check if a catalog entry is already downloaded (reads from cached state). */
     fun isDownloaded(entry: LoraAdapterCatalogEntry): Boolean {
-        return File(loraDir, entry.filename).exists()
+        return entry.id in _uiState.value.downloadedAdapterPaths
     }
 
     /** Check if a specific adapter is currently loaded. */
     fun isLoaded(entry: LoraAdapterCatalogEntry): Boolean {
         val path = localPath(entry) ?: return false
         return _uiState.value.loadedAdapters.any { it.path == path }
+    }
+
+    /** Scan disk for downloaded adapter files and return id->path map. Must be called on IO dispatcher. */
+    private fun scanDownloadedAdapters(adapters: List<LoraAdapterCatalogEntry>): Map<String, String> {
+        return adapters.mapNotNull { entry ->
+            val file = File(loraDir, entry.filename)
+            if (file.exists()) entry.id to file.absolutePath else null
+        }.toMap()
     }
 
     /** Download a LoRA adapter GGUF file. */
@@ -221,6 +233,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                     it.copy(
                         downloadingAdapterId = null,
                         downloadProgress = 0f,
+                        downloadedAdapterPaths = it.downloadedAdapterPaths + (entry.id to destFile.absolutePath),
                     )
                 }
             } catch (e: Exception) {
@@ -269,7 +282,12 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                _uiState.update { it.copy(loadedAdapters = loaded) }
+                _uiState.update {
+                    it.copy(
+                        loadedAdapters = loaded,
+                        downloadedAdapterPaths = it.downloadedAdapterPaths - entry.id,
+                    )
+                }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to delete adapter: ${entry.filename}")
                 _uiState.update { it.copy(error = "Delete failed: ${e.message}") }

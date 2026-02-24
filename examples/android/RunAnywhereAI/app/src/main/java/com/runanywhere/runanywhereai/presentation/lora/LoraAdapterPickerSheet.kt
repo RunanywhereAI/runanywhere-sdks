@@ -223,7 +223,7 @@ private fun CatalogAdapterRow(
     onApply: (Float) -> Unit,
     onRemove: () -> Unit,
 ) {
-    var scale by remember(entry.id) { mutableFloatStateOf(entry.defaultScale) }
+    var scale by remember(entry.id, entry.defaultScale) { mutableFloatStateOf(entry.defaultScale) }
 
     Column(
         modifier = Modifier

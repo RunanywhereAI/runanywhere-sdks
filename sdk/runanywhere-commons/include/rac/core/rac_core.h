@@ -12,6 +12,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/network/rac_environment.h"
 
 #ifdef __cplusplus
