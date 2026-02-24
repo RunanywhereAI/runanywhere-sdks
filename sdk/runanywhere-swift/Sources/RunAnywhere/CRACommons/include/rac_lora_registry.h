@@ -16,8 +16,8 @@
 #ifndef RAC_LORA_REGISTRY_H
 #define RAC_LORA_REGISTRY_H
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
+#include "rac_error.h"
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,8 +39,6 @@ typedef struct rac_lora_entry {
 
 typedef struct rac_lora_registry* rac_lora_registry_handle_t;
 
-// LIFECYCLE
-
 /**
  * @brief Create a new LoRA adapter registry
  * @param out_handle Output: handle to the newly created registry
@@ -53,8 +51,6 @@ RAC_API rac_result_t rac_lora_registry_create(rac_lora_registry_handle_t* out_ha
  * @param handle Registry handle (NULL is a no-op)
  */
 RAC_API void rac_lora_registry_destroy(rac_lora_registry_handle_t handle);
-
-// REGISTRATION
 
 /**
  * @brief Register a LoRA adapter entry in the registry
@@ -76,8 +72,6 @@ RAC_API rac_result_t rac_lora_registry_register(rac_lora_registry_handle_t handl
  */
 RAC_API rac_result_t rac_lora_registry_remove(rac_lora_registry_handle_t handle,
                                                const char* adapter_id);
-
-// QUERIES
 
 /**
  * @brief Get all registered LoRA adapter entries
@@ -113,8 +107,6 @@ RAC_API rac_result_t rac_lora_registry_get_for_model(rac_lora_registry_handle_t 
 RAC_API rac_result_t rac_lora_registry_get(rac_lora_registry_handle_t handle,
                                             const char* adapter_id,
                                             rac_lora_entry_t** out_entry);
-
-// MEMORY
 
 /**
  * @brief Free a single LoRA entry and all its owned strings

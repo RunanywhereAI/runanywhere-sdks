@@ -106,6 +106,7 @@
 // Model management
 #include "rac_model_types.h"
 #include "rac_model_registry.h"
+#include "rac_lora_registry.h"
 #include "rac_model_paths.h"
 #include "rac_model_strategy.h"
 #include "rac_model_assignment.h"

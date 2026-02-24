@@ -21,19 +21,11 @@ extension CppBridge {
         private let logger = SDKLogger(category: "CppBridge.LoraRegistry")
 
         private init() {
-            var h: rac_lora_registry_handle_t?
-            let result = rac_lora_registry_create(&h)
-            if result == RAC_SUCCESS {
-                handle = h
-                logger.debug("LoRA registry created")
+            handle = rac_get_lora_registry()
+            if handle != nil {
+                logger.debug("LoRA registry acquired (global singleton)")
             } else {
-                logger.error("Failed to create LoRA registry: \(result)")
-            }
-        }
-
-        deinit {
-            if let h = handle {
-                rac_lora_registry_destroy(h)
+                logger.error("Failed to acquire global LoRA registry")
             }
         }
 

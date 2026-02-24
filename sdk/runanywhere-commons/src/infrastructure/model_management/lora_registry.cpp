@@ -136,6 +136,7 @@ rac_result_t rac_lora_registry_get_for_model(rac_lora_registry_handle_t handle,
     std::vector<rac_lora_entry_t*> matches;
     for (const auto& pair : handle->entries) {
         const rac_lora_entry_t* entry = pair.second;
+        if (!entry->compatible_model_ids) continue;
         for (size_t i = 0; i < entry->compatible_model_count; ++i) {
             if (entry->compatible_model_ids[i] && strcmp(entry->compatible_model_ids[i], model_id) == 0) {
                 matches.push_back(pair.second);

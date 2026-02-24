@@ -356,7 +356,7 @@ create_xcframework() {
 
         # Find the library (try multiple locations)
         local LIB_PATH="${PLATFORM_DIR}/lib${LIB_NAME}.a"
-        
+
         # Try Xcode generator output paths
         if [[ ! -f "${LIB_PATH}" ]]; then
             if [[ "$PLATFORM" == "OS" ]]; then
@@ -365,7 +365,7 @@ create_xcframework() {
                 LIB_PATH="${PLATFORM_DIR}/Release-iphonesimulator/lib${LIB_NAME}.a"
             fi
         fi
-        
+
         # Try backend-specific paths
         [[ ! -f "${LIB_PATH}" ]] && LIB_PATH="${PLATFORM_DIR}/src/backends/${BUILD_BACKEND}/lib${LIB_NAME}.a"
 
@@ -483,7 +483,7 @@ create_backend_xcframework() {
         else
             XCODE_SUBDIR="Release-iphonesimulator"
         fi
-        
+
         for possible_path in \
             "${PLATFORM_DIR}/src/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/${XCODE_SUBDIR}/librac_backend_${BACKEND_NAME}.a" \
@@ -551,47 +551,6 @@ create_backend_xcframework() {
             fi
         done
     fi
-
-            
-            elif [[ "$BACKEND_NAME" == "rag" ]]; then
-        # RAG backend depends on:
-        # 1. Sherpa-ONNX
-        # 2. ONNX Runtime (required for Ort* symbols)
-
-        # -------------------------------
-        # Bundle Sherpa-ONNX
-        # -------------------------------
-        local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
-        local SHERPA_ARCH
-
-        case $PLATFORM in
-            OS) SHERPA_ARCH="ios-arm64" ;;
-            *)  SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
-        esac
-
-        for possible in \
-            "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
-            "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
-            if [[ -f "$possible" ]]; then
-                LIBS_TO_BUNDLE+=("$possible")
-                break
-            fi
-        done
-
-        # -------------------------------
-        # Bundle ONNX Runtime
-        # -------------------------------
-        local ONNX_XCFW="${PROJECT_ROOT}/third_party/onnxruntime-ios/onnxruntime.xcframework"
-        local ONNX_ARCH="$SHERPA_ARCH"
-
-        for possible in \
-            "${ONNX_XCFW}/${ONNX_ARCH}/libonnxruntime.a" \
-            "${ONNX_XCFW}/${ONNX_ARCH}/onnxruntime.framework/onnxruntime"; do
-            if [[ -f "$possible" ]]; then
-                LIBS_TO_BUNDLE+=("$possible")
-                break
-            fi
-        done
     fi
 
         # Bundle all libraries

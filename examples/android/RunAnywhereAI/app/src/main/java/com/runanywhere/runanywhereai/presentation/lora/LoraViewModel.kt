@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -60,14 +61,16 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 val (registered, loaded) = withContext(Dispatchers.IO) {
                     RunAnywhere.allRegisteredLoraAdapters() to RunAnywhere.getLoadedLoraAdapters()
                 }
-                _uiState.value = _uiState.value.copy(
-                    registeredAdapters = registered,
-                    loadedAdapters = loaded,
-                    error = null,
-                )
+                _uiState.update {
+                    it.copy(
+                        registeredAdapters = registered,
+                        loadedAdapters = loaded,
+                        error = null,
+                    )
+                }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to refresh LoRA state")
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -79,14 +82,16 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 val (compatible, loaded) = withContext(Dispatchers.IO) {
                     RunAnywhere.loraAdaptersForModel(modelId) to RunAnywhere.getLoadedLoraAdapters()
                 }
-                _uiState.value = _uiState.value.copy(
-                    compatibleAdapters = compatible,
-                    loadedAdapters = loaded,
-                    error = null,
-                )
+                _uiState.update {
+                    it.copy(
+                        compatibleAdapters = compatible,
+                        loadedAdapters = loaded,
+                        error = null,
+                    )
+                }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to refresh for model $modelId")
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -98,11 +103,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 val config = LoRAAdapterConfig(path = path, scale = scale)
                 withContext(Dispatchers.IO) { RunAnywhere.loadLoraAdapter(config) }
                 val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                _uiState.value = _uiState.value.copy(loadedAdapters = loaded, error = null)
+                _uiState.update { it.copy(loadedAdapters = loaded, error = null) }
                 Timber.i("Loaded LoRA adapter: $path (scale=$scale)")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load LoRA adapter")
-                _uiState.value = _uiState.value.copy(error = "Failed to load adapter: ${e.message}")
+                _uiState.update { it.copy(error = "Failed to load adapter: ${e.message}") }
             }
         }
     }
@@ -113,11 +118,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 withContext(Dispatchers.IO) { RunAnywhere.removeLoraAdapter(path) }
                 val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                _uiState.value = _uiState.value.copy(loadedAdapters = loaded, error = null)
+                _uiState.update { it.copy(loadedAdapters = loaded, error = null) }
                 Timber.i("Unloaded LoRA adapter: $path")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to unload LoRA adapter")
-                _uiState.value = _uiState.value.copy(error = "Failed to unload adapter: ${e.message}")
+                _uiState.update { it.copy(error = "Failed to unload adapter: ${e.message}") }
             }
         }
     }
@@ -127,11 +132,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) { RunAnywhere.clearLoraAdapters() }
-                _uiState.value = _uiState.value.copy(loadedAdapters = emptyList(), error = null)
+                _uiState.update { it.copy(loadedAdapters = emptyList(), error = null) }
                 Timber.i("Cleared all LoRA adapters")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to clear LoRA adapters")
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.update { it.copy(error = e.message) }
             }
         }
     }
@@ -167,11 +172,13 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadAdapter(entry: LoraAdapterCatalogEntry) {
         if (_uiState.value.downloadingAdapterId != null) return
 
-        _uiState.value = _uiState.value.copy(
-            downloadingAdapterId = entry.id,
-            downloadProgress = 0f,
-            error = null,
-        )
+        _uiState.update {
+            it.copy(
+                downloadingAdapterId = entry.id,
+                downloadProgress = 0f,
+                error = null,
+            )
+        }
 
         downloadJob = viewModelScope.launch {
             val destFile = File(loraDir, entry.filename)
@@ -196,11 +203,12 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                                 downloaded += bytesRead
                                 if (totalSize > 0) {
                                     val progress = (downloaded.toFloat() / totalSize).coerceIn(0f, 1f)
-                                    _uiState.value = _uiState.value.copy(downloadProgress = progress)
+                                    _uiState.update { it.copy(downloadProgress = progress) }
                                 }
                             }
                         }
                     }
+                    destFile.delete()
                     if (!tmpFile.renameTo(destFile)) {
                         tmpFile.delete()
                         throw Exception("Failed to move downloaded file to final location")
@@ -209,17 +217,21 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 Timber.i("Downloaded LoRA adapter: ${entry.name} -> ${destFile.absolutePath}")
-                _uiState.value = _uiState.value.copy(
-                    downloadingAdapterId = null,
-                    downloadProgress = 0f,
-                )
+                _uiState.update {
+                    it.copy(
+                        downloadingAdapterId = null,
+                        downloadProgress = 0f,
+                    )
+                }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to download LoRA adapter: ${entry.name}")
-                _uiState.value = _uiState.value.copy(
-                    downloadingAdapterId = null,
-                    downloadProgress = 0f,
-                    error = "Download failed: ${e.message}",
-                )
+                _uiState.update {
+                    it.copy(
+                        downloadingAdapterId = null,
+                        downloadProgress = 0f,
+                        error = "Download failed: ${e.message}",
+                    )
+                }
             } finally {
                 if (!downloadComplete && tmpFile.exists()) {
                     tmpFile.delete()
@@ -232,10 +244,12 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelDownload() {
         downloadJob?.cancel()
         downloadJob = null
-        _uiState.value = _uiState.value.copy(
-            downloadingAdapterId = null,
-            downloadProgress = 0f,
-        )
+        _uiState.update {
+            it.copy(
+                downloadingAdapterId = null,
+                downloadProgress = 0f,
+            )
+        }
     }
 
     /** Delete a downloaded adapter file. Always attempts unload first (ignores if not loaded). */
@@ -255,15 +269,15 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                _uiState.value = _uiState.value.copy(loadedAdapters = loaded)
+                _uiState.update { it.copy(loadedAdapters = loaded) }
             } catch (e: Exception) {
                 Timber.e(e, "Failed to delete adapter: ${entry.filename}")
-                _uiState.value = _uiState.value.copy(error = "Delete failed: ${e.message}")
+                _uiState.update { it.copy(error = "Delete failed: ${e.message}") }
             }
         }
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(error = null)
+        _uiState.update { it.copy(error = null) }
     }
 }

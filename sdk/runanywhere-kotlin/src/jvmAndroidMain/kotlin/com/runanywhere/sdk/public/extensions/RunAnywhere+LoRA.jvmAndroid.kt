@@ -98,6 +98,7 @@ actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibili
 // MARK: - LoRA Adapter Catalog
 
 actual fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry) {
+    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
     CppBridgeLoraRegistry.register(
         CppBridgeLoraRegistry.LoraEntry(
             id = entry.id,
@@ -113,10 +114,12 @@ actual fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry) {
 }
 
 actual fun RunAnywhere.loraAdaptersForModel(modelId: String): List<LoraAdapterCatalogEntry> {
+    if (!isInitialized) return emptyList()
     return CppBridgeLoraRegistry.getForModel(modelId).map { it.toCatalogEntry() }
 }
 
 actual fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry> {
+    if (!isInitialized) return emptyList()
     return CppBridgeLoraRegistry.getAll().map { it.toCatalogEntry() }
 }
 
