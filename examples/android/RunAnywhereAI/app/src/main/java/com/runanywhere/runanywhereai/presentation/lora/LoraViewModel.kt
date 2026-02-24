@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -211,6 +212,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                             val buffer = ByteArray(8192)
                             var bytesRead: Int
                             while (input.read(buffer).also { bytesRead = it } != -1) {
+                                ensureActive()
                                 output.write(buffer, 0, bytesRead)
                                 downloaded += bytesRead
                                 if (totalSize > 0) {
