@@ -119,3 +119,54 @@ void rac_rag_pipeline_destroy(rac_rag_pipeline_t* pipeline) {
     (void)pipeline;
     // TODO: Remove stub when RABackendRAG release binary is available
 }
+
+// =============================================================================
+// Voice Agent stubs  (declared in rac_voice_agent.h, not yet in RACommons binary)
+// TODO: Remove these stubs once voice agent is implemented in RACommons C++.
+// =============================================================================
+
+#include "include/rac_voice_agent.h"
+
+__attribute__((weak))
+rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
+                                                 const void* audio_data, size_t audio_size,
+                                                 rac_voice_agent_result_t* out_result) {
+    (void)handle; (void)audio_data; (void)audio_size; (void)out_result;
+    return RAC_ERROR_NOT_IMPLEMENTED; // TODO: Replace with real implementation
+}
+
+__attribute__((weak))
+rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
+                                         const void* audio_data, size_t audio_size,
+                                         char** out_transcription) {
+    (void)handle; (void)audio_data; (void)audio_size; (void)out_transcription;
+    return RAC_ERROR_NOT_IMPLEMENTED; // TODO: Replace with real implementation
+}
+
+__attribute__((weak))
+rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
+                                                const char* text, void** out_audio,
+                                                size_t* out_audio_size) {
+    (void)handle; (void)text; (void)out_audio; (void)out_audio_size;
+    return RAC_ERROR_NOT_IMPLEMENTED; // TODO: Replace with real implementation
+}
+
+__attribute__((weak))
+void rac_voice_agent_result_free(rac_voice_agent_result_t* result) {
+    (void)result;
+    // TODO: Replace with real implementation
+}
+
+// =============================================================================
+// WhisperKit CoreML STT stubs
+// TODO: Remove once implemented in RACommons C++.
+// =============================================================================
+
+#include "include/rac_stt_whisperkit_coreml.h"
+
+__attribute__((weak))
+rac_result_t rac_whisperkit_coreml_stt_set_callbacks(
+    const rac_whisperkit_coreml_stt_callbacks_t* callbacks) {
+    (void)callbacks;
+    return RAC_ERROR_NOT_IMPLEMENTED; // TODO: Replace with real implementation
+}

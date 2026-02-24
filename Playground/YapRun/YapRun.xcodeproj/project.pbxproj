@@ -11,9 +11,9 @@
 		54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFB2F497A34009D6B51 /* WidgetKit.framework */; };
 		54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFD2F497A34009D6B51 /* SwiftUI.framework */; };
 		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		54C28E2B2F4D31B000A5AA98 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2A2F4D31B000A5AA98 /* RunAnywhere */; };
-		54C28E2D2F4D31B000A5AA98 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */; };
-		54C28E2F2F4D31B000A5AA98 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */; };
+		5444FECE2F4D52C4006F88EE /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 5444FECD2F4D52C4006F88EE /* RunAnywhere */; };
+		5444FED02F4D52C4006F88EE /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 5444FECF2F4D52C4006F88EE /* RunAnywhereONNX */; };
+		5444FED22F4D52C4006F88EE /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5444FED12F4D52C4006F88EE /* RunAnywhereWhisperKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -139,9 +139,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				54C28E2F2F4D31B000A5AA98 /* RunAnywhereWhisperKit in Frameworks */,
-				54C28E2D2F4D31B000A5AA98 /* RunAnywhereONNX in Frameworks */,
-				54C28E2B2F4D31B000A5AA98 /* RunAnywhere in Frameworks */,
+				5444FED22F4D52C4006F88EE /* RunAnywhereWhisperKit in Frameworks */,
+				5444FED02F4D52C4006F88EE /* RunAnywhereONNX in Frameworks */,
+				5444FECE2F4D52C4006F88EE /* RunAnywhere in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,9 +237,9 @@
 			);
 			name = YapRun;
 			packageProductDependencies = (
-				54C28E2A2F4D31B000A5AA98 /* RunAnywhere */,
-				54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */,
-				54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */,
+				5444FECD2F4D52C4006F88EE /* RunAnywhere */,
+				5444FECF2F4D52C4006F88EE /* RunAnywhereONNX */,
+				5444FED12F4D52C4006F88EE /* RunAnywhereWhisperKit */,
 			);
 			productName = YapRun;
 			productReference = 54398FBA2F4979D2009D6B51 /* YapRun.app */;
@@ -374,7 +374,7 @@
 			mainGroup = 54398FB12F4979D2009D6B51;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
+				5444FECC2F4D52C4006F88EE /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 54398FBB2F4979D2009D6B51 /* Products */;
@@ -628,6 +628,7 @@
 		54398FDC2F4979D3009D6B51 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = YapRun/YapRun.entitlements;
@@ -656,6 +657,10 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-all_load",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -675,6 +680,7 @@
 		54398FDD2F4979D3009D6B51 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = YapRun/YapRun.entitlements;
@@ -703,6 +709,10 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 0.1;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-all_load",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.runanywhere.YapRun;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1011,7 +1021,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+		5444FECC2F4D52C4006F88EE /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
 			requirement = {
@@ -1022,19 +1032,19 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		54C28E2A2F4D31B000A5AA98 /* RunAnywhere */ = {
+		5444FECD2F4D52C4006F88EE /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 5444FECC2F4D52C4006F88EE /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
-		54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */ = {
+		5444FECF2F4D52C4006F88EE /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 5444FECC2F4D52C4006F88EE /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereONNX;
 		};
-		54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */ = {
+		5444FED12F4D52C4006F88EE /* RunAnywhereWhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 5444FECC2F4D52C4006F88EE /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
