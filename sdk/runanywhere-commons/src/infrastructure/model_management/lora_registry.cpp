@@ -21,6 +21,8 @@ struct rac_lora_registry {
     std::mutex mutex;
 };
 
+static void free_lora_entry(rac_lora_entry_t* entry);
+
 static rac_lora_entry_t* deep_copy_lora_entry(const rac_lora_entry_t* src) {
     if (!src) return nullptr;
     rac_lora_entry_t* copy = static_cast<rac_lora_entry_t*>(calloc(1, sizeof(rac_lora_entry_t)));
