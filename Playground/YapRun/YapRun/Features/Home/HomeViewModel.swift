@@ -34,7 +34,9 @@ final class HomeViewModel {
     var errorMessage: String?
 
     #if os(iOS)
-    var keyboardReady = false
+    var keyboardEnabled = false
+    var keyboardFullAccess = false
+    var keyboardReady: Bool { keyboardEnabled && keyboardFullAccess }
     #elseif os(macOS)
     var accessibilityGranted = false
     #endif
@@ -65,8 +67,17 @@ final class HomeViewModel {
 
         // Platform-specific status
         #if os(iOS)
-        let hasSessionState = SharedDataBridge.shared.defaults?.string(forKey: SharedConstants.Keys.sessionState) != nil
-        keyboardReady = hasSessionState
+        let keyboards = UserDefaults.standard.object(forKey: "AppleKeyboards") as? [String] ?? []
+        keyboardEnabled = keyboards.contains(SharedConstants.keyboardExtensionBundleId)
+
+        if keyboardEnabled {
+            SharedDataBridge.shared.defaults?.synchronize()
+            keyboardFullAccess = SharedDataBridge.shared.defaults?.bool(
+                forKey: SharedConstants.Keys.keyboardFullAccessGranted
+            ) ?? false
+        } else {
+            keyboardFullAccess = false
+        }
         #elseif os(macOS)
         accessibilityGranted = AXIsProcessTrusted()
         #endif

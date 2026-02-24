@@ -29,7 +29,9 @@ final class OnboardingViewModel {
 
     var currentStep: Step = .welcome
     var micGranted = false
-    var keyboardReady = false
+    var keyboardEnabled = false
+    var keyboardFullAccess = false
+    var keyboardReady: Bool { keyboardEnabled && keyboardFullAccess }
     var downloadProgress: Double = 0
     var downloadStage: String = ""
     var isDownloading = false
@@ -64,14 +66,20 @@ final class OnboardingViewModel {
     }
 
     func checkKeyboardStatus() {
-        // If the keyboard extension has written anything to App Group UserDefaults,
-        // it means the keyboard is installed AND Full Access is enabled.
-        // The simplest proxy: SharedDataBridge.shared.defaults is non-nil
-        // (App Group container is accessible).
-        // A stronger signal: check if the keyboard has ever written sessionState.
-        let defaults = SharedDataBridge.shared.defaults
-        let hasSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) != nil
-        keyboardReady = hasSessionState
+        // 1. Check if the keyboard is in the system's enabled keyboard list
+        let keyboards = UserDefaults.standard.object(forKey: "AppleKeyboards") as? [String] ?? []
+        keyboardEnabled = keyboards.contains(SharedConstants.keyboardExtensionBundleId)
+
+        // 2. Check full-access proxy flag written by the keyboard extension on each viewDidLoad.
+        //    If the keyboard isn't even enabled, full access is implicitly false.
+        if keyboardEnabled {
+            SharedDataBridge.shared.defaults?.synchronize()
+            keyboardFullAccess = SharedDataBridge.shared.defaults?.bool(
+                forKey: SharedConstants.Keys.keyboardFullAccessGranted
+            ) ?? false
+        } else {
+            keyboardFullAccess = false
+        }
     }
 
     // MARK: - Microphone

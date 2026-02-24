@@ -12,11 +12,29 @@ import SwiftUI
 struct KeyboardSetupStepView: View {
     let viewModel: OnboardingViewModel
 
-    private let steps: [(icon: String, title: String, detail: String)] = [
-        ("gear", "Open Settings", "Tap the button below to open Settings."),
-        ("keyboard", "Add YapRun Keyboard", "General → Keyboard → Keyboards → Add New Keyboard → YapRun."),
-        ("lock.open", "Grant Full Access", "Tap YapRun → enable 'Allow Full Access' for mic and App Group IPC.")
-    ]
+    private var headerColor: Color {
+        viewModel.keyboardReady ? AppColors.primaryGreen : AppColors.ctaOrange
+    }
+
+    private var headerTitle: String {
+        if viewModel.keyboardReady {
+            return "Keyboard Ready!"
+        } else if viewModel.keyboardEnabled {
+            return "Almost There"
+        } else {
+            return "Add the Keyboard"
+        }
+    }
+
+    private var headerSubtitle: String {
+        if viewModel.keyboardReady {
+            return "YapRun keyboard is installed with Full Access."
+        } else if viewModel.keyboardEnabled {
+            return "Enable Full Access so YapRun can use the microphone."
+        } else {
+            return "Two quick steps to start dictating anywhere."
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,23 +43,21 @@ struct KeyboardSetupStepView: View {
             // Header icon
             ZStack {
                 Circle()
-                    .fill((viewModel.keyboardReady ? AppColors.primaryGreen : AppColors.ctaOrange).opacity(0.15))
+                    .fill(headerColor.opacity(0.15))
                     .frame(width: 100, height: 100)
                 Image(systemName: viewModel.keyboardReady ? "checkmark.circle.fill" : "keyboard.badge.ellipsis")
                     .font(.system(size: 48, weight: .medium))
-                    .foregroundStyle(viewModel.keyboardReady ? AppColors.primaryGreen : AppColors.ctaOrange)
+                    .foregroundStyle(headerColor)
                     .contentTransition(.symbolEffect(.replace))
             }
             .padding(.bottom, 24)
 
-            Text(viewModel.keyboardReady ? "Keyboard Ready!" : "Add the Keyboard")
+            Text(headerTitle)
                 .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(AppColors.textPrimary)
                 .padding(.bottom, 8)
 
-            Text(viewModel.keyboardReady
-                 ? "YapRun keyboard is installed with Full Access."
-                 : "Three quick steps to start dictating anywhere.")
+            Text(headerSubtitle)
                 .font(.subheadline)
                 .foregroundStyle(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -49,34 +65,27 @@ struct KeyboardSetupStepView: View {
                 .padding(.bottom, 32)
 
             if !viewModel.keyboardReady {
-                // Steps card
+                // Granular steps card with live checkmarks
                 VStack(spacing: 0) {
-                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: 14) {
-                            Text("\(index + 1)")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.black)
-                                .frame(width: 26, height: 26)
-                                .background(AppColors.ctaOrange, in: Circle())
+                    // Step 1: Add Keyboard
+                    stepRow(
+                        number: 1,
+                        icon: "keyboard",
+                        title: "Add YapRun Keyboard",
+                        detail: "Settings → General → Keyboard → Keyboards → Add New Keyboard → YapRun.",
+                        isComplete: viewModel.keyboardEnabled
+                    )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(step.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(AppColors.textPrimary)
-                                Text(step.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(AppColors.textTertiary)
-                            }
+                    Divider().background(AppColors.cardBorder)
 
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-
-                        if index < steps.count - 1 {
-                            Divider()
-                                .background(AppColors.cardBorder)
-                        }
-                    }
+                    // Step 2: Enable Full Access
+                    stepRow(
+                        number: 2,
+                        icon: "lock.open",
+                        title: "Enable Full Access",
+                        detail: "Settings → General → Keyboard → Keyboards → YapRun → Allow Full Access.",
+                        isComplete: viewModel.keyboardFullAccess
+                    )
                 }
                 .padding(16)
                 .background(AppColors.cardBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -126,10 +135,49 @@ struct KeyboardSetupStepView: View {
             .padding(.horizontal, 40)
             .padding(.bottom, 60)
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.keyboardReady)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.keyboardEnabled)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.keyboardFullAccess)
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             viewModel.checkKeyboardStatus()
         }
+    }
+
+    // MARK: - Step Row
+
+    private func stepRow(
+        number: Int,
+        icon: String,
+        title: String,
+        detail: String,
+        isComplete: Bool
+    ) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            if isComplete {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(AppColors.primaryGreen)
+                    .frame(width: 26, height: 26)
+            } else {
+                Text("\(number)")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 26, height: 26)
+                    .background(AppColors.ctaOrange, in: Circle())
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isComplete ? AppColors.textTertiary : AppColors.textPrimary)
+                    .strikethrough(isComplete)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textTertiary)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 12)
     }
 }
 

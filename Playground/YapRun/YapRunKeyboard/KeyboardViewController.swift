@@ -17,6 +17,14 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // Write full-access status to App Group so the main app can read it.
+        // hasFullAccess is true when the user has enabled "Allow Full Access" in Settings.
+        SharedDataBridge.shared.defaults?.set(
+            hasFullAccess,
+            forKey: SharedConstants.Keys.keyboardFullAccessGranted
+        )
+        SharedDataBridge.shared.defaults?.synchronize()
+
         DarwinNotificationCenter.shared.addObserver(
             name: SharedConstants.DarwinNotifications.transcriptionReady
         ) { [weak self] in

@@ -95,12 +95,10 @@ struct ContentView: View {
 
             // Keyboard
             statusCard(
-                icon: viewModel.keyboardReady ? "checkmark.circle.fill" : "keyboard",
+                icon: keyboardStatusIcon,
                 title: "Keyboard",
-                subtitle: viewModel.keyboardReady
-                    ? "Installed with Full Access"
-                    : "Settings → General → Keyboard → Add YapRun",
-                color: viewModel.keyboardReady ? AppColors.primaryGreen : .orange,
+                subtitle: keyboardStatusSubtitle,
+                color: keyboardStatusColor,
                 actionLabel: viewModel.keyboardReady ? nil : "Setup",
                 action: viewModel.keyboardReady ? nil : { viewModel.openSettings() }
             )
@@ -121,6 +119,30 @@ struct ContentView: View {
         case .denied:  return { viewModel.openSettings() }
         case .granted: return nil
         }
+    }
+
+    private var keyboardStatusIcon: String {
+        if viewModel.keyboardReady {
+            return "checkmark.circle.fill"
+        } else if viewModel.keyboardEnabled {
+            return "lock.open"
+        } else {
+            return "keyboard"
+        }
+    }
+
+    private var keyboardStatusSubtitle: String {
+        if viewModel.keyboardReady {
+            return "Installed with Full Access"
+        } else if viewModel.keyboardEnabled {
+            return "Full Access required — enable in Settings"
+        } else {
+            return "Add keyboard in Settings → General → Keyboard"
+        }
+    }
+
+    private var keyboardStatusColor: Color {
+        viewModel.keyboardReady ? AppColors.primaryGreen : .orange
     }
 
     private func statusCard(

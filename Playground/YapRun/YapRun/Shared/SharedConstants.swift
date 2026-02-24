@@ -12,22 +12,26 @@ enum SharedConstants {
     // App Group identifier — must match both targets' entitlements exactly
     static let appGroupID = "group.com.runanywhere.yaprun"
 
+    // Keyboard extension bundle ID — must match the keyboard target's bundle identifier exactly
+    static let keyboardExtensionBundleId = "com.runanywhere.YapRun.YapRunKeyboard"
+
     // URL scheme for keyboard → main app deep link (Flow Session trigger)
     static let urlScheme = "yaprun"
     static let startFlowURLString = "yaprun://startFlow"
 
     // App Group UserDefaults keys
     enum Keys {
-        static let sessionState        = "sessionState"
-        static let transcribedText     = "transcribedText"
-        static let returnToAppScheme   = "returnToAppScheme"
-        static let preferredSTTModelId = "preferredSTTModelId"
-        static let dictationHistory    = "dictationHistory"
-        static let audioLevel          = "audioLevel"
-        static let lastInsertedText    = "lastInsertedText"
-        static let undoText            = "undoText"
-        static let lastHeartbeat           = "lastHeartbeat"
-        static let hasCompletedOnboarding  = "hasCompletedOnboarding"
+        static let sessionState             = "sessionState"
+        static let transcribedText          = "transcribedText"
+        static let returnToAppScheme        = "returnToAppScheme"
+        static let preferredSTTModelId      = "preferredSTTModelId"
+        static let dictationHistory         = "dictationHistory"
+        static let audioLevel               = "audioLevel"
+        static let lastInsertedText         = "lastInsertedText"
+        static let undoText                 = "undoText"
+        static let lastHeartbeat            = "lastHeartbeat"
+        static let hasCompletedOnboarding   = "hasCompletedOnboarding"
+        static let keyboardFullAccessGranted = "keyboardFullAccessGranted"
     }
 
     // Darwin inter-process notification names (CFNotificationCenter)
