@@ -106,10 +106,9 @@ struct YapRunApp: App {
                 showFlowActivation = true
                 Task { await flowSession.handleStartFlow() }
             case "kill":
-                logger.info("Received kill deep link — killing session and terminating")
+                logger.info("Received kill deep link — killing session")
                 Task {
                     await flowSession.killSession()
-                    exit(0)
                 }
             case "playground":
                 logger.info("Received playground deep link")
