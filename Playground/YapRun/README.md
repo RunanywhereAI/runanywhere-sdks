@@ -105,3 +105,51 @@ All models are downloaded from GitHub Releases and cached on-device:
 | Accurate (whisperkit-base.en) | WhisperKit / Neural Engine | 134 MB | Longer dictation, higher accuracy |
 | Compact CPU (moonshine-tiny-en-int8) | ONNX / sherpa-onnx | 118 MB | When Neural Engine is busy |
 | Whisper CPU (whisper-tiny.en) | ONNX / sherpa-onnx | 75 MB | Maximum device compatibility |
+
+## Building the macOS .dmg
+
+The `scripts/build_dmg.sh` script automates the full pipeline: archive, Developer ID signing, Apple notarization, and a professional .dmg installer with drag-to-Applications.
+
+### One-time setup
+
+```bash
+# 1. Install create-dmg
+brew install create-dmg
+
+# 2. Store notarization credentials in your keychain
+xcrun notarytool store-credentials "YapRun-Notarize" \
+  --apple-id "your@email.com" \
+  --team-id "YOUR_TEAM_ID" \
+  --password "app-specific-password"
+```
+
+> Generate an app-specific password at [appleid.apple.com](https://appleid.apple.com) under Sign-In and Security.
+
+### Build
+
+```bash
+cd Playground/YapRun
+
+# Full pipeline: archive → sign → notarize → .dmg
+./scripts/build_dmg.sh
+
+# Skip notarization (quick local test)
+./scripts/build_dmg.sh --skip-notarize
+
+# Re-package an existing export without rebuilding
+./scripts/build_dmg.sh --skip-build
+```
+
+The final `.dmg` is written to `build/YapRun-<version>-mac.dmg`.
+
+### Publishing
+
+Upload the .dmg to a **GitHub Release** for direct download:
+
+```bash
+gh release create v1.0.0-mac "build/YapRun-1.0.0-mac.dmg" \
+  --title "YapRun 1.0.0 for macOS" \
+  --notes "Direct download for macOS 14.0+. Signed and notarized by Apple."
+```
+
+Then link to it from [runanywhere.ai/yaprun](https://runanywhere.ai/yaprun).
