@@ -11,9 +11,9 @@
 		54398FFC2F497A34009D6B51 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFB2F497A34009D6B51 /* WidgetKit.framework */; };
 		54398FFE2F497A34009D6B51 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54398FFD2F497A34009D6B51 /* SwiftUI.framework */; };
 		5439900B2F497A35009D6B51 /* YapRunActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 54398FF92F497A34009D6B51 /* YapRunActivityExtension.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		54C28D9A2F4CF59300A5AA98 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28D992F4CF59300A5AA98 /* RunAnywhere */; };
-		54C28D9C2F4CF59300A5AA98 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28D9B2F4CF59300A5AA98 /* RunAnywhereONNX */; };
-		54C28D9E2F4CF59300A5AA98 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28D9D2F4CF59300A5AA98 /* RunAnywhereWhisperKit */; };
+		54C28E2B2F4D31B000A5AA98 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2A2F4D31B000A5AA98 /* RunAnywhere */; };
+		54C28E2D2F4D31B000A5AA98 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */; };
+		54C28E2F2F4D31B000A5AA98 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -139,9 +139,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				54C28D9E2F4CF59300A5AA98 /* RunAnywhereWhisperKit in Frameworks */,
-				54C28D9C2F4CF59300A5AA98 /* RunAnywhereONNX in Frameworks */,
-				54C28D9A2F4CF59300A5AA98 /* RunAnywhere in Frameworks */,
+				54C28E2F2F4D31B000A5AA98 /* RunAnywhereWhisperKit in Frameworks */,
+				54C28E2D2F4D31B000A5AA98 /* RunAnywhereONNX in Frameworks */,
+				54C28E2B2F4D31B000A5AA98 /* RunAnywhere in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -237,9 +237,9 @@
 			);
 			name = YapRun;
 			packageProductDependencies = (
-				54C28D992F4CF59300A5AA98 /* RunAnywhere */,
-				54C28D9B2F4CF59300A5AA98 /* RunAnywhereONNX */,
-				54C28D9D2F4CF59300A5AA98 /* RunAnywhereWhisperKit */,
+				54C28E2A2F4D31B000A5AA98 /* RunAnywhere */,
+				54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */,
+				54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */,
 			);
 			productName = YapRun;
 			productReference = 54398FBA2F4979D2009D6B51 /* YapRun.app */;
@@ -374,7 +374,7 @@
 			mainGroup = 54398FB12F4979D2009D6B51;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				54C28D982F4CF59300A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
+				54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 54398FBB2F4979D2009D6B51 /* Products */;
@@ -1011,30 +1011,30 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		54C28D982F4CF59300A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+		54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.19.5;
+				minimumVersion = 0.19.6;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		54C28D992F4CF59300A5AA98 /* RunAnywhere */ = {
+		54C28E2A2F4D31B000A5AA98 /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28D982F4CF59300A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
-		54C28D9B2F4CF59300A5AA98 /* RunAnywhereONNX */ = {
+		54C28E2C2F4D31B000A5AA98 /* RunAnywhereONNX */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28D982F4CF59300A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereONNX;
 		};
-		54C28D9D2F4CF59300A5AA98 /* RunAnywhereWhisperKit */ = {
+		54C28E2E2F4D31B000A5AA98 /* RunAnywhereWhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 54C28D982F4CF59300A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
+			package = 54C28E292F4D31B000A5AA98 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereWhisperKit;
 		};
 /* End XCSwiftPackageProductDependency section */
