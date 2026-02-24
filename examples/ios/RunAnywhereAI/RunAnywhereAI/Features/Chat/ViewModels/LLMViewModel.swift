@@ -38,10 +38,9 @@ final class LLMViewModel {
     private(set) var loraAdapters: [LoRAAdapterInfo] = []
     private(set) var isLoadingLoRA = false
 
-    // MARK: - LoRA Adapter Download State
-    // TODO: [Portal Integration] Remove demo adapter download state once portal delivers adapters OTA.
+    // MARK: - LoRA Adapter Catalog State
 
-    private(set) var availableDemoAdapters: [DemoLoRAAdapter] = []
+    private(set) var availableAdapters: [LoraAdapterCatalogEntry] = []
     private(set) var adapterDownloadProgress: [String: Double] = [:]
     private(set) var downloadedAdapterPaths: [String: String] = [:]
     private(set) var isDownloadingAdapter: [String: Bool] = [:]
@@ -284,7 +283,7 @@ final class LLMViewModel {
 
     func clearChat() {
         generationTask?.cancel()
-        
+
         // Generate smart title for the old conversation before creating new one
         if let oldConversation = currentConversation,
            oldConversation.messages.count >= 2 {
@@ -293,7 +292,7 @@ final class LLMViewModel {
                 await self.conversationStore.generateSmartTitleForConversation(conversationId)
             }
         }
-        
+
         messages.removeAll()
         currentInput = ""
         isGenerating = false
@@ -365,31 +364,28 @@ final class LLMViewModel {
         }
     }
 
-    // MARK: - Demo LoRA Adapter Download
-    // TODO: [Portal Integration] Remove demo adapter download logic once portal delivers adapters OTA.
+    // MARK: - LoRA Adapter Catalog & Download
 
-    /// Refreshes the list of available demo adapters for the currently loaded model.
-    func refreshAvailableDemoAdapters() {
+    /// Refreshes the list of available adapters for the currently loaded model from the SDK registry.
+    func refreshAvailableAdapters() async {
         guard let modelId = ModelListViewModel.shared.currentModel?.id else {
-            availableDemoAdapters = []
+            availableAdapters = []
             return
         }
-        availableDemoAdapters = DemoLoRAAdapterCatalog.adapters(forModelId: modelId)
+        availableAdapters = await RunAnywhere.loraAdaptersForModel(modelId)
         syncDownloadedAdapterPaths()
     }
 
-    /// Checks if a demo adapter's file already exists on disk.
-    func isAdapterDownloaded(_ adapter: DemoLoRAAdapter) -> Bool {
+    func isAdapterDownloaded(_ adapter: LoraAdapterCatalogEntry) -> Bool {
         downloadedAdapterPaths[adapter.id] != nil
     }
 
-    /// Returns the local file path for a downloaded adapter, or nil.
-    func localPath(for adapter: DemoLoRAAdapter) -> String? {
+    func localPath(for adapter: LoraAdapterCatalogEntry) -> String? {
         downloadedAdapterPaths[adapter.id]
     }
 
-    /// Downloads a demo adapter from its URL, then loads it.
-    func downloadAndLoadAdapter(_ adapter: DemoLoRAAdapter, scale: Float) async {
+    /// Downloads a catalog adapter from its URL, then loads it.
+    func downloadAndLoadAdapter(_ adapter: LoraAdapterCatalogEntry, scale: Float) async {
         guard isDownloadingAdapter[adapter.id] != true else { return }
 
         isDownloadingAdapter[adapter.id] = true
@@ -413,11 +409,10 @@ final class LLMViewModel {
         adapterDownloadProgress[adapter.id] = nil
     }
 
-    /// Downloads the adapter file to the LoRA directory.
-    private func downloadAdapter(_ adapter: DemoLoRAAdapter) async throws -> String {
+    private func downloadAdapter(_ adapter: LoraAdapterCatalogEntry) async throws -> String {
         let loraDir = Self.loraDownloadDirectory()
         try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
-        let destinationURL = loraDir.appendingPathComponent(adapter.fileName)
+        let destinationURL = loraDir.appendingPathComponent(adapter.filename)
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             downloadedAdapterPaths[adapter.id] = destinationURL.path
@@ -441,11 +436,10 @@ final class LLMViewModel {
         return destinationURL.path
     }
 
-    /// Scans the LoRA directory to populate downloadedAdapterPaths.
     private func syncDownloadedAdapterPaths() {
         let loraDir = Self.loraDownloadDirectory()
-        for adapter in availableDemoAdapters {
-            let path = loraDir.appendingPathComponent(adapter.fileName).path
+        for adapter in availableAdapters {
+            let path = loraDir.appendingPathComponent(adapter.filename).path
             if FileManager.default.fileExists(atPath: path) {
                 downloadedAdapterPaths[adapter.id] = path
             }
@@ -536,7 +530,7 @@ final class LLMViewModel {
                         self.messages.removeFirst()
                     }
                     self.addSystemMessage()
-                    self.refreshAvailableDemoAdapters()
+                    Task { await self.refreshAvailableAdapters() }
                 }
             } else {
                 await self.checkModelStatus()
