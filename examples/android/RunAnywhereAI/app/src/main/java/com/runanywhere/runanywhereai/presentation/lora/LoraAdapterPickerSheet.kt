@@ -132,6 +132,7 @@ fun LoraAdapterPickerSheet(
                             isDownloading = state.downloadingAdapterId == entry.id,
                             downloadProgress = if (state.downloadingAdapterId == entry.id) state.downloadProgress else 0f,
                             onDownload = { loraViewModel.downloadAdapter(entry) },
+                            onCancelDownload = { loraViewModel.cancelDownload() },
                             onApply = { scale ->
                                 val path = loraViewModel.localPath(entry) ?: return@CatalogAdapterRow
                                 loraViewModel.loadAdapter(path, scale)
@@ -218,6 +219,7 @@ private fun CatalogAdapterRow(
     isDownloading: Boolean,
     downloadProgress: Float,
     onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
     onApply: (Float) -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -314,6 +316,10 @@ private fun CatalogAdapterRow(
                     "${(downloadProgress * 100).toInt()}%",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                Spacer(modifier = Modifier.width(Dimensions.smallMedium))
+                IconButton(onClick = onCancelDownload, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Cancel download", modifier = Modifier.size(16.dp))
+                }
             }
         } else {
             // Not downloaded — show download button

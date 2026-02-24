@@ -878,20 +878,20 @@ extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
 
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (!service) {
-        *out_error = strdup("No model loaded");
+        *out_error = rac_strdup("No model loaded");
         return RAC_ERROR_COMPONENT_NOT_READY;
     }
 
     // Check if the adapter file path is non-empty
     if (strlen(adapter_path) == 0) {
-        *out_error = strdup("Empty adapter path");
+        *out_error = rac_strdup("Empty adapter path");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
     // Basic pre-check: verify the backend supports LoRA at all
     auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
     if (!llm_service->ops || !llm_service->ops->load_lora) {
-        *out_error = strdup("Backend does not support LoRA adapters");
+        *out_error = rac_strdup("Backend does not support LoRA adapters");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 

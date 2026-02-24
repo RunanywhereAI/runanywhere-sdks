@@ -264,15 +264,15 @@ RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
                                                       char** out_json);
 
 /**
- * @brief Check if a LoRA adapter is compatible with the currently loaded model
+ * @brief Check if the current backend supports LoRA adapters
  *
- * Validates that the adapter file exists and is potentially loadable.
- * This is a lightweight pre-check before attempting to load.
+ * Verifies that a model is loaded and the active backend exposes LoRA operations.
+ * This is a lightweight pre-check; actual file validation occurs during load.
  *
  * @param handle Component handle
- * @param adapter_path Path to the LoRA adapter GGUF file
+ * @param adapter_path Path to the LoRA adapter GGUF file (must be non-empty)
  * @param out_error Output: error message if incompatible (caller must free with rac_free), NULL if compatible
- * @return RAC_SUCCESS if compatible, error code otherwise
+ * @return RAC_SUCCESS if the backend supports LoRA, error code otherwise
  */
 RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
                                                            const char* adapter_path,

@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
@@ -153,6 +154,7 @@ fun LoraManagerScreen(
                         isDownloading = state.downloadingAdapterId == entry.id,
                         downloadProgress = if (state.downloadingAdapterId == entry.id) state.downloadProgress else 0f,
                         onDownload = { loraViewModel.downloadAdapter(entry) },
+                        onCancelDownload = { loraViewModel.cancelDownload() },
                         onDelete = { loraViewModel.deleteAdapter(entry) },
                     )
                 }
@@ -181,6 +183,7 @@ private fun RegisteredAdapterCard(
     isDownloading: Boolean,
     downloadProgress: Float,
     onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -272,6 +275,10 @@ private fun RegisteredAdapterCard(
                             "Downloading ${(downloadProgress * 100).toInt()}%",
                             style = MaterialTheme.typography.bodySmall,
                         )
+                        Spacer(modifier = Modifier.width(Dimensions.smallMedium))
+                        IconButton(onClick = onCancelDownload, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel download", modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
                 isDownloaded -> {

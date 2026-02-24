@@ -1961,9 +1961,11 @@ static std::string loraEntryToJson(const rac_lora_entry_t* entry) {
     j["file_size"] = entry->file_size;
     j["default_scale"] = entry->default_scale;
     nlohmann::json ids = nlohmann::json::array();
-    for (size_t i = 0; i < entry->compatible_model_count; ++i) {
-        if (entry->compatible_model_ids[i])
-            ids.push_back(entry->compatible_model_ids[i]);
+    if (entry->compatible_model_ids) {
+        for (size_t i = 0; i < entry->compatible_model_count; ++i) {
+            if (entry->compatible_model_ids[i])
+                ids.push_back(entry->compatible_model_ids[i]);
+        }
     }
     j["compatible_model_ids"] = ids;
     return j.dump();

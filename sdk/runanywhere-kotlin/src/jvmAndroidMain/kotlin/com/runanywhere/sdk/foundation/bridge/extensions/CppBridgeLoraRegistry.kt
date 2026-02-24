@@ -90,7 +90,7 @@ object CppBridgeLoraRegistry {
     }
 
     private fun extractString(json: String, key: String): String? {
-        val regex = Regex(""""$key"\s*:\s*"([^"]*)"""")
+        val regex = Regex(""""$key"\s*:\s*"((?:[^"\\]|\\.)*)"""")
         return regex.find(json)?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
     }
 
@@ -114,7 +114,7 @@ object CppBridgeLoraRegistry {
         if (depth != 0) return emptyList()
         val arrayContent = json.substring(arrayStart, pos - 1).trim()
         if (arrayContent.isEmpty()) return emptyList()
-        return Regex(""""([^"]*)"""").findAll(arrayContent).map { it.groupValues[1] }.toList()
+        return Regex(""""((?:[^"\\]|\\.)*)"""").findAll(arrayContent).map { it.groupValues[1] }.toList()
     }
 
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }

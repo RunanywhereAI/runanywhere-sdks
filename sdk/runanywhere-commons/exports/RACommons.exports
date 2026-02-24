@@ -221,6 +221,11 @@ _rac_lora_entry_free
 _rac_lora_entry_array_free
 _rac_lora_entry_copy
 
+# LoRA Registry - Global convenience API
+_rac_get_lora_registry
+_rac_register_lora
+_rac_get_lora_for_model
+
 # LLM Analytics
 _rac_llm_analytics_complete_generation
 _rac_llm_analytics_create
