@@ -109,6 +109,7 @@ if [ "$SKIP_BUILD" = false ]; then
         -archivePath "$ARCHIVE_PATH" \
         -configuration Release \
         CODE_SIGN_STYLE=Automatic \
+        ENABLE_HARDENED_RUNTIME=YES \
         2>&1 | tail -5
 
     if [ ! -d "$ARCHIVE_PATH" ]; then
