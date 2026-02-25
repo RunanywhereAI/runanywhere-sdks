@@ -509,7 +509,7 @@ extension ChatInterfaceView {
 
     var loraAdapterBadge: some View {
         Button {
-            viewModel.refreshAvailableDemoAdapters()
+            Task { await viewModel.refreshAvailableAdapters() }
             showingLoRAManagement = true
         } label: {
             HStack(spacing: 6) {
@@ -528,7 +528,7 @@ extension ChatInterfaceView {
 
     var loraAddButton: some View {
         Button {
-            viewModel.refreshAvailableDemoAdapters()
+            Task { await viewModel.refreshAvailableAdapters() }
             showingLoRAManagement = true
         } label: {
             HStack(spacing: 4) {
@@ -646,14 +646,13 @@ private struct LoRAManagementSheetView: View {
         }
     }
 
-    // MARK: - Available Adapters (OTA Download)
-    // TODO: [Portal Integration] Replace demo adapter section with portal-provided adapter catalog.
+    // MARK: - Available Adapters (from SDK Registry)
 
     @ViewBuilder
     private var availableAdaptersSection: some View {
-        if !viewModel.availableDemoAdapters.isEmpty {
+        if !viewModel.availableAdapters.isEmpty {
             Section {
-                ForEach(viewModel.availableDemoAdapters) { adapter in
+                ForEach(viewModel.availableAdapters, id: \.id) { adapter in
                     availableAdapterRow(adapter)
                 }
             } header: {
@@ -664,7 +663,7 @@ private struct LoRAManagementSheetView: View {
         }
     }
 
-    private func availableAdapterRow(_ adapter: DemoLoRAAdapter) -> some View {
+    private func availableAdapterRow(_ adapter: LoraAdapterCatalogEntry) -> some View {
         let isDownloaded = viewModel.isAdapterDownloaded(adapter)
         let isDownloading = viewModel.isDownloadingAdapter[adapter.id] == true
         let progress = viewModel.adapterDownloadProgress[adapter.id] ?? 0.0
@@ -672,6 +671,7 @@ private struct LoRAManagementSheetView: View {
         let isAlreadyApplied = viewModel.loraAdapters.contains {
             $0.path == viewModel.localPath(for: adapter)
         }
+        let fileSizeText = ByteCountFormatter.string(fromByteCount: adapter.fileSize, countStyle: .file)
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
@@ -679,10 +679,10 @@ private struct LoRAManagementSheetView: View {
                     Text(adapter.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text(adapter.description)
+                    Text(adapter.adapterDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(adapter.fileSizeFormatted)
+                    Text(fileSizeText)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }

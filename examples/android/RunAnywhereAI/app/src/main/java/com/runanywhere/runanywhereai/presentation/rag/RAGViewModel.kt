@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.presentation.rag
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.DocumentService
@@ -127,15 +127,15 @@ class RAGViewModel : ViewModel() {
 
             try {
                 val fileName = DocumentService.getFileName(context, uri) ?: "Document"
-                Log.i(TAG, "Extracting text from document: $fileName")
+                Timber.i("Extracting text from document: $fileName")
                 val extractedText = withContext(Dispatchers.IO) {
                     DocumentService.extractText(context, uri)
                 }
 
-                Log.i(TAG, "Creating RAG pipeline")
+                Timber.i("Creating RAG pipeline")
                 RunAnywhere.ragCreatePipeline(config)
 
-                Log.i(TAG, "Ingesting document text (${extractedText.length} chars)")
+                Timber.i("Ingesting document text (${extractedText.length} chars)")
                 RunAnywhere.ragIngest(text = extractedText)
 
                 _uiState.update {
@@ -144,12 +144,12 @@ class RAGViewModel : ViewModel() {
                         isDocumentLoaded = true,
                     )
                 }
-                Log.i(TAG, "Document loaded successfully: $fileName")
+                Timber.i("Document loaded successfully: $fileName")
             } catch (e: DocumentServiceError) {
-                Log.e(TAG, "Document extraction failed: ${e.message}")
+                Timber.e("Document extraction failed: ${e.message}")
                 _uiState.update { it.copy(error = e.message) }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load document: ${e.message}", e)
+                Timber.e(e, "Failed to load document: ${e.message}")
                 _uiState.update { it.copy(error = e.message ?: "Failed to load document") }
             } finally {
                 _uiState.update { it.copy(isLoadingDocument = false) }
@@ -181,7 +181,7 @@ class RAGViewModel : ViewModel() {
             }
 
             try {
-                Log.i(TAG, "Querying RAG pipeline: $question")
+                Timber.i("Querying RAG pipeline: $question")
                 val result = RunAnywhere.ragQuery(question = question)
 
                 val answerWithTiming = "${result.answer}\n\nAnswer generated in ${
@@ -196,9 +196,9 @@ class RAGViewModel : ViewModel() {
                         ),
                     )
                 }
-                Log.i(TAG, "Query complete (${result.totalTimeMs}ms)")
+                Timber.i("Query complete (${result.totalTimeMs}ms)")
             } catch (e: Exception) {
-                Log.e(TAG, "Query failed: ${e.message}", e)
+                Timber.e(e, "Query failed: ${e.message}")
                 val errorText = "Error: ${e.message ?: "Query failed"}"
                 _uiState.update {
                     it.copy(
@@ -225,18 +225,14 @@ class RAGViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 RunAnywhere.ragDestroyPipeline()
-                Log.i(TAG, "Document cleared and pipeline destroyed")
+                Timber.i("Document cleared and pipeline destroyed")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to destroy pipeline: ${e.message}", e)
+                Timber.e(e, "Failed to destroy pipeline: ${e.message}")
             } finally {
                 _uiState.update {
                     RAGUiState() // Reset to initial state
                 }
             }
         }
-    }
-
-    companion object {
-        private const val TAG = "RAGViewModel"
     }
 }

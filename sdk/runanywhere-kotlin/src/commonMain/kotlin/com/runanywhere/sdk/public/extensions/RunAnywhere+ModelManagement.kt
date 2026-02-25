@@ -51,6 +51,7 @@ fun RunAnywhere.registerModel(
     artifactType: ModelArtifactType? = null,
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
+    supportsLora: Boolean = false,
 ): ModelInfo {
     val logger = SDKLogger.models
 
@@ -80,6 +81,7 @@ fun RunAnywhere.registerModel(
             framework = framework,
             contextLength = if (modality.requiresContextLength) 2048 else null,
             supportsThinking = supportsThinking,
+            supportsLora = supportsLora,
             description = "User-added model",
             source = com.runanywhere.sdk.public.extensions.Models.ModelSource.LOCAL,
         )

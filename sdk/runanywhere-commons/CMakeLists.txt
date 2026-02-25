@@ -35,6 +35,11 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_RAG "Build RAG backend (USearch)" ON)
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
+if(APPLE)
+    option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
+else()
+    set(RAC_BACKEND_WHISPERKIT_COREML OFF CACHE BOOL "" FORCE)
+endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
 # =============================================================================
@@ -201,6 +206,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/registry/service_registry.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/model_management/model_registry.cpp
+    src/infrastructure/model_management/lora_registry.cpp
     src/infrastructure/model_management/model_types.cpp
     src/infrastructure/model_management/model_paths.cpp
     src/infrastructure/model_management/model_strategy.cpp
@@ -273,12 +279,24 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
+# WhisperKit CoreML backend (Apple-only, no external deps → compiled into rac_commons)
+if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML)
+    set(RAC_WHISPERKIT_COREML_SOURCES
+        src/backends/whisperkit_coreml/rac_stt_whisperkit_coreml.cpp
+        src/backends/whisperkit_coreml/rac_backend_whisperkit_coreml_register.cpp
+    )
+    message(STATUS "Building WhisperKit CoreML backend (compiled into rac_commons)")
+else()
+    set(RAC_WHISPERKIT_COREML_SOURCES "")
+endif()
+
 # Combine all sources
 set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
     ${RAC_PLATFORM_SOURCES}
+    ${RAC_WHISPERKIT_COREML_SOURCES}
 )
 
 # =============================================================================
@@ -462,7 +480,7 @@ if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, RAG=${RAC_BACKEND_RAG}")
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}, RAG=${RAC_BACKEND_RAG}")
 endif()
 if(RAC_BUILD_SERVER)
     message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")

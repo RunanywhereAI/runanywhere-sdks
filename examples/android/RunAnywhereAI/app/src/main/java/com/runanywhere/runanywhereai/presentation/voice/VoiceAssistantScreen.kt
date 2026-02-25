@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
@@ -42,6 +43,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.runanywhere.runanywhereai.domain.models.SessionState
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
@@ -58,7 +60,7 @@ import kotlin.math.min
  *
  * Complete voice pipeline UI with VAD, STT, LLM, and TTS
  */
-@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
@@ -93,73 +95,65 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
         }
     }
 
-    // When !allModelsLoaded show VoicePipelineSetupView as main content; when loaded show mainVoiceUI with Scaffold
-    Scaffold(
-        topBar = {
+    ConfigureTopBar(
+        title = "Voice",
+        actions = {
             if (uiState.allModelsLoaded) {
-                // Header - cube 18pt, info 18pt, padding horizontal 20, top 20, bottom 10, no title
-                TopAppBar(
-                    title = { Text("Voice", style = MaterialTheme.typography.headlineMedium) },
-                    actions = {
-                        IconButton(
-                            onClick = { showVoiceSetupSheet = true },
-                            modifier = Modifier.size(38.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ViewInAr,
-                                contentDescription = "Models",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        IconButton(
-                            onClick = { showModelInfo = !showModelInfo },
-                            modifier = Modifier.size(38.dp),
-                        ) {
-                            Icon(
-                                imageVector = if (showModelInfo) Icons.Filled.Info else Icons.Outlined.Info,
-                                contentDescription = if (showModelInfo) "Hide Info" else "Show Info",
-                                modifier = Modifier.size(18.dp),
-                                tint = if (showModelInfo) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
-                )
+                IconButton(
+                    onClick = { showVoiceSetupSheet = true },
+                    modifier = Modifier.size(38.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ViewInAr,
+                        contentDescription = "Models",
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                IconButton(
+                    onClick = { showModelInfo = !showModelInfo },
+                    modifier = Modifier.size(38.dp),
+                ) {
+                    Icon(
+                        imageVector = if (showModelInfo) Icons.Filled.Info else Icons.Outlined.Info,
+                        contentDescription = if (showModelInfo) "Hide Info" else "Show Info",
+                        modifier = Modifier.size(18.dp),
+                        tint = if (showModelInfo) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         },
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background),
-        ) {
-            if (!uiState.allModelsLoaded) {
-                VoicePipelineSetupView(
-                    sttModel = uiState.sttModel,
-                    llmModel = uiState.llmModel,
-                    ttsModel = uiState.ttsModel,
-                    sttLoadState = uiState.sttLoadState,
-                    llmLoadState = uiState.llmLoadState,
-                    ttsLoadState = uiState.ttsLoadState,
-                    onSelectSTT = { showSTTModelSelection = true },
-                    onSelectLLM = { showLLMModelSelection = true },
-                    onSelectTTS = { showTTSModelSelection = true },
-                    onStartVoice = {},
-                )
-            } else {
-                MainVoiceAssistantUI(
-                    uiState = uiState,
-                    showModelInfo = showModelInfo,
-                    onToggleModelInfo = { showModelInfo = !showModelInfo },
-                    hasPermission = microphonePermissionState.status.isGranted,
-                    onRequestPermission = { microphonePermissionState.launchPermissionRequest() },
-                    onStartSession = { viewModel.startSession() },
-                    onStopSession = { viewModel.stopSession() },
-                    onClearConversation = { viewModel.clearConversation() },
-                )
-            }
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        if (!uiState.allModelsLoaded) {
+            VoicePipelineSetupView(
+                sttModel = uiState.sttModel,
+                llmModel = uiState.llmModel,
+                ttsModel = uiState.ttsModel,
+                sttLoadState = uiState.sttLoadState,
+                llmLoadState = uiState.llmLoadState,
+                ttsLoadState = uiState.ttsLoadState,
+                onSelectSTT = { showSTTModelSelection = true },
+                onSelectLLM = { showLLMModelSelection = true },
+                onSelectTTS = { showTTSModelSelection = true },
+                onStartVoice = {},
+            )
+        } else {
+            MainVoiceAssistantUI(
+                uiState = uiState,
+                showModelInfo = showModelInfo,
+                onToggleModelInfo = { showModelInfo = !showModelInfo },
+                hasPermission = microphonePermissionState.status.isGranted,
+                onRequestPermission = { microphonePermissionState.launchPermissionRequest() },
+                onStartSession = { viewModel.startSession() },
+                onStopSession = { viewModel.stopSession() },
+                onClearConversation = { viewModel.clearConversation() },
+            )
         }
     }
 
@@ -179,7 +173,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             )
         }
     }
-
+    
     // Model selection bottom sheets - uses real SDK models
     // ModelSelectionSheet(context: .stt/.llm/.tts)
     if (showSTTModelSelection) {
@@ -193,7 +187,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             },
         )
     }
-
+    
     if (showLLMModelSelection) {
         ModelSelectionBottomSheet(
             context = ModelSelectionContext.LLM,
@@ -205,7 +199,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             },
         )
     }
-
+    
     if (showTTSModelSelection) {
         ModelSelectionBottomSheet(
             context = ModelSelectionContext.TTS,
@@ -307,7 +301,7 @@ private fun VoicePipelineSetupView(
                 step = 3,
                 title = "Text to Speech",
                 subtitle = "Converts responses to audio",
-                icon = Icons.Default.VolumeUp,
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
                 color = AppColors.primaryPurple,
                 selectedFramework = ttsModel?.framework,
                 selectedModel = ttsModel?.name,
@@ -690,7 +684,7 @@ private fun MainVoiceAssistantUI(
                         color = AppColors.primaryGreen,
                     )
                     ModelBadge(
-                        icon = Icons.Default.VolumeUp,
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
                         label = "TTS",
                         value = uiState.ttsModel?.name ?: "Not set",
                         color = AppColors.primaryPurple,
@@ -1102,7 +1096,7 @@ private fun MicrophoneButton(
                             when {
                                 !hasPermission -> Icons.Default.MicOff
                                 sessionState == SessionState.LISTENING -> Icons.Default.Mic
-                                sessionState == SessionState.SPEAKING -> Icons.Default.VolumeUp
+                                sessionState == SessionState.SPEAKING -> Icons.AutoMirrored.Filled.VolumeUp
                                 else -> Icons.Default.Mic
                             },
                         contentDescription = "Microphone",

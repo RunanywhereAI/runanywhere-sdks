@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
@@ -42,9 +44,11 @@ import java.io.File
  * 4. Messages Area — LazyColumn with user/assistant bubbles
  * 5. Input Bar — question field + send button
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DocumentRAGScreen(viewModel: RAGViewModel = viewModel()) {
+fun DocumentRAGScreen(
+    onBack: () -> Unit = {},
+    viewModel: RAGViewModel = viewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -79,22 +83,13 @@ fun DocumentRAGScreen(viewModel: RAGViewModel = viewModel()) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Document Q&A") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
-        },
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .background(AppColors.backgroundGrouped),
-        ) {
+    ConfigureTopBar(title = "Document Q&A", showBack = true, onBack = onBack)
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppColors.backgroundGrouped),
+    ) {
             // 1. Model Setup Section
             ModelSetupSection(
                 selectedEmbeddingModel = selectedEmbeddingModel,
@@ -138,7 +133,6 @@ fun DocumentRAGScreen(viewModel: RAGViewModel = viewModel()) {
                 onQuestionChange = viewModel::updateQuestion,
                 onSend = viewModel::askQuestion,
             )
-        }
     }
 
     // Embedding model picker sheet
@@ -197,7 +191,7 @@ private fun ModelSetupSection(
                 )
                 ModelPickerRow(
                     label = "LLM Model",
-                    icon = { Icon(Icons.Outlined.Chat, contentDescription = null, modifier = Modifier.size(20.dp), tint = AppColors.textSecondary) },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.Chat, contentDescription = null, modifier = Modifier.size(20.dp), tint = AppColors.textSecondary) },
                     selectedModel = selectedLLMModel,
                     onClick = onLLMPickerTap,
                 )

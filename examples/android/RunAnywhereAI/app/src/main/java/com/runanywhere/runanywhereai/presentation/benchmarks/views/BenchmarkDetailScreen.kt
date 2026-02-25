@@ -31,13 +31,10 @@ import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -57,6 +54,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRunStatus
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.BenchmarkExportFormat
 import com.runanywhere.runanywhereai.presentation.benchmarks.viewmodel.BenchmarkViewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppSpacing
 import java.time.Instant
@@ -70,36 +68,30 @@ private val dateFormat: DateTimeFormatter =
  * Shows details of a single benchmark run with export actions.
  * Matches iOS BenchmarkDetailView exactly.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BenchmarkDetailScreen(
     runId: String,
+    onBack: () -> Unit = {},
     benchmarkViewModel: BenchmarkViewModel = viewModel(),
 ) {
     val uiState by benchmarkViewModel.uiState.collectAsStateWithLifecycle()
     val run = uiState.pastRuns.find { it.id == runId }
     val context = LocalContext.current
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text("Benchmark Details") }) },
-    ) { paddingValues ->
-        if (run == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("Run not found", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            return@Scaffold
-        }
+    ConfigureTopBar(title = "Benchmark Details", showBack = true, onBack = onBack)
 
+    if (run == null) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("Run not found", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    } else {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
                     .padding(horizontal = AppSpacing.large),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.large),
             ) {
@@ -138,7 +130,7 @@ fun BenchmarkDetailScreen(
             }
 
             // Copied toast overlay
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = uiState.copiedToastMessage != null,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),

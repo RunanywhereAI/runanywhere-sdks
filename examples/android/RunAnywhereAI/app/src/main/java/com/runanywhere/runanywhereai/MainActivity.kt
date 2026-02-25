@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai
 
 import android.os.Bundle
-import android.util.Log
+import timber.log.Timber
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,31 +59,26 @@ class MainActivity : ComponentActivity() {
         val initState by app.initializationState.collectAsState()
         val scope = rememberCoroutineScope()
 
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-        ) {
-            when (initState) {
-                is SDKInitializationState.Loading -> {
-                    InitializationLoadingView()
-                }
+        when (initState) {
+            is SDKInitializationState.Loading -> {
+                InitializationLoadingView()
+            }
 
-                is SDKInitializationState.Error -> {
-                    val error = (initState as SDKInitializationState.Error).error
-                    InitializationErrorView(
-                        error = error,
-                        onRetry = {
-                            scope.launch {
-                                app.retryInitialization()
-                            }
-                        },
-                    )
-                }
+            is SDKInitializationState.Error -> {
+                val error = (initState as SDKInitializationState.Error).error
+                InitializationErrorView(
+                    error = error,
+                    onRetry = {
+                        scope.launch {
+                            app.retryInitialization()
+                        }
+                    },
+                )
+            }
 
-                is SDKInitializationState.Ready -> {
-                    Log.i("MainActivity", "App is ready to use!")
-                    AppNavigation()
-                }
+            is SDKInitializationState.Ready -> {
+                LaunchedEffect(Unit) { Timber.i("App is ready to use!") }
+                AppNavigation()
             }
         }
     }

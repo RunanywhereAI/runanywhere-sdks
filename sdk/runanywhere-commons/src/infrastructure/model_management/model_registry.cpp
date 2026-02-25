@@ -65,6 +65,7 @@ static rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     copy->memory_required = src->memory_required;
     copy->context_length = src->context_length;
     copy->supports_thinking = src->supports_thinking;
+    copy->supports_lora = src->supports_lora;
 
     // Copy tags
     if (src->tags && src->tag_count > 0) {
@@ -164,19 +165,36 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
 
     std::string model_id = model->id;
 
-    // If model already exists, free the old one
     auto it = handle->models.find(model_id);
     if (it != handle->models.end()) {
+        // Preserve existing local_path if the incoming model doesn't have one.
+        // This prevents registerModel() (which always passes localPath=nil) from
+        // overwriting a localPath that was set by download completion or discovery.
+        const char* existing_local_path = it->second->local_path;
+        bool should_preserve_path = existing_local_path && strlen(existing_local_path) > 0
+                                    && (!model->local_path || strlen(model->local_path) == 0);
+
+        // Store a deep copy of the incoming model
+        rac_model_info_t* copy = deep_copy_model(model);
+        if (!copy) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+
+        if (should_preserve_path) {
+            if (copy->local_path) free(copy->local_path);
+            copy->local_path = rac_strdup(existing_local_path);
+        }
+
         free_model_info(it->second);
+        handle->models[model_id] = copy;
+    } else {
+        // New model — store a deep copy
+        rac_model_info_t* copy = deep_copy_model(model);
+        if (!copy) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+        handle->models[model_id] = copy;
     }
-
-    // Store a deep copy
-    rac_model_info_t* copy = deep_copy_model(model);
-    if (!copy) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    handle->models[model_id] = copy;
 
     RAC_LOG_DEBUG("ModelRegistry", "Model saved");
 
@@ -597,7 +615,8 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
     rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP,   RAC_FRAMEWORK_ONNX,
                                               RAC_FRAMEWORK_COREML,     RAC_FRAMEWORK_MLX,
                                               RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-                                              RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_UNKNOWN};
+                                              RAC_FRAMEWORK_SYSTEM_TTS, RAC_FRAMEWORK_WHISPERKIT_COREML,
+                                              RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Collect discovered models

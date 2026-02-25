@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Steps to Activate YapRun</string>
+			<key>FooterText</key>
+			<string>① Tap Keyboards
+② Turn on YapRun
+③ Enable Allow Full Access</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Your Privacy Matters</string>
+			<key>FooterText</key>
+			<string>YapRun never stores or sells what you say.
+All transcription runs fully on-device — no audio ever leaves your phone.
+Full Access only lets YapRun work across your apps.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Don't see "Keyboards"?</string>
+			<key>FooterText</key>
+			<string>① Close Settings, then try again
+② Or open YapRun → tap Enable in Settings → retry</string>
+		</dict>
+	</array>
+	<key>StringsTable</key>
+	<string>Root</string>
+</dict>
+</plist>

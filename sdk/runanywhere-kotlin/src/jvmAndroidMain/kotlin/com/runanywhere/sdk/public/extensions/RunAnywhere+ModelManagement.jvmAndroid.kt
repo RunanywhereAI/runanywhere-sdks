@@ -111,6 +111,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                 downloadSize = modelInfo.downloadSize ?: 0,
                 contextLength = modelInfo.contextLength ?: 0,
                 supportsThinking = modelInfo.supportsThinking,
+                supportsLora = modelInfo.supportsLora,
                 description = modelInfo.description,
                 status = CppBridgeModelRegistry.ModelStatus.AVAILABLE,
             )
@@ -308,6 +309,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
         downloadSize = if (bridge.downloadSize > 0) bridge.downloadSize else null,
         contextLength = if (bridge.contextLength > 0) bridge.contextLength else null,
         supportsThinking = bridge.supportsThinking,
+        supportsLora = bridge.supportsLora,
         description = bridge.description,
     )
 }

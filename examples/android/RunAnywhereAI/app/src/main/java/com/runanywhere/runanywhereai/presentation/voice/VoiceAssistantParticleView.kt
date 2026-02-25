@@ -13,23 +13,21 @@ import kotlinx.coroutines.delay
 import kotlin.math.*
 import kotlin.random.Random
 
-// ============================================================
-// VoiceAssistantParticleView.kt
+// VoiceAssistantParticleView
 //
 // Optimized particle animation for voice assistant.
 // Performance-focused for smooth 60fps on low-memory devices.
 //
 // Features:
 //   - ~900 particles on a Fibonacci sphere
-//   - Sphere ↔ Ring morph transition on listening state
+//   - Sphere / Ring morph transition on listening state
 //   - Amplitude-driven ring expansion
 //   - Localized touch/drag scatter
 //   - Batched point drawing (single draw call for most particles)
 //   - Pre-computed per-frame values to avoid redundant trig
 //   - Cheap noise replacement using pre-baked sin LUT
-// ============================================================
 
-// ---------- Data ----------
+// Data
 
 /**
  * Immutable particle data generated once. All fields are primitives
@@ -53,7 +51,7 @@ private class ParticleData(
     val personalMorphBias: Float,
 )
 
-// ---------- Constants ----------
+// Constants
 
 private const val PARTICLE_COUNT = 900
 private const val TWO_PI = (PI * 2.0).toFloat()
@@ -61,7 +59,7 @@ private const val TWO_PI = (PI * 2.0).toFloat()
 // Sin look-up table for cheap noise (256 entries)
 private val SIN_LUT = FloatArray(256) { sin(it.toFloat() / 256f * TWO_PI).toFloat() }
 
-// ---------- Particle Generation (Fibonacci Sphere) ----------
+// Particle Generation (Fibonacci Sphere)
 
 private fun generateParticles(count: Int): Array<ParticleData> {
     val goldenRatio = (1.0 + sqrt(5.0)) / 2.0
@@ -92,7 +90,7 @@ private fun generateParticles(count: Int): Array<ParticleData> {
     }
 }
 
-// ---------- Cheap Noise (LUT-based, no sin() per call) ----------
+// Cheap Noise (LUT-based, no sin() per call)
 
 /** Fast hash via LUT – returns 0..1. */
 @Suppress("NOTHING_TO_INLINE")
@@ -112,7 +110,7 @@ private inline fun cheapNoise(phase: Float, time: Float): Float {
     return (a + b) * 0.5f // 0..1
 }
 
-// ---------- Utility ----------
+// Utility
 
 @Suppress("NOTHING_TO_INLINE")
 private inline fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
@@ -123,7 +121,7 @@ private inline fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
     return t * t * (3f - 2f * t)
 }
 
-// ---------- Per-Frame Shared State (computed once, used by all particles) ----------
+// Per-Frame Shared State (computed once, used by all particles)
 
 private class FrameState(
     val time: Float,
@@ -212,7 +210,7 @@ private fun buildFrameState(
     )
 }
 
-// ---------- Particle Canvas ----------
+// Particle Canvas
 
 @Composable
 fun VoiceAssistantParticleCanvas(
@@ -257,7 +255,7 @@ fun VoiceAssistantParticleCanvas(
     }
 }
 
-// ---------- Batched Drawing ----------
+// Batched Drawing
 
 /**
  * Draws all particles with minimal allocations.
@@ -276,7 +274,7 @@ private fun DrawScope.drawParticlesBatched(
     val invViewScale400 = f.viewScale / 400f
 
     for (p in particles) {
-        // --- Sphere rotation ---
+        // Sphere rotation
         var rsx = p.sx * f.cosA - p.sz * f.sinA
         val rsy = p.sy
         var rsz = p.sx * f.sinA + p.sz * f.cosA
@@ -284,19 +282,19 @@ private fun DrawScope.drawParticlesBatched(
         val rsyB = rsy * f.sphereBreath
         rsz *= f.sphereBreath
 
-        // --- Ring position ---
+        // Ring position
         val ringAngle = p.index * TWO_PI + f.ringTimeOffset
         val ringRadius = f.baseRingWithPulse + f.ringTimeSin + p.radiusOffset * 0.18f
         val ringX = cos(ringAngle) * ringRadius
         val ringY = sin(ringAngle) * ringRadius
 
-        // --- Morph ---
+        // Morph
         val personalMorph = (f.morphProgress * p.personalSpeedFactor + p.personalMorphBias)
             .coerceIn(0f, 1f)
         var sm = personalMorph * personalMorph * (3f - 2f * personalMorph)
         sm = sm * sm * (3f - 2f * sm)
 
-        // --- Wander + spiral (only during transition) ---
+        // Wander + spiral (only during transition)
         var wx = 0f; var wy = 0f; var wz = 0f
         var spiralX = 0f; var spiralY = 0f
         if (f.wanderPhase > 0.01f) {
@@ -309,17 +307,17 @@ private fun DrawScope.drawParticlesBatched(
             spiralY = sin(sa) * sr
         }
 
-        // --- Interpolate sphere → ring ---
+        // Interpolate sphere to ring
         var finalX = lerp(rsx, ringX, sm) + wx + spiralX
         var finalY = lerp(rsyB, ringY, sm) + wy + spiralY
         val finalZ = lerp(rsz, 0f, sm) + wz
 
-        // --- Perspective ---
+        // Perspective
         val zDepth = finalZ + 2.5f
         var screenX = (finalX / zDepth) * projScale
         var screenY = (finalY / zDepth) * projScale
 
-        // --- Touch scatter (skip entirely when not active) ---
+        // Touch scatter (skip entirely when not active)
         var touchInfluence = 0f
         if (f.hasScatter) {
             val dx = screenX - f.touchPoint.x
@@ -341,29 +339,29 @@ private fun DrawScope.drawParticlesBatched(
             }
         }
 
-        // --- Screen position ---
+        // Screen position
         val projX = f.centerX + screenX * f.viewScale
         val projY = f.centerY - screenY * f.viewScale * f.aspectRatio
 
-        // --- Skip off-screen particles ---
+        // Skip off-screen particles
         if (projX < -20f || projX > size.width + 20f ||
             projY < -20f || projY > size.height + 20f) continue
 
-        // --- Size ---
+        // Size
         val transGlow = 1f + f.wanderPhase * 0.25f
         var pointSize = 6f * (2.8f / zDepth) * transGlow
         pointSize *= (1f + touchInfluence * 0.2f)
         pointSize = pointSize.coerceIn(2f, 8f)
         val radius = pointSize * invViewScale400
 
-        // --- Color ---
+        // Color
         val energy = sm * (0.5f + f.amplitude * 0.5f)
         val bright = f.brightBase + energy * f.brightEnergyScale + touchInfluence * 0.15f
         val r = (lerp(f.baseR, f.activeR, energy) * bright).coerceIn(0f, 1f)
         val g = (lerp(f.baseG, f.activeG, energy) * bright).coerceIn(0f, 1f)
         val b = (lerp(f.baseB, f.activeB, energy) * bright).coerceIn(0f, 1f)
 
-        // --- Alpha ---
+        // Alpha
         val depthShade = 0.5f + 0.5f * (1f - (zDepth - 1.8f) * 0.5f)
         val alpha = lerp(depthShade * 0.6f, 0.85f, sm).coerceIn(0.1f, 0.85f)
 
@@ -390,7 +388,7 @@ private fun DrawScope.drawParticlesBatched(
         }
     }
 
-    // --- Batch draw all small particles in one call ---
+    // Batch draw all small particles in one call
     if (batchPoints.isNotEmpty()) {
         // drawPoints with StrokeCap.Round renders small circles efficiently
         drawPoints(
