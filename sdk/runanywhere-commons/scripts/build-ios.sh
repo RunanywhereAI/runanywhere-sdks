@@ -351,6 +351,7 @@ create_xcframework() {
         local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
         local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
 
+        rm -rf "${FRAMEWORK_DIR}"
         mkdir -p "${FRAMEWORK_DIR}/Headers"
         mkdir -p "${FRAMEWORK_DIR}/Modules"
 
@@ -376,11 +377,11 @@ create_xcframework() {
 
         cp "${LIB_PATH}" "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
 
-        # Copy headers
+        # Copy headers (flatten rac/subdir/header.h paths to flat includes)
         if [[ "$FRAMEWORK_NAME" == "RACommons" ]]; then
             find "${PROJECT_ROOT}/include/rac" -name "*.h" | while read -r header; do
                 local filename=$(basename "$header")
-                sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include <RACommons/\1>|g' \
+                sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include "\1"|g' \
                     "$header" > "${FRAMEWORK_DIR}/Headers/${filename}"
             done
         else
@@ -433,7 +434,7 @@ EOF
     done
 
     # SIMULATOR already contains universal binary (arm64 + x86_64)
-    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR"
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -486,6 +487,7 @@ create_backend_xcframework() {
         local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
         local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
 
+        rm -rf "${FRAMEWORK_DIR}"
         mkdir -p "${FRAMEWORK_DIR}/Headers"
         mkdir -p "${FRAMEWORK_DIR}/Modules"
 
@@ -624,7 +626,7 @@ EOF
     fi
 
     # SIMULATOR already contains universal binary (arm64 + x86_64)
-    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR"
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
