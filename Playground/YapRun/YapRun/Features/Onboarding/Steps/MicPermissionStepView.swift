@@ -61,25 +61,15 @@ struct MicPermissionStepView: View {
                 .padding(.bottom, 60)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             } else {
-                VStack(spacing: 12) {
-                    Button {
-                        Task { await viewModel.requestMicPermission() }
-                    } label: {
-                        Text("Allow Microphone")
-                            .font(.headline)
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(AppColors.ctaOrange, in: Capsule())
-                    }
-
-                    Button {
-                        viewModel.advance()
-                    } label: {
-                        Text("Skip for now")
-                            .font(.subheadline)
-                            .foregroundStyle(AppColors.textTertiary)
-                    }
+                Button {
+                    Task { await viewModel.requestMicPermission() }
+                } label: {
+                    Text("Continue")
+                        .font(.headline)
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(AppColors.ctaOrange, in: Capsule())
                 }
                 .padding(.horizontal, 40)
                 .padding(.bottom, 60)
