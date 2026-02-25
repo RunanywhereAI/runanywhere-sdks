@@ -134,10 +134,47 @@ public:
 
     /**
      * @brief Get maximum context size in tokens
-     * 
+     *
      * @return Context window size
      */
     virtual int context_size() const noexcept = 0;
+
+    /**
+     * @brief Inject a system prompt into the KV cache at position 0.
+     * Called once at the start of an adaptive query loop.
+     * Default: no-op (returns false).
+     */
+    virtual bool inject_system_prompt(const std::string& prompt) { (void)prompt; return false; }
+
+    /**
+     * @brief Append text to the KV cache after current content.
+     * Used to incrementally add sentences during the adaptive loop.
+     * Default: no-op (returns false).
+     */
+    virtual bool append_context(const std::string& text) { (void)text; return false; }
+
+    /**
+     * @brief Check confidence that accumulated context answers the query.
+     * Default: returns 0.5 (neutral — loop continues).
+     */
+    virtual float probe_confidence(const std::string& context, const std::string& query) {
+        (void)context; (void)query; return 0.5f;
+    }
+
+    /**
+     * @brief Generate response using accumulated KV cache state.
+     * Unlike generate(), does NOT clear the KV cache first.
+     * Default: falls back to generate(prompt, options).
+     */
+    virtual GenerationResult generate_from_context(const std::string& query, const GenerationOptions& options = GenerationOptions{}) {
+        return generate(query, options);
+    }
+
+    /**
+     * @brief Clear all KV cache state.
+     * Default: no-op.
+     */
+    virtual void clear_context() {}
 };
 
 // =============================================================================

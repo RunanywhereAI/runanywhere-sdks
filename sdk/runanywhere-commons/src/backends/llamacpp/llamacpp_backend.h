@@ -134,6 +134,47 @@ class LlamaCppTextGeneration {
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
                          int* out_prompt_tokens);
     void cancel();
+
+    /**
+     * @brief Check whether the given context answers the query, using logit probing.
+     *
+     * Formats a Yes/No question, runs llama_decode for prefill only (no generation),
+     * extracts logits for the "Yes" and "No" tokens at the last position, and computes
+     * confidence via softmax. Probe tokens are removed from the KV cache before returning.
+     *
+     * @param context The context passage (retrieved sentence or accumulated sentences)
+     * @param query   The user query to check against the context
+     * @return Confidence score in [0.0, 1.0] — higher means context likely answers query.
+     *         Returns 0.5 on error (neutral / unknown).
+     */
+    float probe_confidence(const std::string& context, const std::string& query);
+
+    /**
+     * @brief Inject a system prompt into the KV cache at position 0.
+     * Clears existing KV cache first, then decodes the prompt tokens.
+     * @return true on success, false on error.
+     */
+    bool inject_system_prompt(const std::string& prompt);
+
+    /**
+     * @brief Append text to the KV cache after current content.
+     * Does not clear existing KV cache — adds at current position.
+     * @return true on success, false on error.
+     */
+    bool append_context(const std::string& text);
+
+    /**
+     * @brief Generate a response from accumulated KV cache state.
+     * Unlike generate(), does NOT clear the KV cache first.
+     * @return TextGenerationResult with generated text.
+     */
+    TextGenerationResult generate_from_context(const TextGenerationRequest& request);
+
+    /**
+     * @brief Clear all KV cache state.
+     */
+    void clear_context();
+
     nlohmann::json get_model_info() const;
 
     // LoRA adapter management

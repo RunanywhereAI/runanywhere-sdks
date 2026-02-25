@@ -5,11 +5,27 @@
 
 #include "rag_backend.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "rac/core/rac_logger.h"
 
 #define LOG_TAG "RAG.Backend"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+
+// Contrastive ICL system prompt injected at the start of every query
+static const std::string kICLSystemPrompt =
+    "You are a question-answering assistant. Given context passages and a question, "
+    "determine if the passages contain enough information to answer the question.\n\n"
+    "Example 1 (Sufficient context):\n"
+    "Context: \"The Eiffel Tower was completed in 1889 for the World's Fair in Paris.\"\n"
+    "Question: \"When was the Eiffel Tower built?\"\n"
+    "Assessment: Yes - the context directly states the completion year.\n\n"
+    "Example 2 (Insufficient context):\n"
+    "Context: \"Paris is the capital of France and known for its cuisine.\"\n"
+    "Question: \"When was the Eiffel Tower built?\"\n"
+    "Assessment: No - the context discusses Paris but not the Eiffel Tower's construction date.\n";
 
 namespace runanywhere {
 namespace rag {
@@ -129,6 +145,7 @@ std::vector<SearchResult> RAGBackend::search(
     size_t embedding_dimension = 0;
     float similarity_threshold = 0.0f;
     bool initialized = false;
+    const DocumentChunker* chunker = nullptr;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -136,6 +153,7 @@ std::vector<SearchResult> RAGBackend::search(
         embedding_dimension = config_.embedding_dimension;
         similarity_threshold = config_.similarity_threshold;
         initialized = initialized_;
+        chunker = chunker_.get();
     }
 
     return search_with_provider(
@@ -144,7 +162,8 @@ std::vector<SearchResult> RAGBackend::search(
         embedding_provider,
         embedding_dimension,
         similarity_threshold,
-        initialized
+        initialized,
+        chunker
     );
 }
 
@@ -154,7 +173,8 @@ std::vector<SearchResult> RAGBackend::search_with_provider(
     const std::shared_ptr<IEmbeddingProvider>& embedding_provider,
     size_t embedding_dimension,
     float similarity_threshold,
-    bool initialized
+    bool initialized,
+    const DocumentChunker* chunker
 ) const {
     if (!initialized) {
         return {};
@@ -165,21 +185,107 @@ std::vector<SearchResult> RAGBackend::search_with_provider(
         return {};
     }
 
+    if (!chunker) {
+        LOGE("Chunker not available for sentence splitting");
+        return {};
+    }
+
+    auto cosine_similarity = [](const std::vector<float>& a, const std::vector<float>& b) -> float {
+        if (a.size() != b.size() || a.empty()) return 0.0f;
+        float dot = 0.0f, norm_a = 0.0f, norm_b = 0.0f;
+        for (size_t i = 0; i < a.size(); ++i) {
+            dot += a[i] * b[i];
+            norm_a += a[i] * a[i];
+            norm_b += b[i] * b[i];
+        }
+        float denom = std::sqrt(norm_a) * std::sqrt(norm_b);
+        return denom > 0.0f ? dot / denom : 0.0f;
+    };
+
     try {
-        // Generate embedding for query
+        static constexpr size_t kParentChunkCount = 5;
         auto query_embedding = embedding_provider->embed(query_text);
-        
+
         if (query_embedding.size() != embedding_dimension) {
             LOGE("Query embedding dimension mismatch");
             return {};
         }
 
-        return vector_store_->search(
-            query_embedding,
-            top_k,
-            similarity_threshold
+        auto parent_chunks = vector_store_->search(query_embedding, kParentChunkCount, similarity_threshold);
+        LOGI("Retrieved %zu parent chunks for focused sentence search", parent_chunks.size());
+
+        if (parent_chunks.empty()) {
+            return {};
+        }
+
+        struct ScoredSentence {
+            std::string text;
+            float similarity;
+            std::string parent_chunk_id;
+            nlohmann::json parent_metadata;
+        };
+
+        std::vector<ScoredSentence> scored_sentences;
+
+        for (const auto& parent : parent_chunks) {
+            auto sentences = chunker->split_into_sentences(parent.text);
+            LOGI("Parent chunk '%s' split into %zu sentences", parent.chunk_id.c_str(), sentences.size());
+
+            for (const auto& sentence : sentences) {
+                if (sentence.size() < 3) {
+                    continue;
+                }
+
+                try {
+                    auto sentence_embedding = embedding_provider->embed(sentence);
+                    float sim = cosine_similarity(query_embedding, sentence_embedding);
+
+                    scored_sentences.push_back({
+                        sentence,
+                        sim,
+                        parent.chunk_id,
+                        parent.metadata
+                    });
+                } catch (const std::exception& e) {
+                    LOGE("Failed to embed sentence, skipping: %s", e.what());
+                }
+            }
+        }
+
+        LOGI("Scored %zu sentences total across all parent chunks", scored_sentences.size());
+
+        if (scored_sentences.empty()) {
+            return {};
+        }
+
+        static constexpr size_t kTopSentences = 10;
+        size_t result_count = std::min(kTopSentences, scored_sentences.size());
+
+        std::partial_sort(
+            scored_sentences.begin(),
+            scored_sentences.begin() + static_cast<std::ptrdiff_t>(result_count),
+            scored_sentences.end(),
+            [](const ScoredSentence& a, const ScoredSentence& b) {
+                return a.similarity > b.similarity;
+            }
         );
-        
+
+        std::vector<SearchResult> results;
+        results.reserve(result_count);
+
+        for (size_t i = 0; i < result_count; ++i) {
+            SearchResult r;
+            r.id = scored_sentences[i].parent_chunk_id + "_s" + std::to_string(i);
+            r.chunk_id = scored_sentences[i].parent_chunk_id;
+            r.text = scored_sentences[i].text;
+            r.similarity = scored_sentences[i].similarity;
+            r.score = scored_sentences[i].similarity;
+            r.metadata = scored_sentences[i].parent_metadata;
+            results.push_back(std::move(r));
+        }
+
+        return results;
+
     } catch (const std::exception& e) {
         LOGE("Search failed: %s", e.what());
         return {};
@@ -229,7 +335,6 @@ GenerationResult RAGBackend::query(
     size_t embedding_dimension = 0;
     float similarity_threshold = 0.0f;
     size_t top_k = 0;
-    std::string prompt_template;
     bool initialized = false;
 
     {
@@ -239,7 +344,6 @@ GenerationResult RAGBackend::query(
         embedding_dimension = config_.embedding_dimension;
         similarity_threshold = config_.similarity_threshold;
         top_k = config_.top_k;
-        prompt_template = config_.prompt_template;
         initialized = initialized_;
     }
 
@@ -251,7 +355,7 @@ GenerationResult RAGBackend::query(
         error_result.success = false;
         return error_result;
     }
-    
+
     if (!text_generator || !text_generator->is_ready()) {
         LOGE("Text generator not available for query");
         GenerationResult error_result;
@@ -259,67 +363,103 @@ GenerationResult RAGBackend::query(
         error_result.success = false;
         return error_result;
     }
-    
+
     try {
-        // Step 1: Search for relevant context
+        text_generator->clear_context();
+
+        bool icl_injected = text_generator->inject_system_prompt(kICLSystemPrompt);
+        if (!icl_injected) {
+            LOGI("inject_system_prompt returned false — generator may not support KV cache injection, continuing");
+        }
+
         auto search_results = search_with_provider(
             query,
             top_k,
             embedding_provider,
             embedding_dimension,
             similarity_threshold,
-            initialized
+            initialized,
+            chunker_.get()
         );
-        
+
         if (search_results.empty()) {
-            LOGE("No relevant documents found for query");
+            LOGI("No relevant documents found for query");
             GenerationResult result;
             result.text = "I don't have enough information to answer that question.";
             result.success = true;
             result.metadata["reason"] = "no_context";
             return result;
         }
-        
-        // Step 2: Build context from results
-        std::string context = build_context(search_results);
-        LOGI("Built context from %zu chunks, %zu chars", 
-             search_results.size(), context.size());
-        
-        // Step 3: Format prompt
-        std::string prompt = prompt_template;
-        size_t pos = prompt.find("{context}");
-        if (pos != std::string::npos) {
-            prompt.replace(pos, 9, context);
-        }
-        pos = prompt.find("{query}");
-        if (pos != std::string::npos) {
-            prompt.replace(pos, 7, query);
-        }
-        
-        // Step 4: Generate answer
-        auto result = text_generator->generate(prompt, options);
-        
-        // Add search metadata
-        if (result.success) {
-            result.metadata["num_chunks"] = search_results.size();
-            result.metadata["context_length"] = context.size();
-            
-            // Add chunk sources
-            nlohmann::json sources = nlohmann::json::array();
-            for (const auto& res : search_results) {
-                nlohmann::json source;
-                source["id"] = res.id;
-                source["score"] = res.score;
-                if (res.metadata.contains("source_text")) {
-                    source["source"] = res.metadata["source_text"];
-                }
-                sources.push_back(source);
+
+        std::string accumulated_context;
+        float confidence = 0.0f;
+        size_t sentences_used = 0;
+
+        for (const auto& sentence_result : search_results) {
+            const std::string& sentence_text = sentence_result.text;
+            std::string append_text = (sentences_used == 0) ? sentence_text : ("\n" + sentence_text);
+            text_generator->append_context(append_text);
+
+            if (sentences_used == 0) {
+                accumulated_context = sentence_text;
+            } else {
+                accumulated_context += "\n" + sentence_text;
             }
-            result.metadata["sources"] = sources;
+
+            sentences_used++;
+
+            confidence = text_generator->probe_confidence("", query);
+
+            LOGI("Adaptive loop: sentence %zu/%zu, confidence=%.4f, threshold=%.4f",
+                 sentences_used, search_results.size(), confidence, kConfidenceThreshold);
+
+            if (confidence > kConfidenceThreshold) {
+                LOGI("Confidence threshold reached at sentence %zu (confidence=%.4f)",
+                     sentences_used, confidence);
+                break;
+            }
         }
-        
+
+        bool threshold_reached = confidence > kConfidenceThreshold;
+        LOGI("Adaptive loop complete: sentences_used=%zu, final_confidence=%.4f, threshold_reached=%s",
+             sentences_used, confidence, threshold_reached ? "true" : "false");
+
+        if (!kKeepPartialContext && !threshold_reached) {
+            text_generator->clear_context();
+            text_generator->inject_system_prompt(kICLSystemPrompt);
+            accumulated_context.clear();
+            sentences_used = 0;
+            LOGI("Strict filtering: cleared all sentences (confidence never reached threshold)");
+        } else if (!kKeepPartialContext && threshold_reached && sentences_used < search_results.size()) {
+
+            LOGI("Strict filtering: keeping %zu sentences that reached confidence threshold", sentences_used);
+        }
+ 
+        std::string query_suffix = "\n\nQuestion: " + query + "\n\nAnswer:";
+        auto result = text_generator->generate_from_context(query_suffix, options);
+
+
+        result.metadata["sentences_used"] = sentences_used;
+        result.metadata["final_confidence"] = confidence;
+        result.metadata["threshold_reached"] = threshold_reached;
+        result.metadata["total_sentences"] = search_results.size();
+        result.metadata["keep_partial_context"] = kKeepPartialContext;
+
+        nlohmann::json sources = nlohmann::json::array();
+        for (size_t i = 0; i < sentences_used && i < search_results.size(); ++i) {
+            const auto& res = search_results[i];
+            nlohmann::json source;
+            source["id"] = res.id;
+            source["score"] = res.score;
+            if (res.metadata.contains("source_text")) {
+                source["source"] = res.metadata["source_text"];
+            }
+            sources.push_back(source);
+        }
+        result.metadata["sources"] = sources;
+
         return result;
-        
+
     } catch (const std::exception& e) {
         LOGE("Query failed: %s", e.what());
         GenerationResult error_result;

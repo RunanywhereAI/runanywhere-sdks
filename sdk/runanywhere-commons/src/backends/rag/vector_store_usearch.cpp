@@ -54,11 +54,11 @@ public:
         usearch_config.expansion_add = config.expansion_add;
         usearch_config.expansion_search = config.expansion_search;
 
-        // Create metric for cosine similarity with F32 vectors
+        // Create metric for cosine similarity. Using i8 instead of float to save on RAM(quality isnt affected much)
         metric_punned_t metric(
             static_cast<std::size_t>(config.dimension),
             metric_kind_t::cos_k,
-            scalar_kind_t::f32_k
+            scalar_kind_t::i8_k
         );
 
         // Create index
@@ -71,7 +71,7 @@ public:
 
         // Reserve capacity
         index_.reserve(config.max_elements);
-        LOGI("Created vector store: dim=%zu, max=%zu, connectivity=%zu",
+        LOGI("Created vector store: dim=%zu, max=%zu, connectivity=%zu, quantization=i8",
              config.dimension, config.max_elements, config.connectivity);
     }
 

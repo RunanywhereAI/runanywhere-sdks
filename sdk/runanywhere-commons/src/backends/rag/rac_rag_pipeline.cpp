@@ -69,7 +69,7 @@ rac_result_t rac_rag_pipeline_create(
         RAGBackendConfig backend_config;
         backend_config.embedding_dimension = config->embedding_dimension > 0 
             ? config->embedding_dimension : 384;
-        backend_config.top_k = config->top_k > 0 ? config->top_k : 3;
+        backend_config.top_k = config->top_k > 0 ? config->top_k : 10;
         backend_config.similarity_threshold = config->similarity_threshold;
         backend_config.max_context_tokens = config->max_context_tokens > 0 
             ? config->max_context_tokens : 2048;
