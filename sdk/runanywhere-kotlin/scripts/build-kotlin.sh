@@ -556,10 +556,10 @@ main() {
             if [ "$need_rebuild" = true ]; then
                 download_dependencies
                 build_commons
-                copy_jni_libs
-            else
-                log_info "JNI libs up to date (use --rebuild-commons to force)"
             fi
+
+            # Always copy libs in local mode to prevent stale .so issues
+            copy_jni_libs
         fi
     fi
 

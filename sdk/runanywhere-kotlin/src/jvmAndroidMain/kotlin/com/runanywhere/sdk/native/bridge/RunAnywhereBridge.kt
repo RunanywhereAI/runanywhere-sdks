@@ -206,6 +206,9 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentGetLoraInfo(handle: Long): String?
 
+    @JvmStatic
+    external fun racLlmComponentCheckLoraCompat(handle: Long, loraPath: String): String?
+
     // ========================================================================
     // STT COMPONENT (rac_stt_component.h)
     // ========================================================================
@@ -523,6 +526,7 @@ object RunAnywhereBridge {
         downloadSize: Long,
         contextLength: Int,
         supportsThinking: Boolean,
+        supportsLora: Boolean,
         description: String?,
     ): Int
 
@@ -569,6 +573,28 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
+
+    // ========================================================================
+    // LORA REGISTRY (rac_lora_registry.h)
+    // ========================================================================
+
+    @JvmStatic
+    external fun racLoraRegistryRegister(
+        id: String,
+        name: String,
+        description: String,
+        downloadUrl: String,
+        filename: String,
+        compatibleModelIds: Array<String>,
+        fileSize: Long,
+        defaultScale: Float,
+    ): Int
+
+    @JvmStatic
+    external fun racLoraRegistryGetForModel(modelId: String): String
+
+    @JvmStatic
+    external fun racLoraRegistryGetAll(): String
 
     // ========================================================================
     // MODEL ASSIGNMENT (rac_model_assignment.h)

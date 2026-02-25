@@ -36,7 +36,7 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     rac_service_request_t request = {};
     request.identifier = model_path;
     request.capability = RAC_CAPABILITY_STT;
-    request.framework = RAC_FRAMEWORK_ONNX;  // Default to ONNX for STT
+    request.framework = RAC_FRAMEWORK_UNKNOWN;  // Let service registry dispatch via can_handle
     request.model_path = model_path;
 
     // Service registry returns an rac_stt_service_t* with vtable already set
@@ -145,6 +145,20 @@ void rac_stt_result_free(rac_stt_result_t* result) {
     if (result->text) {
         free(result->text);
         result->text = nullptr;
+    }
+    if (result->detected_language) {
+        free(result->detected_language);
+        result->detected_language = nullptr;
+    }
+    if (result->words) {
+        for (size_t i = 0; i < result->num_words; i++) {
+            if (result->words[i].text) {
+                free(const_cast<char*>(result->words[i].text));
+            }
+        }
+        free(result->words);
+        result->words = nullptr;
+        result->num_words = 0;
     }
 }
 

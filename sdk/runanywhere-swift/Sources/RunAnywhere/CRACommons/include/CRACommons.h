@@ -52,6 +52,7 @@
 #include "rac_stt_component.h"
 #include "rac_stt_analytics.h"
 #include "rac_stt_events.h"
+#include "rac_stt_whisperkit_coreml.h"
 
 // TTS (Text-to-Speech)
 #include "rac_tts.h"
@@ -106,6 +107,7 @@
 // Model management
 #include "rac_model_types.h"
 #include "rac_model_registry.h"
+#include "rac_lora_registry.h"
 #include "rac_model_paths.h"
 #include "rac_model_strategy.h"
 #include "rac_model_assignment.h"

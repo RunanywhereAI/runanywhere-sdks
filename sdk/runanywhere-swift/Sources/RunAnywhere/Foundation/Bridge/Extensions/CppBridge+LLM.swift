@@ -128,6 +128,23 @@ extension CppBridge {
             logger.info("All LoRA adapters cleared")
         }
 
+        /// Check if a LoRA adapter is compatible with the currently loaded model
+        public func checkLoraCompatibility(loraPath: String) -> LoraCompatibilityResult {
+            guard let handle = handle else {
+                return LoraCompatibilityResult(isCompatible: false, error: "No LLM component active")
+            }
+            var errorPtr: UnsafeMutablePointer<CChar>?
+            let result = loraPath.withCString { pathPtr in
+                rac_llm_component_check_lora_compat(handle, pathPtr, &errorPtr)
+            }
+            if result == RAC_SUCCESS {
+                return LoraCompatibilityResult(isCompatible: true)
+            }
+            let errorMsg = errorPtr.map { String(cString: $0) }
+            if let ptr = errorPtr { rac_free(ptr) }
+            return LoraCompatibilityResult(isCompatible: false, error: errorMsg)
+        }
+
         /// Get info about all loaded LoRA adapters
         public func getLoadedLoraAdapters() throws -> [LoRAAdapterInfo] {
             guard let handle = handle else { return [] }

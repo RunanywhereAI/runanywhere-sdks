@@ -69,12 +69,10 @@ elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_library(onnxruntime STATIC IMPORTED GLOBAL)
 
     # Determine architecture-specific library path
-    if(CMAKE_OSX_SYSROOT MATCHES "simulator")
-        if(CMAKE_OSX_ARCHITECTURES MATCHES "arm64")
-            set(ONNX_FRAMEWORK_ARCH "ios-arm64_x86_64-simulator")
-        else()
-            set(ONNX_FRAMEWORK_ARCH "ios-arm64_x86_64-simulator")
-        endif()
+    # Check both CMAKE_OSX_SYSROOT (case-insensitive) and IOS_PLATFORM from ios.toolchain.cmake
+    string(TOLOWER "${CMAKE_OSX_SYSROOT}" _sysroot_lower)
+    if(_sysroot_lower MATCHES "simulator" OR (DEFINED IOS_PLATFORM AND IOS_PLATFORM MATCHES "SIMULATOR"))
+        set(ONNX_FRAMEWORK_ARCH "ios-arm64_x86_64-simulator")
     else()
         set(ONNX_FRAMEWORK_ARCH "ios-arm64")
     endif()
@@ -137,6 +135,41 @@ elseif(ANDROID)
             IMPORTED_LOCATION "${ONNX_LIB_PATH}"
         )
         target_include_directories(onnxruntime INTERFACE "${ONNX_HEADER_PATH}")
+
+        # Sherpa-ONNX Android prebuilts only ship the C API header.
+        # The ONNX C++ API headers (onnxruntime_cxx_api.h etc.) are header-only
+        # wrappers needed by wakeword_onnx.cpp.  Download them if missing.
+        if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
+            set(ONNX_CXX_HEADER_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-cxx-headers")
+            file(MAKE_DIRECTORY "${ONNX_CXX_HEADER_DIR}")
+
+            set(ONNX_HEADER_BASE_URL "https://raw.githubusercontent.com/microsoft/onnxruntime/v${ONNX_VERSION_ANDROID}/include/onnxruntime/core/session")
+            set(ONNX_CXX_HEADERS
+                onnxruntime_cxx_api.h
+                onnxruntime_cxx_inline.h
+                onnxruntime_float16.h
+                onnxruntime_session_options_config_keys.h
+                onnxruntime_run_options_config_keys.h
+            )
+
+            foreach(header ${ONNX_CXX_HEADERS})
+                if(NOT EXISTS "${ONNX_CXX_HEADER_DIR}/${header}")
+                    message(STATUS "Downloading ONNX C++ header: ${header}")
+                    file(DOWNLOAD
+                        "${ONNX_HEADER_BASE_URL}/${header}"
+                        "${ONNX_CXX_HEADER_DIR}/${header}"
+                        STATUS download_status
+                    )
+                    list(GET download_status 0 download_code)
+                    if(NOT download_code EQUAL 0)
+                        message(WARNING "Failed to download ${header} (status: ${download_status})")
+                    endif()
+                endif()
+            endforeach()
+
+            target_include_directories(onnxruntime INTERFACE "${ONNX_CXX_HEADER_DIR}")
+            message(STATUS "ONNX Runtime C++ headers: ${ONNX_CXX_HEADER_DIR}")
+        endif()
 
         message(STATUS "ONNX Runtime Android library: ${ONNX_LIB_PATH}")
         message(STATUS "ONNX Runtime Android headers: ${ONNX_HEADER_PATH}")

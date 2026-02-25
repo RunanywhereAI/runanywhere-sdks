@@ -22,12 +22,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -248,7 +248,7 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
     return when (modality) {
         ModelSelectionContext.LLM -> Icons.Default.AutoAwesome
         ModelSelectionContext.STT -> Icons.Default.GraphicEq
-        ModelSelectionContext.TTS -> Icons.Default.VolumeUp
+        ModelSelectionContext.TTS -> Icons.AutoMirrored.Filled.VolumeUp
         ModelSelectionContext.VOICE -> Icons.Default.Mic
         ModelSelectionContext.RAG_EMBEDDING,
         ModelSelectionContext.RAG_LLM -> Icons.Default.Description

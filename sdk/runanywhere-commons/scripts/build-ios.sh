@@ -351,12 +351,13 @@ create_xcframework() {
         local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
         local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
 
+        rm -rf "${FRAMEWORK_DIR}"
         mkdir -p "${FRAMEWORK_DIR}/Headers"
         mkdir -p "${FRAMEWORK_DIR}/Modules"
 
         # Find the library (try multiple locations)
         local LIB_PATH="${PLATFORM_DIR}/lib${LIB_NAME}.a"
-        
+
         # Try Xcode generator output paths
         if [[ ! -f "${LIB_PATH}" ]]; then
             if [[ "$PLATFORM" == "OS" ]]; then
@@ -365,7 +366,7 @@ create_xcframework() {
                 LIB_PATH="${PLATFORM_DIR}/Release-iphonesimulator/lib${LIB_NAME}.a"
             fi
         fi
-        
+
         # Try backend-specific paths
         [[ ! -f "${LIB_PATH}" ]] && LIB_PATH="${PLATFORM_DIR}/src/backends/${BUILD_BACKEND}/lib${LIB_NAME}.a"
 
@@ -376,11 +377,11 @@ create_xcframework() {
 
         cp "${LIB_PATH}" "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
 
-        # Copy headers
+        # Copy headers (flatten rac/subdir/header.h paths to flat includes)
         if [[ "$FRAMEWORK_NAME" == "RACommons" ]]; then
             find "${PROJECT_ROOT}/include/rac" -name "*.h" | while read -r header; do
                 local filename=$(basename "$header")
-                sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include <RACommons/\1>|g' \
+                sed -e 's|#include "rac/[^"]*\/\([^"]*\)"|#include "\1"|g' \
                     "$header" > "${FRAMEWORK_DIR}/Headers/${filename}"
             done
         else
@@ -425,6 +426,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>
@@ -432,16 +434,32 @@ EOF
     done
 
     # SIMULATOR already contains universal binary (arm64 + x86_64)
-    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR"
 
-    # Create XCFramework (iOS + optionally macOS)
+    # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
     rm -rf "${XCFW_PATH}"
 
-    xcodebuild -create-xcframework \
-        -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
-        -framework "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework" \
-        -output "${XCFW_PATH}"
+    # Prepare library files (rename binary to lib*.a for library format)
+    local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
+    cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
+
+    local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+    cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+
+    local XCFW_ARGS=(
+        -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
+        -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
+    )
+
+    if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+        local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
+        cp "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${MACOS_LIB}"
+        XCFW_ARGS+=(-library "${MACOS_LIB}" -headers "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/Headers")
+        log_info "Including macOS slice in ${FRAMEWORK_NAME}.xcframework"
+    fi
+
+    xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_PATH}"
 
     log_info "Created: ${XCFW_PATH}"
     echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
@@ -469,6 +487,7 @@ create_backend_xcframework() {
         local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
         local FRAMEWORK_DIR="${PLATFORM_DIR}/${FRAMEWORK_NAME}.framework"
 
+        rm -rf "${FRAMEWORK_DIR}"
         mkdir -p "${FRAMEWORK_DIR}/Headers"
         mkdir -p "${FRAMEWORK_DIR}/Modules"
 
@@ -483,7 +502,7 @@ create_backend_xcframework() {
         else
             XCODE_SUBDIR="Release-iphonesimulator"
         fi
-        
+
         for possible_path in \
             "${PLATFORM_DIR}/src/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/${XCODE_SUBDIR}/librac_backend_${BACKEND_NAME}.a" \
@@ -551,47 +570,6 @@ create_backend_xcframework() {
             fi
         done
     fi
-
-            
-            elif [[ "$BACKEND_NAME" == "rag" ]]; then
-        # RAG backend depends on:
-        # 1. Sherpa-ONNX
-        # 2. ONNX Runtime (required for Ort* symbols)
-
-        # -------------------------------
-        # Bundle Sherpa-ONNX
-        # -------------------------------
-        local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
-        local SHERPA_ARCH
-
-        case $PLATFORM in
-            OS) SHERPA_ARCH="ios-arm64" ;;
-            *)  SHERPA_ARCH="ios-arm64_x86_64-simulator" ;;
-        esac
-
-        for possible in \
-            "${SHERPA_XCFW}/${SHERPA_ARCH}/libsherpa-onnx.a" \
-            "${SHERPA_XCFW}/${SHERPA_ARCH}/sherpa-onnx.framework/sherpa-onnx"; do
-            if [[ -f "$possible" ]]; then
-                LIBS_TO_BUNDLE+=("$possible")
-                break
-            fi
-        done
-
-        # -------------------------------
-        # Bundle ONNX Runtime
-        # -------------------------------
-        local ONNX_XCFW="${PROJECT_ROOT}/third_party/onnxruntime-ios/onnxruntime.xcframework"
-        local ONNX_ARCH="$SHERPA_ARCH"
-
-        for possible in \
-            "${ONNX_XCFW}/${ONNX_ARCH}/libonnxruntime.a" \
-            "${ONNX_XCFW}/${ONNX_ARCH}/onnxruntime.framework/onnxruntime"; do
-            if [[ -f "$possible" ]]; then
-                LIBS_TO_BUNDLE+=("$possible")
-                break
-            fi
-        done
     fi
 
         # Bundle all libraries
@@ -635,6 +613,7 @@ EOF
     <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>${MIN_OS_KEY}</key><string>${MIN_OS_VAL}</string>
 </dict>
 </plist>
@@ -647,17 +626,33 @@ EOF
     fi
 
     # SIMULATOR already contains universal binary (arm64 + x86_64)
-    # No need to create fat binary as both SIMULATORARM64 and SIMULATOR have arm64
+    local SIM_FAT="${BUILD_DIR}/SIMULATOR"
 
-    # Create XCFramework (iOS + optionally macOS)
+    # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
     rm -rf "${XCFW_PATH}"
 
     if [[ -f "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
-        xcodebuild -create-xcframework \
-            -framework "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework" \
-            -framework "${BUILD_DIR}/SIMULATOR/${FRAMEWORK_NAME}.framework" \
-            -output "${XCFW_PATH}"
+        # Prepare library files (rename binary to lib*.a for library format)
+        local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
+        cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
+
+        local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+        cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+
+        local XCFW_ARGS=(
+            -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
+            -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
+        )
+
+        if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+            local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
+            cp "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${MACOS_LIB}"
+            XCFW_ARGS+=(-library "${MACOS_LIB}" -headers "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/Headers")
+            log_info "Including macOS slice in ${FRAMEWORK_NAME}.xcframework"
+        fi
+
+        xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_PATH}"
 
         log_info "Created: ${XCFW_PATH}"
         echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"

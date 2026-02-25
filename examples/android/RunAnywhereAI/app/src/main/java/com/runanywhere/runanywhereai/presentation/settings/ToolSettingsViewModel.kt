@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.presentation.settings
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
@@ -54,7 +54,6 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
         get() = _uiState.value.toolCallingEnabled
 
     companion object {
-        private const val TAG = "ToolSettingsVM"
         private const val PREFS_NAME = "tool_settings"
         private const val KEY_TOOL_CALLING_ENABLED = "tool_calling_enabled"
         
@@ -173,11 +172,11 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                     }
                 )
 
-                Log.i(TAG, "✅ Demo tools registered")
+                Timber.i("✅ Demo tools registered")
                 refreshRegisteredTools()
 
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to register demo tools", e)
+                Timber.e(e, "Failed to register demo tools")
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -190,9 +189,9 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             try {
                 RunAnywhereToolCalling.clearTools()
                 refreshRegisteredTools()
-                Log.i(TAG, "✅ All tools cleared")
+                Timber.i("✅ All tools cleared")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear tools", e)
+                Timber.e(e, "Failed to clear tools")
             } finally {
                 _uiState.update { it.copy(isLoading = false) }
             }
@@ -212,9 +211,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
         }
     }
 
-    // ========================================================================
     // Tool Executor Implementations
-    // ========================================================================
 
     /**
      * Fetch weather using Open-Meteo API (free, no API key required)
@@ -285,13 +282,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                     )
                 }
             } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Weather API request timed out for location: $location")
+                Timber.w("Weather API request timed out for location: $location")
                 mapOf(
                     "error" to ToolValue.StringValue("Weather API request timed out. Please try again."),
                     "location" to ToolValue.StringValue(location)
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Weather fetch failed", e)
+                Timber.e(e, "Weather fetch failed")
                 mapOf(
                     "error" to ToolValue.StringValue("Failed to fetch weather: ${e.message}"),
                     "location" to ToolValue.StringValue(location)

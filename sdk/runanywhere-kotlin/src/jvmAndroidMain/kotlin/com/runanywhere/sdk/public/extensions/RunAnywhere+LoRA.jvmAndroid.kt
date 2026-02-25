@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoraRegistry
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
@@ -81,3 +82,54 @@ actual suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo> {
         emptyList()
     }
 }
+
+// MARK: - LoRA Compatibility Check
+
+actual fun RunAnywhere.checkLoraCompatibility(loraPath: String): LoraCompatibilityResult {
+    if (!isInitialized) return LoraCompatibilityResult(isCompatible = false, error = "SDK not initialized")
+    val error = CppBridgeLLM.checkLoraCompatibility(loraPath)
+    return if (error == null) {
+        LoraCompatibilityResult(isCompatible = true)
+    } else {
+        LoraCompatibilityResult(isCompatible = false, error = error)
+    }
+}
+
+// MARK: - LoRA Adapter Catalog
+
+actual fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry) {
+    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+    CppBridgeLoraRegistry.register(
+        CppBridgeLoraRegistry.LoraEntry(
+            id = entry.id,
+            name = entry.name,
+            description = entry.description,
+            downloadUrl = entry.downloadUrl,
+            filename = entry.filename,
+            compatibleModelIds = entry.compatibleModelIds,
+            fileSize = entry.fileSize,
+            defaultScale = entry.defaultScale,
+        ),
+    )
+}
+
+actual fun RunAnywhere.loraAdaptersForModel(modelId: String): List<LoraAdapterCatalogEntry> {
+    if (!isInitialized) return emptyList()
+    return CppBridgeLoraRegistry.getForModel(modelId).map { it.toCatalogEntry() }
+}
+
+actual fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry> {
+    if (!isInitialized) return emptyList()
+    return CppBridgeLoraRegistry.getAll().map { it.toCatalogEntry() }
+}
+
+private fun CppBridgeLoraRegistry.LoraEntry.toCatalogEntry() = LoraAdapterCatalogEntry(
+    id = id,
+    name = name,
+    description = description,
+    downloadUrl = downloadUrl,
+    filename = filename,
+    compatibleModelIds = compatibleModelIds,
+    fileSize = fileSize,
+    defaultScale = defaultScale,
+)

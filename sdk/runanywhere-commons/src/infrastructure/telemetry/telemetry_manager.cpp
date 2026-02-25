@@ -312,6 +312,12 @@ const char* framework_to_string(rac_inference_framework_t framework) {
             return "builtin";
         case RAC_FRAMEWORK_NONE:
             return "none";
+        case RAC_FRAMEWORK_COREML:
+            return "coreml";
+        case RAC_FRAMEWORK_MLX:
+            return "mlx";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return "whisperkit_coreml";
         case RAC_FRAMEWORK_UNKNOWN:
         default:
             return "unknown";

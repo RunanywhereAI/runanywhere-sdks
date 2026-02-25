@@ -1,3 +1,5 @@
-// CRACommons shim file
-// This file exists to ensure Xcode's Swift Package Manager integration
-// can build this module. The actual implementation is in the binary target.
+// CRACommons shim — SPM requires at least one source file for C targets.
+// All real implementations live in the xcframework binary targets:
+//   - RACommons.xcframework      (LoRA, Voice Agent, core)
+//   - RABackendRAG.xcframework   (RAG pipeline)
+//   - RABackendONNX.xcframework  (STT/TTS/VAD)

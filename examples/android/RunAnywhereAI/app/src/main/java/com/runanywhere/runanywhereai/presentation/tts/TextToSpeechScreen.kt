@@ -14,6 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -36,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
@@ -53,151 +56,140 @@ import kotlinx.coroutines.launch
  * - Audio info display
  * - Model status banner
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TextToSpeechScreen(viewModel: TextToSpeechViewModel = viewModel()) {
+fun TextToSpeechScreen(
+    onBack: () -> Unit = {},
+    viewModel: TextToSpeechViewModel = viewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
     var showModelLoadedToast by remember { mutableStateOf(false) }
     var loadedModelToastName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
-    Scaffold(
-        topBar = {
+    ConfigureTopBar(
+        title = "Text to Speech",
+        showBack = true,
+        onBack = onBack,
+        actions = {
             if (uiState.isModelLoaded) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Text to Speech",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    actions = {
-                        Surface(
-                            onClick = { showModelPicker = true },
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            TTSModelChip(
-                                modelName = uiState.selectedModelName,
-                                modifier = Modifier.padding(
-                                    start = 6.dp,
-                                    end = 12.dp,
-                                    top = 6.dp,
-                                    bottom = 6.dp,
-                                ),
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                )
-            }
-        },
-    ) { paddingValues ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (uiState.isModelLoaded) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState())
-                                .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                    ) {
-                        TextInputSection(
-                            text = uiState.inputText,
-                            onTextChange = { viewModel.updateInputText(it) },
-                            characterCount = uiState.characterCount,
-                            maxCharacters = uiState.maxCharacters,
-                            onShuffle = { viewModel.shuffleSampleText() },
-                        )
-
-                        VoiceSettingsSection(
-                            speed = uiState.speed,
-                            pitch = uiState.pitch,
-                            onSpeedChange = { viewModel.updateSpeed(it) },
-                            onPitchChange = { viewModel.updatePitch(it) },
-                        )
-
-                        if (uiState.audioDuration != null) {
-                            AudioInfoSection(
-                                duration = uiState.audioDuration!!,
-                                audioSize = uiState.audioSize,
-                                sampleRate = uiState.sampleRate,
-                            )
-                        }
-                    }
-
-                    HorizontalDivider()
-
-                    ControlsSection(
-                        isGenerating = uiState.isGenerating,
-                        isPlaying = uiState.isPlaying,
-                        isSpeaking = uiState.isSpeaking,
-                        hasGeneratedAudio = uiState.hasGeneratedAudio,
-                        isSystemTTS = uiState.isSystemTTS,
-                        isTextEmpty = uiState.inputText.isEmpty(),
-                        isModelSelected = uiState.selectedModelName != null,
-                        playbackProgress = uiState.playbackProgress,
-                        currentTime = uiState.currentTime,
-                        duration = uiState.audioDuration ?: 0.0,
-                        errorMessage = uiState.errorMessage,
-                        onGenerate = { viewModel.generateSpeech() },
-                        onStopSpeaking = { viewModel.stopSynthesis() },
-                        onTogglePlayback = { viewModel.togglePlayback() },
+                Surface(
+                    onClick = { showModelPicker = true },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    TTSModelChip(
+                        modelName = uiState.selectedModelName,
+                        modifier = Modifier.padding(
+                            start = 6.dp,
+                            end = 12.dp,
+                            top = 6.dp,
+                            bottom = 6.dp,
+                        ),
                     )
                 }
             }
+        },
+    )
 
-            if (!uiState.isModelLoaded && !uiState.isGenerating) {
-                ModelRequiredOverlay(
-                    modality = ModelSelectionContext.TTS,
-                    onSelectModel = { showModelPicker = true },
-                    modifier = Modifier.matchParentSize(),
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (uiState.isModelLoaded) {
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    TextInputSection(
+                        text = uiState.inputText,
+                        onTextChange = { viewModel.updateInputText(it) },
+                        characterCount = uiState.characterCount,
+                        maxCharacters = uiState.maxCharacters,
+                        onShuffle = { viewModel.shuffleSampleText() },
+                    )
+
+                    VoiceSettingsSection(
+                        speed = uiState.speed,
+                        pitch = uiState.pitch,
+                        onSpeedChange = { viewModel.updateSpeed(it) },
+                        onPitchChange = { viewModel.updatePitch(it) },
+                    )
+
+                    if (uiState.audioDuration != null) {
+                        AudioInfoSection(
+                            duration = uiState.audioDuration!!,
+                            audioSize = uiState.audioSize,
+                            sampleRate = uiState.sampleRate,
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                ControlsSection(
+                    isGenerating = uiState.isGenerating,
+                    isPlaying = uiState.isPlaying,
+                    isSpeaking = uiState.isSpeaking,
+                    hasGeneratedAudio = uiState.hasGeneratedAudio,
+                    isSystemTTS = uiState.isSystemTTS,
+                    isTextEmpty = uiState.inputText.isEmpty(),
+                    isModelSelected = uiState.selectedModelName != null,
+                    playbackProgress = uiState.playbackProgress,
+                    currentTime = uiState.currentTime,
+                    duration = uiState.audioDuration ?: 0.0,
+                    errorMessage = uiState.errorMessage,
+                    onGenerate = { viewModel.generateSpeech() },
+                    onStopSpeaking = { viewModel.stopSynthesis() },
+                    onTogglePlayback = { viewModel.togglePlayback() },
                 )
             }
+        }
 
-            // Model loaded toast overlay
-            ModelLoadedToast(
-                modelName = loadedModelToastName,
-                isVisible = showModelLoadedToast,
-                onDismiss = { showModelLoadedToast = false },
-                modifier = Modifier.align(Alignment.TopCenter),
+        if (!uiState.isModelLoaded && !uiState.isGenerating) {
+            ModelRequiredOverlay(
+                modality = ModelSelectionContext.TTS,
+                onSelectModel = { showModelPicker = true },
+                modifier = Modifier.matchParentSize(),
             )
         }
+
+        // Model loaded toast overlay
+        ModelLoadedToast(
+            modelName = loadedModelToastName,
+            isVisible = showModelLoadedToast,
+            onDismiss = { showModelLoadedToast = false },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
     if (showModelPicker) {
-            ModelSelectionBottomSheet(
-                context = ModelSelectionContext.TTS,
-                onDismiss = { showModelPicker = false },
-                onModelSelected = { model ->
-                    scope.launch {
-                        android.util.Log.d("TextToSpeechScreen", "TTS model selected: ${model.name}")
-                        // Notify ViewModel that model is loaded
-                        viewModel.onModelLoaded(
-                            modelName = model.name,
-                            modelId = model.id,
-                            framework = model.framework,
-                        )
-                        showModelPicker = false
-                        // Show model loaded toast
-                        loadedModelToastName = model.name
-                        showModelLoadedToast = true
-                    }
-                },
-            )
-        }
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.TTS,
+            onDismiss = { showModelPicker = false },
+            onModelSelected = { model ->
+                scope.launch {
+                    // Notify ViewModel that model is loaded
+                    viewModel.onModelLoaded(
+                        modelName = model.name,
+                        modelId = model.id,
+                        framework = model.framework,
+                    )
+                    showModelPicker = false
+                    // Show model loaded toast
+                    loadedModelToastName = model.name
+                    showModelLoadedToast = true
+                }
+            },
+        )
+    }
 }
 
 /**
@@ -313,7 +305,7 @@ private fun ModelStatusBannerTTS(
                 )
             } else if (framework != null && modelName != null) {
                 Icon(
-                    imageVector = Icons.Filled.VolumeUp,
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
                     contentDescription = null,
                     tint = AppColors.primaryAccent,
                     modifier = Modifier.size(18.dp),
@@ -572,7 +564,7 @@ private fun AudioInfoSection(
 
             sampleRate?.let {
                 AudioInfoRow(
-                    icon = Icons.Outlined.VolumeUp,
+                    icon = Icons.AutoMirrored.Outlined.VolumeUp,
                     label = "Sample Rate",
                     value = "$it Hz",
                 )
@@ -713,7 +705,7 @@ private fun ControlsSection(
                             if (isSystemTTS && isSpeaking) {
                                 Icons.Filled.Stop
                             } else if (isSystemTTS) {
-                                Icons.Filled.VolumeUp
+                                Icons.AutoMirrored.Filled.VolumeUp
                             } else {
                                 Icons.Filled.GraphicEq
                             },

@@ -162,6 +162,19 @@ struct MoreHubView: View {
                             subtitle: "Manage models and files"
                         )
                     }
+
+                    #if os(iOS)
+                    NavigationLink {
+                        VoiceDictationManagementView()
+                    } label: {
+                        FeatureRow(
+                            icon: "keyboard",
+                            iconColor: .indigo,
+                            title: "Voice Keyboard",
+                            subtitle: "Dictate text in any app on-device"
+                        )
+                    }
+                    #endif
                 } header: {
                     Text("Utilities")
                 } footer: {

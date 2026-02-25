@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,6 +56,12 @@ import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
+import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
+import com.runanywhere.runanywhereai.presentation.lora.LoraAdapterPickerSheet
+import com.runanywhere.runanywhereai.presentation.lora.LoraViewModel
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import android.app.Application
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
@@ -66,7 +73,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
+fun ChatScreen(
+    viewModel: ChatViewModel = viewModel(),
+    loraViewModel: LoraViewModel = viewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -74,6 +84,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     var showingConversationList by remember { mutableStateOf(false) }
     var showingModelSelection by remember { mutableStateOf(false) }
     var showingChatDetails by remember { mutableStateOf(false) }
+    var showingLoraAdapterPicker by remember { mutableStateOf(false) }
     var showDebugAlert by remember { mutableStateOf(false) }
     var debugMessage by remember { mutableStateOf("") }
 
@@ -88,30 +99,39 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            if (uiState.isModelLoaded) {
-                ChatTopBar(
-                    hasMessages = uiState.messages.isNotEmpty(),
-                    modelName = uiState.loadedModelName,
-                    supportsStreaming = uiState.useStreaming,
-                    onHistoryClick = {
-                        viewModel.ensureCurrentConversationInHistory()
-                        showingConversationList = true
-                    },
-                    onInfoClick = { showingChatDetails = true },
-                    onModelClick = { showingModelSelection = true },
-                )
-            }
-        },
-    ) { padding ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+    if (uiState.isModelLoaded) {
+        ConfigureCustomTopBar {
+            ChatTopBar(
+                hasMessages = uiState.messages.isNotEmpty(),
+                modelName = uiState.loadedModelName,
+                supportsStreaming = uiState.useStreaming,
+                supportsLora = uiState.currentModelSupportsLora,
+                hasActiveLoraAdapter = uiState.hasActiveLoraAdapter,
+                onHistoryClick = {
+                    viewModel.ensureCurrentConversationInHistory()
+                    showingConversationList = true
+                },
+                onInfoClick = { showingChatDetails = true },
+                onModelClick = { showingModelSelection = true },
+                onLoraClick = {
+                    RunAnywhere.currentLLMModelId?.let { modelId ->
+                        loraViewModel.refreshForModel(modelId)
+                    }
+                    showingLoraAdapterPicker = true
+                },
+            )
+        }
+    } else {
+        ConfigureTopBar(title = "Chat")
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+    ) {
+        Column(modifier = Modifier.fillMaxSize().imePadding()) {
                 if (uiState.isModelLoaded) {
                     if (uiState.messages.isEmpty() && !uiState.isGenerating) {
                         EmptyStateView(modifier = Modifier.weight(1f))
@@ -189,7 +209,6 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                 onDismiss = { showModelLoadedToast = false },
                 modifier = Modifier.align(Alignment.TopCenter),
             )
-        }
     }
 
     if (showingModelSelection) {
@@ -202,6 +221,16 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     loadedModelToastName = model.name
                     showModelLoadedToast = true
                 }
+            },
+        )
+    }
+
+    if (showingLoraAdapterPicker) {
+        LoraAdapterPickerSheet(
+            loraViewModel = loraViewModel,
+            onDismiss = {
+                showingLoraAdapterPicker = false
+                viewModel.refreshLoraState()
             },
         )
     }
@@ -282,97 +311,31 @@ fun ChatTopBar(
     hasMessages: Boolean,
     modelName: String?,
     supportsStreaming: Boolean,
+    supportsLora: Boolean = false,
+    hasActiveLoraAdapter: Boolean = false,
     onHistoryClick: () -> Unit,
     onInfoClick: () -> Unit,
     onModelClick: () -> Unit,
+    onLoraClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     TopAppBar(
         modifier = modifier,
         title = {
-            Text(
-                text = "Chat",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-            )
-        },
-        actions = {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(4.dp),
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = onHistoryClick,
-                            ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "History",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .then(
-                                if (hasMessages) {
-                                    Modifier
-                                        .background(AppColors.primaryAccent, CircleShape)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null,
-                                            onClick = onInfoClick,
-                                        )
-                                } else {
-                                    Modifier
-                                }
-                            ),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            modifier = Modifier.size(20.dp),
-                            tint = if (hasMessages) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
+            // Model chip as the title — clickable to switch model
             Surface(
                 onClick = onModelClick,
-                shape = RoundedCornerShape(50),
+                shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(
-                        start = 6.dp,
-                        end = 12.dp,
-                        top = 6.dp,
-                        bottom = 6.dp,
-                    ),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                 ) {
                     if (modelName != null) {
                         Box(
                             modifier = Modifier
-                                .size(30.dp)
+                                .size(26.dp)
                                 .clip(RoundedCornerShape(6.dp)),
                         ) {
                             Image(
@@ -382,34 +345,54 @@ fun ChatTopBar(
                                 contentScale = ContentScale.Fit,
                             )
                         }
-
                         Spacer(modifier = Modifier.width(8.dp))
-
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(
-                                text = shortModelName(modelName, maxLength = 12),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                Icon(
-                                    imageVector = if (supportsStreaming) Icons.Default.Bolt else Icons.Default.Stop,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(10.dp),
-                                    tint = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                Text(
+                                    text = shortModelName(modelName, maxLength = 14),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                // LoRA active badge — inline next to model name
+                                if (hasActiveLoraAdapter) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = AppColors.primaryPurple,
+                                    ) {
+                                        Text(
+                                            text = "LoRA",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.sp,
+                                                letterSpacing = 0.3.sp,
+                                            ),
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                        ),
                                 )
                                 Text(
                                     text = if (supportsStreaming) "Streaming" else "Batch",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                    ),
-                                    color = if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -423,11 +406,52 @@ fun ChatTopBar(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Select Model",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Medium,
                         )
                     }
                 }
+            }
+        },
+        actions = {
+            // LoRA button — ghost when no adapter, hidden when not supported
+            if (supportsLora && !hasActiveLoraAdapter) {
+                TextButton(
+                    onClick = onLoraClick,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                ) {
+                    Text(
+                        text = "+ LoRA",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.3.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            // History
+            IconButton(onClick = onHistoryClick) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "History",
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Info — highlighted when there are messages
+            IconButton(
+                onClick = onInfoClick,
+                enabled = hasMessages,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info",
+                    modifier = Modifier.size(20.dp),
+                    tint = if (hasMessages) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                )
             }
 
             Spacer(modifier = Modifier.width(4.dp))
@@ -446,13 +470,6 @@ fun MessageBubbleView(
     modifier: Modifier = Modifier,
 ) {
     var showToolCallSheet by remember { mutableStateOf(false) }
-    
-    val alignment =
-        if (message.role == MessageRole.USER) {
-            Arrangement.End
-        } else {
-            Arrangement.Start
-        }
 
     // context menu state
     var showDialog by remember { mutableStateOf(false) }
@@ -461,34 +478,96 @@ fun MessageBubbleView(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
 
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = alignment,
-    ) {
-        if (message.role == MessageRole.USER) {
-            Spacer(modifier = Modifier.width(Dimensions.messageBubbleMinSpacing))
-        }
+    val isUserMessage = message.role == MessageRole.USER
 
-        Column(
-            modifier = Modifier.widthIn(max = Dimensions.messageBubbleMaxWidth),
-            horizontalAlignment =
-                if (message.role == MessageRole.USER) {
-                    Alignment.End
-                } else {
-                    Alignment.Start
-                },
+    // Context menu dialog (shared by both user and assistant)
+    if (showDialog) {
+        BasicAlertDialog(
+            onDismissRequest = { showDialog = false },
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimensions.cornerRadiusModal))
+                .background(MaterialTheme.colorScheme.surface)
+                .widthIn(max = Dimensions.contextMenuMaxWidth)
         ) {
-            // Model badge (for assistant messages)
-            if (message.role == MessageRole.ASSISTANT && message.modelInfo != null) {
-                ModelBadge(
-                    modelName = message.modelInfo.modelName,
-                    framework = message.modelInfo.framework,
-                )
-                Spacer(modifier = Modifier.height(Dimensions.small))
+            Column(modifier = Modifier.padding(vertical = Dimensions.padding8)) {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            val clipEntry = ClipEntry(ClipData.newPlainText("chat_msg", message.content))
+                            clipboard.setClipEntry(clipEntry)
+                            showDialog = false
+                            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
+                                Toast.makeText(context, "Message copied to clipboard", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimensions.padding16)
+                ) {
+                    Text("Copy", style = MaterialTheme.typography.bodyLarge)
+                }
+                TextButton(
+                    onClick = {
+                        showDialog = false
+                        showTextSelectionDialog = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Dimensions.padding16)
+                ) {
+                    Text("Select Text", style = MaterialTheme.typography.bodyLarge)
+                }
             }
+        }
+    }
 
-            // Tool call indicator (for assistant messages with tool calls) - matching iOS
-            if (message.role == MessageRole.ASSISTANT && message.toolCallInfo != null) {
+    if (showTextSelectionDialog) {
+        SelectableTextDialog(
+            text = message.content,
+            onDismiss = { showTextSelectionDialog = false }
+        )
+    }
+
+    if (isUserMessage) {
+        // ── User message: right-aligned, simple solid rounded background ──
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(Dimensions.messageMaxWidthFraction)
+                    .wrapContentWidth(Alignment.End),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(Dimensions.userBubbleCornerRadius))
+                        .background(AppColors.userBubbleColor())
+                        .combinedClickable(
+                            onClick = { /* No-op */ },
+                            onLongClick = { showDialog = true },
+                        ),
+                ) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(
+                            horizontal = Dimensions.messageBubblePaddingHorizontal,
+                            vertical = Dimensions.messageBubblePaddingVertical,
+                        ),
+                    )
+                }
+            }
+        }
+    } else {
+        // ── Assistant message: full-width, no bubble, model icon at top-left ──
+        Column(
+            modifier = modifier.fillMaxWidth(),
+        ) {
+            // Tool call indicator
+            if (message.toolCallInfo != null) {
                 com.runanywhere.runanywhereai.presentation.chat.components.ToolCallIndicator(
                     toolCallInfo = message.toolCallInfo,
                     onTap = { showToolCallSheet = true },
@@ -496,186 +575,64 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
 
+            // Thinking toggle
             message.thinkingContent?.let { thinking ->
-                ThinkingToggle(
-                    thinkingContent = thinking,
-                )
+                ThinkingToggle(thinkingContent = thinking)
                 Spacer(modifier = Modifier.height(Dimensions.small))
             }
 
-            if (message.role == MessageRole.ASSISTANT &&
-                message.content.isEmpty() &&
-                message.thinkingContent != null &&
-                isGenerating
-            ) {
+            // Thinking progress (empty content but thinking exists)
+            if (message.content.isEmpty() && message.thinkingContent != null && isGenerating) {
                 ThinkingProgressIndicator()
             }
 
+            // Main content: icon + markdown
             if (message.content.isNotEmpty()) {
-                val bubbleShape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
-                val isUserMessage = message.role == MessageRole.USER
-
-                if (showDialog) {
-                    BasicAlertDialog(
-                        onDismissRequest = { showDialog = false },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(Dimensions.cornerRadiusModal))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .widthIn(max = Dimensions.contextMenuMaxWidth)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(vertical = Dimensions.padding8)
-                        ) {
-                            TextButton(
-                                onClick = {
-                                    scope.launch {
-                                        val clipEntry = ClipEntry(ClipData.newPlainText("chat_msg", message.content))
-                                        clipboard.setClipEntry(clipEntry)
-                                        showDialog = false
-                                        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2) {
-                                            Toast.makeText(context, "Message copied to clipboard", Toast.LENGTH_SHORT).show()
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Dimensions.padding16)
-                            ) {
-                                Text("Copy", style = MaterialTheme.typography.bodyLarge)
-                            }
-                            TextButton(
-                                onClick = {
-                                    showDialog = false
-                                    showTextSelectionDialog = true
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = Dimensions.padding16)
-                            ) {
-                                Text("Select Text", style = MaterialTheme.typography.bodyLarge)
-                            }
-                        }
-                    }
-                }
-
-                if (showTextSelectionDialog) {
-                    SelectableTextDialog(
-                        text = message.content,
-                        onDismiss = { showTextSelectionDialog = false }
-                    )
-                }
-
-                Box(
-                    modifier =
-                        Modifier
-                            .shadow(
-                                elevation = Dimensions.messageBubbleShadowRadius,
-                                shape = bubbleShape,
-                            )
-                            .clip(bubbleShape)
-                            .background(
-                                brush =
-                                    if (isUserMessage) {
-                                        AppColors.userBubbleGradient()
-                                    } else {
-                                        AppColors.assistantBubbleGradientThemed()
-                                    },
-                            )
-                            .border(
-                                width = Dimensions.strokeThin,
-                                color =
-                                    if (isUserMessage) {
-                                        AppColors.borderLight
-                                    } else {
-                                        AppColors.borderMedium
-                                    },
-                                shape = bubbleShape,
-                            )
-                            .combinedClickable(
-                                onClick = { /* No-op */ },
-                                onLongClick = { showDialog = true },
-                            ),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = { /* No-op */ },
+                            onLongClick = { showDialog = true },
+                        ),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    if (isUserMessage) {
-                        Text(
-                            text = message.content,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = AppColors.textWhite,
-                            modifier =
-                                Modifier.padding(
-                                    horizontal = Dimensions.messageBubblePaddingHorizontal,
-                                    vertical = Dimensions.messageBubblePaddingVertical,
-                                ),
+                    // Small model icon
+                    if (message.modelInfo != null) {
+                        Image(
+                            painter = painterResource(id = getModelLogoResIdForName(message.modelInfo.modelName)),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(Dimensions.assistantIconSize)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Fit,
                         )
-                    } else {
-                        Box {
-                            Column(
-                                modifier = Modifier.padding(
-                                    horizontal = Dimensions.messageBubblePaddingHorizontal,
-                                    vertical = Dimensions.messageBubblePaddingVertical,
-                                ),
-                            ) {
-                                MarkdownText(
-                                    markdown = message.content,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = AppColors.assistantBubbleTextColor(),
-                                )
-
-                                if (message.modelInfo != null) {
-                                    Spacer(modifier = Modifier.height(Dimensions.large))
-                                }
-                            }
-
-                            if (message.modelInfo != null) {
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.BottomEnd)
-                                        .padding(
-                                            end = Dimensions.mediumLarge,
-                                            bottom = Dimensions.small,
-                                        ),
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ViewInAr,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(8.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    )
-                                    Text(
-                                        text = message.modelInfo.modelName,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Medium,
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    )
-                                }
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(Dimensions.assistantIconSpacing))
                     }
+
+                    // Full-width markdown text, no background
+                    MarkdownText(
+                        markdown = message.content,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
 
-            if (message.role == MessageRole.ASSISTANT &&
-                message.content.isNotEmpty() &&
-                !isGenerating
-            ) {
+            // Analytics footer (left-aligned for assistant)
+            if (message.content.isNotEmpty() && !isGenerating) {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 AnalyticsFooter(
                     message = message,
                     hasThinking = message.thinkingContent != null,
+                    alignEnd = false,
                 )
             }
         }
-
-        if (message.role == MessageRole.ASSISTANT) {
-            Spacer(modifier = Modifier.width(Dimensions.messageBubbleMinSpacing))
-        }
     }
-    
-    // Tool call detail sheet - matching iOS
+
+    // Tool call detail sheet
     if (showToolCallSheet && message.toolCallInfo != null) {
         com.runanywhere.runanywhereai.presentation.chat.components.ToolCallDetailSheet(
             toolCallInfo = message.toolCallInfo,
@@ -913,7 +870,7 @@ fun ThinkingToggle(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowRight,
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
                     tint = AppColors.primaryPurple.copy(alpha = 0.6f),
@@ -955,21 +912,22 @@ fun ThinkingToggle(
 // ANALYTICS FOOTER
 // ====================
 
-// Matches iOS timestampAndAnalyticsSection - right-aligned, timestamp always shown + optional analytics
+// Matches iOS timestampAndAnalyticsSection - timestamp always shown + optional analytics
 @Composable
 fun AnalyticsFooter(
     message: ChatMessage,
     hasThinking: Boolean,
+    alignEnd: Boolean = true,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalArrangement = if (alignEnd) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = Dimensions.mediumLarge),
+            modifier = if (alignEnd) Modifier.padding(start = Dimensions.mediumLarge) else Modifier.padding(start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing),
         ) {
             // Timestamp - always shown ( Text(message.timestamp, style: .time))
             Text(
@@ -1027,84 +985,54 @@ fun AnalyticsFooter(
 // TYPING INDICATOR
 // ====================
 
-// Typing indicator - : dots in separate bubble, text outside, centered with spacers
+// Typing indicator — simple dots + text, no bubble
 @Composable
 fun TypingIndicatorView() {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = Dimensions.mediumLarge),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
     ) {
-        Spacer(modifier = Modifier.width(Dimensions.messageBubbleMinSpacing))
-
         Row(
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.typingIndicatorDotSpacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Dots in their own bubble background - 
-            Box(
-                modifier = Modifier
-                    .shadow(
-                        elevation = Dimensions.shadowMedium,
-                        shape = RoundedCornerShape(Dimensions.large),
-                        ambientColor = AppColors.shadowLight,
-                        spotColor = AppColors.shadowLight,
-                    )
-                    .clip(RoundedCornerShape(Dimensions.large))
-                    .background(AppColors.typingIndicatorBackground)
-                    .border(
-                        width = Dimensions.strokeThin,
-                        color = AppColors.typingIndicatorBorder,
-                        shape = RoundedCornerShape(Dimensions.large),
-                    )
-                    .padding(
-                        horizontal = Dimensions.typingIndicatorPaddingHorizontal,
-                        vertical = Dimensions.typingIndicatorPaddingVertical,
-                    ),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Dimensions.typingIndicatorDotSpacing),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    repeat(3) { index ->
-                        val infiniteTransition = rememberInfiniteTransition(label = "typing")
-                        val scale by infiniteTransition.animateFloat(
-                            initialValue = 0.8f,
-                            targetValue = 1.3f,
-                            animationSpec =
-                                infiniteRepeatable(
-                                    animation = tween(600),
-                                    repeatMode = RepeatMode.Reverse,
-                                    initialStartOffset = StartOffset(index * 200),
-                                ),
-                            label = "dot_scale_$index",
-                        )
+            repeat(3) { index ->
+                val infiniteTransition = rememberInfiniteTransition(label = "typing")
+                val scale by infiniteTransition.animateFloat(
+                    initialValue = 0.8f,
+                    targetValue = 1.3f,
+                    animationSpec =
+                        infiniteRepeatable(
+                            animation = tween(600),
+                            repeatMode = RepeatMode.Reverse,
+                            initialStartOffset = StartOffset(index * 200),
+                        ),
+                    label = "dot_scale_$index",
+                )
 
-                        Box(
-                            modifier =
-                                Modifier
-                                    .size(Dimensions.typingIndicatorDotSize)
-                                    .graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                    }
-                                    .background(
-                                        color = AppColors.typingIndicatorDots,
-                                        shape = CircleShape,
-                                    ),
-                        )
-                    }
-                }
+                Box(
+                    modifier = Modifier
+                        .size(Dimensions.typingIndicatorDotSize)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .background(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            shape = CircleShape,
+                        ),
+                )
             }
-
-            // Text outside the bubble - 
-            Text(
-                text = "AI is thinking...",
-                style = AppTypography.caption,
-                color = AppColors.typingIndicatorText,
-            )
         }
 
-        Spacer(modifier = Modifier.width(Dimensions.messageBubbleMinSpacing))
+        Text(
+            text = "Thinking...",
+            style = AppTypography.caption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        )
     }
 }
 

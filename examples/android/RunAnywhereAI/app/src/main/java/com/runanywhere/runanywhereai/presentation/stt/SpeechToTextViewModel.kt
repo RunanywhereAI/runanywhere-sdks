@@ -3,7 +3,7 @@ package com.runanywhere.runanywhereai.presentation.stt
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.util.Log
+import timber.log.Timber
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -101,7 +101,6 @@ data class STTUiState(
  */
 class SpeechToTextViewModel : ViewModel() {
     companion object {
-        private const val TAG = "STTViewModel"
         private const val SAMPLE_RATE = 16000 // 16kHz for Whisper/ONNX STT models
     }
 
@@ -123,7 +122,7 @@ class SpeechToTextViewModel : ViewModel() {
     private var hasSubscribedToEvents = false
 
     init {
-        Log.d(TAG, "STTViewModel initialized")
+        Timber.d("STTViewModel initialized")
     }
 
     /**
@@ -132,13 +131,13 @@ class SpeechToTextViewModel : ViewModel() {
      */
     fun initialize(context: Context) {
         if (isInitialized) {
-            Log.d(TAG, "STT view model already initialized, skipping")
+            Timber.d("STT view model already initialized, skipping")
             return
         }
         isInitialized = true
 
         viewModelScope.launch {
-            Log.i(TAG, "Initializing STT view model...")
+            Timber.i("Initializing STT view model...")
 
             // Initialize audio capture service
             audioCaptureService = AudioCaptureService(context)
@@ -151,7 +150,7 @@ class SpeechToTextViewModel : ViewModel() {
                 ) == PackageManager.PERMISSION_GRANTED
 
             if (!hasPermission) {
-                Log.w(TAG, "Microphone permission not granted")
+                Timber.w("Microphone permission not granted")
                 _uiState.update { it.copy(errorMessage = "Microphone permission required") }
             }
 
@@ -169,7 +168,7 @@ class SpeechToTextViewModel : ViewModel() {
      */
     private fun subscribeToSDKEvents() {
         if (hasSubscribedToEvents) {
-            Log.d(TAG, "Already subscribed to SDK events, skipping")
+            Timber.d("Already subscribed to SDK events, skipping")
             return
         }
         hasSubscribedToEvents = true
@@ -193,7 +192,7 @@ class SpeechToTextViewModel : ViewModel() {
     private fun handleModelEvent(event: ModelEvent) {
         when (event.eventType) {
             ModelEvent.ModelEventType.LOADED -> {
-                Log.i(TAG, "STT model loaded: ${event.modelId}")
+                Timber.i("STT model loaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = true,
@@ -204,7 +203,7 @@ class SpeechToTextViewModel : ViewModel() {
                 }
             }
             ModelEvent.ModelEventType.UNLOADED -> {
-                Log.i(TAG, "STT model unloaded: ${event.modelId}")
+                Timber.i("STT model unloaded: ${event.modelId}")
                 _uiState.update {
                     it.copy(
                         isModelLoaded = false,
@@ -215,15 +214,15 @@ class SpeechToTextViewModel : ViewModel() {
                 }
             }
             ModelEvent.ModelEventType.DOWNLOAD_STARTED -> {
-                Log.i(TAG, "STT model download started: ${event.modelId}")
+                Timber.i("STT model download started: ${event.modelId}")
                 _uiState.update { it.copy(isProcessing = true) }
             }
             ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                Log.i(TAG, "STT model download completed: ${event.modelId}")
+                Timber.i("STT model download completed: ${event.modelId}")
                 _uiState.update { it.copy(isProcessing = false) }
             }
             ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                Log.e(TAG, "STT model download failed: ${event.modelId} - ${event.error}")
+                Timber.e("STT model download failed: ${event.modelId} - ${event.error}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Download failed: ${event.error}",
@@ -252,7 +251,7 @@ class SpeechToTextViewModel : ViewModel() {
                     selectedModelName = displayName,
                 )
             }
-            Log.i(TAG, "STT model already loaded: $displayName")
+            Timber.i("STT model already loaded: $displayName")
         }
     }
 
@@ -280,7 +279,7 @@ class SpeechToTextViewModel : ViewModel() {
         modelId: String,
         framework: InferenceFramework?,
     ) {
-        Log.i(TAG, "Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
+        Timber.i("Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
         _uiState.update {
             it.copy(
                 isModelLoaded = true,
@@ -313,7 +312,7 @@ class SpeechToTextViewModel : ViewModel() {
             }
 
             try {
-                Log.i(TAG, "Loading STT model: $modelName (id: $modelId)")
+                Timber.i("Loading STT model: $modelName (id: $modelId)")
 
                 // Use SDK's loadSTTModel extension function
                 RunAnywhere.loadSTTModel(modelId)
@@ -327,9 +326,9 @@ class SpeechToTextViewModel : ViewModel() {
                     )
                 }
 
-                Log.i(TAG, "✅ STT model loaded successfully: $modelName")
+                Timber.i("✅ STT model loaded successfully: $modelName")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load STT model: ${e.message}", e)
+                Timber.e(e, "Failed to load STT model: ${e.message}")
                 _uiState.update {
                     it.copy(
                         errorMessage = "Failed to load model: ${e.message}",
@@ -359,7 +358,7 @@ class SpeechToTextViewModel : ViewModel() {
      * iOS Reference: startRecording() in STTViewModel.swift
      */
     private suspend fun startRecording() {
-        Log.i(TAG, "Starting recording in ${_uiState.value.mode} mode")
+        Timber.i("Starting recording in ${_uiState.value.mode} mode")
 
         if (!_uiState.value.isModelLoaded) {
             _uiState.update { it.copy(errorMessage = "No STT model loaded") }
@@ -409,9 +408,9 @@ class SpeechToTextViewModel : ViewModel() {
                         _uiState.update { it.copy(audioLevel = normalizedLevel) }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
-                    Log.d(TAG, "Batch recording cancelled (expected when stopping)")
+                    Timber.d("Batch recording cancelled (expected when stopping)")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error during batch recording: ${e.message}", e)
+                    Timber.e(e, "Error during batch recording: ${e.message}")
                     _uiState.update {
                         it.copy(
                             errorMessage = "Recording error: ${e.message}",
@@ -475,15 +474,15 @@ class SpeechToTextViewModel : ViewModel() {
                                         handleSTTStreamText(lastTranscription)
                                     }
                                 } catch (e: Exception) {
-                                    Log.w(TAG, "Chunk transcription error: ${e.message}")
+                                    Timber.w("Chunk transcription error: ${e.message}")
                                 }
                             }
                         }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
-                    Log.d(TAG, "Live recording cancelled (expected when stopping)")
+                    Timber.d("Live recording cancelled (expected when stopping)")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error during live recording: ${e.message}", e)
+                    Timber.e(e, "Error during live recording: ${e.message}")
                     _uiState.update {
                         it.copy(
                             errorMessage = "Live transcription error: ${e.message}",
@@ -511,7 +510,7 @@ class SpeechToTextViewModel : ViewModel() {
                         ),
                 )
             }
-            Log.d(TAG, "Stream transcription: $text")
+            Timber.d("Stream transcription: $text")
         }
     }
 
@@ -520,7 +519,7 @@ class SpeechToTextViewModel : ViewModel() {
      * iOS Reference: stopRecording() in STTViewModel.swift
      */
     private suspend fun stopRecording() {
-        Log.i(TAG, "Stopping recording in ${_uiState.value.mode} mode")
+        Timber.i("Stopping recording in ${_uiState.value.mode} mode")
 
         // Stop audio capture
         audioCaptureService?.stopCapture()
@@ -569,7 +568,7 @@ class SpeechToTextViewModel : ViewModel() {
             return
         }
 
-        Log.i(TAG, "Starting batch transcription of ${audioBytes.size} bytes")
+        Timber.i("Starting batch transcription of ${audioBytes.size} bytes")
 
         try {
             withContext(Dispatchers.IO) {
@@ -602,10 +601,10 @@ class SpeechToTextViewModel : ViewModel() {
                     }
                 }
 
-                Log.i(TAG, "✅ Batch transcription complete: $result (${inferenceTimeMs}ms, $wordCount words)")
+                Timber.i("✅ Batch transcription complete: $result (${inferenceTimeMs}ms, $wordCount words)")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Batch transcription failed: ${e.message}", e)
+            Timber.e(e, "Batch transcription failed: ${e.message}")
             _uiState.update {
                 it.copy(
                     errorMessage = "Transcription failed: ${e.message}",

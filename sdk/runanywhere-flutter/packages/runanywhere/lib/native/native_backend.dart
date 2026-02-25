@@ -559,9 +559,18 @@ class NativeBackend {
       };
     } finally {
       calloc.free(samplesPtr);
-      // Free result text if allocated by C++
-      if (resultPtr.ref.text != nullptr) {
-        RacCore.free(resultPtr.ref.text.cast());
+      // Free C-allocated strings inside the result (strdup'd by rac_stt_onnx_transcribe).
+      // rac_stt_result_free handles text, detected_language, and words array.
+      try {
+        final resultFreeFn = _lib!.lookupFunction<
+            Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)>('rac_stt_result_free');
+        resultFreeFn(resultPtr.cast<Void>());
+      } catch (_) {
+        // Fallback: manually free text if rac_stt_result_free not available
+        if (resultPtr.ref.text != nullptr) {
+          RacCore.free(resultPtr.ref.text.cast());
+        }
       }
       calloc.free(resultPtr);
     }

@@ -202,6 +202,30 @@ _rac_llm_component_load_model
 _rac_llm_component_supports_streaming
 _rac_llm_component_unload
 
+# LLM Component - LoRA
+_rac_llm_component_load_lora
+_rac_llm_component_remove_lora
+_rac_llm_component_clear_lora
+_rac_llm_component_get_lora_info
+_rac_llm_component_check_lora_compat
+
+# LoRA Registry
+_rac_lora_registry_create
+_rac_lora_registry_destroy
+_rac_lora_registry_register
+_rac_lora_registry_remove
+_rac_lora_registry_get_all
+_rac_lora_registry_get_for_model
+_rac_lora_registry_get
+_rac_lora_entry_free
+_rac_lora_entry_array_free
+_rac_lora_entry_copy
+
+# LoRA Registry - Global convenience API
+_rac_get_lora_registry
+_rac_register_lora
+_rac_get_lora_for_model
+
 # LLM Analytics
 _rac_llm_analytics_complete_generation
 _rac_llm_analytics_create

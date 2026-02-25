@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.data
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
@@ -182,7 +182,7 @@ class ConversationStore private constructor(context: Context) {
                 _currentConversation.value = loaded
                 return loaded
             } catch (e: Exception) {
-                Log.e("ConversationStore", "Failed to load conversation from disk", e)
+                Timber.e(e, "Failed to load conversation from disk")
             }
         }
 
@@ -228,7 +228,7 @@ class ConversationStore private constructor(context: Context) {
                         val jsonString = file.readText()
                         json.decodeFromString<Conversation>(jsonString)
                     } catch (e: Exception) {
-                        Log.e("ConversationStore", "Failed to load conversation: ${file.name}", e)
+                        Timber.e(e, "Failed to load conversation: ${file.name}")
                         null
                     }
                 }
@@ -238,7 +238,7 @@ class ConversationStore private constructor(context: Context) {
 
             // Don't automatically set current conversation - let ChatViewModel create a new one
         } catch (e: Exception) {
-            Log.e("ConversationStore", "Failed to load conversations", e)
+            Timber.e(e, "Failed to load conversations")
         }
     }
 
@@ -251,7 +251,7 @@ class ConversationStore private constructor(context: Context) {
             val jsonString = json.encodeToString(conversation)
             file.writeText(jsonString)
         } catch (e: Exception) {
-            Log.e("ConversationStore", "Failed to save conversation", e)
+            Timber.e(e, "Failed to save conversation")
         }
     }
 
