@@ -52,6 +52,17 @@ public:
      */
     size_t estimate_tokens(const std::string& text) const;
 
+    /**
+     * @brief Split text into individual sentences
+     *
+     * Uses the same sentence boundary detection as chunk_document().
+     * Sentences are trimmed of whitespace. Empty sentences are excluded.
+     *
+     * @param text Input text to split
+     * @return Vector of sentence strings
+     */
+    std::vector<std::string> split_into_sentences(const std::string& text) const;
+
 private:
     ChunkerConfig config_;
 

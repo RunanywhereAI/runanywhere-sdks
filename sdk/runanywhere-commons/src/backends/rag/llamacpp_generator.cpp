@@ -390,10 +390,421 @@ public:
         result.stop_reason = cancel_requested.load() ? "cancelled" : 
                            n_tokens_generated >= n_max_tokens ? "length" : "stop";
         
-        LOGI("Generation complete: %d/%d tokens, reason: %s", 
+        LOGI("Generation complete: %d/%d tokens, reason: %s",
              n_tokens_generated, n_max_tokens, result.stop_reason.c_str());
 
-           return finalize(result);
+        return finalize(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Adaptive query loop methods
+    // -------------------------------------------------------------------------
+
+    bool inject_system_prompt(const std::string& prompt) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        if (!model || !context) {
+            LOGE("inject_system_prompt: not initialized");
+            return false;
+        }
+
+        // Clear KV cache for fresh start
+        llama_memory_t mem = llama_get_memory(context);
+        if (mem) {
+            llama_memory_clear(mem, true);
+        }
+
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+
+        int32_t n_tokens = llama_tokenize(
+            vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+            nullptr, 0,
+            true,   // add_special
+            true    // parse_special
+        );
+        if (n_tokens < 0) n_tokens = -n_tokens;
+        if (n_tokens <= 0) {
+            LOGE("inject_system_prompt: tokenization produced no tokens");
+            return false;
+        }
+
+        const int n_ctx = llama_n_ctx(context);
+        if (n_tokens >= n_ctx) {
+            LOGE("inject_system_prompt: prompt too long (%d tokens, ctx=%d)", n_tokens, n_ctx);
+            return false;
+        }
+
+        std::vector<llama_token> tokens(static_cast<size_t>(n_tokens));
+        llama_tokenize(vocab, prompt.c_str(), static_cast<int32_t>(prompt.size()),
+                       tokens.data(), n_tokens, true, true);
+
+        llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+        batch.n_tokens = 0;
+
+        for (int i = 0; i < n_tokens; ++i) {
+            batch.token[i] = tokens[i];
+            batch.pos[i] = i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = false;
+            batch.n_tokens++;
+        }
+
+        if (llama_decode(context, batch) != 0) {
+            LOGE("inject_system_prompt: llama_decode failed");
+            llama_batch_free(batch);
+            return false;
+        }
+
+        llama_batch_free(batch);
+        LOGI("inject_system_prompt: injected %d tokens into KV cache", n_tokens);
+        return true;
+    }
+
+    bool append_context(const std::string& text) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        if (!model || !context) {
+            LOGE("append_context: not initialized");
+            return false;
+        }
+
+        llama_memory_t mem = llama_get_memory(context);
+        const llama_pos start_pos = mem ? (llama_memory_seq_pos_max(mem, 0) + 1) : 0;
+
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+
+        int32_t n_tokens = llama_tokenize(
+            vocab, text.c_str(), static_cast<int32_t>(text.size()),
+            nullptr, 0,
+            false,  // add_special
+            false   // parse_special
+        );
+        if (n_tokens < 0) n_tokens = -n_tokens;
+        if (n_tokens <= 0) {
+            return true;
+        }
+
+        const int n_ctx = llama_n_ctx(context);
+        if (start_pos + n_tokens >= n_ctx) {
+            LOGE("append_context: context full (pos=%d, tokens=%d, ctx=%d)",
+                 static_cast<int>(start_pos), n_tokens, n_ctx);
+            return false;
+        }
+
+        std::vector<llama_token> tokens(static_cast<size_t>(n_tokens));
+        llama_tokenize(vocab, text.c_str(), static_cast<int32_t>(text.size()),
+                       tokens.data(), n_tokens, false, false);
+
+        llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+        batch.n_tokens = 0;
+
+        for (int i = 0; i < n_tokens; ++i) {
+            batch.token[i] = tokens[i];
+            batch.pos[i] = start_pos + i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = false;
+            batch.n_tokens++;
+        }
+
+        if (llama_decode(context, batch) != 0) {
+            LOGE("append_context: llama_decode failed");
+            llama_batch_free(batch);
+            return false;
+        }
+
+        llama_batch_free(batch);
+        LOGI("append_context: appended %d tokens at pos %d", n_tokens, static_cast<int>(start_pos));
+        return true;
+    }
+
+    float probe_confidence(const std::string& ctx_text, const std::string& query) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        if (!model || !context) {
+            LOGE("probe_confidence: not initialized");
+            return 0.5f;
+        }
+
+        const std::string probe_prompt =
+            ctx_text + "\n" + query + "\nDoes this answer the question? (Yes/No):";
+
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+
+        int32_t n_probe = llama_tokenize(
+            vocab, probe_prompt.c_str(), static_cast<int32_t>(probe_prompt.size()),
+            nullptr, 0, false, false
+        );
+        if (n_probe < 0) n_probe = -n_probe;
+        if (n_probe <= 0) {
+            LOGE("probe_confidence: tokenization produced no tokens");
+            return 0.5f;
+        }
+
+        const int n_ctx = llama_n_ctx(context);
+        if (n_probe >= n_ctx) {
+            LOGE("probe_confidence: probe too long (%d tokens, ctx=%d)", n_probe, n_ctx);
+            return 0.5f;
+        }
+
+        std::vector<llama_token> probe_tokens(static_cast<size_t>(n_probe));
+        llama_tokenize(vocab, probe_prompt.c_str(), static_cast<int32_t>(probe_prompt.size()),
+                       probe_tokens.data(), n_probe, false, false);
+
+
+        llama_memory_t mem = llama_get_memory(context);
+        const llama_pos probe_start_pos = mem ? (llama_memory_seq_pos_max(mem, 0) + 1) : 0;
+
+
+        llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+        batch.n_tokens = 0;
+
+        for (int i = 0; i < n_probe; ++i) {
+            const bool need_logits = (i == n_probe - 1);
+            batch.token[i] = probe_tokens[i];
+            batch.pos[i] = probe_start_pos + i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = need_logits;
+            batch.n_tokens++;
+        }
+
+        if (llama_decode(context, batch) != 0) {
+            LOGE("probe_confidence: llama_decode failed");
+            llama_batch_free(batch);
+            return 0.5f;
+        }
+
+        llama_batch_free(batch);
+
+
+        float* logits = llama_get_logits_ith(context, -1);
+        if (!logits) {
+            LOGE("probe_confidence: failed to get logits");
+            if (mem) {
+                llama_memory_seq_rm(mem, 0, probe_start_pos, -1);
+            }
+            return 0.5f;
+        }
+
+        const int32_t n_vocab = llama_vocab_n_tokens(vocab);
+
+        auto get_first_token = [&](const std::string& word) -> llama_token {
+            std::vector<llama_token> toks(8);
+            int n = llama_tokenize(vocab, word.c_str(), static_cast<int32_t>(word.size()),
+                                   toks.data(), static_cast<int32_t>(toks.size()),
+                                   false, false);
+            if (n > 0 && toks[0] >= 0 && toks[0] < n_vocab) return toks[0];
+            return -1;
+        };
+
+        llama_token yes_token = get_first_token(" Yes");
+        if (yes_token < 0) yes_token = get_first_token("Yes");
+
+        llama_token no_token = get_first_token(" No");
+        if (no_token < 0) no_token = get_first_token("No");
+
+        float confidence = 0.5f;
+
+        if (yes_token >= 0 && yes_token < n_vocab && no_token >= 0 && no_token < n_vocab) {
+            const float logit_yes = logits[yes_token];
+            const float logit_no  = logits[no_token];
+            const float max_logit = std::max(logit_yes, logit_no);
+            const float exp_yes   = std::exp(logit_yes - max_logit);
+            const float exp_no    = std::exp(logit_no  - max_logit);
+            confidence = exp_yes / (exp_yes + exp_no);
+            LOGI("probe_confidence: yes=%d, no=%d, logit_yes=%.4f, logit_no=%.4f, conf=%.4f",
+                 yes_token, no_token, logit_yes, logit_no, confidence);
+        } else {
+            LOGE("probe_confidence: could not find Yes/No tokens (yes=%d, no=%d)", yes_token, no_token);
+        }
+
+        if (mem) {
+            llama_memory_seq_rm(mem, 0, probe_start_pos, -1);
+            LOGI("probe_confidence: removed probe tokens from KV cache (pos %d onwards)",
+                 static_cast<int>(probe_start_pos));
+        }
+
+        return confidence;
+    }
+
+    GenerationResult generate_from_context(const std::string& query, const GenerationOptions& options) {
+        GenerationResult result;
+        result.success = false;
+
+        std::lock_guard<std::mutex> lock(mutex);
+
+        const auto start_time = std::chrono::steady_clock::now();
+        auto finalize = [&](GenerationResult& res) -> GenerationResult {
+            const auto end_time = std::chrono::steady_clock::now();
+            res.inference_time_ms = std::chrono::duration<double, std::milli>(
+                end_time - start_time
+            ).count();
+            return res;
+        };
+
+        if (!model || !context) {
+            result.text = "Error: LlamaCpp model not initialized";
+            return finalize(result);
+        }
+
+        cancel_requested.store(false);
+
+        const llama_vocab* vocab = llama_model_get_vocab(model);
+
+        int32_t n_prompt_tokens = llama_tokenize(
+            vocab, query.c_str(), static_cast<int32_t>(query.length()),
+            nullptr, 0, false, false
+        );
+        if (n_prompt_tokens < 0) n_prompt_tokens = -n_prompt_tokens;
+        if (n_prompt_tokens <= 0) {
+            LOGE("generate_from_context: failed to tokenize query");
+            result.text = "Error: Failed to tokenize query";
+            return finalize(result);
+        }
+
+        std::vector<llama_token> prompt_tokens(static_cast<size_t>(n_prompt_tokens));
+        int32_t actual = llama_tokenize(
+            vocab, query.c_str(), static_cast<int32_t>(query.length()),
+            prompt_tokens.data(), n_prompt_tokens, false, false
+        );
+        if (actual < 0) {
+            LOGE("generate_from_context: failed to tokenize query (second pass)");
+            result.text = "Error: Failed to tokenize query";
+            return finalize(result);
+        }
+        prompt_tokens.resize(static_cast<size_t>(actual));
+
+        const int n_ctx = llama_n_ctx(context);
+        const int n_prompt = static_cast<int>(prompt_tokens.size());
+
+        llama_memory_t mem = llama_get_memory(context);
+        const llama_pos current_pos = mem ? (llama_memory_seq_pos_max(mem, 0) + 1) : 0;
+
+        const int available_tokens = n_ctx - static_cast<int>(current_pos) - n_prompt - 4;
+        if (available_tokens <= 0) {
+            LOGE("generate_from_context: no space for generation (pos=%d, prompt=%d, ctx=%d)",
+                 static_cast<int>(current_pos), n_prompt, n_ctx);
+            result.text = "Error: Context full";
+            return finalize(result);
+        }
+
+        int max_tokens = options.max_tokens > 0 ? options.max_tokens : 512;
+        const int n_max_tokens = std::min(max_tokens, available_tokens);
+
+        LOGI("generate_from_context: pos=%d, prompt_tokens=%d, max_tokens=%d",
+             static_cast<int>(current_pos), n_prompt, n_max_tokens);
+
+        llama_batch batch = llama_batch_init(n_ctx, 0, 1);
+        if (!batch.token) {
+            result.text = "Error: Memory allocation failed";
+            return finalize(result);
+        }
+
+        int prompt_offset = 0;
+        while (prompt_offset < n_prompt) {
+            const int chunk = std::min(batch_size, n_prompt - prompt_offset);
+            batch.n_tokens = 0;
+
+            for (int i = 0; i < chunk; i++) {
+                const int token_index = prompt_offset + i;
+                batch.token[i] = prompt_tokens[token_index];
+                batch.pos[i] = static_cast<int>(current_pos) + token_index;
+                batch.n_seq_id[i] = 1;
+                batch.seq_id[i][0] = 0;
+                batch.logits[i] = false;
+                batch.n_tokens++;
+            }
+
+            if (prompt_offset + chunk == n_prompt) {
+                batch.logits[batch.n_tokens - 1] = true;  // Logits on last token
+            }
+
+            if (llama_decode(context, batch) != 0) {
+                LOGE("generate_from_context: llama_decode failed for prompt at offset %d", prompt_offset);
+                llama_batch_free(batch);
+                result.text = "Error: Failed to decode prompt";
+                return finalize(result);
+            }
+
+            prompt_offset += chunk;
+        }
+
+        llama_sampler* sampler = create_sampler();
+        if (!sampler) {
+            llama_batch_free(batch);
+            result.text = "Error: Failed to create sampler";
+            return finalize(result);
+        }
+        llama_sampler_reset(sampler);
+
+        std::string generated_text;
+        generated_text.reserve(static_cast<size_t>(n_max_tokens) * 4);
+        int n_tokens_generated = 0;
+        int n_cur = static_cast<int>(current_pos) + n_prompt;
+
+        while (n_tokens_generated < n_max_tokens && !cancel_requested.load()) {
+            const llama_token new_token = llama_sampler_sample(sampler, context, -1);
+            llama_sampler_accept(sampler, new_token);
+
+            if (llama_vocab_is_eog(vocab, new_token)) {
+                break;
+            }
+
+            char buf[128];
+            int n = llama_token_to_piece(vocab, new_token, buf, sizeof(buf), 0, true);
+            if (n > 0) {
+                generated_text.append(buf, n);
+            }
+
+            batch.n_tokens = 0;
+            batch.token[0] = new_token;
+            batch.pos[0] = n_cur;
+            batch.n_seq_id[0] = 1;
+            batch.seq_id[0][0] = 0;
+            batch.logits[0] = true;
+            batch.n_tokens = 1;
+
+            n_cur++;
+
+            if (llama_decode(context, batch) != 0) {
+                LOGE("generate_from_context: llama_decode failed during generation at token %d",
+                     n_tokens_generated);
+                break;
+            }
+
+            n_tokens_generated++;
+        }
+
+        llama_batch_free(batch);
+        llama_sampler_free(sampler);
+
+
+        result.success = true;
+        result.text = generated_text;
+        result.tokens_generated = n_tokens_generated;
+        result.prompt_tokens = n_prompt;
+        result.finished = !cancel_requested.load();
+        result.stop_reason = cancel_requested.load() ? "cancelled" :
+                             n_tokens_generated >= n_max_tokens ? "length" : "stop";
+
+        LOGI("generate_from_context: complete, tokens=%d, reason: %s",
+             n_tokens_generated, result.stop_reason.c_str());
+
+        return finalize(result);
+    }
+
+    void clear_context() {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        if (context) {
+            llama_memory_t mem = llama_get_memory(context);
+            if (mem) {
+                llama_memory_clear(mem, true);
+            }
+            LOGI("clear_context: KV cache cleared");
+        }
     }
 };
 
@@ -428,7 +839,32 @@ const char* LlamaCppGenerator::name() const noexcept {
 }
 
 int LlamaCppGenerator::context_size() const noexcept {
-    return 4096;  // Default; could be configurable
+    return impl_ ? impl_->context_size : 4096;
+}
+
+// =============================================================================
+// ADAPTIVE QUERY LOOP METHODS
+// =============================================================================
+
+bool LlamaCppGenerator::inject_system_prompt(const std::string& prompt) {
+    return impl_->inject_system_prompt(prompt);
+}
+
+bool LlamaCppGenerator::append_context(const std::string& text) {
+    return impl_->append_context(text);
+}
+
+float LlamaCppGenerator::probe_confidence(const std::string& context, const std::string& query) {
+    return impl_->probe_confidence(context, query);
+}
+
+GenerationResult LlamaCppGenerator::generate_from_context(const std::string& query,
+                                                           const GenerationOptions& options) {
+    return impl_->generate_from_context(query, options);
+}
+
+void LlamaCppGenerator::clear_context() {
+    impl_->clear_context();
 }
 
 // =============================================================================

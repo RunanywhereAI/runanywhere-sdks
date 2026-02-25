@@ -29,6 +29,29 @@ size_t DocumentChunker::estimate_tokens(const std::string& text) const {
     return text.length() / config_.chars_per_token;
 }
 
+// used for focus mode in RAG(not final yet, will minmax this further, but this is a working version)
+std::vector<std::string> DocumentChunker::split_into_sentences(const std::string& text) const {
+    if (text.empty()) return {};
+
+    auto boundaries = find_sentence_boundaries(text);
+    std::vector<std::string> sentences;
+    sentences.reserve(boundaries.size() - 1);
+
+    for (size_t i = 0; i + 1 < boundaries.size(); ++i) {
+        std::string sentence = text.substr(boundaries[i], boundaries[i + 1] - boundaries[i]);
+        // Trim whitespace
+        size_t first = sentence.find_first_not_of(" \t\n\r");
+        size_t last = sentence.find_last_not_of(" \t\n\r");
+        if (first != std::string::npos && last != std::string::npos) {
+            sentence = sentence.substr(first, last - first + 1);
+        }
+        if (!sentence.empty()) {
+            sentences.push_back(std::move(sentence));
+        }
+    }
+    return sentences;
+}
+
 std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string& text) const {
     std::vector<size_t> boundaries;
     boundaries.push_back(0); // Start of document

@@ -50,10 +50,17 @@ public:
         const std::string& prompt,
         const GenerationOptions& options
     ) override;
-    
+
     bool is_ready() const noexcept override;
     const char* name() const noexcept override;
     int context_size() const noexcept override;
+
+    // Adaptive query loop methods
+    bool inject_system_prompt(const std::string& prompt) override;
+    bool append_context(const std::string& text) override;
+    float probe_confidence(const std::string& context, const std::string& query) override;
+    GenerationResult generate_from_context(const std::string& query, const GenerationOptions& options = GenerationOptions{}) override;
+    void clear_context() override;
 
 private:
     class Impl;

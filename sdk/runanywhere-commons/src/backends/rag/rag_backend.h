@@ -25,7 +25,7 @@ namespace rag {
  */
 struct RAGBackendConfig {
     size_t embedding_dimension = 384;
-    size_t top_k = 3;
+    size_t top_k = 10; //Need to get Golden document
     float similarity_threshold = 0.15f;
     size_t max_context_tokens = 2048;
     size_t chunk_size = 512;
@@ -35,12 +35,18 @@ struct RAGBackendConfig {
 
 /**
  * @brief RAG backend coordinating vector store, embeddings, and generation
- * 
+ *
  * Uses strategy pattern with pluggable embedding and generation providers.
  * Thread-safe for all operations.
  */
 class __attribute__((visibility("default"))) RAGBackend {
 public:
+    // Adaptive query loop constants
+    static constexpr float kConfidenceThreshold = 0.8f;
+
+    // Decides whether or not "weak" sentences are kept 
+    static constexpr bool kKeepPartialContext = true;
+
     /**
      * @brief Construct RAG backend with configuration
      * 
@@ -145,7 +151,8 @@ private:
         const std::shared_ptr<IEmbeddingProvider>& embedding_provider,
         size_t embedding_dimension,
         float similarity_threshold,
-        bool initialized
+        bool initialized,
+        const DocumentChunker* chunker
     ) const;
 
     RAGBackendConfig config_;
