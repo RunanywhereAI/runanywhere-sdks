@@ -615,7 +615,9 @@ private struct LoRAScaleSheetView: View {
             }
             .padding()
             .navigationTitle("Load LoRA Adapter")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
     }
 }
@@ -637,7 +639,9 @@ private struct LoRAManagementSheetView: View {
                 customAdapterSection
             }
             .navigationTitle("LoRA Adapters")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { onDismiss() }
