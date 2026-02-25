@@ -195,7 +195,7 @@ fi
 # =============================================================================
 
 BACKENDS="${1:-all}"
-ABIS="${2:-arm64-v8a}"
+ABIS="${2:-arm64-v8a,armeabi-v7a,x86_64}"
 
 # Use version from VERSIONS file (loaded via load-versions.sh)
 # ANDROID_MIN_SDK is the canonical name from VERSIONS file
