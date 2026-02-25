@@ -44,7 +44,8 @@ typedef struct rac_lora_registry* rac_lora_registry_handle_t;
 /**
  * @brief Create a new LoRA adapter registry
  * @param out_handle Output: handle to the newly created registry
- * @return RAC_SUCCESS or error code
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT (NULL out_handle),
+ *         or RAC_ERROR_OUT_OF_MEMORY
  */
 RAC_API rac_result_t rac_lora_registry_create(rac_lora_registry_handle_t* out_handle);
 
@@ -60,10 +61,12 @@ RAC_API void rac_lora_registry_destroy(rac_lora_registry_handle_t handle);
  * @brief Register a LoRA adapter entry in the registry
  *
  * The entry is deep-copied; the caller retains ownership of the original.
+ * If an entry with the same id already exists, it is replaced.
  *
  * @param handle Registry handle
  * @param entry Adapter entry to register (must have a non-NULL id)
- * @return RAC_SUCCESS or error code
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT (NULL handle/entry/id),
+ *         or RAC_ERROR_OUT_OF_MEMORY
  */
 RAC_API rac_result_t rac_lora_registry_register(rac_lora_registry_handle_t handle,
                                                  const rac_lora_entry_t* entry);
@@ -84,7 +87,8 @@ RAC_API rac_result_t rac_lora_registry_remove(rac_lora_registry_handle_t handle,
  * @param handle Registry handle
  * @param out_entries Output: array of deep-copied entries (caller must free with rac_lora_entry_array_free)
  * @param out_count Output: number of entries
- * @return RAC_SUCCESS or error code
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT (NULL params),
+ *         or RAC_ERROR_OUT_OF_MEMORY
  */
 RAC_API rac_result_t rac_lora_registry_get_all(rac_lora_registry_handle_t handle,
                                                 rac_lora_entry_t*** out_entries,
@@ -96,7 +100,8 @@ RAC_API rac_result_t rac_lora_registry_get_all(rac_lora_registry_handle_t handle
  * @param model_id Model ID to match against each entry's compatible_model_ids
  * @param out_entries Output: array of matching deep-copied entries (caller must free with rac_lora_entry_array_free)
  * @param out_count Output: number of matching entries
- * @return RAC_SUCCESS or error code
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT (NULL params),
+ *         or RAC_ERROR_OUT_OF_MEMORY
  */
 RAC_API rac_result_t rac_lora_registry_get_for_model(rac_lora_registry_handle_t handle,
                                                       const char* model_id,
@@ -108,7 +113,8 @@ RAC_API rac_result_t rac_lora_registry_get_for_model(rac_lora_registry_handle_t 
  * @param handle Registry handle
  * @param adapter_id ID of the adapter to look up
  * @param out_entry Output: deep-copied entry (caller must free with rac_lora_entry_free)
- * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
+ * @return RAC_SUCCESS, RAC_ERROR_INVALID_ARGUMENT (NULL params),
+ *         RAC_ERROR_NOT_FOUND, or RAC_ERROR_OUT_OF_MEMORY
  */
 RAC_API rac_result_t rac_lora_registry_get(rac_lora_registry_handle_t handle,
                                             const char* adapter_id,

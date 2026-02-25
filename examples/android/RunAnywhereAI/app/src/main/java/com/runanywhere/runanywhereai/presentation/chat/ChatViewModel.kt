@@ -31,7 +31,9 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -801,10 +803,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Refresh LoRA loaded state for the active adapters indicator. */
+    private var loraRefreshJob: Job? = null
     fun refreshLoraState() {
-        viewModelScope.launch {
+        loraRefreshJob?.cancel()
+        loraRefreshJob = viewModelScope.launch {
             try {
-                val loaded = RunAnywhere.getLoadedLoraAdapters()
+                val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
                 _uiState.value = _uiState.value.copy(hasActiveLoraAdapter = loaded.isNotEmpty())
             } catch (e: Exception) {
                 Timber.e(e, "Failed to refresh LoRA state")

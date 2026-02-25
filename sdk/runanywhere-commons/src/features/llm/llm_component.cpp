@@ -782,7 +782,7 @@ extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
                                                      float scale) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
-    if (!adapter_path)
+    if (!adapter_path || adapter_path[0] == '\0')
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
@@ -805,7 +805,7 @@ extern "C" rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
                                                        const char* adapter_path) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
-    if (!adapter_path)
+    if (!adapter_path || adapter_path[0] == '\0')
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);

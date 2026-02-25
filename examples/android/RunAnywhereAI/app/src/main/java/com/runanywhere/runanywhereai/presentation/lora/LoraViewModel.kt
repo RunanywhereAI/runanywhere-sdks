@@ -24,9 +24,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.net.URL
+import java.net.URI
 
 data class LoraUiState(
     val registeredAdapters: List<LoraAdapterCatalogEntry> = emptyList(),
@@ -47,6 +49,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(LoraUiState())
     val uiState: StateFlow<LoraUiState> = _uiState.asStateFlow()
     private var downloadJob: Job? = null
+    private val downloadMutex = Mutex()
 
     private val loraDir: File by lazy {
         File(application.filesDir, "lora_adapters").also { it.mkdirs() }
@@ -177,13 +180,42 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     private fun scanDownloadedAdapters(adapters: List<LoraAdapterCatalogEntry>): Map<String, String> {
         return adapters.mapNotNull { entry ->
             val file = File(loraDir, entry.filename)
+            // Validate resolved path stays under loraDir to prevent path traversal
+            if (!file.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
+                Timber.w("Skipping adapter with invalid filename (path traversal): ${entry.filename}")
+                return@mapNotNull null
+            }
             if (file.exists()) entry.id to file.absolutePath else null
         }.toMap()
     }
 
     /** Download a LoRA adapter GGUF file. */
     fun downloadAdapter(entry: LoraAdapterCatalogEntry) {
-        if (_uiState.value.downloadingAdapterId != null) return
+        viewModelScope.launch {
+            // Mutex ensures only one download starts even under concurrent calls
+            if (!downloadMutex.tryLock()) return@launch
+            try {
+                if (_uiState.value.downloadingAdapterId != null) return@launch
+                startDownload(entry)
+            } finally {
+                downloadMutex.unlock()
+            }
+        }
+    }
+
+    private fun startDownload(entry: LoraAdapterCatalogEntry) {
+        val destFile = File(loraDir, entry.filename)
+        // Validate resolved path stays under loraDir
+        if (!destFile.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
+            _uiState.update { it.copy(error = "Invalid adapter filename") }
+            return
+        }
+        // Only allow HTTPS downloads to prevent MITM attacks
+        val uri = try { URI(entry.downloadUrl) } catch (_: Exception) { null }
+        if (uri == null || uri.scheme?.lowercase() != "https") {
+            _uiState.update { it.copy(error = "Only HTTPS download URLs are allowed") }
+            return
+        }
 
         _uiState.update {
             it.copy(
@@ -194,12 +226,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         downloadJob = viewModelScope.launch {
-            val destFile = File(loraDir, entry.filename)
             val tmpFile = File(loraDir, "${entry.filename}.tmp")
             var downloadComplete = false
             try {
                 withContext(Dispatchers.IO) {
-                    val connection = URL(entry.downloadUrl).openConnection().apply {
+                    val connection = URI(entry.downloadUrl).toURL().openConnection().apply {
                         connectTimeout = 30_000
                         readTimeout = 60_000
                     }
@@ -221,6 +252,13 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                         }
+                    }
+                    // Validate downloaded file size if catalog provides one
+                    if (entry.fileSize > 0 && tmpFile.length() != entry.fileSize) {
+                        tmpFile.delete()
+                        throw Exception(
+                            "Downloaded file size (${tmpFile.length()}) does not match expected size (${entry.fileSize})"
+                        )
                     }
                     destFile.delete()
                     if (!tmpFile.renameTo(destFile)) {
@@ -272,6 +310,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val file = File(loraDir, entry.filename)
+                // Validate resolved path stays under loraDir
+                if (!file.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
+                    _uiState.update { it.copy(error = "Invalid adapter filename") }
+                    return@launch
+                }
                 withContext(Dispatchers.IO) {
                     // Always try to unload — ignore errors if not loaded
                     try {

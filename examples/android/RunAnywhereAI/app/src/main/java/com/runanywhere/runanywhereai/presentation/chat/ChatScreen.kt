@@ -73,11 +73,13 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
+fun ChatScreen(
+    viewModel: ChatViewModel = viewModel(),
+    loraViewModel: LoraViewModel = viewModel(),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val loraViewModel: LoraViewModel = viewModel()
 
     var showingConversationList by remember { mutableStateOf(false) }
     var showingModelSelection by remember { mutableStateOf(false) }

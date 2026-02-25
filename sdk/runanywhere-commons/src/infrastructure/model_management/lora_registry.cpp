@@ -10,6 +10,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@ struct rac_lora_registry {
     std::mutex mutex;
 };
 
+// Forward declaration — needed by deep_copy_lora_entry for OOM cleanup
 static void free_lora_entry(rac_lora_entry_t* entry);
 
 static rac_lora_entry_t* deep_copy_lora_entry(const rac_lora_entry_t* src) {
@@ -85,7 +87,8 @@ static void free_lora_entry(rac_lora_entry_t* entry) {
 
 rac_result_t rac_lora_registry_create(rac_lora_registry_handle_t* out_handle) {
     if (!out_handle) return RAC_ERROR_INVALID_ARGUMENT;
-    rac_lora_registry* registry = new rac_lora_registry();
+    rac_lora_registry* registry = new (std::nothrow) rac_lora_registry();
+    if (!registry) return RAC_ERROR_OUT_OF_MEMORY;
     RAC_LOG_INFO("LoraRegistry", "LoRA registry created");
     *out_handle = registry;
     return RAC_SUCCESS;
@@ -106,10 +109,11 @@ rac_result_t rac_lora_registry_register(rac_lora_registry_handle_t handle,
     if (!handle || !entry || !entry->id) return RAC_ERROR_INVALID_ARGUMENT;
     std::lock_guard<std::mutex> lock(handle->mutex);
     std::string adapter_id = entry->id;
-    auto it = handle->entries.find(adapter_id);
-    if (it != handle->entries.end()) { free_lora_entry(it->second); }
     rac_lora_entry_t* copy = deep_copy_lora_entry(entry);
     if (!copy) return RAC_ERROR_OUT_OF_MEMORY;
+    // Free old entry AFTER successful deep_copy to avoid dangling pointer on OOM
+    auto it = handle->entries.find(adapter_id);
+    if (it != handle->entries.end()) { free_lora_entry(it->second); }
     handle->entries[adapter_id] = copy;
     RAC_LOG_DEBUG("LoraRegistry", "LoRA adapter registered: %s", entry->id);
     return RAC_SUCCESS;

@@ -9,6 +9,8 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import org.json.JSONArray
+import org.json.JSONObject
 
 object CppBridgeLoraRegistry {
     private const val TAG = "CppBridge/CppBridgeLoraRegistry"
@@ -49,20 +51,26 @@ object CppBridgeLoraRegistry {
         return parseLoraEntryArrayJson(json)
     }
 
-    // JSON Parsing
+    // JSON Parsing — uses org.json for correctness with special characters
 
-    private fun parseLoraEntryJson(json: String): LoraEntry? {
-        if (json == "null" || json.isBlank()) return null
+    private fun parseLoraEntryJson(obj: JSONObject): LoraEntry? {
         return try {
+            val id = obj.optString("id", "").takeIf { it.isNotEmpty() } ?: return null
+            val modelIds = mutableListOf<String>()
+            obj.optJSONArray("compatible_model_ids")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    arr.optString(i)?.takeIf { it.isNotEmpty() }?.let { modelIds.add(it) }
+                }
+            }
             LoraEntry(
-                id = extractString(json, "id") ?: return null,
-                name = extractString(json, "name") ?: "",
-                description = extractString(json, "description") ?: "",
-                downloadUrl = extractString(json, "download_url") ?: "",
-                filename = extractString(json, "filename") ?: "",
-                compatibleModelIds = extractStringArray(json, "compatible_model_ids"),
-                fileSize = extractLong(json, "file_size"),
-                defaultScale = extractFloat(json, "default_scale"),
+                id = id,
+                name = obj.optString("name", ""),
+                description = obj.optString("description", ""),
+                downloadUrl = obj.optString("download_url", ""),
+                filename = obj.optString("filename", ""),
+                compatibleModelIds = modelIds,
+                fileSize = obj.optLong("file_size", 0L),
+                defaultScale = obj.optDouble("default_scale", 0.0).toFloat(),
             )
         } catch (e: Exception) {
             log(LogLevel.ERROR, "Failed to parse LoRA entry JSON: ${e.message}")
@@ -71,50 +79,16 @@ object CppBridgeLoraRegistry {
     }
 
     private fun parseLoraEntryArrayJson(json: String): List<LoraEntry> {
-        if (json == "[]" || json.isBlank()) return emptyList()
-        val entries = mutableListOf<LoraEntry>()
-        var depth = 0; var objectStart = -1
-        for (i in json.indices) {
-            when (json[i]) {
-                '{' -> { if (depth == 0) objectStart = i; depth++ }
-                '}' -> {
-                    depth--
-                    if (depth == 0 && objectStart >= 0) {
-                        parseLoraEntryJson(json.substring(objectStart, i + 1))?.let { entries.add(it) }
-                        objectStart = -1
-                    }
-                }
+        if (json.isBlank() || json == "[]") return emptyList()
+        return try {
+            val array = JSONArray(json)
+            (0 until array.length()).mapNotNull { i ->
+                parseLoraEntryJson(array.getJSONObject(i))
             }
+        } catch (e: Exception) {
+            log(LogLevel.ERROR, "Failed to parse LoRA entry array JSON: ${e.message}")
+            emptyList()
         }
-        return entries
-    }
-
-    private fun extractString(json: String, key: String): String? {
-        val regex = Regex(""""$key"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-        return regex.find(json)?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
-    }
-
-    private fun extractLong(json: String, key: String): Long {
-        val regex = Regex(""""$key"\s*:\s*(-?\d+)""")
-        return regex.find(json)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-    }
-
-    private fun extractFloat(json: String, key: String): Float {
-        val regex = Regex(""""$key"\s*:\s*(-?[\d.]+)""")
-        return regex.find(json)?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
-    }
-
-    private fun extractStringArray(json: String, key: String): List<String> {
-        val keyMatch = Regex(""""$key"\s*:\s*\[""").find(json) ?: return emptyList()
-        val arrayStart = keyMatch.range.last + 1
-        var depth = 1; var pos = arrayStart
-        while (pos < json.length && depth > 0) {
-            when (json[pos]) { '[' -> depth++; ']' -> depth-- }; pos++
-        }
-        if (depth != 0) return emptyList()
-        val arrayContent = json.substring(arrayStart, pos - 1).trim()
-        if (arrayContent.isEmpty()) return emptyList()
-        return Regex(""""((?:[^"\\]|\\.)*)"""").findAll(arrayContent).map { it.groupValues[1] }.toList()
     }
 
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
