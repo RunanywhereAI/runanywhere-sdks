@@ -782,7 +782,7 @@ extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
                                                      float scale) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
-    if (!adapter_path)
+    if (!adapter_path || adapter_path[0] == '\0')
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
@@ -805,7 +805,7 @@ extern "C" rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
                                                        const char* adapter_path) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
-    if (!adapter_path)
+    if (!adapter_path || adapter_path[0] == '\0')
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
@@ -861,6 +861,42 @@ extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
     if (!llm_service->ops || !llm_service->ops->get_lora_info)
         return RAC_ERROR_NOT_SUPPORTED;
     return llm_service->ops->get_lora_info(llm_service->impl, out_json);
+}
+
+extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
+                                                              const char* adapter_path,
+                                                              char** out_error) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!adapter_path || !out_error)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    *out_error = nullptr;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    if (!service) {
+        *out_error = rac_strdup("No model loaded");
+        return RAC_ERROR_COMPONENT_NOT_READY;
+    }
+
+    // Check if the adapter file path is non-empty
+    if (strlen(adapter_path) == 0) {
+        *out_error = rac_strdup("Empty adapter path");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // Basic pre-check: verify the backend supports LoRA at all
+    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
+    if (!llm_service->ops || !llm_service->ops->load_lora) {
+        *out_error = rac_strdup("Backend does not support LoRA adapters");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    // Adapter path and backend both valid - considered compatible
+    return RAC_SUCCESS;
 }
 
 // =============================================================================

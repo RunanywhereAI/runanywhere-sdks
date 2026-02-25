@@ -420,6 +420,10 @@ struct RunAnywhereAIApp: App {
 
         logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
 
+        // Register LoRA adapters into SDK registry (same catalog as Android)
+        await LoRAAdapterCatalog.registerAll()
+        logger.info("✅ LoRA adapters registered (\(LoRAAdapterCatalog.adapters.count))")
+
         logger.info("🎉 All modules and models registered")
     }
 }

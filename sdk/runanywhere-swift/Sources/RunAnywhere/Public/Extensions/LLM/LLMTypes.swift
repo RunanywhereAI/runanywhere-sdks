@@ -405,7 +405,6 @@ public struct ThinkingTagPattern: Codable, Sendable {
 // MARK: - LoRA Adapter Types
 
 /// Configuration for loading a LoRA adapter.
-/// Mirrors the C++ LoraAdapterEntry and Kotlin LoRAAdapterConfig.
 public struct LoRAAdapterConfig: Sendable {
 
     /// Path to the LoRA adapter GGUF file
@@ -422,7 +421,6 @@ public struct LoRAAdapterConfig: Sendable {
 }
 
 /// Info about a loaded LoRA adapter (read-only).
-/// Mirrors the C++ LoRA info JSON structure.
 public struct LoRAAdapterInfo: Sendable {
 
     /// Path used when loading the adapter
@@ -433,6 +431,88 @@ public struct LoRAAdapterInfo: Sendable {
 
     /// Whether the adapter is currently applied to the context
     public let applied: Bool
+}
+
+/// Catalog entry for a LoRA adapter registered with the SDK.
+/// Register adapters at app startup via RunAnywhere.registerLoraAdapter(_:).
+public struct LoraAdapterCatalogEntry: Sendable {
+
+    /// Unique adapter identifier
+    public let id: String
+
+    /// Human-readable display name
+    public let name: String
+
+    /// Short description of what this adapter does
+    public let adapterDescription: String
+
+    /// Direct download URL for the GGUF file
+    public let downloadURL: URL
+
+    /// Filename to save as on disk
+    public let filename: String
+
+    /// Model IDs this adapter is compatible with
+    public let compatibleModelIds: [String]
+
+    /// File size in bytes (0 if unknown)
+    public let fileSize: Int64
+
+    /// Recommended LoRA scale (e.g. 0.3 for F16 adapters on quantized bases)
+    public let defaultScale: Float
+
+    public init(
+        id: String,
+        name: String,
+        description: String,
+        downloadURL: URL,
+        filename: String,
+        compatibleModelIds: [String],
+        fileSize: Int64 = 0,
+        defaultScale: Float = 1.0
+    ) {
+        self.id = id
+        self.name = name
+        self.adapterDescription = description
+        self.downloadURL = downloadURL
+        self.filename = filename
+        self.compatibleModelIds = compatibleModelIds
+        self.fileSize = fileSize
+        self.defaultScale = defaultScale
+    }
+
+    // Internal init from C struct
+    init(from cEntry: rac_lora_entry_t) {
+        self.id = String(cString: cEntry.id)
+        self.name = String(cString: cEntry.name)
+        self.adapterDescription = String(cString: cEntry.description)
+        self.downloadURL = URL(string: String(cString: cEntry.download_url)) ?? URL(fileURLWithPath: "")
+        self.filename = String(cString: cEntry.filename)
+        var modelIds: [String] = []
+        if let ids = cEntry.compatible_model_ids {
+            for i in 0..<cEntry.compatible_model_count {
+                if let ptr = ids[i] { modelIds.append(String(cString: ptr)) }
+            }
+        }
+        self.compatibleModelIds = modelIds
+        self.fileSize = cEntry.file_size
+        self.defaultScale = cEntry.default_scale
+    }
+}
+
+/// Result of a LoRA compatibility pre-check.
+public struct LoraCompatibilityResult: Sendable {
+
+    /// Whether the adapter is compatible with the currently loaded model
+    public let isCompatible: Bool
+
+    /// Error message if not compatible
+    public let error: String?
+
+    public init(isCompatible: Bool, error: String? = nil) {
+        self.isCompatible = isCompatible
+        self.error = error
+    }
 }
 
 // MARK: - Structured Output Types

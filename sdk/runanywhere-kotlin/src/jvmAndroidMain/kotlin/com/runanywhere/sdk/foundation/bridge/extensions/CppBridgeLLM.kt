@@ -931,6 +931,21 @@ object CppBridgeLLM {
         }
     }
 
+    /**
+     * Check if a LoRA adapter is compatible with the currently loaded model.
+     *
+     * @param loraPath Path to the LoRA adapter file
+     * @return null if compatible, error message string if incompatible
+     */
+    fun checkLoraCompatibility(loraPath: String): String? {
+        synchronized(lock) {
+            if (handle == 0L) {
+                return "No LLM component loaded"
+            }
+            return RunAnywhereBridge.racLlmComponentCheckLoraCompat(handle, loraPath)
+        }
+    }
+
     // ========================================================================
     // MODEL UNLOADING
     // ========================================================================

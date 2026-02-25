@@ -252,11 +252,10 @@ func ragProducts() -> [Product] {
 }
 
 /// RAG dependency for the RunAnywhere core target
+/// NOTE: Core already accesses RAG C headers via CRACommons umbrella (rac_rag.h, rac_rag_pipeline.h).
+/// No additional dependency needed — RAGBackend is only used by RAGRuntime.
 func ragCoreDependencies() -> [Target.Dependency] {
-    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
-    return [
-        "RAGBackend",
-    ]
+    return []
 }
 
 /// RAG-related targets (C bridge + Swift runtime)
@@ -276,6 +275,8 @@ func ragTargets() -> [Target] {
             dependencies: [
                 "RunAnywhere",
                 "RAGBackend",
+                "ONNXRuntime",
+                "LlamaCPPRuntime",
             ],
             path: "sdk/runanywhere-swift/Sources/RAGRuntime",
             exclude: ["include"],

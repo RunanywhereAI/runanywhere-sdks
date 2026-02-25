@@ -126,6 +126,7 @@ object CppBridgeModelRegistry {
         val downloadSize: Long,
         val contextLength: Int,
         val supportsThinking: Boolean,
+        val supportsLora: Boolean = false,
         val description: String?,
         val status: Int = ModelStatus.AVAILABLE,
     )
@@ -158,6 +159,7 @@ object CppBridgeModelRegistry {
                 downloadSize = model.downloadSize,
                 contextLength = model.contextLength,
                 supportsThinking = model.supportsThinking,
+                supportsLora = model.supportsLora,
                 description = model.description,
             )
 
@@ -342,6 +344,7 @@ object CppBridgeModelRegistry {
                 downloadSize = extractLong(json, "download_size"),
                 contextLength = extractInt(json, "context_length"),
                 supportsThinking = extractBoolean(json, "supports_thinking"),
+                supportsLora = extractBoolean(json, "supports_lora"),
                 description = extractString(json, "description"),
                 status = if (extractString(json, "local_path") != null) ModelStatus.DOWNLOADED else ModelStatus.AVAILABLE,
             )

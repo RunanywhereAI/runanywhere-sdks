@@ -8,9 +8,7 @@ import androidx.compose.ui.unit.dp
  * All values extracted from iOS implementation for pixel-perfect Android replication
  */
 object Dimensions {
-    // ====================
-    // PADDING VALUES
-    // ====================
+    // Padding Values
     val xxSmall = 2.dp
     val xSmall = 4.dp
     val small = 6.dp
@@ -40,9 +38,7 @@ object Dimensions {
     val padding60 = 60.dp
     val padding100 = 100.dp
 
-    // ====================
-    // CORNER RADIUS
-    // ====================
+    // Corner Radius
     val cornerRadiusSmall = 4.dp
     val cornerRadiusMedium = 6.dp
     val cornerRadiusRegular = 8.dp
@@ -53,9 +49,7 @@ object Dimensions {
     val cornerRadiusBubble = 18.dp
     val cornerRadiusModal = 20.dp
 
-    // ====================
-    // ICON SIZES
-    // ====================
+    // Icon Sizes
     val iconSmall = 8.dp
     val iconRegular = 18.dp
     val iconMedium = 28.dp
@@ -64,45 +58,43 @@ object Dimensions {
     val iconXXLarge = 72.dp
     val iconHuge = 80.dp
 
-    // ====================
-    // BUTTON HEIGHTS
-    // ====================
+    // Button Heights
     val buttonHeightSmall = 28.dp
     val buttonHeightRegular = 44.dp
     val buttonHeightLarge = 72.dp
 
-    // ====================
-    // FRAME SIZES
-    // ====================
+    // Frame Sizes
     val minFrameHeight = 150.dp
     val maxFrameHeight = 150.dp
 
-    // ====================
-    // STROKE WIDTHS
-    // ====================
+    // Stroke Widths
     val strokeThin = 0.5.dp
     val strokeRegular = 1.dp
     val strokeMedium = 2.dp
 
-    // ====================
-    // SHADOW RADIUS
-    // ====================
+    // Shadow Radius
     val shadowSmall = 2.dp
     val shadowMedium = 3.dp
     val shadowLarge = 4.dp
     val shadowXLarge = 10.dp
 
-    // ====================
-    // CHAT-SPECIFIC DIMENSIONS
-    // ====================
+    // Chat-Specific Dimensions
 
-    // Message Bubbles
+    // Message Bubbles — ChatGPT-style
     val messageBubbleCornerRadius = cornerRadiusBubble // 18.dp
     val messageBubblePaddingHorizontal = padding16 // 16.dp
     val messageBubblePaddingVertical = padding12 // 12.dp
     val messageBubbleShadowRadius = shadowLarge // 4.dp
-    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment)
-    val messageSpacingBetween = large // 16.dp
+    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment, legacy)
+    val messageSpacingBetween = xLarge // 20.dp
+    val messageMaxWidthFraction = 0.85f // fraction-based width for user messages
+
+    // Assistant message icon
+    val assistantIconSize = 20.dp
+    val assistantIconSpacing = 10.dp
+
+    // User bubble (simplified)
+    val userBubbleCornerRadius = cornerRadiusBubble // 18.dp
 
     // Thinking Section
     val thinkingSectionCornerRadius = mediumLarge // 12.dp
@@ -149,10 +141,11 @@ object Dimensions {
     val toolbarButtonSpacing = smallMedium // 8.dp
     val toolbarHeight = buttonHeightRegular // 44.dp
 
-    // ====================
-    // MAX WIDTHS
-    // ====================
+    // Max Widths
     val messageBubbleMaxWidth = 280.dp
     val maxContentWidth = 700.dp
     val contextMenuMaxWidth = 280.dp
+
+    // LoRA
+    val loraScaleSliderHeight = 32.dp
 }

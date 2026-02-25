@@ -4,7 +4,7 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.util.Log
+import timber.log.Timber
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -66,7 +66,6 @@ data class VLMUiState(
  */
 class VLMViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
-        private const val TAG = "VLMViewModel"
         private const val AUTO_STREAM_INTERVAL_MS = 2500L
     }
 
@@ -93,17 +92,15 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ========================================================================
     // MODEL
-    // ========================================================================
 
     fun checkModelStatus() {
         try {
             val isLoaded = RunAnywhere.isVLMModelLoaded
             _uiState.update { it.copy(isModelLoaded = isLoaded) }
-            Log.d(TAG, "VLM model loaded: $isLoaded")
+            Timber.d("VLM model loaded: $isLoaded")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to check VLM model status: ${e.message}", e)
+            Timber.e(e, "Failed to check VLM model status: ${e.message}")
             _uiState.update { it.copy(isModelLoaded = false) }
         }
     }
@@ -122,10 +119,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showModelSelection = show) }
     }
 
-    // ========================================================================
     // CAMERA - Mirrors iOS setupCamera / startCamera / stopCamera
     // Uses LifecycleCameraController (CameraX recommended API)
-    // ========================================================================
 
     fun checkCameraPermission() {
         val context = getApplication<Application>()
@@ -207,15 +202,13 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 currentFrameHeight = height
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Frame capture failed: ${e.message}")
+            Timber.e("Frame capture failed: ${e.message}")
         } finally {
             imageProxy.close()
         }
     }
 
-    // ========================================================================
     // DESCRIBE - Mirrors iOS describeCurrentFrame / describeImage
-    // ========================================================================
 
     /**
      * Describe the current camera frame. Mirrors iOS describeCurrentFrame().
@@ -251,7 +244,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 val image = VLMImage.fromRGBPixels(frameData, w, h)
                 val options = VLMGenerationOptions(maxTokens = 200, temperature = 0.7f)
 
-                Log.i(TAG, "Describing current camera frame (${w}x${h})")
+                Timber.i("Describing current camera frame (${w}x${h})")
 
                 RunAnywhere.processImageStream(
                     image,
@@ -262,9 +255,9 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
-                Log.i(TAG, "Frame description completed")
+                Timber.i("Frame description completed")
             } catch (e: Exception) {
-                Log.e(TAG, "Frame description failed: ${e.message}", e)
+                Timber.e(e, "Frame description failed: ${e.message}")
                 _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
             } finally {
                 _uiState.update { it.copy(isProcessing = false) }
@@ -297,7 +290,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 val image = VLMImage.fromFilePath(tempFile.absolutePath)
                 val options = VLMGenerationOptions(maxTokens = 300, temperature = 0.7f)
 
-                Log.i(TAG, "Starting VLM streaming for image: ${tempFile.name}")
+                Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
                 RunAnywhere.processImageStream(image, prompt, options)
                     .collect { token ->
@@ -305,9 +298,9 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                 _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
-                Log.i(TAG, "VLM streaming completed")
+                Timber.i("VLM streaming completed")
             } catch (e: Exception) {
-                Log.e(TAG, "VLM processing failed: ${e.message}", e)
+                Timber.e(e, "VLM processing failed: ${e.message}")
                 _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
             } finally {
                 tempFile?.delete()
@@ -316,9 +309,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ========================================================================
     // AUTO-STREAMING - Mirrors iOS toggleAutoStreaming / startAutoStreaming
-    // ========================================================================
 
     fun toggleAutoStreaming() {
         if (_uiState.value.isAutoStreamingEnabled) {
@@ -387,30 +378,26 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             }
             _uiState.update { it.copy(currentDescription = newDescription.trim()) }
         } catch (e: Exception) {
-            Log.e(TAG, "Auto-stream VLM error: ${e.message}")
+            Timber.e("Auto-stream VLM error: ${e.message}")
         } finally {
             _uiState.update { it.copy(isProcessing = false) }
         }
     }
 
-    // ========================================================================
     // CANCEL
-    // ========================================================================
 
     fun cancelGeneration() {
         try {
             RunAnywhere.cancelVLMGeneration()
             generationJob?.cancel()
             _uiState.update { it.copy(isProcessing = false) }
-            Log.d(TAG, "VLM generation cancelled")
+            Timber.d("VLM generation cancelled")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to cancel VLM generation: ${e.message}", e)
+            Timber.e(e, "Failed to cancel VLM generation: ${e.message}")
         }
     }
 
-    // ========================================================================
     // IMAGE SELECTION
-    // ========================================================================
 
     fun setSelectedImage(uri: Uri?) {
         _uiState.update {
@@ -418,9 +405,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // ========================================================================
     // HELPERS
-    // ========================================================================
 
     private suspend fun copyUriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
         try {
@@ -434,7 +419,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             }
             tempFile
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to copy URI to temp file: ${e.message}", e)
+            Timber.e(e, "Failed to copy URI to temp file: ${e.message}")
             null
         }
     }

@@ -35,10 +35,10 @@ import androidx.compose.material.icons.outlined.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -51,10 +51,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
@@ -88,6 +89,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VLMScreen(
+    onBack: () -> Unit = {},
     viewModel: VLMViewModel = viewModel(
         factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
             LocalContext.current.applicationContext as android.app.Application,
@@ -96,7 +98,7 @@ fun VLMScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val context = LocalContext.current
 
     // Photo picker launcher
@@ -124,34 +126,40 @@ fun VLMScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Vision AI") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black,
-                    titleContentColor = Color.White,
-                ),
-                actions = {
-                    // Show loaded model name (mirrors iOS toolbar trailing item)
-                    uiState.loadedModelName?.let { name ->
-                        Text(
-                            text = name,
-                            color = Color.Gray,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(end = 8.dp),
-                        )
-                    }
-                },
-            )
-        },
-        containerColor = Color.Black,
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-        ) {
+    ConfigureCustomTopBar {
+        TopAppBar(
+            title = { Text("Vision AI") },
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White,
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Black,
+                titleContentColor = Color.White,
+            ),
+            actions = {
+                uiState.loadedModelName?.let { name ->
+                    Text(
+                        text = name,
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                }
+            },
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black),
+    ) {
             if (!uiState.isModelLoaded) {
                 ModelRequiredContent(
                     onSelectModel = { viewModel.setShowModelSelection(true) },
@@ -176,7 +184,16 @@ fun VLMScreen(
                     isAutoStreaming = uiState.isAutoStreamingEnabled,
                     onCopy = {
                         if (uiState.currentDescription.isNotEmpty()) {
-                            clipboardManager.setText(AnnotatedString(uiState.currentDescription))
+                            scope.launch {
+                                clipboard.setClipEntry(
+                                    ClipEntry(
+                                        android.content.ClipData.newPlainText(
+                                            "description",
+                                            uiState.currentDescription,
+                                        ),
+                                    ),
+                                )
+                            }
                         }
                     },
                     modifier = Modifier
@@ -198,29 +215,26 @@ fun VLMScreen(
                         .weight(0.1f),
                 )
             }
-        }
+    }
 
-        // Model selection bottom sheet
-        if (uiState.showModelSelection) {
-            ModelSelectionBottomSheet(
-                context = ModelSelectionContext.VLM,
-                onDismiss = { viewModel.setShowModelSelection(false) },
-                onModelSelected = { model ->
-                    scope.launch {
-                        viewModel.checkModelStatus()
-                        if (RunAnywhere.isVLMModelLoaded) {
-                            viewModel.onModelLoaded(modelName = model.name)
-                        }
+    // Model selection bottom sheet
+    if (uiState.showModelSelection) {
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.VLM,
+            onDismiss = { viewModel.setShowModelSelection(false) },
+            onModelSelected = { model ->
+                scope.launch {
+                    viewModel.checkModelStatus()
+                    if (RunAnywhere.isVLMModelLoaded) {
+                        viewModel.onModelLoaded(modelName = model.name)
                     }
-                },
-            )
-        }
+                }
+            },
+        )
     }
 }
 
-// ==========================================================================
 // Camera Preview Section — mirrors iOS cameraPreview
-// ==========================================================================
 
 @Composable
 private fun CameraPreviewSection(
@@ -288,9 +302,7 @@ private fun CameraPreviewSection(
     }
 }
 
-// ==========================================================================
 // Camera Permission View — mirrors iOS cameraPermissionView
-// ==========================================================================
 
 @Composable
 private fun CameraPermissionView(onRequestPermission: () -> Unit) {
@@ -334,9 +346,7 @@ private fun CameraPermissionView(onRequestPermission: () -> Unit) {
     }
 }
 
-// ==========================================================================
 // Description Panel — mirrors iOS descriptionPanel exactly
-// ==========================================================================
 
 @Composable
 private fun DescriptionPanel(
@@ -433,9 +443,7 @@ private fun DescriptionPanel(
     }
 }
 
-// ==========================================================================
 // Control Bar (4 buttons) — mirrors iOS controlBar exactly
-// ==========================================================================
 
 @Composable
 private fun ControlBar(
@@ -559,9 +567,7 @@ private fun ControlBar(
     }
 }
 
-// ==========================================================================
 // Model Required Content — mirrors iOS modelRequiredContent
-// ==========================================================================
 
 @Composable
 private fun ModelRequiredContent(onSelectModel: () -> Unit) {

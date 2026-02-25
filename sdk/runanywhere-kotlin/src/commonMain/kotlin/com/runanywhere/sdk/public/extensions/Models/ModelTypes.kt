@@ -345,6 +345,7 @@ data class ModelInfo(
     // Model-specific capabilities
     val contextLength: Int? = null,
     val supportsThinking: Boolean = false,
+    val supportsLora: Boolean = false,
     val thinkingPattern: ThinkingTagPattern? = null,
     // Optional metadata
     val description: String? = null,

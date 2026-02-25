@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
+import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
@@ -64,9 +65,11 @@ import kotlinx.coroutines.launch
  * - Model status banner
  * - Transcription display
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
+fun SpeechToTextScreen(
+    onBack: () -> Unit = {},
+    viewModel: SpeechToTextViewModel = viewModel(),
+) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
@@ -90,151 +93,138 @@ fun SpeechToTextScreen(viewModel: SpeechToTextViewModel = viewModel()) {
             }
         }
 
-    Scaffold(
-        topBar = {
+    ConfigureTopBar(
+        title = "Speech to Text",
+        showBack = true,
+        onBack = onBack,
+        actions = {
             if (uiState.isModelLoaded) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = "Speech to Text",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
-                    actions = {
-                        Surface(
-                            onClick = { showModelPicker = true },
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            STTModelChip(
-                                modelName = uiState.selectedModelName,
-                                mode = uiState.mode,
-                                modifier = Modifier.padding(
-                                    start = 6.dp,
-                                    end = 12.dp,
-                                    top = 6.dp,
-                                    bottom = 6.dp,
-                                ),
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                    ),
-                )
-            }
-        },
-    ) { paddingValues ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(MaterialTheme.colorScheme.background),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                if (uiState.isModelLoaded) {
-                    STTModeSelector(
-                        selectedMode = uiState.mode,
-                        supportsLiveMode = uiState.supportsLiveMode,
-                        onModeChange = { viewModel.setMode(it) },
-                    )
-
-                    TranscriptionArea(
-                        transcription = uiState.transcription,
-                        isRecording = uiState.recordingState == RecordingState.RECORDING,
-                        isTranscribing = uiState.isTranscribing || uiState.recordingState == RecordingState.PROCESSING,
-                        metrics = uiState.metrics,
+                Surface(
+                    onClick = { showModelPicker = true },
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    STTModelChip(
+                        modelName = uiState.selectedModelName,
                         mode = uiState.mode,
-                        modifier = Modifier.weight(1f),
-                    )
-
-                    uiState.errorMessage?.let { error ->
-                        Text(
-                            text = error,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppColors.statusRed,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-
-                    // Audio level indicator - green bars
-                    if (uiState.recordingState == RecordingState.RECORDING) {
-                        AudioLevelIndicator(
-                            audioLevel = uiState.audioLevel,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
-                    }
-
-                    // Controls section
-                    ControlsSection(
-                        recordingState = uiState.recordingState,
-                        audioLevel = uiState.audioLevel,
-                        isModelLoaded = uiState.isModelLoaded,
-                        onToggleRecording = {
-                            // Check if permission is already granted
-                            val hasPermission =
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.RECORD_AUDIO,
-                                ) == PackageManager.PERMISSION_GRANTED
-
-                            if (hasPermission) {
-                                // Permission already granted, toggle recording directly
-                                viewModel.toggleRecording()
-                            } else {
-                                // Request permission, toggleRecording will be called in callback
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        },
+                        modifier = Modifier.padding(
+                            start = 6.dp,
+                            end = 12.dp,
+                            top = 6.dp,
+                            bottom = 6.dp,
+                        ),
                     )
                 }
             }
+        },
+    )
 
-            if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
-                ModelRequiredOverlay(
-                    modality = ModelSelectionContext.STT,
-                    onSelectModel = { showModelPicker = true },
-                    modifier = Modifier.matchParentSize(),
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (uiState.isModelLoaded) {
+                STTModeSelector(
+                    selectedMode = uiState.mode,
+                    supportsLiveMode = uiState.supportsLiveMode,
+                    onModeChange = { viewModel.setMode(it) },
+                )
+
+                TranscriptionArea(
+                    transcription = uiState.transcription,
+                    isRecording = uiState.recordingState == RecordingState.RECORDING,
+                    isTranscribing = uiState.isTranscribing || uiState.recordingState == RecordingState.PROCESSING,
+                    metrics = uiState.metrics,
+                    mode = uiState.mode,
+                    modifier = Modifier.weight(1f),
+                )
+
+                uiState.errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppColors.statusRed,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                // Audio level indicator - green bars
+                if (uiState.recordingState == RecordingState.RECORDING) {
+                    AudioLevelIndicator(
+                        audioLevel = uiState.audioLevel,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+
+                // Controls section
+                ControlsSection(
+                    recordingState = uiState.recordingState,
+                    audioLevel = uiState.audioLevel,
+                    isModelLoaded = uiState.isModelLoaded,
+                    onToggleRecording = {
+                        // Check if permission is already granted
+                        val hasPermission =
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.RECORD_AUDIO,
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasPermission) {
+                            // Permission already granted, toggle recording directly
+                            viewModel.toggleRecording()
+                        } else {
+                            // Request permission, toggleRecording will be called in callback
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
                 )
             }
+        }
 
-            // Model loaded toast overlay
-            ModelLoadedToast(
-                modelName = loadedModelToastName,
-                isVisible = showModelLoadedToast,
-                onDismiss = { showModelLoadedToast = false },
-                modifier = Modifier.align(Alignment.TopCenter),
+        if (!uiState.isModelLoaded && uiState.recordingState != RecordingState.PROCESSING) {
+            ModelRequiredOverlay(
+                modality = ModelSelectionContext.STT,
+                onSelectModel = { showModelPicker = true },
+                modifier = Modifier.matchParentSize(),
             )
         }
+
+        // Model loaded toast overlay
+        ModelLoadedToast(
+            modelName = loadedModelToastName,
+            isVisible = showModelLoadedToast,
+            onDismiss = { showModelLoadedToast = false },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
     if (showModelPicker) {
-            ModelSelectionBottomSheet(
-                context = ModelSelectionContext.STT,
-                onDismiss = { showModelPicker = false },
-                onModelSelected = { model ->
-                    scope.launch {
-                        // Update ViewModel with model info AND mark as loaded
-                        // The model was already loaded by ModelSelectionViewModel.selectModel()
-                        viewModel.onModelLoaded(
-                            modelName = model.name,
-                            modelId = model.id,
-                            framework = model.framework,
-                        )
-                        android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
-                        // Show model loaded toast
-                        loadedModelToastName = model.name
-                        showModelLoadedToast = true
-                    }
-                },
-            )
-        }
+        ModelSelectionBottomSheet(
+            context = ModelSelectionContext.STT,
+            onDismiss = { showModelPicker = false },
+            onModelSelected = { model ->
+                scope.launch {
+                    // Update ViewModel with model info AND mark as loaded
+                    // The model was already loaded by ModelSelectionViewModel.selectModel()
+                    viewModel.onModelLoaded(
+                        modelName = model.name,
+                        modelId = model.id,
+                        framework = model.framework,
+                    )
+                    // Show model loaded toast
+                    loadedModelToastName = model.name
+                    showModelLoadedToast = true
+                }
+            },
+        )
+    }
 }
 
 /**

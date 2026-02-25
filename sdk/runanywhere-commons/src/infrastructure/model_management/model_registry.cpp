@@ -65,6 +65,7 @@ static rac_model_info_t* deep_copy_model(const rac_model_info_t* src) {
     copy->memory_required = src->memory_required;
     copy->context_length = src->context_length;
     copy->supports_thinking = src->supports_thinking;
+    copy->supports_lora = src->supports_lora;
 
     // Copy tags
     if (src->tags && src->tag_count > 0) {

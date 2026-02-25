@@ -248,6 +248,9 @@ typedef struct rac_model_info {
     /** Whether model supports thinking/reasoning */
     rac_bool_t supports_thinking;
 
+    /** Whether model supports LoRA adapters */
+    rac_bool_t supports_lora;
+
     /** Tags (NULL-terminated array of strings, can be NULL) */
     char** tags;
     size_t tag_count;

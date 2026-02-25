@@ -2,13 +2,26 @@
 //
 // Available tasks:
 //   ./gradlew setup              - Check environment and create local.properties
+//
+//   Native (C++):
+//   ./gradlew buildCpp           - Build C++ and copy .so to jniLibs
+//   ./gradlew buildFullSdk       - Full pipeline: C++ + copy + Kotlin SDK
+//   ./gradlew copyNativeLibs     - Copy .so from dist/ to jniLibs/ (no rebuild)
+//
+//   Kotlin SDK:
 //   ./gradlew buildSdk           - Build SDK (debug AAR + JVM JAR)
 //   ./gradlew buildSdkRelease    - Build SDK (release AAR)
+//   ./gradlew publishSdkToMavenLocal - Publish SDK to ~/.m2
+//
+//   Android App:
 //   ./gradlew buildAndroidApp    - Build Android example app
 //   ./gradlew runAndroidApp      - Build, install, and launch Android app
+//
+//   IntelliJ Plugin:
 //   ./gradlew buildIntellijPlugin - Build IntelliJ plugin
 //   ./gradlew runIntellijPlugin  - Run IntelliJ plugin in sandbox
-//   ./gradlew publishSdkToMavenLocal - Publish SDK to ~/.m2
+//
+//   Utility:
 //   ./gradlew buildAll           - Build everything
 //   ./gradlew cleanAll           - Clean everything
 
@@ -126,7 +139,55 @@ tasks.register("setup") {
     }
 }
 
+// =============================================================================
+// Native (C++) tasks — wraps build-sdk.sh for IDE integration
+// =============================================================================
+
+tasks.register("buildCpp") {
+    group = "native"
+    description = "Build C++ (runanywhere-commons) and copy .so to jniLibs"
+
+    doLast {
+        val ndkHome = resolveNdkHome(resolveAndroidHome())
+        exec {
+            workingDir = file("sdk/runanywhere-kotlin")
+            environment("ANDROID_NDK_HOME", ndkHome)
+            commandLine("bash", "scripts/build-sdk.sh", "--cpp-only")
+        }
+    }
+}
+
+tasks.register("buildFullSdk") {
+    group = "native"
+    description = "Full pipeline: build C++ + copy .so + build Kotlin SDK"
+
+    doLast {
+        val ndkHome = resolveNdkHome(resolveAndroidHome())
+        exec {
+            workingDir = file("sdk/runanywhere-kotlin")
+            environment("ANDROID_NDK_HOME", ndkHome)
+            commandLine("bash", "scripts/build-sdk.sh")
+        }
+    }
+}
+
+tasks.register("copyNativeLibs") {
+    group = "native"
+    description = "Copy .so from dist/ to jniLibs/ (no C++ rebuild)"
+
+    doLast {
+        val ndkHome = resolveNdkHome(resolveAndroidHome())
+        exec {
+            workingDir = file("sdk/runanywhere-kotlin")
+            environment("ANDROID_NDK_HOME", ndkHome)
+            commandLine("bash", "scripts/build-kotlin.sh", "--local", "--skip-build")
+        }
+    }
+}
+
+// =============================================================================
 // SDK tasks
+// =============================================================================
 
 tasks.register("buildSdk") {
     group = "sdk"
