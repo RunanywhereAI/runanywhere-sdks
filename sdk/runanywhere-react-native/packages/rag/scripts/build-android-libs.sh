@@ -98,8 +98,8 @@ for ABI in "${ABIS[@]}"; do
     # Copy .so files
     echo "Copying libraries to $JNILIB_DIR"
     
-    if [ -f "src/backends/rag/librac_backend_rag.so" ]; then
-        cp -v "src/backends/rag/librac_backend_rag.so" "$JNILIB_DIR/"
+    if [ -f "src/features/rag/librac_backend_rag.so" ]; then
+        cp -v "src/features/rag/librac_backend_rag.so" "$JNILIB_DIR/"
     else
         echo "Warning: librac_backend_rag.so not found"
     fi

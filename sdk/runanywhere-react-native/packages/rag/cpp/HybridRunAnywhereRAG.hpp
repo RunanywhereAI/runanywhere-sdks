@@ -29,7 +29,7 @@
 #include <RACommons/rac_error.h>
 #else
 #include "rac/features/rag/rac_rag_pipeline.h"
-#include "rac/backends/rac_rag.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/core/rac_error.h"
 #endif
 

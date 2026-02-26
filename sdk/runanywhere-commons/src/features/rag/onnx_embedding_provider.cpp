@@ -4,9 +4,9 @@
  */
 
 #include "onnx_embedding_provider.h"
-#include "backends/rag/ort_guards.h"
+#include "rac/features/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
-#include "../onnx/onnx_backend.h"
+#include "../../backends/onnx/onnx_backend.h"
 
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>

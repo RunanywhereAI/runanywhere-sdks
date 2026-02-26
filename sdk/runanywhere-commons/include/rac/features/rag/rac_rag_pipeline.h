@@ -48,64 +48,82 @@ typedef struct rac_search_result {
 } rac_search_result_t;
 
 // =============================================================================
-// RAG CONFIGURATION
+// RAG PIPELINE CONFIGURATION (RAG-specific parameters only)
 // =============================================================================
 
 /**
  * @brief RAG pipeline configuration
+ *
+ * Contains only RAG-specific parameters (chunking, search, prompt template).
+ * Model paths are not included — the pipeline receives pre-created LLM and
+ * embeddings service handles, following the Voice Agent pattern.
  */
-typedef struct rac_rag_config {
-    /** Path to embedding model (ONNX) */
-    const char* embedding_model_path;
-    
-    /** Path to LLM model (GGUF) */
-    const char* llm_model_path;
-    
+typedef struct rac_rag_pipeline_config {
     /** Embedding dimension (default 384 for all-MiniLM-L6-v2) */
     size_t embedding_dimension;
-    
-    /** Number of top chunks to retrieve (default 3) */
+
+    /** Number of top chunks to retrieve (default 10) */
     size_t top_k;
-    
-    /** Minimum similarity threshold 0.0-1.0 (default 0.7) */
+
+    /** Minimum similarity threshold 0.0-1.0 (default 0.15) */
     float similarity_threshold;
-    
+
     /** Maximum tokens for context (default 2048) */
     size_t max_context_tokens;
-    
+
     /** Tokens per chunk when splitting documents (default 512) */
     size_t chunk_size;
-    
+
     /** Overlap tokens between chunks (default 50) */
     size_t chunk_overlap;
-    
-    /** Prompt template with {context} and {query} placeholders */
+
+    /** Prompt template with {context} and {query} placeholders (optional) */
     const char* prompt_template;
-    
-    /** Configuration JSON for embedding model (optional) */
+} rac_rag_pipeline_config_t;
+
+/**
+ * @brief Get default RAG pipeline configuration
+ */
+static inline rac_rag_pipeline_config_t rac_rag_pipeline_config_default(void) {
+    rac_rag_pipeline_config_t cfg;
+    cfg.embedding_dimension = 384;
+    cfg.top_k = 10;
+    cfg.similarity_threshold = 0.15f;
+    cfg.max_context_tokens = 2048;
+    cfg.chunk_size = 512;
+    cfg.chunk_overlap = 50;
+    cfg.prompt_template = NULL;
+    return cfg;
+}
+
+/**
+ * @brief Legacy RAG configuration (kept for backward compatibility with standalone creation)
+ */
+typedef struct rac_rag_config {
+    const char* embedding_model_path;
+    const char* llm_model_path;
+    size_t embedding_dimension;
+    size_t top_k;
+    float similarity_threshold;
+    size_t max_context_tokens;
+    size_t chunk_size;
+    size_t chunk_overlap;
+    const char* prompt_template;
     const char* embedding_config_json;
-    
-    /** Configuration JSON for LLM model (optional) */
     const char* llm_config_json;
 } rac_rag_config_t;
 
-/**
- * @brief Get default RAG configuration
- *
- * Uses an inline function instead of a designated-initializer constant
- * for C++17 compatibility (designated initializers are C99/C++20).
- */
 static inline rac_rag_config_t rac_rag_config_default(void) {
     rac_rag_config_t cfg;
     cfg.embedding_model_path = NULL;
     cfg.llm_model_path = NULL;
     cfg.embedding_dimension = 384;
-    cfg.top_k = 3;
+    cfg.top_k = 10;
     cfg.similarity_threshold = 0.15f;
     cfg.max_context_tokens = 2048;
     cfg.chunk_size = 512;
     cfg.chunk_overlap = 50;
-    cfg.prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
+    cfg.prompt_template = NULL;
     cfg.embedding_config_json = NULL;
     cfg.llm_config_json = NULL;
     return cfg;
@@ -145,13 +163,36 @@ typedef struct rac_rag_result {
 // =============================================================================
 
 /**
- * @brief Create a RAG pipeline
+ * @brief Create a RAG pipeline with existing service handles
  *
- * @param config Pipeline configuration
+ * Follows the Voice Agent pattern: the pipeline orchestrates pre-created
+ * LLM and embeddings services rather than loading models itself.
+ *
+ * @param llm_service Handle to an LLM service (from rac_llm_create)
+ * @param embeddings_service Handle to an embeddings service (from rac_embeddings_create)
+ * @param config RAG-specific pipeline configuration (can be NULL for defaults)
  * @param out_pipeline Pointer to receive pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
 RAC_API rac_result_t rac_rag_pipeline_create(
+    rac_handle_t llm_service,
+    rac_handle_t embeddings_service,
+    const rac_rag_pipeline_config_t* config,
+    rac_rag_pipeline_t** out_pipeline
+);
+
+/**
+ * @brief Create a standalone RAG pipeline that creates its own services
+ *
+ * Convenience function that creates LLM and embeddings services via the
+ * service registry, then passes them to the pipeline. The pipeline owns
+ * and destroys the services on cleanup.
+ *
+ * @param config Legacy configuration with model paths
+ * @param out_pipeline Pointer to receive pipeline handle
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_rag_pipeline_create_standalone(
     const rac_rag_config_t* config,
     rac_rag_pipeline_t** out_pipeline
 );

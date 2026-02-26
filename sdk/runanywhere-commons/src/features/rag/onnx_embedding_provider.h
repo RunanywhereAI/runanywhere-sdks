@@ -1,50 +1,45 @@
 /**
  * @file onnx_embedding_provider.h
  * @brief ONNX-based embedding provider implementation
+ *
+ * Standalone embedding provider using ONNX Runtime for sentence-transformer models.
+ * Wrapped by rac_onnx_embeddings_register.cpp to expose via the embeddings service vtable.
  */
 
 #ifndef RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H
 #define RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H
 
-#include "inference_provider.h"
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace runanywhere {
 namespace rag {
 
 /**
- * @brief ONNX implementation of embedding provider
- * 
- * Uses ONNX Runtime for efficient text embedding generation.
+ * @brief ONNX embedding provider for sentence-transformer models
+ *
+ * Includes a built-in WordPiece tokenizer for BERT-style models (e.g. all-MiniLM-L6-v2).
  * Thread-safe after initialization.
  */
-class ONNXEmbeddingProvider final : public IEmbeddingProvider {
+class ONNXEmbeddingProvider {
 public:
-    /**
-     * @brief Construct ONNX embedding provider
-     * 
-     * @param model_path Path to ONNX model
-     * @param config_json Optional JSON configuration
-     * @throws std::runtime_error if model loading fails
-     */
     explicit ONNXEmbeddingProvider(
         const std::string& model_path,
         const std::string& config_json = ""
     );
 
-    ~ONNXEmbeddingProvider() override;
+    ~ONNXEmbeddingProvider();
 
-    // Disable copy, allow move
     ONNXEmbeddingProvider(const ONNXEmbeddingProvider&) = delete;
     ONNXEmbeddingProvider& operator=(const ONNXEmbeddingProvider&) = delete;
     ONNXEmbeddingProvider(ONNXEmbeddingProvider&&) noexcept;
     ONNXEmbeddingProvider& operator=(ONNXEmbeddingProvider&&) noexcept;
 
-    // IEmbeddingProvider interface
-    std::vector<float> embed(const std::string& text) override;
-    size_t dimension() const noexcept override;
-    bool is_ready() const noexcept override;
-    const char* name() const noexcept override;
+    std::vector<float> embed(const std::string& text);
+    size_t dimension() const noexcept;
+    bool is_ready() const noexcept;
+    const char* name() const noexcept;
 
 private:
     class Impl;

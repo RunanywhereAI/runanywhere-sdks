@@ -1,27 +1,26 @@
 # =============================================================================
-# RAG Backend - Retrieval-Augmented Generation
+# RAG Pipeline — Orchestrates LLM + Embeddings services for RAG
+#
+# This is a pipeline (like Voice Agent), NOT a standalone backend.
+# It calls through the LLM and Embeddings service vtables — it does NOT
+# link llama.cpp or ONNX Runtime directly.
 # =============================================================================
 
-message(STATUS "Configuring RAG backend...")
+message(STATUS "Configuring RAG pipeline...")
 
-# Set policy for USearch compatibility
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
 endif()
 
 # =============================================================================
-# Dependencies
+# Dependencies (RAG-specific only — USearch for vector search)
 # =============================================================================
 
 include(FetchContent)
 
-# Fetch USearch (header-only vector database)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-# Workaround for USearch's old CMake minimum version requirement
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE INTERNAL "")
 
-# Disable FP16 and SIMD support before fetching USearch
 set(USEARCH_USE_FP16LIB OFF CACHE BOOL "" FORCE)
 set(USEARCH_USE_SIMSIMD OFF CACHE BOOL "" FORCE)
 
@@ -37,10 +36,8 @@ set(USEARCH_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
 set(USEARCH_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(usearch)
 
-# Force disable FP16 in USearch (header-only needs compile defs)
 add_compile_definitions(USEARCH_USE_FP16LIB=0 USEARCH_USE_SIMSIMD=0)
 
-# nlohmann_json (should already be available from other backends)
 if(NOT TARGET nlohmann_json::nlohmann_json)
     FetchContent_Declare(
         nlohmann_json
@@ -53,45 +50,35 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
 endif()
 
 # =============================================================================
-# RAG Backend Library
+# RAG Pipeline Library (no direct backend dependencies)
 # =============================================================================
 
-# Core RAG components (always built)
-set(RAG_BACKEND_SOURCES
+set(RAG_PIPELINE_SOURCES
     rag_backend.cpp
     vector_store_usearch.cpp
     rag_chunker.cpp
-    rac_backend_rag_register.cpp
+    rac_rag_register.cpp
     rac_rag_pipeline.cpp
 )
 
-set(RAG_BACKEND_HEADERS
+# ONNX embedding provider — wraps as a proper embeddings service backend
+if(TARGET rac_backend_onnx)
+    list(APPEND RAG_PIPELINE_SOURCES
+        onnx_embedding_provider.cpp
+        rac_onnx_embeddings_register.cpp
+    )
+endif()
+
+set(RAG_PIPELINE_HEADERS
     rag_backend.h
     vector_store_usearch.h
     rag_chunker.h
-    inference_provider.h
 )
 
-# Provider implementations are conditionally added when backends are available
-# These files include backend headers so they require the backends to be built
-if(TARGET rac_backend_onnx)
-    list(APPEND RAG_BACKEND_SOURCES onnx_embedding_provider.cpp)
-    list(APPEND RAG_BACKEND_HEADERS onnx_embedding_provider.h)
-    
-    # ONNX can also provide text generation
-    list(APPEND RAG_BACKEND_SOURCES onnx_generator.cpp)
-    list(APPEND RAG_BACKEND_HEADERS onnx_generator.h)
-endif()
-
-if(TARGET rac_backend_llamacpp)
-    list(APPEND RAG_BACKEND_SOURCES llamacpp_generator.cpp)
-    list(APPEND RAG_BACKEND_HEADERS llamacpp_generator.h)
-endif()
-
 if(RAC_BUILD_SHARED)
-    add_library(rac_backend_rag SHARED ${RAG_BACKEND_SOURCES} ${RAG_BACKEND_HEADERS})
+    add_library(rac_backend_rag SHARED ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADERS})
 else()
-    add_library(rac_backend_rag STATIC ${RAG_BACKEND_SOURCES} ${RAG_BACKEND_HEADERS})
+    add_library(rac_backend_rag STATIC ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADERS})
 endif()
 
 target_include_directories(rac_backend_rag PUBLIC
@@ -101,27 +88,20 @@ target_include_directories(rac_backend_rag PUBLIC
     ${usearch_SOURCE_DIR}/include
 )
 
+# RAG links against rac_commons for vtable dispatch — NOT against backend libraries
 target_link_libraries(rac_backend_rag PUBLIC
     rac_commons
     nlohmann_json::nlohmann_json
 )
 
-# RAG providers link to backends conditionally (maintains separation of concerns)
-# Providers use forward declarations - can build without backends
+# ONNX embedding provider needs ONNX Runtime headers for inference
 if(TARGET rac_backend_onnx)
     target_link_libraries(rac_backend_rag PUBLIC rac_backend_onnx)
     target_compile_definitions(rac_backend_rag PRIVATE RAG_HAS_ONNX_PROVIDER=1)
 endif()
 
-if(TARGET rac_backend_llamacpp)
-    target_link_libraries(rac_backend_rag PUBLIC rac_backend_llamacpp)
-    target_compile_definitions(rac_backend_rag PRIVATE RAG_HAS_LLAMACPP_PROVIDER=1)
-endif()
-
-# Define RAC_RAG_BUILDING to export symbols
 target_compile_definitions(rac_backend_rag PRIVATE RAC_RAG_BUILDING)
 
-# USearch requires C++17 - set via properties for better Xcode compatibility
 set_target_properties(rac_backend_rag PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
@@ -133,7 +113,6 @@ target_compile_options(rac_backend_rag PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-missing-field-initializers>
 )
 
-# Disable FP16 support to avoid compilation issues
 target_compile_definitions(rac_backend_rag PRIVATE
     USEARCH_USE_FP16LIB=0
     USEARCH_USE_SIMSIMD=0
@@ -144,23 +123,21 @@ target_compile_definitions(rac_backend_rag PRIVATE
 # =============================================================================
 
 if(RAC_PLATFORM_IOS)
-    message(STATUS "Configuring RAG backend for iOS")
+    message(STATUS "Configuring RAG pipeline for iOS")
     target_link_libraries(rac_backend_rag PUBLIC
         "-framework Foundation"
         "-framework Accelerate"
     )
 
 elseif(RAC_PLATFORM_ANDROID)
-    message(STATUS "Configuring RAG backend for Android")
+    message(STATUS "Configuring RAG pipeline for Android")
     target_link_libraries(rac_backend_rag PRIVATE log)
-    # Ensure ORT_API_VERSION matches bundled libonnxruntime (1.17.x -> API 17)
     target_compile_definitions(rac_backend_rag PRIVATE ORT_API_VERSION=17)
     target_compile_options(rac_backend_rag PRIVATE -O3 -ffunction-sections -fdata-sections)
-    # 16KB page alignment for Android 15+ (API 35) compliance
     target_link_options(rac_backend_rag PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 
 elseif(RAC_PLATFORM_MACOS)
-    message(STATUS "Configuring RAG backend for macOS")
+    message(STATUS "Configuring RAG pipeline for macOS")
     target_link_libraries(rac_backend_rag PUBLIC
         "-framework Foundation"
         "-framework Accelerate"
@@ -171,9 +148,9 @@ endif()
 # Summary
 # =============================================================================
 
-message(STATUS "RAG Backend Configuration:")
+message(STATUS "RAG Pipeline Configuration:")
 message(STATUS "  USearch: v2.15.2 (HNSW vector search)")
-message(STATUS "  Vector dimension: Configurable (default 384)")
+message(STATUS "  Architecture: Pipeline (calls LLM + Embeddings via vtables)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
 
 # =============================================================================
@@ -186,7 +163,7 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
 
         get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 
-        add_library(rac_backend_rag_jni SHARED jni/rac_backend_rag_jni.cpp)
+        add_library(rac_backend_rag_jni SHARED jni/rac_rag_jni.cpp)
 
         target_include_directories(rac_backend_rag_jni PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -199,7 +176,6 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
         )
 
         target_compile_options(rac_backend_rag_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
-        # 16KB page alignment for Android 15+ (API 35) compliance
         target_link_options(rac_backend_rag_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
     endif()
 endif()

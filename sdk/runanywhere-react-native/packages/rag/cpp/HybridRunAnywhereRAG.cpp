@@ -94,7 +94,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereRAG::createPipeline(const RAGCon
     
     // Create RAG pipeline using C API
     rac_rag_pipeline_t* new_pipeline = nullptr;
-    rac_result_t result = rac_rag_pipeline_create(&c_config, &new_pipeline);
+    rac_result_t result = rac_rag_pipeline_create_standalone(&c_config, &new_pipeline);
 
     if (result != RAC_SUCCESS || new_pipeline == nullptr) {
       if (new_pipeline != nullptr) {
