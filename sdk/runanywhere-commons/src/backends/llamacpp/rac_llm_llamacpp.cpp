@@ -402,6 +402,138 @@ rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json
     return RAC_SUCCESS;
 }
 
+// =============================================================================
+// ADAPTIVE CONTEXT API IMPLEMENTATION
+// =============================================================================
+
+rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle, const char* prompt) {
+    if (handle == nullptr || prompt == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    try {
+        return h->text_gen->inject_system_prompt(prompt) ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
+rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle, const char* text) {
+    if (handle == nullptr || text == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    try {
+        return h->text_gen->append_context(text) ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
+rac_result_t rac_llm_llamacpp_probe_confidence(rac_handle_t handle, const char* context,
+                                                const char* query, float* out_confidence) {
+    if (handle == nullptr || query == nullptr || out_confidence == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    try {
+        *out_confidence = h->text_gen->probe_confidence(context ? context : "", query);
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        *out_confidence = 0.5f;
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
+rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const char* query,
+                                                     const rac_llm_options_t* options,
+                                                     rac_llm_result_t* out_result) {
+    if (handle == nullptr || query == nullptr || out_result == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    TextGenerationRequest request;
+    request.prompt = query;
+    if (options != nullptr) {
+        request.max_tokens = options->max_tokens;
+        request.temperature = options->temperature;
+        request.top_p = options->top_p;
+        if (options->system_prompt != nullptr) {
+            request.system_prompt = options->system_prompt;
+        }
+        if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
+            for (int32_t i = 0; i < options->num_stop_sequences; i++) {
+                if (options->stop_sequences[i]) {
+                    request.stop_sequences.push_back(options->stop_sequences[i]);
+                }
+            }
+        }
+    }
+
+    try {
+        auto result = h->text_gen->generate_from_context(request);
+
+        if (result.finish_reason == "error") {
+            rac_error_set_details("generate_from_context failed");
+            return RAC_ERROR_GENERATION_FAILED;
+        }
+
+        out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
+        out_result->completion_tokens = result.tokens_generated;
+        out_result->prompt_tokens = result.prompt_tokens;
+        out_result->total_tokens = result.prompt_tokens + result.tokens_generated;
+        out_result->time_to_first_token_ms = 0;
+        out_result->total_time_ms = result.inference_time_ms;
+        out_result->tokens_per_second =
+            result.tokens_generated > 0 && result.inference_time_ms > 0
+                ? static_cast<float>(result.tokens_generated) /
+                      static_cast<float>(result.inference_time_ms / 1000.0)
+                : 0.0f;
+
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
+rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    h->text_gen->clear_context();
+    return RAC_SUCCESS;
+}
+
 void rac_llm_llamacpp_destroy(rac_handle_t handle) {
     if (handle == nullptr) {
         return;

@@ -183,7 +183,7 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipeline(
     if (llmCfg) config.llm_config_json       = llmCfg;
 
     rac_rag_pipeline_t* pipeline = nullptr;
-    rac_result_t result = rac_rag_pipeline_create(&config, &pipeline);
+    rac_result_t result = rac_rag_pipeline_create_standalone(&config, &pipeline);
 
     release_string(env, embeddingModelPath, embPath);
     release_string(env, llmModelPath, llmPath);

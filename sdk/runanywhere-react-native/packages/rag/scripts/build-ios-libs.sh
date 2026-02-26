@@ -69,9 +69,9 @@ echo "========================================"
 echo "Creating XCFrameworks"
 echo "========================================"
 
-DEVICE_LIB_DIR="$BUILD_BASE_DIR/OS/src/backends/rag"
-SIMULATOR_ARM64_LIB_DIR="$BUILD_BASE_DIR/SIMULATORARM64/src/backends/rag"
-SIMULATOR_X86_LIB_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/rag"
+DEVICE_LIB_DIR="$BUILD_BASE_DIR/OS/src/features/rag"
+SIMULATOR_ARM64_LIB_DIR="$BUILD_BASE_DIR/SIMULATORARM64/src/features/rag"
+SIMULATOR_X86_LIB_DIR="$BUILD_BASE_DIR/SIMULATOR/src/features/rag"
 DEVICE_ONNX_DIR="$BUILD_BASE_DIR/OS/src/backends/onnx"
 SIMULATOR_ARM64_ONNX_DIR="$BUILD_BASE_DIR/SIMULATORARM64/src/backends/onnx"
 SIMULATOR_X86_ONNX_DIR="$BUILD_BASE_DIR/SIMULATOR/src/backends/onnx"
@@ -117,20 +117,17 @@ echo "========================================"
 echo "Copying Headers"
 echo "========================================"
 
-HEADERS_SRC="$COMMONS_DIR/src/backends/rag"
+HEADERS_SRC="$COMMONS_DIR/src/features/rag"
 HEADERS_DEST="$PACKAGE_DIR/ios/Headers"
 
-# Copy RAG headers
+# Clean stale headers before copying
+rm -f "$HEADERS_DEST"/*.h 2>/dev/null || true
+
+# Copy RAG pipeline headers (only the ones still relevant)
 if [[ -d "$HEADERS_SRC" ]]; then
-    cp -v "$HEADERS_SRC/rag_backend.h" "$HEADERS_DEST/" || echo "⚠ rag_backend.h not found"
-    cp -v "$HEADERS_SRC/inference_provider.h" "$HEADERS_DEST/" || echo "⚠ inference_provider.h not found"
-    cp -v "$HEADERS_SRC/vector_store_usearch.h" "$HEADERS_DEST/" || echo "⚠ vector_store_usearch.h not found"
-    cp -v "$HEADERS_SRC/rag_chunker.h" "$HEADERS_DEST/" || echo "⚠ rag_chunker.h not found"
-    
-    # Copy provider headers if they were built
-    if [[ -f "$HEADERS_SRC/onnx_embedding_provider.h" ]]; then
-        cp -v "$HEADERS_SRC/onnx_embedding_provider.h" "$HEADERS_DEST/"
-    fi
+    cp -v "$HEADERS_SRC/rag_backend.h" "$HEADERS_DEST/" 2>/dev/null || true
+    cp -v "$HEADERS_SRC/vector_store_usearch.h" "$HEADERS_DEST/" 2>/dev/null || true
+    cp -v "$HEADERS_SRC/rag_chunker.h" "$HEADERS_DEST/" 2>/dev/null || true
 fi
 
 echo ""

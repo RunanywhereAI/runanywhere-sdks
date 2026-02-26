@@ -32,7 +32,7 @@ option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, Syst
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
-option(RAC_BACKEND_RAG "Build RAG backend (USearch)" ON)
+option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(APPLE)
@@ -411,9 +411,9 @@ if(RAC_BUILD_BACKENDS)
         add_subdirectory(src/backends/whispercpp)
     endif()
 
-    if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/rag/CMakeLists.txt")
-        message(STATUS "  - RAG backend (USearch)")
-        add_subdirectory(src/backends/rag)
+    if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
+        message(STATUS "  - RAG pipeline (USearch)")
+        add_subdirectory(src/features/rag)
     endif()
 endif()
 

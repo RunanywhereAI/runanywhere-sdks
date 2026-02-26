@@ -126,6 +126,30 @@ static rac_result_t llamacpp_vtable_get_lora_info(void* impl, char** out_json) {
     return rac_llm_llamacpp_get_lora_info(impl, out_json);
 }
 
+// Adaptive context ops
+static rac_result_t llamacpp_vtable_inject_system_prompt(void* impl, const char* prompt) {
+    return rac_llm_llamacpp_inject_system_prompt(impl, prompt);
+}
+
+static rac_result_t llamacpp_vtable_append_context(void* impl, const char* text) {
+    return rac_llm_llamacpp_append_context(impl, text);
+}
+
+static rac_result_t llamacpp_vtable_probe_confidence(void* impl, const char* context,
+                                                     const char* query, float* out_confidence) {
+    return rac_llm_llamacpp_probe_confidence(impl, context, query, out_confidence);
+}
+
+static rac_result_t llamacpp_vtable_generate_from_context(void* impl, const char* query,
+                                                          const rac_llm_options_t* options,
+                                                          rac_llm_result_t* out_result) {
+    return rac_llm_llamacpp_generate_from_context(impl, query, options, out_result);
+}
+
+static rac_result_t llamacpp_vtable_clear_context(void* impl) {
+    return rac_llm_llamacpp_clear_context(impl);
+}
+
 // Static vtable for LlamaCpp
 static const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
@@ -139,6 +163,11 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .remove_lora = llamacpp_vtable_remove_lora,
     .clear_lora = llamacpp_vtable_clear_lora,
     .get_lora_info = llamacpp_vtable_get_lora_info,
+    .inject_system_prompt = llamacpp_vtable_inject_system_prompt,
+    .append_context = llamacpp_vtable_append_context,
+    .probe_confidence = llamacpp_vtable_probe_confidence,
+    .generate_from_context = llamacpp_vtable_generate_from_context,
+    .clear_context = llamacpp_vtable_clear_context,
 };
 
 // =============================================================================

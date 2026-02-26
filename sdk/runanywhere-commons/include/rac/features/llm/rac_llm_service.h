@@ -61,6 +61,30 @@ typedef struct rac_llm_service_ops {
 
     /** Get loaded LoRA adapters info as JSON (optional, NULL if not supported) */
     rac_result_t (*get_lora_info)(void* impl, char** out_json);
+
+    /** Inject system prompt into KV cache at position 0 (optional, NULL if not supported) */
+    rac_result_t (*inject_system_prompt)(void* impl, const char* prompt);
+
+    /** Append text to KV cache after current content (optional, NULL if not supported) */
+    rac_result_t (*append_context)(void* impl, const char* text);
+
+    /**
+     * Probe confidence that accumulated context answers query (optional, NULL if not supported).
+     * Returns confidence in [0.0, 1.0] via out_confidence. Non-destructive to KV cache.
+     */
+    rac_result_t (*probe_confidence)(void* impl, const char* context, const char* query,
+                                     float* out_confidence);
+
+    /**
+     * Generate response from accumulated KV cache state (optional, NULL if not supported).
+     * Unlike generate(), does NOT clear KV cache first.
+     */
+    rac_result_t (*generate_from_context)(void* impl, const char* query,
+                                          const rac_llm_options_t* options,
+                                          rac_llm_result_t* out_result);
+
+    /** Clear all KV cache state (optional, NULL if not supported) */
+    rac_result_t (*clear_context)(void* impl);
 } rac_llm_service_ops_t;
 
 /**
@@ -167,6 +191,78 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
+// =============================================================================
+// ADAPTIVE CONTEXT API - For RAG and similar pipelines
+// =============================================================================
+
+/**
+ * @brief Inject a system prompt into the LLM's KV cache at position 0
+ *
+ * Clears existing KV cache, then seeds with the given prompt.
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Service handle
+ * @param prompt System prompt text
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const char* prompt);
+
+/**
+ * @brief Append text to the LLM's KV cache after current content
+ *
+ * Does not clear existing KV state — accumulates context incrementally.
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Service handle
+ * @param text Text to append
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text);
+
+/**
+ * @brief Probe whether accumulated context answers a query
+ *
+ * Uses logit probing (Yes/No softmax) to estimate confidence.
+ * Non-destructive — probe tokens are removed from KV cache after probing.
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Service handle
+ * @param context Context passage (can be empty string if context is already in KV cache)
+ * @param query The user question
+ * @param out_confidence Output: confidence in [0.0, 1.0]
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_probe_confidence(rac_handle_t handle, const char* context,
+                                               const char* query, float* out_confidence);
+
+/**
+ * @brief Generate a response from accumulated KV cache state
+ *
+ * Unlike rac_llm_generate(), this does NOT clear the KV cache first.
+ * Use after inject_system_prompt + append_context to generate from accumulated state.
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Service handle
+ * @param query Query/suffix text to append before generation
+ * @param options Generation options (can be NULL for defaults)
+ * @param out_result Output: Generation result
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
+                                                    const rac_llm_options_t* options,
+                                                    rac_llm_result_t* out_result);
+
+/**
+ * @brief Clear all KV cache state
+ *
+ * Resets the LLM's context for a fresh adaptive query cycle.
+ * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
+ *
+ * @param handle Service handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_clear_context(rac_handle_t handle);
 
 #ifdef __cplusplus
 }

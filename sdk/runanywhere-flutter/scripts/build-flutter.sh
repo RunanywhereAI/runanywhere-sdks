@@ -271,6 +271,15 @@ copy_ios_frameworks() {
         log_warn "RABackendONNX.xcframework not found at ${COMMONS_DIST}/"
     fi
 
+    # Copy RABackendRAG.xcframework to core package (RAG pipeline)
+    if [[ -d "${COMMONS_DIST}/RABackendRAG.xcframework" ]]; then
+        rm -rf "${CORE_IOS_FRAMEWORKS}/RABackendRAG.xcframework"
+        cp -R "${COMMONS_DIST}/RABackendRAG.xcframework" "${CORE_IOS_FRAMEWORKS}/"
+        log_info "Core: RABackendRAG.xcframework"
+    else
+        log_warn "RABackendRAG.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
     # Copy onnxruntime.xcframework to onnx package (required dependency)
     # This matches the architecture of React Native and Swift SDKs
     local ONNX_RUNTIME_PATH="${COMMONS_DIR}/third_party/onnxruntime-ios/onnxruntime.xcframework"
@@ -487,6 +496,18 @@ copy_android_jnilibs() {
                 log_info "ONNX: ${lib} (from Sherpa-ONNX)"
             fi
         done
+
+        # =======================================================================
+        # RAG Pipeline: librac_backend_rag.so (into core package)
+        # =======================================================================
+
+        if [[ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]]; then
+            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so"
+        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" ]]; then
+            cp "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
+            log_info "RAG: librac_backend_rag.so (from build)"
+        fi
     done
 
     log_info "Android JNI libraries copied"

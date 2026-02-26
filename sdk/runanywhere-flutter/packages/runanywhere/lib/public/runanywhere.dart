@@ -24,6 +24,7 @@ import 'package:runanywhere/native/dart_bridge_model_registry.dart'
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
+import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -2478,5 +2479,51 @@ class RunAnywhere {
       }
     }
     return null;
+  }
+
+  // ============================================================================
+  // MARK: - RAG (Retrieval-Augmented Generation)
+  // ============================================================================
+
+  /// Create a RAG pipeline with the given configuration.
+  ///
+  /// Must be called before ingesting documents or running queries.
+  static Future<void> ragCreatePipeline(RAGConfiguration config) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.createPipeline(config);
+  }
+
+  /// Destroy the RAG pipeline and release resources.
+  static Future<void> ragDestroyPipeline() async {
+    DartBridgeRAG.shared.destroyPipeline();
+  }
+
+  /// Ingest a document into the RAG pipeline.
+  ///
+  /// The document is split into chunks, embedded, and indexed.
+  static Future<void> ragIngest(String text, {String? metadataJson}) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
+  }
+
+  /// Clear all documents from the RAG pipeline.
+  static Future<void> ragClearDocuments() async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.clearDocuments();
+  }
+
+  /// Get the number of indexed document chunks.
+  static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
+
+  /// Query the RAG pipeline with a question.
+  ///
+  /// Returns a [RAGResult] with the generated answer and retrieved chunks.
+  static Future<RAGResult> ragQuery(
+    String question, {
+    RAGQueryOptions? options,
+  }) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    final queryOptions = options ?? RAGQueryOptions(question: question);
+    return DartBridgeRAG.shared.query(queryOptions);
   }
 }
