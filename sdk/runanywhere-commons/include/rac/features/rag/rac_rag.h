@@ -8,8 +8,8 @@
 #ifndef RAC_RAG_H
 #define RAC_RAG_H
 
-#include "rac_types.h"
-#include "rac_rag_pipeline.h"
+#include "rac/core/rac_types.h"
+#include "rac/features/rag/rac_rag_pipeline.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -22,7 +22,7 @@
 #                       Multiple: Use comma-separated (e.g., arm64-v8a,armeabi-v7a)
 #   --backends=LIST     Backends to build (default: onnx)
 #                       Options: llamacpp,onnx or just onnx
-#                       Note: RAG backend has separation of concerns and can build without providers
+#                       Note: RAG pipeline has separation of concerns and can build without providers
 #   --help              Show this help message
 #
 # ANDROID ABI GUIDE:
@@ -108,13 +108,9 @@ COMMONS_ANDROID_SCRIPT="${COMMONS_DIR}/scripts/build-android.sh"
 CORE_IOS_BINARIES="${RN_SDK_DIR}/packages/core/ios/Binaries"
 LLAMACPP_IOS_FRAMEWORKS="${RN_SDK_DIR}/packages/llamacpp/ios/Frameworks"
 ONNX_IOS_FRAMEWORKS="${RN_SDK_DIR}/packages/onnx/ios/Frameworks"
-RAG_IOS_LIBRARIES="${RN_SDK_DIR}/packages/rag/ios/Libraries"
-RAG_IOS_HEADERS="${RN_SDK_DIR}/packages/rag/ios/Headers"
-
 CORE_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/core/android/src/main/jniLibs"
 LLAMACPP_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/llamacpp/android/src/main/jniLibs"
 ONNX_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/onnx/android/src/main/jniLibs"
-RAG_ANDROID_JNILIBS="${RN_SDK_DIR}/packages/rag/android/src/main/jniLibs"
 
 # Defaults
 MODE="local"
@@ -291,28 +287,6 @@ build_commons_ios() {
     log_info "iOS commons build complete"
 }
 
-build_rag_ios() {
-    log_header "Building RAG Static Libraries for iOS"
-
-    local RAG_BUILD_SCRIPT="${RN_SDK_DIR}/packages/rag/scripts/build-ios-libs.sh"
-
-    if [[ ! -x "$RAG_BUILD_SCRIPT" ]]; then
-        log_error "RAG iOS build script not found: $RAG_BUILD_SCRIPT"
-        return 1
-    fi
-
-    local FLAGS=""
-    [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
-
-    log_step "Running: build-ios-libs.sh $FLAGS"
-    bash "$RAG_BUILD_SCRIPT" $FLAGS || {
-        log_error "RAG iOS build failed"
-        return 1
-    }
-
-    log_info "RAG iOS build complete"
-}
-
 build_commons_android() {
     log_header "Building runanywhere-commons for Android"
 
@@ -323,60 +297,12 @@ build_commons_android() {
 
     # build-android.sh takes positional args: BACKENDS ABIS
     # BACKENDS variable set via --backends option (default: onnx)
-    # RAG backend has separation of concerns - can build without LlamaCPP
+    # RAG pipeline has separation of concerns - can build without LlamaCPP
 
     log_step "Running: build-android.sh $BACKENDS $ABIS"
     "$COMMONS_ANDROID_SCRIPT" "$BACKENDS" "$ABIS"
 
     log_info "Android commons build complete"
-}
-
-build_rag_android() {
-    log_header "Building RAG Native Libraries for Android"
-
-    local RAG_BUILD_SCRIPT="${RN_SDK_DIR}/packages/rag/scripts/build-android-libs.sh"
-
-    if [[ ! -x "$RAG_BUILD_SCRIPT" ]]; then
-        log_error "RAG build script not found: $RAG_BUILD_SCRIPT"
-        return 1
-    fi
-
-    # Check for Android NDK
-    if [[ -z "$ANDROID_NDK" ]]; then
-        # Try common locations
-        if [[ -d "$HOME/Library/Android/sdk/ndk" ]]; then
-            # Find the latest NDK version
-            ANDROID_NDK=$(find "$HOME/Library/Android/sdk/ndk" -maxdepth 1 -type d | sort -V | tail -1)
-            if [[ -n "$ANDROID_NDK" ]] && [[ "$ANDROID_NDK" != "$HOME/Library/Android/sdk/ndk" ]]; then
-                export ANDROID_NDK
-                log_info "Using Android NDK: $ANDROID_NDK"
-            else
-                log_error "ANDROID_NDK not set and couldn't find NDK in default location"
-                log_error "Please install Android NDK 26.1+ or set ANDROID_NDK environment variable"
-                return 1
-            fi
-        else
-            log_error "ANDROID_NDK not set and couldn't find SDK at $HOME/Library/Android/sdk"
-            log_error "Please install Android NDK 26.1+ or set ANDROID_NDK environment variable"
-            return 1
-        fi
-    fi
-
-    log_step "Building RAG libraries for ABIs: $ABIS"
-    
-    # Convert comma-separated ABIs to space-separated for the RAG script
-    local ABIS_SPACE="${ABIS//,/ }"
-    
-    # Build for specified ABIs
-    for ABI in $ABIS_SPACE; do
-        log_step "Building RAG for $ABI..."
-        bash "$RAG_BUILD_SCRIPT" "$ABI" || {
-            log_error "RAG build failed for $ABI"
-            return 1
-        }
-    done
-
-    log_info "RAG Android build complete"
 }
 
 # =============================================================================
@@ -400,6 +326,15 @@ copy_ios_frameworks() {
         log_info "Core: RACommons.xcframework"
     else
         log_warn "RACommons.xcframework not found at ${COMMONS_DIST}/"
+    fi
+
+    # Copy RABackendRAG.xcframework to core package (RAG pipeline)
+    if [[ -d "${COMMONS_DIST}/RABackendRAG.xcframework" ]]; then
+        rm -rf "${CORE_IOS_BINARIES}/RABackendRAG.xcframework"
+        cp -R "${COMMONS_DIST}/RABackendRAG.xcframework" "${CORE_IOS_BINARIES}/"
+        log_info "Core: RABackendRAG.xcframework"
+    else
+        log_warn "RABackendRAG.xcframework not found at ${COMMONS_DIST}/"
     fi
 
     # Copy RABackendLLAMACPP.xcframework to llamacpp package
@@ -430,22 +365,10 @@ copy_ios_frameworks() {
         log_warn "onnxruntime.xcframework not found at ${ONNX_RUNTIME_PATH}"
     fi
 
-    # Copy RAG static libraries and headers (already bundled in package)
-    # Note: RAG package uses static libraries (.a) that are already committed to the repo
-    # These were built separately using packages/rag/scripts/build-ios-libs.sh
-    if [[ -d "${RAG_IOS_LIBRARIES}" ]] && [[ -d "${RAG_IOS_HEADERS}" ]]; then
-        local lib_count=$(find "${RAG_IOS_LIBRARIES}" -name "*.a" 2>/dev/null | wc -l)
-        local header_count=$(find "${RAG_IOS_HEADERS}" -name "*.h" 2>/dev/null | wc -l)
-        log_info "RAG: ${lib_count} static libraries + ${header_count} headers (pre-bundled)"
-    else
-        log_warn "RAG iOS libraries not found (expected to be pre-bundled)"
-    fi
-
     # Create .testlocal markers for local mode
     touch "${RN_SDK_DIR}/packages/core/ios/.testlocal"
     touch "${RN_SDK_DIR}/packages/llamacpp/ios/.testlocal"
     touch "${RN_SDK_DIR}/packages/onnx/ios/.testlocal"
-    touch "${RN_SDK_DIR}/packages/rag/ios/.testlocal"
 
     log_info "iOS frameworks copied"
 }
@@ -623,7 +546,8 @@ copy_cpp_headers() {
 
     # Copy internal backend headers (needed by React Native wrappers)
     mkdir -p "${CORE_INCLUDE}/rac/backends"
-    cp -R "${COMMONS_SRC}/backends/rag" "${CORE_INCLUDE}/rac/backends/" 2>/dev/null || true
+    mkdir -p "${CORE_INCLUDE}/rac/features"
+    cp -R "${COMMONS_SRC}/features/rag" "${CORE_INCLUDE}/rac/features/" 2>/dev/null || true
     cp -R "${COMMONS_SRC}/backends/onnx" "${CORE_INCLUDE}/rac/backends/" 2>/dev/null || true
     cp -R "${COMMONS_SRC}/backends/llamacpp" "${CORE_INCLUDE}/rac/backends/" 2>/dev/null || true
 
@@ -689,7 +613,6 @@ clean_build() {
         rm -rf "${CORE_ANDROID_JNILIBS}"
         rm -rf "${LLAMACPP_ANDROID_JNILIBS}"
         rm -rf "${ONNX_ANDROID_JNILIBS}"
-        rm -rf "${RAG_ANDROID_JNILIBS}"
         rm -rf "${RN_SDK_DIR}/packages/core/android/src/main/include"
         log_info "Cleaned Android jniLibs and headers"
     fi
@@ -712,14 +635,6 @@ print_summary() {
         ls -la "${LLAMACPP_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
         ls -la "${ONNX_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
         
-        # Show RAG static libraries
-        if [[ -d "${RAG_IOS_LIBRARIES}" ]]; then
-            local lib_count=$(find "${RAG_IOS_LIBRARIES}" -name "*.a" 2>/dev/null | wc -l | xargs)
-            local lib_size=$(du -sh "${RAG_IOS_LIBRARIES}" 2>/dev/null | cut -f1)
-            echo ""
-            echo "RAG Static Libraries: ${lib_count} files (${lib_size})"
-            ls -lh "${RAG_IOS_LIBRARIES}"/*.a 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
-        fi
         echo ""
     fi
 
@@ -772,7 +687,6 @@ main() {
     if [[ "$REBUILD_COMMONS" == true ]] && [[ "$SKIP_BUILD" == false ]]; then
         if [[ "$BUILD_IOS" == true ]]; then
             build_commons_ios
-            build_rag_ios
         fi
         if [[ "$BUILD_ANDROID" == true ]]; then
             build_commons_android

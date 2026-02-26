@@ -241,6 +241,69 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle
                                                               char** out_json);
 
 // =============================================================================
+// ADAPTIVE CONTEXT API (for RAG pipelines)
+// =============================================================================
+
+/**
+ * Inject a system prompt into the KV cache at position 0.
+ * Clears existing KV cache first, then decodes the prompt tokens.
+ *
+ * @param handle Service handle (from rac_llm_llamacpp_create)
+ * @param prompt System prompt text
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle,
+                                                                     const char* prompt);
+
+/**
+ * Append text to the KV cache after current content.
+ * Does not clear existing KV cache — adds at current position.
+ *
+ * @param handle Service handle
+ * @param text Text to append
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle,
+                                                               const char* text);
+
+/**
+ * Probe confidence that accumulated context answers a query.
+ * Non-destructive to KV cache — probe tokens are cleaned up.
+ *
+ * @param handle Service handle
+ * @param context Context passage (can be empty if context is in KV cache)
+ * @param query The user question
+ * @param out_confidence Output: confidence in [0.0, 1.0]
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_probe_confidence(rac_handle_t handle,
+                                                                 const char* context,
+                                                                 const char* query,
+                                                                 float* out_confidence);
+
+/**
+ * Generate response from accumulated KV cache state.
+ * Unlike rac_llm_llamacpp_generate(), does NOT clear the KV cache first.
+ *
+ * @param handle Service handle
+ * @param query Query/suffix to append before generation
+ * @param options Generation options (can be NULL for defaults)
+ * @param out_result Output: Generation result
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
+    rac_handle_t handle, const char* query, const rac_llm_options_t* options,
+    rac_llm_result_t* out_result);
+
+/**
+ * Clear all KV cache state.
+ *
+ * @param handle Service handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 

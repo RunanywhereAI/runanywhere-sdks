@@ -217,4 +217,66 @@ void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
+// =============================================================================
+// ADAPTIVE CONTEXT API - VTable dispatch
+// =============================================================================
+
+rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const char* prompt) {
+    if (!handle || !prompt)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->inject_system_prompt)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->inject_system_prompt(service->impl, prompt);
+}
+
+rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text) {
+    if (!handle || !text)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->append_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->append_context(service->impl, text);
+}
+
+rac_result_t rac_llm_probe_confidence(rac_handle_t handle, const char* context,
+                                       const char* query, float* out_confidence) {
+    if (!handle || !query || !out_confidence)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->probe_confidence)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->probe_confidence(service->impl, context, query, out_confidence);
+}
+
+rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
+                                            const rac_llm_options_t* options,
+                                            rac_llm_result_t* out_result) {
+    if (!handle || !query || !out_result)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->generate_from_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->generate_from_context(service->impl, query, options, out_result);
+}
+
+rac_result_t rac_llm_clear_context(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->clear_context)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->clear_context(service->impl);
+}
+
 }  // extern "C"

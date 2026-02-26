@@ -240,7 +240,6 @@ tasks.register<Exec>("buildLocalJniLibs") {
     val jniLibsDir = file("src/androidMain/jniLibs")
     val llamaCppJniLibsDir = file("modules/runanywhere-core-llamacpp/src/androidMain/jniLibs")
     val onnxJniLibsDir = file("modules/runanywhere-core-onnx/src/androidMain/jniLibs")
-    val ragJniLibsDir = file("modules/runanywhere-core-rag/src/androidMain/jniLibs")
     val buildMarker = file(".commons-build-marker")
     val buildKotlinScript = file("scripts/build-kotlin.sh")
     val buildLocalScript = file("scripts/build-local.sh")
@@ -267,7 +266,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
         val hasMainLibs = jniLibsDir.resolve("arm64-v8a/libc++_shared.so").exists()
         val hasLlamaCppLibs = llamaCppJniLibsDir.resolve("arm64-v8a/librac_backend_llamacpp_jni.so").exists()
         val hasOnnxLibs = onnxJniLibsDir.resolve("arm64-v8a/librac_backend_onnx_jni.so").exists()
-        val hasRagLibs = ragJniLibsDir.resolve("arm64-v8a/librac_backend_rag_jni.so").exists()
+        val hasRagLibs = jniLibsDir.resolve("arm64-v8a/librac_backend_rag_jni.so").exists()
 
         val allLibsExist = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs && hasRagLibs
 

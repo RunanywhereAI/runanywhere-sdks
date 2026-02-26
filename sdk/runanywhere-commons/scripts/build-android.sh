@@ -601,19 +601,16 @@ for ABI in "${ABI_ARRAY[@]}"; do
         fi
     fi
 
-    # RAG backend
+    # RAG pipeline
     mkdir -p "${DIST_DIR}/rag/${ABI}"
-    if [ -f "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag.so" ]; then
-        cp "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag.so" "${DIST_DIR}/rag/${ABI}/"
+    if [ -f "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag.so" "${DIST_DIR}/rag/${ABI}/"
         echo "  Copied: librac_backend_rag.so -> rag/${ABI}/"
     fi
 
     # Copy JNI bridge library for RAG
-    if [ -f "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag_jni.so" ]; then
-        cp "${ABI_BUILD_DIR}/src/backends/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
-        echo "  Copied: librac_backend_rag_jni.so -> rag/${ABI}/"
-    elif [ -f "${ABI_BUILD_DIR}/backends/rag/librac_backend_rag_jni.so" ]; then
-        cp "${ABI_BUILD_DIR}/backends/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
+    if [ -f "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag_jni.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
         echo "  Copied: librac_backend_rag_jni.so -> rag/${ABI}/"
     else
         print_warning "librac_backend_rag_jni.so not found - JNI bridge not built by CMake"
@@ -726,7 +723,7 @@ if [ "$BUILD_WHISPERCPP" = "ON" ]; then
     done
 fi
 
-echo "├── rag/                      # RAG backend libraries"
+echo "├── rag/                      # RAG pipeline libraries"
 for ABI in "${ABI_ARRAY[@]}"; do
     echo "│   └── ${ABI}/"
     echo "│       ├── librac_backend_rag.so"
