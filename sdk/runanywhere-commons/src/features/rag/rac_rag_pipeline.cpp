@@ -82,7 +82,7 @@ rac_result_t rac_rag_pipeline_create(
             bc, llm_service, embeddings_service, false);
 
         if (!pipeline->backend->is_initialized()) {
-            LOGE("RAG backend failed to initialize");
+            LOGE("RAG pipeline failed to initialize");
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 
@@ -153,7 +153,7 @@ rac_result_t rac_rag_pipeline_create_standalone(
             bc, llm_handle, embed_handle, true);
 
         if (!pipeline->backend->is_initialized()) {
-            LOGE("RAG backend failed to initialize");
+            LOGE("RAG pipeline failed to initialize");
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 

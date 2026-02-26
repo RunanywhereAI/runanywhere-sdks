@@ -254,6 +254,29 @@ export {
 } from './Public/Extensions/RunAnywhere+Models';
 
 // =============================================================================
+// RAG Pipeline
+// =============================================================================
+
+export {
+  ragCreatePipeline,
+  ragDestroyPipeline,
+  ragIngest,
+  ragAddDocumentsBatch,
+  ragQuery,
+  ragClearDocuments,
+  ragGetDocumentCount,
+  ragGetStatistics,
+} from './Public/Extensions/RunAnywhere+RAG';
+
+export type {
+  RAGConfiguration,
+  RAGQueryOptions,
+  RAGResult,
+  RAGSearchResult,
+  RAGStatistics,
+} from './types/RAGTypes';
+
+// =============================================================================
 // Nitrogen Spec Types
 // =============================================================================
 

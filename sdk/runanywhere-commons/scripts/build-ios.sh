@@ -15,7 +15,7 @@
 #   --backend NAME      Build specific backend: llamacpp, onnx, rag, all (default: all)
 #                       - llamacpp: LLM text generation (GGUF models)
 #                       - onnx: STT/TTS/VAD (Sherpa-ONNX models)
-#                       - rag: RAG backend with embeddings and text generation
+#                       - rag: RAG pipeline with embeddings and text generation
 #                       - all: All backends (default)
 #   --clean             Clean build directories first
 #   --release           Release build (default)
@@ -42,7 +42,7 @@
 #   # Build only ONNX backend (speech-to-text/text-to-speech)
 #   ./scripts/build-ios.sh --backend onnx
 #
-#   # Build only RAG backend (embeddings + text generation)
+#   # Build only RAG pipeline (embeddings + text generation)
 #   ./scripts/build-ios.sh --backend rag
 #
 #   # Build only RACommons (no backends)

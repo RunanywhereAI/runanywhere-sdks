@@ -7,7 +7,6 @@
 /// LLM and Embeddings services for Retrieval-Augmented Generation.
 library dart_bridge_rag;
 
-import 'dart:convert';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';

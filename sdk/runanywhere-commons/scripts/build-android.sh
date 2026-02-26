@@ -723,7 +723,7 @@ if [ "$BUILD_WHISPERCPP" = "ON" ]; then
     done
 fi
 
-echo "├── rag/                      # RAG backend libraries"
+echo "├── rag/                      # RAG pipeline libraries"
 for ABI in "${ABI_ARRAY[@]}"; do
     echo "│   └── ${ABI}/"
     echo "│       ├── librac_backend_rag.so"

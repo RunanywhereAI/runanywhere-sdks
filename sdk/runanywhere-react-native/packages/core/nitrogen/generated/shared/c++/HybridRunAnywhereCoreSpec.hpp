@@ -19,7 +19,7 @@
 #include <string>
 #include <optional>
 #include <functional>
-// #include <NitroModules/Null.hpp> // Removed - file does not exist in nitro-modules 0.31.3
+#include <NitroModules/Null.hpp>
 #include <variant>
 
 namespace margelo::nitro::runanywhere {
@@ -132,6 +132,14 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> formatToolsForPrompt(const std::string& toolsJson, const std::string& format) = 0;
       virtual std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> buildFollowupPrompt(const std::string& originalPrompt, const std::string& toolsPrompt, const std::string& toolName, const std::string& resultJson, bool keepToolsAvailable) = 0;
+      virtual std::shared_ptr<Promise<bool>> ragCreatePipeline(const std::string& configJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> ragDestroyPipeline() = 0;
+      virtual std::shared_ptr<Promise<bool>> ragAddDocument(const std::string& text, const std::string& metadataJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> ragAddDocumentsBatch(const std::string& documentsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> ragQuery(const std::string& queryJson) = 0;
+      virtual std::shared_ptr<Promise<bool>> ragClearDocuments() = 0;
+      virtual std::shared_ptr<Promise<double>> ragGetDocumentCount() = 0;
+      virtual std::shared_ptr<Promise<std::string>> ragGetStatistics() = 0;
 
     protected:
       // Hybrid Setup
