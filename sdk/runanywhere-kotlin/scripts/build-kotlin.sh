@@ -417,7 +417,7 @@ copy_jni_libs() {
         fi
         
         # =======================================================================
-        # RAG Module: Backend + JNI bridge
+        # RAG Pipeline: Native libs + JNI bridge
         # =======================================================================
         # Copy backend library
         if [ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]; then

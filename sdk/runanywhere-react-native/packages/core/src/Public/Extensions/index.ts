@@ -166,3 +166,15 @@ export {
   generateWithTools,
   continueWithToolResult,
 } from './RunAnywhere+ToolCalling';
+
+// RAG Pipeline
+export {
+  ragCreatePipeline,
+  ragDestroyPipeline,
+  ragIngest,
+  ragAddDocumentsBatch,
+  ragQuery,
+  ragClearDocuments,
+  ragGetDocumentCount,
+  ragGetStatistics,
+} from './RunAnywhere+RAG';

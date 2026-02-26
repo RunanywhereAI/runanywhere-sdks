@@ -1,8 +1,8 @@
 /**
  * @file rac_backend_rag_jni.cpp
- * @brief RunAnywhere Core - RAG Backend JNI Bridge
+ * @brief RunAnywhere Core - RAG Pipeline JNI Bridge
  *
- * Self-contained JNI layer for the RAG backend.
+ * Self-contained JNI layer for the RAG pipeline.
  *
  * Package: com.runanywhere.sdk.rag
  * Class: RAGBridge
@@ -89,11 +89,11 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeRegister(JNIEnv* env, jclass clazz)
     rac_result_t result = rac_backend_rag_register();
 
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
-        LOGe("Failed to register RAG backend: %d", result);
+        LOGe("Failed to register RAG pipeline: %d", result);
         return static_cast<jint>(result);
     }
 
-    LOGi("RAG backend registered successfully");
+    LOGi("RAG pipeline registered successfully");
     return RAC_SUCCESS;
 }
 
@@ -106,9 +106,9 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeUnregister(JNIEnv* env, jclass claz
     rac_result_t result = rac_backend_rag_unregister();
 
     if (result != RAC_SUCCESS) {
-        LOGe("Failed to unregister RAG backend: %d", result);
+        LOGe("Failed to unregister RAG pipeline: %d", result);
     } else {
-        LOGi("RAG backend unregistered");
+        LOGi("RAG pipeline unregistered");
     }
 
     return static_cast<jint>(result);

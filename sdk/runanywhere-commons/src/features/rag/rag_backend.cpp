@@ -142,14 +142,12 @@ bool RAGBackend::add_document(const std::string& text, const nlohmann::json& met
 std::vector<SearchResult> RAGBackend::search(const std::string& query_text, size_t top_k) const {
     size_t embedding_dimension;
     float similarity_threshold;
-    bool initialized;
     const DocumentChunker* chunker;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         embedding_dimension = config_.embedding_dimension;
         similarity_threshold = config_.similarity_threshold;
-        initialized = initialized_;
         chunker = chunker_.get();
     }
 

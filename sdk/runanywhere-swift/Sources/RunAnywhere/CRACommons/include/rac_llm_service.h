@@ -11,7 +11,7 @@
 #define RAC_LLM_SERVICE_H
 
 #include "rac_error.h"
-#include "rac/features/llm/rac_llm_types.h"
+#include "rac_llm_types.h"
 
 #ifdef __cplusplus
 extern "C" {

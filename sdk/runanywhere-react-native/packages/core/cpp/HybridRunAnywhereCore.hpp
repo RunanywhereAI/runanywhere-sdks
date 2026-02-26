@@ -276,6 +276,19 @@ public:
   std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) override;
   std::shared_ptr<Promise<std::string>> buildFollowupPrompt(const std::string& originalPrompt, const std::string& toolsPrompt, const std::string& toolName, const std::string& resultJson, bool keepToolsAvailable) override;
 
+  // ============================================================================
+  // RAG Pipeline - Delegates to RAGBridge
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> ragCreatePipeline(const std::string& configJson) override;
+  std::shared_ptr<Promise<bool>> ragDestroyPipeline() override;
+  std::shared_ptr<Promise<bool>> ragAddDocument(const std::string& text, const std::string& metadataJson) override;
+  std::shared_ptr<Promise<bool>> ragAddDocumentsBatch(const std::string& documentsJson) override;
+  std::shared_ptr<Promise<std::string>> ragQuery(const std::string& queryJson) override;
+  std::shared_ptr<Promise<bool>> ragClearDocuments() override;
+  std::shared_ptr<Promise<double>> ragGetDocumentCount() override;
+  std::shared_ptr<Promise<std::string>> ragGetStatistics() override;
+
 private:
   // Thread safety
   std::mutex initMutex_;
