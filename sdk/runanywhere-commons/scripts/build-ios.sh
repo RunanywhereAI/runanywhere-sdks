@@ -100,6 +100,91 @@ require_cmd() {
     fi
 }
 
+# =============================================================================
+# Validate XCFramework simulator slice architectures
+# Ensures both arm64 (Apple Silicon) and x86_64 (Intel) are present so the
+# framework works in ALL simulator configurations, not just one.
+# =============================================================================
+validate_xcframework() {
+    local XCFW_PATH=$1
+    local FRAMEWORK_NAME=$2
+
+    log_step "Validating ${FRAMEWORK_NAME}.xcframework simulator slice..."
+
+    # Locate the simulator slice directory
+    local SIM_SLICE=""
+    for d in "${XCFW_PATH}"/ios-arm64_x86_64-simulator \
+              "${XCFW_PATH}"/ios-arm64-simulator; do
+        [[ -d "$d" ]] && SIM_SLICE="$d" && break
+    done
+
+    if [[ -z "$SIM_SLICE" ]]; then
+        log_error "${FRAMEWORK_NAME}.xcframework is missing a simulator slice — simulator builds will fail. Re-run without --skip-download and ensure SIMULATORARM64 and SIMULATOR builds both succeeded."
+    fi
+
+    local BIN="${SIM_SLICE}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    if [[ ! -f "$BIN" ]]; then
+        log_error "Simulator binary not found at expected path: ${BIN}"
+    fi
+
+    local ARCH_INFO
+    ARCH_INFO=$(lipo -info "$BIN" 2>&1)
+
+    if ! echo "$ARCH_INFO" | grep -q "arm64"; then
+        log_error "${FRAMEWORK_NAME} simulator slice is missing arm64 (Apple Silicon). lipo reports: ${ARCH_INFO}"
+    fi
+
+    if ! echo "$ARCH_INFO" | grep -q "x86_64"; then
+        log_warn "${FRAMEWORK_NAME} simulator slice is missing x86_64 — Intel Mac simulators will not be supported."
+        log_warn "lipo reports: ${ARCH_INFO}"
+    fi
+
+    log_info "${FRAMEWORK_NAME}.xcframework ✓  $(echo "$ARCH_INFO" | sed 's/.*are: //' | sed 's/.*is architecture: //')"
+}
+
+# =============================================================================
+# Pre-validate third-party dependencies for simulator architecture support
+# Catches bad dep downloads before wasting build time.
+# =============================================================================
+validate_third_party_deps() {
+    log_header "Validating Third-Party Simulator Dependencies"
+
+    # --- Sherpa-ONNX (ONNX backend) ---
+    local SHERPA_XCFW="${PROJECT_ROOT}/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework"
+
+    if [[ ! -d "$SHERPA_XCFW" ]]; then
+        log_error "Sherpa-ONNX XCFramework not found at ${SHERPA_XCFW}. Run without --skip-download first to fetch it."
+    fi
+
+    # Find the simulator slice
+    local SHERPA_SIM_SLICE=""
+    for d in "${SHERPA_XCFW}"/ios-arm64_x86_64-simulator \
+              "${SHERPA_XCFW}"/ios-arm64-simulator; do
+        [[ -d "$d" ]] && SHERPA_SIM_SLICE="$d" && break
+    done
+
+    if [[ -z "$SHERPA_SIM_SLICE" ]]; then
+        log_error "Sherpa-ONNX is missing a simulator slice — cannot build ONNX backend for simulator. Check the downloaded xcframework at: ${SHERPA_XCFW}"
+    fi
+
+    # Find and validate the simulator library binary
+    local SHERPA_BIN
+    SHERPA_BIN=$(find "$SHERPA_SIM_SLICE" \( -name "libsherpa-onnx.a" -o -name "sherpa-onnx" \) | head -1)
+
+    if [[ -n "$SHERPA_BIN" ]]; then
+        local ARCH_INFO
+        ARCH_INFO=$(lipo -info "$SHERPA_BIN" 2>&1)
+        log_info "Sherpa-ONNX simulator: $(echo "$ARCH_INFO" | sed 's/.*are: //' | sed 's/.*is architecture: //')"
+
+        if ! echo "$ARCH_INFO" | grep -q "arm64"; then
+            log_error "Sherpa-ONNX simulator library is missing arm64 — ONNX backend will not work on Apple Silicon simulators. Re-download dependencies."
+        fi
+        log_info "Third-party dependency pre-validation passed"
+    else
+        log_warn "Could not locate Sherpa-ONNX simulator binary for pre-validation — proceeding anyway."
+    fi
+}
+
 show_help() {
     head -45 "$0" | tail -40
     exit 0
@@ -463,6 +548,8 @@ EOF
 
     log_info "Created: ${XCFW_PATH}"
     echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
+
+    validate_xcframework "${XCFW_PATH}" "${FRAMEWORK_NAME}"
 }
 
 # =============================================================================
@@ -656,6 +743,8 @@ EOF
 
         log_info "Created: ${XCFW_PATH}"
         echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
+
+        validate_xcframework "${XCFW_PATH}" "${FRAMEWORK_NAME}"
     else
         log_warn "Could not create ${FRAMEWORK_NAME}.xcframework"
     fi
@@ -715,6 +804,12 @@ main() {
         if [[ "$INCLUDE_MACOS" == true ]]; then
             download_macos_deps
         fi
+    fi
+
+    # Step 1b: Pre-validate third-party dependencies have simulator architecture support.
+    # Catches missing or broken xcframeworks before any build time is spent (fixes: #273).
+    if [[ "$SKIP_BACKENDS" != true && ("$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" || "$BUILD_BACKEND" == "rag") ]]; then
+        validate_third_party_deps
     fi
 
     # Step 2: Build for all iOS platforms
