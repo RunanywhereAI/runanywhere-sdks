@@ -119,6 +119,12 @@ rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
         // Copy model info
         metrics->model_id = model->id ? strdup(model->id) : nullptr;
         metrics->model_name = model->name ? strdup(model->name) : nullptr;
+        if ((model->id && !metrics->model_id) || (model->name && !metrics->model_name)) {
+            free(const_cast<char*>(metrics->model_id));
+            free(const_cast<char*>(metrics->model_name));
+            memset(metrics, 0, sizeof(rac_model_storage_metrics_t));
+            continue;
+        }
         metrics->framework = model->framework;
         metrics->format = model->format;
         metrics->artifact_info = model->artifact_info;
@@ -179,6 +185,13 @@ rac_result_t rac_storage_analyzer_get_model_metrics(rac_storage_analyzer_handle_
     // Copy model info
     out_metrics->model_id = model->id ? strdup(model->id) : nullptr;
     out_metrics->model_name = model->name ? strdup(model->name) : nullptr;
+    if ((model->id && !out_metrics->model_id) || (model->name && !out_metrics->model_name)) {
+        free(const_cast<char*>(out_metrics->model_id));
+        free(const_cast<char*>(out_metrics->model_name));
+        memset(out_metrics, 0, sizeof(rac_model_storage_metrics_t));
+        rac_model_info_free(model);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_metrics->framework = model->framework;
     out_metrics->format = model->format;
     out_metrics->artifact_info = model->artifact_info;
@@ -230,15 +243,21 @@ rac_result_t rac_storage_analyzer_check_available(rac_storage_analyzer_handle_t 
     out_availability->is_available = available > required ? RAC_TRUE : RAC_FALSE;
     out_availability->has_warning = available < required * 2 ? RAC_TRUE : RAC_FALSE;
 
-    // Generate recommendation message
+    // Generate recommendation message (NULL recommendation is acceptable on OOM)
     if (out_availability->is_available == RAC_FALSE) {
         int64_t shortfall = required - available;
         // Simple message - platform can format with locale-specific formatter
         char msg[256];
         snprintf(msg, sizeof(msg), "Need %lld more bytes of space.", (long long)shortfall);
         out_availability->recommendation = strdup(msg);
+        if (!out_availability->recommendation) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     } else if (out_availability->has_warning == RAC_TRUE) {
         out_availability->recommendation = strdup("Storage space is getting low.");
+        if (!out_availability->recommendation) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
     return RAC_SUCCESS;

@@ -73,6 +73,10 @@ rac_http_request_t* rac_http_request_create(rac_http_method_t method, const char
 
     request->method = method;
     request->url = str_dup(url);
+    if (url && !request->url) {
+        free(request);
+        return nullptr;
+    }
     request->timeout_ms = 30000;  // Default 30s timeout
 
     return request;
@@ -100,8 +104,15 @@ void rac_http_request_add_header(rac_http_request_t* request, const char* key, c
         return;
 
     request->headers = new_headers;
-    request->headers[request->header_count].key = str_dup(key);
-    request->headers[request->header_count].value = str_dup(value);
+    char* dup_key = str_dup(key);
+    char* dup_value = str_dup(value);
+    if (!dup_key || !dup_value) {
+        free(dup_key);
+        free(dup_value);
+        return;
+    }
+    request->headers[request->header_count].key = dup_key;
+    request->headers[request->header_count].value = dup_value;
     request->header_count = new_count;
 }
 

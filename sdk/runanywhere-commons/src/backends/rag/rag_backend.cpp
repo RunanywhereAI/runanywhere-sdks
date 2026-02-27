@@ -7,9 +7,7 @@
 
 #include "rac/core/rac_logger.h"
 
-#define LOG_TAG "RAG.Backend"
-#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+static const char* LOG_TAG = "RAG.Backend";
 
 namespace runanywhere {
 namespace rag {
@@ -33,7 +31,7 @@ RAGBackend::RAGBackend(
     chunker_ = std::make_unique<DocumentChunker>(chunker_config);
 
     initialized_ = true;
-    LOGI("RAG backend initialized: dim=%zu, chunk_size=%zu",
+    RAC_LOG_INFO(LOG_TAG,"RAG backend initialized: dim=%zu, chunk_size=%zu",
          config.embedding_dimension, config.chunk_size);
 }
 
@@ -48,7 +46,7 @@ void RAGBackend::set_embedding_provider(std::unique_ptr<IEmbeddingProvider> prov
     // Update embedding dimension if provider is ready
     if (embedding_provider_ && embedding_provider_->is_ready()) {
         config_.embedding_dimension = embedding_provider_->dimension();
-        LOGI("Set embedding provider: %s, dim=%zu", 
+        RAC_LOG_INFO(LOG_TAG,"Set embedding provider: %s, dim=%zu", 
              embedding_provider_->name(), config_.embedding_dimension);
     }
 }
@@ -58,7 +56,7 @@ void RAGBackend::set_text_generator(std::unique_ptr<ITextGenerator> generator) {
     text_generator_ = std::shared_ptr<ITextGenerator>(std::move(generator));
     
     if (text_generator_ && text_generator_->is_ready()) {
-        LOGI("Set text generator: %s", text_generator_->name());
+        RAC_LOG_INFO(LOG_TAG,"Set text generator: %s", text_generator_->name());
     }
 }
 
@@ -69,18 +67,18 @@ bool RAGBackend::add_document(
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!initialized_) {
-        LOGE("Backend not initialized");
+        RAC_LOG_ERROR(LOG_TAG,"Backend not initialized");
         return false;
     }
 
     if (!embedding_provider_ || !embedding_provider_->is_ready()) {
-        LOGE("Embedding provider not available");
+        RAC_LOG_ERROR(LOG_TAG,"Embedding provider not available");
         return false;
     }
 
     // Split into chunks
     auto chunks = chunker_->chunk_document(text);
-    LOGI("Split document into %zu chunks", chunks.size());
+    RAC_LOG_INFO(LOG_TAG,"Split document into %zu chunks", chunks.size());
 
     // Embed and add each chunk
     for (const auto& chunk_obj : chunks) {
@@ -89,7 +87,7 @@ bool RAGBackend::add_document(
             auto embedding = embedding_provider_->embed(chunk_obj.text);
             
             if (embedding.size() != config_.embedding_dimension) {
-                LOGE("Embedding dimension mismatch: got %zu, expected %zu",
+                RAC_LOG_ERROR(LOG_TAG,"Embedding dimension mismatch: got %zu, expected %zu",
                      embedding.size(), config_.embedding_dimension);
                 continue;
             }
@@ -104,20 +102,20 @@ bool RAGBackend::add_document(
 
             // Add to vector store
             if (!vector_store_->add_chunk(chunk)) {
-                LOGE("Failed to add chunk to vector store");
+                RAC_LOG_ERROR(LOG_TAG,"Failed to add chunk to vector store");
                 return false;
             }
             
-            LOGI("Added chunk %s to vector store (text: %.50s...)", 
+            RAC_LOG_INFO(LOG_TAG,"Added chunk %s to vector store (text: %.50s...)", 
                  chunk.id.c_str(), chunk.text.c_str());
             
         } catch (const std::exception& e) {
-            LOGE("Failed to embed chunk: %s", e.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to embed chunk: %s", e.what());
             return false;
         }
     }
 
-    LOGI("Successfully added %zu chunks from document", chunks.size());
+    RAC_LOG_INFO(LOG_TAG,"Successfully added %zu chunks from document", chunks.size());
     return true;
 }
 
@@ -161,7 +159,7 @@ std::vector<SearchResult> RAGBackend::search_with_provider(
     }
 
     if (!embedding_provider || !embedding_provider->is_ready()) {
-        LOGE("Embedding provider not available for search");
+        RAC_LOG_ERROR(LOG_TAG,"Embedding provider not available for search");
         return {};
     }
 
@@ -170,7 +168,7 @@ std::vector<SearchResult> RAGBackend::search_with_provider(
         auto query_embedding = embedding_provider->embed(query_text);
         
         if (query_embedding.size() != embedding_dimension) {
-            LOGE("Query embedding dimension mismatch");
+            RAC_LOG_ERROR(LOG_TAG,"Query embedding dimension mismatch");
             return {};
         }
 
@@ -181,7 +179,7 @@ std::vector<SearchResult> RAGBackend::search_with_provider(
         );
         
     } catch (const std::exception& e) {
-        LOGE("Search failed: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Search failed: %s", e.what());
         return {};
     }
 }
@@ -245,7 +243,7 @@ GenerationResult RAGBackend::query(
 
     // Validate providers are available
     if (!embedding_provider || !embedding_provider->is_ready()) {
-        LOGE("Embedding provider not available for query");
+        RAC_LOG_ERROR(LOG_TAG,"Embedding provider not available for query");
         GenerationResult error_result;
         error_result.text = "Error: Embedding provider not available";
         error_result.success = false;
@@ -253,7 +251,7 @@ GenerationResult RAGBackend::query(
     }
     
     if (!text_generator || !text_generator->is_ready()) {
-        LOGE("Text generator not available for query");
+        RAC_LOG_ERROR(LOG_TAG,"Text generator not available for query");
         GenerationResult error_result;
         error_result.text = "Error: Text generator not available";
         error_result.success = false;
@@ -272,7 +270,7 @@ GenerationResult RAGBackend::query(
         );
         
         if (search_results.empty()) {
-            LOGE("No relevant documents found for query");
+            RAC_LOG_ERROR(LOG_TAG,"No relevant documents found for query");
             GenerationResult result;
             result.text = "I don't have enough information to answer that question.";
             result.success = true;
@@ -282,7 +280,7 @@ GenerationResult RAGBackend::query(
         
         // Step 2: Build context from results
         std::string context = build_context(search_results);
-        LOGI("Built context from %zu chunks, %zu chars", 
+        RAC_LOG_INFO(LOG_TAG,"Built context from %zu chunks, %zu chars", 
              search_results.size(), context.size());
         
         // Step 3: Format prompt
@@ -321,7 +319,7 @@ GenerationResult RAGBackend::query(
         return result;
         
     } catch (const std::exception& e) {
-        LOGE("Query failed: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Query failed: %s", e.what());
         GenerationResult error_result;
         error_result.text = std::string("Error: ") + e.what();
         error_result.success = false;

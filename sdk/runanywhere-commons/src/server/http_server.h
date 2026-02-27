@@ -124,6 +124,7 @@ private:
     std::atomic<bool> running_{false};
     std::atomic<bool> shouldStop_{false};
     mutable std::mutex mutex_;
+    mutable std::mutex callback_mutex_;  // Protects callback pointers
 
     // Configuration (copied on start)
     rac_server_config_t config_;

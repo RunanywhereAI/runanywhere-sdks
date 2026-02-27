@@ -41,9 +41,6 @@ std::unordered_map<rac_event_category_t, std::vector<Subscription>> g_subscripti
 // All-events subscriptions
 std::vector<Subscription> g_all_subscriptions;
 
-// Sentinel category for "all events"
-const rac_event_category_t CATEGORY_ALL_SENTINEL = static_cast<rac_event_category_t>(-1);
-
 uint64_t current_time_ms() {
     using namespace std::chrono;
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
@@ -146,18 +143,28 @@ rac_result_t rac_event_publish(const rac_event_t* event) {
         event_copy.timestamp_ms = static_cast<int64_t>(current_time_ms());
     }
 
-    std::lock_guard<std::mutex> lock(g_event_mutex);
+    // Copy subscriber lists under lock, then invoke callbacks without lock
+    // to avoid deadlock if a callback subscribes/unsubscribes/publishes.
+    std::vector<Subscription> category_subs;
+    std::vector<Subscription> all_subs;
+
+    {
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+
+        auto it = g_subscriptions.find(event_copy.category);
+        if (it != g_subscriptions.end()) {
+            category_subs = it->second;
+        }
+        all_subs = g_all_subscriptions;
+    }
 
     // Notify category-specific subscribers
-    auto it = g_subscriptions.find(event_copy.category);
-    if (it != g_subscriptions.end()) {
-        for (const auto& sub : it->second) {
-            sub.callback(&event_copy, sub.user_data);
-        }
+    for (const auto& sub : category_subs) {
+        sub.callback(&event_copy, sub.user_data);
     }
 
     // Notify all-events subscribers
-    for (const auto& sub : g_all_subscriptions) {
+    for (const auto& sub : all_subs) {
         sub.callback(&event_copy, sub.user_data);
     }
 

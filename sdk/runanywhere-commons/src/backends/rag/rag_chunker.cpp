@@ -26,7 +26,8 @@ std::vector<TextChunk> DocumentChunker::chunk_document(const std::string& text) 
 }
 
 size_t DocumentChunker::estimate_tokens(const std::string& text) const {
-    return text.length() / config_.chars_per_token;
+    const size_t chars_per_token = config_.chars_per_token > 0 ? config_.chars_per_token : 1;
+    return text.length() / chars_per_token;
 }
 
 std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string& text) const {

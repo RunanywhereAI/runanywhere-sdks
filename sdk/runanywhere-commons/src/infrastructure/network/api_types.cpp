@@ -530,8 +530,13 @@ char* rac_telemetry_batch_to_json(const rac_telemetry_batch_t* batch) {
     if (!batch)
         return nullptr;
 
-    // Estimate size needed
-    size_t buf_size = 1024 + (batch->event_count * 8192);
+    // Estimate size needed (with overflow check)
+    static constexpr size_t kPerEventEstimate = 8192;
+    static constexpr size_t kBaseEstimate = 1024;
+    if (batch->event_count > (SIZE_MAX - kBaseEstimate) / kPerEventEstimate) {
+        return nullptr;
+    }
+    size_t buf_size = kBaseEstimate + (batch->event_count * kPerEventEstimate);
     char* buf = (char*)malloc(buf_size);
     if (!buf)
         return nullptr;

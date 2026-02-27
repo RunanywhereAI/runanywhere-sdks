@@ -18,10 +18,7 @@
 #include <atomic>
 #include <nlohmann/json.hpp>
 
-#define LOG_TAG "RAG.LlamaCppGenerator"
-#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
-#define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
+static const char* LOG_TAG = "RAG.LlamaCppGenerator";
 
 namespace runanywhere {
 namespace rag {
@@ -125,7 +122,7 @@ public:
         // Verify model file exists
         std::ifstream file(path);
         if (!file.good()) {
-            LOGE("Model file not found: %s", path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Model file not found: %s", path.c_str());
             return false;
         }
         file.close();
@@ -147,7 +144,7 @@ public:
                     top_k = config["top_k"].get<int>();
                 }
             } catch (const std::exception& e) {
-                LOGW("Failed to parse config JSON: %s", e.what());
+                RAC_LOG_WARNING(LOG_TAG,"Failed to parse config JSON: %s", e.what());
             }
         }
         
@@ -156,13 +153,13 @@ public:
         model = llama_model_load_from_file(path.c_str(), model_params);
         
         if (!model) {
-            LOGE("Failed to load LlamaCpp model: %s", path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to load LlamaCpp model: %s", path.c_str());
             return false;
         }
         
         // Get model info
         int model_train_ctx = llama_model_n_ctx_train(model);
-        LOGI("Model training context size: %d", model_train_ctx);
+        RAC_LOG_INFO(LOG_TAG,"Model training context size: %d", model_train_ctx);
         
         // Cap context size to model training context
         context_size = std::min(context_size, model_train_ctx);
@@ -186,14 +183,14 @@ public:
         context = llama_init_from_model(model, ctx_params);
         
         if (!context) {
-            LOGE("Failed to create llama.cpp context");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create llama.cpp context");
             llama_model_free(model);
             model = nullptr;
             return false;
         }
         
-        LOGI("LlamaCPP generator initialized successfully for: %s", path.c_str());
-        LOGI("Context size: %d, Temperature: %.2f, Top-P: %.2f, Top-K: %d", 
+        RAC_LOG_INFO(LOG_TAG,"LlamaCPP generator initialized successfully for: %s", path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"Context size: %d, Temperature: %.2f, Top-P: %.2f, Top-K: %d", 
              context_size, temperature, top_p, top_k);
            batch_size = ctx_params.n_batch;
         ready = true;
@@ -248,7 +245,7 @@ public:
             n_prompt_tokens = -n_prompt_tokens;
         }
         if (n_prompt_tokens <= 0) {
-            LOGE("Failed to tokenize prompt");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to tokenize prompt");
             result.text = "Error: Failed to tokenize prompt";
             llama_sampler_free(sampler);
             return finalize(result);
@@ -265,7 +262,7 @@ public:
             true
         );
         if (n_prompt_tokens_actual < 0) {
-            LOGE("Failed to tokenize prompt (second pass)");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to tokenize prompt (second pass)");
             result.text = "Error: Failed to tokenize prompt";
             llama_sampler_free(sampler);
             return finalize(result);
@@ -277,7 +274,7 @@ public:
         int available_tokens = n_ctx - n_prompt - 4;
         
         if (available_tokens <= 0) {
-            LOGE("Prompt too long: %d tokens, context: %d", n_prompt, n_ctx);
+            RAC_LOG_ERROR(LOG_TAG,"Prompt too long: %d tokens, context: %d", n_prompt, n_ctx);
             result.text = "Error: Prompt exceeds maximum context length";
             llama_sampler_free(sampler);
             return finalize(result);
@@ -286,14 +283,14 @@ public:
         int max_tokens = options.max_tokens > 0 ? options.max_tokens : 512;
         int n_max_tokens = std::min(max_tokens, available_tokens);
         
-        LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d", 
+        RAC_LOG_INFO(LOG_TAG,"Generation: prompt_tokens=%d, max_tokens=%d, context=%d", 
              n_prompt, n_max_tokens, n_ctx);
         
         // Allocate ONE batch for entire generation (like working llamacpp backend)
         llama_batch batch = llama_batch_init(n_ctx, 0, 1);
         
         if (batch.token == nullptr) {
-            LOGE("Failed to allocate batch");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to allocate batch");
             result.text = "Error: Memory allocation failed";
             llama_sampler_free(sampler);
             return finalize(result);
@@ -320,7 +317,7 @@ public:
             }
 
             if (llama_decode(context, batch) != 0) {
-                LOGE("llama_decode failed for prompt at offset %d", prompt_offset);
+                RAC_LOG_ERROR(LOG_TAG,"llama_decode failed for prompt at offset %d", prompt_offset);
                 llama_batch_free(batch);
                 llama_sampler_free(sampler);
                 result.text = "Error: Failed to decode prompt";
@@ -345,7 +342,7 @@ public:
             
             // Check for end-of-sequence token
             if (llama_vocab_is_eog(vocab, new_token)) {
-                LOGI("End of generation token encountered");
+                RAC_LOG_INFO(LOG_TAG,"End of generation token encountered");
                 break;
             }
             
@@ -369,13 +366,13 @@ public:
             
             // Decode next position
             if (llama_decode(context, batch) != 0) {
-                LOGE("llama_decode failed during generation at token %d", n_tokens_generated);
+                RAC_LOG_ERROR(LOG_TAG,"llama_decode failed during generation at token %d", n_tokens_generated);
                 break;
             }
 
             n_tokens_generated++;
             if (n_tokens_generated % 10 == 0) {
-                LOGI("Generated %d tokens so far...", n_tokens_generated);
+                RAC_LOG_INFO(LOG_TAG,"Generated %d tokens so far...", n_tokens_generated);
             }
         }
         
@@ -390,7 +387,7 @@ public:
         result.stop_reason = cancel_requested.load() ? "cancelled" : 
                            n_tokens_generated >= n_max_tokens ? "length" : "stop";
         
-        LOGI("Generation complete: %d/%d tokens, reason: %s", 
+        RAC_LOG_INFO(LOG_TAG,"Generation complete: %d/%d tokens, reason: %s", 
              n_tokens_generated, n_max_tokens, result.stop_reason.c_str());
 
            return finalize(result);

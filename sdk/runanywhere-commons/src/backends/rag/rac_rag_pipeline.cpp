@@ -23,10 +23,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
 
-#define LOG_TAG "RAG.Pipeline"
-#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
-#define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
+static const char* LOG_TAG = "RAG.Pipeline";
 
 using namespace runanywhere::rag;
 
@@ -50,12 +47,12 @@ rac_result_t rac_rag_pipeline_create(
     rac_rag_pipeline_t** out_pipeline
 ) {
     if (config == nullptr || out_pipeline == nullptr) {
-        LOGE("Null pointer in rac_rag_pipeline_create");
+        RAC_LOG_ERROR(LOG_TAG,"Null pointer in rac_rag_pipeline_create");
         return RAC_ERROR_NULL_POINTER;
     }
 
     if (config->embedding_model_path == nullptr || config->llm_model_path == nullptr) {
-        LOGE("Model paths required");
+        RAC_LOG_ERROR(LOG_TAG,"Model paths required");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -91,11 +88,11 @@ rac_result_t rac_rag_pipeline_create(
         );
         
         if (!embedding_provider || !embedding_provider->is_ready()) {
-            LOGE("Failed to initialize embedding provider");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to initialize embedding provider");
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 #else
-        LOGE("No embedding provider available - ONNX backend not built");
+        RAC_LOG_ERROR(LOG_TAG,"No embedding provider available - ONNX backend not built");
         return RAC_ERROR_NOT_SUPPORTED;
 #endif
         
@@ -112,24 +109,24 @@ rac_result_t rac_rag_pipeline_create(
             );
             
             if (!text_generator || !text_generator->is_ready()) {
-                LOGE("Failed to initialize LlamaCPP text generator");
+                RAC_LOG_ERROR(LOG_TAG,"Failed to initialize LlamaCPP text generator");
                 return RAC_ERROR_INITIALIZATION_FAILED;
             }
             
-            LOGI("Successfully created LlamaCPP text generator: %s", text_generator->name());
+            RAC_LOG_INFO(LOG_TAG,"Successfully created LlamaCPP text generator: %s", text_generator->name());
         } catch (const std::exception& e) {
-            LOGE("LlamaCPP generator creation failed: %s", e.what());
+            RAC_LOG_ERROR(LOG_TAG,"LlamaCPP generator creation failed: %s", e.what());
             return RAC_ERROR_INITIALIZATION_FAILED;
         } catch (...) {
-            LOGE("LlamaCPP generator creation failed with unknown error");
+            RAC_LOG_ERROR(LOG_TAG,"LlamaCPP generator creation failed with unknown error");
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 #else
-        LOGE("LlamaCPP backend not available");
+        RAC_LOG_ERROR(LOG_TAG,"LlamaCPP backend not available");
         return RAC_ERROR_NOT_SUPPORTED;
 #endif
             
-            LOGI("Providers initialized: %s, %s", 
+            RAC_LOG_INFO(LOG_TAG,"Providers initialized: %s, %s", 
                  embedding_provider->name(), text_generator->name());
 
         // Create RAG backend with providers
@@ -140,22 +137,22 @@ rac_result_t rac_rag_pipeline_create(
         );
 
         if (!pipeline->backend->is_initialized()) {
-            LOGE("Failed to initialize RAG backend");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to initialize RAG backend");
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 
         *out_pipeline = pipeline.release();
-        LOGI("RAG pipeline created");
+        RAC_LOG_INFO(LOG_TAG,"RAG pipeline created");
         return RAC_SUCCESS;
 
     } catch (const std::bad_alloc& e) {
-        LOGE("Memory allocation failed: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Memory allocation failed: %s", e.what());
         return RAC_ERROR_OUT_OF_MEMORY;
     } catch (const std::exception& e) {
-        LOGE("Exception creating pipeline: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Exception creating pipeline: %s", e.what());
         return RAC_ERROR_INITIALIZATION_FAILED;
     } catch (...) {
-        LOGE("Unknown exception creating pipeline");
+        RAC_LOG_ERROR(LOG_TAG,"Unknown exception creating pipeline");
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 }
@@ -179,7 +176,7 @@ rac_result_t rac_rag_add_document(
         return success ? RAC_SUCCESS : RAC_ERROR_PROCESSING_FAILED;
 
     } catch (const std::exception& e) {
-        LOGE("Exception adding document: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Exception adding document: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
 }
@@ -198,7 +195,7 @@ rac_result_t rac_rag_add_documents_batch(
         const char* metadata = (metadata_array != nullptr) ? metadata_array[i] : nullptr;
         rac_result_t result = rac_rag_add_document(pipeline, documents[i], metadata);
         if (result != RAC_SUCCESS) {
-            LOGE("Failed to add document %zu", i);
+            RAC_LOG_ERROR(LOG_TAG,"Failed to add document %zu", i);
             // Continue with other documents
         }
     }
@@ -238,14 +235,14 @@ rac_result_t rac_rag_query(
         
         // Check if generation was successful
         if (!result.success) {
-            LOGE("RAG query failed: %s", result.text.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"RAG query failed: %s", result.text.c_str());
             return RAC_ERROR_PROCESSING_FAILED;
         }
         
         // Allocate answer string
         out_result->answer = rac_strdup(result.text.c_str());
         if (out_result->answer == nullptr) {
-            LOGE("Failed to allocate memory for answer");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to allocate memory for answer");
             return RAC_ERROR_OUT_OF_MEMORY;
         }
         
@@ -297,16 +294,16 @@ rac_result_t rac_rag_query(
         out_result->retrieval_time_ms = total_ms - result.inference_time_ms;
         out_result->total_time_ms = total_ms;
         
-        LOGI("RAG query completed: %zu chunks, %.2fms total", 
+        RAC_LOG_INFO(LOG_TAG,"RAG query completed: %zu chunks, %.2fms total", 
              out_result->num_chunks, total_ms);
         
         return RAC_SUCCESS;
 
     } catch (const std::bad_alloc& e) {
-        LOGE("Memory allocation failed: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Memory allocation failed: %s", e.what());
         return RAC_ERROR_OUT_OF_MEMORY;
     } catch (const std::exception& e) {
-        LOGE("Exception in RAG query: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Exception in RAG query: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
 }
@@ -320,7 +317,7 @@ rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline) {
         pipeline->backend->clear();
         return RAC_SUCCESS;
     } catch (const std::exception& e) {
-        LOGE("Exception clearing documents: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Exception clearing documents: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
 }
@@ -347,14 +344,14 @@ rac_result_t rac_rag_get_statistics(
         
         char* json_copy = rac_strdup(json_str.c_str());
         if (json_copy == nullptr) {
-            LOGE("Failed to allocate memory for statistics JSON");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to allocate memory for statistics JSON");
             return RAC_ERROR_OUT_OF_MEMORY;
         }
         *out_stats_json = json_copy;
         return RAC_SUCCESS;
 
     } catch (const std::exception& e) {
-        LOGE("Exception getting statistics: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"Exception getting statistics: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
 }
@@ -386,7 +383,7 @@ void rac_rag_pipeline_destroy(rac_rag_pipeline_t* pipeline) {
         return;
     }
 
-    LOGI("Destroying RAG pipeline");
+    RAC_LOG_INFO(LOG_TAG,"Destroying RAG pipeline");
     delete pipeline;
 }
 

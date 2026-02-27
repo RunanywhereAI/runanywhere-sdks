@@ -222,7 +222,7 @@ class ONNXBackendNew {
     bool initialize_ort();
     void create_capabilities();
 
-    bool initialized_ = false;
+    std::atomic<bool> initialized_{false};
     const OrtApi* ort_api_ = nullptr;
     OrtEnv* ort_env_ = nullptr;
     nlohmann::json config_;
@@ -277,7 +277,7 @@ class ONNXSTT {
     void* sherpa_recognizer_ = nullptr;
 #endif
     STTModelType model_type_ = STTModelType::WHISPER;
-    bool model_loaded_ = false;
+    std::atomic<bool> model_loaded_{false};
     std::atomic<bool> cancel_requested_{false};
     std::unordered_map<std::string, void*> streams_;
     int stream_counter_ = 0;
@@ -322,7 +322,7 @@ class ONNXTTS {
     void* sherpa_tts_ = nullptr;
 #endif
     TTSModelType model_type_ = TTSModelType::PIPER;
-    bool model_loaded_ = false;
+    std::atomic<bool> model_loaded_{false};
     std::atomic<bool> cancel_requested_{false};
     std::atomic<int> active_synthesis_count_{0};
     std::vector<VoiceInfo> voices_;
@@ -366,7 +366,7 @@ class ONNXVAD {
 #endif
     std::string model_path_;
     VADConfig config_;
-    bool model_loaded_ = false;
+    std::atomic<bool> model_loaded_{false};
     mutable std::mutex mutex_;
 
     // Internal buffer to accumulate audio until we have a full Silero window (512 samples).

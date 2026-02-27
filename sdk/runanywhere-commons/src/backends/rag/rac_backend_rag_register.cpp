@@ -10,9 +10,7 @@
 
 #include <string.h>
 
-#define LOG_TAG "RAG.Register"
-#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+static const char* LOG_TAG = "RAG.Register";
 
 // =============================================================================
 // MODULE REGISTRATION
@@ -26,7 +24,7 @@ static const char* MODULE_DESC = "Retrieval-Augmented Generation with USearch";
 extern "C" {
 
 rac_result_t rac_backend_rag_register(void) {
-    LOGI("Registering RAG backend module...");
+    RAC_LOG_INFO(LOG_TAG,"Registering RAG backend module...");
 
     // Register module
     rac_capability_t capabilities[] = {
@@ -45,24 +43,24 @@ rac_result_t rac_backend_rag_register(void) {
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to register RAG module");
+        RAC_LOG_ERROR(LOG_TAG,"Failed to register RAG module");
         return result;
     }
 
-    LOGI("RAG backend registered successfully");
+    RAC_LOG_INFO(LOG_TAG,"RAG backend registered successfully");
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_backend_rag_unregister(void) {
-    LOGI("Unregistering RAG backend...");
+    RAC_LOG_INFO(LOG_TAG,"Unregistering RAG backend...");
 
     rac_result_t result = rac_module_unregister(MODULE_ID);
     if (result != RAC_SUCCESS) {
-        LOGE("Failed to unregister RAG module");
+        RAC_LOG_ERROR(LOG_TAG,"Failed to unregister RAG module");
         return result;
     }
 
-    LOGI("RAG backend unregistered");
+    RAC_LOG_INFO(LOG_TAG,"RAG backend unregistered");
     return RAC_SUCCESS;
 }
 

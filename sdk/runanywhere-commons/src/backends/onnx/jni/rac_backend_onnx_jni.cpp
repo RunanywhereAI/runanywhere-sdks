@@ -12,25 +12,19 @@
 #include <string>
 #include <cstring>
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#define TAG "RACOnnxJNI"
-#define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
-#define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-#define LOGw(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGi(...) fprintf(stdout, "[INFO] " __VA_ARGS__); fprintf(stdout, "\n")
-#define LOGe(...) fprintf(stderr, "[ERROR] " __VA_ARGS__); fprintf(stderr, "\n")
-#define LOGw(...) fprintf(stdout, "[WARN] " __VA_ARGS__); fprintf(stdout, "\n")
-#endif
-
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+
+// Route JNI logging through unified RAC_LOG_* system
+static const char* LOG_TAG = "JNI.ONNX";
+#define LOGi(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
+#define LOGe(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+#define LOGw(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 
 // Forward declaration
 extern "C" rac_result_t rac_backend_onnx_register(void);

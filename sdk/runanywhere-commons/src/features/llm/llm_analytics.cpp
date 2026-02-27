@@ -11,6 +11,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <new>
 #include <random>
 #include <sstream>
 #include <string>
@@ -46,9 +47,8 @@ int64_t get_current_time_ms() {
 }
 
 std::string generate_uuid() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    static thread_local std::mt19937 gen(std::random_device{}());
+    static thread_local std::uniform_int_distribution<> dis(0, 15);
 
     std::stringstream ss;
     ss << std::hex;
@@ -120,13 +120,12 @@ rac_result_t rac_llm_analytics_create(rac_llm_analytics_handle_t* out_handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
-    try {
-        *out_handle = new rac_llm_analytics_s();
-        log_info("LLM.Analytics", "LLM analytics service created");
-        return RAC_SUCCESS;
-    } catch (...) {
+    *out_handle = new (std::nothrow) rac_llm_analytics_s();
+    if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    log_info("LLM.Analytics", "LLM analytics service created");
+    return RAC_SUCCESS;
 }
 
 void rac_llm_analytics_destroy(rac_llm_analytics_handle_t handle) {
@@ -171,7 +170,7 @@ rac_result_t rac_llm_analytics_start_generation(rac_llm_analytics_handle_t handl
     if (!*out_generation_id) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    strcpy(*out_generation_id, id.c_str());
+    memcpy(*out_generation_id, id.c_str(), id.size() + 1);
 
     log_debug("LLM.Analytics", "Non-streaming generation started: %s", id.c_str());
     return RAC_SUCCESS;
@@ -210,7 +209,7 @@ rac_result_t rac_llm_analytics_start_streaming_generation(
     if (!*out_generation_id) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    strcpy(*out_generation_id, id.c_str());
+    memcpy(*out_generation_id, id.c_str(), id.size() + 1);
 
     log_debug("LLM.Analytics", "Streaming generation started: %s", id.c_str());
     return RAC_SUCCESS;

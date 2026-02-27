@@ -19,8 +19,6 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_events.h"
 
-// Use the RAC logging system
-#define LOGI(...) RAC_LOG_INFO("LLM.LlamaCpp.C-API", __VA_ARGS__)
 
 // =============================================================================
 // INTERNAL HANDLE STRUCTURE
@@ -140,7 +138,7 @@ rac_bool_t rac_llm_llamacpp_is_model_loaded(rac_handle_t handle) {
 rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                                        const rac_llm_options_t* options,
                                        rac_llm_result_t* out_result) {
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: START handle=%p", handle);
+    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: START handle=%p", handle);
 
     if (handle == nullptr || prompt == nullptr || out_result == nullptr) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: NULL pointer! handle=%p, prompt=%p, out_result=%p",
@@ -148,9 +146,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
         return RAC_ERROR_NULL_POINTER;
     }
 
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: casting handle...");
     auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: handle cast ok, text_gen=%p", (void*)h->text_gen);
 
     if (!h->text_gen) {
         RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: text_gen is null!");
@@ -158,7 +154,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
 
     // Build request from RAC options
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: building request, prompt_len=%zu", strlen(prompt));
+    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: building request, prompt_len=%zu", strlen(prompt));
     runanywhere::TextGenerationRequest request;
     request.prompt = prompt;
     if (options != nullptr) {
@@ -178,12 +174,12 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                 }
             }
         }
-        LOGI("[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=%s",
              request.max_tokens, request.temperature, request.top_p,
              request.system_prompt.empty() ? "(none)" : "(set)");
     } else {
-        LOGI("[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=(none)",
              request.max_tokens, request.temperature, request.top_p);
     }
@@ -194,7 +190,6 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     // templates that use unsupported features. Without this catch, the exception
     // propagates through the extern "C" boundary causing undefined behavior in WASM
     // (Emscripten returns the exception pointer as the function return value).
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: calling text_gen->generate()...");
     runanywhere::TextGenerationResult result;
     try {
         result = h->text_gen->generate(request);
@@ -205,7 +200,7 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
         rac_error_set_details("Unknown C++ exception during LLM generation");
         return RAC_ERROR_INFERENCE_FAILED;
     }
-    RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
+    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
 
     // finish_reason is std::string; TODO: migrate to enum if TextGenerationResult gains one
     if (result.finish_reason == "error") {
@@ -215,7 +210,14 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
 
     // Fill RAC result struct
-    out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
+    if (!result.text.empty()) {
+        out_result->text = strdup(result.text.c_str());
+        if (!out_result->text) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    } else {
+        out_result->text = nullptr;
+    }
     out_result->completion_tokens = result.tokens_generated;
     out_result->prompt_tokens = result.prompt_tokens;
     out_result->total_tokens = result.prompt_tokens + result.tokens_generated;
@@ -262,12 +264,12 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
             }
         }
-        LOGI("[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=%s",
              request.max_tokens, request.temperature, request.top_p,
              request.system_prompt.empty() ? "(none)" : "(set)");
     } else {
-        LOGI("[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=(none)",
              request.max_tokens, request.temperature, request.top_p);
     }
@@ -325,6 +327,9 @@ rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
 
     std::string json_str = info.dump();
     *out_json = strdup(json_str.c_str());
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     return RAC_SUCCESS;
 }
@@ -398,6 +403,9 @@ rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json
     auto info = h->text_gen->get_lora_info();
     std::string json_str = info.dump();
     *out_json = strdup(json_str.c_str());
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     return RAC_SUCCESS;
 }

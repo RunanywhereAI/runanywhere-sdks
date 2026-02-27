@@ -56,6 +56,11 @@ struct TextGenerationResult {
     std::string finish_reason;  // "stop", "length", "cancelled"
 };
 
+// Verify request struct size — allocated per generate() call.
+// If this fires, review whether new fields should be passed by reference instead.
+static_assert(sizeof(TextGenerationRequest) <= 256,
+              "TextGenerationRequest grew — consider passing by reference or reducing members");
+
 // Streaming callback: receives token, returns false to cancel
 using TextStreamCallback = std::function<bool(const std::string& token)>;
 
@@ -154,6 +159,12 @@ class LlamaCppTextGeneration {
     llama_model* model_ = nullptr;
     llama_context* context_ = nullptr;
     llama_sampler* sampler_ = nullptr;
+
+    // Cached sampler parameters — skip rebuild when unchanged
+    float cached_temperature_ = -1.0f;
+    float cached_top_p_ = -1.0f;
+    int cached_top_k_ = -1;
+    float cached_repetition_penalty_ = -1.0f;
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};

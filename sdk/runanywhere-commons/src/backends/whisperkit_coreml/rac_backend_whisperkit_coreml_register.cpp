@@ -58,6 +58,7 @@ static rac_result_t whisperkit_coreml_stt_vtable_transcribe_stream(
     if (status == RAC_SUCCESS && callback && result.text) {
         callback(result.text, RAC_TRUE, user_data);
     }
+    rac_stt_result_free(&result);
     return status;
 }
 

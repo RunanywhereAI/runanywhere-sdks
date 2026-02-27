@@ -8,9 +8,11 @@
  * CRITICAL: This is a direct port of Swift implementation - do NOT add custom logic!
  */
 
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <new>
 
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
@@ -43,24 +45,23 @@ void emit_voice_agent_all_ready();
 // =============================================================================
 
 struct rac_voice_agent {
-    // State
-    bool is_configured;
+    // State — atomic so is_ready() checks don't need the mutex
+    std::atomic<bool> is_configured{false};
 
     // Whether we own the component handles (and should destroy them)
     bool owns_components;
 
-    // Composed component handles
+    // Composed component handles (set at creation, immutable after)
     rac_handle_t llm_handle;
     rac_handle_t stt_handle;
     rac_handle_t tts_handle;
     rac_handle_t vad_handle;
 
-    // Thread safety
+    // Thread safety — protects mutable operations (load, process, cleanup)
     std::mutex mutex;
 
     rac_voice_agent()
-        : is_configured(false),
-          owns_components(false),
+        : owns_components(false),
           llm_handle(nullptr),
           stt_handle(nullptr),
           tts_handle(nullptr),
@@ -150,7 +151,10 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
 
     RAC_LOG_INFO("VoiceAgent", "Creating standalone voice agent");
 
-    rac_voice_agent* agent = new rac_voice_agent();
+    rac_voice_agent* agent = new (std::nothrow) rac_voice_agent();
+    if (!agent) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     agent->owns_components = true;
 
     // Create LLM component
@@ -212,7 +216,10 @@ rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_voice_agent* agent = new rac_voice_agent();
+    rac_voice_agent* agent = new (std::nothrow) rac_voice_agent();
+    if (!agent) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     agent->owns_components = false;  // External handles, don't destroy them
     agent->llm_handle = llm_component_handle;
     agent->stt_handle = stt_component_handle;
@@ -458,7 +465,7 @@ rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
     // Step 5: Verify all components ready (mirrors Swift's verifyAllComponentsReady)
     // Note: In the C API, we trust initialization succeeded
 
-    handle->is_configured = true;
+    handle->is_configured.store(true, std::memory_order_release);
     RAC_LOG_INFO("VoiceAgent", "Voice Agent initialized successfully");
 
     return RAC_SUCCESS;
@@ -483,7 +490,7 @@ rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handl
     // Note: In C API, we trust that components are already initialized
     // The Swift version checks isModelLoaded properties
 
-    handle->is_configured = true;
+    handle->is_configured.store(true, std::memory_order_release);
     RAC_LOG_INFO("VoiceAgent", "Voice Agent initialized with pre-loaded models");
 
     return RAC_SUCCESS;
@@ -506,7 +513,7 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
     rac_vad_component_stop(handle->vad_handle);
     rac_vad_component_reset(handle->vad_handle);
 
-    handle->is_configured = false;
+    handle->is_configured.store(false, std::memory_order_release);
 
     return RAC_SUCCESS;
 }
@@ -516,8 +523,8 @@ rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle, rac_bool_
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
-    *out_is_ready = handle->is_configured ? RAC_TRUE : RAC_FALSE;
+    // Atomic read — no mutex needed for a simple state check
+    *out_is_ready = handle->is_configured.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
 
     return RAC_SUCCESS;
 }
@@ -533,20 +540,22 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    // --- Validate under lock, then release ---
+    // Each stage locks only for its own component call, allowing other threads
+    // (e.g. is_ready checks, VAD processing) to proceed between stages.
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
 
-    // Mirrors Swift's guard isConfigured
-    if (!handle->is_configured) {
-        RAC_LOG_ERROR("VoiceAgent", "Voice Agent is not initialized");
-        return RAC_ERROR_NOT_INITIALIZED;
-    }
+        if (!handle->is_configured.load(std::memory_order_acquire)) {
+            RAC_LOG_ERROR("VoiceAgent", "Voice Agent is not initialized");
+            return RAC_ERROR_NOT_INITIALIZED;
+        }
 
-    // Defensive validation: Verify all components are in LOADED state before processing
-    // This catches issues like dangling handles or improperly initialized components
-    rac_result_t validation_result = validate_all_components_ready(handle);
-    if (validation_result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process");
-        return validation_result;
+        rac_result_t validation_result = validate_all_components_ready(handle);
+        if (validation_result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process");
+            return validation_result;
+        }
     }
 
     RAC_LOG_INFO("VoiceAgent", "Processing voice turn");
@@ -554,13 +563,15 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     // Initialize result
     memset(out_result, 0, sizeof(rac_voice_agent_result_t));
 
-    // Step 1: Transcribe audio (mirrors Swift's Step 1)
+    // Step 1: Transcribe audio — lock only for STT stage
     RAC_LOG_DEBUG("VoiceAgent", "Step 1: Transcribing audio");
-
     rac_stt_result_t stt_result = {};
-    rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
-                                                       nullptr,  // default options
-                                                       &stt_result);
+    rac_result_t result;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
+                                              nullptr, &stt_result);
+    }
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "STT transcription failed");
@@ -570,19 +581,19 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     if (!stt_result.text || strlen(stt_result.text) == 0) {
         RAC_LOG_WARNING("VoiceAgent", "Empty transcription, skipping processing");
         rac_stt_result_free(&stt_result);
-        // Return invalid state to indicate empty input (mirrors Swift's emptyInput error)
         return RAC_ERROR_INVALID_STATE;
     }
 
     RAC_LOG_INFO("VoiceAgent", "Transcription completed");
 
-    // Step 2: Generate LLM response (mirrors Swift's Step 2)
+    // Step 2: Generate LLM response — lock only for LLM stage
     RAC_LOG_DEBUG("VoiceAgent", "Step 2: Generating LLM response");
-
     rac_llm_result_t llm_result = {};
-    result = rac_llm_component_generate(handle->llm_handle, stt_result.text,
-                                        nullptr,  // default options
-                                        &llm_result);
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_llm_component_generate(handle->llm_handle, stt_result.text,
+                                            nullptr, &llm_result);
+    }
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "LLM generation failed");
@@ -592,13 +603,14 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
 
     RAC_LOG_INFO("VoiceAgent", "LLM response generated");
 
-    // Step 3: Synthesize speech (mirrors Swift's Step 3)
+    // Step 3: Synthesize speech — lock only for TTS stage
     RAC_LOG_DEBUG("VoiceAgent", "Step 3: Synthesizing speech");
-
     rac_tts_result_t tts_result = {};
-    result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text,
-                                          nullptr,  // default options
-                                          &tts_result);
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text,
+                                              nullptr, &tts_result);
+    }
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "TTS synthesis failed");
@@ -607,8 +619,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         return result;
     }
 
-    // Step 4: Convert Float32 PCM to WAV format for playback
-    // TTS returns raw Float32 samples, but audio players need WAV format
+    // Step 4: Convert Float32 PCM to WAV format — no lock needed (pure computation)
     void* wav_data = nullptr;
     size_t wav_size = 0;
     result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
@@ -633,7 +644,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     out_result->synthesized_audio = wav_data;
     out_result->synthesized_audio_size = wav_size;
 
-    // Free intermediate results (tts_result audio data is no longer needed since we have WAV)
+    // Free intermediate results
     rac_stt_result_free(&stt_result);
     rac_llm_result_free(&llm_result);
     rac_tts_result_free(&tts_result);
@@ -651,31 +662,37 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    std::lock_guard<std::mutex> lock(handle->mutex);
+    // --- Validate under lock, then release ---
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
 
-    if (!handle->is_configured) {
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = RAC_ERROR_NOT_INITIALIZED;
-        callback(&error_event, user_data);
-        return RAC_ERROR_NOT_INITIALIZED;
+        if (!handle->is_configured.load(std::memory_order_acquire)) {
+            rac_voice_agent_event_t error_event = {};
+            error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+            error_event.data.error_code = RAC_ERROR_NOT_INITIALIZED;
+            callback(&error_event, user_data);
+            return RAC_ERROR_NOT_INITIALIZED;
+        }
+
+        rac_result_t validation_result = validate_all_components_ready(handle);
+        if (validation_result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process stream");
+            rac_voice_agent_event_t error_event = {};
+            error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+            error_event.data.error_code = validation_result;
+            callback(&error_event, user_data);
+            return validation_result;
+        }
     }
 
-    // Defensive validation: Verify all components are in LOADED state before processing
-    rac_result_t validation_result = validate_all_components_ready(handle);
-    if (validation_result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VoiceAgent", "Component validation failed - cannot process stream");
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = validation_result;
-        callback(&error_event, user_data);
-        return validation_result;
-    }
-
-    // Step 1: Transcribe
+    // Step 1: Transcribe — lock only for STT stage
     rac_stt_result_t stt_result = {};
-    rac_result_t result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
-                                                       nullptr, &stt_result);
+    rac_result_t result;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
+                                              nullptr, &stt_result);
+    }
 
     if (result != RAC_SUCCESS) {
         rac_voice_agent_event_t error_event = {};
@@ -685,15 +702,18 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return result;
     }
 
-    // Emit transcription event
+    // Emit transcription event (no lock — callback is caller's code)
     rac_voice_agent_event_t transcription_event = {};
     transcription_event.type = RAC_VOICE_AGENT_EVENT_TRANSCRIPTION;
     transcription_event.data.transcription = stt_result.text;
     callback(&transcription_event, user_data);
 
-    // Step 2: Generate response
+    // Step 2: Generate response — lock only for LLM stage
     rac_llm_result_t llm_result = {};
-    result = rac_llm_component_generate(handle->llm_handle, stt_result.text, nullptr, &llm_result);
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_llm_component_generate(handle->llm_handle, stt_result.text, nullptr, &llm_result);
+    }
 
     if (result != RAC_SUCCESS) {
         rac_stt_result_free(&stt_result);
@@ -710,10 +730,12 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     response_event.data.response = llm_result.text;
     callback(&response_event, user_data);
 
-    // Step 3: Synthesize
+    // Step 3: Synthesize — lock only for TTS stage
     rac_tts_result_t tts_result = {};
-    result =
-        rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
+    }
 
     if (result != RAC_SUCCESS) {
         rac_stt_result_free(&stt_result);
@@ -725,7 +747,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return result;
     }
 
-    // Step 4: Convert Float32 PCM to WAV format for playback
+    // Step 4: Convert Float32 PCM to WAV — no lock needed (pure computation)
     void* wav_data = nullptr;
     size_t wav_size = 0;
     result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
@@ -744,7 +766,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return result;
     }
 
-    // Emit audio synthesized event (with WAV data)
+    // Emit audio synthesized event
     rac_voice_agent_event_t audio_event = {};
     audio_event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
     audio_event.data.audio.audio_data = wav_data;
@@ -761,7 +783,12 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     processed_event.data.result.synthesized_audio_size = wav_size;
     callback(&processed_event, user_data);
 
-    // Free intermediate results (WAV data ownership transferred to processed_event)
+    // Free event-owned allocations (callback has consumed the data)
+    free(processed_event.data.result.transcription);
+    free(processed_event.data.result.response);
+    free(wav_data);
+
+    // Free intermediate results
     rac_stt_result_free(&stt_result);
     rac_llm_result_free(&llm_result);
     rac_tts_result_free(&tts_result);
@@ -781,7 +808,7 @@ rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle, const v
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    if (!handle->is_configured) {
+    if (!handle->is_configured.load(std::memory_order_acquire)) {
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -807,7 +834,7 @@ rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle, 
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    if (!handle->is_configured) {
+    if (!handle->is_configured.load(std::memory_order_acquire)) {
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -833,7 +860,7 @@ rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, 
 
     std::lock_guard<std::mutex> lock(handle->mutex);
 
-    if (!handle->is_configured) {
+    if (!handle->is_configured.load(std::memory_order_acquire)) {
         return RAC_ERROR_NOT_INITIALIZED;
     }
 

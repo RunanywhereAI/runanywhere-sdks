@@ -285,9 +285,10 @@ static bool extract_json_string(const char* str, size_t pos, size_t len, char** 
         if (ch == '"') {
             // End of string
             *out_value = static_cast<char*>(malloc(result.size() + 1));
-            if (*out_value) {
-                memcpy(*out_value, result.c_str(), result.size() + 1);
+            if (!*out_value) {
+                return false;
             }
+            memcpy(*out_value, result.c_str(), result.size() + 1);
             *out_end_pos = i + 1;
             return true;
         }

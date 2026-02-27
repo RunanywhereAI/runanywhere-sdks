@@ -117,8 +117,8 @@ std::vector<uint8_t> base64_decode(const char* data, size_t len) {
  */
 void bilinear_resize(const uint8_t* src, int src_w, int src_h, uint8_t* dst, int dst_w, int dst_h,
                      int channels) {
-    float x_ratio = static_cast<float>(src_w - 1) / static_cast<float>(dst_w - 1);
-    float y_ratio = static_cast<float>(src_h - 1) / static_cast<float>(dst_h - 1);
+    float x_ratio = (dst_w > 1) ? static_cast<float>(src_w - 1) / static_cast<float>(dst_w - 1) : 0.0f;
+    float y_ratio = (dst_h > 1) ? static_cast<float>(src_h - 1) / static_cast<float>(dst_h - 1) : 0.0f;
 
     for (int y = 0; y < dst_h; y++) {
         for (int x = 0; x < dst_w; x++) {
@@ -313,6 +313,10 @@ rac_result_t rac_image_normalize(const rac_image_data_t* image, const float* mea
         return RAC_ERROR_NULL_POINTER;
     }
 
+    if (image->channels < 1 || image->channels > 3) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
     memset(out_float, 0, sizeof(rac_image_float_t));
 
     // Default mean and std (ImageNet-style normalization)
@@ -485,6 +489,12 @@ void rac_image_calc_resize(int32_t width, int32_t height, int32_t max_size, int3
                            int32_t* out_height) {
     if (!out_width || !out_height)
         return;
+
+    if (width <= 0 || height <= 0) {
+        *out_width = 1;
+        *out_height = 1;
+        return;
+    }
 
     if (width <= max_size && height <= max_size) {
         *out_width = width;

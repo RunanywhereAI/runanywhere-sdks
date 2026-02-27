@@ -172,6 +172,7 @@ static rac_result_t onnx_tts_vtable_synthesize_stream(void* impl, const char* te
     if (status == RAC_SUCCESS && callback) {
         callback(result.audio_data, result.audio_size, user_data);
     }
+    rac_tts_result_free(&result);
     return status;
 }
 
@@ -450,6 +451,9 @@ rac_result_t onnx_download_post_process(const rac_model_download_config_t* confi
     out_result->was_extracted =
         (config->archive_type != RAC_ARCHIVE_TYPE_NONE) ? RAC_TRUE : RAC_FALSE;
     out_result->final_path = strdup(downloaded_path);
+    if (!out_result->final_path) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->file_count = 1;
 
     return RAC_SUCCESS;

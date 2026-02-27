@@ -124,7 +124,13 @@ void rac_error_set_source(rac_error_t* error, const char* file, int32_t line,
     if (file) {
         const char* last_slash = strrchr(file, '/');
         const char* last_backslash = strrchr(file, '\\');
-        const char* last_sep = (last_slash > last_backslash) ? last_slash : last_backslash;
+        // Avoid UB: relational comparison of unrelated pointers when one is NULL
+        const char* last_sep;
+        if (last_slash && last_backslash) {
+            last_sep = last_slash > last_backslash ? last_slash : last_backslash;
+        } else {
+            last_sep = last_slash ? last_slash : last_backslash;
+        }
         const char* filename = last_sep ? last_sep + 1 : file;
         safe_strcpy(error->source_file, sizeof(error->source_file), filename);
     }
@@ -602,71 +608,119 @@ char* rac_error_to_json(const rac_error_t* error) {
     if (!error)
         return nullptr;
 
-    // Allocate buffer for JSON
-    size_t buffer_size = 4096;
+    // Buffer large enough for all rac_error_t fields at max capacity
+    constexpr size_t buffer_size = 8192;
     char* json = static_cast<char*>(malloc(buffer_size));
     if (!json)
         return nullptr;
 
     int pos = 0;
+
+    // Clamp pos after snprintf to prevent buffer overrun
+    // (snprintf returns count that WOULD be written, which can exceed available space)
+    auto clamp = [&]() {
+        if (pos >= static_cast<int>(buffer_size))
+            pos = static_cast<int>(buffer_size) - 1;
+    };
+
+    // Write a JSON-escaped string into the buffer
+    auto write_escaped = [&](const char* str) {
+        for (const char* p = str; *p != '\0' && pos < static_cast<int>(buffer_size) - 2; p++) {
+            auto c = static_cast<unsigned char>(*p);
+            if (c == '"' || c == '\\') {
+                json[pos++] = '\\';
+                if (pos < static_cast<int>(buffer_size) - 1)
+                    json[pos++] = static_cast<char>(c);
+            } else if (c == '\n') {
+                json[pos++] = '\\';
+                if (pos < static_cast<int>(buffer_size) - 1)
+                    json[pos++] = 'n';
+            } else if (c == '\r') {
+                json[pos++] = '\\';
+                if (pos < static_cast<int>(buffer_size) - 1)
+                    json[pos++] = 'r';
+            } else if (c == '\t') {
+                json[pos++] = '\\';
+                if (pos < static_cast<int>(buffer_size) - 1)
+                    json[pos++] = 't';
+            } else if (c < 0x20) {
+                continue;  // Skip other control characters
+            } else {
+                json[pos++] = static_cast<char>(c);
+            }
+        }
+    };
+
     pos += snprintf(json + pos, buffer_size - pos, "{");
+    clamp();
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\"code\":%d,", error->code);
+    clamp();
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\"code_name\":\"%s\",",
                     rac_error_code_name(error->code));
+    clamp();
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\"category\":\"%s\",",
                     rac_error_category_name(error->category));
+    clamp();
 
-    // Escape message for JSON
+    // Escape message for JSON (handles ", \, \n, \r, \t, control chars)
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\"message\":\"");
-    for (const char* p = error->message; *p != '\0' && pos < (int)buffer_size - 10; p++) {
-        if (*p == '"' || *p == '\\') {
-            json[pos++] = '\\';
-        }
-        json[pos++] = *p;
-    }
+    clamp();
+    write_escaped(error->message);
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\",");
+    clamp();
 
     // NOLINTNEXTLINE(modernize-raw-string-literal)
     pos += snprintf(json + pos, buffer_size - pos, "\"timestamp_ms\":%lld,",
                     static_cast<long long>(error->timestamp_ms));
+    clamp();
 
     // Source location
     if (error->source_file[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"source_file\":\"%s\",\"source_line\":%d,",
                         error->source_file, error->source_line);
+        clamp();
     }
     if (error->source_function[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"source_function\":\"%s\",",
                         error->source_function);
+        clamp();
     }
 
     // Model context
     if (error->model_id[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"model_id\":\"%s\",", error->model_id);
+        clamp();
     }
     if (error->framework[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"framework\":\"%s\",", error->framework);
+        clamp();
     }
     if (error->session_id[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"session_id\":\"%s\",", error->session_id);
+        clamp();
     }
 
-    // Underlying error
+    // Underlying error — escape the message
     if (error->underlying_code != 0) {
-        pos += snprintf(
-            json + pos, buffer_size - pos,
-            "\"underlying_code\":%d,\"underlying_message\":\"%s\",",  // NOLINT(modernize-raw-string-literal)
-            error->underlying_code, error->underlying_message);
+        // NOLINTNEXTLINE(modernize-raw-string-literal)
+        pos += snprintf(json + pos, buffer_size - pos,
+                        "\"underlying_code\":%d,\"underlying_message\":\"",
+                        error->underlying_code);
+        clamp();
+        write_escaped(error->underlying_message);
+        // NOLINTNEXTLINE(modernize-raw-string-literal)
+        pos += snprintf(json + pos, buffer_size - pos, "\",");
+        clamp();
     }
 
     // Stack trace
@@ -674,6 +728,7 @@ char* rac_error_to_json(const rac_error_t* error) {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"stack_frame_count\":%d,",
                         error->stack_frame_count);
+        clamp();
     }
 
     // Custom metadata
@@ -681,22 +736,26 @@ char* rac_error_to_json(const rac_error_t* error) {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"%s\":\"%s\",", error->custom_key1,
                         error->custom_value1);
+        clamp();
     }
     if (error->custom_key2[0] != '\0' && error->custom_value2[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"%s\":\"%s\",", error->custom_key2,
                         error->custom_value2);
+        clamp();
     }
     if (error->custom_key3[0] != '\0' && error->custom_value3[0] != '\0') {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos, "\"%s\":\"%s\",", error->custom_key3,
                         error->custom_value3);
+        clamp();
     }
 
     // Remove trailing comma and close
-    if (json[pos - 1] == ',')
+    if (pos > 0 && json[pos - 1] == ',')
         pos--;
-    json[pos++] = '}';
+    if (pos < static_cast<int>(buffer_size) - 1)
+        json[pos++] = '}';
     json[pos] = '\0';
 
     return json;
@@ -712,16 +771,31 @@ int32_t rac_error_get_telemetry_properties(const rac_error_t* error, char** out_
     // Error code
     out_keys[count] = strdup("error_code");
     out_values[count] = strdup(rac_error_code_name(error->code));
+    if (!out_keys[count] || !out_values[count]) {
+        free(out_keys[count]);
+        free(out_values[count]);
+        return count;
+    }
     count++;
 
     // Error category
     out_keys[count] = strdup("error_category");
     out_values[count] = strdup(rac_error_category_name(error->category));
+    if (!out_keys[count] || !out_values[count]) {
+        free(out_keys[count]);
+        free(out_values[count]);
+        return count;
+    }
     count++;
 
     // Error message
     out_keys[count] = strdup("error_message");
     out_values[count] = strdup(error->message);
+    if (!out_keys[count] || !out_values[count]) {
+        free(out_keys[count]);
+        free(out_values[count]);
+        return count;
+    }
     count++;
 
     return count;
@@ -746,42 +820,56 @@ char* rac_error_to_debug_string(const rac_error_t* error) {
     if (!error)
         return nullptr;
 
-    size_t size = 2048;
+    constexpr size_t size = 2048;
     char* str = static_cast<char*>(malloc(size));
     if (!str)
         return nullptr;
 
     int pos = 0;
+    // Clamp pos after snprintf to prevent buffer overrun
+    auto clamp = [&]() {
+        if (pos >= static_cast<int>(size))
+            pos = static_cast<int>(size) - 1;
+    };
+
     pos += snprintf(str + pos, size - pos, "SDKError[%s.%s]: %s",
                     rac_error_category_name(error->category), rac_error_code_name(error->code),
                     error->message);
+    clamp();
 
     if (error->underlying_code != 0) {
         pos += snprintf(str + pos, size - pos, "\n  Caused by: %s (%d)", error->underlying_message,
                         error->underlying_code);
+        clamp();
     }
 
     if (error->source_file[0] != '\0') {
         pos += snprintf(str + pos, size - pos, "\n  At: %s:%d in %s", error->source_file,
                         error->source_line, error->source_function);
+        clamp();
     }
 
     if (error->model_id[0] != '\0') {
         pos += snprintf(str + pos, size - pos, "\n  Model: %s (%s)", error->model_id,
                         error->framework);
+        clamp();
     }
 
     if (error->stack_frame_count > 0) {
         pos += snprintf(str + pos, size - pos,
                         "\n  Stack trace (%d frames):", error->stack_frame_count);
-        for (int i = 0; i < error->stack_frame_count && i < 5 && pos < (int)size - 100; i++) {
+        clamp();
+        for (int i = 0; i < error->stack_frame_count && i < 5 && pos < static_cast<int>(size) - 100;
+             i++) {
             if (error->stack_frames[i].function != nullptr) {
                 pos += snprintf(
                     str + pos, size - pos, "\n    %s at %s:%d", error->stack_frames[i].function,
                     error->stack_frames[i].file != nullptr ? error->stack_frames[i].file : "?",
                     error->stack_frames[i].line);
+                clamp();
             } else if (error->stack_frames[i].address != nullptr) {
                 pos += snprintf(str + pos, size - pos, "\n    %p", error->stack_frames[i].address);
+                clamp();
             }
         }
     }

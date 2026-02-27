@@ -14,10 +14,6 @@
 
 #include "rac/core/rac_logger.h"
 
-// Use the RAC logging system
-#define LOGI(...) RAC_LOG_INFO("STT.WhisperCpp", __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR("STT.WhisperCpp", __VA_ARGS__)
-#define LOGW(...) RAC_LOG_WARNING("STT.WhisperCpp", __VA_ARGS__)
 
 // Whisper sample rate constant
 #ifndef WHISPER_SAMPLE_RATE
@@ -31,19 +27,19 @@ namespace runanywhere {
 // =============================================================================
 
 WhisperCppBackend::WhisperCppBackend() {
-    LOGI("WhisperCppBackend created");
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppBackend created");
 }
 
 WhisperCppBackend::~WhisperCppBackend() {
     cleanup();
-    LOGI("WhisperCppBackend destroyed");
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppBackend destroyed");
 }
 
 bool WhisperCppBackend::initialize(const nlohmann::json& config) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (initialized_) {
-        LOGI("WhisperCppBackend already initialized");
+        RAC_LOG_INFO("STT.WhisperCpp","WhisperCppBackend already initialized");
         return true;
     }
 
@@ -65,7 +61,7 @@ bool WhisperCppBackend::initialize(const nlohmann::json& config) {
         use_gpu_ = config["use_gpu"].get<bool>();
     }
 
-    LOGI("WhisperCppBackend initialized with %d threads, GPU: %s", num_threads_,
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppBackend initialized with %d threads, GPU: %s", num_threads_,
          use_gpu_ ? "enabled" : "disabled");
 
     create_stt();
@@ -87,12 +83,12 @@ void WhisperCppBackend::cleanup() {
 
     stt_.reset();
     initialized_ = false;
-    LOGI("WhisperCppBackend cleaned up");
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppBackend cleaned up");
 }
 
 void WhisperCppBackend::create_stt() {
     stt_ = std::make_unique<WhisperCppSTT>(this);
-    LOGI("Created STT component");
+    RAC_LOG_INFO("STT.WhisperCpp","Created STT component");
 }
 
 DeviceType WhisperCppBackend::get_device_type() const {
@@ -114,7 +110,7 @@ size_t WhisperCppBackend::get_memory_usage() const {
 // =============================================================================
 
 WhisperCppSTT::WhisperCppSTT(WhisperCppBackend* backend) : backend_(backend) {
-    LOGI("WhisperCppSTT created");
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppSTT created");
 }
 
 WhisperCppSTT::~WhisperCppSTT() {
@@ -127,7 +123,7 @@ WhisperCppSTT::~WhisperCppSTT() {
     }
     streams_.clear();
 
-    LOGI("WhisperCppSTT destroyed");
+    RAC_LOG_INFO("STT.WhisperCpp","WhisperCppSTT destroyed");
 }
 
 bool WhisperCppSTT::is_ready() const {
@@ -139,13 +135,13 @@ bool WhisperCppSTT::load_model(const std::string& model_path, STTModelType model
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (model_loaded_ && ctx_) {
-        LOGI("Unloading previous model");
+        RAC_LOG_INFO("STT.WhisperCpp","Unloading previous model");
         whisper_free(ctx_);
         ctx_ = nullptr;
         model_loaded_ = false;
     }
 
-    LOGI("Loading whisper model from: %s", model_path.c_str());
+    RAC_LOG_INFO("STT.WhisperCpp","Loading whisper model from: %s", model_path.c_str());
 
     whisper_context_params cparams = whisper_context_default_params();
     cparams.use_gpu = backend_->is_gpu_enabled();
@@ -162,7 +158,7 @@ bool WhisperCppSTT::load_model(const std::string& model_path, STTModelType model
     ctx_ = whisper_init_from_file_with_params(model_path.c_str(), cparams);
 
     if (!ctx_) {
-        LOGE("Failed to load whisper model from: %s", model_path.c_str());
+        RAC_LOG_ERROR("STT.WhisperCpp","Failed to load whisper model from: %s", model_path.c_str());
         return false;
     }
 
@@ -170,7 +166,7 @@ bool WhisperCppSTT::load_model(const std::string& model_path, STTModelType model
     model_config_ = config;
     model_loaded_ = true;
 
-    LOGI("Whisper model loaded successfully. Multilingual: %s",
+    RAC_LOG_INFO("STT.WhisperCpp","Whisper model loaded successfully. Multilingual: %s",
          whisper_is_multilingual(ctx_) ? "yes" : "no");
 
     return true;
@@ -199,7 +195,7 @@ bool WhisperCppSTT::unload_model() {
     model_loaded_ = false;
     model_path_.clear();
 
-    LOGI("Whisper model unloaded");
+    RAC_LOG_INFO("STT.WhisperCpp","Whisper model unloaded");
     return true;
 }
 
@@ -214,7 +210,7 @@ STTResult WhisperCppSTT::transcribe(const STTRequest& request) {
     result.is_final = true;
 
     if (!model_loaded_ || !ctx_) {
-        LOGE("Model not loaded");
+        RAC_LOG_ERROR("STT.WhisperCpp","Model not loaded");
         return result;
     }
 
@@ -265,7 +261,7 @@ STTResult WhisperCppSTT::transcribe_internal(const std::vector<float>& audio,
     int ret = whisper_full(ctx_, wparams, audio.data(), static_cast<int>(audio.size()));
 
     if (ret != 0) {
-        LOGE("whisper_full failed with code: %d", ret);
+        RAC_LOG_ERROR("STT.WhisperCpp","whisper_full failed with code: %d", ret);
         return result;
     }
 
@@ -332,7 +328,7 @@ STTResult WhisperCppSTT::transcribe_internal(const std::vector<float>& audio,
         result.confidence = total_conf / static_cast<float>(result.segments.size());
     }
 
-    LOGI("Transcription complete: %d segments, %.0fms inference, lang=%s", n_segments,
+    RAC_LOG_INFO("STT.WhisperCpp","Transcription complete: %d segments, %.0fms inference, lang=%s", n_segments,
          result.inference_time_ms,
          result.detected_language.empty() ? "unknown" : result.detected_language.c_str());
 
@@ -353,7 +349,7 @@ std::string WhisperCppSTT::create_stream(const nlohmann::json& config) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!model_loaded_ || !ctx_) {
-        LOGE("Cannot create stream: model not loaded");
+        RAC_LOG_ERROR("STT.WhisperCpp","Cannot create stream: model not loaded");
         return "";
     }
 
@@ -363,7 +359,7 @@ std::string WhisperCppSTT::create_stream(const nlohmann::json& config) {
     state->state = whisper_init_state(ctx_);
 
     if (!state->state) {
-        LOGE("Failed to create whisper state for stream");
+        RAC_LOG_ERROR("STT.WhisperCpp","Failed to create whisper state for stream");
         return "";
     }
 
@@ -377,7 +373,7 @@ std::string WhisperCppSTT::create_stream(const nlohmann::json& config) {
 
     streams_[stream_id] = std::move(state);
 
-    LOGI("Created stream: %s", stream_id.c_str());
+    RAC_LOG_INFO("STT.WhisperCpp","Created stream: %s", stream_id.c_str());
     return stream_id;
 }
 
@@ -387,7 +383,7 @@ bool WhisperCppSTT::feed_audio(const std::string& stream_id, const std::vector<f
 
     auto it = streams_.find(stream_id);
     if (it == streams_.end()) {
-        LOGE("Stream not found: %s", stream_id.c_str());
+        RAC_LOG_ERROR("STT.WhisperCpp","Stream not found: %s", stream_id.c_str());
         return false;
     }
 
@@ -422,7 +418,7 @@ STTResult WhisperCppSTT::decode(const std::string& stream_id) {
 
     auto it = streams_.find(stream_id);
     if (it == streams_.end()) {
-        LOGE("Stream not found: %s", stream_id.c_str());
+        RAC_LOG_ERROR("STT.WhisperCpp","Stream not found: %s", stream_id.c_str());
         return result;
     }
 
@@ -450,7 +446,7 @@ STTResult WhisperCppSTT::decode(const std::string& stream_id) {
                                       static_cast<int>(stream_state->audio_buffer.size()));
 
     if (ret != 0) {
-        LOGE("whisper_full_with_state failed: %d", ret);
+        RAC_LOG_ERROR("STT.WhisperCpp","whisper_full_with_state failed: %d", ret);
         return result;
     }
 
@@ -504,7 +500,7 @@ void WhisperCppSTT::input_finished(const std::string& stream_id) {
     auto it = streams_.find(stream_id);
     if (it != streams_.end()) {
         it->second->input_finished = true;
-        LOGI("Input finished for stream: %s", stream_id.c_str());
+        RAC_LOG_INFO("STT.WhisperCpp","Input finished for stream: %s", stream_id.c_str());
     }
 }
 
@@ -515,7 +511,7 @@ void WhisperCppSTT::reset_stream(const std::string& stream_id) {
     if (it != streams_.end()) {
         it->second->audio_buffer.clear();
         it->second->input_finished = false;
-        LOGI("Reset stream: %s", stream_id.c_str());
+        RAC_LOG_INFO("STT.WhisperCpp","Reset stream: %s", stream_id.c_str());
     }
 }
 
@@ -528,13 +524,13 @@ void WhisperCppSTT::destroy_stream(const std::string& stream_id) {
             whisper_free_state(it->second->state);
         }
         streams_.erase(it);
-        LOGI("Destroyed stream: %s", stream_id.c_str());
+        RAC_LOG_INFO("STT.WhisperCpp","Destroyed stream: %s", stream_id.c_str());
     }
 }
 
 void WhisperCppSTT::cancel() {
     cancel_requested_.store(true);
-    LOGI("Cancellation requested");
+    RAC_LOG_INFO("STT.WhisperCpp","Cancellation requested");
 }
 
 std::vector<std::string> WhisperCppSTT::get_supported_languages() const {
@@ -613,7 +609,7 @@ std::vector<float> WhisperCppSTT::resample_to_16khz(const std::vector<float>& sa
         pos += step;
     }
 
-    LOGI("Resampled audio from %d Hz to %d Hz (%zu -> %zu samples)", source_rate,
+    RAC_LOG_INFO("STT.WhisperCpp","Resampled audio from %d Hz to %d Hz (%zu -> %zu samples)", source_rate,
          WHISPER_SAMPLE_RATE, samples.size(), output_size);
 
     return output;

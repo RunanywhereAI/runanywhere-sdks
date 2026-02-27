@@ -8,6 +8,7 @@
 
 #include "rac/core/rac_logger.h"
 
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -22,12 +23,14 @@
 namespace {
 
 // Logger configuration
+// min_level is atomic so log-level checks can skip the mutex entirely.
+// stderr_fallback/stderr_always are also atomic for lock-free reads in the hot path.
 struct LoggerState {
-    rac_log_level_t min_level = RAC_LOG_INFO;
-    rac_bool_t stderr_fallback = RAC_TRUE;
-    rac_bool_t stderr_always = RAC_TRUE;  // Always log to stderr (safe during static init)
-    rac_bool_t initialized = RAC_FALSE;
-    std::mutex mutex;
+    std::atomic<rac_log_level_t> min_level{RAC_LOG_INFO};
+    std::atomic<rac_bool_t> stderr_fallback{RAC_TRUE};
+    std::atomic<rac_bool_t> stderr_always{RAC_TRUE};
+    std::atomic<rac_bool_t> initialized{RAC_FALSE};
+    std::mutex mutex;  // Only used for write operations (init/shutdown/set)
 };
 
 LoggerState& state() {
@@ -61,7 +64,14 @@ const char* filename_from_path(const char* path) {
         return nullptr;
     const char* last_slash = strrchr(path, '/');
     const char* last_backslash = strrchr(path, '\\');
-    const char* last_sep = last_slash > last_backslash ? last_slash : last_backslash;
+    // Pick the later separator. Avoid comparing two pointers from unrelated
+    // arrays (UB when one is nullptr): explicitly handle the null cases.
+    const char* last_sep;
+    if (last_slash && last_backslash) {
+        last_sep = last_slash > last_backslash ? last_slash : last_backslash;
+    } else {
+        last_sep = last_slash ? last_slash : last_backslash;
+    }
     return last_sep ? last_sep + 1 : path;
 }
 
@@ -134,10 +144,10 @@ void format_message_with_metadata(char* buffer, size_t buffer_size, const char* 
 // Fallback to stderr
 void log_to_stderr(rac_log_level_t level, const char* category, const char* message,
                    const rac_log_metadata_t* metadata) {
-    const char* level_str = level_to_string(level);
+    const char* const level_str = level_to_string(level);
 
     // Determine output stream
-    FILE* stream = (level >= RAC_LOG_ERROR) ? stderr : stdout;
+    FILE* const stream = (level >= RAC_LOG_ERROR) ? stderr : stdout;
 
     // Print base message
     fprintf(stream, "[RAC][%s][%s] %s", level_str, category, message);
@@ -177,35 +187,29 @@ void log_to_stderr(rac_log_level_t level, const char* category, const char* mess
 extern "C" {
 
 rac_result_t rac_logger_init(rac_log_level_t min_level) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    state().min_level = min_level;
-    state().initialized = RAC_TRUE;
+    state().min_level.store(min_level, std::memory_order_relaxed);
+    state().initialized.store(RAC_TRUE, std::memory_order_release);
     return RAC_SUCCESS;
 }
 
 void rac_logger_shutdown(void) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    state().initialized = RAC_FALSE;
+    state().initialized.store(RAC_FALSE, std::memory_order_release);
 }
 
 void rac_logger_set_min_level(rac_log_level_t level) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    state().min_level = level;
+    state().min_level.store(level, std::memory_order_relaxed);
 }
 
 rac_log_level_t rac_logger_get_min_level(void) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    return state().min_level;
+    return state().min_level.load(std::memory_order_relaxed);
 }
 
 void rac_logger_set_stderr_fallback(rac_bool_t enabled) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    state().stderr_fallback = enabled;
+    state().stderr_fallback.store(enabled, std::memory_order_relaxed);
 }
 
 void rac_logger_set_stderr_always(rac_bool_t enabled) {
-    std::lock_guard<std::mutex> lock(state().mutex);
-    state().stderr_always = enabled;
+    state().stderr_always.store(enabled, std::memory_order_relaxed);
 }
 
 void rac_logger_log(rac_log_level_t level, const char* category, const char* message,
@@ -215,18 +219,12 @@ void rac_logger_log(rac_log_level_t level, const char* category, const char* mes
     if (!category)
         category = "RAC";
 
-    // Get state configuration (with lock)
-    rac_log_level_t min_level;
-    rac_bool_t stderr_always;
-    rac_bool_t stderr_fallback;
-    {
-        std::lock_guard<std::mutex> lock(state().mutex);
-        min_level = state().min_level;
-        stderr_always = state().stderr_always;
-        stderr_fallback = state().stderr_fallback;
-    }
+    // Atomic reads — no mutex needed for the hot-path level check
+    const rac_log_level_t min_level = state().min_level.load(std::memory_order_relaxed);
+    const rac_bool_t stderr_always = state().stderr_always.load(std::memory_order_relaxed);
+    const rac_bool_t stderr_fallback = state().stderr_fallback.load(std::memory_order_relaxed);
 
-    // Check min level
+    // Check min level (early out before any formatting work)
     if (level < min_level)
         return;
 
@@ -254,6 +252,10 @@ void rac_logger_logf(rac_log_level_t level, const char* category,
     if (!format)
         return;
 
+    // Early level check: skip vsnprintf entirely if this message will be filtered
+    if (level < state().min_level.load(std::memory_order_relaxed))
+        return;
+
     va_list args;
     va_start(args, format);
     rac_logger_logv(level, category, metadata, format, args);
@@ -265,7 +267,11 @@ void rac_logger_logv(rac_log_level_t level, const char* category,
     if (!format)
         return;
 
-    // Format the message
+    // Early level check: skip vsnprintf entirely if this message will be filtered
+    if (level < state().min_level.load(std::memory_order_relaxed))
+        return;
+
+    // Format the message (only reached when level passes)
     char buffer[2048];
     vsnprintf(buffer, sizeof(buffer), format, args);
 

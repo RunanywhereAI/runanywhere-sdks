@@ -10,6 +10,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
@@ -61,36 +62,19 @@ int64_t get_current_timestamp_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
 }
 
-// Thread-safe seeding flag
-std::once_flag rand_seed_flag;
-
-// Ensure random number generator is seeded exactly once (thread-safe)
-void ensure_rand_seeded() {
-    std::call_once(rand_seed_flag, []() {
-        // Seed with combination of time and memory address for better entropy
-        auto now = std::chrono::high_resolution_clock::now();
-        auto nanos =
-            std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-        unsigned int seed =
-            static_cast<unsigned int>(nanos ^ reinterpret_cast<uintptr_t>(&rand_seed_flag));
-        srand(seed);
-    });
-}
-
-// Generate UUID
+// Generate UUID using thread-safe RNG
 std::string generate_uuid() {
-    // Ensure random number generator is seeded
-    ensure_rand_seeded();
+    static thread_local std::mt19937 gen(std::random_device{}());
+    static thread_local std::uniform_int_distribution<> dis(0, 15);
 
-    // Simple UUID generation (not RFC4122 compliant, but sufficient for event IDs)
     static const char hex[] = "0123456789abcdef";
     std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
 
     for (char& c : uuid) {
         if (c == 'x') {
-            c = hex[rand() % 16];
+            c = hex[dis(gen)];
         } else if (c == 'y') {
-            c = hex[(rand() % 4) + 8];  // 8, 9, a, or b
+            c = hex[(dis(gen) % 4) + 8];  // 8, 9, a, or b
         }
     }
 

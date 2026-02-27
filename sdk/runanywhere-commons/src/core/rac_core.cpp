@@ -194,6 +194,10 @@ rac_result_t rac_http_download(const char* url, const char* destination_path,
                                rac_http_progress_callback_fn progress_callback,
                                rac_http_complete_callback_fn complete_callback,
                                void* callback_user_data, char** out_task_id) {
+    if (url == nullptr || destination_path == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
     if (s_platform_adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -208,6 +212,10 @@ rac_result_t rac_http_download(const char* url, const char* destination_path,
 }
 
 rac_result_t rac_http_download_cancel(const char* task_id) {
+    if (task_id == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
     if (s_platform_adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -226,6 +234,10 @@ rac_result_t rac_http_download_cancel(const char* task_id) {
 rac_result_t rac_extract_archive(const char* archive_path, const char* destination_dir,
                                  rac_extract_progress_callback_fn progress_callback,
                                  void* callback_user_data) {
+    if (archive_path == nullptr || destination_dir == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
     if (s_platform_adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }

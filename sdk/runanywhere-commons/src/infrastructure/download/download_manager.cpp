@@ -16,6 +16,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -120,7 +121,10 @@ rac_result_t rac_download_manager_create(const rac_download_config_t* config,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_download_manager* mgr = new rac_download_manager();
+    rac_download_manager* mgr = new (std::nothrow) rac_download_manager();
+    if (!mgr) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     // Initialize config
     if (config) {

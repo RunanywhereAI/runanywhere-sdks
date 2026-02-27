@@ -19,8 +19,13 @@
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <string>
 #include <nlohmann/json.hpp>
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
@@ -50,28 +55,12 @@
 //   - backends/llamacpp/src/jni/rac_backend_llamacpp_jni.cpp
 //   - backends/onnx/src/jni/rac_backend_onnx_jni.cpp
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#define TAG "RACCommonsJNI"
-#define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
-#define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-#define LOGw(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
-#define LOGd(...) __android_log_print(ANDROID_LOG_DEBUG, TAG, __VA_ARGS__)
-#else
-#include <cstdio>
-#define LOGi(...)                           \
-    fprintf(stdout, "[INFO] " __VA_ARGS__); \
-    fprintf(stdout, "\n")
-#define LOGe(...)                            \
-    fprintf(stderr, "[ERROR] " __VA_ARGS__); \
-    fprintf(stderr, "\n")
-#define LOGw(...)                           \
-    fprintf(stdout, "[WARN] " __VA_ARGS__); \
-    fprintf(stdout, "\n")
-#define LOGd(...)                            \
-    fprintf(stdout, "[DEBUG] " __VA_ARGS__); \
-    fprintf(stdout, "\n")
-#endif
+// Route JNI logging through unified RAC_LOG_* system
+static const char* JNI_LOG_TAG = "JNI.Commons";
+#define LOGi(...) RAC_LOG_INFO(JNI_LOG_TAG, __VA_ARGS__)
+#define LOGe(...) RAC_LOG_ERROR(JNI_LOG_TAG, __VA_ARGS__)
+#define LOGw(...) RAC_LOG_WARNING(JNI_LOG_TAG, __VA_ARGS__)
+#define LOGd(...) RAC_LOG_DEBUG(JNI_LOG_TAG, __VA_ARGS__)
 
 // =============================================================================
 // Global State for Platform Adapter JNI Callbacks
@@ -139,6 +128,8 @@ static std::string getCString(JNIEnv* env, jstring str) {
     if (str == nullptr)
         return "";
     const char* chars = env->GetStringUTFChars(str, nullptr);
+    if (chars == nullptr)
+        return "";
     std::string result(chars);
     env->ReleaseStringUTFChars(str, chars);
     return result;
@@ -162,8 +153,14 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
                              void* user_data) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
-        // Fallback to native logging
-        LOGd("[%s] %s", tag ? tag : "RAC", message ? message : "");
+        // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
+        // since this function IS the platform adapter's log callback)
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_DEBUG, "RACCommonsJNI", "[%s] %s",
+                            tag ? tag : "RAC", message ? message : "");
+#else
+        fprintf(stdout, "[DEBUG] [%s] %s\n", tag ? tag : "RAC", message ? message : "");
+#endif
         return;
     }
 
@@ -208,8 +205,13 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
     }
 
     jsize len = env->GetArrayLength(result);
-    *out_size = static_cast<size_t>(len);
     *out_data = malloc(len);
+    if (*out_data == nullptr) {
+        *out_size = 0;
+        env->DeleteLocalRef(result);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    *out_size = static_cast<size_t>(len);
     env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
 
     env->DeleteLocalRef(result);
@@ -266,10 +268,18 @@ static rac_result_t jni_secure_get_callback(const char* key, char** out_value, v
     }
 
     const char* chars = env->GetStringUTFChars(result, nullptr);
+    if (!chars) {
+        env->DeleteLocalRef(result);
+        *out_value = nullptr;
+        return RAC_ERROR_INTERNAL;
+    }
     *out_value = strdup(chars);
     env->ReleaseStringUTFChars(result, chars);
     env->DeleteLocalRef(result);
 
+    if (!*out_value) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     return RAC_SUCCESS;
 }
 
@@ -605,6 +615,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     }
 
     LOGw("racLlmComponentGenerate: result.text is null");
+    rac_llm_result_free(&result);
     return env->NewStringUTF("{\"text\":\"\",\"completion_tokens\":0}");
 }
 
@@ -1237,6 +1248,19 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegistryRegister
     entry.description = desc_str ? strdup(desc_str) : nullptr;
     entry.download_url = url_str ? strdup(url_str) : nullptr;
     entry.filename = file_str ? strdup(file_str) : nullptr;
+
+    // Check mandatory field allocation
+    if (id_str && !entry.id) {
+        free(entry.name); free(entry.description);
+        free(entry.download_url); free(entry.filename);
+        if (id_str) env->ReleaseStringUTFChars(id, id_str);
+        if (name_str) env->ReleaseStringUTFChars(name, name_str);
+        if (desc_str) env->ReleaseStringUTFChars(description, desc_str);
+        if (url_str) env->ReleaseStringUTFChars(downloadUrl, url_str);
+        if (file_str) env->ReleaseStringUTFChars(filename, file_str);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
     entry.file_size = fileSize;
     entry.default_scale = defaultScale;
 
@@ -1449,6 +1473,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
 
     if (status != RAC_SUCCESS) {
         LOGe("STT transcribe failed with status: %d", status);
+        rac_stt_result_free(&result);
         return nullptr;
     }
 
@@ -1604,6 +1629,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
                                                        textStr.c_str(), &options, &result);
 
     if (status != RAC_SUCCESS || result.audio_data == nullptr) {
+        rac_tts_result_free(&result);
         return nullptr;
     }
 
@@ -1884,15 +1910,19 @@ static rac_model_info_t* javaModelInfoToC(JNIEnv* env, jobject modelInfo) {
     jstring jId = (jstring)env->GetObjectField(modelInfo, idField);
     if (jId) {
         const char* str = env->GetStringUTFChars(jId, nullptr);
-        model->id = strdup(str);
-        env->ReleaseStringUTFChars(jId, str);
+        if (str) {
+            model->id = strdup(str);
+            env->ReleaseStringUTFChars(jId, str);
+        }
     }
 
     jstring jName = (jstring)env->GetObjectField(modelInfo, nameField);
     if (jName) {
         const char* str = env->GetStringUTFChars(jName, nullptr);
-        model->name = strdup(str);
-        env->ReleaseStringUTFChars(jName, str);
+        if (str) {
+            model->name = strdup(str);
+            env->ReleaseStringUTFChars(jName, str);
+        }
     }
 
     model->category = static_cast<rac_model_category_t>(env->GetIntField(modelInfo, categoryField));
@@ -1903,15 +1933,19 @@ static rac_model_info_t* javaModelInfoToC(JNIEnv* env, jobject modelInfo) {
     jstring jDownloadUrl = (jstring)env->GetObjectField(modelInfo, downloadUrlField);
     if (jDownloadUrl) {
         const char* str = env->GetStringUTFChars(jDownloadUrl, nullptr);
-        model->download_url = strdup(str);
-        env->ReleaseStringUTFChars(jDownloadUrl, str);
+        if (str) {
+            model->download_url = strdup(str);
+            env->ReleaseStringUTFChars(jDownloadUrl, str);
+        }
     }
 
     jstring jLocalPath = (jstring)env->GetObjectField(modelInfo, localPathField);
     if (jLocalPath) {
         const char* str = env->GetStringUTFChars(jLocalPath, nullptr);
-        model->local_path = strdup(str);
-        env->ReleaseStringUTFChars(jLocalPath, str);
+        if (str) {
+            model->local_path = strdup(str);
+            env->ReleaseStringUTFChars(jLocalPath, str);
+        }
     }
 
     model->download_size = env->GetLongField(modelInfo, downloadSizeField);
@@ -1922,8 +1956,16 @@ static rac_model_info_t* javaModelInfoToC(JNIEnv* env, jobject modelInfo) {
     jstring jDesc = (jstring)env->GetObjectField(modelInfo, descriptionField);
     if (jDesc) {
         const char* str = env->GetStringUTFChars(jDesc, nullptr);
-        model->description = strdup(str);
-        env->ReleaseStringUTFChars(jDesc, str);
+        if (str) {
+            model->description = strdup(str);
+            env->ReleaseStringUTFChars(jDesc, str);
+        }
+    }
+
+    // Verify mandatory field allocation (id is required for all model operations)
+    if (jId && !model->id) {
+        rac_model_info_free(model);
+        return nullptr;
     }
 
     return model;
@@ -2022,6 +2064,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistrySave(
         env->ReleaseStringUTFChars(localPath, path_str);
     if (desc_str)
         env->ReleaseStringUTFChars(description, desc_str);
+
+    // Check mandatory field allocation
+    if ((id_str && !model->id) || (name_str && !model->name)) {
+        LOGe("OOM: failed to allocate mandatory model fields");
+        rac_model_info_free(model);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     LOGi("Saving model to C++ registry: %s (framework=%d)", model->id, framework);
 
@@ -2256,7 +2305,12 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
                 out_response->result = RAC_SUCCESS;
                 out_response->status_code = 200;
                 out_response->response_body = strdup(response_str);
-                out_response->response_length = strlen(response_str);
+                if (!out_response->response_body) {
+                    out_response->result = RAC_ERROR_OUT_OF_MEMORY;
+                    result = RAC_ERROR_OUT_OF_MEMORY;
+                } else {
+                    out_response->response_length = strlen(response_str);
+                }
             }
         }
         env->ReleaseStringUTFChars(jResponse, response_str);
@@ -2681,6 +2735,10 @@ static const char* jni_device_get_id(void* user_data) {
 
     if (jResult) {
         const char* str = env->GetStringUTFChars(jResult, nullptr);
+        if (str == nullptr) {
+            env->DeleteLocalRef(jResult);
+            return "";
+        }
 
         // Lock mutex to protect g_cached_device_id from concurrent access
         std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
@@ -3707,7 +3765,10 @@ static void fillVlmImage(rac_vlm_image_t& image,
         case RAC_VLM_IMAGE_FORMAT_RGB_PIXELS:
             if (imageData != nullptr) {
                 jsize len = env->GetArrayLength(imageData);
-                auto* buf = new uint8_t[len];
+                auto* buf = new (std::nothrow) uint8_t[len];
+                if (!buf) {
+                    return;
+                }
                 env->GetByteArrayRegion(imageData, 0, len, reinterpret_cast<jbyte*>(buf));
                 image.pixel_data = buf;
                 image.data_size = static_cast<size_t>(len);
@@ -3875,6 +3936,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentProcess(
 
     if (status != RAC_SUCCESS) {
         LOGe("racVlmComponentProcess failed with status=%d", status);
+        rac_vlm_result_free(&result);
         return nullptr;
     }
 

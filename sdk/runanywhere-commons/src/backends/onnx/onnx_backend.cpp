@@ -1094,11 +1094,13 @@ bool ONNXVAD::unload_model() {
 }
 
 bool ONNXVAD::configure_vad(const VADConfig& config) {
+    std::lock_guard<std::mutex> lock(mutex_);
     config_ = config;
     return true;
 }
 
 VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_rate) {
+    std::lock_guard<std::mutex> lock(mutex_);
     VADResult result;
 
 #if SHERPA_ONNX_AVAILABLE
@@ -1106,18 +1108,24 @@ VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_r
         return result;
     }
 
-    const int32_t window_size = 512;  // Silero native window size
+    static constexpr int32_t SILERO_WINDOW_SIZE = 512;
 
     // Append incoming audio to the pending buffer.
-    // Audio capture may deliver chunks smaller than window_size (e.g. 256 samples),
+    // Audio capture may deliver chunks smaller than SILERO_WINDOW_SIZE (e.g. 256 samples),
     // but Silero VAD requires exactly 512 samples per call.
     pending_samples_.insert(pending_samples_.end(), audio_samples.begin(), audio_samples.end());
 
-    // Feed complete window_size chunks to Silero VAD
-    while (pending_samples_.size() >= static_cast<size_t>(window_size)) {
+    // Feed complete SILERO_WINDOW_SIZE chunks to Silero VAD.
+    // Use offset tracking instead of repeated front-erase (O(n) per erase).
+    size_t consumed = 0;
+    while (consumed + SILERO_WINDOW_SIZE <= pending_samples_.size()) {
         SherpaOnnxVoiceActivityDetectorAcceptWaveform(
-            sherpa_vad_, pending_samples_.data(), window_size);
-        pending_samples_.erase(pending_samples_.begin(), pending_samples_.begin() + window_size);
+            sherpa_vad_, pending_samples_.data() + consumed, SILERO_WINDOW_SIZE);
+        consumed += SILERO_WINDOW_SIZE;
+    }
+    if (consumed > 0) {
+        pending_samples_.erase(pending_samples_.begin(),
+                               pending_samples_.begin() + static_cast<ptrdiff_t>(consumed));
     }
 
     // Check if speech is currently detected in the latest frame
@@ -1154,6 +1162,7 @@ VADResult ONNXVAD::feed_audio(const std::string& stream_id, const std::vector<fl
 void ONNXVAD::destroy_stream(const std::string& stream_id) {}
 
 void ONNXVAD::reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
 #if SHERPA_ONNX_AVAILABLE
     if (sherpa_vad_) {
         SherpaOnnxVoiceActivityDetectorReset(sherpa_vad_);
@@ -1163,6 +1172,7 @@ void ONNXVAD::reset() {
 }
 
 VADConfig ONNXVAD::get_vad_config() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return config_;
 }
 

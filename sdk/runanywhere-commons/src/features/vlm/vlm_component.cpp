@@ -11,6 +11,7 @@
 #include <cstring>
 #include <dirent.h>
 #include <mutex>
+#include <random>
 #include <string>
 #include <sys/stat.h>
 
@@ -74,8 +75,8 @@ struct rac_vlm_component {
 static int32_t estimate_tokens(const char* text) {
     if (!text)
         return 1;
-    size_t len = strlen(text);
-    int32_t tokens = static_cast<int32_t>((len + 3) / 4);
+    const size_t len = strlen(text);
+    const int32_t tokens = static_cast<int32_t>((len + 3) / 4);
     return tokens > 0 ? tokens : 1;
 }
 
@@ -83,11 +84,10 @@ static int32_t estimate_tokens(const char* text) {
  * Generate a unique ID for generation tracking.
  */
 static std::string generate_unique_id() {
-    auto now = std::chrono::high_resolution_clock::now();
-    auto epoch = now.time_since_epoch();
-    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch).count();
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "vlm_gen_%lld", static_cast<long long>(ns));
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<uint32_t> dis;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "vlm_%08x%08x", dis(gen), dis(gen));
     return std::string(buffer);
 }
 
@@ -111,21 +111,22 @@ static const char* vlm_strip_special_tokens(const char* token, char* buf, size_t
 
     size_t out = 0;
     size_t i = 0;
-    size_t len = strlen(token);
 
-    while (i < len && out < buf_size - 1) {
-        if (token[i] == '<' && i + 1 < len && token[i + 1] == '|') {
+    // Use null-terminator checks instead of strlen() to avoid the upfront O(n) scan.
+    // Tokens are typically short (1-4 chars), but this avoids redundant work.
+    while (token[i] != '\0' && out < buf_size - 1) {
+        if (token[i] == '<' && token[i + 1] == '|') {
             // Scan ahead for closing |>
             size_t end = i + 2;
-            while (end < len) {
-                if (token[end] == '|' && end + 1 < len && token[end + 1] == '>') {
+            while (token[end] != '\0') {
+                if (token[end] == '|' && token[end + 1] == '>') {
                     // Found <|...|> — skip the entire special token
                     i = end + 2;
                     break;
                 }
                 end++;
             }
-            if (end >= len) {
+            if (token[end] == '\0') {
                 // No closing |> found — copy the '<' literally
                 buf[out++] = token[i++];
             }
@@ -169,8 +170,8 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
 
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
-        const char* name = entry->d_name;
-        size_t name_len = strlen(name);
+        const char* const name = entry->d_name;
+        const size_t name_len = strlen(name);
 
         // Must end with .gguf (case-insensitive)
         if (name_len < 5) continue;
@@ -655,6 +656,11 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     ctx.prompt_tokens = estimate_tokens(prompt);
     ctx.token_count = 0;
 
+    // Pre-allocate string capacity to avoid repeated reallocations during streaming.
+    // Typical VLM responses are a few hundred tokens (~2KB text).
+    ctx.full_text.reserve(2048);
+    ctx.cleaned_text.reserve(2048);
+
     // Perform streaming generation
     result = rac_vlm_process_stream(service, image, prompt, effective_options,
                                     vlm_stream_token_callback, &ctx);
@@ -679,6 +685,13 @@ extern "C" rac_result_t rac_vlm_component_process_stream(
     // Fall back to full_text if no cleaned tokens were produced.
     const std::string& result_text = ctx.cleaned_text.empty() ? ctx.full_text : ctx.cleaned_text;
     final_result.text = strdup(result_text.c_str());
+    if (!final_result.text) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate result text");
+        if (error_callback) {
+            error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     final_result.prompt_tokens = ctx.prompt_tokens;
     final_result.completion_tokens = estimate_tokens(result_text.c_str());
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
@@ -714,8 +727,11 @@ extern "C" rac_result_t rac_vlm_component_cancel(rac_handle_t handle) {
         return RAC_ERROR_INVALID_HANDLE;
 
     auto* component = reinterpret_cast<rac_vlm_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Do NOT acquire component->mtx here. process_stream holds the mutex for
+    // the entire streaming duration, so locking here would deadlock until
+    // generation finishes — defeating the purpose of cancel.
+    // rac_vlm_cancel only sets an atomic bool, so it is safe without the lock.
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (service) {
         rac_vlm_cancel(service);

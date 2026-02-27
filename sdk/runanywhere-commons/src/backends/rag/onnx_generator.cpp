@@ -18,9 +18,7 @@
 #include <vector>
 #include <onnxruntime_c_api.h>
 
-#define LOG_TAG "RAG.ONNXGenerator"
-#define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
-#define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+static const char* LOG_TAG = "RAG.ONNXGenerator";
 
 namespace runanywhere {
 namespace rag {
@@ -58,7 +56,7 @@ public:
         // Try to load from JSON first
         std::ifstream file(tokenizer_path);
         if (!file.is_open()) {
-            LOGE("Failed to open tokenizer file: %s", tokenizer_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to open tokenizer file: %s", tokenizer_path.c_str());
             return false;
         }
         
@@ -72,11 +70,11 @@ public:
                     vocab_[item.key()] = item.value().get<int64_t>();
                     reverse_vocab_[item.value().get<int64_t>()] = item.key();
                 }
-                LOGI("Loaded vocabulary: %zu tokens", vocab_.size());
+                RAC_LOG_INFO(LOG_TAG,"Loaded vocabulary: %zu tokens", vocab_.size());
                 return true;
             }
         } catch (const std::exception& e) {
-            LOGE("Failed to parse tokenizer JSON: %s", e.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to parse tokenizer JSON: %s", e.what());
         }
         
         return false;
@@ -191,7 +189,7 @@ public:
                     tokenizer_path = config["tokenizer_path"].get<std::string>();
                 }
             } catch (const std::exception& e) {
-                LOGE("Failed to parse config JSON: %s", e.what());
+                RAC_LOG_ERROR(LOG_TAG,"Failed to parse config JSON: %s", e.what());
                 config = nlohmann::json::object();
             }
         }
@@ -202,17 +200,17 @@ public:
         // Load vocabulary if tokenizer path provided
         if (!tokenizer_path.empty()) {
             if (!tokenizer->load_vocab(tokenizer_path)) {
-                LOGE("Failed to load tokenizer from %s", tokenizer_path.c_str());
-                LOGI("Using default word-level tokenizer");
+                RAC_LOG_ERROR(LOG_TAG,"Failed to load tokenizer from %s", tokenizer_path.c_str());
+                RAC_LOG_INFO(LOG_TAG,"Using default word-level tokenizer");
             }
         } else {
-            LOGI("No tokenizer path provided, using default word-level tokenizer");
+            RAC_LOG_INFO(LOG_TAG,"No tokenizer path provided, using default word-level tokenizer");
         }
         
         // Initialize ONNX Runtime directly
         cached_api = OrtGetApiBase()->GetApi(ORT_API_VERSION);
         if (!cached_api) {
-            LOGE("Failed to get ONNX Runtime API");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to get ONNX Runtime API");
             return false;
         }
         
@@ -220,7 +218,7 @@ public:
         OrtStatusGuard status_guard(cached_api);
         status_guard.reset(cached_api->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAG_ONNX_Generator", &ort_env));
         if (status_guard.is_error() || !ort_env) {
-            LOGE("Failed to create ONNX Runtime environment: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create ONNX Runtime environment: %s", status_guard.error_message());
             return false;
         }
         
@@ -231,7 +229,7 @@ public:
         OrtSessionOptions* session_options = nullptr;
         status_guard.reset(cached_api->CreateSessionOptions(&session_options));
         if (status_guard.is_error()) {
-            LOGE("Failed to create session options: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create session options: %s", status_guard.error_message());
             return false;
         }
         
@@ -251,21 +249,21 @@ public:
         // Create memory info for CPU
         status_guard.reset(cached_api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info));
         if (status_guard.is_error()) {
-            LOGE("Failed to create memory info: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create memory info: %s", status_guard.error_message());
             return false;
         }
         
         // Load model and create session
-        LOGI("Loading ONNX model: %s", model_path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"Loading ONNX model: %s", model_path.c_str());
         status_guard.reset(cached_api->CreateSession(ort_env, model_path.c_str(), session_options, &session));
         if (status_guard.is_error()) {
-            LOGE("Failed to create ONNX session: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create ONNX session: %s", status_guard.error_message());
             return false;
         }
         
-        LOGI("ONNX generator initialized successfully");
-        LOGI("  Model: %s", model_path.c_str());
-        LOGI("  Max context: %d tokens", max_context_length);
+        RAC_LOG_INFO(LOG_TAG,"ONNX generator initialized successfully");
+        RAC_LOG_INFO(LOG_TAG,"  Model: %s", model_path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"  Max context: %d tokens", max_context_length);
         
         ready = true;
         return true;
@@ -378,7 +376,7 @@ public:
         result.success = false;
         
         if (!ready || !cached_api || !session) {
-            LOGE("Generator not ready");
+            RAC_LOG_ERROR(LOG_TAG,"Generator not ready");
             result.text = "";
             result.stop_reason = "error";
             return result;
@@ -387,11 +385,11 @@ public:
         try {
             auto start_time = std::chrono::high_resolution_clock::now();
             
-            LOGI("Generating text with ONNX Runtime (KV-cache enabled):");
-            LOGI("  Prompt length: %zu chars", prompt.length());
-            LOGI("  Max tokens: %d", options.max_tokens);
-            LOGI("  Temperature: %.2f", options.temperature);
-            LOGI("  Top-p: %.2f", options.top_p);
+            RAC_LOG_INFO(LOG_TAG,"Generating text with ONNX Runtime (KV-cache enabled):");
+            RAC_LOG_INFO(LOG_TAG,"  Prompt length: %zu chars", prompt.length());
+            RAC_LOG_INFO(LOG_TAG,"  Max tokens: %d", options.max_tokens);
+            RAC_LOG_INFO(LOG_TAG,"  Temperature: %.2f", options.temperature);
+            RAC_LOG_INFO(LOG_TAG,"  Top-p: %.2f", options.top_p);
             
             // ========================================================================
             // STEP 1: Tokenization
@@ -404,7 +402,7 @@ public:
                 input_ids.push_back(SimpleTokenizer::BOS_TOKEN);
             }
             
-            LOGI("Tokenized to %zu tokens", input_ids.size());
+            RAC_LOG_INFO(LOG_TAG,"Tokenized to %zu tokens", input_ids.size());
             
             // ========================================================================
             // STEP 2: Initialize KV-cache state with pre-allocated capacity
@@ -462,14 +460,14 @@ public:
                     &input_ids_tensor
                 );
                 if (status != nullptr) {
-                    LOGE("Failed to create input_ids tensor: %s", cached_api->GetErrorMessage(status));
+                    RAC_LOG_ERROR(LOG_TAG,"Failed to create input_ids tensor: %s", cached_api->GetErrorMessage(status));
                     cached_api->ReleaseStatus(status);
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
                 }
                 if (input_ids_tensor == nullptr) {
-                    LOGE("input_ids_tensor is null after creation");
+                    RAC_LOG_ERROR(LOG_TAG,"input_ids_tensor is null after creation");
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
@@ -493,14 +491,14 @@ public:
                     &attention_mask_tensor
                 );
                 if (status != nullptr) {
-                    LOGE("Failed to create attention_mask tensor: %s", cached_api->GetErrorMessage(status));
+                    RAC_LOG_ERROR(LOG_TAG,"Failed to create attention_mask tensor: %s", cached_api->GetErrorMessage(status));
                     cached_api->ReleaseStatus(status);
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
                 }
                 if (attention_mask_tensor == nullptr) {
-                    LOGE("attention_mask_tensor is null after creation");
+                    RAC_LOG_ERROR(LOG_TAG,"attention_mask_tensor is null after creation");
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
@@ -526,14 +524,14 @@ public:
                     &position_ids_tensor
                 );
                 if (status != nullptr) {
-                    LOGE("Failed to create position_ids tensor: %s", cached_api->GetErrorMessage(status));
+                    RAC_LOG_ERROR(LOG_TAG,"Failed to create position_ids tensor: %s", cached_api->GetErrorMessage(status));
                     cached_api->ReleaseStatus(status);
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
                 }
                 if (position_ids_tensor == nullptr) {
-                    LOGE("position_ids_tensor is null after creation");
+                    RAC_LOG_ERROR(LOG_TAG,"position_ids_tensor is null after creation");
                     result.success = false;
                     result.stop_reason = "error";
                     return result;
@@ -564,7 +562,7 @@ public:
                             &past_key_tensor
                         );
                         if (status != nullptr) {
-                            LOGE("Failed to create empty past_key tensor: %s", cached_api->GetErrorMessage(status));
+                            RAC_LOG_ERROR(LOG_TAG,"Failed to create empty past_key tensor: %s", cached_api->GetErrorMessage(status));
                             cached_api->ReleaseStatus(status);
                             result.success = false;
                             result.stop_reason = "error";
@@ -581,7 +579,7 @@ public:
                             &past_key_tensor
                         );
                         if (status != nullptr) {
-                            LOGE("Failed to create past_key tensor: %s", cached_api->GetErrorMessage(status));
+                            RAC_LOG_ERROR(LOG_TAG,"Failed to create past_key tensor: %s", cached_api->GetErrorMessage(status));
                             cached_api->ReleaseStatus(status);
                             result.success = false;
                             result.stop_reason = "error";
@@ -589,7 +587,7 @@ public:
                         }
                     }
                     if (past_key_tensor == nullptr) {
-                        LOGE("past_key_tensor is null after creation");
+                        RAC_LOG_ERROR(LOG_TAG,"past_key_tensor is null after creation");
                         result.success = false;
                         result.stop_reason = "error";
                         return result;
@@ -612,7 +610,7 @@ public:
                             &past_value_tensor
                         );
                         if (status != nullptr) {
-                            LOGE("Failed to create empty past_value tensor: %s", cached_api->GetErrorMessage(status));
+                            RAC_LOG_ERROR(LOG_TAG,"Failed to create empty past_value tensor: %s", cached_api->GetErrorMessage(status));
                             cached_api->ReleaseStatus(status);
                             result.success = false;
                             result.stop_reason = "error";
@@ -629,7 +627,7 @@ public:
                             &past_value_tensor
                         );
                         if (status != nullptr) {
-                            LOGE("Failed to create past_value tensor: %s", cached_api->GetErrorMessage(status));
+                            RAC_LOG_ERROR(LOG_TAG,"Failed to create past_value tensor: %s", cached_api->GetErrorMessage(status));
                             cached_api->ReleaseStatus(status);
                             result.success = false;
                             result.stop_reason = "error";
@@ -637,7 +635,7 @@ public:
                         }
                     }
                     if (past_value_tensor == nullptr) {
-                        LOGE("past_value_tensor is null after creation");
+                        RAC_LOG_ERROR(LOG_TAG,"past_value_tensor is null after creation");
                         result.success = false;
                         result.stop_reason = "error";
                         return result;
@@ -678,7 +676,7 @@ public:
                 
                 if (status != nullptr || output_tensors[0] == nullptr) {
                     if (status) {
-                        LOGE("Inference failed: %s", cached_api->GetErrorMessage(status));
+                        RAC_LOG_ERROR(LOG_TAG,"Inference failed: %s", cached_api->GetErrorMessage(status));
                         cached_api->ReleaseStatus(status);
                     }
                     for (auto* tensor : output_tensors) {
@@ -692,7 +690,7 @@ public:
                 status = cached_api->GetTensorMutableData(output_tensors[0], (void**)&logits_data);
                 if (status != nullptr || logits_data == nullptr) {
                     if (status) {
-                        LOGE("Failed to get logits data: %s", cached_api->GetErrorMessage(status));
+                        RAC_LOG_ERROR(LOG_TAG,"Failed to get logits data: %s", cached_api->GetErrorMessage(status));
                         cached_api->ReleaseStatus(status);
                     }
                     for (auto* tensor : output_tensors) {
@@ -795,12 +793,12 @@ public:
                 tokens_per_sec = tokens_generated / (result.inference_time_ms / 1000.0);
             }
             
-            LOGI("Generated %d tokens in %.2f ms (%.1f tokens/sec)", 
+            RAC_LOG_INFO(LOG_TAG,"Generated %d tokens in %.2f ms (%.1f tokens/sec)", 
                  tokens_generated, result.inference_time_ms, tokens_per_sec);
             return result;
             
         } catch (const std::exception& e) {
-            LOGE("Generation failed: %s", e.what());
+            RAC_LOG_ERROR(LOG_TAG,"Generation failed: %s", e.what());
             result.text = "";
             result.stop_reason = "error";
             result.success = false;
