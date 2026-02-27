@@ -24,7 +24,7 @@ import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
 import type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
 
-export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './TTSTypes';
+export type { TTSVoiceConfig } from './TTSTypes';
 
 import { loadTTSHelpers } from '../Foundation/SherpaHelperLoader';
 import type { SherpaConfigHandle } from '../Foundation/SherpaHelperLoader';

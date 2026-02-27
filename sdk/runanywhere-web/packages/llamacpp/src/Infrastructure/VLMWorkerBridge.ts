@@ -49,6 +49,7 @@ export type VLMWorkerCommand =
       type: 'process'; id: number; payload: {
         rgbPixels: ArrayBuffer; width: number; height: number;
         prompt: string; maxTokens: number; temperature: number;
+        topP: number; systemPrompt?: string;
       };
     }
   | { type: 'cancel'; id: number }
@@ -90,11 +91,14 @@ export interface VLMLoadModelParams {
 }
 
 /**
- * Options for VLM image processing.
+ * Options for VLM image processing via the Worker bridge.
  */
 export interface VLMProcessOptions {
   maxTokens?: number;
   temperature?: number;
+  topP?: number;
+  /** System prompt prepended to the user prompt inside the Worker. */
+  systemPrompt?: string;
 }
 
 /**
@@ -285,6 +289,8 @@ export class VLMWorkerBridge {
           prompt,
           maxTokens: options.maxTokens ?? 200,
           temperature: options.temperature ?? 0.7,
+          topP: options.topP ?? 0.9,
+          systemPrompt: options.systemPrompt,
         },
         [buffer],
       );

@@ -246,10 +246,12 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
 
   // Dynamically import the Emscripten ES6 glue JS
   const { default: createModule } = await import(/* @vite-ignore */ wasmJsUrl);
+  const wasmBaseUrl = wasmJsUrl.substring(0, wasmJsUrl.lastIndexOf('/') + 1);
 
   wasmModule = await createModule({
     print: (text: string) => logInfo(text),
     printErr: (text: string) => logError(text),
+    locateFile: (path: string) => wasmBaseUrl + path,
   });
 
   const m = wasmModule;
@@ -562,6 +564,7 @@ async function processImage(
   width: number, height: number,
   prompt: string,
   maxTokens: number, temperature: number,
+  topP: number, systemPrompt?: string,
 ): Promise<VLMWorkerResult> {
   const m = wasmModule;
   const pixelArray = new Uint8Array(rgbPixels);
@@ -592,7 +595,13 @@ async function processImage(
   const vo = offsets!.vlmOptions;
   m.setValue(optPtr + vo.maxTokens, maxTokens, 'i32');
   m.setValue(optPtr + vo.temperature, temperature, 'float');
-  m.setValue(optPtr + vo.topP, 0.9, 'float');
+  m.setValue(optPtr + vo.topP, topP, 'float');
+
+  let systemPromptPtr = 0;
+  if (systemPrompt) {
+    systemPromptPtr = allocString(systemPrompt);
+    m.setValue(optPtr + vo.systemPrompt, systemPromptPtr, '*');
+  }
 
   const promptPtr = allocString(prompt);
 
@@ -629,6 +638,7 @@ async function processImage(
     m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);
     return result;
   } finally {
+    if (systemPromptPtr) m._free(systemPromptPtr);
     m._free(promptPtr);
     m._free(imagePtr);
     m._free(optPtr);
@@ -669,6 +679,7 @@ function handleMessage(e: MessageEvent<VLMWorkerCommand>): void {
         const result = await processImage(
           p.rgbPixels, p.width, p.height,
           p.prompt, p.maxTokens, p.temperature,
+          p.topP, p.systemPrompt,
         );
         self.postMessage({ id, type: 'result', payload: result } satisfies VLMWorkerResponse);
         break;

@@ -21,6 +21,7 @@
  */
 
 import { SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { SherpaONNXBridge } from './SherpaONNXBridge';
 import type { SherpaONNXModule } from './SherpaONNXBridge';
 
 const logger = new SDKLogger('SherpaHelperLoader');
@@ -92,7 +93,12 @@ async function doLoad<T>(
   filename: string,
   exportNames: readonly string[],
 ): Promise<T> {
-  const url = new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;
+  // Prefer the bridge's resolved base URL (auto-derived during WASM load)
+  // over import.meta.url which breaks when bundlers rewrite module paths.
+  const bridgeBase = SherpaONNXBridge.shared.helperBaseUrl;
+  const url = bridgeBase
+    ? `${bridgeBase}${filename}`
+    : new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;
   logger.info(`Loading sherpa helper: ${filename}`);
 
   const response = await fetch(url);
