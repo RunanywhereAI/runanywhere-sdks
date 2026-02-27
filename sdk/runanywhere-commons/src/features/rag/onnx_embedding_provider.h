@@ -37,6 +37,7 @@ public:
     ONNXEmbeddingProvider& operator=(ONNXEmbeddingProvider&&) noexcept;
 
     std::vector<float> embed(const std::string& text);
+    std::vector<std::vector<float>> embed_batch(const std::vector<std::string>& texts);
     size_t dimension() const noexcept;
     bool is_ready() const noexcept;
     const char* name() const noexcept;

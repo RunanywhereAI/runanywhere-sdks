@@ -23,6 +23,7 @@
 
 #include "vector_store_usearch.h"
 #include "rag_chunker.h"
+#include "bm25_index.h"
 
 namespace runanywhere {
 namespace rag {
@@ -32,8 +33,8 @@ struct RAGBackendConfig {
     size_t top_k = 10;
     float similarity_threshold = 0.15f;
     size_t max_context_tokens = 2048;
-    size_t chunk_size = 512;
-    size_t chunk_overlap = 50;
+    size_t chunk_size = 180;
+    size_t chunk_overlap = 30;
     std::string prompt_template = "Context:\n{context}\n\nQuestion: {query}\n\nAnswer:";
 };
 
@@ -45,9 +46,6 @@ struct RAGBackendConfig {
  */
 class __attribute__((visibility("default"))) RAGBackend {
 public:
-    static constexpr float kConfidenceThreshold = 0.8f;
-    static constexpr bool kKeepPartialContext = true;
-
     /**
      * @brief Construct RAG pipeline with service handles
      *
@@ -93,17 +91,24 @@ public:
 
 private:
     std::vector<float> embed_text(const std::string& text) const;
+    std::vector<std::vector<float>> embed_texts_batch(const std::vector<std::string>& texts) const;
 
     std::vector<SearchResult> search_with_embedding(
         const std::string& query_text,
         size_t top_k,
         size_t embedding_dimension,
-        float similarity_threshold,
-        const DocumentChunker* chunker
+        float similarity_threshold
+    ) const;
+
+    std::vector<SearchResult> fuse_results(
+        const std::vector<SearchResult>& dense_results,
+        const std::vector<std::pair<std::string, float>>& bm25_results,
+        size_t top_k
     ) const;
 
     RAGBackendConfig config_;
     std::unique_ptr<VectorStoreUSearch> vector_store_;
+    std::unique_ptr<BM25Index> bm25_index_;
     std::unique_ptr<DocumentChunker> chunker_;
 
     rac_handle_t llm_service_;

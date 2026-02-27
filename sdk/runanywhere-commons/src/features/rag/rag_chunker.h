@@ -28,8 +28,8 @@ struct TextChunk {
  * @brief Chunking configuration
  */
 struct ChunkerConfig {
-    size_t chunk_size = 512;      // Approximate tokens per chunk
-    size_t chunk_overlap = 50;     // Overlap tokens
+    size_t chunk_size = 180;      // Approximate tokens per chunk
+    size_t chunk_overlap = 30;     // Overlap tokens
     size_t chars_per_token = 4;    // Rough estimate for token counting
 };
 
@@ -67,10 +67,6 @@ private:
     ChunkerConfig config_;
 
     std::vector<size_t> find_sentence_boundaries(const std::string& text) const;
-    std::vector<TextChunk> split_by_boundaries(
-        const std::string& text,
-        const std::vector<size_t>& boundaries
-    ) const;
 };
 
 } // namespace rag

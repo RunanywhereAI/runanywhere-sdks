@@ -65,16 +65,18 @@ typedef struct rac_rag_pipeline_config {
     /** Number of top chunks to retrieve (default 10) */
     size_t top_k;
 
-    /** Minimum similarity threshold 0.0-1.0 (default 0.15) */
+    /**
+     * Minimum similarity threshold 0.0-1.0 (default 0.15).
+     */
     float similarity_threshold;
 
     /** Maximum tokens for context (default 2048) */
     size_t max_context_tokens;
 
-    /** Tokens per chunk when splitting documents (default 512) */
+    /** Tokens per chunk when splitting documents (default 180) */
     size_t chunk_size;
 
-    /** Overlap tokens between chunks (default 50) */
+    /** Overlap tokens between chunks (default 30) */
     size_t chunk_overlap;
 
     /** Prompt template with {context} and {query} placeholders (optional) */
@@ -85,13 +87,13 @@ typedef struct rac_rag_pipeline_config {
  * @brief Get default RAG pipeline configuration
  */
 static inline rac_rag_pipeline_config_t rac_rag_pipeline_config_default(void) {
-    rac_rag_pipeline_config_t cfg;
+    rac_rag_pipeline_config_t cfg = {0};
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
     cfg.similarity_threshold = 0.15f;
     cfg.max_context_tokens = 2048;
-    cfg.chunk_size = 512;
-    cfg.chunk_overlap = 50;
+    cfg.chunk_size = 180;
+    cfg.chunk_overlap = 30;
     cfg.prompt_template = NULL;
     return cfg;
 }
@@ -114,15 +116,15 @@ typedef struct rac_rag_config {
 } rac_rag_config_t;
 
 static inline rac_rag_config_t rac_rag_config_default(void) {
-    rac_rag_config_t cfg;
+    rac_rag_config_t cfg = {0};
     cfg.embedding_model_path = NULL;
     cfg.llm_model_path = NULL;
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
     cfg.similarity_threshold = 0.15f;
     cfg.max_context_tokens = 2048;
-    cfg.chunk_size = 512;
-    cfg.chunk_overlap = 50;
+    cfg.chunk_size = 180;
+    cfg.chunk_overlap = 30;
     cfg.prompt_template = NULL;
     cfg.embedding_config_json = NULL;
     cfg.llm_config_json = NULL;

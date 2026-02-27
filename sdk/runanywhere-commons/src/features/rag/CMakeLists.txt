@@ -57,6 +57,7 @@ set(RAG_PIPELINE_SOURCES
     rag_backend.cpp
     vector_store_usearch.cpp
     rag_chunker.cpp
+    bm25_index.cpp
     rac_rag_register.cpp
     rac_rag_pipeline.cpp
 )
@@ -73,6 +74,7 @@ set(RAG_PIPELINE_HEADERS
     rag_backend.h
     vector_store_usearch.h
     rag_chunker.h
+    bm25_index.h
 )
 
 if(RAC_BUILD_SHARED)

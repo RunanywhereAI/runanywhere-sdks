@@ -442,26 +442,6 @@ rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle, const char* te
     }
 }
 
-rac_result_t rac_llm_llamacpp_probe_confidence(rac_handle_t handle, const char* context,
-                                                const char* query, float* out_confidence) {
-    if (handle == nullptr || query == nullptr || out_confidence == nullptr) {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
-    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
-    if (!h->text_gen) {
-        return RAC_ERROR_INVALID_HANDLE;
-    }
-
-    try {
-        *out_confidence = h->text_gen->probe_confidence(context ? context : "", query);
-        return RAC_SUCCESS;
-    } catch (const std::exception& e) {
-        rac_error_set_details(e.what());
-        *out_confidence = 0.5f;
-        return RAC_ERROR_INFERENCE_FAILED;
-    }
-}
 
 rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const char* query,
                                                      const rac_llm_options_t* options,
@@ -475,7 +455,7 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-    TextGenerationRequest request;
+    runanywhere::TextGenerationRequest request;
     request.prompt = query;
     if (options != nullptr) {
         request.max_tokens = options->max_tokens;

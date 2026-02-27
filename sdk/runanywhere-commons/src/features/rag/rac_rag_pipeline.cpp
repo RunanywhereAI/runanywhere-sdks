@@ -10,6 +10,7 @@
 #include "rac/features/rag/rac_rag_pipeline.h"
 #include "rag_backend.h"
 
+#include <algorithm>
 #include <memory>
 #include <cstring>
 #include <chrono>
@@ -116,9 +117,10 @@ rac_result_t rac_rag_pipeline_create_standalone(
 
     *out_pipeline = nullptr;
 
+    rac_handle_t llm_handle = nullptr;
+
     try {
         // Create embeddings service via registry
-        rac_handle_t embed_handle = nullptr;
         rac_result_t result = rac_embeddings_create(config->embedding_model_path, &embed_handle);
         if (result != RAC_SUCCESS || !embed_handle) {
             LOGE("Failed to create embeddings service: %d", result);
@@ -126,7 +128,6 @@ rac_result_t rac_rag_pipeline_create_standalone(
         }
 
         // Create LLM service via registry (optional — can be null for embed-only pipelines)
-        rac_handle_t llm_handle = nullptr;
         if (config->llm_model_path) {
             result = rac_llm_create(config->llm_model_path, &llm_handle);
             if (result != RAC_SUCCESS || !llm_handle) {
@@ -154,6 +155,7 @@ rac_result_t rac_rag_pipeline_create_standalone(
 
         if (!pipeline->backend->is_initialized()) {
             LOGE("RAG pipeline failed to initialize");
+            // pipeline destructor will clean up services via RAGBackend (owns_services=true)
             return RAC_ERROR_INITIALIZATION_FAILED;
         }
 
@@ -163,6 +165,8 @@ rac_result_t rac_rag_pipeline_create_standalone(
 
     } catch (const std::exception& e) {
         LOGE("Exception creating standalone pipeline: %s", e.what());
+        if (llm_handle) rac_llm_destroy(llm_handle);
+        if (embed_handle) rac_embeddings_destroy(embed_handle);
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 }
@@ -198,10 +202,20 @@ rac_result_t rac_rag_add_documents_batch(
 ) {
     if (!pipeline || !documents) return RAC_ERROR_NULL_POINTER;
 
+    size_t failed_count = 0;
     for (size_t i = 0; i < count; ++i) {
         const char* metadata = metadata_array ? metadata_array[i] : nullptr;
-        rac_rag_add_document(pipeline, documents[i], metadata);
+        rac_result_t result = rac_rag_add_document(pipeline, documents[i], metadata);
+        if (result != RAC_SUCCESS) {
+            LOGE("Failed to add document %zu of %zu: %d", i, count, result);
+            ++failed_count;
+        }
     }
+
+    if (failed_count == count && count > 0) {
+        return RAC_ERROR_PROCESSING_FAILED;
+    }
+
     return RAC_SUCCESS;
 }
 
@@ -220,8 +234,9 @@ rac_result_t rac_rag_query(
     try {
         rac_llm_options_t opts = {};
         opts.max_tokens = query->max_tokens > 0 ? query->max_tokens : 512;
-        opts.temperature = query->temperature > 0.0f ? query->temperature : 0.7f;
-        opts.top_p = query->top_p > 0.0f ? query->top_p : 0.9f;
+        opts.temperature = query->temperature >= 0.0f ? query->temperature : 0.7f;
+        opts.top_p = query->top_p >= 0.0f ? query->top_p : 0.9f;
+        opts.system_prompt = query->system_prompt;
 
         auto start = std::chrono::high_resolution_clock::now();
 
@@ -242,7 +257,13 @@ rac_result_t rac_rag_query(
         out_result->answer = llm_result.text ? rac_strdup(llm_result.text) : nullptr;
         out_result->num_chunks = 0;
         out_result->retrieved_chunks = nullptr;
-        out_result->context_used = nullptr;
+
+        if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
+            out_result->context_used = rac_strdup(
+                metadata["context_used"].get<std::string>().c_str());
+        } else {
+            out_result->context_used = nullptr;
+        }
 
         if (metadata.contains("sources") && metadata["sources"].is_array()) {
             auto& sources = metadata["sources"];
@@ -257,7 +278,9 @@ rac_result_t rac_rag_query(
                         auto& c = out_result->retrieved_chunks[i];
                         c.chunk_id = rac_strdup(s["id"].get<std::string>().c_str());
                         c.similarity_score = s["score"].get<float>();
-                        c.text = nullptr;
+                        c.text = (s.contains("text") && s["text"].is_string())
+                            ? rac_strdup(s["text"].get<std::string>().c_str())
+                            : nullptr;
                         c.metadata_json = nullptr;
                         if (s.contains("source"))
                             c.metadata_json = rac_strdup(s["source"].get<std::string>().c_str());
@@ -267,7 +290,7 @@ rac_result_t rac_rag_query(
         }
 
         out_result->generation_time_ms = llm_result.total_time_ms;
-        out_result->retrieval_time_ms = total_ms - llm_result.total_time_ms;
+        out_result->retrieval_time_ms = std::max(0.0, total_ms - llm_result.total_time_ms);
         out_result->total_time_ms = total_ms;
 
         rac_llm_result_free(&llm_result);

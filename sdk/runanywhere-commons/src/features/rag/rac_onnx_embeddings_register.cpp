@@ -10,8 +10,11 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
 
 #include "onnx_embedding_provider.h"
 
@@ -96,6 +99,14 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         return RAC_ERROR_BACKEND_NOT_READY;
 
     try {
+        std::vector<std::string> texts_vec;
+        texts_vec.reserve(num_texts);
+        for (size_t i = 0; i < num_texts; ++i) {
+            texts_vec.emplace_back(texts[i]);
+        }
+
+        auto batch_results = h->provider->embed_batch(texts_vec);
+
         size_t dim = h->provider->dimension();
         out_result->num_embeddings = num_texts;
         out_result->dimension = dim;
@@ -107,15 +118,15 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         if (!out_result->embeddings)
             return RAC_ERROR_OUT_OF_MEMORY;
 
-        for (size_t i = 0; i < num_texts; i++) {
-            auto embedding = h->provider->embed(texts[i]);
-            out_result->embeddings[i].dimension = dim;
-            out_result->embeddings[i].data = static_cast<float*>(malloc(dim * sizeof(float)));
+        for (size_t i = 0; i < num_texts; ++i) {
+            const auto& embedding = batch_results[i];
+            out_result->embeddings[i].dimension = embedding.size();
+            out_result->embeddings[i].data = static_cast<float*>(malloc(embedding.size() * sizeof(float)));
             if (!out_result->embeddings[i].data) {
                 rac_embeddings_result_free(out_result);
                 return RAC_ERROR_OUT_OF_MEMORY;
             }
-            memcpy(out_result->embeddings[i].data, embedding.data(), dim * sizeof(float));
+            memcpy(out_result->embeddings[i].data, embedding.data(), embedding.size() * sizeof(float));
         }
 
         return RAC_SUCCESS;
@@ -198,6 +209,12 @@ rac_bool_t onnx_embeddings_can_handle(const rac_service_request_t* request, void
     if (len >= 5) {
         const char* ext = path + len - 5;
         if (strcmp(ext, ".onnx") == 0 || strcmp(ext, ".ONNX") == 0)
+            return RAC_TRUE;
+    }
+
+    if (std::filesystem::is_directory(path)) {
+        auto model_file = std::filesystem::path(path) / "model.onnx";
+        if (std::filesystem::exists(model_file))
             return RAC_TRUE;
     }
 

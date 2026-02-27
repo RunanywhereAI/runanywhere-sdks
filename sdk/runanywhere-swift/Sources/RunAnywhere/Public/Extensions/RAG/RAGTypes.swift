@@ -55,8 +55,8 @@ public struct RAGConfiguration: Sendable {
         topK: Int = 3,
         similarityThreshold: Float = 0.3,
         maxContextTokens: Int = 2048,
-        chunkSize: Int = 512,
-        chunkOverlap: Int = 50,
+        chunkSize: Int = 180,
+        chunkOverlap: Int = 30,
         promptTemplate: String? = nil,
         embeddingConfigJSON: String? = nil,
         llmConfigJSON: String? = nil
