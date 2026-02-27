@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -288,15 +289,17 @@ private fun CatalogAdapterRow(
                 Text("Apply")
             }
         } else if (isLoaded) {
-            // Already loaded — show remove
+            // Already loaded — show unload
             Button(
                 onClick = onRemove,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryRed),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
+                ),
             ) {
-                Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.LinkOff, contentDescription = null, tint = AppColors.primaryRed, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(Dimensions.xSmall))
-                Text("Remove")
+                Text("Unload", color = AppColors.primaryRed)
             }
         } else if (isDownloading) {
             // Download progress

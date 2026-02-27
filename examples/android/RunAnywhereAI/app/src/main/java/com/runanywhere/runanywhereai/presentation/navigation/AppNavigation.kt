@@ -6,7 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,6 +59,10 @@ fun AppNavigation() {
     val selectedTab = routeToBottomNavTab(currentDestination?.route)
     val topBarState = remember { TopBarState() }
 
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val isKeyboardOpen = imeBottom > 0
+
     CompositionLocalProvider(LocalTopBarState provides topBarState) {
         Scaffold(
             topBar = {
@@ -82,25 +90,29 @@ fun AppNavigation() {
                 }
             },
             bottomBar = {
-                AppBottomNavigationBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = { tab ->
-                        val route = bottomNavTabToRoute(tab)
-                        navController.navigate(route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
+                if (!isKeyboardOpen) {
+                    AppBottomNavigationBar(
+                        selectedTab = selectedTab,
+                        onTabSelected = { tab ->
+                            val route = bottomNavTabToRoute(tab)
+                            navController.navigate(route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                )
+                        },
+                    )
+                }
             },
         ) { paddingValues ->
             NavHost(
                 navController = navController,
                 startDestination = NavigationRoute.CHAT,
-                modifier = Modifier.padding(paddingValues),
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .then(if (isKeyboardOpen) Modifier.imePadding() else Modifier),
                 enterTransition = {
                     slideInHorizontally(
                         initialOffsetX = { it / SLIDE_OFFSET_FRACTION },

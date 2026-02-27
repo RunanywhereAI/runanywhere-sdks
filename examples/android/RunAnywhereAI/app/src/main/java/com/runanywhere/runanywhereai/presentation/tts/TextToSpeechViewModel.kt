@@ -501,23 +501,31 @@ class TextToSpeechViewModel(
         playbackJob =
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    // Parse WAV header to get audio parameters
-                    val sampleRate = _uiState.value.sampleRate ?: 22050
+                    // Parse WAV header to extract actual audio parameters
+                    val isWav = audioData.size > 44 &&
+                        audioData[0] == 'R'.code.toByte() &&
+                        audioData[1] == 'I'.code.toByte() &&
+                        audioData[2] == 'F'.code.toByte() &&
+                        audioData[3] == 'F'.code.toByte()
+
+                    val sampleRate: Int
+                    val headerSize: Int
+
+                    if (isWav) {
+                        // WAV header: bytes 24-27 = sample rate (little-endian uint32)
+                        sampleRate = (audioData[24].toInt() and 0xFF) or
+                            ((audioData[25].toInt() and 0xFF) shl 8) or
+                            ((audioData[26].toInt() and 0xFF) shl 16) or
+                            ((audioData[27].toInt() and 0xFF) shl 24)
+                        headerSize = 44
+                        Timber.i("WAV header: sampleRate=$sampleRate")
+                    } else {
+                        sampleRate = _uiState.value.sampleRate ?: 22050
+                        headerSize = 0
+                    }
+
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-
-                    // Skip WAV header (44 bytes) if present
-                    val headerSize =
-                        if (audioData.size > 44 &&
-                            audioData[0] == 'R'.code.toByte() &&
-                            audioData[1] == 'I'.code.toByte() &&
-                            audioData[2] == 'F'.code.toByte() &&
-                            audioData[3] == 'F'.code.toByte()
-                        ) {
-                            44
-                        } else {
-                            0
-                        }
 
                     val pcmData = audioData.copyOfRange(headerSize, audioData.size)
 

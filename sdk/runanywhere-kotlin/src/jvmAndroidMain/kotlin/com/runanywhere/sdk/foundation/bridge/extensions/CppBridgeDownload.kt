@@ -243,6 +243,9 @@ object CppBridgeDownload {
      */
     private val downloadFutures = ConcurrentHashMap<String, Future<*>>()
 
+    // Lock for cancel/pause/resume operations to make check-then-act sequences atomic
+    private val downloadLock = Any()
+
     /**
      * Optional listener for download events.
      * Set this before calling [register] to receive events.
@@ -280,12 +283,12 @@ object CppBridgeDownload {
         val destinationPath: String,
         val modelId: String,
         val modelType: Int,
-        var status: Int = DownloadStatus.QUEUED,
-        var error: Int = DownloadError.NONE,
-        var totalBytes: Long = -1L,
-        var downloadedBytes: Long = 0L,
+        @Volatile var status: Int = DownloadStatus.QUEUED,
+        @Volatile var error: Int = DownloadError.NONE,
+        @Volatile var totalBytes: Long = -1L,
+        @Volatile var downloadedBytes: Long = 0L,
         val startedAt: Long = System.currentTimeMillis(),
-        var completedAt: Long = 0L,
+        @Volatile var completedAt: Long = 0L,
         val priority: Int = DownloadPriority.NORMAL,
         val expectedChecksum: String? = null,
     ) {
@@ -591,48 +594,50 @@ object CppBridgeDownload {
      */
     @JvmStatic
     fun cancelDownloadCallback(downloadId: String): Boolean {
-        val task = activeDownloads[downloadId]
-        if (task == null || DownloadStatus.isTerminal(task.status)) {
-            return false
-        }
+        synchronized(downloadLock) {
+            val task = activeDownloads[downloadId]
+            if (task == null || DownloadStatus.isTerminal(task.status)) {
+                return false
+            }
 
-        // Cancel the future
-        val future = downloadFutures.remove(downloadId)
-        future?.cancel(true)
+            // Cancel the future
+            val future = downloadFutures.remove(downloadId)
+            future?.cancel(true)
 
-        // Update task status
-        task.status = DownloadStatus.CANCELLED
-        task.error = DownloadError.CANCELLED
-        task.completedAt = System.currentTimeMillis()
+            // Update task status
+            task.status = DownloadStatus.CANCELLED
+            task.error = DownloadError.CANCELLED
+            task.completedAt = System.currentTimeMillis()
 
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Download cancelled: $downloadId",
-        )
-
-        // Clear model download status on cancellation
-        CppBridgeModelRegistry.updateDownloadStatus(task.modelId, null)
-
-        // Cleanup temp file
-        try {
-            File(task.destinationPath).delete()
-        } catch (e: Exception) {
-            // Ignore cleanup errors
-        }
-
-        // Notify listener
-        try {
-            downloadListener?.onDownloadCancelled(downloadId)
-        } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Error in download listener onDownloadCancelled: ${e.message}",
+                "Download cancelled: $downloadId",
             )
-        }
 
-        return true
+            // Clear model download status on cancellation
+            CppBridgeModelRegistry.updateDownloadStatus(task.modelId, null)
+
+            // Cleanup temp file
+            try {
+                File(task.destinationPath).delete()
+            } catch (e: Exception) {
+                // Ignore cleanup errors
+            }
+
+            // Notify listener
+            try {
+                downloadListener?.onDownloadCancelled(downloadId)
+            } catch (e: Exception) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Error in download listener onDownloadCancelled: ${e.message}",
+                )
+            }
+
+            return true
+        }
     }
 
     /**
@@ -647,35 +652,37 @@ object CppBridgeDownload {
      */
     @JvmStatic
     fun pauseDownloadCallback(downloadId: String): Boolean {
-        val task = activeDownloads[downloadId]
-        if (task == null || task.status != DownloadStatus.DOWNLOADING) {
-            return false
-        }
+        synchronized(downloadLock) {
+            val task = activeDownloads[downloadId]
+            if (task == null || task.status != DownloadStatus.DOWNLOADING) {
+                return false
+            }
 
-        // Cancel the future (will be resumed later)
-        val future = downloadFutures.remove(downloadId)
-        future?.cancel(true)
+            // Cancel the future (will be resumed later)
+            val future = downloadFutures.remove(downloadId)
+            future?.cancel(true)
 
-        task.status = DownloadStatus.PAUSED
+            task.status = DownloadStatus.PAUSED
 
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Download paused: $downloadId at ${task.downloadedBytes} bytes",
-        )
-
-        // Notify listener
-        try {
-            downloadListener?.onDownloadPaused(downloadId)
-        } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Error in download listener onDownloadPaused: ${e.message}",
+                "Download paused: $downloadId at ${task.downloadedBytes} bytes",
             )
-        }
 
-        return true
+            // Notify listener
+            try {
+                downloadListener?.onDownloadPaused(downloadId)
+            } catch (e: Exception) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Error in download listener onDownloadPaused: ${e.message}",
+                )
+            }
+
+            return true
+        }
     }
 
     /**
@@ -690,36 +697,38 @@ object CppBridgeDownload {
      */
     @JvmStatic
     fun resumeDownloadCallback(downloadId: String): Boolean {
-        val task = activeDownloads[downloadId]
-        if (task == null || task.status != DownloadStatus.PAUSED) {
-            return false
-        }
-
-        CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.DEBUG,
-            TAG,
-            "Resuming download: $downloadId from ${task.downloadedBytes} bytes",
-        )
-
-        // Restart download on background thread
-        val future =
-            downloadExecutor.submit {
-                executeDownload(task, resumeFrom = task.downloadedBytes)
+        synchronized(downloadLock) {
+            val task = activeDownloads[downloadId]
+            if (task == null || task.status != DownloadStatus.PAUSED) {
+                return false
             }
-        downloadFutures[downloadId] = future
 
-        // Notify listener
-        try {
-            downloadListener?.onDownloadResumed(downloadId)
-        } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.WARN,
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Error in download listener onDownloadResumed: ${e.message}",
+                "Resuming download: $downloadId from ${task.downloadedBytes} bytes",
             )
-        }
 
-        return true
+            // Restart download on background thread
+            val future =
+                downloadExecutor.submit {
+                    executeDownload(task, resumeFrom = task.downloadedBytes)
+                }
+            downloadFutures[downloadId] = future
+
+            // Notify listener
+            try {
+                downloadListener?.onDownloadResumed(downloadId)
+            } catch (e: Exception) {
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.WARN,
+                    TAG,
+                    "Error in download listener onDownloadResumed: ${e.message}",
+                )
+            }
+
+            return true
+        }
     }
 
     /**
