@@ -117,6 +117,7 @@ rac_result_t rac_rag_pipeline_create_standalone(
 
     *out_pipeline = nullptr;
 
+    rac_handle_t embed_handle = nullptr;
     rac_handle_t llm_handle = nullptr;
 
     try {
