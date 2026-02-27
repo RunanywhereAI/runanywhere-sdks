@@ -253,13 +253,6 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
-                    // Validate downloaded file size if catalog provides one
-                    if (entry.fileSize > 0 && tmpFile.length() != entry.fileSize) {
-                        tmpFile.delete()
-                        throw Exception(
-                            "Downloaded file size (${tmpFile.length()}) does not match expected size (${entry.fileSize})"
-                        )
-                    }
                     destFile.delete()
                     if (!tmpFile.renameTo(destFile)) {
                         tmpFile.delete()

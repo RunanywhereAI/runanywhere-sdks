@@ -90,7 +90,7 @@ object ModelList {
             downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/chat_assistant-lora-Q8_0.gguf",
             filename = "chat_assistant-lora-Q8_0.gguf",
             compatibleModelIds = listOf("lfm2-350m-q4_k_m", "lfm2-350m-q8_0"),
-            fileSize = 690_176,
+            fileSize = 673_664,
             defaultScale = 1.0f,
         ),
         LoraAdapterCatalogEntry(
@@ -100,7 +100,7 @@ object ModelList {
             downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/summarizer-lora-Q8_0.gguf",
             filename = "summarizer-lora-Q8_0.gguf",
             compatibleModelIds = listOf("lfm2-350m-q4_k_m", "lfm2-350m-q8_0"),
-            fileSize = 690_176,
+            fileSize = 673_632,
             defaultScale = 1.0f,
         ),
         LoraAdapterCatalogEntry(
@@ -110,7 +110,7 @@ object ModelList {
             downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/translator-lora-Q8_0.gguf",
             filename = "translator-lora-Q8_0.gguf",
             compatibleModelIds = listOf("lfm2-350m-q4_k_m", "lfm2-350m-q8_0"),
-            fileSize = 690_176,
+            fileSize = 673_632,
             defaultScale = 1.0f,
         ),
         LoraAdapterCatalogEntry(
@@ -120,7 +120,7 @@ object ModelList {
             downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/sentiment-lora-Q8_0.gguf",
             filename = "sentiment-lora-Q8_0.gguf",
             compatibleModelIds = listOf("lfm2-350m-q4_k_m", "lfm2-350m-q8_0"),
-            fileSize = 690_176,
+            fileSize = 673_632,
             defaultScale = 1.0f,
         ),
     )
