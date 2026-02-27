@@ -509,7 +509,7 @@ class TextToSpeechViewModel(
                         audioData[3] == 'F'.code.toByte()
 
                     val sampleRate: Int
-                    val headerSize: Int
+                    val pcmOffset: Int
 
                     if (isWav) {
                         // WAV header: bytes 24-27 = sample rate (little-endian uint32)
@@ -517,17 +517,34 @@ class TextToSpeechViewModel(
                             ((audioData[25].toInt() and 0xFF) shl 8) or
                             ((audioData[26].toInt() and 0xFF) shl 16) or
                             ((audioData[27].toInt() and 0xFF) shl 24)
-                        headerSize = 44
-                        Timber.i("WAV header: sampleRate=$sampleRate")
+
+                        // Scan for the "data" chunk — WAV files can have extra
+                        // chunks (LIST, fact, bext, …) before the PCM payload.
+                        var offset = 12 // skip RIFF header (12 bytes)
+                        var dataStart = -1
+                        while (offset + 8 <= audioData.size) {
+                            val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
+                            val chunkSize = (audioData[offset + 4].toInt() and 0xFF) or
+                                ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
+                                ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
+                                ((audioData[offset + 7].toInt() and 0xFF) shl 24)
+                            if (chunkId == "data") {
+                                dataStart = offset + 8
+                                break
+                            }
+                            offset += 8 + chunkSize
+                        }
+                        pcmOffset = if (dataStart > 0) dataStart else 44 // fallback for malformed files
+                        Timber.i("WAV header: sampleRate=$sampleRate, pcmOffset=$pcmOffset")
                     } else {
                         sampleRate = _uiState.value.sampleRate ?: 22050
-                        headerSize = 0
+                        pcmOffset = 0
                     }
 
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
-                    val pcmData = audioData.copyOfRange(headerSize, audioData.size)
+                    val pcmData = audioData.copyOfRange(pcmOffset, audioData.size)
 
                     val bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
 
