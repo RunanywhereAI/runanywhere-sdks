@@ -28,12 +28,14 @@
 #include "vector_store_usearch.h"
 
 #include <fstream>
+#include <optional>
 #include <usearch/index_dense.hpp>
 
 #include "rac/core/rac_logger.h"
 
 #define LOG_TAG "RAG.VectorStore"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
+#define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
 namespace runanywhere {
@@ -101,7 +103,10 @@ public:
         }
 
         // Store metadata
-        chunks_[key] = chunk;
+        DocumentChunk metadata_copy = chunk;
+        metadata_copy.embedding.clear();
+        metadata_copy.embedding.shrink_to_fit();
+        chunks_[key] = std::move(metadata_copy);
         id_to_key_[chunk.id] = key;
 
         return true;
@@ -130,7 +135,10 @@ public:
                 LOGE("Failed to add chunk to batch: %s", add_result.error.what());
                 continue;
             }
-            chunks_[key] = chunk;
+            DocumentChunk metadata_copy = chunk;
+            metadata_copy.embedding.clear();
+            metadata_copy.embedding.shrink_to_fit();
+            chunks_[key] = std::move(metadata_copy);
             id_to_key_[chunk.id] = key;
             any_added = true;
         }
@@ -160,10 +168,10 @@ public:
         LOGI("USearch returned %zu matches from %zu total vectors", 
              matches.size(), index_.size());
 
-        // Dense embeddings (like all-minilm) rarely score above 0.3-0.5 for natural questions.
-        // We cap the incoming threshold to a realistic semantic boundary (e.g., 0.15) 
-        // to ensure we actually return the Top-K results instead of blocking them.
-        float effective_threshold = std::min(threshold, 0.15f);
+        float effective_threshold = threshold;
+        if (threshold > 0.5f) {
+            LOGW("Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely exceed 0.3-0.5", threshold);
+        }
 
         std::vector<SearchResult> results;
         results.reserve(matches.size());
@@ -202,6 +210,22 @@ public:
         }
 
         return results;
+    }
+
+    std::optional<DocumentChunk> get_chunk(const std::string& chunk_id) const {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        auto it = id_to_key_.find(chunk_id);
+        if (it == id_to_key_.end()) {
+            return std::nullopt;
+        }
+
+        auto chunk_it = chunks_.find(it->second);
+        if (chunk_it == chunks_.end()) {
+            return std::nullopt;
+        }
+
+        return chunk_it->second;
     }
 
     bool remove_chunk(const std::string& chunk_id) {
@@ -276,7 +300,6 @@ public:
             chunk_json["key"] = key;
             chunk_json["id"] = chunk.id;
             chunk_json["text"] = chunk.text;
-            chunk_json["embedding"] = chunk.embedding;
             chunk_json["metadata"] = chunk.metadata;
             metadata["chunks"].push_back(chunk_json);
         }
@@ -328,7 +351,9 @@ public:
                 DocumentChunk chunk;
                 chunk.id = chunk_json.at("id").get<std::string>();
                 chunk.text = chunk_json.at("text").get<std::string>();
-                chunk.embedding = chunk_json.at("embedding").get<std::vector<float>>();
+                if (chunk_json.contains("embedding")) {
+                    chunk.embedding = chunk_json.at("embedding").get<std::vector<float>>();
+                }
                 chunk.metadata = chunk_json.at("metadata");
 
                 new_chunks[key] = std::move(chunk);
@@ -389,6 +414,10 @@ std::vector<SearchResult> VectorStoreUSearch::search(
         LOGE("search() unknown exception");
         return {};
     }
+}
+
+std::optional<DocumentChunk> VectorStoreUSearch::get_chunk(const std::string& chunk_id) const {
+    return impl_->get_chunk(chunk_id);
 }
 
 bool VectorStoreUSearch::remove_chunk(const std::string& chunk_id) {

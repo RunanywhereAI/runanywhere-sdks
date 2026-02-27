@@ -243,17 +243,6 @@ rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text) {
     return service->ops->append_context(service->impl, text);
 }
 
-rac_result_t rac_llm_probe_confidence(rac_handle_t handle, const char* context,
-                                       const char* query, float* out_confidence) {
-    if (!handle || !query || !out_confidence)
-        return RAC_ERROR_NULL_POINTER;
-
-    auto* service = static_cast<rac_llm_service_t*>(handle);
-    if (!service->ops || !service->ops->probe_confidence)
-        return RAC_ERROR_NOT_SUPPORTED;
-
-    return service->ops->probe_confidence(service->impl, context, query, out_confidence);
-}
 
 rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
                                             const rac_llm_options_t* options,

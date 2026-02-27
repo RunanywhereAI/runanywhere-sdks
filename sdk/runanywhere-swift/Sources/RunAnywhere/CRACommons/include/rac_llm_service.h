@@ -69,13 +69,6 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*append_context)(void* impl, const char* text);
 
     /**
-     * Probe confidence that accumulated context answers query (optional, NULL if not supported).
-     * Returns confidence in [0.0, 1.0] via out_confidence. Non-destructive to KV cache.
-     */
-    rac_result_t (*probe_confidence)(void* impl, const char* context, const char* query,
-                                     float* out_confidence);
-
-    /**
      * Generate response from accumulated KV cache state (optional, NULL if not supported).
      * Unlike generate(), does NOT clear KV cache first.
      */
@@ -219,22 +212,6 @@ RAC_API rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const cha
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text);
-
-/**
- * @brief Probe whether accumulated context answers a query
- *
- * Uses logit probing (Yes/No softmax) to estimate confidence.
- * Non-destructive — probe tokens are removed from KV cache after probing.
- * Optional — returns RAC_ERROR_NOT_SUPPORTED if backend doesn't support it.
- *
- * @param handle Service handle
- * @param context Context passage (can be empty string if context is already in KV cache)
- * @param query The user question
- * @param out_confidence Output: confidence in [0.0, 1.0]
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_llm_probe_confidence(rac_handle_t handle, const char* context,
-                                               const char* query, float* out_confidence);
 
 /**
  * @brief Generate a response from accumulated KV cache state

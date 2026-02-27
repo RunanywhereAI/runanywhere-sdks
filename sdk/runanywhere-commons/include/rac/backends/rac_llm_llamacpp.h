@@ -267,21 +267,6 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handl
                                                                const char* text);
 
 /**
- * Probe confidence that accumulated context answers a query.
- * Non-destructive to KV cache — probe tokens are cleaned up.
- *
- * @param handle Service handle
- * @param context Context passage (can be empty if context is in KV cache)
- * @param query The user question
- * @param out_confidence Output: confidence in [0.0, 1.0]
- * @return RAC_SUCCESS or error code
- */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_probe_confidence(rac_handle_t handle,
-                                                                 const char* context,
-                                                                 const char* query,
-                                                                 float* out_confidence);
-
-/**
  * Generate response from accumulated KV cache state.
  * Unlike rac_llm_llamacpp_generate(), does NOT clear the KV cache first.
  *

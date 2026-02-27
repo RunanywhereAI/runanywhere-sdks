@@ -58,8 +58,8 @@ bool RAGBridge::createPipeline(const std::string& configJson) {
         config.top_k = json.value("topK", 10);
         config.similarity_threshold = json.value("similarityThreshold", 0.15f);
         config.max_context_tokens = json.value("maxContextTokens", 2048);
-        config.chunk_size = json.value("chunkSize", 512);
-        config.chunk_overlap = json.value("chunkOverlap", 50);
+        config.chunk_size = json.value("chunkSize", 180);
+        config.chunk_overlap = json.value("chunkOverlap", 30);
 
         std::string tmpl = json.value("promptTemplate", "");
         if (!tmpl.empty()) config.prompt_template = tmpl.c_str();

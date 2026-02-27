@@ -6,9 +6,8 @@
 #include "rag_backend.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstring>
-#include <chrono>
+#include <unordered_set>
 
 #include "rac/core/rac_logger.h"
 
@@ -16,17 +15,10 @@
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-static const std::string kICLSystemPrompt =
-    "You are a question-answering assistant. Given context passages and a question, "
-    "determine if the passages contain enough information to answer the question.\n\n"
-    "Example 1 (Sufficient context):\n"
-    "Context: \"The Eiffel Tower was completed in 1889 for the World's Fair in Paris.\"\n"
-    "Question: \"When was the Eiffel Tower built?\"\n"
-    "Assessment: Yes - the context directly states the completion year.\n\n"
-    "Example 2 (Insufficient context):\n"
-    "Context: \"Paris is the capital of France and known for its cuisine.\"\n"
-    "Question: \"When was the Eiffel Tower built?\"\n"
-    "Assessment: No - the context discusses Paris but not the Eiffel Tower's construction date.\n";
+static const std::string kSystemPrompt =
+    "You are a helpful question-answering assistant. "
+    "Answer the question using only the provided context passages. "
+    "If the context does not contain enough information, say so.";
 
 namespace runanywhere {
 namespace rag {
@@ -45,12 +37,14 @@ RAGBackend::RAGBackend(
     store_config.dimension = config.embedding_dimension;
     vector_store_ = std::make_unique<VectorStoreUSearch>(store_config);
 
+    bm25_index_ = std::make_unique<BM25Index>();
+
     ChunkerConfig chunker_config;
     chunker_config.chunk_size = config.chunk_size;
     chunker_config.chunk_overlap = config.chunk_overlap;
     chunker_ = std::make_unique<DocumentChunker>(chunker_config);
 
-    initialized_ = (llm_service_ != nullptr && embeddings_service_ != nullptr);
+    initialized_ = (embeddings_service_ != nullptr);
     LOGI("RAG pipeline initialized: dim=%zu, chunk_size=%zu, has_llm=%d, has_embed=%d",
          config.embedding_dimension, config.chunk_size,
          llm_service_ != nullptr, embeddings_service_ != nullptr);
@@ -94,89 +88,148 @@ std::vector<float> RAGBackend::embed_text(const std::string& text) const {
     return embedding;
 }
 
+std::vector<std::vector<float>> RAGBackend::embed_texts_batch(
+    const std::vector<std::string>& texts
+) const {
+    if (!embeddings_service_ || texts.empty()) return {};
+
+    std::vector<const char*> c_texts;
+    c_texts.reserve(texts.size());
+    for (const auto& t : texts) {
+        c_texts.push_back(t.c_str());
+    }
+
+    rac_embeddings_result_t result = {};
+    rac_result_t status = rac_embeddings_embed_batch(
+        embeddings_service_, c_texts.data(), c_texts.size(), nullptr, &result);
+
+    if (status != RAC_SUCCESS || result.num_embeddings == 0 || !result.embeddings) {
+        rac_embeddings_result_free(&result);
+        return {};
+    }
+
+    std::vector<std::vector<float>> embeddings;
+    embeddings.reserve(result.num_embeddings);
+    for (size_t i = 0; i < result.num_embeddings; ++i) {
+        embeddings.emplace_back(
+            result.embeddings[i].data,
+            result.embeddings[i].data + result.embeddings[i].dimension
+        );
+    }
+
+    rac_embeddings_result_free(&result);
+    return embeddings;
+}
+
 // =============================================================================
 // Document management
 // =============================================================================
 
 bool RAGBackend::add_document(const std::string& text, const nlohmann::json& metadata) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    size_t embedding_dimension;
 
-    if (!initialized_) {
-        LOGE("Pipeline not initialized");
-        return false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!initialized_) {
+            LOGE("Pipeline not initialized");
+            return false;
+        }
+        embedding_dimension = config_.embedding_dimension;
     }
 
     auto chunks = chunker_->chunk_document(text);
     LOGI("Split document into %zu chunks", chunks.size());
 
-    for (const auto& chunk_obj : chunks) {
-        auto embedding = embed_text(chunk_obj.text);
+    if (chunks.empty()) return true;
 
-        if (embedding.size() != config_.embedding_dimension) {
-            LOGE("Embedding dimension mismatch: got %zu, expected %zu",
-                 embedding.size(), config_.embedding_dimension);
+    std::vector<std::string> chunk_texts;
+    chunk_texts.reserve(chunks.size());
+    for (const auto& chunk_obj : chunks) {
+        chunk_texts.push_back(chunk_obj.text);
+    }
+
+    auto embeddings = embed_texts_batch(chunk_texts);
+
+    if (embeddings.empty()) {
+        LOGI("Batch embedding unavailable, falling back to single embedding");
+        embeddings.reserve(chunks.size());
+        for (const auto& chunk_obj : chunks) {
+            embeddings.push_back(embed_text(chunk_obj.text));
+        }
+    }
+
+    if (embeddings.size() != chunks.size()) {
+        LOGE("Embedding count mismatch: got %zu, expected %zu",
+             embeddings.size(), chunks.size());
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    std::string source_preview = text.substr(0, 100);
+    std::vector<DocumentChunk> doc_chunks;
+    doc_chunks.reserve(chunks.size());
+
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        if (embeddings[i].size() != embedding_dimension) {
+            LOGE("Embedding dimension mismatch at chunk %zu: got %zu, expected %zu",
+                 i, embeddings[i].size(), embedding_dimension);
             continue;
         }
 
         DocumentChunk chunk;
         chunk.id = "chunk_" + std::to_string(next_chunk_id_++);
-        chunk.text = chunk_obj.text;
-        chunk.embedding = std::move(embedding);
+        chunk.text = chunks[i].text;
+        chunk.embedding = std::move(embeddings[i]);
         chunk.metadata = metadata;
-        chunk.metadata["source_text"] = text.substr(0, 100);
-
-        if (!vector_store_->add_chunk(chunk)) {
-            LOGE("Failed to add chunk to vector store");
-            return false;
-        }
+        chunk.metadata["source_text"] = source_preview;
+        doc_chunks.push_back(std::move(chunk));
     }
 
-    LOGI("Successfully added %zu chunks from document", chunks.size());
+    if (!doc_chunks.empty() && !vector_store_->add_chunks_batch(doc_chunks)) {
+        LOGE("Failed to add chunks batch to vector store");
+        return false;
+    }
+
+    if (bm25_index_ && !doc_chunks.empty()) {
+        std::vector<std::pair<std::string, std::string>> bm25_chunks;
+        bm25_chunks.reserve(doc_chunks.size());
+        for (const auto& chunk : doc_chunks) {
+            bm25_chunks.emplace_back(chunk.id, chunk.text);
+        }
+        bm25_index_->add_chunks_batch(bm25_chunks);
+    }
+
+    LOGI("Successfully added %zu chunks from document", doc_chunks.size());
     return true;
 }
 
 // =============================================================================
-// Search — two-tier retrieval (parent chunks → sentence re-ranking)
+// Search — retrieve top-k chunks from vector store
 // =============================================================================
 
 std::vector<SearchResult> RAGBackend::search(const std::string& query_text, size_t top_k) const {
     size_t embedding_dimension;
     float similarity_threshold;
-    const DocumentChunker* chunker;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         embedding_dimension = config_.embedding_dimension;
         similarity_threshold = config_.similarity_threshold;
-        chunker = chunker_.get();
     }
 
-    return search_with_embedding(query_text, top_k, embedding_dimension, similarity_threshold, chunker);
+    return search_with_embedding(query_text, top_k, embedding_dimension, similarity_threshold);
 }
 
 std::vector<SearchResult> RAGBackend::search_with_embedding(
     const std::string& query_text,
     size_t top_k,
     size_t embedding_dimension,
-    float similarity_threshold,
-    const DocumentChunker* chunker
+    float similarity_threshold
 ) const {
-    if (!initialized_ || !chunker) return {};
-
-    auto cosine_similarity = [](const std::vector<float>& a, const std::vector<float>& b) -> float {
-        if (a.size() != b.size() || a.empty()) return 0.0f;
-        float dot = 0.0f, norm_a = 0.0f, norm_b = 0.0f;
-        for (size_t i = 0; i < a.size(); ++i) {
-            dot += a[i] * b[i];
-            norm_a += a[i] * a[i];
-            norm_b += b[i] * b[i];
-        }
-        float denom = std::sqrt(norm_a) * std::sqrt(norm_b);
-        return denom > 0.0f ? dot / denom : 0.0f;
-    };
+    if (!initialized_) return {};
 
     try {
-        static constexpr size_t kParentChunkCount = 5;
         auto query_embedding = embed_text(query_text);
 
         if (query_embedding.size() != embedding_dimension) {
@@ -184,62 +237,19 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(
             return {};
         }
 
-        auto parent_chunks = vector_store_->search(query_embedding, kParentChunkCount, similarity_threshold);
-        LOGI("Retrieved %zu parent chunks", parent_chunks.size());
+        auto dense_results = vector_store_->search(query_embedding, top_k, similarity_threshold);
 
-        if (parent_chunks.empty()) return {};
-
-        struct ScoredSentence {
-            std::string text;
-            float similarity;
-            std::string parent_chunk_id;
-            nlohmann::json parent_metadata;
-        };
-
-        std::vector<ScoredSentence> scored_sentences;
-
-        for (const auto& parent : parent_chunks) {
-            auto sentences = chunker->split_into_sentences(parent.text);
-
-            for (const auto& sentence : sentences) {
-                if (sentence.size() < 3) continue;
-
-                auto sentence_embedding = embed_text(sentence);
-                float sim = cosine_similarity(query_embedding, sentence_embedding);
-
-                scored_sentences.push_back({sentence, sim, parent.chunk_id, parent.metadata});
-            }
+        // BM25 keyword search
+        std::vector<std::pair<std::string, float>> bm25_results;
+        if (bm25_index_) {
+            bm25_results = bm25_index_->search(query_text, top_k);
         }
 
-        if (scored_sentences.empty()) return {};
+        auto fused = fuse_results(dense_results, bm25_results, top_k);
+        LOGI("Hybrid search: %zu dense, %zu bm25, %zu fused",
+             dense_results.size(), bm25_results.size(), fused.size());
 
-        static constexpr size_t kTopSentences = 10;
-        size_t result_count = std::min(kTopSentences, scored_sentences.size());
-
-        std::partial_sort(
-            scored_sentences.begin(),
-            scored_sentences.begin() + static_cast<std::ptrdiff_t>(result_count),
-            scored_sentences.end(),
-            [](const ScoredSentence& a, const ScoredSentence& b) {
-                return a.similarity > b.similarity;
-            }
-        );
-
-        std::vector<SearchResult> results;
-        results.reserve(result_count);
-
-        for (size_t i = 0; i < result_count; ++i) {
-            SearchResult r;
-            r.id = scored_sentences[i].parent_chunk_id + "_s" + std::to_string(i);
-            r.chunk_id = scored_sentences[i].parent_chunk_id;
-            r.text = scored_sentences[i].text;
-            r.similarity = scored_sentences[i].similarity;
-            r.score = scored_sentences[i].similarity;
-            r.metadata = scored_sentences[i].parent_metadata;
-            results.push_back(std::move(r));
-        }
-
-        return results;
+        return fused;
 
     } catch (const std::exception& e) {
         LOGE("Search failed: %s", e.what());
@@ -248,14 +258,124 @@ std::vector<SearchResult> RAGBackend::search_with_embedding(
 }
 
 // =============================================================================
+// Reciprocal Rank Fusion (RRF) — merges dense + BM25 results
+// =============================================================================
+
+std::vector<SearchResult> RAGBackend::fuse_results(
+    const std::vector<SearchResult>& dense_results,
+    const std::vector<std::pair<std::string, float>>& bm25_results,
+    size_t top_k
+) const {
+    static constexpr float kRRFConstant = 60.0f;
+    static constexpr float kMaxRRFScore = 2.0f / 61.0f;
+
+    if (bm25_results.empty()) return dense_results;
+
+    size_t missing_rank = top_k + 1;
+
+    // Build RRF scores: chunk_id -> accumulated rrf score
+    std::unordered_map<std::string, float> rrf_scores;
+
+    for (size_t i = 0; i < dense_results.size(); ++i) {
+        float rank_score = 1.0f / (kRRFConstant + static_cast<float>(i + 1));
+        rrf_scores[dense_results[i].id] += rank_score;
+    }
+
+    for (size_t i = 0; i < bm25_results.size(); ++i) {
+        float rank_score = 1.0f / (kRRFConstant + static_cast<float>(i + 1));
+        rrf_scores[bm25_results[i].first] += rank_score;
+    }
+
+    float missing_score = 1.0f / (kRRFConstant + static_cast<float>(missing_rank));
+
+    std::unordered_set<std::string> dense_ids;
+    for (const auto& r : dense_results) dense_ids.insert(r.id);
+
+    std::unordered_set<std::string> bm25_ids;
+    for (const auto& r : bm25_results) bm25_ids.insert(r.first);
+
+    for (auto& [id, score] : rrf_scores) {
+        if (dense_ids.find(id) == dense_ids.end()) {
+            score += missing_score; // Not in dense → add missing-rank dense score
+        }
+        if (bm25_ids.find(id) == bm25_ids.end()) {
+            score += missing_score; // Not in BM25 → add missing-rank BM25 score
+        }
+    }
+
+    std::unordered_map<std::string, const SearchResult*> dense_map;
+    for (const auto& r : dense_results) {
+        dense_map[r.id] = &r;
+    }
+
+    std::vector<std::pair<std::string, float>> sorted_ids;
+    sorted_ids.reserve(rrf_scores.size());
+    for (const auto& [id, score] : rrf_scores) {
+        sorted_ids.emplace_back(id, score);
+    }
+    std::sort(sorted_ids.begin(), sorted_ids.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    if (sorted_ids.size() > top_k) {
+        sorted_ids.resize(top_k);
+    }
+
+    std::vector<SearchResult> fused;
+    fused.reserve(sorted_ids.size());
+
+    for (const auto& [id, rrf_score] : sorted_ids) {
+        float normalized = rrf_score / kMaxRRFScore;
+        normalized = std::min(1.0f, std::max(0.0f, normalized));
+
+        auto dense_it = dense_map.find(id);
+        if (dense_it != dense_map.end()) {
+            SearchResult result = *(dense_it->second);
+            result.score = normalized;
+            result.similarity = normalized;
+            fused.push_back(std::move(result));
+        } else {
+            SearchResult result;
+            result.id = id;
+            result.chunk_id = id;
+            result.score = normalized;
+            result.similarity = normalized;
+
+            if (vector_store_) {
+                auto chunk = vector_store_->get_chunk(id);
+                if (chunk) {
+                    result.text = chunk->text;
+                    result.metadata = chunk->metadata;
+                }
+            }
+
+            fused.push_back(std::move(result));
+        }
+    }
+
+    return fused;
+}
+
+// =============================================================================
 // Context helpers
 // =============================================================================
 
 std::string RAGBackend::build_context(const std::vector<SearchResult>& results) const {
+    static constexpr size_t kCharsPerToken = 4;
+    const size_t max_chars = config_.max_context_tokens * kCharsPerToken;
+
     std::string context;
     for (size_t i = 0; i < results.size(); ++i) {
+        const std::string& chunk_text = results[i].text;
+        size_t separator_len = (i > 0) ? 2 : 0; // "\n\n"
+
+        if (context.size() + separator_len + chunk_text.size() > max_chars) {
+            LOGI("Context budget reached at chunk %zu/%zu (%zu chars, limit ~%zu)",
+                 i, results.size(), context.size(), max_chars);
+            break;
+        }
+
         if (i > 0) context += "\n\n";
-        context += results[i].text;
+        context += chunk_text;
     }
     return context;
 }
@@ -263,17 +383,21 @@ std::string RAGBackend::build_context(const std::vector<SearchResult>& results) 
 std::string RAGBackend::format_prompt(const std::string& query, const std::string& context) const {
     std::string prompt = config_.prompt_template;
 
-    size_t pos = prompt.find("{context}");
-    if (pos != std::string::npos) prompt.replace(pos, 9, context);
+    for (size_t pos = prompt.find("{query}"); pos != std::string::npos;
+         pos = prompt.find("{query}", pos + query.size())) {
+        prompt.replace(pos, 7, query);
+    }
 
-    pos = prompt.find("{query}");
-    if (pos != std::string::npos) prompt.replace(pos, 7, query);
+    for (size_t pos = prompt.find("{context}"); pos != std::string::npos;
+         pos = prompt.find("{context}", pos + context.size())) {
+        prompt.replace(pos, 9, context);
+    }
 
     return prompt;
 }
 
 // =============================================================================
-// Query — adaptive context accumulation via LLM service vtable
+// Query — insert top N chunks then generate
 // =============================================================================
 
 rac_result_t RAGBackend::query(
@@ -302,23 +426,14 @@ rac_result_t RAGBackend::query(
         return RAC_ERROR_INVALID_STATE;
     }
 
-    // 1. Clear LLM context
-    rac_llm_clear_context(llm);
-
-    // 2. Inject ICL system prompt
-    rac_result_t status = rac_llm_inject_system_prompt(llm, kICLSystemPrompt.c_str());
-    if (status != RAC_SUCCESS) {
-        LOGI("inject_system_prompt not supported (status=%d), continuing", status);
-    }
-
-    // 3. Two-tier search
+    // 1. Retrieve top-k chunks
     auto search_results = search_with_embedding(
-        question, top_k, embedding_dimension, similarity_threshold, chunker_.get());
+        question, top_k, embedding_dimension, similarity_threshold);
 
     if (search_results.empty()) {
         LOGI("No relevant documents found");
         if (out_result) {
-            out_result->text = strdup("I don't have enough information to answer that question.");
+            out_result->text = rac_strdup("I don't have enough information to answer that question.");
             out_result->completion_tokens = 0;
             out_result->prompt_tokens = 0;
             out_result->total_tokens = 0;
@@ -330,60 +445,41 @@ rac_result_t RAGBackend::query(
         return RAC_SUCCESS;
     }
 
-    // 4. Adaptive context accumulation
-    float confidence = 0.0f;
-    size_t sentences_used = 0;
+    // 2. Build context from retrieved chunks
+    std::string assembled_context = build_context(search_results);
+    LOGI("Built context from %zu chunks (%zu chars)", search_results.size(), assembled_context.size());
 
-    for (const auto& sentence_result : search_results) {
-        std::string append_text = (sentences_used == 0)
-            ? sentence_result.text
-            : ("\n" + sentence_result.text);
+    // 3. Format the full prompt using the prompt template (context + query together)
+    std::string full_prompt = format_prompt(question, assembled_context);
 
-        rac_llm_append_context(llm, append_text.c_str());
-        sentences_used++;
-
-        rac_llm_probe_confidence(llm, "", question.c_str(), &confidence);
-
-        LOGI("Adaptive loop: sentence %zu/%zu, confidence=%.4f",
-             sentences_used, search_results.size(), confidence);
-
-        if (confidence > kConfidenceThreshold) {
-            LOGI("Confidence threshold reached at sentence %zu", sentences_used);
-            break;
-        }
+    // 4. Generate via standard rac_llm_generate so the chat template is applied
+    //    uniformly to the entire prompt (system + context + question).
+    //    This avoids the KV cache / chat template mismatch that occurs when raw
+    //    context is injected via append_context and only the query gets templated.
+    rac_llm_options_t rag_options = options ? *options : RAC_LLM_OPTIONS_DEFAULT;
+    if (!rag_options.system_prompt || rag_options.system_prompt[0] == '\0') {
+        rag_options.system_prompt = kSystemPrompt.c_str();
     }
 
-    bool threshold_reached = confidence > kConfidenceThreshold;
-
-    if (!kKeepPartialContext && !threshold_reached) {
-        rac_llm_clear_context(llm);
-        rac_llm_inject_system_prompt(llm, kICLSystemPrompt.c_str());
-        sentences_used = 0;
-    }
-
-    // 5. Generate answer from accumulated KV cache
-    std::string query_suffix = "\n\nQuestion: " + question + "\n\nAnswer:";
-    status = rac_llm_generate_from_context(llm, query_suffix.c_str(), options, out_result);
+    rac_result_t status = rac_llm_generate(llm, full_prompt.c_str(), &rag_options, out_result);
 
     if (status != RAC_SUCCESS) {
-        LOGE("generate_from_context failed: %d", status);
+        LOGE("rac_llm_generate failed: %d", status);
         return status;
     }
 
     // 6. Populate metadata
-    out_metadata["sentences_used"] = sentences_used;
-    out_metadata["final_confidence"] = confidence;
-    out_metadata["threshold_reached"] = threshold_reached;
-    out_metadata["total_sentences"] = search_results.size();
-    out_metadata["keep_partial_context"] = kKeepPartialContext;
+    out_metadata["chunks_used"] = search_results.size();
+    out_metadata["context_used"] = assembled_context;
 
     nlohmann::json sources = nlohmann::json::array();
-    for (size_t i = 0; i < sentences_used && i < search_results.size(); ++i) {
+    for (const auto& result : search_results) {
         nlohmann::json source;
-        source["id"] = search_results[i].id;
-        source["score"] = search_results[i].score;
-        if (search_results[i].metadata.contains("source_text")) {
-            source["source"] = search_results[i].metadata["source_text"];
+        source["id"] = result.id;
+        source["score"] = result.score;
+        source["text"] = result.text;
+        if (result.metadata.contains("source_text")) {
+            source["source"] = result.metadata["source_text"];
         }
         sources.push_back(source);
     }
@@ -399,6 +495,7 @@ rac_result_t RAGBackend::query(
 void RAGBackend::clear() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (vector_store_) vector_store_->clear();
+    if (bm25_index_) bm25_index_->clear();
     next_chunk_id_ = 0;
 }
 
@@ -407,6 +504,7 @@ nlohmann::json RAGBackend::get_statistics() const {
     nlohmann::json stats;
     if (vector_store_) stats = vector_store_->get_statistics();
 
+    stats["bm25_chunks"] = bm25_index_ ? bm25_index_->size() : 0;
     stats["config"] = {
         {"embedding_dimension", config_.embedding_dimension},
         {"top_k", config_.top_k},
@@ -418,6 +516,7 @@ nlohmann::json RAGBackend::get_statistics() const {
 }
 
 size_t RAGBackend::document_count() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return vector_store_ ? vector_store_->size() : 0;
 }
 

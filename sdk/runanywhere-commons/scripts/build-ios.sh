@@ -505,6 +505,7 @@ create_backend_xcframework() {
 
         for possible_path in \
             "${PLATFORM_DIR}/src/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
+            "${PLATFORM_DIR}/src/features/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/${XCODE_SUBDIR}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/librac_backend_${BACKEND_NAME}.a" \
             "${PLATFORM_DIR}/backends/${BACKEND_NAME}/librac_backend_${BACKEND_NAME}.a"; do

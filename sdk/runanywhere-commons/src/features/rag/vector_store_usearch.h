@@ -12,6 +12,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <algorithm>
 
 #include <nlohmann/json.hpp>
@@ -33,11 +34,11 @@ struct DocumentChunk {
  * @brief Search result with similarity score
  */
 struct SearchResult {
-    std::string id;           // Chunk ID (alias for chunk_id)
-    std::string chunk_id;     // Document chunk identifier
+    std::string id;           // Primary chunk identifier
+    std::string chunk_id;     // Alias for id (kept for bridge compatibility)
     std::string text;         // Chunk text content
-    float score;              // Similarity score (alias for similarity)
-    float similarity;         // Similarity score (0.0-1.0)
+    float score = 0.0f;      // Primary similarity score (0.0-1.0)
+    float similarity = 0.0f; // Alias for score (kept for bridge compatibility)
     nlohmann::json metadata;  // Additional metadata
 };
 
@@ -87,6 +88,11 @@ public:
         size_t top_k,
         float threshold = 0.0f
     ) const noexcept;
+
+    /**
+     * @brief Look up a chunk by ID (text + metadata, no embedding)
+     */
+    std::optional<DocumentChunk> get_chunk(const std::string& chunk_id) const;
 
     /**
      * @brief Remove a chunk by ID
