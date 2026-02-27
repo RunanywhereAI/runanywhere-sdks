@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -35,14 +34,12 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
  *
  * Lists vision-related features:
  * 1. Vision Chat (VLM) — Chat with images using photos
- * 2. Image Generation — Create images from text prompts (placeholder for future)
  *
  * iOS Reference: examples/ios/RunAnywhereAI/.../App/ContentView.swift — VisionHubView
  */
 @Composable
 fun VisionHubScreen(
     onNavigateToVLM: () -> Unit,
-    onNavigateToImageGeneration: () -> Unit = {},
 ) {
     ConfigureTopBar(title = "Vision")
 
@@ -66,17 +63,6 @@ fun VisionHubScreen(
                 title = "Vision Chat",
                 subtitle = "Chat with images using your camera or photos",
                 onClick = onNavigateToVLM,
-            )
-
-            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
-
-            // Image Generation (placeholder for future diffusion model support)
-            FeatureCard(
-                icon = Icons.Filled.PhotoLibrary,
-                iconColor = AppColors.featurePink,
-                title = "Image Generation",
-                subtitle = "Create images from text prompts",
-                onClick = onNavigateToImageGeneration,
             )
 
             Spacer(modifier = Modifier.height(Dimensions.large))

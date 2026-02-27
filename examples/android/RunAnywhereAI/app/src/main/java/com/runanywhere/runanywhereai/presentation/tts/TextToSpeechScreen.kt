@@ -690,13 +690,12 @@ private fun ControlsSection(
                     ButtonDefaults.buttonColors(
                         containerColor = AppColors.primaryAccent,
                         contentColor = Color.White,
-                        disabledContainerColor = Color.Gray,
+                        disabledContainerColor = AppColors.statusGray,
                     ),
             ) {
                 if (isGenerating) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = Color.White,
                         strokeWidth = 2.dp,
                     )
                 } else {
@@ -711,7 +710,6 @@ private fun ControlsSection(
                             },
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),
-                        tint = Color.White,
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -725,7 +723,6 @@ private fun ControlsSection(
                             "Generate"
                         },
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
                 )
             }
 
@@ -740,8 +737,8 @@ private fun ControlsSection(
                 shape = RoundedCornerShape(25.dp),
                 colors =
                     ButtonDefaults.buttonColors(
-                        containerColor = if (hasGeneratedAudio) AppColors.primaryGreen else Color.Gray,
-                        disabledContainerColor = Color.Gray,
+                        containerColor = if (hasGeneratedAudio) AppColors.primaryGreen else AppColors.statusGray,
+                        disabledContainerColor = AppColors.statusGray,
                     ),
             ) {
                 Icon(

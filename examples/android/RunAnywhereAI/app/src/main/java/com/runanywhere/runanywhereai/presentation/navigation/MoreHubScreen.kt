@@ -1,6 +1,8 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,6 +52,7 @@ fun MoreHubScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
     ) {
             // Audio AI section

@@ -9,6 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +22,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -411,11 +412,10 @@ private fun DescriptionPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Description text (scrollable) — mirrors iOS ScrollView
+        // Description text — mirrors iOS ScrollView
         Column(
             modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+                .weight(1f),
         ) {
             when {
                 error != null -> {
@@ -470,7 +470,9 @@ private fun ControlBar(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable(enabled = !isProcessing) { onPickPhoto() },
+            modifier = Modifier
+                .clickable(enabled = !isProcessing) { onPickPhoto() }
+                .semantics { role = Role.Button },
         ) {
             Icon(
                 imageVector = Icons.Filled.Image,
@@ -489,7 +491,7 @@ private fun ControlBar(
         // Main action button (64dp circle) — mirrors iOS main action button
         val buttonColor = when {
             isAutoStreaming -> AppColors.primaryRed
-            isProcessing -> Color.Gray
+            isProcessing -> AppColors.statusGray
             else -> AppColors.primaryAccent
         }
 
