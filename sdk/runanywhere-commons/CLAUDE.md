@@ -11,7 +11,7 @@
 
 ## C++ Specific Rules
 
-- C++17 standard required
+- C++20 standard required
 - Google C++ Style Guide with project customizations (see `.clang-format`)
 - Run `./scripts/lint-cpp.sh` before committing
 - Use `./scripts/lint-cpp.sh --fix` to auto-fix formatting issues

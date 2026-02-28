@@ -46,7 +46,7 @@ option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server
 # C++ CONFIGURATION
 # =============================================================================
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -348,7 +348,7 @@ if(RAC_PLATFORM_ANDROID)
 endif()
 
 set_target_properties(rac_commons PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

@@ -11,7 +11,7 @@ target_include_directories(test_core PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
 target_link_libraries(test_core PRIVATE rac_commons)
-target_compile_features(test_core PRIVATE cxx_std_17)
+target_compile_features(test_core PRIVATE cxx_std_20)
 add_test(NAME core_tests COMMAND test_core --run-all)
 
 # --- ONNX backend tests (VAD, STT, TTS, WakeWord) ---
@@ -23,7 +23,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
         ${CMAKE_SOURCE_DIR}/include
     )
     target_link_libraries(test_vad PRIVATE rac_commons rac_backend_onnx)
-    target_compile_features(test_vad PRIVATE cxx_std_17)
+    target_compile_features(test_vad PRIVATE cxx_std_20)
     add_test(NAME vad_tests COMMAND test_vad --run-all)
 
     # STT test
@@ -33,7 +33,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
         ${CMAKE_SOURCE_DIR}/include
     )
     target_link_libraries(test_stt PRIVATE rac_commons rac_backend_onnx)
-    target_compile_features(test_stt PRIVATE cxx_std_17)
+    target_compile_features(test_stt PRIVATE cxx_std_20)
     add_test(NAME stt_tests COMMAND test_stt --run-all)
 
     # TTS test
@@ -43,7 +43,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
         ${CMAKE_SOURCE_DIR}/include
     )
     target_link_libraries(test_tts PRIVATE rac_commons rac_backend_onnx)
-    target_compile_features(test_tts PRIVATE cxx_std_17)
+    target_compile_features(test_tts PRIVATE cxx_std_20)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
     # WakeWord test
@@ -53,7 +53,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
         ${CMAKE_SOURCE_DIR}/include
     )
     target_link_libraries(test_wakeword PRIVATE rac_commons rac_backend_onnx)
-    target_compile_features(test_wakeword PRIVATE cxx_std_17)
+    target_compile_features(test_wakeword PRIVATE cxx_std_20)
     add_test(NAME wakeword_tests COMMAND test_wakeword --run-all)
 endif()
 
@@ -65,7 +65,7 @@ if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
         ${CMAKE_SOURCE_DIR}/include
     )
     target_link_libraries(test_llm PRIVATE rac_commons rac_backend_llamacpp)
-    target_compile_features(test_llm PRIVATE cxx_std_17)
+    target_compile_features(test_llm PRIVATE cxx_std_20)
     add_test(NAME llm_tests COMMAND test_llm --run-all)
 endif()
 
@@ -79,7 +79,7 @@ if(RAC_BACKEND_ONNX AND RAC_BACKEND_LLAMACPP
     )
     target_link_libraries(test_voice_agent PRIVATE
         rac_commons rac_backend_onnx rac_backend_llamacpp)
-    target_compile_features(test_voice_agent PRIVATE cxx_std_17)
+    target_compile_features(test_voice_agent PRIVATE cxx_std_20)
     add_test(NAME voice_agent_tests COMMAND test_voice_agent --run-all)
 endif()
 
@@ -137,7 +137,7 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
         Threads::Threads
         GTest::gtest_main
     )
-    target_compile_features(rac_rag_backend_thread_safety_test PRIVATE cxx_std_17)
+    target_compile_features(rac_rag_backend_thread_safety_test PRIVATE cxx_std_20)
     include(GoogleTest)
     gtest_discover_tests(rac_rag_backend_thread_safety_test
         DISCOVERY_MODE PRE_TEST
@@ -157,7 +157,7 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
         Threads::Threads
         GTest::gtest_main
     )
-    target_compile_features(rac_chunker_test PRIVATE cxx_std_17)
+    target_compile_features(rac_chunker_test PRIVATE cxx_std_20)
     gtest_discover_tests(rac_chunker_test
         DISCOVERY_MODE PRE_TEST
     )
@@ -176,7 +176,7 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
         Threads::Threads
         GTest::gtest_main
     )
-    target_compile_features(rac_simple_tokenizer_test PRIVATE cxx_std_17)
+    target_compile_features(rac_simple_tokenizer_test PRIVATE cxx_std_20)
     gtest_discover_tests(rac_simple_tokenizer_test
         DISCOVERY_MODE PRE_TEST
     )

@@ -122,7 +122,7 @@ target_link_libraries(rac_backend_whispercpp PUBLIC
     nlohmann_json::nlohmann_json
 )
 
-target_compile_features(rac_backend_whispercpp PUBLIC cxx_std_17)
+target_compile_features(rac_backend_whispercpp PUBLIC cxx_std_20)
 
 # =============================================================================
 # Platform-specific configuration
