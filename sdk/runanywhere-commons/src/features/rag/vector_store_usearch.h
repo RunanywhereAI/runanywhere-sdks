@@ -32,6 +32,9 @@ struct DocumentChunk {
 
 /**
  * @brief Search result with similarity score
+ *
+ * Note: id/chunk_id and score/similarity are aliases kept for backward
+ * compatibility with JNI and React Native bridges. Prefer id and score.
  */
 struct SearchResult {
     std::string id;           // Primary chunk identifier
@@ -49,8 +52,8 @@ struct VectorStoreConfig {
     size_t dimension = 384;              // Embedding dimension
     size_t max_elements = 100000;        // Max capacity
     size_t connectivity = 16;            // HNSW connectivity (M)
-    size_t expansion_add = 40;           // Construction search depth ( even a smaller one should be good enough)
-    size_t expansion_search = 20;        // Query search depth( even a smaller one should be good enough)
+    size_t expansion_add = 40;           // Construction search depth
+    size_t expansion_search = 30;        // Query search depth
 };
 
 /**

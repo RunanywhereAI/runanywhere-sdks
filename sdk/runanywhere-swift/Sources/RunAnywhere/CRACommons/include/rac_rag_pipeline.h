@@ -65,7 +65,7 @@ typedef struct rac_rag_pipeline_config {
     /** Number of top chunks to retrieve (default 10) */
     size_t top_k;
 
-    /** Minimum similarity threshold 0.0-1.0 (default 0.15) */
+    /** Minimum similarity threshold 0.0-1.0 (default 0.12) */
     float similarity_threshold;
 
     /** Maximum tokens for context (default 2048) */
@@ -88,7 +88,7 @@ static inline rac_rag_pipeline_config_t rac_rag_pipeline_config_default(void) {
     rac_rag_pipeline_config_t cfg = {0};
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
-    cfg.similarity_threshold = 0.15f;
+    cfg.similarity_threshold = 0.12f;
     cfg.max_context_tokens = 2048;
     cfg.chunk_size = 180;
     cfg.chunk_overlap = 30;
@@ -119,7 +119,7 @@ static inline rac_rag_config_t rac_rag_config_default(void) {
     cfg.llm_model_path = NULL;
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
-    cfg.similarity_threshold = 0.15f;
+    cfg.similarity_threshold = 0.12f;
     cfg.max_context_tokens = 2048;
     cfg.chunk_size = 180;
     cfg.chunk_overlap = 30;

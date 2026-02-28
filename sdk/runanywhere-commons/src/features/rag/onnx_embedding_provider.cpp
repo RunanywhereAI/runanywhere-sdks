@@ -83,9 +83,9 @@ public:
         return true;
     }
     
-    std::vector<int64_t> encode(const std::string& text, size_t max_length = 512) {
+    std::vector<int64_t> encode_unpadded(const std::string& text, size_t max_length = 512) {
         std::vector<int64_t> token_ids;
-        token_ids.reserve(max_length);
+        token_ids.reserve(std::min(max_length, static_cast<size_t>(128)));
         token_ids.push_back(cls_id_); // [CLS]
 
         const auto words = basic_tokenize(text);
@@ -104,12 +104,18 @@ public:
         }
 
         token_ids.push_back(sep_id_); // [SEP]
-        
-        // Pad to max_length
-        while (token_ids.size() < max_length) {
-            token_ids.push_back(pad_id_); // [PAD]
+        return token_ids;
+    }
+
+    void pad_to(std::vector<int64_t>& token_ids, size_t target_length) {
+        while (token_ids.size() < target_length) {
+            token_ids.push_back(pad_id_);
         }
-        
+    }
+
+    std::vector<int64_t> encode(const std::string& text, size_t max_length = 512) {
+        auto token_ids = encode_unpadded(text, max_length);
+        pad_to(token_ids, max_length);
         return token_ids;
     }
     
@@ -553,12 +559,22 @@ public:
         std::lock_guard<std::mutex> lock(embed_mutex_);
 
         try {
-            // 1. Tokenize input
-            auto token_ids = tokenizer_.encode(text, max_seq_length_);
+            auto token_ids = tokenizer_.encode_unpadded(text, max_seq_length_);
+            const size_t pad_length = align_up(token_ids.size(), 8);
+            tokenizer_.pad_to(token_ids, pad_length);
+
             auto attention_mask = tokenizer_.create_attention_mask(token_ids);
 
-            std::memcpy(input_ids_buf_.data(), token_ids.data(), max_seq_length_ * sizeof(int64_t));
-            std::memcpy(attention_mask_buf_.data(), attention_mask.data(), max_seq_length_ * sizeof(int64_t));
+            std::memcpy(input_ids_buf_.data(), token_ids.data(), pad_length * sizeof(int64_t));
+            std::memcpy(attention_mask_buf_.data(), attention_mask.data(), pad_length * sizeof(int64_t));
+            std::memset(token_type_ids_buf_.data(), 0, pad_length * sizeof(int64_t));
+
+            input_shape_ = {1, static_cast<int64_t>(pad_length)};
+
+            LOGI("Single embed: %zu real tokens, padded to %zu (max %zu)",
+                 token_ids.size() - std::count(token_ids.begin(), token_ids.end(), 0),
+                 pad_length, max_seq_length_);
+
             OrtStatusGuard status_guard(ort_api_);
             OrtValueGuard input_ids_guard(ort_api_);
             OrtValueGuard attention_mask_guard(ort_api_);
@@ -568,7 +584,7 @@ public:
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 input_ids_buf_.data(),
-                max_seq_length_ * sizeof(int64_t),
+                pad_length * sizeof(int64_t),
                 input_shape_.data(),
                 input_shape_.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
@@ -583,7 +599,7 @@ public:
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 attention_mask_buf_.data(),
-                max_seq_length_ * sizeof(int64_t),
+                pad_length * sizeof(int64_t),
                 input_shape_.data(),
                 input_shape_.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
@@ -598,7 +614,7 @@ public:
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 token_type_ids_buf_.data(),
-                max_seq_length_ * sizeof(int64_t),
+                pad_length * sizeof(int64_t),
                 input_shape_.data(),
                 input_shape_.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
@@ -671,11 +687,10 @@ public:
                 ort_api_->ReleaseTensorTypeAndShapeInfo(shape_info);
             }
 
-            // 5. Mean pooling
             auto pooled = mean_pooling(
                 output_data,
                 attention_mask,
-                max_seq_length_,
+                pad_length,
                 actual_hidden_dim
             );
             
@@ -707,34 +722,90 @@ public:
             return {};
         }
 
-        const size_t batch_size = texts.size();
-
         std::lock_guard<std::mutex> lock(embed_mutex_);
 
+        std::vector<std::vector<float>> all_results;
+        all_results.reserve(texts.size());
+
+        for (size_t offset = 0; offset < texts.size(); offset += kMaxSubBatchSize) {
+            size_t sub_batch_size = std::min(kMaxSubBatchSize, texts.size() - offset);
+
+            LOGI("Embedding sub-batch %zu/%zu (size=%zu)",
+                 offset / kMaxSubBatchSize + 1,
+                 (texts.size() + kMaxSubBatchSize - 1) / kMaxSubBatchSize,
+                 sub_batch_size);
+
+            auto sub_results = embed_sub_batch(texts, offset, sub_batch_size);
+            if (sub_results.empty()) {
+                LOGE("Sub-batch embedding failed at offset %zu", offset);
+                return {};
+            }
+
+            for (auto& r : sub_results) {
+                all_results.push_back(std::move(r));
+            }
+        }
+
+        LOGI("Generated batch embeddings: count=%zu, dim=%zu", all_results.size(), embedding_dim_);
+        return all_results;
+    }
+
+    size_t dimension() const noexcept {
+        return embedding_dim_;
+    }
+
+    bool is_ready() const noexcept {
+        return ready_;
+    }
+
+private:
+    static constexpr size_t kMaxSubBatchSize = 50;
+
+    static size_t align_up(size_t value, size_t alignment) {
+        const size_t aligned = ((value + alignment - 1) / alignment) * alignment;
+        return std::min(aligned, static_cast<size_t>(512));
+    }
+
+    std::vector<std::vector<float>> embed_sub_batch(
+        const std::vector<std::string>& texts,
+        size_t offset,
+        size_t count
+    ) {
         try {
-            // 1. Tokenize all texts into flat contiguous buffers
-            std::vector<int64_t> flat_input_ids(batch_size * max_seq_length_, 0);
-            std::vector<int64_t> flat_attention_mask(batch_size * max_seq_length_, 0);
-            std::vector<int64_t> flat_token_type_ids(batch_size * max_seq_length_, 0);
+            std::vector<std::vector<int64_t>> all_token_ids(count);
+            size_t max_actual_len = 0;
 
-            std::vector<std::vector<int64_t>> attention_masks(batch_size);
+            for (size_t i = 0; i < count; ++i) {
+                all_token_ids[i] = tokenizer_.encode_unpadded(texts[offset + i], max_seq_length_);
+                max_actual_len = std::max(max_actual_len, all_token_ids[i].size());
+            }
 
-            for (size_t i = 0; i < batch_size; ++i) {
-                auto token_ids = tokenizer_.encode(texts[i], max_seq_length_);
-                auto attn_mask = tokenizer_.create_attention_mask(token_ids);
+            const size_t pad_length = align_up(max_actual_len, 8);
 
-                std::memcpy(flat_input_ids.data() + i * max_seq_length_,
-                            token_ids.data(), max_seq_length_ * sizeof(int64_t));
-                std::memcpy(flat_attention_mask.data() + i * max_seq_length_,
-                            attn_mask.data(), max_seq_length_ * sizeof(int64_t));
+            LOGI("Sub-batch dynamic padding: max_actual=%zu, pad_length=%zu (was %zu)",
+                 max_actual_len, pad_length, max_seq_length_);
+
+            std::vector<int64_t> flat_input_ids(count * pad_length, 0);
+            std::vector<int64_t> flat_attention_mask(count * pad_length, 0);
+            std::vector<int64_t> flat_token_type_ids(count * pad_length, 0);
+
+            std::vector<std::vector<int64_t>> attention_masks(count);
+
+            for (size_t i = 0; i < count; ++i) {
+                tokenizer_.pad_to(all_token_ids[i], pad_length);
+                auto attn_mask = tokenizer_.create_attention_mask(all_token_ids[i]);
+
+                std::memcpy(flat_input_ids.data() + i * pad_length,
+                            all_token_ids[i].data(), pad_length * sizeof(int64_t));
+                std::memcpy(flat_attention_mask.data() + i * pad_length,
+                            attn_mask.data(), pad_length * sizeof(int64_t));
 
                 attention_masks[i] = std::move(attn_mask);
             }
 
-            // 2. Create tensors with batch shape {batch_size, max_seq_length_}
             std::vector<int64_t> batch_shape = {
-                static_cast<int64_t>(batch_size),
-                static_cast<int64_t>(max_seq_length_)
+                static_cast<int64_t>(count),
+                static_cast<int64_t>(pad_length)
             };
 
             OrtStatusGuard status_guard(ort_api_);
@@ -745,40 +816,39 @@ public:
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 flat_input_ids.data(),
-                batch_size * max_seq_length_ * sizeof(int64_t),
+                count * pad_length * sizeof(int64_t),
                 batch_shape.data(), batch_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 input_ids_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Batch: CreateTensor (input_ids) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (input_ids) failed: %s", status_guard.error_message());
                 return {};
             }
 
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 flat_attention_mask.data(),
-                batch_size * max_seq_length_ * sizeof(int64_t),
+                count * pad_length * sizeof(int64_t),
                 batch_shape.data(), batch_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 attention_mask_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Batch: CreateTensor (attention_mask) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (attention_mask) failed: %s", status_guard.error_message());
                 return {};
             }
 
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
                 memory_info_,
                 flat_token_type_ids.data(),
-                batch_size * max_seq_length_ * sizeof(int64_t),
+                count * pad_length * sizeof(int64_t),
                 batch_shape.data(), batch_shape.size(),
                 ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 token_type_ids_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Batch: CreateTensor (token_type_ids) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (token_type_ids) failed: %s", status_guard.error_message());
                 return {};
             }
 
-            // 3. Run ONNX once for the entire batch
             const char* input_names[] = {"input_ids", "attention_mask", "token_type_ids"};
             const OrtValue* inputs[] = {
                 input_ids_guard.get(), attention_mask_guard.get(), token_type_ids_guard.get()
@@ -793,22 +863,21 @@ public:
                 output_names, 1,
                 &output_ptr));
             if (status_guard.is_error()) {
-                LOGE("Batch ONNX inference failed: %s", status_guard.error_message());
+                LOGE("Sub-batch ONNX inference failed: %s", status_guard.error_message());
                 return {};
             }
             *output_guard.ptr() = output_ptr;
 
-            // 4. Extract output and get hidden_dim from shape
             float* output_data = nullptr;
             OrtStatusGuard data_status(ort_api_);
             data_status.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
             if (data_status.is_error() || output_data == nullptr) {
-                LOGE("Batch: Failed to get output tensor data");
+                LOGE("Sub-batch: Failed to get output tensor data");
                 return {};
             }
 
             size_t actual_hidden_dim = embedding_dim_;
-            size_t actual_seq_len = max_seq_length_;
+            size_t actual_seq_len = pad_length;  // Default to what we sent
             OrtTensorTypeAndShapeInfo* shape_info = nullptr;
             OrtStatusGuard shape_status(ort_api_);
             shape_status.reset(ort_api_->GetTensorTypeAndShape(output_guard.get(), &shape_info));
@@ -829,11 +898,10 @@ public:
                 ort_api_->ReleaseTensorTypeAndShapeInfo(shape_info);
             }
 
-            // 5. Extract per-sentence embeddings via mean pooling + normalize
-            std::vector<std::vector<float>> results(batch_size);
+            std::vector<std::vector<float>> results(count);
             const size_t stride = actual_seq_len * actual_hidden_dim;
 
-            for (size_t i = 0; i < batch_size; ++i) {
+            for (size_t i = 0; i < count; ++i) {
                 const float* sentence_data = output_data + i * stride;
                 auto pooled = mean_pooling(
                     sentence_data, attention_masks[i],
@@ -842,24 +910,14 @@ public:
                 results[i] = std::move(pooled);
             }
 
-            LOGI("Generated batch embeddings: count=%zu, dim=%zu", batch_size, actual_hidden_dim);
             return results;
 
         } catch (const std::exception& e) {
-            LOGE("Batch embedding generation failed: %s", e.what());
-            return std::vector<std::vector<float>>(batch_size, std::vector<float>(embedding_dim_, 0.0f));
+            LOGE("Sub-batch embedding failed: %s", e.what());
+            return {};
         }
     }
 
-    size_t dimension() const noexcept {
-        return embedding_dim_;
-    }
-
-    bool is_ready() const noexcept {
-        return ready_;
-    }
-
-private:
     bool initialize_onnx_runtime() {
         const OrtApiBase* ort_api_base = OrtGetApiBase();
         const char* ort_version = ort_api_base ? ort_api_base->GetVersionString() : "unknown";

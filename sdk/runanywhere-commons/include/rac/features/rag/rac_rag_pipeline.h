@@ -90,7 +90,7 @@ static inline rac_rag_pipeline_config_t rac_rag_pipeline_config_default(void) {
     rac_rag_pipeline_config_t cfg = {0};
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
-    cfg.similarity_threshold = 0.15f;
+    cfg.similarity_threshold = 0.12f;
     cfg.max_context_tokens = 2048;
     cfg.chunk_size = 180;
     cfg.chunk_overlap = 30;
@@ -121,7 +121,7 @@ static inline rac_rag_config_t rac_rag_config_default(void) {
     cfg.llm_model_path = NULL;
     cfg.embedding_dimension = 384;
     cfg.top_k = 10;
-    cfg.similarity_threshold = 0.15f;
+    cfg.similarity_threshold = 0.12f;
     cfg.max_context_tokens = 2048;
     cfg.chunk_size = 180;
     cfg.chunk_overlap = 30;
