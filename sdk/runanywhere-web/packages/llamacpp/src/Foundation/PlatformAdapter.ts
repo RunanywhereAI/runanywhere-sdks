@@ -375,12 +375,20 @@ export class PlatformAdapter {
   /**
    * extract_archive: rac_result_t (*)(const char* archive_path, const char* dest_dir,
    *   progress_cb, void* cb_user_data, void* user_data)
-   * Note: 5 params in C
+   *
+   * NOTE: This callback is dead code as of Phase 2 (libarchive migration).
+   * rac_extract_archive() in rac_core.cpp now calls rac_extract_archive_native()
+   * directly (native libarchive compiled into WASM), bypassing the platform adapter.
+   * Kept as a no-op for struct layout compatibility.
    */
   private registerExtractArchive(m: LlamaCppModule): number {
-    return m.addFunction((_archivePtr: number, _destPtr: number, _progressCb: number, _cbUserData: number, _userData: number): number => {
-      // Archive extraction not yet implemented for WASM
-      logger.warning('Archive extraction not yet implemented for WASM');
+    return m.addFunction((archivePtr: number, destPtr: number, _progressCb: number, _cbUserData: number, _userData: number): number => {
+      // Native libarchive extraction is compiled into the WASM module.
+      // rac_extract_archive() calls rac_extract_archive_native() directly,
+      // so this platform adapter callback should never be reached.
+      const archivePath = m.UTF8ToString(archivePtr);
+      const destPath = m.UTF8ToString(destPtr);
+      logger.warning(`Unexpected extract_archive callback invocation: ${archivePath} -> ${destPath}`);
       return -180;
     }, 'iiiiii');
   }

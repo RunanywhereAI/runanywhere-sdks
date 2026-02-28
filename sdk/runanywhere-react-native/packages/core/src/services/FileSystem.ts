@@ -103,20 +103,6 @@ try {
   logger.warning('react-native-fs not installed, file operations will be limited');
 }
 
-// Try to import react-native-zip-archive
-let ZipArchive: {
-  unzip: (source: string, target: string) => Promise<string>;
-  unzipWithPassword: (source: string, target: string, password: string) => Promise<string>;
-  unzipAssets: (assetPath: string, target: string) => Promise<string>;
-  subscribe: (callback: (event: { progress: number; filePath: string }) => void) => { remove: () => void };
-} | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  ZipArchive = require('react-native-zip-archive');
-} catch {
-  logger.warning('react-native-zip-archive not installed, archive extraction will be limited');
-}
-
 // Constants matching Swift SDK path structure
 const RUN_ANYWHERE_DIR = 'RunAnywhere';
 const MODELS_DIR = 'Models';
@@ -517,7 +503,7 @@ if (fw === 'LlamaCpp' && archiveType === null) {
 
   /**
    * Extract an archive to a destination folder
-   * Uses native extraction via the core module (iOS: ArchiveUtility, Android: native extraction)
+   * Uses native C++ extraction via libarchive (supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ)
    */
   async extractArchive(
     archivePath: string,
@@ -536,51 +522,20 @@ if (fw === 'LlamaCpp' && archiveType === null) {
     // Ensure destination exists
     await this.ensureDirectory(destinationFolder);
 
-    // Try native extraction first (supports tar.gz, tar.bz2, zip)
-    try {
-      const native = getNativeModule();
-      if (!native) {
-        throw new Error('Native module not available');
-      }
-
-      logger.info('Using native archive extraction...');
-      const success = await native.extractArchive(archivePath, destinationFolder);
-
-      if (!success) {
-        throw new Error('Native extraction returned false');
-      }
-
-      logger.info('Native extraction completed successfully');
-    } catch (nativeError) {
-      logger.warning(`Native extraction failed: ${nativeError}, trying fallback...`);
-
-      // Fallback to react-native-zip-archive for ZIP files only
-      if (archiveType === ArchiveType.Zip && ZipArchive) {
-        logger.info('Falling back to react-native-zip-archive for ZIP...');
-
-        let subscription: { remove: () => void } | null = null;
-        if (onProgress) {
-          subscription = ZipArchive.subscribe(({ progress }) => {
-            onProgress(progress);
-          });
-        }
-
-        try {
-          await ZipArchive.unzip(archivePath, destinationFolder);
-        } finally {
-          if (subscription) {
-            subscription.remove();
-          }
-        }
-      } else if (archiveType === ArchiveType.TarGz || archiveType === ArchiveType.TarBz2) {
-        // No fallback for tar archives - native is required
-        throw new Error(
-          `Archive extraction failed for ${archiveType}. Native extraction is required for tar archives. Error: ${nativeError}`
-        );
-      } else {
-        throw new Error(`Archive extraction failed: ${nativeError}`);
-      }
+    // Use native C++ extraction (libarchive) — auto-detects all formats
+    const native = getNativeModule();
+    if (!native) {
+      throw new Error('Native module not available');
     }
+
+    logger.info('Using native archive extraction (libarchive)...');
+    const success = await native.extractArchive(archivePath, destinationFolder);
+
+    if (!success) {
+      throw new Error('Native extraction failed');
+    }
+
+    logger.info('Native extraction completed successfully');
 
     // After extraction, find the actual model path
     // ONNX models are typically nested in a directory with the same name

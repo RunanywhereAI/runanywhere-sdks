@@ -103,7 +103,7 @@ extension AlamofireDownloadService {
         }
     }
 
-    /// Perform extraction for archive models (platform-specific - uses SWCompression)
+    /// Perform extraction for archive models (uses native C++ libarchive via rac_extract_archive)
     func performExtraction(
         archiveURL: URL,
         destinationFolder: URL,

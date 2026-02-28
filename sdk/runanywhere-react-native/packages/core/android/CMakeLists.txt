@@ -114,6 +114,7 @@ include_directories(
     "${RAC_INCLUDE_DIR}/rac/infrastructure/events"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/model_management"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/network"
+    "${RAC_INCLUDE_DIR}/rac/infrastructure/extraction"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/storage"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/telemetry"
 )

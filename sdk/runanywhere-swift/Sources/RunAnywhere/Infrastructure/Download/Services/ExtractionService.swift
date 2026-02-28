@@ -3,10 +3,11 @@
 //  RunAnywhere SDK
 //
 //  Centralized service for extracting model archives.
-//  Uses pure Swift extraction via SWCompression (no native C library dependency).
+//  Uses native C++ extraction via libarchive (rac_extract_archive).
 //  Located in Download as it's part of the download post-processing pipeline.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Extraction Result
@@ -55,7 +56,7 @@ public protocol ExtractionServiceProtocol: Sendable {
 // MARK: - Default Extraction Service
 
 /// Default implementation of the model extraction service
-/// Uses pure Swift extraction via SWCompression for all archive types
+/// Uses native C++ extraction via libarchive for all archive types
 public final class DefaultExtractionService: ExtractionServiceProtocol, @unchecked Sendable {
     private let logger = SDKLogger(category: "ExtractionService")
 
@@ -69,14 +70,13 @@ public final class DefaultExtractionService: ExtractionServiceProtocol, @uncheck
     ) async throws -> ExtractionResult {
         let startTime = Date()
 
-        guard case .archive(let archiveType, let structure, _) = artifactType else {
+        guard case .archive(_, let structure, _) = artifactType else {
             throw SDKError.download(.extractionFailed, "Artifact type does not require extraction")
         }
 
         logger.info("Starting extraction", metadata: [
             "archiveURL": archiveURL.path,
-            "destination": destinationURL.path,
-            "archiveType": archiveType.rawValue
+            "destination": destinationURL.path
         ])
 
         // Ensure destination exists
@@ -85,16 +85,16 @@ public final class DefaultExtractionService: ExtractionServiceProtocol, @uncheck
         // Report starting
         progressHandler?(0.0)
 
-        // Perform extraction based on archive type using pure Swift (SWCompression)
-        switch archiveType {
-        case .zip:
-            try ArchiveUtility.extractZipArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
-        case .tarBz2:
-            try ArchiveUtility.extractTarBz2Archive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
-        case .tarGz:
-            try ArchiveUtility.extractTarGzArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
-        case .tarXz:
-            try ArchiveUtility.extractTarXzArchive(from: archiveURL, to: destinationURL, progressHandler: progressHandler)
+        // Use native C++ extraction (libarchive) — auto-detects format from file contents
+        let result = rac_extract_archive(
+            archiveURL.path,
+            destinationURL.path,
+            nil,  // no progress callback needed (we report 0.0 and 1.0)
+            nil   // no user data
+        )
+
+        guard result == RAC_SUCCESS else {
+            throw SDKError.download(.extractionFailed, "Native extraction failed with code: \(result)")
         }
 
         // Find the actual model path based on structure

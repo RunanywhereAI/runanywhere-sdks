@@ -23,8 +23,6 @@ dependencies:
   ffi: ^2.1.0
   # HTTP for download strategy
   http: ^1.2.1
-  # Archive extraction for model downloads
-  archive: ^3.4.9
 
 dev_dependencies:
   flutter_test:

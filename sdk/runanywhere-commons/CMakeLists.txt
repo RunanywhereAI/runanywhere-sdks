@@ -119,6 +119,87 @@ FetchContent_MakeAvailable(nlohmann_json)
 # (nlohmann_json_SOURCE_DIR is set by FetchContent_MakeAvailable)
 include_directories(SYSTEM ${nlohmann_json_SOURCE_DIR}/include)
 
+# libarchive - streaming archive extraction (ZIP, TAR.GZ, TAR.BZ2)
+# Used for native model archive extraction across all platforms
+if(NOT DEFINED LIBARCHIVE_VERSION)
+    set(LIBARCHIVE_VERSION "3.8.1")
+endif()
+
+# -----------------------------------------------------------------------------
+# BZip2: Bundle from source for cross-compilation targets
+# Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
+# We try system first; if not found, build from source so libarchive gets it.
+# -----------------------------------------------------------------------------
+find_package(BZip2 QUIET)
+if(NOT BZIP2_FOUND)
+    message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
+    FetchContent_Declare(
+        bzip2_src
+        URL https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+        URL_HASH SHA256=ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269
+    )
+    FetchContent_MakeAvailable(bzip2_src)
+
+    add_library(bz2_bundled STATIC
+        ${bzip2_src_SOURCE_DIR}/blocksort.c
+        ${bzip2_src_SOURCE_DIR}/huffman.c
+        ${bzip2_src_SOURCE_DIR}/crctable.c
+        ${bzip2_src_SOURCE_DIR}/randtable.c
+        ${bzip2_src_SOURCE_DIR}/compress.c
+        ${bzip2_src_SOURCE_DIR}/decompress.c
+        ${bzip2_src_SOURCE_DIR}/bzlib.c
+    )
+    target_include_directories(bz2_bundled PUBLIC ${bzip2_src_SOURCE_DIR})
+    set_target_properties(bz2_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # Set cache variables so libarchive's find_package(BZip2) picks up our build
+    set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
+    set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
+    message(STATUS "Bundled BZip2 ready (v1.0.8)")
+else()
+    message(STATUS "Using system BZip2: ${BZIP2_LIBRARIES}")
+endif()
+
+FetchContent_Declare(
+    libarchive
+    GIT_REPOSITORY https://github.com/libarchive/libarchive.git
+    GIT_TAG v${LIBARCHIVE_VERSION}
+    GIT_SHALLOW TRUE
+)
+# Disable everything except the static library and the formats we need
+set(ENABLE_MBEDTLS OFF CACHE BOOL "" FORCE)
+set(ENABLE_NETTLE OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPENSSL OFF CACHE BOOL "" FORCE)
+set(ENABLE_LIBB2 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZ4 OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZO OFF CACHE BOOL "" FORCE)
+set(ENABLE_LZMA OFF CACHE BOOL "" FORCE)     # tar.xz not currently used by any model
+set(ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
+set(ENABLE_ZLIB ON CACHE BOOL "" FORCE)      # Needed for tar.gz and zip
+set(ENABLE_BZip2 ON CACHE BOOL "" FORCE)     # Needed for tar.bz2 (k2-fsa models)
+set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
+set(ENABLE_EXPAT OFF CACHE BOOL "" FORCE)
+set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
+set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
+set(ENABLE_LIBGCC OFF CACHE BOOL "" FORCE)
+set(ENABLE_CNG OFF CACHE BOOL "" FORCE)
+set(ENABLE_TAR OFF CACHE BOOL "" FORCE)      # Don't build bsdtar binary
+set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)     # Don't build bsdcpio binary
+set(ENABLE_CAT OFF CACHE BOOL "" FORCE)      # Don't build bsdcat binary
+set(ENABLE_UNZIP OFF CACHE BOOL "" FORCE)    # Don't build bsdunzip binary
+set(ENABLE_TEST OFF CACHE BOOL "" FORCE)
+set(ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(ENABLE_ACL OFF CACHE BOOL "" FORCE)
+set(ENABLE_XATTR OFF CACHE BOOL "" FORCE)
+set(ENABLE_ICONV OFF CACHE BOOL "" FORCE)
+# Save and restore BUILD_SHARED_LIBS since libarchive respects it
+set(_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_SHARED_LIBS OFF)
+FetchContent_MakeAvailable(libarchive)
+set(BUILD_SHARED_LIBS ${_SAVED_BUILD_SHARED_LIBS})
+message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
+
 # =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
 # =============================================================================
@@ -223,6 +304,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
+    src/infrastructure/extraction/rac_extraction.cpp
 )
 
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
@@ -329,6 +411,10 @@ if(RAC_BUILD_SHARED)
         VISIBILITY_INLINES_HIDDEN ON
     )
 endif()
+
+# libarchive - native archive extraction
+target_link_libraries(rac_commons PRIVATE archive_static)
+target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
 # Platform-specific linking
 if(APPLE)

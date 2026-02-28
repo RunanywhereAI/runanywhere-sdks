@@ -14,6 +14,17 @@ target_link_libraries(test_core PRIVATE rac_commons)
 target_compile_features(test_core PRIVATE cxx_std_17)
 add_test(NAME core_tests COMMAND test_core --run-all)
 
+# --- test_extraction: Always built (no backend dependency) ---
+# Tests rac_extract_archive_native() and rac_detect_archive_type() from libarchive.
+add_executable(test_extraction test_extraction.cpp)
+target_include_directories(test_extraction PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_extraction PRIVATE rac_commons)
+target_compile_features(test_extraction PRIVATE cxx_std_17)
+add_test(NAME extraction_tests COMMAND test_extraction --run-all)
+
 # --- ONNX backend tests (VAD, STT, TTS, WakeWord) ---
 if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     # VAD test

@@ -1,12 +1,14 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
+import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
@@ -255,7 +257,8 @@ class ModelDownloadService {
     return Directory(modelPath);
   }
 
-  /// Extract an archive to the destination
+  /// Extract an archive to the destination using native C++ (libarchive).
+  /// Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection.
   Future<String> _extractArchive(
     String archivePath,
     String destDir,
@@ -263,57 +266,45 @@ class ModelDownloadService {
   ) async {
     _logger.info('Extracting archive: $archivePath');
 
-    final archiveFile = File(archivePath);
-    final bytes = await archiveFile.readAsBytes();
+    final lib = PlatformLoader.loadCommons();
+    final extractFn = lib.lookupFunction<
+        Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
+            Pointer<Void>, Pointer<Void>, Pointer<Void>),
+        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
+            Pointer<Void>, Pointer<Void>, Pointer<Void>)>(
+      'rac_extract_archive_native',
+    );
 
-    Archive? archive;
+    final archivePathPtr = archivePath.toNativeUtf8();
+    final destPathPtr = destDir.toNativeUtf8();
 
-    // Determine archive type
-    if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-      final gzDecoded = GZipDecoder().decodeBytes(bytes);
-      archive = TarDecoder().decodeBytes(gzDecoded);
-    } else if (archivePath.endsWith('.tar.bz2') ||
-        archivePath.endsWith('.tbz2')) {
-      final bz2Decoded = BZip2Decoder().decodeBytes(bytes);
-      archive = TarDecoder().decodeBytes(bz2Decoded);
-    } else if (archivePath.endsWith('.zip')) {
-      archive = ZipDecoder().decodeBytes(bytes);
-    } else if (archivePath.endsWith('.tar')) {
-      archive = TarDecoder().decodeBytes(bytes);
-    } else {
-      _logger.warning('Unknown archive format: $archivePath');
-      return archivePath;
-    }
+    try {
+      final result = extractFn(
+        archivePathPtr,
+        destPathPtr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+      );
 
-    // Extract files
-    String? rootDir;
-    for (final file in archive) {
-      final filePath = p.join(destDir, file.name);
-
-      if (file.isFile) {
-        final outFile = File(filePath);
-        await outFile.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
-        _logger.debug('Extracted: ${file.name}');
-
-        // Track root directory
-        final parts = file.name.split('/');
-        if (parts.isNotEmpty && rootDir == null) {
-          rootDir = parts.first;
-        }
-      } else {
-        await Directory(filePath).create(recursive: true);
+      if (result != 0) {
+        _logger.error('Native extraction failed with code: $result');
+        return archivePath;
       }
+    } finally {
+      calloc.free(archivePathPtr);
+      calloc.free(destPathPtr);
     }
 
     _logger.info('Extraction complete: $destDir');
 
     // Return the model directory (could be a nested directory)
-    if (rootDir != null) {
-      final nestedPath = p.join(destDir, rootDir);
-      if (await Directory(nestedPath).exists()) {
-        return nestedPath;
-      }
+    final contents = await Directory(destDir).list().toList();
+    final directories =
+        contents.whereType<Directory>().toList();
+    if (directories.length == 1) {
+      return directories.first.path;
     }
 
     return destDir;

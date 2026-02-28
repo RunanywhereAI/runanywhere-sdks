@@ -2669,15 +2669,12 @@ __metadata:
     react-native-device-info: ">=11.0.0"
     react-native-fs: ">=2.20.0"
     react-native-nitro-modules: ">=0.31.3"
-    react-native-zip-archive: ">=6.1.0"
   peerDependenciesMeta:
     react-native-blob-util:
       optional: true
     react-native-device-info:
       optional: true
     react-native-fs:
-      optional: true
-    react-native-zip-archive:
       optional: true
   languageName: unknown
   linkType: soft

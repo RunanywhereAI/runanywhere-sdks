@@ -4,7 +4,7 @@ import Foundation
 
 /// Download service using Alamofire for HTTP and C++ bridge for orchestration
 /// C++ handles: task tracking, progress calculation, retry logic
-/// Swift handles: HTTP transport via Alamofire, extraction via SWCompression
+/// Swift handles: HTTP transport via Alamofire, extraction via native C++ libarchive
 public class AlamofireDownloadService: @unchecked Sendable {
 
     // MARK: - Shared Instance

@@ -49,6 +49,7 @@
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
+#include "rac/infrastructure/extraction/rac_extraction.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -4195,6 +4196,44 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetMetri
     std::string json = j.dump();
 
     return env->NewStringUTF(json.c_str());
+}
+
+// =============================================================================
+// ARCHIVE EXTRACTION
+// =============================================================================
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeExtractArchive(JNIEnv* env,
+                                                                               jobject /* thiz */,
+                                                                               jstring jArchivePath,
+                                                                               jstring jDestDir) {
+    std::string archivePath = getCString(env, jArchivePath);
+    std::string destDir = getCString(env, jDestDir);
+
+    LOGi("Extracting archive: %s -> %s", archivePath.c_str(), destDir.c_str());
+
+    rac_extraction_result_t result = {};
+    rac_result_t status =
+        rac_extract_archive_native(archivePath.c_str(), destDir.c_str(), nullptr /* default options */,
+                                   nullptr /* no progress */, nullptr, &result);
+
+    if (RAC_SUCCEEDED(status)) {
+        LOGi("Extraction complete: %d files, %lld bytes", result.files_extracted,
+             static_cast<long long>(result.bytes_extracted));
+    } else {
+        LOGe("Extraction failed with code: %d", status);
+    }
+
+    return static_cast<jint>(status);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDetectArchiveType(
+    JNIEnv* env, jobject /* thiz */, jstring jFilePath) {
+    std::string filePath = getCString(env, jFilePath);
+    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
+    rac_detect_archive_type(filePath.c_str(), &type);
+    return static_cast<jint>(type);
 }
 
 }  // extern "C"

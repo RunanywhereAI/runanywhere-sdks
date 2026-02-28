@@ -53,6 +53,7 @@
 #include "rac_voice_agent.h"
 #include "rac_types.h"
 #include "rac_model_assignment.h"
+#include "rac_extraction.h"
 
 #include <sstream>
 #include <chrono>
@@ -1237,47 +1238,29 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getLastError() {
     return Promise<std::string>::async([this]() { return lastError_; });
 }
 
-// Forward declaration for platform-specific archive extraction
-#if defined(__APPLE__)
-extern "C" bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath);
-#elif defined(__ANDROID__)
-// On Android, we'll call the Kotlin ArchiveUtility via JNI in a separate helper
-extern "C" bool ArchiveUtility_extractAndroid(const char* archivePath, const char* destinationPath);
-#endif
-
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::extractArchive(
     const std::string& archivePath,
     const std::string& destPath) {
     return Promise<bool>::async([this, archivePath, destPath]() {
         LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
 
-#if defined(__APPLE__)
-        // iOS: Call Swift ArchiveUtility
-        bool success = ArchiveUtility_extract(archivePath.c_str(), destPath.c_str());
-        if (success) {
-            LOGI("iOS archive extraction succeeded");
+        // Use native C++ extraction (libarchive) — works on all platforms
+        rac_result_t result = rac_extract_archive_native(
+            archivePath.c_str(), destPath.c_str(),
+            nullptr,  // default options
+            nullptr,  // no progress callback
+            nullptr,  // no user data
+            nullptr   // no result output
+        );
+
+        if (result == RAC_SUCCESS) {
+            LOGI("Native archive extraction succeeded");
             return true;
         } else {
-            LOGE("iOS archive extraction failed");
+            LOGE("Native archive extraction failed with code: %d", result);
             setLastError("Archive extraction failed");
             return false;
         }
-#elif defined(__ANDROID__)
-        // Android: Call Kotlin ArchiveUtility via JNI
-        bool success = ArchiveUtility_extractAndroid(archivePath.c_str(), destPath.c_str());
-        if (success) {
-            LOGI("Android archive extraction succeeded");
-            return true;
-        } else {
-            LOGE("Android archive extraction failed");
-            setLastError("Archive extraction failed");
-            return false;
-        }
-#else
-        LOGW("Archive extraction not supported on this platform");
-        setLastError("Archive extraction not supported");
-        return false;
-#endif
     });
 }
 

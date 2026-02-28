@@ -487,6 +487,69 @@ rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t hand
 }
 
 // =============================================================================
+// PUBLIC API - EXTRACTION COMPLETION
+// =============================================================================
+
+rac_result_t rac_download_manager_mark_extraction_complete(rac_download_manager_handle_t handle,
+                                                            const char* task_id,
+                                                            const char* extracted_path) {
+    if (!handle || !task_id || !extracted_path) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    auto it = handle->tasks.find(task_id);
+    if (it == handle->tasks.end()) {
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    download_task_internal& task = it->second;
+
+    task.progress.state = RAC_DOWNLOAD_STATE_COMPLETED;
+    task.progress.stage = RAC_DOWNLOAD_STAGE_COMPLETED;
+    task.progress.stage_progress = 1.0;
+    task.progress.overall_progress = 1.0;
+    notify_progress(task);
+    notify_complete(task, RAC_SUCCESS, extracted_path);
+
+    RAC_LOG_INFO("DownloadManager", "Extraction completed for task: %s", task_id);
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_download_manager_mark_extraction_failed(rac_download_manager_handle_t handle,
+                                                          const char* task_id,
+                                                          rac_result_t error_code,
+                                                          const char* error_message) {
+    if (!handle || !task_id) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::lock_guard<std::mutex> lock(handle->mutex);
+
+    auto it = handle->tasks.find(task_id);
+    if (it == handle->tasks.end()) {
+        return RAC_ERROR_NOT_FOUND;
+    }
+
+    download_task_internal& task = it->second;
+
+    task.progress.state = RAC_DOWNLOAD_STATE_FAILED;
+    task.progress.error_code = error_code;
+    if (error_message) {
+        task.error_message = error_message;
+        task.progress.error_message = task.error_message.c_str();
+    }
+    notify_progress(task);
+    notify_complete(task, error_code, nullptr);
+
+    RAC_LOG_ERROR("DownloadManager", "Extraction failed for task: %s", task_id);
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
 // PUBLIC API - STAGE INFO
 // =============================================================================
 

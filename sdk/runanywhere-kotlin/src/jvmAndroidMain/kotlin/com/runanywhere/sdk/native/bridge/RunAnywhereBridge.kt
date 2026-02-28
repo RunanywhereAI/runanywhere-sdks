@@ -466,6 +466,19 @@ object RunAnywhereBridge {
     external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
+    // ARCHIVE EXTRACTION (rac_extraction.h)
+    // ========================================================================
+
+    /** Extract an archive (ZIP, TAR.GZ, TAR.BZ2, TAR.XZ) to destination directory.
+     *  Returns RAC_SUCCESS (0) on success, negative error code on failure. */
+    @JvmStatic
+    external fun nativeExtractArchive(archivePath: String, destinationDir: String): Int
+
+    /** Detect archive type from magic bytes. Returns rac_archive_type_t enum value, or -1 on failure. */
+    @JvmStatic
+    external fun nativeDetectArchiveType(filePath: String): Int
+
+    // ========================================================================
     // BACKEND REGISTRATION
     // ========================================================================
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
