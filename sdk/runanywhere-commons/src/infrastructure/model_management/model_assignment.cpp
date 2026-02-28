@@ -3,6 +3,8 @@
  * @brief Model Assignment Manager Implementation
  */
 
+#include "model_versioning.h"
+
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -349,8 +351,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
         return RAC_ERROR_NULL_POINTER;
     }
 
-    snprintf(msg, sizeof(msg), "force_refresh=%d, cache_valid=%d, cached_count=%zu",
-             force_refresh, is_cache_valid() ? 1 : 0, g_cached_models.size());
+    snprintf(msg, sizeof(msg), "force_refresh=%d, cache_valid=%d, cached_count=%zu", force_refresh,
+             is_cache_valid() ? 1 : 0, g_cached_models.size());
     RAC_LOG_INFO(LOG_CAT, msg);
 
     // Check cache first
@@ -379,7 +381,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     rac_result_t result =
         g_callbacks.http_get(endpoint, RAC_TRUE, &response, g_callbacks.user_data);
 
-    snprintf(msg, sizeof(msg), "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
+    snprintf(msg, sizeof(msg),
+             "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
              result, response.result, response.status_code, response.response_length);
     RAC_LOG_INFO(LOG_CAT, msg);
 
@@ -448,6 +451,34 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
                     // Note: This is a shallow copy — existing must stay alive until
                     // after rac_model_registry_save deep-copies the data.
                 }
+                // ================= Invalidate Older Versions =================
+                std::string base_id = model->id;
+
+                rac_model_info_t** all_models = nullptr;
+                size_t all_count = 0;
+
+                if (rac_model_registry_get_all(registry, &all_models, &all_count) == RAC_SUCCESS) {
+                    for (size_t i = 0; i < all_count; ++i) {
+                        std::string existing_id = all_models[i]->id ? all_models[i]->id : "";
+
+                        if (existing_id.find(base_id + "@") == 0) {
+                            rac_model_registry_remove(registry, existing_id.c_str());
+                        }
+                    }
+
+                    rac_model_info_array_free(all_models, all_count);
+                }
+                // ================= Versioning Layer =================
+                std::string version = rac_generate_deterministic_version(model->download_url);
+
+                std::string versioned_id =
+                    rac_generate_versioned_model_id(model->id, version.c_str());
+                // Replace model ID safely
+                if (model->id) {
+                    free(model->id);
+                }
+                model->id = rac_strdup(versioned_id.c_str());
+                // =====================================================
                 rac_model_registry_save(registry, model);
                 rac_model_info_free(existing);
             } else {
