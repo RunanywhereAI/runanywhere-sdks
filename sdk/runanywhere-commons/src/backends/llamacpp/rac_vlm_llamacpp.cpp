@@ -161,15 +161,26 @@ VLMModelType detect_vlm_model_type(llama_model* model) {
 /**
  * Format prompt using model's built-in chat template via llama_chat_apply_template.
  * Falls back to manual formatting if template application fails.
+ *
+ * When system_prompt is provided, it is prepended as a system message.
+ * For models that expect a system message (e.g. Qwen2-VL), a default is
+ * injected based on the detected model_type when no explicit prompt is given.
  */
 std::string format_vlm_prompt_with_template(llama_model* model, const std::string& user_prompt,
-                                            const char* image_marker, bool has_image) {
+                                            const char* image_marker, bool has_image,
+                                            const char* system_prompt, VLMModelType model_type) {
     // Build user content with image marker if present
     std::string user_content;
     if (has_image) {
         user_content = std::string(image_marker) + user_prompt;
     } else {
         user_content = user_prompt;
+    }
+
+    // Resolve system prompt: use explicit value, or inject a default for Qwen2-VL
+    const char* effective_system = system_prompt;
+    if (!effective_system && model_type == VLMModelType::Qwen2VL) {
+        effective_system = "You are a helpful assistant.";
     }
 
     // Get the model's chat template
@@ -179,11 +190,31 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
     if (tmpl) {
         RAC_LOG_DEBUG(LOG_CAT, "Using model chat template: %.80s...", tmpl);
 
+        if (effective_system) {
+            llama_chat_message messages[2];
+            messages[0].role = "system";
+            messages[0].content = effective_system;
+            messages[1].role = "user";
+            messages[1].content = user_content.c_str();
+
+            int32_t size = llama_chat_apply_template(tmpl, messages, 2, true, nullptr, 0);
+            if (size > 0) {
+                std::vector<char> buf(size + 1);
+                int32_t result = llama_chat_apply_template(tmpl, messages, 2, true, buf.data(), buf.size());
+                if (result > 0) {
+                    std::string formatted(buf.data(), result);
+                    RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt with system (%d chars): %s",
+                                  (int)formatted.length(), formatted.c_str());
+                    return formatted;
+                }
+            }
+            RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system failed (size=%d), trying without", size);
+        }
+
         llama_chat_message messages[1];
         messages[0].role = "user";
         messages[0].content = user_content.c_str();
 
-        // First call to get required buffer size
         int32_t size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
         if (size > 0) {
             std::vector<char> buf(size + 1);
@@ -201,7 +232,13 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
     }
 
     // Fallback: manual chatml format (works for most models)
-    std::string formatted = "<|im_start|>user\n";
+    std::string formatted;
+    if (effective_system) {
+        formatted = "<|im_start|>system\n";
+        formatted += effective_system;
+        formatted += "<|im_end|>\n";
+    }
+    formatted += "<|im_start|>user\n";
     formatted += user_content;
     formatted += "<|im_end|>\n<|im_start|>assistant\n";
 
@@ -300,14 +337,30 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
         }
     }
 
-    // Build new sampler chain
+    // Build new sampler chain.
+    // Order follows llama.cpp common_sampler_init: penalties → DRY → top_p → min_p → temp → dist.
+    // Penalties and DRY must be applied to raw logits before temperature softens them.
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
     backend->sampler = llama_sampler_chain_init(sampler_params);
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
+
+    // Token-level repetition penalty + frequency/presence penalties
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_penalties(256, 1.3f, 0.1f, 0.1f));
+
+    // DRY sampler: catches n-gram (sequence) repetition like "gó gó gó" where individual
+    // tokens may alternate. Multiplier=0.8, base=1.75, allowed_length=2, last_n=256.
+    const llama_vocab* vocab = llama_model_get_vocab(backend->model);
+    static const char* dry_breakers[] = { "\n", ":", "\"", "*" };
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_dry(
+        vocab, llama_model_n_ctx_train(backend->model),
+        0.8f, 1.75f, 2, 256, dry_breakers, 4));
+
     llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(top_p, 1));
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_min_p(0.1f, 1));
+    llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
-    RAC_LOG_DEBUG(LOG_CAT, "Sampler configured: temp=%.2f, top_p=%.2f", temperature, top_p);
+    RAC_LOG_INFO(LOG_CAT, "Sampler configured: temp=%.2f, top_p=%.2f, repeat=1.3, freq=0.1, pres=0.1, DRY=0.8, min_p=0.1",
+                 temperature, top_p);
 }
 
 }  // namespace
@@ -524,6 +577,19 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
     backend->n_past = 0;
 
+    // Resolve effective model type: options override > auto-detected at load time
+    VLMModelType effective_model_type = backend->model_type;
+    if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
+        switch (options->model_family) {
+            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: effective_model_type = VLMModelType::Qwen2VL; break;
+            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  effective_model_type = VLMModelType::SmolVLM; break;
+            case RAC_VLM_MODEL_FAMILY_LLAVA:     effective_model_type = VLMModelType::LLaVA;   break;
+            default:                             effective_model_type = VLMModelType::Generic;  break;
+        }
+    }
+
+    const char* system_prompt = (options && options->system_prompt) ? options->system_prompt : nullptr;
+
     // Build the prompt with proper chat template formatting
     std::string full_prompt;
     bool has_image = false;
@@ -552,7 +618,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
+                                                  system_prompt, effective_model_type);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -599,7 +666,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false,
+                                                      system_prompt, effective_model_type);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
@@ -710,6 +778,19 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     backend->n_past = 0;
     RAC_LOG_DEBUG(LOG_CAT, "Cleared KV cache for new request");
 
+    // Resolve effective model type: options override > auto-detected at load time
+    VLMModelType effective_model_type = backend->model_type;
+    if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
+        switch (options->model_family) {
+            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: effective_model_type = VLMModelType::Qwen2VL; break;
+            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  effective_model_type = VLMModelType::SmolVLM; break;
+            case RAC_VLM_MODEL_FAMILY_LLAVA:     effective_model_type = VLMModelType::LLaVA;   break;
+            default:                             effective_model_type = VLMModelType::Generic;  break;
+        }
+    }
+
+    const char* system_prompt = (options && options->system_prompt) ? options->system_prompt : nullptr;
+
     // Build the prompt with proper chat template formatting
     std::string full_prompt;
     bool has_image = false;
@@ -733,7 +814,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     }
 
     // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
+                                                  system_prompt, effective_model_type);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -780,7 +862,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
 #endif
     {
         // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false,
+                                                      system_prompt, effective_model_type);
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);

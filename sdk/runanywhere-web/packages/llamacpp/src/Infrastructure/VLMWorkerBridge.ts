@@ -49,7 +49,7 @@ export type VLMWorkerCommand =
       type: 'process'; id: number; payload: {
         rgbPixels: ArrayBuffer; width: number; height: number;
         prompt: string; maxTokens: number; temperature: number;
-        topP: number; systemPrompt?: string;
+        topP: number; systemPrompt?: string; modelFamily?: number;
       };
     }
   | { type: 'cancel'; id: number }
@@ -99,6 +99,8 @@ export interface VLMProcessOptions {
   topP?: number;
   /** System prompt prepended to the user prompt inside the Worker. */
   systemPrompt?: string;
+  /** Model family enum value (maps to rac_vlm_model_family_t). 0 = auto-detect. */
+  modelFamily?: number;
 }
 
 /**
@@ -291,6 +293,7 @@ export class VLMWorkerBridge {
           temperature: options.temperature ?? 0.7,
           topP: options.topP ?? 0.9,
           systemPrompt: options.systemPrompt,
+          modelFamily: options.modelFamily,
         },
         [buffer],
       );

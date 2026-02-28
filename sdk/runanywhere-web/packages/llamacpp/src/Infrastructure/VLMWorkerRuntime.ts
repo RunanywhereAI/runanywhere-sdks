@@ -565,6 +565,7 @@ async function processImage(
   prompt: string,
   maxTokens: number, temperature: number,
   topP: number, systemPrompt?: string,
+  modelFamily?: number,
 ): Promise<VLMWorkerResult> {
   const m = wasmModule;
   const pixelArray = new Uint8Array(rgbPixels);
@@ -602,6 +603,8 @@ async function processImage(
     systemPromptPtr = allocString(systemPrompt);
     m.setValue(optPtr + vo.systemPrompt, systemPromptPtr, '*');
   }
+
+  m.setValue(optPtr + vo.modelFamily, modelFamily ?? 0, 'i32');
 
   const promptPtr = allocString(prompt);
 
@@ -679,7 +682,7 @@ function handleMessage(e: MessageEvent<VLMWorkerCommand>): void {
         const result = await processImage(
           p.rgbPixels, p.width, p.height,
           p.prompt, p.maxTokens, p.temperature,
-          p.topP, p.systemPrompt,
+          p.topP, p.systemPrompt, p.modelFamily,
         );
         self.postMessage({ id, type: 'result', payload: result } satisfies VLMWorkerResponse);
         break;

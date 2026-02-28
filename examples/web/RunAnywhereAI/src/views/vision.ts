@@ -413,7 +413,7 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
       frame.width,
       frame.height,
       prompt,
-      { maxTokens, temperature: 0.7 },
+      { maxTokens, temperature: 0.7, systemPrompt: 'You are a helpful assistant.' },
     );
 
     // Compute metrics from JS wall clock
