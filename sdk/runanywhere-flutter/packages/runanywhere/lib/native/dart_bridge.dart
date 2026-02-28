@@ -28,6 +28,7 @@ import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/dart_bridge_voice_agent.dart';
+import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
@@ -307,6 +308,9 @@ class DartBridge {
 
   /// Voice agent bridge
   static DartBridgeVoiceAgent get voiceAgent => DartBridgeVoiceAgent.shared;
+
+  /// RAG pipeline bridge
+  static DartBridgeRAG get rag => DartBridgeRAG.shared;
 
   // -------------------------------------------------------------------------
   // Private Helpers

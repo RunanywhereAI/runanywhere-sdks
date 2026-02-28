@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Retrieval-Augmented Generation (RAG) operations.
- * Dispatches to RAG JNI (librac_backend_rag_jni) which calls the C++ rac_rag_* backend.
+ * Dispatches to RAG JNI (librac_backend_rag_jni) which calls the C++ rac_rag_* pipeline.
  *
  * Mirrors Swift RunAnywhere+RAG.swift + CppBridge.RAG exactly.
  */
@@ -63,7 +63,7 @@ actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
         if (!RAGBridge.nativeIsRegistered()) {
             val regResult = RAGBridge.nativeRegister()
             if (regResult != 0) { // 0 is RAC_SUCCESS
-                throw IllegalStateException("Failed to register RAG backend. Error code: $regResult")
+                throw IllegalStateException("Failed to register RAG pipeline. Error code: $regResult")
             }
         }
 
@@ -168,7 +168,7 @@ actual suspend fun RunAnywhere.ragQuery(question: String, options: RAGQueryOptio
         )
 
         if (jsonString.isBlank()) {
-            throw IllegalStateException("RAG query failed — empty response from native backend")
+            throw IllegalStateException("RAG query failed — empty response from native pipeline")
         }
 
         ragJson.decodeFromString<RawRAGResult>(jsonString)

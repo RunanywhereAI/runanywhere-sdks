@@ -28,9 +28,15 @@ extension CppBridge {
 
         /// Create the RAG pipeline with configuration (low-level C overload)
         public func createPipeline(config: rac_rag_config_t) throws {
+            // Register RAG module + ONNX embeddings provider if not already registered
+            let regResult = rac_backend_rag_register()
+            if regResult != RAC_SUCCESS && regResult != RAC_ERROR_MODULE_ALREADY_REGISTERED {
+                logger.warning("RAG module registration returned \(regResult)")
+            }
+
             var mutableConfig = config
             var newPipeline: OpaquePointer?
-            let result = rac_rag_pipeline_create(&mutableConfig, &newPipeline)
+            let result = rac_rag_pipeline_create_standalone(&mutableConfig, &newPipeline)
             guard result == RAC_SUCCESS, let newPipeline else {
                 throw SDKError.rag(.notInitialized, "Failed to create RAG pipeline: \(result)")
             }

@@ -4,8 +4,8 @@
  *
  * RAG Native Bridge
  *
- * Self-contained JNI bridge for the RAG backend module.
- * This mirrors the Swift RAGBackend XCFramework architecture.
+ * Self-contained JNI bridge for the RAG pipeline module.
+ * This mirrors the Swift RAG pipeline XCFramework architecture.
  *
  * The native library (librac_backend_rag_jni.so) contains:
  * - rac_backend_rag_register()
@@ -18,7 +18,7 @@ package com.runanywhere.sdk.rag
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
- * Native bridge for RAG backend registration and pipeline operations.
+ * Native bridge for RAG pipeline registration and operations.
  *
  * This object handles loading the RAG-specific JNI library and provides
  * JNI methods for backend registration with the C++ service registry,
@@ -83,7 +83,7 @@ object RAGBridge {
     // ==========================================================================
 
     /**
-     * Register the RAG backend with the C++ service registry.
+     * Register the RAG pipeline with the C++ service registry.
      *
      * @return 0 (RAC_SUCCESS) on success, error code on failure
      */
@@ -91,7 +91,7 @@ object RAGBridge {
     external fun nativeRegister(): Int
 
     /**
-     * Unregister the RAG backend from the C++ service registry.
+     * Unregister the RAG pipeline from the C++ service registry.
      *
      * @return 0 (RAC_SUCCESS) on success, error code on failure
      */
@@ -99,7 +99,7 @@ object RAGBridge {
     external fun nativeUnregister(): Int
 
     /**
-     * Check if the RAG backend is registered.
+     * Check if the RAG pipeline is registered.
      *
      * @return true if registered
      */
