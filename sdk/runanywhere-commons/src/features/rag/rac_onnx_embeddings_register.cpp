@@ -106,6 +106,11 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         }
 
         auto batch_results = h->provider->embed_batch(texts_vec);
+        if (batch_results.size() != num_texts) {
+            RAC_LOG_ERROR(LOG_CAT, "Batch embedding returned %zu results, expected %zu",
+                          batch_results.size(), num_texts);
+            return RAC_ERROR_INFERENCE_FAILED;
+        }
 
         size_t dim = h->provider->dimension();
         out_result->num_embeddings = num_texts;

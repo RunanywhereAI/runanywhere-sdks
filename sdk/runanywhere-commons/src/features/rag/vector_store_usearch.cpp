@@ -56,11 +56,11 @@ public:
         usearch_config.expansion_add = config.expansion_add;
         usearch_config.expansion_search = config.expansion_search;
 
-        // Create metric for cosine similarity. Using i8 instead of float to save on RAM(quality isnt affected much)
+        // Create metric for cosine similarity. Quantize further for RAM, switch to f32 for precision
         metric_punned_t metric(
             static_cast<std::size_t>(config.dimension),
             metric_kind_t::cos_k,
-            scalar_kind_t::i8_k
+            scalar_kind_t::f16_k
         );
 
         // Create index
@@ -73,7 +73,7 @@ public:
 
         // Reserve capacity
         index_.reserve(config.max_elements);
-        LOGI("Created vector store: dim=%zu, max=%zu, connectivity=%zu, quantization=i8",
+        LOGI("Created vector store: dim=%zu, max=%zu, connectivity=%zu, quantization=f16",
              config.dimension, config.max_elements, config.connectivity);
     }
 
@@ -135,6 +135,7 @@ public:
                 LOGE("Failed to add chunk to batch: %s", add_result.error.what());
                 continue;
             }
+            // Store metadata
             DocumentChunk metadata_copy = chunk;
             metadata_copy.embedding.clear();
             metadata_copy.embedding.shrink_to_fit();

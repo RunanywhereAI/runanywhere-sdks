@@ -31,7 +31,7 @@ namespace rag {
 struct RAGBackendConfig {
     size_t embedding_dimension = 384;
     size_t top_k = 10;
-    float similarity_threshold = 0.15f;
+    float similarity_threshold = 0.12f;
     size_t max_context_tokens = 2048;
     size_t chunk_size = 180;
     size_t chunk_overlap = 30;
