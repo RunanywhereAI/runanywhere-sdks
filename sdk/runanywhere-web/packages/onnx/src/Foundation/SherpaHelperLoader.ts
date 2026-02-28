@@ -95,7 +95,8 @@ async function doLoad<T>(
 ): Promise<T> {
   // Prefer the bridge's resolved base URL (auto-derived during WASM load)
   // over import.meta.url which breaks when bundlers rewrite module paths.
-  const bridgeBase = SherpaONNXBridge.shared.helperBaseUrl;
+  const raw = SherpaONNXBridge.shared.helperBaseUrl;
+  const bridgeBase = raw ? (raw.endsWith('/') ? raw : `${raw}/`) : null;
   const url = bridgeBase
     ? `${bridgeBase}${filename}`
     : new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;

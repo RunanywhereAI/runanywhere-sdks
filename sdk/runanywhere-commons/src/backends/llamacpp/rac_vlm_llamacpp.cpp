@@ -208,29 +208,42 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
                     return formatted;
                 }
             }
-            RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system failed (size=%d), trying without", size);
-        }
-
-        llama_chat_message messages[1];
-        messages[0].role = "user";
-        messages[0].content = user_content.c_str();
-
-        int32_t size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
-        if (size > 0) {
-            std::vector<char> buf(size + 1);
-            int32_t result = llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
-            if (result > 0) {
-                std::string formatted(buf.data(), result);
-                RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
-                              (int)formatted.length(), formatted.c_str());
-                return formatted;
+            bool has_explicit_system = (system_prompt && system_prompt[0] != '\0');
+            if (has_explicit_system) {
+                RAC_LOG_WARNING(LOG_CAT, "Template with system failed (size=%d); falling back to manual to preserve explicit system prompt", size);
+            } else {
+                RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system failed (size=%d), trying without", size);
+            }
+            // If the caller passed an explicit system prompt, skip user-only
+            // template to avoid silently dropping it -- go straight to manual.
+            if (has_explicit_system) {
+                goto manual_fallback;
             }
         }
-        RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template failed (size=%d), falling back to manual", size);
+
+        {
+            llama_chat_message messages[1];
+            messages[0].role = "user";
+            messages[0].content = user_content.c_str();
+
+            int32_t size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
+            if (size > 0) {
+                std::vector<char> buf(size + 1);
+                int32_t result = llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
+                if (result > 0) {
+                    std::string formatted(buf.data(), result);
+                    RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
+                                  (int)formatted.length(), formatted.c_str());
+                    return formatted;
+                }
+            }
+            RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template failed (size=%d), falling back to manual", size);
+        }
     } else {
         RAC_LOG_DEBUG(LOG_CAT, "No chat template in model, using manual formatting");
     }
 
+manual_fallback:
     // Fallback: manual chatml format (works for most models)
     std::string formatted;
     if (effective_system) {
@@ -659,9 +672,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
                                                   system_prompt, effective_model_type);
 
-    RAC_LOG_INFO(LOG_CAT, "[v3-process] Prompt (%d chars, img=%d, type=%d): %.200s",
-                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type,
-                 full_prompt.c_str());
+    RAC_LOG_INFO(LOG_CAT, "[v3-process] Prompt ready (chars=%d, img=%d, type=%d)",
+                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -915,9 +927,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
                                                   system_prompt, effective_model_type);
 
-    RAC_LOG_INFO(LOG_CAT, "[v3-stream] Prompt (%d chars, img=%d, type=%d): %.200s",
-                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type,
-                 full_prompt.c_str());
+    RAC_LOG_INFO(LOG_CAT, "[v3-stream] Prompt ready (chars=%d, img=%d, type=%d)",
+                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type);
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {

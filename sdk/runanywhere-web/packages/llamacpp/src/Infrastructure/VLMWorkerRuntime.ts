@@ -595,8 +595,8 @@ async function processImage(
   for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
   const vo = offsets!.vlmOptions;
   m.setValue(optPtr + vo.maxTokens, maxTokens, 'i32');
-  m.setValue(optPtr + vo.temperature, temperature, 'float');
-  m.setValue(optPtr + vo.topP, topP, 'float');
+  m.setValue(optPtr + vo.temperature, Number.isFinite(temperature) ? temperature : 0.7, 'float');
+  m.setValue(optPtr + vo.topP, Number.isFinite(topP) ? topP : 0.9, 'float');
 
   let systemPromptPtr = 0;
   if (systemPrompt) {

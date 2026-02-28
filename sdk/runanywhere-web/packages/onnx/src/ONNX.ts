@@ -45,7 +45,11 @@ export const ONNX = {
   async register(options?: ONNXRegisterOptions): Promise<void> {
     const bridge = SherpaONNXBridge.shared;
     if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
-    if (options?.helperBaseUrl) bridge.helperBaseUrl = options.helperBaseUrl;
+    if (options?.helperBaseUrl) {
+      bridge.helperBaseUrl = options.helperBaseUrl.endsWith('/')
+        ? options.helperBaseUrl
+        : `${options.helperBaseUrl}/`;
+    }
     return ONNXProvider.register();
   },
 
