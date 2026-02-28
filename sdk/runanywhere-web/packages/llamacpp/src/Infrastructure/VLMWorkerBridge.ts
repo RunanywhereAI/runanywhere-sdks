@@ -240,6 +240,28 @@ export class VLMWorkerBridge {
       await this.init();
     }
 
+    // M-RoPE models (Qwen2-VL) produce NaN logits on WebGPU due to f16
+    // accumulation overflow in the rotary position encoding shader. If we
+    // detect one, restart the Worker with the CPU WASM binary so the entire
+    // inference runs on the CPU backend.
+    //
+    // PERFORMANCE: The CPU WASM binary is single-threaded (pthreads OFF), so
+    // Qwen2-VL runs at ~1 tok/s vs ~15-20 tok/s for WebGPU models (LFM2-VL).
+    // This is a correctness-over-speed trade-off.
+    // TODO: re-test on WebGPU periodically as llama.cpp's WebGPU backend
+    // matures — the Vulkan fp16 FA fix (b8168) may eventually be ported.
+    const bridge = LlamaCppBridge.shared;
+    const isQwenVL = /qwen/i.test(params.modelId) || /qwen/i.test(params.modelName);
+    if (isQwenVL && bridge.accelerationMode === 'webgpu') {
+      const currentUrl = bridge.wasmUrl ?? '';
+      const cpuUrl = currentUrl.replace(/-webgpu\.js$/, '.js');
+      if (cpuUrl !== currentUrl) {
+        logger.info('Qwen2-VL detected — restarting VLM Worker with CPU WASM (M-RoPE compat)');
+        this.terminate();
+        await this.init(cpuUrl);
+      }
+    }
+
     // Transfer data buffers when provided (zero-copy to Worker)
     const transferables: Transferable[] = [];
     if (params.modelData) transferables.push(params.modelData);

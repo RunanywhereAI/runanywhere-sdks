@@ -102,6 +102,8 @@ const REGISTERED_MODELS: CompactModelDef[] = [
     modality: ModelCategory.Multimodal,
     memoryRequirement: 600_000_000,
   },
+  // NOTE: Qwen2-VL uses M-RoPE which produces NaN logits on WebGPU. It falls
+  // back to CPU WASM (~1 tok/s) — noticeably slower than LFM2-VL on WebGPU.
   {
     id: 'qwen2-vl-2b-instruct-q4_k_m',
     name: 'Qwen2-VL 2B Instruct Q4_K_M',

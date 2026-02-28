@@ -153,6 +153,8 @@ if(RAC_VLM_USE_MTMD)
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/whisper-enc.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/kimik25.cpp
         ${llamacpp_SOURCE_DIR}/tools/mtmd/models/mobilenetv5.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/nemotron-v2-vl.cpp
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models/paddleocr.cpp
     )
 endif()
 

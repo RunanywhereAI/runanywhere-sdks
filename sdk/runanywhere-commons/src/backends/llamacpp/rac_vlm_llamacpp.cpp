@@ -359,7 +359,7 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
     llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
     llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 
-    RAC_LOG_INFO(LOG_CAT, "Sampler configured: temp=%.2f, top_p=%.2f, repeat=1.3, freq=0.1, pres=0.1, DRY=0.8, min_p=0.1",
+    RAC_LOG_INFO(LOG_CAT, "[v3] Sampler: temp=%.2f top_p=%.2f repeat=1.3 freq=0.1 pres=0.1 DRY=0.8 min_p=0.1 + repeat_guard=4",
                  temperature, top_p);
 }
 
@@ -423,14 +423,52 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     llama_backend_init();
 
     // Load model
+    int gpu_layers = backend->config.gpu_layers;
     llama_model_params model_params = llama_model_default_params();
-    model_params.n_gpu_layers = backend->config.gpu_layers;
+    model_params.n_gpu_layers = gpu_layers;
 
     backend->model = llama_model_load_from_file(model_path, model_params);
     if (!backend->model) {
         RAC_LOG_ERROR(LOG_CAT, "Failed to load model: %s", model_path);
         return RAC_ERROR_MODEL_LOAD_FAILED;
     }
+
+    // Detect model type early — M-RoPE models (Qwen2-VL) produce NaN logits on
+    // WebGPU due to shader precision limitations in the rotary position encoding.
+    // The upstream WebGPU RoPE shader does contain M-RoPE handling, but f16
+    // accumulation overflow causes all 151k+ logits to become NaN.
+    //
+    // Force CPU execution for these models by reloading with n_gpu_layers=0.
+    // NOTE: default gpu_layers is -1 (all layers), so we check != 0 not > 0.
+    //
+    // PERFORMANCE: CPU fallback runs at ~1 tok/s in single-threaded WASM, which
+    // is significantly slower than WebGPU-accelerated models like LFM2-VL (~15-20
+    // tok/s). This is a correctness-over-speed trade-off until the WebGPU backend
+    // resolves the M-RoPE precision issue.
+    // TODO: re-test Qwen2-VL on WebGPU after future llama.cpp upgrades — the
+    // Vulkan fp16 FA fix (b8168) and related precision work may eventually land
+    // in the WebGPU backend as well.
+    backend->model_type = detect_vlm_model_type(backend->model);
+    bool force_cpu = false;
+
+#ifdef RAC_VLM_USE_MTMD
+    if (backend->model_type == VLMModelType::Qwen2VL && gpu_layers != 0) {
+        RAC_LOG_WARNING(LOG_CAT, "Qwen2-VL uses M-RoPE which is incompatible with WebGPU "
+                        "(gpu_layers=%d) — reloading with n_gpu_layers=0 for CPU execution",
+                        gpu_layers);
+        llama_model_free(backend->model);
+        backend->model = nullptr;
+
+        model_params.n_gpu_layers = 0;
+        backend->model = llama_model_load_from_file(model_path, model_params);
+        if (!backend->model) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to reload model for CPU: %s", model_path);
+            return RAC_ERROR_MODEL_LOAD_FAILED;
+        }
+        force_cpu = true;
+        gpu_layers = 0;
+    }
+#endif
 
     // Determine context size
     int ctx_size = backend->config.context_size;
@@ -464,7 +502,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     // Initialize mtmd context if mmproj provided
     if (mmproj_path && mmproj_path[0]) {
         mtmd_context_params mparams = mtmd_context_params_default();
-        mparams.use_gpu = backend->config.use_gpu_vision;
+        // Force CPU for vision encoder too when model requires CPU (M-RoPE)
+        mparams.use_gpu = force_cpu ? false : backend->config.use_gpu_vision;
         mparams.n_threads = n_threads;
         mparams.print_timings = false;
         mparams.warmup = true;
@@ -475,7 +514,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
             // Continue without vision - will work as text-only LLM
             RAC_LOG_WARNING(LOG_CAT, "VLM will operate in text-only mode");
         } else {
-            RAC_LOG_INFO(LOG_CAT, "Vision projector loaded successfully");
+            RAC_LOG_INFO(LOG_CAT, "Vision projector loaded successfully%s",
+                         force_cpu ? " (CPU mode for M-RoPE compat)" : "");
         }
         backend->mmproj_path = mmproj_path;
     }
@@ -485,10 +525,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     backend->model_loaded = true;
     backend->n_past = 0;
 
-    // Detect model type for chat template
-    backend->model_type = detect_vlm_model_type(backend->model);
-
-    RAC_LOG_INFO(LOG_CAT, "VLM model loaded successfully (ctx=%d, threads=%d)", ctx_size, n_threads);
+    RAC_LOG_INFO(LOG_CAT, "VLM model loaded (ctx=%d, threads=%d, gpu_layers=%d%s) [build:v4-cpu-mrope]",
+                 ctx_size, n_threads, gpu_layers, force_cpu ? ", forced-cpu" : "");
     return RAC_SUCCESS;
 }
 
@@ -621,6 +659,10 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
                                                   system_prompt, effective_model_type);
 
+    RAC_LOG_INFO(LOG_CAT, "[v3-process] Prompt (%d chars, img=%d, type=%d): %.200s",
+                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type,
+                 full_prompt.c_str());
+
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
         mtmd_input_chunks* chunks = mtmd_input_chunks_init();
@@ -709,13 +751,69 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     llama_batch batch = llama_batch_init(1, 0, 1);
     const llama_vocab* vocab = llama_model_get_vocab(backend->model);
 
+    // Runtime repetition guard: track last token and consecutive repeat count.
+    // If the same token appears too many times in a row, the model is stuck and
+    // we force-stop to avoid emitting garbage like "gó gó gó gó ...".
+    llama_token prev_token = -1;
+    int repeat_run = 0;
+    constexpr int MAX_CONSECUTIVE_REPEATS = 4;
+
     for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
+        // Diagnostic: on first token, inspect logits for NaN/corruption
+        if (i == 0) {
+            float* logits = llama_get_logits(backend->ctx);
+            int n_vocab = llama_vocab_n_tokens(vocab);
+            if (logits && n_vocab > 0) {
+                float max_logit = logits[0];
+                int max_idx = 0;
+                int nan_count = 0;
+                int inf_count = 0;
+                for (int v = 0; v < n_vocab; v++) {
+                    if (logits[v] != logits[v]) nan_count++;       // NaN check
+                    if (logits[v] > 1e30f || logits[v] < -1e30f) inf_count++;
+                    if (logits[v] > max_logit) { max_logit = logits[v]; max_idx = v; }
+                }
+                RAC_LOG_INFO(LOG_CAT, "[v3-diag] Logits: n_vocab=%d, max_logit=%.4f at token %d, NaN=%d, Inf=%d",
+                             n_vocab, max_logit, max_idx, nan_count, inf_count);
+                // Log top 5 logits
+                float top5_val[5] = {-1e30f, -1e30f, -1e30f, -1e30f, -1e30f};
+                int   top5_idx[5] = {0, 0, 0, 0, 0};
+                for (int v = 0; v < n_vocab; v++) {
+                    if (logits[v] != logits[v]) continue; // skip NaN
+                    for (int k = 0; k < 5; k++) {
+                        if (logits[v] > top5_val[k]) {
+                            for (int j = 4; j > k; j--) { top5_val[j] = top5_val[j-1]; top5_idx[j] = top5_idx[j-1]; }
+                            top5_val[k] = logits[v]; top5_idx[k] = v;
+                            break;
+                        }
+                    }
+                }
+                RAC_LOG_INFO(LOG_CAT, "[v3-diag] Top5: [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f",
+                             top5_idx[0], top5_val[0], top5_idx[1], top5_val[1],
+                             top5_idx[2], top5_val[2], top5_idx[3], top5_val[3],
+                             top5_idx[4], top5_val[4]);
+            }
+        }
+
         llama_token token = llama_sampler_sample(backend->sampler, backend->ctx, -1);
         llama_sampler_accept(backend->sampler, token);
 
         if (llama_vocab_is_eog(vocab, token)) {
             break;
         }
+
+        // Detect stuck generation: same token repeated consecutively
+        if (token == prev_token) {
+            repeat_run++;
+            if (repeat_run >= MAX_CONSECUTIVE_REPEATS) {
+                RAC_LOG_WARNING(LOG_CAT, "Repetition guard: token %d repeated %d times, stopping",
+                                token, repeat_run + 1);
+                break;
+            }
+        } else {
+            repeat_run = 0;
+        }
+        prev_token = token;
 
         char buf[256];
         int len = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, true);
@@ -813,9 +911,13 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         }
     }
 
-    // Format prompt using model's built-in chat template
+    // Format prompt using model's built-in chat template (streaming path)
     full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image,
                                                   system_prompt, effective_model_type);
+
+    RAC_LOG_INFO(LOG_CAT, "[v3-stream] Prompt (%d chars, img=%d, type=%d): %.200s",
+                 (int)full_prompt.length(), has_image ? 1 : 0, (int)effective_model_type,
+                 full_prompt.c_str());
 
     // Tokenize and evaluate
     if (backend->mtmd_ctx && bitmap) {
@@ -901,11 +1003,32 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     llama_batch batch = llama_batch_init(1, 0, 1);
     const llama_vocab* vocab = llama_model_get_vocab(backend->model);
 
+    // Runtime repetition guard (same as non-streaming path)
+    llama_token prev_token = -1;
+    int repeat_run = 0;
+    constexpr int MAX_CONSECUTIVE_REPEATS = 4;
+
     for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
         llama_token token = llama_sampler_sample(backend->sampler, backend->ctx, -1);
         llama_sampler_accept(backend->sampler, token);
 
         bool is_eog = llama_vocab_is_eog(vocab, token);
+
+        // Detect stuck generation
+        if (!is_eog) {
+            if (token == prev_token) {
+                repeat_run++;
+                if (repeat_run >= MAX_CONSECUTIVE_REPEATS) {
+                    RAC_LOG_WARNING(LOG_CAT, "Repetition guard: token %d repeated %d times, stopping",
+                                    token, repeat_run + 1);
+                    callback("", RAC_TRUE, user_data);
+                    break;
+                }
+            } else {
+                repeat_run = 0;
+            }
+            prev_token = token;
+        }
 
         char buf[256];
         int len = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, true);
