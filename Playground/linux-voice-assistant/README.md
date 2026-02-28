@@ -56,7 +56,7 @@ linux-voice-assistant/
 
 - Linux (Raspberry Pi 5, Ubuntu, Debian, etc.)
 - CMake 3.16+
-- C++17 compiler (g++ or clang++)
+- C++20 compiler (g++ or clang++)
 - ALSA development headers: `sudo apt install libasound2-dev`
 
 ### Build and Run

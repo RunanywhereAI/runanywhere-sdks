@@ -32,7 +32,7 @@ target_link_libraries(rac_backend_whisperkit_coreml PUBLIC
     rac_commons
 )
 
-target_compile_features(rac_backend_whisperkit_coreml PUBLIC cxx_std_17)
+target_compile_features(rac_backend_whisperkit_coreml PUBLIC cxx_std_20)
 
 # =============================================================================
 # Summary
