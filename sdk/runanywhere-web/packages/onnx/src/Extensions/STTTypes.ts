@@ -1,12 +1,15 @@
 /**
- * RunAnywhere Web SDK - Speech-to-Text Types
+ * RunAnywhere Web SDK - STT Types (ONNX Backend)
  *
- * Type definitions for STT models and transcription results.
- * Separated from the main STT extension for clean imports.
+ * Re-exports generic STT types from core and defines backend-specific
+ * model configuration types for sherpa-onnx.
  */
 
+// Re-export all generic STT types from core
+export type { STTTranscriptionResult, STTWord } from '@runanywhere/web';
+
 // ---------------------------------------------------------------------------
-// STT Types
+// Backend-specific: sherpa-onnx model configurations
 // ---------------------------------------------------------------------------
 
 export enum STTModelType {
@@ -45,21 +48,4 @@ export interface STTZipformerFiles {
 export interface STTParaformerFiles {
   model: string;
   tokens: string;
-}
-
-export interface STTTranscriptionResult {
-  [key: string]: unknown;
-  text: string;
-  confidence: number;
-  detectedLanguage?: string;
-  processingTimeMs: number;
-  words?: STTWord[];
-  [key: string]: unknown;
-}
-
-export interface STTWord {
-  text: string;
-  startMs: number;
-  endMs: number;
-  confidence: number;
 }

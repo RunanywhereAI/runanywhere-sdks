@@ -22,26 +22,16 @@
 
 // Module facade & provider
 export { ONNX, autoRegister } from './ONNX';
+export type { ONNXRegisterOptions } from './ONNX';
 export { ONNXProvider } from './ONNXProvider';
 
-// Extensions
+// Extensions (backend-specific implementations + backend-specific config types)
 export { STT, STTModelType } from './Extensions/RunAnywhere+STT';
-export type {
-  STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles,
-  STTTranscriptionResult, STTWord, STTTranscribeOptions, STTStreamCallback, STTStreamingSession,
-} from './Extensions/RunAnywhere+STT';
+export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles } from './Extensions/RunAnywhere+STT';
 export { TTS } from './Extensions/RunAnywhere+TTS';
-export type { TTSVoiceConfig, TTSSynthesisResult, TTSSynthesizeOptions } from './Extensions/RunAnywhere+TTS';
-export { VAD, SpeechActivity } from './Extensions/RunAnywhere+VAD';
-export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './Extensions/RunAnywhere+VAD';
+export type { TTSVoiceConfig } from './Extensions/RunAnywhere+TTS';
+export { VAD } from './Extensions/RunAnywhere+VAD';
+export type { VADModelConfig } from './Extensions/RunAnywhere+VAD';
 
 // Foundation
 export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
-
-// Infrastructure
-export { AudioCapture } from './Infrastructure/AudioCapture';
-export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
-export { AudioPlayback } from './Infrastructure/AudioPlayback';
-export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
-export { AudioFileLoader } from './Infrastructure/AudioFileLoader';
-export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';

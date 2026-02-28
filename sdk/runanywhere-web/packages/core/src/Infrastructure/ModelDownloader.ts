@@ -224,10 +224,11 @@ export class ModelDownloader {
       let totalBytesDownloaded = 0;
       let totalBytesExpected = 0;
 
-      // Download the primary file
-      const primaryData = await this.downloadFile(model.url, (progress, bytesDown, bytesTotal) => {
+      // Try streaming the primary file directly to storage (keeps memory constant).
+      // Falls back to buffered download + store if streaming is not possible.
+      const primaryProgressCb = (progress: number, bytesDown: number, bytesTotal: number) => {
         totalBytesDownloaded = bytesDown;
-        totalBytesExpected = bytesTotal * totalFiles; // rough estimate
+        totalBytesExpected = bytesTotal * totalFiles;
         const overallProgress = progress / totalFiles;
         this.registry.updateModel(modelId, { downloadProgress: overallProgress });
         this.emitDownloadProgress({
@@ -240,16 +241,21 @@ export class ModelDownloader {
           filesCompleted: 0,
           filesTotal: totalFiles,
         });
-      });
+      };
 
-      await this.storeInOPFS(modelId, primaryData);
+      let primarySize = await this.downloadAndStoreStreaming(model.url, modelId, primaryProgressCb);
+      if (primarySize === null) {
+        const primaryData = await this.downloadFile(model.url, primaryProgressCb);
+        await this.storeInOPFS(modelId, primaryData);
+        primarySize = primaryData.length;
+      }
 
       // Download additional files (e.g., mmproj for VLM)
       if (model.additionalFiles && model.additionalFiles.length > 0) {
         for (let i = 0; i < model.additionalFiles.length; i++) {
           const file = model.additionalFiles[i];
           const fileKey = this.additionalFileKey(modelId, file.filename);
-          const fileData = await this.downloadFile(file.url, (progress, bytesDown, bytesTotal) => {
+          const fileProgressCb = (progress: number, bytesDown: number, bytesTotal: number) => {
             const baseProgress = (1 + i) / totalFiles;
             const fileProgress = progress / totalFiles;
             const overallProgress = baseProgress + fileProgress;
@@ -264,8 +270,13 @@ export class ModelDownloader {
               filesCompleted: 1 + i,
               filesTotal: totalFiles,
             });
-          });
-          await this.storeInOPFS(fileKey, fileData);
+          };
+
+          const streamedSize = await this.downloadAndStoreStreaming(file.url, fileKey, fileProgressCb);
+          if (streamedSize === null) {
+            const fileData = await this.downloadFile(file.url, fileProgressCb);
+            await this.storeInOPFS(fileKey, fileData);
+          }
         }
       }
 
@@ -280,7 +291,7 @@ export class ModelDownloader {
         filesTotal: totalFiles,
       });
 
-      let totalSize = primaryData.length;
+      let totalSize = primarySize;
       if (model.additionalFiles) {
         for (const file of model.additionalFiles) {
           const fileKey = this.additionalFileKey(modelId, file.filename);
@@ -357,6 +368,56 @@ export class ModelDownloader {
     }
 
     return data;
+  }
+
+  /**
+   * Download a file and stream it directly to persistent storage (OPFS or local FS)
+   * without buffering the entire payload in memory.
+   *
+   * Returns the total bytes downloaded. Falls back to buffered download + store
+   * if streaming write is not supported or fails.
+   *
+   * @returns Total bytes written, or null if streaming was not possible.
+   */
+  async downloadAndStoreStreaming(
+    url: string,
+    storageKey: string,
+    onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+  ): Promise<number | null> {
+    validateModelUrl(url);
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+    if (!response.body) return null;
+
+    const total = Number(response.headers.get('content-length') || 0);
+    let received = 0;
+
+    // Build a progress-tracking pass-through stream
+    const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
+      transform: (chunk, controller) => {
+        received += chunk.length;
+        onProgress?.(total > 0 ? received / total : 0, received, total);
+        controller.enqueue(chunk);
+      },
+    });
+
+    const storageStream = response.body.pipeThrough(progressTransform);
+
+    try {
+      if (this.localFileStorage?.isReady) {
+        await this.localFileStorage.saveModelFromStream(storageKey, storageStream);
+        logger.info(`Streamed ${storageKey} to local storage (${(received / 1024 / 1024).toFixed(1)} MB)`);
+        return received;
+      }
+
+      await this.storage.saveModelFromStream(storageKey, storageStream);
+      logger.info(`Streamed ${storageKey} to OPFS (${(received / 1024 / 1024).toFixed(1)} MB)`);
+      return received;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`Streaming store failed for "${storageKey}": ${msg}, will fall back to buffered download`);
+      return null;
+    }
   }
 
   /** Store data, preferring local filesystem when available, then OPFS, then memory cache. */

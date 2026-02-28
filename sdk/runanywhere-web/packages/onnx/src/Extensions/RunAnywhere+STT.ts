@@ -27,11 +27,14 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter } from '@runanywhere/web';
+import {
+  RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, AnalyticsEmitter,
+  AudioFileLoader,
+} from '@runanywhere/web';
+import type { STTTranscriptionResult, STTTranscribeOptions, STTStreamingSession } from '@runanywhere/web';
 import { SherpaONNXBridge } from '../Foundation/SherpaONNXBridge';
-import { AudioFileLoader } from '../Infrastructure/AudioFileLoader';
 import { STTModelType } from './STTTypes';
-import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult } from './STTTypes';
+import type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles } from './STTTypes';
 
 import { loadASRHelpers } from '../Foundation/SherpaHelperLoader';
 
@@ -41,19 +44,11 @@ const logger = new SDKLogger('STT');
 const RAC_FRAMEWORK_ONNX = 0;
 
 // ---------------------------------------------------------------------------
-// STT Types (re-exported from STTTypes.ts)
+// STT Types (re-exported for backward compatibility)
 // ---------------------------------------------------------------------------
 
 export { STTModelType } from './STTTypes';
-export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles, STTTranscriptionResult, STTWord } from './STTTypes';
-
-export interface STTTranscribeOptions {
-  language?: string;
-  sampleRate?: number;
-}
-
-/** Callback for streaming STT partial results */
-export type STTStreamCallback = (text: string, isFinal: boolean) => void;
+export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles } from './STTTypes';
 
 // ---------------------------------------------------------------------------
 // Config Builders (stateless helpers)
@@ -464,21 +459,8 @@ export function getCurrentSTTModelType(): STTModelType {
 }
 
 // ---------------------------------------------------------------------------
-// Streaming Session
+// Streaming Session Implementation (interface defined in core)
 // ---------------------------------------------------------------------------
-
-export interface STTStreamingSession {
-  /** Feed audio samples to the recognizer */
-  acceptWaveform(samples: Float32Array, sampleRate?: number): void;
-  /** Signal end of audio input */
-  inputFinished(): void;
-  /** Get current partial/final result */
-  getResult(): { text: string; isEndpoint: boolean };
-  /** Reset after endpoint */
-  reset(): void;
-  /** Destroy the streaming session */
-  destroy(): void;
-}
 
 class STTStreamingSessionImpl implements STTStreamingSession {
   private _stream: number;

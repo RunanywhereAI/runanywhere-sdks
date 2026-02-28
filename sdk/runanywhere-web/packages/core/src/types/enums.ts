@@ -37,12 +37,19 @@ export enum LLMFramework {
 }
 
 export enum ModelCategory {
+  /** Large Language Models (LLM) for text generation. */
   Language = 'language',
+  /** Speech-to-Text (STT) transcription models (~105 MB+). */
   SpeechRecognition = 'speech-recognition',
+  /** Text-to-Speech (TTS) synthesis models. */
   SpeechSynthesis = 'speech-synthesis',
+  /** Vision-Language Models (VLM) for image understanding. */
   Vision = 'vision',
+  /** Diffusion / image generation models. */
   ImageGeneration = 'image-generation',
+  /** Models combining multiple modalities. */
   Multimodal = 'multimodal',
+  /** Voice Activity Detection (VAD) — detects speech boundaries (~5 MB). Not transcription — use SpeechRecognition for STT. */
   Audio = 'audio',
 }
 

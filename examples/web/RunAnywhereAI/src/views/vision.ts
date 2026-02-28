@@ -12,7 +12,8 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
-import { VLMWorkerBridge, VideoCapture, type CapturedFrame } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
+import { VideoCapture, type CapturedFrame } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { VLMWorkerBridge } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/index';
 
 // ---------------------------------------------------------------------------
 // Constants (matching iOS VLMViewModel defaults)
@@ -412,7 +413,7 @@ async function processFrame(frame: CapturedFrame, prompt: string, maxTokens: num
       frame.width,
       frame.height,
       prompt,
-      { maxTokens, temperature: 0.7 },
+      { maxTokens, temperature: 0.7, systemPrompt: 'You are a helpful assistant.' },
     );
 
     // Compute metrics from JS wall clock

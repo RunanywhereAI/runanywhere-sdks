@@ -12,7 +12,9 @@
  *   - Completion callbacks
  */
 
-import { SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
+import { SDKLogger } from '../Foundation/SDKLogger';
+import { EventBus } from '../Foundation/EventBus';
+import { SDKEventType } from '../types/enums';
 
 const logger = new SDKLogger('AudioPlayback');
 

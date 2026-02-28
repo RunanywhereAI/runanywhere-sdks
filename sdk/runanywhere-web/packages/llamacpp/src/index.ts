@@ -22,12 +22,16 @@
 
 // Module facade & provider
 export { LlamaCPP, autoRegister } from './LlamaCPP';
+export type { LlamaCPPRegisterOptions } from './LlamaCPP';
 export { LlamaCppProvider } from './LlamaCppProvider';
 
-// Extensions
+// Foundation (WASM bridge — exposed for advanced URL override)
+export { LlamaCppBridge } from './Foundation/LlamaCppBridge';
+export type { LlamaCppModule } from './Foundation/LlamaCppBridge';
+
+// Extensions (backend-specific implementations)
 export { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
-export { VLM, VLMImageFormat, VLMModelFamily } from './Extensions/RunAnywhere+VLM';
-export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Extensions/RunAnywhere+VLM';
+export { VLM, VLMModelFamily } from './Extensions/RunAnywhere+VLM';
 export { ToolCalling, ToolCallFormat, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Extensions/RunAnywhere+ToolCalling';
 export type {
   ToolValue, ToolParameterType, ToolParameter, ToolDefinition,
@@ -42,9 +46,6 @@ export { Embeddings } from './Extensions/RunAnywhere+Embeddings';
 export { EmbeddingsNormalize, EmbeddingsPooling } from './Extensions/RunAnywhere+Embeddings';
 export type { EmbeddingVector, EmbeddingsResult, EmbeddingsOptions } from './Extensions/RunAnywhere+Embeddings';
 
-// Types
-export type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from './types/LLMTypes';
-
 // Telemetry & Analytics
 export { TelemetryService, getOrCreateDeviceId } from './Foundation/TelemetryService';
 
@@ -54,6 +55,4 @@ export type {
   VLMWorkerResult, VLMLoadModelParams, VLMProcessOptions,
   VLMWorkerCommand, VLMWorkerResponse, ProgressListener,
 } from './Infrastructure/VLMWorkerBridge';
-export { VideoCapture } from './Infrastructure/VideoCapture';
-export type { VideoCaptureConfig, CapturedFrame } from './Infrastructure/VideoCapture';
 export { startVLMWorkerRuntime } from './Infrastructure/VLMWorkerRuntime';
