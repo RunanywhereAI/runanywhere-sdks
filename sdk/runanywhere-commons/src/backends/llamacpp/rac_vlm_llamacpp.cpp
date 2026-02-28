@@ -785,8 +785,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
                     if (logits[v] > 1e30f || logits[v] < -1e30f) inf_count++;
                     if (logits[v] > max_logit) { max_logit = logits[v]; max_idx = v; }
                 }
-                RAC_LOG_INFO(LOG_CAT, "[v3-diag] Logits: n_vocab=%d, max_logit=%.4f at token %d, NaN=%d, Inf=%d",
-                             n_vocab, max_logit, max_idx, nan_count, inf_count);
+                RAC_LOG_DEBUG(LOG_CAT, "[v3-diag] Logits: n_vocab=%d, max_logit=%.4f at token %d, NaN=%d, Inf=%d",
+                              n_vocab, max_logit, max_idx, nan_count, inf_count);
                 // Log top 5 logits
                 float top5_val[5] = {-1e30f, -1e30f, -1e30f, -1e30f, -1e30f};
                 int   top5_idx[5] = {0, 0, 0, 0, 0};
@@ -800,10 +800,10 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
                         }
                     }
                 }
-                RAC_LOG_INFO(LOG_CAT, "[v3-diag] Top5: [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f",
-                             top5_idx[0], top5_val[0], top5_idx[1], top5_val[1],
-                             top5_idx[2], top5_val[2], top5_idx[3], top5_val[3],
-                             top5_idx[4], top5_val[4]);
+                RAC_LOG_DEBUG(LOG_CAT, "[v3-diag] Top5: [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f",
+                              top5_idx[0], top5_val[0], top5_idx[1], top5_val[1],
+                              top5_idx[2], top5_val[2], top5_idx[3], top5_val[3],
+                              top5_idx[4], top5_val[4]);
             }
         }
 
