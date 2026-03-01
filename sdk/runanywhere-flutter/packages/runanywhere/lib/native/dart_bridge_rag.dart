@@ -288,7 +288,6 @@ class DartBridgeRAG {
         throw Exception('Failed to create RAG pipeline: error $result');
       }
 
-      // Destroy existing pipeline if any
       if (_pipeline != null) {
         destroyPipeline();
       }
@@ -397,7 +396,6 @@ class DartBridgeRAG {
         throw Exception('RAG query failed: error $status');
       }
 
-      // Convert C result to Dart
       final answer = cResult.ref.answer != nullptr
           ? cResult.ref.answer.toDartString()
           : '';

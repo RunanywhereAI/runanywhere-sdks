@@ -234,6 +234,8 @@ class DartBridgeModelRegistry {
         return 5; // RAC_MODEL_CATEGORY_MULTIMODAL
       case public_types.ModelCategory.audio:
         return 6; // RAC_MODEL_CATEGORY_AUDIO
+      case public_types.ModelCategory.embedding:
+        return 7; // RAC_MODEL_CATEGORY_EMBEDDING
     }
   }
 
@@ -311,6 +313,8 @@ class DartBridgeModelRegistry {
         return public_types.ModelCategory.multimodal;
       case 6:
         return public_types.ModelCategory.audio;
+      case 7:
+        return public_types.ModelCategory.embedding;
       default:
         return public_types.ModelCategory.language;
     }
