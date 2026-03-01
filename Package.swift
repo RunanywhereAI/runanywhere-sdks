@@ -37,7 +37,7 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -146,7 +146,6 @@ let package = Package(
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
                 "RACommonsBinary",
-                "RABackendRAGBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
@@ -256,10 +255,6 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
-            .binaryTarget(
-                name: "RABackendRAGBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendRAG.xcframework"
-            ),
         ]
 
         // ONNX Runtime xcframeworks - split by platform
@@ -310,14 +305,6 @@ func binaryTargets() -> [Target] {
                 checksum: "f73db9dc09012325b35fd3da74de794a75f4e9971d9b923af0805d6ab1dfc243"
             ),
         ]
-
-        targets.append(
-            .binaryTarget(
-                name: "RABackendRAGBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendRAG-v\(sdkVersion).zip",
-                checksum: "0000000000000000000000000000000000000000000000000000000000000000" // TODO: Replace with actual checksum on release
-            )
-        )
 
         return targets
     }

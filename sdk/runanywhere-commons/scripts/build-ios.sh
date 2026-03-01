@@ -24,10 +24,9 @@
 #   --help              Show this help
 #
 # OUTPUTS:
-#   dist/RACommons.xcframework                 (always built)
+#   dist/RACommons.xcframework                 (always built, includes RAG pipeline)
 #   dist/RABackendLLAMACPP.xcframework         (if --backend llamacpp or all)
 #   dist/RABackendONNX.xcframework             (if --backend onnx or all)
-#   dist/RABackendRAG.xcframework              (if --backend rag or all)
 #
 # EXAMPLES:
 #   # Full build (all backends, iOS only)
@@ -730,20 +729,49 @@ main() {
         build_macos
     fi
 
-    # Step 3: Create RACommons.xcframework
+    # Step 3: Merge RAG pipeline into rac_commons (RAG is a feature, not a separate backend)
+    if [[ "$SKIP_BACKENDS" != true ]]; then
+        log_step "Merging RAG pipeline into rac_commons..."
+        local MERGE_PLATFORMS="OS SIMULATORARM64 SIMULATOR"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            MERGE_PLATFORMS="$MERGE_PLATFORMS MACOS"
+        fi
+        for PLATFORM in $MERGE_PLATFORMS; do
+            local PLATFORM_DIR="${BUILD_DIR}/${PLATFORM}"
+            local COMMONS_LIB="${PLATFORM_DIR}/librac_commons.a"
+            local RAG_LIB=""
+
+            for possible_path in \
+                "${PLATFORM_DIR}/src/features/rag/librac_backend_rag.a" \
+                "${PLATFORM_DIR}/src/backends/rag/librac_backend_rag.a" \
+                "${PLATFORM_DIR}/librac_backend_rag.a"; do
+                if [[ -f "$possible_path" ]]; then
+                    RAG_LIB="$possible_path"
+                    break
+                fi
+            done
+
+            if [[ -n "$RAG_LIB" && -f "$COMMONS_LIB" ]]; then
+                libtool -static -o "${COMMONS_LIB}.merged" "$COMMONS_LIB" "$RAG_LIB"
+                mv "${COMMONS_LIB}.merged" "$COMMONS_LIB"
+                log_info "  ${PLATFORM}: Merged librac_backend_rag.a into librac_commons.a"
+            elif [[ -f "$COMMONS_LIB" ]]; then
+                log_warn "  ${PLATFORM}: librac_backend_rag.a not found — RAG not merged"
+            fi
+        done
+    fi
+
+    # Step 4: Create RACommons.xcframework (now includes RAG pipeline)
     log_header "Creating XCFrameworks"
     create_xcframework "rac_commons" "RACommons"
 
-    # Step 4: Create backend XCFrameworks
+    # Step 5: Create backend XCFrameworks
     if [[ "$SKIP_BACKENDS" != true ]]; then
         if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "llamacpp" ]]; then
             create_backend_xcframework "llamacpp" "RABackendLLAMACPP"
         fi
         if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" ]]; then
             create_backend_xcframework "onnx" "RABackendONNX"
-        fi
-        if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "rag" ]]; then
-            create_backend_xcframework "rag" "RABackendRAG"
         fi
     fi
 
