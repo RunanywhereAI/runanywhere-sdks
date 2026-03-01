@@ -29,12 +29,12 @@ void perform_recursive_chunking(
         const char* start_ptr = text_view.data();
         size_t start_pos = start_ptr - original_text.data();
         size_t end_pos = start_pos + text_view.length();
-        
+
         TextChunk chunk;
         chunk.text = original_text.substr(start_pos, end_pos - start_pos);
         chunk.start_position = start_pos;
         chunk.end_position = end_pos;
-        
+
         size_t first = chunk.text.find_first_not_of(" \t\n\r");
         size_t last = chunk.text.find_last_not_of(" \t\n\r");
         if (first != std::string::npos && last != std::string::npos) {
@@ -91,12 +91,12 @@ void perform_recursive_chunking(
         const char* end_ptr = current_batch.back().data() + current_batch.back().length();
         size_t start_pos = start_ptr - original_text.data();
         size_t end_pos = end_ptr - original_text.data();
-        
+
         TextChunk chunk;
         chunk.text = original_text.substr(start_pos, end_pos - start_pos);
         chunk.start_position = start_pos;
         chunk.end_position = end_pos;
-        
+
         size_t first = chunk.text.find_first_not_of(" \t\n\r");
         size_t last = chunk.text.find_last_not_of(" \t\n\r");
         if (first != std::string::npos && last != std::string::npos) {
@@ -115,12 +115,12 @@ void perform_recursive_chunking(
 
     for (size_t i = 0; i < splits.size(); ++i) {
         auto split = splits[i];
-        
+
         if (split.length() > chunk_size_chars) {
             emit_chunk();
             current_batch.clear();
             current_length = 0;
-            
+
             if (!next_separators.empty()) {
                 perform_recursive_chunking(split, original_text, next_separators, chunk_size_chars, chunk_overlap_chars, output_chunks, chunk_index);
             } else {
@@ -147,16 +147,17 @@ void perform_recursive_chunking(
                 current_batch.erase(current_batch.begin());
             }
         }
-        
+
         current_batch.push_back(split);
         current_length += split.length();
     }
-    
+
     if (!current_batch.empty()) {
         emit_chunk();
     }
 }
 
+} // anonymous namespace
 
 DocumentChunker::DocumentChunker(const ChunkerConfig& config) : config_(config) {}
 
@@ -167,10 +168,10 @@ std::vector<TextChunk> DocumentChunker::chunk_document(const std::string& text) 
 
     std::vector<TextChunk> chunks;
     size_t chunk_index = 0;
-    
+
     size_t chunk_size_chars = config_.chunk_size * config_.chars_per_token;
     size_t overlap_chars = config_.chunk_overlap * config_.chars_per_token;
-    
+
     // Hierarchy of separators for standard English text
     std::vector<std::string> separators = {"\n\n", "\n", ". ", "? ", "! ", "; ", ", ", " ", ""};
 
@@ -213,7 +214,7 @@ std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string&
 
     for (size_t i = 0; i < text.length(); ++i) {
         char c = text[i];
-        
+
         // Check for sentence endings
         if (c == '.' || c == '!' || c == '?' || c == '\n') {
             // Look ahead for whitespace
