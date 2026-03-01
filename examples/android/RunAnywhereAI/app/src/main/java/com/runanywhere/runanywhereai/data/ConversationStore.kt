@@ -12,6 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -79,9 +80,7 @@ class ConversationStore private constructor(context: Context) {
                 performanceSummary = null,
             )
 
-        val updated = _conversations.value.toMutableList()
-        updated.add(0, conversation)
-        _conversations.value = updated
+        _conversations.update { list -> listOf(conversation) + list }
         _currentConversation.value = conversation
 
         saveConversation(conversation)
@@ -93,13 +92,16 @@ class ConversationStore private constructor(context: Context) {
      * If not present (by id), adds it at the front so it appears in history.
      */
     fun ensureConversationInList(conversation: Conversation) {
-        val index = _conversations.value.indexOfFirst { it.id == conversation.id }
-        if (index == -1) {
-            val list = _conversations.value.toMutableList()
-            list.add(0, conversation)
-            _conversations.value = list
-            saveConversation(conversation)
+        var wasAdded = false
+        _conversations.update { list ->
+            if (list.any { it.id == conversation.id }) {
+                list
+            } else {
+                wasAdded = true
+                listOf(conversation) + list
+            }
         }
+        if (wasAdded) saveConversation(conversation)
     }
 
     /**
@@ -107,17 +109,19 @@ class ConversationStore private constructor(context: Context) {
      */
     fun updateConversation(conversation: Conversation) {
         val updated = conversation.copy(updatedAt = System.currentTimeMillis())
-
-        val index = _conversations.value.indexOfFirst { it.id == conversation.id }
-        if (index != -1) {
-            val list = _conversations.value.toMutableList()
-            list[index] = updated
-            _conversations.value = list
-
+        var found = false
+        _conversations.update { list ->
+            list.map {
+                if (it.id == conversation.id) {
+                    found = true
+                    updated
+                } else it
+            }
+        }
+        if (found) {
             if (_currentConversation.value?.id == conversation.id) {
                 _currentConversation.value = updated
             }
-
             saveConversation(updated)
         }
     }
@@ -126,7 +130,7 @@ class ConversationStore private constructor(context: Context) {
      * Delete a conversation
      */
     fun deleteConversation(conversation: Conversation) {
-        _conversations.value = _conversations.value.filter { it.id != conversation.id }
+        _conversations.update { list -> list.filter { it.id != conversation.id } }
 
         if (_currentConversation.value?.id == conversation.id) {
             _currentConversation.value = _conversations.value.firstOrNull()
@@ -183,9 +187,7 @@ class ConversationStore private constructor(context: Context) {
             try {
                 val jsonString = file.readText()
                 val loaded = json.decodeFromString<Conversation>(jsonString)
-                val list = _conversations.value.toMutableList()
-                list.add(loaded)
-                _conversations.value = list
+                _conversations.update { list -> list + loaded }
                 _currentConversation.value = loaded
                 return loaded
             } catch (e: Exception) {

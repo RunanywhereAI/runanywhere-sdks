@@ -60,8 +60,7 @@ fun AppNavigation() {
     val topBarState = remember { TopBarState() }
 
     val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val isKeyboardOpen = imeBottom > 0
+    val isKeyboardOpen = WindowInsets.ime.getBottom(density) > 0
 
     CompositionLocalProvider(LocalTopBarState provides topBarState) {
         Scaffold(
@@ -146,9 +145,6 @@ fun AppNavigation() {
                     VisionHubScreen(
                         onNavigateToVLM = {
                             navController.navigate(NavigationRoute.VLM)
-                        },
-                        onNavigateToImageGeneration = {
-                            // Future
                         },
                     )
                 }

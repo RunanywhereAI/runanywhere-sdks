@@ -1,151 +1,153 @@
 package com.runanywhere.runanywhereai.ui.theme
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * Comprehensive dimension system matching iOS ChatInterfaceView exactly
- * Reference: iOS ChatInterfaceView.swift design specifications
- * All values extracted from iOS implementation for pixel-perfect Android replication
+ * Comprehensive dimension system matching iOS ChatInterfaceView exactly.
+ * All values are responsive — they scale with screen width via [rDp].
+ * Design baseline: 360dp (standard phone).
  */
 object Dimensions {
     // Padding Values
-    val xxSmall = 2.dp
-    val xSmall = 4.dp
-    val small = 6.dp
-    val smallMedium = 8.dp
-    val medium = 10.dp
-    val mediumLarge = 12.dp
-    val regular = 14.dp
-    val large = 16.dp
-    val xLarge = 20.dp
-    val xxLarge = 30.dp
-    val xxxLarge = 40.dp
-    val huge = 40.dp
+    val xxSmall: Dp @Composable get() = rDp(2.dp)
+    val xSmall: Dp @Composable get() = rDp(4.dp)
+    val small: Dp @Composable get() = rDp(6.dp)
+    val smallMedium: Dp @Composable get() = rDp(8.dp)
+    val medium: Dp @Composable get() = rDp(10.dp)
+    val mediumLarge: Dp @Composable get() = rDp(12.dp)
+    val regular: Dp @Composable get() = rDp(14.dp)
+    val large: Dp @Composable get() = rDp(16.dp)
+    val xLarge: Dp @Composable get() = rDp(20.dp)
+    val xxLarge: Dp @Composable get() = rDp(30.dp)
+    val xxxLarge: Dp @Composable get() = rDp(40.dp)
+    val huge: Dp @Composable get() = rDp(40.dp)
 
     // Specific paddings
-    val padding4 = 4.dp
-    val padding6 = 6.dp
-    val padding8 = 8.dp
-    val padding9 = 9.dp
-    val padding10 = 10.dp
-    val padding12 = 12.dp
-    val padding14 = 14.dp
-    val padding15 = 15.dp
-    val padding16 = 16.dp
-    val padding20 = 20.dp
-    val padding30 = 30.dp
-    val padding40 = 40.dp
-    val padding60 = 60.dp
-    val padding100 = 100.dp
+    val padding4: Dp @Composable get() = rDp(4.dp)
+    val padding6: Dp @Composable get() = rDp(6.dp)
+    val padding8: Dp @Composable get() = rDp(8.dp)
+    val padding9: Dp @Composable get() = rDp(9.dp)
+    val padding10: Dp @Composable get() = rDp(10.dp)
+    val padding12: Dp @Composable get() = rDp(12.dp)
+    val padding14: Dp @Composable get() = rDp(14.dp)
+    val padding15: Dp @Composable get() = rDp(15.dp)
+    val padding16: Dp @Composable get() = rDp(16.dp)
+    val padding20: Dp @Composable get() = rDp(20.dp)
+    val padding30: Dp @Composable get() = rDp(30.dp)
+    val padding40: Dp @Composable get() = rDp(40.dp)
+    val padding60: Dp @Composable get() = rDp(60.dp)
+    val padding100: Dp @Composable get() = rDp(100.dp)
 
     // Corner Radius
-    val cornerRadiusSmall = 4.dp
-    val cornerRadiusMedium = 6.dp
-    val cornerRadiusRegular = 8.dp
-    val cornerRadiusLarge = 10.dp
-    val cornerRadiusXLarge = 12.dp
-    val cornerRadiusXXLarge = 14.dp
-    val cornerRadiusCard = 16.dp
-    val cornerRadiusBubble = 18.dp
-    val cornerRadiusModal = 20.dp
+    val cornerRadiusSmall: Dp @Composable get() = rDp(4.dp)
+    val cornerRadiusMedium: Dp @Composable get() = rDp(6.dp)
+    val cornerRadiusRegular: Dp @Composable get() = rDp(8.dp)
+    val cornerRadiusLarge: Dp @Composable get() = rDp(10.dp)
+    val cornerRadiusXLarge: Dp @Composable get() = rDp(12.dp)
+    val cornerRadiusXXLarge: Dp @Composable get() = rDp(14.dp)
+    val cornerRadiusCard: Dp @Composable get() = rDp(16.dp)
+    val cornerRadiusBubble: Dp @Composable get() = rDp(18.dp)
+    val cornerRadiusModal: Dp @Composable get() = rDp(20.dp)
 
     // Icon Sizes
-    val iconSmall = 8.dp
-    val iconRegular = 18.dp
-    val iconMedium = 28.dp
-    val iconLarge = 48.dp
-    val iconXLarge = 60.dp
-    val iconXXLarge = 72.dp
-    val iconHuge = 80.dp
+    val iconSmall: Dp @Composable get() = rDp(8.dp)
+    val iconRegular: Dp @Composable get() = rDp(18.dp)
+    val iconMedium: Dp @Composable get() = rDp(28.dp)
+    val iconLarge: Dp @Composable get() = rDp(48.dp)
+    val iconXLarge: Dp @Composable get() = rDp(60.dp)
+    val iconXXLarge: Dp @Composable get() = rDp(72.dp)
+    val iconHuge: Dp @Composable get() = rDp(80.dp)
 
     // Button Heights
-    val buttonHeightSmall = 28.dp
-    val buttonHeightRegular = 44.dp
-    val buttonHeightLarge = 72.dp
+    val buttonHeightSmall: Dp @Composable get() = rDp(28.dp)
+    val buttonHeightRegular: Dp @Composable get() = rDp(44.dp)
+    val buttonHeightLarge: Dp @Composable get() = rDp(72.dp)
 
     // Frame Sizes
-    val minFrameHeight = 150.dp
-    val maxFrameHeight = 150.dp
+    val minFrameHeight: Dp @Composable get() = rDp(150.dp)
+    val maxFrameHeight: Dp @Composable get() = rDp(150.dp)
 
     // Stroke Widths
-    val strokeThin = 0.5.dp
-    val strokeRegular = 1.dp
-    val strokeMedium = 2.dp
+    val strokeThin: Dp @Composable get() = rDp(0.5.dp)
+    val strokeRegular: Dp @Composable get() = rDp(1.dp)
+    val strokeMedium: Dp @Composable get() = rDp(2.dp)
 
     // Shadow Radius
-    val shadowSmall = 2.dp
-    val shadowMedium = 3.dp
-    val shadowLarge = 4.dp
-    val shadowXLarge = 10.dp
+    val shadowSmall: Dp @Composable get() = rDp(2.dp)
+    val shadowMedium: Dp @Composable get() = rDp(3.dp)
+    val shadowLarge: Dp @Composable get() = rDp(4.dp)
+    val shadowXLarge: Dp @Composable get() = rDp(10.dp)
 
     // Chat-Specific Dimensions
 
-    // Message Bubbles — ChatGPT-style
-    val messageBubbleCornerRadius = cornerRadiusBubble // 18.dp
-    val messageBubblePaddingHorizontal = mediumLarge // 12.dp
-    val messageBubblePaddingVertical = padding10 // 10.dp
-    val messageBubbleShadowRadius = shadowLarge // 4.dp
-    val messageBubbleMinSpacing = padding60 // 60.dp (for alignment, legacy)
-    val messageSpacingBetween = mediumLarge // 12.dp
-    val messageMaxWidthFraction = 0.85f // fraction-based width for user messages
+    // Message Bubbles
+    val messageBubbleCornerRadius: Dp @Composable get() = rDp(18.dp)
+    val messageBubblePaddingHorizontal: Dp @Composable get() = rDp(12.dp)
+    val messageBubblePaddingVertical: Dp @Composable get() = rDp(10.dp)
+    val messageBubbleShadowRadius: Dp @Composable get() = rDp(4.dp)
+    val messageBubbleMinSpacing: Dp @Composable get() = rDp(60.dp)
+    val messageSpacingBetween: Dp @Composable get() = rDp(12.dp)
+    val messageMaxWidthFraction = 0.85f
 
     // Assistant message icon
-    val assistantIconSize = 20.dp
-    val assistantIconSpacing = 10.dp
+    val assistantIconSize: Dp @Composable get() = rDp(20.dp)
+    val assistantIconSpacing: Dp @Composable get() = rDp(10.dp)
 
-    // User bubble (simplified)
-    val userBubbleCornerRadius = cornerRadiusBubble // 18.dp
+    // User bubble
+    val userBubbleCornerRadius: Dp @Composable get() = rDp(18.dp)
 
     // Thinking Section
-    val thinkingSectionCornerRadius = mediumLarge // 12.dp
-    val thinkingSectionPaddingHorizontal = regular // 14.dp
-    val thinkingSectionPaddingVertical = padding9 // 9.dp
-    val thinkingContentCornerRadius = medium // 10.dp
-    val thinkingContentPadding = mediumLarge // 12.dp
-    val thinkingContentMaxHeight = minFrameHeight // 150.dp
+    val thinkingSectionCornerRadius: Dp @Composable get() = rDp(12.dp)
+    val thinkingSectionPaddingHorizontal: Dp @Composable get() = rDp(14.dp)
+    val thinkingSectionPaddingVertical: Dp @Composable get() = rDp(9.dp)
+    val thinkingContentCornerRadius: Dp @Composable get() = rDp(10.dp)
+    val thinkingContentPadding: Dp @Composable get() = rDp(12.dp)
+    val thinkingContentMaxHeight: Dp @Composable get() = rDp(150.dp)
 
     // Model Badge
-    val modelBadgePaddingHorizontal = medium // 10.dp
-    val modelBadgePaddingVertical = 5.dp
-    val modelBadgeCornerRadius = regular // 14.dp
-    val modelBadgeSpacing = smallMedium // 8.dp
+    val modelBadgePaddingHorizontal: Dp @Composable get() = rDp(10.dp)
+    val modelBadgePaddingVertical: Dp @Composable get() = rDp(5.dp)
+    val modelBadgeCornerRadius: Dp @Composable get() = rDp(14.dp)
+    val modelBadgeSpacing: Dp @Composable get() = rDp(8.dp)
 
     // Model Info Bar
-    val modelInfoBarPaddingHorizontal = large // 16.dp
-    val modelInfoBarPaddingVertical = small // 6.dp
-    val modelInfoFrameworkBadgeCornerRadius = cornerRadiusSmall // 4.dp
-    val modelInfoFrameworkBadgePaddingHorizontal = small // 6.dp
-    val modelInfoFrameworkBadgePaddingVertical = xSmall // 2.dp
-    val modelInfoStatsIconTextSpacing = 3.dp
-    val modelInfoStatsItemSpacing = mediumLarge // 12.dp
+    val modelInfoBarPaddingHorizontal: Dp @Composable get() = rDp(16.dp)
+    val modelInfoBarPaddingVertical: Dp @Composable get() = rDp(6.dp)
+    val modelInfoFrameworkBadgeCornerRadius: Dp @Composable get() = rDp(4.dp)
+    val modelInfoFrameworkBadgePaddingHorizontal: Dp @Composable get() = rDp(6.dp)
+    val modelInfoFrameworkBadgePaddingVertical: Dp @Composable get() = rDp(2.dp)
+    val modelInfoStatsIconTextSpacing: Dp @Composable get() = rDp(3.dp)
+    val modelInfoStatsItemSpacing: Dp @Composable get() = rDp(12.dp)
 
     // Input Area
-    val inputAreaPadding = large // 16.dp
-    val inputFieldButtonSpacing = mediumLarge // 12.dp
-    val sendButtonSize = iconMedium // 28.dp
+    val inputAreaPadding: Dp @Composable get() = rDp(16.dp)
+    val inputFieldButtonSpacing: Dp @Composable get() = rDp(12.dp)
+    val sendButtonSize: Dp @Composable get() = rDp(28.dp)
 
     // Typing Indicator
-    val typingIndicatorDotSize = iconSmall // 8.dp
-    val typingIndicatorDotSpacing = xSmall // 4.dp
-    val typingIndicatorPaddingHorizontal = mediumLarge // 12.dp
-    val typingIndicatorPaddingVertical = smallMedium // 8.dp
-    val typingIndicatorCornerRadius = medium // 10.dp
-    val typingIndicatorTextSpacing = mediumLarge // 12.dp
+    val typingIndicatorDotSize: Dp @Composable get() = rDp(8.dp)
+    val typingIndicatorDotSpacing: Dp @Composable get() = rDp(4.dp)
+    val typingIndicatorPaddingHorizontal: Dp @Composable get() = rDp(12.dp)
+    val typingIndicatorPaddingVertical: Dp @Composable get() = rDp(8.dp)
+    val typingIndicatorCornerRadius: Dp @Composable get() = rDp(10.dp)
+    val typingIndicatorTextSpacing: Dp @Composable get() = rDp(12.dp)
 
     // Empty State
-    val emptyStateIconSize = iconXLarge // 60.dp
-    val emptyStateIconTextSpacing = large // 16.dp
-    val emptyStateTitleSubtitleSpacing = smallMedium // 8.dp
+    val emptyStateIconSize: Dp @Composable get() = rDp(60.dp)
+    val emptyStateIconTextSpacing: Dp @Composable get() = rDp(16.dp)
+    val emptyStateTitleSubtitleSpacing: Dp @Composable get() = rDp(8.dp)
 
     // Toolbar
-    val toolbarButtonSpacing = smallMedium // 8.dp
-    val toolbarHeight = buttonHeightRegular // 44.dp
+    val toolbarButtonSpacing: Dp @Composable get() = rDp(8.dp)
+    val toolbarHeight: Dp @Composable get() = rDp(44.dp)
 
     // Max Widths
-    val messageBubbleMaxWidth = 280.dp
-    val maxContentWidth = 700.dp
-    val contextMenuMaxWidth = 280.dp
+    val messageBubbleMaxWidth: Dp @Composable get() = rDp(280.dp)
+    val maxContentWidth: Dp @Composable get() = rDp(700.dp)
+    val contextMenuMaxWidth: Dp @Composable get() = rDp(280.dp)
 
     // LoRA
-    val loraScaleSliderHeight = 32.dp
+    val loraScaleSliderHeight: Dp @Composable get() = rDp(32.dp)
 }

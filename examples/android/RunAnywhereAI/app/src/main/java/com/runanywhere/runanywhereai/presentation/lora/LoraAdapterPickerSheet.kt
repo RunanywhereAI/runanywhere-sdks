@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.PlayArrow
@@ -35,7 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -43,8 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
@@ -60,7 +65,7 @@ fun LoraAdapterPickerSheet(
     loraViewModel: LoraViewModel,
     onDismiss: () -> Unit,
 ) {
-    val state by loraViewModel.uiState.collectAsState()
+    val state by loraViewModel.uiState.collectAsStateWithLifecycle()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -181,33 +186,80 @@ private fun LoadedAdapterRow(
     adapter: LoRAAdapterInfo,
     onRemove: () -> Unit,
 ) {
-    Row(
+    val clipboardManager = LocalClipboardManager.current
+    val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(Dimensions.mediumLarge),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                adapter.path.substringAfterLast("/"),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                "Scale: %.2f".format(adapter.scale),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    adapter.path.substringAfterLast("/"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                Text(
+                    "Scale: %.2f".format(adapter.scale),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onRemove) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Remove",
+                    tint = AppColors.primaryRed,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
-        IconButton(onClick = onRemove) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "Remove",
-                tint = AppColors.primaryRed,
-                modifier = Modifier.size(20.dp),
+
+        // Example prompts
+        if (examplePrompts.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+            Text(
+                "Try it out:",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
             )
+            Spacer(modifier = Modifier.height(Dimensions.xSmall))
+            examplePrompts.forEach { prompt ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Dimensions.xxSmall),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "\u201C$prompt\u201D",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColors.primaryPurple,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    IconButton(
+                        onClick = { clipboardManager.setText(AnnotatedString(prompt)) },
+                        modifier = Modifier.size(Dimensions.iconRegular),
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy prompt",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(Dimensions.regular),
+                        )
+                    }
+                }
+            }
         }
     }
 }

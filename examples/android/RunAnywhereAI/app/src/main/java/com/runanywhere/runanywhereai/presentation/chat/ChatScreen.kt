@@ -894,7 +894,6 @@ fun ThinkingToggle(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 shape = RoundedCornerShape(Dimensions.cornerRadiusRegular),
             ) {
-                val scrollState = rememberScrollState()
                 Text(
                     text = thinkingContent,
                     style = MaterialTheme.typography.bodySmall.copy(
@@ -903,8 +902,8 @@ fun ThinkingToggle(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .heightIn(max = 200.dp)
-                        .verticalScroll(scrollState)
                         .padding(Dimensions.mediumLarge),
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -1101,15 +1100,12 @@ fun EmptyStateView(
                 // Small delay before starting auto-scroll
                 kotlinx.coroutines.delay(800)
                 while (!userHasScrolled) {
-                    val currentOffset = promptListState.firstVisibleItemScrollOffset
                     promptListState.animateScrollBy(
                         value = 1.5f,
                         animationSpec = tween(durationMillis = 16, easing = LinearEasing),
                     )
                     // If we can't scroll further, wrap back to start
-                    if (promptListState.firstVisibleItemScrollOffset == currentOffset &&
-                        promptListState.firstVisibleItemIndex == promptListState.layoutInfo.totalItemsCount - 1
-                    ) {
+                    if (!promptListState.canScrollForward) {
                         promptListState.scrollToItem(0)
                     }
                     kotlinx.coroutines.delay(16)
@@ -1331,7 +1327,8 @@ fun ConversationListSheet(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.85f),
+                    .fillMaxHeight(0.85f)
+                    .imePadding(),
         ) {
             // Header
             Row(

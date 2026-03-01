@@ -9,6 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -411,7 +414,7 @@ private fun DescriptionPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Description text (scrollable) — mirrors iOS ScrollView
+        // Description text — mirrors iOS ScrollView
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -470,7 +473,9 @@ private fun ControlBar(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable(enabled = !isProcessing) { onPickPhoto() },
+            modifier = Modifier
+                .clickable(enabled = !isProcessing) { onPickPhoto() }
+                .semantics { role = Role.Button },
         ) {
             Icon(
                 imageVector = Icons.Filled.Image,
@@ -489,7 +494,7 @@ private fun ControlBar(
         // Main action button (64dp circle) — mirrors iOS main action button
         val buttonColor = when {
             isAutoStreaming -> AppColors.primaryRed
-            isProcessing -> Color.Gray
+            isProcessing -> AppColors.statusGray
             else -> AppColors.primaryAccent
         }
 

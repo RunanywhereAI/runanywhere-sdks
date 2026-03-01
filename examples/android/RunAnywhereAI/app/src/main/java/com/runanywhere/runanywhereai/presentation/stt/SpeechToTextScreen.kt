@@ -672,7 +672,7 @@ private fun AudioLevelIndicator(
         repeat(barsCount) { index ->
             val isActive = index < activeBars
             val barColor by animateColorAsState(
-                targetValue = if (isActive) AppColors.primaryGreen else Color.Gray.copy(alpha = 0.3f),
+                targetValue = if (isActive) AppColors.primaryGreen else AppColors.statusGray.copy(alpha = 0.3f),
                 animationSpec = tween(100),
                 label = "bar_color_$index",
             )
@@ -919,7 +919,7 @@ private fun STTModeSelector(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        STTMode.values().forEach { mode ->
+        STTMode.entries.forEach { mode ->
             val isSelected = mode == selectedMode
             Surface(
                 modifier =
@@ -932,7 +932,7 @@ private fun STTModeSelector(
                     androidx.compose.foundation.BorderStroke(
                         1.dp,
                         if (isSelected) AppColors.primaryAccent.copy(alpha = 0.3f)
-                        else Color.Gray.copy(alpha = 0.2f),
+                        else AppColors.statusGray.copy(alpha = 0.2f),
                     ),
             ) {
                 Column(

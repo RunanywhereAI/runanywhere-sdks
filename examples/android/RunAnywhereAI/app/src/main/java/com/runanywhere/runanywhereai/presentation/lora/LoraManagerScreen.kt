@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.LinkOff
@@ -30,14 +31,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
@@ -52,7 +58,8 @@ fun LoraManagerScreen(
     onBack: () -> Unit = {},
     loraViewModel: LoraViewModel = viewModel(),
 ) {
-    val state by loraViewModel.uiState.collectAsState()
+    val state by loraViewModel.uiState.collectAsStateWithLifecycle()
+    val clipboardManager = LocalClipboardManager.current
 
     ConfigureTopBar(title = "LoRA Adapters", showBack = true, onBack = onBack)
 
@@ -74,43 +81,89 @@ fun LoraManagerScreen(
                     )
                 }
                 items(state.loadedAdapters, key = { it.path }) { adapter ->
+                    val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
+
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(Dimensions.large),
-                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    adapter.path.substringAfterLast("/"),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium,
-                                )
-                                Text(
-                                    "Scale: ${"%.2f".format(adapter.scale)}  |  ${if (adapter.applied) "Applied" else "Pending"}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Button(
-                                onClick = { loraViewModel.unloadAdapter(adapter.path) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
-                                ),
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(
-                                    Icons.Default.LinkOff,
-                                    contentDescription = null,
-                                    tint = AppColors.primaryRed,
-                                    modifier = Modifier.size(16.dp),
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        adapter.path.substringAfterLast("/"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                    )
+                                    Text(
+                                        "Scale: ${"%.2f".format(adapter.scale)}  |  ${if (adapter.applied) "Applied" else "Pending"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Button(
+                                    onClick = { loraViewModel.unloadAdapter(adapter.path) },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
+                                    ),
+                                ) {
+                                    Icon(
+                                        Icons.Default.LinkOff,
+                                        contentDescription = null,
+                                        tint = AppColors.primaryRed,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(modifier = Modifier.width(Dimensions.xSmall))
+                                    Text("Unload", color = AppColors.primaryRed)
+                                }
+                            }
+
+                            // Example prompts
+                            if (examplePrompts.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                                Text(
+                                    "Try it out:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.SemiBold,
                                 )
-                                Spacer(modifier = Modifier.width(Dimensions.xSmall))
-                                Text("Unload", color = AppColors.primaryRed)
+                                Spacer(modifier = Modifier.height(Dimensions.xSmall))
+                                examplePrompts.forEach { prompt ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = Dimensions.xxSmall),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            "\u201C$prompt\u201D",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = AppColors.primaryPurple,
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        IconButton(
+                                            onClick = { clipboardManager.setText(AnnotatedString(prompt)) },
+                                            modifier = Modifier.size(Dimensions.iconRegular),
+                                        ) {
+                                            Icon(
+                                                Icons.Default.ContentCopy,
+                                                contentDescription = "Copy prompt",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(Dimensions.regular),
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

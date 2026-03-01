@@ -575,7 +575,7 @@ private fun RAGMessageBubble(message: RAGMessage) {
         Surface(
             shape = bubbleShape,
             color = if (isUser) AppColors.messageBubbleUser else MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.widthIn(max = 300.dp),
+            modifier = Modifier.widthIn(max = Dimensions.messageBubbleMaxWidth),
         ) {
             Text(
                 text = message.text,
