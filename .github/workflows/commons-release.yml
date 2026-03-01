@@ -391,12 +391,29 @@ jobs:
           fi
 
           mkdir -p android-combined/jniLibs
-          for dir in dist/android-artifacts/racommons-android-*/jniLibs/*/; do
-            if [ -d "$dir" ]; then
-              abi=$(basename "$dir")
-              mkdir -p "android-combined/jniLibs/${abi}"
-              cp -r "${dir}"* "android-combined/jniLibs/${abi}/" 2>/dev/null || true
-              echo "Copied libs for ${abi}: $(ls android-combined/jniLibs/${abi}/ 2>/dev/null | wc -l) files"
+          # Collect .so files from all build output subdirectories (jni/, commons/, onnx/, llamacpp/, rag/)
+          # Each artifact was built for a single ABI via the matrix strategy
+          for artifact_dir in dist/android-artifacts/racommons-android-*/; do
+            if [ ! -d "$artifact_dir" ]; then
+              continue
+            fi
+            for sub in jni commons onnx llamacpp rag; do
+              for abi_dir in "${artifact_dir}${sub}"/*/; do
+                if [ -d "$abi_dir" ]; then
+                  abi=$(basename "$abi_dir")
+                  mkdir -p "android-combined/jniLibs/${abi}"
+                  cp -n "${abi_dir}"*.so "android-combined/jniLibs/${abi}/" 2>/dev/null || true
+                fi
+              done
+            done
+          done
+          # Log what was collected per ABI
+          for abi_dir in android-combined/jniLibs/*/; do
+            if [ -d "$abi_dir" ]; then
+              abi=$(basename "$abi_dir")
+              count=$(ls "$abi_dir"/*.so 2>/dev/null | wc -l)
+              echo "Collected ${abi}: ${count} .so files"
+              ls -la "$abi_dir" 2>/dev/null
             fi
           done
 
