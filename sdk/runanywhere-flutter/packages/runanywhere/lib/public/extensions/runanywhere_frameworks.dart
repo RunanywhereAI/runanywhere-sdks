@@ -70,10 +70,7 @@ extension RunAnywhereFrameworks on RunAnywhere {
       break;
 
     case SDKComponent.embedding:
-      relevantCategories = {
-        ModelCategory.language,
-        ModelCategory.multimodal
-      };
+      relevantCategories = {ModelCategory.embedding};
       break;
 
     case SDKComponent.vlm:
