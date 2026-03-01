@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -96,12 +97,20 @@ fun LoraManagerScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(onClick = { loraViewModel.unloadAdapter(adapter.path) }) {
+                            Button(
+                                onClick = { loraViewModel.unloadAdapter(adapter.path) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
+                                ),
+                            ) {
                                 Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Remove",
+                                    Icons.Default.LinkOff,
+                                    contentDescription = null,
                                     tint = AppColors.primaryRed,
+                                    modifier = Modifier.size(16.dp),
                                 )
+                                Spacer(modifier = Modifier.width(Dimensions.xSmall))
+                                Text("Unload", color = AppColors.primaryRed)
                             }
                         }
                     }

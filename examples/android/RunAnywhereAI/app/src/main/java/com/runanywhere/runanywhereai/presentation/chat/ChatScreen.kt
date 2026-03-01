@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -131,22 +132,44 @@ fun ChatScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background),
     ) {
-        Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+        ) {
                 if (uiState.isModelLoaded) {
                     if (uiState.messages.isEmpty() && !uiState.isGenerating) {
-                        EmptyStateView(modifier = Modifier.weight(1f))
+                        EmptyStateView(
+                            modifier = Modifier.weight(1f),
+                            onPromptClick = { prompt ->
+                                viewModel.updateInput(prompt)
+                                viewModel.sendMessage()
+                            },
+                        )
                     } else {
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(Dimensions.large),
-                            verticalArrangement = Arrangement.spacedBy(Dimensions.messageSpacingBetween),
+                            contentPadding = PaddingValues(
+                                horizontal = Dimensions.mediumLarge,
+                                vertical = Dimensions.smallMedium,
+                            ),
                         ) {
                             item {
-                                Spacer(modifier = Modifier.height(20.dp))
+                                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
                             }
 
-                            items(uiState.messages, key = { it.id }) { message ->
+                            val messages = uiState.messages
+                            items(messages.size, key = { messages[it].id }) { index ->
+                                val message = messages[index]
+                                val previousRole = messages.getOrNull(index - 1)?.role
+                                val isRoleSwitch = previousRole != null && previousRole != message.role
+
+                                // Extra spacing when switching between user and AI
+                                if (isRoleSwitch) {
+                                    Spacer(modifier = Modifier.height(Dimensions.large))
+                                } else if (index > 0) {
+                                    Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                                }
+
                                 MessageBubbleView(
                                     message = message,
                                     isGenerating = uiState.isGenerating,
@@ -161,7 +184,7 @@ fun ChatScreen(
                             }
 
                             item {
-                                Spacer(modifier = Modifier.height(20.dp))
+                                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
                             }
                         }
                     }
@@ -414,20 +437,38 @@ fun ChatTopBar(
             }
         },
         actions = {
-            // LoRA button — ghost when no adapter, hidden when not supported
-            if (supportsLora && !hasActiveLoraAdapter) {
+            // LoRA button — always visible when model supports LoRA
+            if (supportsLora) {
                 TextButton(
                     onClick = onLoraClick,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                 ) {
-                    Text(
-                        text = "+ LoRA",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.3.sp,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (hasActiveLoraAdapter) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = AppColors.primaryPurple.copy(alpha = 0.15f),
+                        ) {
+                            Text(
+                                text = "LoRA",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    letterSpacing = 0.3.sp,
+                                ),
+                                color = AppColors.primaryPurple,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "+ LoRA",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.3.sp,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -530,35 +571,32 @@ fun MessageBubbleView(
     }
 
     if (isUserMessage) {
-        // ── User message: right-aligned, simple solid rounded background ──
+        // ── User message: right-aligned, solid rounded background, medium weight ──
         Row(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End,
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(Dimensions.messageMaxWidthFraction)
-                    .wrapContentWidth(Alignment.End),
+                    .widthIn(max = Dimensions.maxContentWidth)
+                    .clip(RoundedCornerShape(Dimensions.userBubbleCornerRadius))
+                    .background(AppColors.userBubbleColor())
+                    .combinedClickable(
+                        onClick = { /* No-op */ },
+                        onLongClick = { showDialog = true },
+                    ),
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(Dimensions.userBubbleCornerRadius))
-                        .background(AppColors.userBubbleColor())
-                        .combinedClickable(
-                            onClick = { /* No-op */ },
-                            onLongClick = { showDialog = true },
-                        ),
-                ) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(
-                            horizontal = Dimensions.messageBubblePaddingHorizontal,
-                            vertical = Dimensions.messageBubblePaddingVertical,
-                        ),
-                    )
-                }
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Medium,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(
+                        horizontal = Dimensions.messageBubblePaddingHorizontal,
+                        vertical = Dimensions.messageBubblePaddingVertical,
+                    ),
+                )
             }
         }
     } else {
@@ -613,7 +651,9 @@ fun MessageBubbleView(
                     // Full-width markdown text, no background
                     MarkdownText(
                         markdown = message.content,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 22.sp,
+                        ),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
@@ -736,7 +776,6 @@ private fun extractThinkingSummary(thinking: String): String {
 fun ThinkingProgressIndicator() {
     val thinkingShape = RoundedCornerShape(Dimensions.medium)
 
-    // : purple gradient background with purple border
     Box(
         modifier =
             Modifier
@@ -763,7 +802,6 @@ fun ThinkingProgressIndicator() {
             horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Animated dots
             repeat(3) { index ->
                 val infiniteTransition = rememberInfiniteTransition(label = "thinking_progress")
                 val scale by infiniteTransition.animateFloat(
@@ -810,99 +848,64 @@ fun ThinkingToggle(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    // Extract intelligent summary
-    val thinkingSummary =
-        remember(thinkingContent) {
-            extractThinkingSummary(thinkingContent)
-        }
+    val thinkingSummary = remember(thinkingContent) {
+        extractThinkingSummary(thinkingContent)
+    }
 
-    Column {
-        // Toggle button with gradient background
-        val toggleShape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
-
-        // : purple gradient background with purple border and shadow
-        Box(
-            modifier =
-                Modifier
-                    .clickable { isExpanded = !isExpanded }
-                    .shadow(
-                        elevation = Dimensions.shadowSmall,
-                        shape = toggleShape,
-                        ambientColor = AppColors.primaryPurple.copy(alpha = 0.2f),
-                        spotColor = AppColors.primaryPurple.copy(alpha = 0.2f),
-                    )
-                    .clip(toggleShape)
-                    .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                AppColors.primaryPurple.copy(alpha = 0.1f),
-                                AppColors.primaryPurple.copy(alpha = 0.05f),
-                            ),
-                        ),
-                    )
-                    .border(
-                        width = Dimensions.strokeThin,
-                        color = AppColors.primaryPurple.copy(alpha = 0.2f),
-                        shape = toggleShape,
-                    ),
+    Column(
+        modifier = Modifier.padding(
+            start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
+        ),
+    ) {
+        // Minimal toggle row — no border, no shadow, just a subtle clickable row
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(Dimensions.smallMedium))
+                .clickable { isExpanded = !isExpanded }
+                .padding(vertical = Dimensions.xSmall),
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier =
-                    Modifier.padding(
-                        horizontal = Dimensions.thinkingSectionPaddingHorizontal,
-                        vertical = Dimensions.thinkingSectionPaddingVertical,
-                    ),
-                horizontalArrangement = Arrangement.spacedBy(Dimensions.toolbarButtonSpacing),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    modifier = Modifier.size(AppTypography.caption.fontSize.value.dp),
-                    tint = AppColors.primaryPurple,
-                )
-                Text(
-                    text = if (isExpanded) "Hide reasoning" else thinkingSummary,
-                    style = AppTypography.caption,
-                    color = AppColors.primaryPurple,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                    tint = AppColors.primaryPurple.copy(alpha = 0.6f),
-                )
-            }
+            Icon(
+                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+            Text(
+                text = if (isExpanded) "Hide reasoning" else thinkingSummary,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
 
-        // Expanded content
+        // Expanded content — scrollable, subtle background
         AnimatedVisibility(
             visible = isExpanded,
-            enter = fadeIn(animationSpec = tween(250)) + expandVertically(),
-            exit = fadeOut(animationSpec = tween(250)) + shrinkVertically(),
+            enter = fadeIn(animationSpec = tween(200)) + expandVertically(),
+            exit = fadeOut(animationSpec = tween(200)) + shrinkVertically(),
         ) {
-            Column {
-                Spacer(modifier = Modifier.height(Dimensions.small))
-                Surface(
-                    color = AppColors.thinkingContentBackground,
-                    shape = RoundedCornerShape(Dimensions.thinkingContentCornerRadius),
-                ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .heightIn(max = Dimensions.thinkingContentMaxHeight)
-                                .padding(Dimensions.thinkingContentPadding),
-                    ) {
-                        Text(
-                            text = thinkingContent,
-                            style = AppTypography.caption,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Dimensions.xSmall),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(Dimensions.cornerRadiusRegular),
+            ) {
+                val scrollState = rememberScrollState()
+                Text(
+                    text = thinkingContent,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        lineHeight = 18.sp,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .heightIn(max = 200.dp)
+                        .verticalScroll(scrollState)
+                        .padding(Dimensions.mediumLarge),
+                )
             }
         }
     }
@@ -985,53 +988,52 @@ fun AnalyticsFooter(
 // TYPING INDICATOR
 // ====================
 
-// Typing indicator — simple dots + text, no bubble
+// Typing indicator — text-based shimmer
 @Composable
 fun TypingIndicatorView() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing_shimmer")
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+        ),
+        label = "typing_shimmer_offset",
+    )
+
+    val baseColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val shimmerBrush = Brush.linearGradient(
+        colors = listOf(
+            baseColor.copy(alpha = 0.3f),
+            baseColor.copy(alpha = 0.7f),
+            baseColor.copy(alpha = 0.3f),
+        ),
+        start = androidx.compose.ui.geometry.Offset(x = shimmerOffset * 300f, y = 0f),
+        end = androidx.compose.ui.geometry.Offset(x = (shimmerOffset + 0.5f) * 300f, y = 0f),
+    )
+
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = Dimensions.mediumLarge),
+            .padding(
+                start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
+                top = Dimensions.xSmall,
+                bottom = Dimensions.xSmall,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.typingIndicatorDotSpacing),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            repeat(3) { index ->
-                val infiniteTransition = rememberInfiniteTransition(label = "typing")
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.8f,
-                    targetValue = 1.3f,
-                    animationSpec =
-                        infiniteRepeatable(
-                            animation = tween(600),
-                            repeatMode = RepeatMode.Reverse,
-                            initialStartOffset = StartOffset(index * 200),
-                        ),
-                    label = "dot_scale_$index",
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size(Dimensions.typingIndicatorDotSize)
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                        .background(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            shape = CircleShape,
-                        ),
-                )
-            }
-        }
-
+        // Shimmer bar
+        Box(
+            modifier = Modifier
+                .width(60.dp)
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(brush = shimmerBrush),
+        )
         Text(
             text = "Thinking...",
-            style = AppTypography.caption,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
         )
     }
 }
@@ -1041,44 +1043,111 @@ fun TypingIndicatorView() {
 // ====================
 
 @Composable
-fun EmptyStateView(modifier: Modifier = Modifier) {
+fun EmptyStateView(
+    modifier: Modifier = Modifier,
+    onPromptClick: (String) -> Unit = {},
+) {
+    val starterPrompts = remember {
+        listOf(
+            "Explain quantum computing in simple terms",
+            "Write a short poem about the ocean",
+            "What are 5 tips for better sleep?",
+            "Help me debug a Python script",
+            "Summarize the latest AI trends",
+            "Give me a healthy meal plan",
+        )
+    }
+
     Column(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
         Spacer(modifier = Modifier.weight(1f))
 
-        // App logo -  runanywhere_logo 80x80
+        // App logo
         Image(
             painter = painterResource(id = com.runanywhere.runanywhereai.R.drawable.runanywhere_logo),
             contentDescription = "RunAnywhere Logo",
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier.size(64.dp),
             contentScale = ContentScale.Fit,
         )
 
-        Spacer(modifier = Modifier.height(Dimensions.large))
+        Spacer(modifier = Modifier.height(Dimensions.mediumLarge))
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
-        ) {
-            Text(
-                text = "Start a conversation",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-
-            Text(
-                text = "Type a message below to get started",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        }
+        Text(
+            text = "How can I help you?",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
 
         Spacer(modifier = Modifier.weight(1f))
+
+        // Auto-scrolling prompt suggestions — stops when user touches
+        val promptListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        var userHasScrolled by remember { mutableStateOf(false) }
+
+        // Detect user-initiated scrolling
+        LaunchedEffect(promptListState.isScrollInProgress) {
+            if (promptListState.isScrollInProgress) {
+                userHasScrolled = true
+            }
+        }
+
+        // Auto-scroll slowly until user takes control
+        LaunchedEffect(userHasScrolled) {
+            if (!userHasScrolled) {
+                // Small delay before starting auto-scroll
+                kotlinx.coroutines.delay(800)
+                while (!userHasScrolled) {
+                    val currentOffset = promptListState.firstVisibleItemScrollOffset
+                    promptListState.animateScrollBy(
+                        value = 1.5f,
+                        animationSpec = tween(durationMillis = 16, easing = LinearEasing),
+                    )
+                    // If we can't scroll further, wrap back to start
+                    if (promptListState.firstVisibleItemScrollOffset == currentOffset &&
+                        promptListState.firstVisibleItemIndex == promptListState.layoutInfo.totalItemsCount - 1
+                    ) {
+                        promptListState.scrollToItem(0)
+                    }
+                    kotlinx.coroutines.delay(16)
+                }
+            }
+        }
+
+        androidx.compose.foundation.lazy.LazyRow(
+            state = promptListState,
+            contentPadding = PaddingValues(horizontal = Dimensions.large),
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(starterPrompts.size) { index ->
+                Surface(
+                    onClick = { onPromptClick(starterPrompts[index]) },
+                    shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        Dimensions.strokeThin,
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    ),
+                ) {
+                    Text(
+                        text = starterPrompts[index],
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.medium)
+                            .widthIn(max = 200.dp),
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Dimensions.large))
     }
 }
 

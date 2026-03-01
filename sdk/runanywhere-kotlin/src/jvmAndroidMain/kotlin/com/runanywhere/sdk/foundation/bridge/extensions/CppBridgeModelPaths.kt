@@ -270,54 +270,66 @@ object CppBridgeModelPaths {
      */
     @JvmStatic
     fun setBaseDirCallback(path: String): Boolean {
-        return try {
-            val file = File(path)
+        // Hold lock for both file checks and state write to prevent TOCTOU races.
+        // File I/O here is fast (mkdirs/exists), and this is called rarely (once at init).
+        var previousPath: String? = null
+        val success = synchronized(lock) {
+            try {
+                val file = File(path)
 
-            // Create directory if it doesn't exist
-            if (!file.exists()) {
-                if (!file.mkdirs()) {
+                // Create directory if it doesn't exist
+                if (!file.exists()) {
+                    if (!file.mkdirs()) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            TAG,
+                            "Failed to create base directory: $path",
+                        )
+                        return@synchronized false
+                    }
+                }
+
+                // Verify it's a directory and writable
+                if (!file.isDirectory) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.ERROR,
                         TAG,
-                        "Failed to create base directory: $path",
+                        "Path is not a directory: $path",
                     )
-                    return false
+                    return@synchronized false
                 }
-            }
 
-            // Verify it's a directory and writable
-            if (!file.isDirectory) {
+                if (!file.canWrite()) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "Directory is not writable: $path",
+                    )
+                    return@synchronized false
+                }
+
+                previousPath = baseDirectory
+                baseDirectory = path
+
+                CppBridgePlatformAdapter.logCallback(
+                    CppBridgePlatformAdapter.LogLevel.DEBUG,
+                    TAG,
+                    "Base directory set: $path",
+                )
+
+                true
+            } catch (e: Exception) {
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.ERROR,
                     TAG,
-                    "Path is not a directory: $path",
+                    "Failed to set base directory: ${e.message}",
                 )
-                return false
+                false
             }
+        }
 
-            if (!file.canWrite()) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "Directory is not writable: $path",
-                )
-                return false
-            }
-
-            val previousPath =
-                synchronized(lock) {
-                    val prev = baseDirectory
-                    baseDirectory = path
-                    prev
-                }
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Base directory set: $path",
-            )
-
-            // Notify listener
+        // Notify listener outside lock to avoid holding lock during callbacks
+        if (success) {
             try {
                 pathListener?.onBaseDirectoryChanged(previousPath, path)
             } catch (e: Exception) {
@@ -327,16 +339,9 @@ object CppBridgeModelPaths {
                     "Error in path listener: ${e.message}",
                 )
             }
-
-            true
-        } catch (e: Exception) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
-                TAG,
-                "Failed to set base directory: ${e.message}",
-            )
-            false
         }
+
+        return success
     }
 
     /**

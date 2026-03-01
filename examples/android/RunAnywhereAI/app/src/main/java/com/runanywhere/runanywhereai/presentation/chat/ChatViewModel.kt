@@ -379,7 +379,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     // Not in thinking mode, show response tokens directly
-                    responseContent = fullResponse.replace("</think>", "").trim()
+                    responseContent = fullResponse
+                        .replace("<think>", "")
+                        .replace("</think>", "")
+                        .trim()
                 }
 
                 // Update the assistant message
@@ -389,6 +392,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     thinkingContent = if (thinkingContent.isEmpty()) null else thinkingContent.trim(),
                 )
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            Timber.i("Streaming cancelled by user")
+            wasInterrupted = true
         } catch (e: Exception) {
             Timber.e(e, "Streaming failed")
             wasInterrupted = true
@@ -492,6 +498,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         error: Exception,
         messageId: String,
     ) {
+        // Don't show error for user-initiated cancellation
+        if (error is kotlinx.coroutines.CancellationException) {
+            Timber.i("Generation cancelled by user")
+            _uiState.value = _uiState.value.copy(isGenerating = false)
+            syncCurrentConversationToStore()
+            return
+        }
+
         Timber.e(error, "❌ Generation failed")
 
         val errorMessage =

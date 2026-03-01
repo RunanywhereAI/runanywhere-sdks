@@ -146,6 +146,7 @@ class VoiceAssistantViewModel(
     // Audio playback (matching iOS AudioPlaybackManager)
     private var audioTrack: AudioTrack? = null
     private var audioPlaybackJob: Job? = null
+    private var processingJob: Job? = null
 
     @Volatile
     private var isPlayingAudio = false
@@ -287,7 +288,7 @@ class VoiceAssistantViewModel(
         val audioData = audioBuffer.toByteArray()
         audioBuffer.reset()
 
-        viewModelScope.launch {
+        processingJob = viewModelScope.launch {
             try {
                 // Update state to processing (on main thread for UI)
                 _uiState.update {
@@ -966,6 +967,8 @@ class VoiceAssistantViewModel(
             silenceDetectionJob = null
             pipelineJob?.cancel()
             pipelineJob = null
+            processingJob?.cancel()
+            processingJob = null
 
             // Stop audio capture service
             audioCaptureService?.stopCapture()
@@ -1156,16 +1159,21 @@ class VoiceAssistantViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
+        // Cancel all jobs BEFORE super.onCleared() cancels viewModelScope
         eventSubscriptionJob?.cancel()
         pipelineJob?.cancel()
         audioRecordingJob?.cancel()
         silenceDetectionJob?.cancel()
+        processingJob?.cancel()
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        viewModelScope.launch {
-            RunAnywhere.stopVoiceSession()
+        // Run synchronously — viewModelScope is dead after super.onCleared()
+        kotlinx.coroutines.runBlocking {
+            try {
+                RunAnywhere.stopVoiceSession()
+            } catch (_: Exception) { /* best-effort cleanup */ }
         }
+        super.onCleared()
     }
 }

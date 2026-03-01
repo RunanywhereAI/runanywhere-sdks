@@ -6,9 +6,13 @@ import timber.log.Timber
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -42,6 +46,7 @@ class ConversationStore private constructor(context: Context) {
     val currentConversation: StateFlow<Conversation?> = _currentConversation.asStateFlow()
 
     private val conversationsDirectory: File
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val json =
         Json {
             prettyPrint = true
@@ -53,7 +58,7 @@ class ConversationStore private constructor(context: Context) {
         if (!conversationsDirectory.exists()) {
             conversationsDirectory.mkdirs()
         }
-        loadConversations()
+        ioScope.launch { loadConversations() }
     }
 
     // MARK: - Public Methods
@@ -127,10 +132,12 @@ class ConversationStore private constructor(context: Context) {
             _currentConversation.value = _conversations.value.firstOrNull()
         }
 
-        // Delete file
-        val file = conversationFileURL(conversation.id)
-        if (file.exists()) {
-            file.delete()
+        // Delete file off main thread
+        ioScope.launch {
+            val file = conversationFileURL(conversation.id)
+            if (file.exists()) {
+                file.delete()
+            }
         }
     }
 
@@ -246,12 +253,14 @@ class ConversationStore private constructor(context: Context) {
      * Save a conversation to disk
      */
     private fun saveConversation(conversation: Conversation) {
-        try {
-            val file = conversationFileURL(conversation.id)
-            val jsonString = json.encodeToString(conversation)
-            file.writeText(jsonString)
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to save conversation")
+        ioScope.launch {
+            try {
+                val file = conversationFileURL(conversation.id)
+                val jsonString = json.encodeToString(conversation)
+                file.writeText(jsonString)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to save conversation")
+            }
         }
     }
 

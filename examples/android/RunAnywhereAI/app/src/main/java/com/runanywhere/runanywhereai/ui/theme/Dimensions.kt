@@ -82,11 +82,11 @@ object Dimensions {
 
     // Message Bubbles — ChatGPT-style
     val messageBubbleCornerRadius = cornerRadiusBubble // 18.dp
-    val messageBubblePaddingHorizontal = padding16 // 16.dp
-    val messageBubblePaddingVertical = padding12 // 12.dp
+    val messageBubblePaddingHorizontal = mediumLarge // 12.dp
+    val messageBubblePaddingVertical = padding10 // 10.dp
     val messageBubbleShadowRadius = shadowLarge // 4.dp
     val messageBubbleMinSpacing = padding60 // 60.dp (for alignment, legacy)
-    val messageSpacingBetween = xLarge // 20.dp
+    val messageSpacingBetween = mediumLarge // 12.dp
     val messageMaxWidthFraction = 0.85f // fraction-based width for user messages
 
     // Assistant message icon

@@ -8,6 +8,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +19,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ContentCopy
@@ -35,10 +37,10 @@ import androidx.compose.material.icons.outlined.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -54,16 +56,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
 import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
+import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
 import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
@@ -134,20 +135,20 @@ fun VLMScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Black,
-                titleContentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
             ),
             actions = {
                 uiState.loadedModelName?.let { name ->
                     Text(
                         text = name,
-                        color = Color.Gray,
-                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(end = 8.dp),
                     )
                 }
@@ -158,10 +159,11 @@ fun VLMScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(MaterialTheme.colorScheme.background),
     ) {
             if (!uiState.isModelLoaded) {
-                ModelRequiredContent(
+                ModelRequiredOverlay(
+                    modality = ModelSelectionContext.VLM,
                     onSelectModel = { viewModel.setShowModelSelection(true) },
                 )
             } else {
@@ -198,7 +200,7 @@ fun VLMScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.45f),
+                        .weight(1f),
                 )
 
                 // Control bar (4 buttons) — mirrors iOS controlBar
@@ -210,9 +212,7 @@ fun VLMScreen(
                     onStopAutoStream = { viewModel.stopAutoStreaming() },
                     onToggleLive = { viewModel.toggleAutoStreaming() },
                     onSelectModel = { viewModel.setShowModelSelection(true) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
     }
@@ -282,7 +282,7 @@ private fun CameraPreviewSection(
                         .padding(bottom = 16.dp)
                         .background(
                             Color.Black.copy(alpha = 0.6f),
-                            shape = CircleShape,
+                            shape = RoundedCornerShape(50),
                         )
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
@@ -294,7 +294,7 @@ private fun CameraPreviewSection(
                     Text(
                         "Analyzing...",
                         color = Color.White,
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.labelSmall,
                     )
                 }
             }
@@ -314,22 +314,21 @@ private fun CameraPermissionView(onRequestPermission: () -> Unit) {
         Icon(
             imageVector = Icons.Filled.CameraAlt,
             contentDescription = null,
-            tint = Color.Gray,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(48.dp),
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             "Camera Access Required",
-            color = Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
         )
         Spacer(modifier = Modifier.height(12.dp))
         Button(
             onClick = onRequestPermission,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3C)),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
-            Text("Grant Permission", color = Color.White)
+            Text("Grant Permission", color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(
@@ -341,7 +340,7 @@ private fun CameraPermissionView(onRequestPermission: () -> Unit) {
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
         ) {
-            Text("Open Settings", color = Color(0xFF0A84FF), fontSize = 14.sp)
+            Text("Open Settings", color = AppColors.primaryBlue, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
@@ -358,7 +357,8 @@ private fun DescriptionPanel(
 ) {
     Column(
         modifier = modifier
-            .background(Color(0xFF1C1C1E))
+            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         // Header row — "Description" + optional LIVE badge + copy button
@@ -373,9 +373,8 @@ private fun DescriptionPanel(
             ) {
                 Text(
                     "Description",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleSmall,
                 )
                 // LIVE badge — mirrors iOS HStack with green Circle + "LIVE" text
                 if (isAutoStreaming) {
@@ -386,14 +385,13 @@ private fun DescriptionPanel(
                         Icon(
                             imageVector = Icons.Filled.FiberManualRecord,
                             contentDescription = null,
-                            tint = Color.Green,
+                            tint = AppColors.primaryGreen,
                             modifier = Modifier.size(8.dp),
                         )
                         Text(
                             "LIVE",
-                            color = Color.Green,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            color = AppColors.primaryGreen,
+                            style = MaterialTheme.typography.labelSmall,
                         )
                     }
                 }
@@ -404,7 +402,7 @@ private fun DescriptionPanel(
                     Icon(
                         imageVector = Icons.Filled.ContentCopy,
                         contentDescription = "Copy",
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -413,7 +411,7 @@ private fun DescriptionPanel(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Description text (scrollable, max height ~150dp) — mirrors iOS ScrollView
+        // Description text (scrollable) — mirrors iOS ScrollView
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -421,21 +419,24 @@ private fun DescriptionPanel(
         ) {
             when {
                 error != null -> {
-                    Text(error, color = Color(0xFFFF453A), fontSize = 14.sp)
+                    Text(
+                        error,
+                        color = AppColors.primaryRed,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
                 description.isNotEmpty() -> {
                     Text(
                         description,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 else -> {
                     Text(
                         "Tap the button to describe what your camera sees",
-                        color = Color.Gray,
-                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
@@ -458,34 +459,38 @@ private fun ControlBar(
 ) {
     Row(
         modifier = modifier
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Photos button — mirrors iOS Photos button
-        IconButton(onClick = onPickPhoto, enabled = !isProcessing) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Filled.Image,
-                    contentDescription = "Photos",
-                    tint = if (!isProcessing) Color.White else Color.Gray,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Photos",
-                    color = if (!isProcessing) Color.White else Color.Gray,
-                    fontSize = 10.sp,
-                )
-            }
+        val enabledColor = MaterialTheme.colorScheme.onSurface
+        val disabledColor = MaterialTheme.colorScheme.onSurfaceVariant
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clickable(enabled = !isProcessing) { onPickPhoto() },
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Image,
+                contentDescription = "Photos",
+                tint = if (!isProcessing) enabledColor else disabledColor,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Photos",
+                color = if (!isProcessing) enabledColor else disabledColor,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
 
         // Main action button (64dp circle) — mirrors iOS main action button
         val buttonColor = when {
-            isAutoStreaming -> Color(0xFFFF453A) // Red when auto-streaming
+            isAutoStreaming -> AppColors.primaryRed
             isProcessing -> Color.Gray
-            else -> Color(0xFFFF9500) // Orange
+            else -> AppColors.primaryAccent
         }
 
         IconButton(
@@ -530,96 +535,42 @@ private fun ControlBar(
         }
 
         // Live toggle — mirrors iOS auto-stream toggle
-        IconButton(onClick = onToggleLive) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = if (isAutoStreaming) Icons.Filled.LiveTv else Icons.Outlined.LiveTv,
-                    contentDescription = "Live",
-                    tint = if (isAutoStreaming) Color.Green else Color.White,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Live",
-                    color = if (isAutoStreaming) Color.Green else Color.White,
-                    fontSize = 10.sp,
-                )
-            }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clickable { onToggleLive() },
+        ) {
+            Icon(
+                imageVector = if (isAutoStreaming) Icons.Filled.LiveTv else Icons.Outlined.LiveTv,
+                contentDescription = "Live",
+                tint = if (isAutoStreaming) AppColors.primaryGreen else enabledColor,
+                modifier = Modifier.size(24.dp),
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "Live",
+                color = if (isAutoStreaming) AppColors.primaryGreen else enabledColor,
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
 
         // Model button — mirrors iOS Model button
-        IconButton(onClick = onSelectModel) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    imageVector = Icons.Outlined.ViewInAr,
-                    contentDescription = "Model",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Model",
-                    color = Color.White,
-                    fontSize = 10.sp,
-                )
-            }
-        }
-    }
-}
-
-// Model Required Content — mirrors iOS modelRequiredContent
-
-@Composable
-private fun ModelRequiredContent(onSelectModel: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(32.dp),
+            modifier = Modifier.clickable { onSelectModel() },
         ) {
             Icon(
-                imageVector = Icons.Filled.CameraAlt,
-                contentDescription = null,
-                tint = Color(0xFFFF9500),
-                modifier = Modifier.size(64.dp),
+                imageVector = Icons.Outlined.ViewInAr,
+                contentDescription = "Model",
+                tint = enabledColor,
+                modifier = Modifier.size(24.dp),
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                "Vision AI",
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
+                "Model",
+                color = enabledColor,
+                style = MaterialTheme.typography.labelSmall,
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "Select a vision model to describe images",
-                color = Color.Gray,
-                fontSize = 14.sp,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onSelectModel,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFFF9500),
-                ),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.AutoAwesome,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text("Select Model", color = Color.White, fontWeight = FontWeight.SemiBold)
-                }
-            }
         }
     }
 }
+

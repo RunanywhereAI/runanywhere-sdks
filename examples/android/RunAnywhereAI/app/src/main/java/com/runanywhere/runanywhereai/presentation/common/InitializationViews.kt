@@ -1,120 +1,77 @@
 package com.runanywhere.runanywhereai.presentation.common
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 
 /**
- * Loading view shown during SDK initialization.
- * Matches iOS InitializationLoadingView exactly.
- *
- * iOS Reference: RunAnywhereAIApp.swift - InitializationLoadingView
- * - Brain icon with pulsing animation (1.0 to 1.2 scale)
- * - "Initializing RunAnywhere AI" title
- * - "Setting up AI models and services..." subtitle
- * - Circular progress indicator
+ * Minimal loading view shown during SDK initialization.
+ * Clean centered layout with app name, subtitle, and linear progress bar.
  */
 @Composable
 fun InitializationLoadingView() {
-    // Pulsing animation state matching iOS pattern
-    var isAnimating by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isAnimating) 1.2f else 1.0f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 1000),
-            ),
-        label = "brain_pulse",
-    )
-
-    LaunchedEffect(Unit) {
-        isAnimating = true
-    }
-
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            // Brain icon with pulsing animation - matches iOS Image(systemName: "brain")
-            Icon(
-                imageVector = Icons.Outlined.Psychology,
-                contentDescription = "AI Brain",
-                modifier = Modifier.scale(scale),
-                tint = AppColors.primaryAccent,
-            )
+            Column(
+                modifier = Modifier.padding(horizontal = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = "RunAnywhere AI",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Title - matches iOS Text("Initializing RunAnywhere AI")
-            Text(
-                text = "Initializing RunAnywhere AI",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+                Text(
+                    text = "Setting up on-device AI...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            // Subtitle - matches iOS Text("Setting up AI models and services...")
-            Text(
-                text = "Setting up AI models and services...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Progress indicator - matches iOS ProgressView()
-            CircularProgressIndicator(
-                color = AppColors.primaryAccent,
-            )
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = AppColors.primaryAccent,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+            }
         }
     }
 }
 
 /**
  * Error view shown when SDK initialization fails.
- * Matches iOS InitializationErrorView exactly.
- *
- * iOS Reference: RunAnywhereAIApp.swift - InitializationErrorView
- * - Warning triangle icon (orange)
- * - "Initialization Failed" title
- * - Error description
- * - Retry button
+ * Minimal layout with error message and retry button.
  */
 @Composable
 fun InitializationErrorView(
@@ -125,45 +82,33 @@ fun InitializationErrorView(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            // Warning icon - matches iOS Image(systemName: "exclamationmark.triangle")
-            Icon(
-                imageVector = Icons.Outlined.Warning,
-                contentDescription = "Error",
-                tint = AppColors.warningOrange,
-            )
+            Column(
+                modifier = Modifier.padding(horizontal = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Something went wrong",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground,
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = error.localizedMessage ?: error.message ?: "Unknown error",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
 
-            // Title - matches iOS Text("Initialization Failed")
-            Text(
-                text = "Initialization Failed",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-            )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Error description - matches iOS Text(error.localizedDescription)
-            Text(
-                text = error.localizedMessage ?: error.message ?: "Unknown error",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Retry button - matches iOS Button("Retry") { retryAction() }
-            Button(onClick = onRetry) {
-                Text("Retry")
+                Button(onClick = onRetry) {
+                    Text("Try Again")
+                }
             }
         }
     }

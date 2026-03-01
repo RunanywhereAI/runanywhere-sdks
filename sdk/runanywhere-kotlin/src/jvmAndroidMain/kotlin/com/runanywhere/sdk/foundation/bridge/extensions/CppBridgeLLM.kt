@@ -172,8 +172,10 @@ object CppBridgeLLM {
      */
     fun checkNativeLibrary() {
         try {
-            // Try to call a simple native method to verify library is loaded
-            // If it throws UnsatisfiedLinkError, the library isn't available
+            // Call a lightweight native method to verify library is loaded.
+            // cancel(0) is a no-op with invalid handle but will throw
+            // UnsatisfiedLinkError if the native library isn't available.
+            RunAnywhereBridge.racLlmComponentCancel(0)
             isNativeLibraryLoaded = true
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
@@ -647,54 +649,60 @@ object CppBridgeLLM {
      */
     @Throws(SDKError::class)
     fun generate(prompt: String, config: GenerationConfig = GenerationConfig.DEFAULT): GenerationResult {
+        val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
                 throw SDKError.llm("LLM component not ready for generation")
             }
-
+            currentHandle = handle
             isCancelled = false
             setState(LLMState.GENERATING)
+        }
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Starting generation (prompt length: ${prompt.length})",
+        )
+
+        try {
+            llmListener?.onGenerationStarted(prompt)
+        } catch (e: Exception) {
+            // Ignore listener errors
+        }
+
+        val startTime = System.currentTimeMillis()
+
+        try {
+            // JNI call outside lock so cancel() can acquire lock and set isCancelled
+            val resultJson =
+                RunAnywhereBridge.racLlmComponentGenerate(currentHandle, prompt, config.toJson())
+                    ?: throw SDKError.llm("Generation failed: null result")
+
+            val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
+
+            synchronized(lock) {
+                setState(LLMState.READY)
+            }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting generation (prompt length: ${prompt.length})",
+                "Generation completed: ${result.tokensGenerated} tokens, ${result.tokensPerSecond} tok/s",
             )
 
             try {
-                llmListener?.onGenerationStarted(prompt)
+                llmListener?.onGenerationCompleted(result)
             } catch (e: Exception) {
                 // Ignore listener errors
             }
 
-            val startTime = System.currentTimeMillis()
-
-            try {
-                val resultJson =
-                    RunAnywhereBridge.racLlmComponentGenerate(handle, prompt, config.toJson())
-                        ?: throw SDKError.llm("Generation failed: null result")
-
-                val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
-
-                setState(LLMState.READY)
-
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Generation completed: ${result.tokensGenerated} tokens, ${result.tokensPerSecond} tok/s",
-                )
-
-                try {
-                    llmListener?.onGenerationCompleted(result)
-                } catch (e: Exception) {
-                    // Ignore listener errors
-                }
-
-                return result
-            } catch (e: Exception) {
+            return result
+        } catch (e: Exception) {
+            synchronized(lock) {
                 setState(LLMState.READY) // Reset to ready, not error
-                throw if (e is SDKError) e else SDKError.llm("Generation failed: ${e.message}")
             }
+            throw if (e is SDKError) e else SDKError.llm("Generation failed: ${e.message}")
         }
     }
 
@@ -713,89 +721,95 @@ object CppBridgeLLM {
         config: GenerationConfig = GenerationConfig.DEFAULT,
         callback: StreamCallback,
     ): GenerationResult {
+        val currentHandle: Long
         synchronized(lock) {
             if (handle == 0L || state != LLMState.READY) {
                 throw SDKError.llm("LLM component not ready for generation")
             }
-
+            currentHandle = handle
             isCancelled = false
             streamCallback = callback
             setState(LLMState.GENERATING)
+        }
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Starting streaming generation (prompt length: ${prompt.length})",
+        )
+
+        try {
+            llmListener?.onGenerationStarted(prompt)
+        } catch (e: Exception) {
+            // Ignore listener errors
+        }
+
+        val startTime = System.currentTimeMillis()
+
+        try {
+            val byteStreamDecoder = IncompleteBytesToStringBuffer()
+            // Use the new callback-based streaming JNI method
+            // This calls back to Kotlin for each token in real-time
+            val jniCallback =
+                RunAnywhereBridge.TokenCallback { tokenBytes ->
+                    try {
+                        val text = byteStreamDecoder.push(tokenBytes)
+                        // Forward each token to the user's callback
+                        if (text.isNotEmpty()) callback.onToken(text)
+                        true
+                    } catch (e: Exception) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.WARN,
+                            TAG,
+                            "Error in stream callback: ${e.message}",
+                        )
+                        true // Continue even if callback fails
+                    }
+                }
+
+            // JNI call outside lock so cancel() can set isCancelled flag
+            val resultJson =
+                RunAnywhereBridge.racLlmComponentGenerateStreamWithCallback(
+                    currentHandle,
+                    prompt,
+                    config.toJson(),
+                    jniCallback,
+                ) ?: throw SDKError.llm("Streaming generation failed: null result")
+
+            try {
+                // when stream ends:
+                val tail = byteStreamDecoder.finish()
+                if (tail.isNotEmpty()) callback.onToken(tail)
+            } catch (_: Exception) {
+                // Finish may fail if stream was interrupted; safe to ignore
+            }
+
+            val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
+
+            synchronized(lock) {
+                setState(LLMState.READY)
+                streamCallback = null
+            }
 
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "Starting streaming generation (prompt length: ${prompt.length})",
+                "Streaming generation completed: ${result.tokensGenerated} tokens",
             )
 
             try {
-                llmListener?.onGenerationStarted(prompt)
+                llmListener?.onGenerationCompleted(result)
             } catch (e: Exception) {
                 // Ignore listener errors
             }
 
-            val startTime = System.currentTimeMillis()
-
-            try {
-                val byteStreamDecoder = IncompleteBytesToStringBuffer()
-                // Use the new callback-based streaming JNI method
-                // This calls back to Kotlin for each token in real-time
-                val jniCallback =
-                    RunAnywhereBridge.TokenCallback { tokenBytes ->
-                        try {
-                            val text = byteStreamDecoder.push(tokenBytes)
-                            // Forward each token to the user's callback
-                            if (text.isNotEmpty()) callback.onToken(text)
-                            true
-                        } catch (e: Exception) {
-                            CppBridgePlatformAdapter.logCallback(
-                                CppBridgePlatformAdapter.LogLevel.WARN,
-                                TAG,
-                                "Error in stream callback: ${e.message}",
-                            )
-                            true // Continue even if callback fails
-                        }
-                    }
-
-                val resultJson =
-                    RunAnywhereBridge.racLlmComponentGenerateStreamWithCallback(
-                        handle,
-                        prompt,
-                        config.toJson(),
-                        jniCallback,
-                    ) ?: throw SDKError.llm("Streaming generation failed: null result")
-
-                try {
-                    // when stream ends:
-                    val tail = byteStreamDecoder.finish()
-                    if (tail.isNotEmpty()) callback.onToken(tail)
-                } catch (_: Exception) {
-                    // Finish may fail if stream was interrupted; safe to ignore
-                }
-
-                val result = parseGenerationResult(resultJson, System.currentTimeMillis() - startTime)
-
-                setState(LLMState.READY)
-                streamCallback = null
-
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Streaming generation completed: ${result.tokensGenerated} tokens",
-                )
-
-                try {
-                    llmListener?.onGenerationCompleted(result)
-                } catch (e: Exception) {
-                    // Ignore listener errors
-                }
-
-                return result
-            } catch (e: Exception) {
+            return result
+        } catch (e: Exception) {
+            synchronized(lock) {
                 setState(LLMState.READY) // Reset to ready, not error
                 streamCallback = null
-                throw if (e is SDKError) e else SDKError.llm("Streaming generation failed: ${e.message}")
             }
+            throw if (e is SDKError) e else SDKError.llm("Streaming generation failed: ${e.message}")
         }
     }
 
@@ -803,21 +817,21 @@ object CppBridgeLLM {
      * Cancel an ongoing generation.
      */
     fun cancel() {
-        synchronized(lock) {
-            if (state != LLMState.GENERATING) {
-                return
-            }
-
-            isCancelled = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Cancelling generation",
-            )
-
-            RunAnywhereBridge.racLlmComponentCancel(handle)
+        // No synchronized — isCancelled is @Volatile and racLlmComponentCancel is thread-safe.
+        // Using lock here would deadlock since generate/generateStream hold lock during JNI calls.
+        if (state != LLMState.GENERATING) {
+            return
         }
+
+        isCancelled = true
+
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Cancelling generation",
+        )
+
+        RunAnywhereBridge.racLlmComponentCancel(handle)
     }
 
     // ========================================================================
@@ -1381,12 +1395,13 @@ object CppBridgeLLM {
      * Unescape JSON string.
      */
     private fun unescapeJson(value: String): String {
+        // Process \\\\ first so that \\n is not incorrectly consumed as \n
         return value
+            .replace("\\\\", "\\")
             .replace("\\n", "\n")
             .replace("\\r", "\r")
             .replace("\\t", "\t")
             .replace("\\\"", "\"")
-            .replace("\\\\", "\\")
     }
 
     /**
