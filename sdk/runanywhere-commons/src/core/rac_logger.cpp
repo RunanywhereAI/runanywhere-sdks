@@ -13,6 +13,7 @@
 #include <cstring>
 #include <mutex>
 
+#include "rac/core/rac_error_model.h"
 #include "rac/core/rac_platform_adapter.h"
 
 // =============================================================================
@@ -154,7 +155,10 @@ void log_to_stderr(rac_log_level_t level, const char* category, const char* mess
             fprintf(stream, ", func=%s", metadata->function);
         }
         if (metadata->error_code != 0) {
-            fprintf(stream, ", error_code=%d", metadata->error_code);
+            rac_error_model_t err = rac_make_error_model((rac_result_t)metadata->error_code);
+            fprintf(stream, ", error_code=%d", err.code);
+            fprintf(stream, ", error_category=%s", err.category);
+            fprintf(stream, ", error_message=%s", err.message);
         }
         if (metadata->model_id) {
             fprintf(stream, ", model=%s", metadata->model_id);
