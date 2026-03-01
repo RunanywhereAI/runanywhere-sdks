@@ -192,6 +192,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                         rgb[rgbIdx++] = buffer[srcIdx]       // R
                         rgb[rgbIdx++] = buffer[srcIdx + 1]   // G
                         rgb[rgbIdx++] = buffer[srcIdx + 2]   // B
+                    } else {
+                        rgbIdx += 3 // skip pixel but keep alignment
                     }
                 }
             }

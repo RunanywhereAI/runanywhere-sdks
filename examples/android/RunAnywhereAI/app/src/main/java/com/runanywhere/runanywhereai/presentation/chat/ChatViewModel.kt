@@ -79,7 +79,7 @@ data class ChatUiState(
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as RunAnywhereApplication
     private val conversationStore = ConversationStore.getInstance(application)
-    private val tokensPerSecondHistory = mutableListOf<Double>()
+    private val tokensPerSecondHistory = java.util.concurrent.CopyOnWriteArrayList<Double>()
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
