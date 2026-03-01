@@ -44,13 +44,13 @@ object AppColors {
     val backgroundGray5 = Color(0xFFE2E8F0) // Slate-200 - light gray
     val backgroundGray6 = Color(0xFFF1F5F9) // Slate-100 - lighter gray
 
-    // Dark mode - matching RunAnywhere.ai website dark theme
-    val backgroundPrimaryDark = Color(0xFF0F172A) // Deep dark blue-gray - main background
-    val backgroundSecondaryDark = Color(0xFF1A1F2E) // Slightly lighter dark surface
-    val backgroundTertiaryDark = Color(0xFF252B3A) // Medium dark surface
-    val backgroundGroupedDark = Color(0xFF0F172A) // Deep dark - grouped background
-    val backgroundGray5Dark = Color(0xFF2A3142) // Medium dark gray
-    val backgroundGray6Dark = Color(0xFF353B4A) // Lighter dark gray
+    // Dark mode - matching RunAnywhere.ai website dark theme (deeper/darker variant)
+    val backgroundPrimaryDark = Color(0xFF080D19) // Very deep dark blue-gray - main background
+    val backgroundSecondaryDark = Color(0xFF0F1520) // Slightly lighter dark surface
+    val backgroundTertiaryDark = Color(0xFF161C2A) // Medium dark surface
+    val backgroundGroupedDark = Color(0xFF080D19) // Very deep dark - grouped background
+    val backgroundGray5Dark = Color(0xFF1E2433) // Medium dark gray
+    val backgroundGray6Dark = Color(0xFF272D3C) // Lighter dark gray
 
     // Message Bubble Colors
     // User bubbles (with gradient support) - using vibrant orange/red brand color
@@ -69,7 +69,7 @@ object AppColors {
 
     // User Bubble — ChatGPT-style solid colors
     val userBubbleSolid = Color(0xFFEFEFEF) // Light mode: light gray
-    val userBubbleSolidDark = Color(0xFF2F3541) // Dark mode: slightly lighter
+    val userBubbleSolidDark = Color(0xFF1E2430) // Dark mode: deeper dark
 
     /**
      * Theme-aware solid color for user message bubbles (no gradient).

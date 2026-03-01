@@ -433,4 +433,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             else -> token.toDoubleOrNull() ?: 0.0
         }
     }
+
+    override fun onCleared() {
+        super.onCleared()
+        synchronized(Companion) {
+            if (instance === this) {
+                instance = null
+            }
+        }
+    }
 }
