@@ -50,7 +50,10 @@ if(NOT TARGET nlohmann_json::nlohmann_json)
 endif()
 
 # =============================================================================
-# RAG Pipeline Library (no direct backend dependencies)
+# RAG Pipeline Library (OBJECT — folded into rac_commons at link time)
+#
+# Built as OBJECT so all RAG symbols end up inside librac_commons.{a,so}.
+# There is no separate librac_backend_rag binary to distribute.
 # =============================================================================
 
 set(RAG_PIPELINE_SOURCES
@@ -62,13 +65,10 @@ set(RAG_PIPELINE_SOURCES
     rac_rag_pipeline.cpp
 )
 
-# ONNX embedding provider — wraps as a proper embeddings service backend
-if(TARGET rac_backend_onnx)
-    list(APPEND RAG_PIPELINE_SOURCES
-        onnx_embedding_provider.cpp
-        rac_onnx_embeddings_register.cpp
-    )
-endif()
+# ONNX embedding provider (onnx_embedding_provider.cpp, rac_onnx_embeddings_register.cpp)
+# is compiled into rac_backend_onnx instead of this OBJECT library to avoid a
+# shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+# See src/backends/onnx/CMakeLists.txt for where these sources are compiled.
 
 set(RAG_PIPELINE_HEADERS
     rag_backend.h
@@ -77,11 +77,7 @@ set(RAG_PIPELINE_HEADERS
     bm25_index.h
 )
 
-if(RAC_BUILD_SHARED)
-    add_library(rac_backend_rag SHARED ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADERS})
-else()
-    add_library(rac_backend_rag STATIC ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADERS})
-endif()
+add_library(rac_backend_rag OBJECT ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADERS})
 
 target_include_directories(rac_backend_rag PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -90,17 +86,11 @@ target_include_directories(rac_backend_rag PUBLIC
     ${usearch_SOURCE_DIR}/include
 )
 
-# RAG links against rac_commons for vtable dispatch — NOT against backend libraries
+# nlohmann_json is used by RAG for config parsing.
+# It's header-only (INTERFACE lib) so no link-time cost.
 target_link_libraries(rac_backend_rag PUBLIC
-    rac_commons
     nlohmann_json::nlohmann_json
 )
-
-# ONNX embedding provider needs ONNX Runtime headers for inference
-if(TARGET rac_backend_onnx)
-    target_link_libraries(rac_backend_rag PUBLIC rac_backend_onnx)
-    target_compile_definitions(rac_backend_rag PRIVATE RAG_HAS_ONNX_PROVIDER=1)
-endif()
 
 target_compile_definitions(rac_backend_rag PRIVATE RAC_RAG_BUILDING)
 
@@ -133,10 +123,8 @@ if(RAC_PLATFORM_IOS)
 
 elseif(RAC_PLATFORM_ANDROID)
     message(STATUS "Configuring RAG pipeline for Android")
-    target_link_libraries(rac_backend_rag PRIVATE log)
     target_compile_definitions(rac_backend_rag PRIVATE ORT_API_VERSION=17)
     target_compile_options(rac_backend_rag PRIVATE -O3 -ffunction-sections -fdata-sections)
-    target_link_options(rac_backend_rag PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 
 elseif(RAC_PLATFORM_MACOS)
     message(STATUS "Configuring RAG pipeline for macOS")
@@ -172,8 +160,9 @@ if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
             ${RAC_COMMONS_ROOT_DIR}/include
         )
 
+        # RAG symbols live in rac_commons (the OBJECT lib was folded in)
         target_link_libraries(rac_backend_rag_jni PRIVATE
-            rac_backend_rag
+            rac_commons
             log
         )
 

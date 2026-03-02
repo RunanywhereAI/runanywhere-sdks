@@ -1,9 +1,9 @@
 #
 # RunAnywhere Core SDK - iOS
 #
-# This podspec integrates RACommons.xcframework and RABackendRAG.xcframework
-# into Flutter iOS apps. RACommons provides the core infrastructure for
-# on-device AI capabilities. RABackendRAG provides the RAG pipeline backend.
+# This podspec integrates RACommons.xcframework into Flutter iOS apps.
+# RACommons provides the core infrastructure for on-device AI capabilities,
+# including the RAG pipeline (compiled directly into RACommons).
 #
 # Binary Configuration:
 #   - Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
@@ -16,10 +16,9 @@
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
 COMMONS_VERSION = "0.1.6"
-RAG_VERSION = "0.1.6"
 
 # =============================================================================
-# Binary Source - RACommons and RABackendRAG from runanywhere-sdks
+# Binary Source - RACommons from runanywhere-sdks
 # =============================================================================
 GITHUB_ORG = "RunanywhereAI"
 COMMONS_REPO = "runanywhere-sdks"
@@ -37,8 +36,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
 infrastructure (RACommons) for speech-to-text (STT), text-to-speech (TTS),
-language models (LLM), voice activity detection (VAD), and embeddings.
-RABackendRAG provides the RAG pipeline for document ingestion and querying.
+language models (LLM), voice activity detection (VAD), embeddings, and RAG.
 Pre-built binaries are downloaded from:
 https://github.com/RunanywhereAI/runanywhere-sdks
                        DESC
@@ -57,16 +55,13 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   s.dependency 'Flutter'
 
   # =============================================================================
-  # RACommons XCFramework - Core infrastructure
-  # RABackendRAG XCFramework - RAG pipeline backend
-  # Both downloaded from runanywhere-sdks releases
+  # RACommons XCFramework - Core infrastructure (includes RAG pipeline)
+  # Downloaded from runanywhere-sdks releases
   # =============================================================================
   if TEST_LOCAL
     puts "[runanywhere] Using LOCAL RACommons from Frameworks/"
-    puts "[runanywhere] Using LOCAL RABackendRAG from Frameworks/"
     s.vendored_frameworks = [
-      'Frameworks/RACommons.xcframework',
-      'Frameworks/RABackendRAG.xcframework'
+      'Frameworks/RACommons.xcframework'
     ]
   else
     s.prepare_command = <<-CMD
@@ -122,58 +117,10 @@ https://github.com/RunanywhereAI/runanywhere-sdks
         fi
       fi
 
-      # ---------------------------------------------------------------------------
-      # RABackendRAG
-      # ---------------------------------------------------------------------------
-      RAG_VERSION="#{RAG_VERSION}"
-      RAG_VERSION_FILE="$FRAMEWORK_DIR/.rag_version"
-
-      # Check if already downloaded with correct version
-      if [ -f "$RAG_VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RABackendRAG.xcframework" ]; then
-        CURRENT_RAG_VERSION=$(cat "$RAG_VERSION_FILE")
-        if [ "$CURRENT_RAG_VERSION" = "$RAG_VERSION" ]; then
-          echo "RABackendRAG.xcframework version $RAG_VERSION already downloaded"
-        else
-          SKIP_RAG=false
-        fi
-      else
-        SKIP_RAG=false
-      fi
-
-      if [ "${SKIP_RAG:-true}" != "true" ]; then
-        echo "Downloading RABackendRAG.xcframework version $RAG_VERSION..."
-
-        mkdir -p "$FRAMEWORK_DIR"
-        rm -rf "$FRAMEWORK_DIR/RABackendRAG.xcframework"
-
-        RAG_DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$RAG_VERSION/RABackendRAG-ios-v$RAG_VERSION.zip"
-        RAG_ZIP_FILE="/tmp/RABackendRAG.zip"
-
-        echo "   URL: $RAG_DOWNLOAD_URL"
-
-        curl -L -f -o "$RAG_ZIP_FILE" "$RAG_DOWNLOAD_URL" || {
-          echo "Failed to download RABackendRAG from $RAG_DOWNLOAD_URL"
-          exit 1
-        }
-
-        echo "Extracting RABackendRAG.xcframework..."
-        unzip -q -o "$RAG_ZIP_FILE" -d "$FRAMEWORK_DIR/"
-        rm -f "$RAG_ZIP_FILE"
-
-        echo "$RAG_VERSION" > "$RAG_VERSION_FILE"
-
-        if [ -d "$FRAMEWORK_DIR/RABackendRAG.xcframework" ]; then
-          echo "RABackendRAG.xcframework installed successfully"
-        else
-          echo "RABackendRAG.xcframework extraction failed"
-          exit 1
-        fi
-      fi
     CMD
 
     s.vendored_frameworks = [
-      'Frameworks/RACommons.xcframework',
-      'Frameworks/RABackendRAG.xcframework'
+      'Frameworks/RACommons.xcframework'
     ]
   end
 

@@ -17,11 +17,11 @@ Pod::Spec.new do |s|
   # =============================================================================
   # Core SDK - RACommons xcframework is bundled in npm package
   # No downloads needed - framework is included in ios/Binaries/
+  # RAG pipeline is compiled directly into RACommons.
   # =============================================================================
   puts "[RunAnywhereCore] Using bundled xcframeworks from npm package"
   s.vendored_frameworks = [
     "ios/Binaries/RACommons.xcframework",
-    "ios/Binaries/RABackendRAG.xcframework",
   ]
 
   # Source files

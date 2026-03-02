@@ -5,7 +5,7 @@
 # Unified Android build script - builds JNI bridge + selected backends
 #
 # Usage: ./build-android.sh [options] [backends] [abis]
-#        backends: onnx | llamacpp | whispercpp | tflite | rag | all (default: all)
+#        backends: onnx | llamacpp | whispercpp | tflite | all (default: all)
 #                  - onnx: STT/TTS/VAD (Sherpa-ONNX models)
 #                  - llamacpp: LLM text generation (GGUF models)
 #                  - all: onnx + llamacpp (default)
@@ -210,16 +210,13 @@ BUILD_ONNX=OFF
 BUILD_LLAMACPP=OFF
 BUILD_WHISPERCPP=OFF
 BUILD_TFLITE=OFF
-BUILD_RAG=OFF
-
-VALID_BACKENDS="onnx llamacpp whispercpp tflite rag all"
+VALID_BACKENDS="onnx llamacpp whispercpp tflite all"
 
 if [[ "$BACKENDS" == "all" ]]; then
     # NOTE: WhisperCPP is deprecated - use ONNX for STT instead
     # WhisperCPP has build issues with newer ggml versions (GGML_KQ_MASK_PAD)
     BUILD_ONNX=ON
     BUILD_LLAMACPP=ON
-    BUILD_RAG=ON
     BUILD_WHISPERCPP=OFF
 else
     # Parse comma-separated backends list
@@ -230,11 +227,10 @@ else
             llamacpp)   BUILD_LLAMACPP=ON ;;
             whispercpp) BUILD_WHISPERCPP=ON ;;
             tflite)     BUILD_TFLITE=ON ;;
-            rag)        BUILD_RAG=ON ;;
             *)
                 print_error "Unknown backend: $backend"
                 echo "Usage: $0 [backends] [abis]"
-                echo "  backends: onnx | llamacpp | whispercpp | tflite | rag | all"
+                echo "  backends: onnx | llamacpp | whispercpp | tflite | all"
                 echo "  abis: comma-separated list (default: arm64-v8a)"
                 exit 1
                 ;;
@@ -249,7 +245,6 @@ SINGLE_BACKEND=""
 [[ "$BUILD_LLAMACPP" == "ON" ]]   && ((ENABLED_COUNT++)) && SINGLE_BACKEND="llamacpp"
 [[ "$BUILD_WHISPERCPP" == "ON" ]] && ((ENABLED_COUNT++)) && SINGLE_BACKEND="whispercpp"
 [[ "$BUILD_TFLITE" == "ON" ]]     && ((ENABLED_COUNT++)) && SINGLE_BACKEND="tflite"
-[[ "$BUILD_RAG" == "ON" ]]        && ((ENABLED_COUNT++)) && SINGLE_BACKEND="rag"
 
 if [[ "$ENABLED_COUNT" -eq 1 ]]; then
     DIST_SUBDIR="$SINGLE_BACKEND"
@@ -258,7 +253,7 @@ else
 fi
 
 print_header "RunAnywhere Android Build (Unified)"
-echo "Backends: ONNX=$BUILD_ONNX, LlamaCPP=$BUILD_LLAMACPP, WhisperCPP=$BUILD_WHISPERCPP, TFLite=$BUILD_TFLITE, RAG=$BUILD_RAG"
+echo "Backends: ONNX=$BUILD_ONNX, LlamaCPP=$BUILD_LLAMACPP, WhisperCPP=$BUILD_WHISPERCPP, TFLite=$BUILD_TFLITE"
 echo "ABIs: ${ABIS}"
 echo "Android API Level: ${ANDROID_API_LEVEL}"
 echo "Output: dist/android/${DIST_SUBDIR}/"
@@ -360,7 +355,7 @@ for ABI in "${ABI_ARRAY[@]}"; do
         -DRAC_BACKEND_ONNX=${BUILD_ONNX} \
         -DRAC_BACKEND_LLAMACPP=${BUILD_LLAMACPP} \
         -DRAC_BACKEND_WHISPERCPP=${BUILD_WHISPERCPP} \
-        -DRAC_BACKEND_RAG=${BUILD_RAG} \
+        -DRAC_BACKEND_RAG=ON \
         -DRAC_BUILD_TESTS=OFF \
         -DRAC_BUILD_SHARED=ON \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
@@ -590,19 +585,11 @@ for ABI in "${ABI_ARRAY[@]}"; do
         fi
     fi
 
-    # RAG pipeline
-    mkdir -p "${DIST_DIR}/rag/${ABI}"
-    if [ -f "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag.so" ]; then
-        cp "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag.so" "${DIST_DIR}/rag/${ABI}/"
-        echo "  Copied: librac_backend_rag.so -> rag/${ABI}/"
-    fi
-
-    # Copy JNI bridge library for RAG
+    # RAG JNI bridge (RAG pipeline is compiled into librac_commons.so;
+    # the JNI bridge is still a thin separate .so that links against rac_commons)
     if [ -f "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag_jni.so" ]; then
-        cp "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag_jni.so" "${DIST_DIR}/rag/${ABI}/"
-        echo "  Copied: librac_backend_rag_jni.so -> rag/${ABI}/"
-    else
-        print_warning "librac_backend_rag_jni.so not found - JNI bridge not built by CMake"
+        cp "${ABI_BUILD_DIR}/src/features/rag/librac_backend_rag_jni.so" "${JNI_DIST_DIR}/${ABI}/"
+        echo "  Copied: librac_backend_rag_jni.so -> jni/${ABI}/"
     fi
 
     # TFLite backend
@@ -712,13 +699,6 @@ if [ "$BUILD_WHISPERCPP" = "ON" ]; then
     done
 fi
 
-echo "├── rag/                      # RAG pipeline libraries"
-for ABI in "${ABI_ARRAY[@]}"; do
-    echo "│   └── ${ABI}/"
-    echo "│       ├── librac_backend_rag.so"
-    echo "│       └── librac_backend_rag_jni.so"
-done
-
 if [ "$BUILD_TFLITE" = "ON" ]; then
     echo "└── tflite/                   # TFLite backend libraries"
     for ABI in "${ABI_ARRAY[@]}"; do
@@ -746,9 +726,6 @@ if [ "$BUILD_WHISPERCPP" = "ON" ]; then
     echo "  WhisperCPP:"
     ls -lh "${DIST_DIR}/whispercpp"/*/*.so 2>/dev/null | awk '{print "    " $NF ": " $5}' || echo "    (no files)"
 fi
-
-echo "  RAG:"
-ls -lh "${DIST_DIR}/rag"/*/*.so 2>/dev/null | awk '{print "    " $NF ": " $5}' || echo "    (no files)"
 
 echo ""
 echo -e "${GREEN}Build complete!${NC}"

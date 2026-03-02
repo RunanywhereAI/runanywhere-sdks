@@ -180,6 +180,17 @@ set(ONNX_BACKEND_SOURCES
     wakeword_onnx.cpp
 )
 
+# ONNX embedding provider lives in src/features/rag/ but is compiled here
+# to avoid a shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../features/rag")
+if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
+    list(APPEND ONNX_BACKEND_SOURCES
+        ${RAG_DIR}/onnx_embedding_provider.cpp
+        ${RAG_DIR}/rac_onnx_embeddings_register.cpp
+    )
+    message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
+endif()
+
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
 )
@@ -198,6 +209,11 @@ target_include_directories(rac_backend_onnx PUBLIC
     ${RAC_COMMONS_ROOT_DIR}/include
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
 )
+
+# RAG embedding provider headers (onnx_embedding_provider.h lives in features/rag/)
+if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
+    target_include_directories(rac_backend_onnx PRIVATE ${RAG_DIR})
+endif()
 
 # Define RAC_ONNX_BUILDING to export symbols with visibility("default")
 # Define RAC_HAS_ONNX to enable ONNX Runtime code paths

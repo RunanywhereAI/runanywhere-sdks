@@ -227,13 +227,13 @@ setup_environment() {
             log_warn "Failed to enable corepack. You may need to run: sudo corepack enable"
             log_warn "Continuing without corepack - yarn may not work correctly"
         fi
-        
+
         # Prepare the yarn version specified in package.json
         if [[ -f "package.json" ]] && grep -q '"packageManager"' package.json; then
             log_step "Preparing yarn version from package.json..."
             corepack prepare 2>/dev/null || log_warn "Could not prepare yarn version"
         fi
-        
+
         YARN_CMD="corepack yarn"
     else
         log_warn "Corepack not available, using system yarn"
@@ -267,7 +267,7 @@ build_commons_ios() {
 
     local FLAGS=""
     [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
-    
+
     # Pass backends to commons build script
     # build-ios.sh only supports a single --backend flag (last one wins).
     # If multiple backends are requested, pass --backend all instead.
@@ -328,14 +328,7 @@ copy_ios_frameworks() {
         log_warn "RACommons.xcframework not found at ${COMMONS_DIST}/"
     fi
 
-    # Copy RABackendRAG.xcframework to core package (RAG pipeline)
-    if [[ -d "${COMMONS_DIST}/RABackendRAG.xcframework" ]]; then
-        rm -rf "${CORE_IOS_BINARIES}/RABackendRAG.xcframework"
-        cp -R "${COMMONS_DIST}/RABackendRAG.xcframework" "${CORE_IOS_BINARIES}/"
-        log_info "Core: RABackendRAG.xcframework"
-    else
-        log_warn "RABackendRAG.xcframework not found at ${COMMONS_DIST}/"
-    fi
+    # RAG pipeline is compiled into RACommons.xcframework — no separate framework needed
 
     # Copy RABackendLLAMACPP.xcframework to llamacpp package
     if [[ -d "${COMMONS_DIST}/RABackendLLAMACPP.xcframework" ]]; then
@@ -634,13 +627,13 @@ print_summary() {
         ls -la "${CORE_IOS_BINARIES}" 2>/dev/null || echo "  (none)"
         ls -la "${LLAMACPP_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
         ls -la "${ONNX_IOS_FRAMEWORKS}" 2>/dev/null || echo "  (none)"
-        
+
         echo ""
     fi
 
     if [[ "$BUILD_ANDROID" == true ]]; then
         echo "Android JNI Libraries:"
-        for pkg in core llamacpp onnx rag; do
+        for pkg in core llamacpp onnx; do
             local dir="${RN_SDK_DIR}/packages/${pkg}/android/src/main/jniLibs"
             if [[ -d "$dir" ]]; then
                 local count=$(find "$dir" -name "*.so" 2>/dev/null | wc -l)
@@ -690,7 +683,6 @@ main() {
         fi
         if [[ "$BUILD_ANDROID" == true ]]; then
             build_commons_android
-            build_rag_android
         fi
     fi
 

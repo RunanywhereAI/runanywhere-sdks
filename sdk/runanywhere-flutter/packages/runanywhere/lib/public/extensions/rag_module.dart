@@ -5,7 +5,7 @@
 ///
 /// ## Architecture
 ///
-/// The C++ backend (RABackendRAG) handles all business logic:
+/// The C++ RAG pipeline (compiled into RACommons) handles all business logic:
 /// - RAG pipeline creation and management
 /// - Document embedding and vector indexing
 /// - Query retrieval and LLM answer generation

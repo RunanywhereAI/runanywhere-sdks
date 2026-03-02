@@ -263,12 +263,12 @@ tasks.register<Exec>("buildLocalJniLibs") {
         logger.lifecycle("")
 
         // Check if we have existing libs
+        // RAG pipeline is compiled into librac_commons.so; only the thin JNI bridge is separate
         val hasMainLibs = jniLibsDir.resolve("arm64-v8a/libc++_shared.so").exists()
         val hasLlamaCppLibs = llamaCppJniLibsDir.resolve("arm64-v8a/librac_backend_llamacpp_jni.so").exists()
         val hasOnnxLibs = onnxJniLibsDir.resolve("arm64-v8a/librac_backend_onnx_jni.so").exists()
-        val hasRagLibs = jniLibsDir.resolve("arm64-v8a/librac_backend_rag_jni.so").exists()
 
-        val allLibsExist = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs && hasRagLibs
+        val allLibsExist = hasMainLibs && hasLlamaCppLibs && hasOnnxLibs
 
         if (allLibsExist && !rebuildCommons) {
             logger.lifecycle("✅ JNI libraries already exist - skipping build")

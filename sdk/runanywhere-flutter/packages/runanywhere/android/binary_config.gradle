@@ -21,17 +21,14 @@ ext {
 
     // =============================================================================
     // Remote binary URLs
-    // RACommons from runanywhere-sdks (NOT runanywhere-binaries)
-    // RABackendRAG from runanywhere-sdks
+    // RACommons from runanywhere-sdks (includes RAG pipeline)
     // =============================================================================
     commonsGitHubOrg = "RunanywhereAI"
     commonsRepo = "runanywhere-sdks"
     commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
-    binariesBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
 
     // Android native libraries packages
     commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
-    ragAndroidUrl = "${binariesBaseUrl}/commons-v${coreVersion}/RABackendRAG-android-v${coreVersion}.zip"
 
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->
@@ -52,17 +49,4 @@ ext {
         return commonsLib.exists()
     }
 
-    // Helper method to check if local RAG libs exist
-    checkLocalRagLibsExist = { ->
-        def jniLibsDir = project.file('src/main/jniLibs')
-        def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
-
-        if (!arm64Dir.exists() || !arm64Dir.isDirectory()) {
-            return false
-        }
-
-        // Check for RAG backend library
-        def ragLib = new File(arm64Dir, 'librac_backend_rag.so')
-        return ragLib.exists()
-    }
 }

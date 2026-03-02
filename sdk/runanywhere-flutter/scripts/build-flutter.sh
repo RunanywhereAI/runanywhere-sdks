@@ -84,7 +84,6 @@ BUILD_ANDROID=true
 ABIS="arm64-v8a,x86_64"
 BACKEND_LLAMACPP=false
 BACKEND_ONNX=false
-BACKEND_RAG=false
 BACKENDS_SPECIFIED=false
 
 # =============================================================================
@@ -161,14 +160,9 @@ for arg in "$@"; do
             BACKEND_ONNX=true
             BACKENDS_SPECIFIED=true
             ;;
-        --rag)
-            BACKEND_RAG=true
-            BACKENDS_SPECIFIED=true
-            ;;
         --all-backends)
             BACKEND_LLAMACPP=true
             BACKEND_ONNX=true
-            BACKEND_RAG=true
             BACKENDS_SPECIFIED=true
             ;;
         --clean)
@@ -194,14 +188,13 @@ done
 if [[ "$BACKENDS_SPECIFIED" == false ]]; then
     BACKEND_LLAMACPP=true
     BACKEND_ONNX=true
-    BACKEND_RAG=true
 fi
 
 # Build comma-separated BACKENDS string for build-android.sh
+# RAG pipeline is compiled into rac_commons, not a separate backend
 BACKENDS_LIST=()
 [[ "$BACKEND_LLAMACPP" == true ]] && BACKENDS_LIST+=("llamacpp")
 [[ "$BACKEND_ONNX" == true ]] && BACKENDS_LIST+=("onnx")
-[[ "$BACKEND_RAG" == true ]] && BACKENDS_LIST+=("rag")
 BACKENDS=$(IFS=','; echo "${BACKENDS_LIST[*]}")
 
 # =============================================================================
@@ -314,14 +307,7 @@ copy_ios_frameworks() {
         log_warn "RABackendONNX.xcframework not found at ${COMMONS_DIST}/"
     fi
 
-    # Copy RABackendRAG.xcframework to core package (RAG pipeline)
-    if [[ -d "${COMMONS_DIST}/RABackendRAG.xcframework" ]]; then
-        rm -rf "${CORE_IOS_FRAMEWORKS}/RABackendRAG.xcframework"
-        cp -R "${COMMONS_DIST}/RABackendRAG.xcframework" "${CORE_IOS_FRAMEWORKS}/"
-        log_info "Core: RABackendRAG.xcframework"
-    else
-        log_warn "RABackendRAG.xcframework not found at ${COMMONS_DIST}/"
-    fi
+    # RAG pipeline is compiled into RACommons.xcframework — no separate framework needed
 
     # Copy onnxruntime.xcframework to onnx package (required dependency)
     # This matches the architecture of React Native and Swift SDKs
@@ -540,17 +526,7 @@ copy_android_jnilibs() {
             fi
         done
 
-        # =======================================================================
-        # RAG Pipeline: librac_backend_rag.so (into core package)
-        # =======================================================================
-
-        if [[ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]]; then
-            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
-            log_info "RAG: librac_backend_rag.so"
-        elif [[ -f "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" ]]; then
-            cp "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" "${CORE_ANDROID_JNILIBS}/${ABI}/"
-            log_info "RAG: librac_backend_rag.so (from build)"
-        fi
+        # RAG pipeline is compiled into librac_commons.so — no separate .so needed
     done
 
     log_info "Android JNI libraries copied"

@@ -412,8 +412,23 @@ if(RAC_BUILD_BACKENDS)
     endif()
 
     if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
-        message(STATUS "  - RAG pipeline (USearch)")
+        message(STATUS "  - RAG pipeline (USearch) — folded into rac_commons")
         add_subdirectory(src/features/rag)
+
+        # RAG is an OBJECT library. Fold its compiled objects into rac_commons
+        # so there is no separate librac_backend_rag binary to distribute.
+        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_rag>)
+
+        # Propagate RAG's non-cyclic dependencies manually.
+        # We intentionally do NOT use target_link_libraries(rac_commons PRIVATE rac_backend_rag)
+        # because that would transitively pull in rac_backend_onnx (via the ONNX embedding
+        # provider) and create a shared-library cycle:
+        #   rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons
+        # nlohmann_json is already linked project-wide (line 116).
+        # Apple frameworks used by RAG (Accelerate) need explicit propagation.
+        if(APPLE)
+            target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
+        endif()
     endif()
 endif()
 
@@ -480,7 +495,10 @@ if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}, RAG=${RAC_BACKEND_RAG}")
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}")
+    if(RAC_BACKEND_RAG)
+        message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
+    endif()
 endif()
 if(RAC_BUILD_SERVER)
     message(STATUS "  Server:       OpenAI-compatible HTTP server (runanywhere-server)")

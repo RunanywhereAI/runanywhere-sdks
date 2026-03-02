@@ -66,7 +66,8 @@ COMMONS_BUILD_SCRIPT="${COMMONS_DIR}/scripts/build-android.sh"
 MAIN_JNILIBS_DIR="${KOTLIN_SDK_DIR}/src/androidMain/jniLibs"
 LLAMACPP_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"
 ONNX_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-onnx/src/androidMain/jniLibs"
-RAG_JNILIBS_DIR="${MAIN_JNILIBS_DIR}"
+# RAG pipeline is compiled into librac_commons.so; only the thin JNI bridge
+# (librac_backend_rag_jni.so) is a separate .so, shipped alongside librunanywhere_jni.so.
 
 # Defaults
 MODE="local"
@@ -205,11 +206,6 @@ check_libs_exist() {
 
     # Check ONNX module
     if [ ! -f "${ONNX_JNILIBS_DIR}/${abi}/librac_backend_onnx_jni.so" ]; then
-        return 1
-    fi
-    
-    # Check RAG module
-    if [ ! -f "${RAG_JNILIBS_DIR}/${abi}/librac_backend_rag_jni.so" ]; then
         return 1
     fi
 
@@ -415,30 +411,19 @@ copy_jni_libs() {
                 fi
             done
         fi
-        
-        # =======================================================================
-        # RAG Pipeline: Native libs + JNI bridge
-        # =======================================================================
-        # Copy backend library
-        if [ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" ]; then
-            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag.so" "${RAG_JNILIBS_DIR}/${ABI}/"
-            log_info "RAG: librac_backend_rag.so"
-        elif [ -f "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" ]; then
-            cp "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag.so" "${RAG_JNILIBS_DIR}/${ABI}/"
-            log_info "RAG: librac_backend_rag.so (from build)"
-        fi
 
-        # Copy JNI bridge
-        if [ -f "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" ]; then
-            cp "${COMMONS_DIST}/rag/${ABI}/librac_backend_rag_jni.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+        # =======================================================================
+        # RAG JNI Bridge (RAG pipeline is in librac_commons.so;
+        # the thin JNI bridge is distributed alongside the main JNI libs)
+        # =======================================================================
+        if [ -f "${COMMONS_DIST}/jni/${ABI}/librac_backend_rag_jni.so" ]; then
+            cp "${COMMONS_DIST}/jni/${ABI}/librac_backend_rag_jni.so" "${MAIN_JNILIBS_DIR}/${ABI}/"
             log_info "RAG: librac_backend_rag_jni.so"
         elif [ -f "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag_jni.so" ]; then
-            cp "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag_jni.so" "${RAG_JNILIBS_DIR}/${ABI}/"
+            cp "${COMMONS_BUILD}/${ABI}/src/features/rag/librac_backend_rag_jni.so" "${MAIN_JNILIBS_DIR}/${ABI}/"
             log_info "RAG: librac_backend_rag_jni.so (from build)"
-        else
-            log_warn "RAG: librac_backend_rag_jni.so NOT FOUND - JNI bridge missing!"
         fi
-        
+
     done
 
     log_info "JNI libraries installed"
