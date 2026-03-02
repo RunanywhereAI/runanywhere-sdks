@@ -206,7 +206,7 @@ const App: React.FC = () => {
     // ONNX module with STT and TTS models
     // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
     // Using explicit IDs ensures models are recognized after download across app restarts
-    ONNX.register();
+    await ONNX.register();
     // Register ONNX models in parallel
     const onnxPromises = [
       ONNX.addModel({

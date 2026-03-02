@@ -123,9 +123,9 @@ export const ONNX = {
    * ONNX.register();
    * ```
    */
-  register(): void {
+  async register(): Promise<void> {
     logger.info('Registering ONNX module (STT + TTS)');
-    ONNXProvider.register();
+    await ONNXProvider.register();
     logger.info('ONNX module registered (STT + TTS)');
   },
 

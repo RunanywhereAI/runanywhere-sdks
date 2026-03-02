@@ -13,6 +13,8 @@ export interface RAGConfiguration {
   chunkSize?: number;
   chunkOverlap?: number;
   promptTemplate?: string;
+  embeddingConfigJSON?: string;
+  llmConfigJSON?: string;
 }
 
 export interface RAGQueryOptions {

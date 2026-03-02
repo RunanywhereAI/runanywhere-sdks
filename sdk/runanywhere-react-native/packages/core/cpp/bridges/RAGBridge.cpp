@@ -12,9 +12,9 @@
 
 #include <nlohmann/json.hpp>
 
-#include <rac/features/rag/rac_rag.h>
-#include <rac/features/rag/rac_rag_pipeline.h>
-#include <rac/core/rac_error.h>
+#include "rac_rag.h"
+#include "rac_rag_pipeline.h"
+#include "rac_error.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -63,6 +63,12 @@ bool RAGBridge::createPipeline(const std::string& configJson) {
 
         std::string tmpl = json.value("promptTemplate", "");
         if (!tmpl.empty()) config.prompt_template = tmpl.c_str();
+
+        std::string embConfigJson = json.value("embeddingConfigJSON", "");
+        if (!embConfigJson.empty()) config.embedding_config_json = embConfigJson.c_str();
+
+        std::string llmConfigJson = json.value("llmConfigJSON", "");
+        if (!llmConfigJson.empty()) config.llm_config_json = llmConfigJson.c_str();
 
         rac_rag_pipeline_t* newPipeline = nullptr;
         rac_result_t result = rac_rag_pipeline_create_standalone(&config, &newPipeline);
