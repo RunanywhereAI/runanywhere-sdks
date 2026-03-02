@@ -77,7 +77,7 @@ set(RAG_BACKEND_HEADERS
 if(TARGET rac_backend_onnx)
     list(APPEND RAG_BACKEND_SOURCES onnx_embedding_provider.cpp)
     list(APPEND RAG_BACKEND_HEADERS onnx_embedding_provider.h)
-    
+
     # ONNX can also provide text generation
     list(APPEND RAG_BACKEND_SOURCES onnx_generator.cpp)
     list(APPEND RAG_BACKEND_HEADERS onnx_generator.h)
@@ -121,9 +121,9 @@ endif()
 # Define RAC_RAG_BUILDING to export symbols
 target_compile_definitions(rac_backend_rag PRIVATE RAC_RAG_BUILDING)
 
-# USearch requires C++17 - set via properties for better Xcode compatibility
+# USearch requires C++17 minimum - set via properties for better Xcode compatibility
 set_target_properties(rac_backend_rag PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

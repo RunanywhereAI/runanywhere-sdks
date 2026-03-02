@@ -42,7 +42,7 @@ A complete on-device voice AI pipeline for Linux (Raspberry Pi 5, x86_64, ARM64)
 - **Large Language Model** — Qwen2.5 0.5B Q4 via llama.cpp (fully local)
 - **Text-to-Speech** — Piper Lessac Medium neural TTS
 
-**Requirements:** Linux (ALSA), x86_64 or ARM64, CMake 3.16+, C++17
+**Requirements:** Linux (ALSA), x86_64 or ARM64, CMake 3.16+, C++20
 
 ## swift-starter-app
 
@@ -94,4 +94,4 @@ A hybrid voice assistant that combines on-device AI inference with cloud LLM rea
 - **Barge-in Support** — Wake word during TTS playback cancels speech and re-listens
 - **Waiting Chime** — Earcon feedback while waiting for cloud response
 
-**Requirements:** Linux (ALSA), x86_64 or ARM64, CMake 3.16+, C++17
+**Requirements:** Linux (ALSA), x86_64 or ARM64, CMake 3.16+, C++20
