@@ -8,6 +8,7 @@
 #include "ModelRegistryBridge.hpp"
 #include "rac_core.h"  // For rac_get_model_registry()
 #include <cstring>
+#include <mutex>
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -94,56 +95,51 @@ ModelInfo ModelRegistryBridge::fromRac(const rac_model_info_t& cModel) {
     return model;
 }
 
-void ModelRegistryBridge::toRac(const ModelInfo& model, rac_model_info_t& cModel) {
-    // Note: This allocates strings that must be freed
-    // For now we use static storage for simplicity
-    static std::string s_id, s_name, s_desc, s_url, s_path;
-    static std::vector<std::string> s_tags;
-    static std::vector<const char*> s_tagPtrs;
-
-    s_id = model.id;
-    s_name = model.name;
-    s_desc = model.description;
-    s_url = model.downloadUrl;
-    s_path = model.localPath;
+void ModelRegistryBridge::toRac(const ModelInfo& model, rac_model_info_t& cModel,
+                                ToRacStorage& storage) {
+    storage.id = model.id;
+    storage.name = model.name;
+    storage.desc = model.description;
+    storage.url = model.downloadUrl;
+    storage.path = model.localPath;
+    storage.tags = model.tags;
 
     memset(&cModel, 0, sizeof(cModel));
 
-    cModel.id = const_cast<char*>(s_id.c_str());
-    cModel.name = const_cast<char*>(s_name.c_str());
-    cModel.description = s_desc.empty() ? nullptr : const_cast<char*>(s_desc.c_str());
+    cModel.id = const_cast<char*>(storage.id.c_str());
+    cModel.name = const_cast<char*>(storage.name.c_str());
+    cModel.description = storage.desc.empty() ? nullptr : const_cast<char*>(storage.desc.c_str());
     cModel.category = model.category;
     cModel.format = model.format;
     cModel.framework = model.framework;
-    cModel.download_url = s_url.empty() ? nullptr : const_cast<char*>(s_url.c_str());
-    cModel.local_path = s_path.empty() ? nullptr : const_cast<char*>(s_path.c_str());
+    cModel.download_url = storage.url.empty() ? nullptr : const_cast<char*>(storage.url.c_str());
+    cModel.local_path = storage.path.empty() ? nullptr : const_cast<char*>(storage.path.c_str());
     cModel.download_size = model.downloadSize;
     cModel.memory_required = model.memoryRequired;
     cModel.context_length = model.contextLength;
     cModel.supports_thinking = model.supportsThinking ? RAC_TRUE : RAC_FALSE;
     cModel.source = model.source;
 
-    // Setup tags
-    s_tags = model.tags;
-    s_tagPtrs.clear();
-    for (const auto& tag : s_tags) {
-        s_tagPtrs.push_back(tag.c_str());
+    storage.tagPtrs.clear();
+    for (const auto& tag : storage.tags) {
+        storage.tagPtrs.push_back(tag.c_str());
     }
-    if (!s_tagPtrs.empty()) {
-        cModel.tags = const_cast<char**>(s_tagPtrs.data());
-        cModel.tag_count = s_tagPtrs.size();
+    if (!storage.tagPtrs.empty()) {
+        cModel.tags = const_cast<char**>(storage.tagPtrs.data());
+        cModel.tag_count = storage.tagPtrs.size();
     }
 }
 
 rac_result_t ModelRegistryBridge::addModel(const ModelInfo& model) {
     if (!handle_) {
+        LOGE("addModel: Registry not initialized (handle is null)");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
     rac_model_info_t cModel;
-    toRac(model, cModel);
+    ToRacStorage storage;
+    toRac(model, cModel, storage);
 
-    // Use rac_model_registry_save to add/update a model
     rac_result_t result = rac_model_registry_save(handle_, &cModel);
 
     if (result == RAC_SUCCESS) {

@@ -44,7 +44,6 @@ import {
   ragDestroyPipeline,
   ragIngest,
   ragQuery,
-  type RAGConfiguration,
 } from '@runanywhere/core';
 
 // MARK: - Types
@@ -73,15 +72,6 @@ function resolveLLMFilePath(localPath: string): string {
   }
   // Assume directory - the SDK already resolves to the gguf path in most cases
   return localPath;
-}
-
-function resolveVocabPath(embeddingPath: string): string | null {
-  if (embeddingPath.endsWith('.onnx')) {
-    const lastSlash = embeddingPath.lastIndexOf('/');
-    if (lastSlash === -1) return null;
-    return `${embeddingPath.substring(0, lastSlash)}/vocab.txt`;
-  }
-  return `${embeddingPath}/vocab.txt`;
 }
 
 // MARK: - Document Text Extraction
@@ -191,14 +181,15 @@ export const RAGScreen: React.FC = () => {
       // Extract text from the picked file
       const text = await extractTextFromFile(fileUri);
 
-      // Build RAG configuration matching iOS ragConfig computed property
+      // Build RAG configuration matching iOS ragConfig computed property.
+      // With multi-file registration, vocab.txt is co-located with model.onnx,
+      // so the C++ pipeline auto-discovers it (no embeddingConfigJSON needed).
       const embeddingPath = resolveEmbeddingFilePath(
         selectedEmbeddingModel!.localPath!
       );
       const llmPath = resolveLLMFilePath(selectedLLMModel!.localPath!);
-      const vocabPath = resolveVocabPath(embeddingPath);
 
-      const config: RAGConfiguration = {
+      const config = {
         embeddingModelPath: embeddingPath,
         llmModelPath: llmPath,
         topK: 5,
@@ -206,9 +197,6 @@ export const RAGScreen: React.FC = () => {
         maxContextTokens: 2048,
         chunkSize: 512,
         chunkOverlap: 50,
-        embeddingConfigJSON: vocabPath
-          ? JSON.stringify({ vocab_path: vocabPath })
-          : undefined,
       };
 
       // Create pipeline and ingest document (same as iOS loadDocument)

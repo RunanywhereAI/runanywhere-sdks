@@ -48,9 +48,9 @@
 		9E75FBBD9CE4CFEFC37E3C16 /* libPods-RunAnywhereAI.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAI.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AABB001122334456 /* NativeAudioModule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = NativeAudioModule.swift; path = RunAnywhereAI/NativeAudioModule.swift; sourceTree = "<group>"; };
 		AABB001122334458 /* NativeAudioModule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = NativeAudioModule.m; path = RunAnywhereAI/NativeAudioModule.m; sourceTree = "<group>"; };
+		AABB001122334459 /* RunAnywhereAI-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "RunAnywhereAI-Bridging-Header.h"; path = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h"; sourceTree = "<group>"; };
 		CCDD001122334456 /* DocumentService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = DocumentService.swift; path = RunAnywhereAI/DocumentService.swift; sourceTree = "<group>"; };
 		CCDD001122334458 /* DocumentService.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = DocumentService.m; path = RunAnywhereAI/DocumentService.m; sourceTree = "<group>"; };
-		AABB001122334459 /* RunAnywhereAI-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "RunAnywhereAI-Bridging-Header.h"; path = "RunAnywhereAI/RunAnywhereAI-Bridging-Header.h"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FF375136ECCEFB06442E8E31 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = RunAnywhereAI/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */

@@ -126,6 +126,7 @@ export {
   cancelDownload,
   deleteModel,
   registerModel,
+  registerMultiFileModel,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -178,3 +179,17 @@ export {
   ragGetDocumentCount,
   ragGetStatistics,
 } from './RunAnywhere+RAG';
+
+// Vision Language Model
+export {
+  registerVLMBackend,
+  loadVLMModel,
+  loadVLMModelById,
+  isVLMModelLoaded,
+  unloadVLMModel,
+  describeImage,
+  askAboutImage,
+  processImage,
+  processImageStream,
+  cancelVLMGeneration,
+} from './RunAnywhere+VLM';

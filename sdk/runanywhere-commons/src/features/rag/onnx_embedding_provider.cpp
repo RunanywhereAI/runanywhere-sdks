@@ -82,7 +82,7 @@ public:
 
         return true;
     }
-    
+
     std::vector<int64_t> encode_unpadded(const std::string& text, size_t max_length = 512) {
         std::vector<int64_t> token_ids;
         token_ids.reserve(std::min(max_length, static_cast<size_t>(128)));
@@ -118,7 +118,7 @@ public:
         pad_to(token_ids, max_length);
         return token_ids;
     }
-    
+
     std::vector<int64_t> create_attention_mask(const std::vector<int64_t>& token_ids) {
         std::vector<int64_t> mask;
         for (auto id : token_ids) {
@@ -126,7 +126,7 @@ public:
         }
         return mask;
     }
-    
+
     std::vector<int64_t> create_token_type_ids(size_t length) {
         // Token type IDs: all 0s for single sequence models like all-MiniLM
         return std::vector<int64_t>(length, 0);
@@ -430,7 +430,7 @@ std::vector<float> mean_pooling(
 ) {
     std::vector<float> pooled(hidden_dim, 0.0f);
     int valid_tokens = 0;
-    
+
     for (size_t i = 0; i < seq_length; ++i) {
         if (attention_mask[i] == 1) {
             for (size_t j = 0; j < hidden_dim; ++j) {
@@ -439,14 +439,14 @@ std::vector<float> mean_pooling(
             valid_tokens++;
         }
     }
-    
+
     // Average
     if (valid_tokens > 0) {
         for (size_t j = 0; j < hidden_dim; ++j) {
             pooled[j] /= static_cast<float>(valid_tokens);
         }
     }
-    
+
     return pooled;
 }
 
@@ -456,7 +456,7 @@ void normalize_vector(std::vector<float>& vec) {
     for (float val : vec) {
         sum_squared += val * val;
     }
-    
+
     float norm = std::sqrt(sum_squared);
     if (norm > 1e-8f) {
         for (float& val : vec) {
@@ -519,8 +519,29 @@ public:
         }
 
         if (vocab_path.empty() || !std::filesystem::exists(vocab_path)) {
-            LOGE("Tokenizer vocab not found: %s", vocab_path.c_str());
-            return;
+            LOGW("vocab.txt not at primary path: %s — scanning subdirectories...", vocab_path.c_str());
+            std::filesystem::path search_dir = std::filesystem::is_directory(model_path_)
+                ? std::filesystem::path(model_path_)
+                : std::filesystem::path(model_path_).parent_path();
+            bool found = false;
+            if (std::filesystem::exists(search_dir) && std::filesystem::is_directory(search_dir)) {
+                for (auto& entry : std::filesystem::directory_iterator(search_dir)) {
+                    if (entry.is_directory()) {
+                        auto sub_vocab = entry.path() / "vocab.txt";
+                        if (std::filesystem::exists(sub_vocab)) {
+                            vocab_path = sub_vocab.string();
+                            LOGI("Found vocab.txt in subdirectory: %s", vocab_path.c_str());
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!found) {
+                LOGE("Tokenizer vocab not found at %s or subdirectories of %s",
+                     vocab_path.c_str(), search_dir.string().c_str());
+                return;
+            }
         }
 
         if (!tokenizer_.load_vocab(vocab_path)) {
@@ -624,14 +645,14 @@ public:
                 LOGE("CreateTensorWithDataAsOrtValue (token_type_ids) failed: %s", status_guard.error_message());
                 return {};
             }
-            
+
             // 3. Run inference
             const char* input_names[] = {"input_ids", "attention_mask", "token_type_ids"};
             const OrtValue* inputs[] = {input_ids_guard.get(), attention_mask_guard.get(), token_type_ids_guard.get()};
             const char* output_names[] = {"last_hidden_state"};
             OrtValueGuard output_guard(ort_api_);
             OrtValue* output_ptr = nullptr;
-            
+
             status_guard.reset(ort_api_->Run(
                 session_,
                 nullptr,
@@ -642,20 +663,20 @@ public:
                 1,
                 &output_ptr
             ));
-            
+
             if (status_guard.is_error()) {
                 LOGE("ONNX inference failed: %s", status_guard.error_message());
                 return {};
             }
-            
+
             // Transfer ownership to guard for automatic cleanup
             *output_guard.ptr() = output_ptr;
-            
+
             // 4. Extract output embeddings
             float* output_data = nullptr;
             OrtStatusGuard output_status_guard(ort_api_);
             output_status_guard.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
-            
+
             if (output_status_guard.is_error()) {
                 LOGE("Failed to get output tensor data: %s", output_status_guard.error_message());
                 return {};
@@ -693,14 +714,14 @@ public:
                 pad_length,
                 actual_hidden_dim
             );
-            
+
             // 6. Normalize to unit vector
             normalize_vector(pooled);
-            
+
             // All resources automatically cleaned up by RAII guards
             LOGI("Generated embedding: dim=%zu, norm=1.0", pooled.size());
             return pooled;
-            
+
         } catch (const std::exception& e) {
             LOGE("Embedding generation failed: %s", e.what());
             return {};
@@ -926,7 +947,7 @@ private:
             LOGE("Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
             return false;
         }
-        
+
         // Create environment
         OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAGEmbedding", &ort_env_);
         if (status != nullptr) {
@@ -935,39 +956,39 @@ private:
             ort_api_->ReleaseStatus(status);
             return false;
         }
-        
+
         return true;
     }
-    
+
     bool load_model(const std::string& model_path) {
         // Create session options with RAII guard
         OrtSessionOptionsGuard options_guard(ort_api_);
         OrtStatusGuard status_guard(ort_api_);
-        
+
         status_guard.reset(ort_api_->CreateSessionOptions(options_guard.ptr()));
         if (status_guard.is_error()) {
             LOGE("Failed to create session options: %s", status_guard.error_message());
             return false;
         }
-        
+
         if (options_guard.get() == nullptr) {
             LOGE("Session options is null after creation");
             return false;
         }
-        
+
         // Configure session options with error checking
         status_guard.reset(ort_api_->SetIntraOpNumThreads(options_guard.get(), 4));
         if (status_guard.is_error()) {
             LOGE("Failed to set intra-op threads: %s", status_guard.error_message());
             return false;
         }
-        
+
         status_guard.reset(ort_api_->SetSessionGraphOptimizationLevel(options_guard.get(), ORT_ENABLE_ALL));
         if (status_guard.is_error()) {
             LOGE("Failed to set graph optimization level: %s", status_guard.error_message());
             return false;
         }
-        
+
         // Load model with session options
         status_guard.reset(ort_api_->CreateSession(
             ort_env_,
@@ -976,16 +997,16 @@ private:
             &session_
         ));
         // options_guard automatically releases session options on scope exit
-        
+
         if (status_guard.is_error()) {
             LOGE("Failed to load model: %s", status_guard.error_message());
             return false;
         }
-        
+
         LOGI("Model loaded successfully: %s", model_path.c_str());
         return true;
     }
-    
+
     void cleanup() {
         if (memory_info_) {
             ort_api_->ReleaseMemoryInfo(memory_info_);

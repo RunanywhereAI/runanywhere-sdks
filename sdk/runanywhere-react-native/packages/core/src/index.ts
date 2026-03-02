@@ -148,6 +148,7 @@ export {
 export {
   ModelRegistry,
   FileSystem,
+  MultiFileModelCache,
   DownloadService,
   DownloadState,
   SystemTTSService,
@@ -157,6 +158,7 @@ export {
   PlatformVoices,
   type ModelCriteria,
   type AddModelFromURLOptions,
+  type ModelFileDescriptor,
   type DownloadProgress,
   type DownloadTask,
   type DownloadConfiguration,
@@ -251,6 +253,7 @@ export {
   cancelDownload,
   deleteModel,
   registerModel,
+  registerMultiFileModel,
 } from './Public/Extensions/RunAnywhere+Models';
 
 // =============================================================================
@@ -267,6 +270,23 @@ export {
   ragGetDocumentCount,
   ragGetStatistics,
 } from './Public/Extensions/RunAnywhere+RAG';
+
+// =============================================================================
+// Vision Language Model
+// =============================================================================
+
+export {
+  registerVLMBackend,
+  loadVLMModel,
+  loadVLMModelById,
+  isVLMModelLoaded,
+  unloadVLMModel,
+  describeImage,
+  askAboutImage,
+  processImage,
+  processImageStream,
+  cancelVLMGeneration,
+} from './Public/Extensions/RunAnywhere+VLM';
 
 export type {
   RAGConfiguration,

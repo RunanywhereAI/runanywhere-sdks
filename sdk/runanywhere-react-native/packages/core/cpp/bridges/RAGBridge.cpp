@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <stdexcept>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #include <nlohmann/json.hpp>
 
@@ -52,6 +54,80 @@ bool RAGBridge::createPipeline(const std::string& configJson) {
 
         std::string embPath = json.value("embeddingModelPath", "");
         std::string llmPath = json.value("llmModelPath", "");
+
+        // Resolve LLM directory to .gguf file (models from .tar.gz extract into directories).
+        // rac_llm_create needs a file path, not a directory.
+        struct stat llmStat;
+        if (!llmPath.empty() && stat(llmPath.c_str(), &llmStat) == 0 && S_ISDIR(llmStat.st_mode)) {
+            DIR* dir = opendir(llmPath.c_str());
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != nullptr) {
+                    std::string name(entry->d_name);
+                    if (name.size() > 5 && name.substr(name.size() - 5) == ".gguf") {
+                        llmPath = llmPath + "/" + name;
+                        LOGI("Resolved LLM directory to: %s", llmPath.c_str());
+                        break;
+                    }
+                }
+                closedir(dir);
+            }
+        }
+
+        // Build embeddingConfigJSON with vocab_path if not already provided (matching iOS).
+        std::string embConfigJson = json.value("embeddingConfigJSON", "");
+        if (embConfigJson.empty() && !embPath.empty()) {
+            std::string vocabDir = embPath;
+            struct stat embStat;
+            if (stat(embPath.c_str(), &embStat) == 0) {
+                if (!S_ISDIR(embStat.st_mode)) {
+                    size_t lastSlash = embPath.rfind('/');
+                    if (lastSlash != std::string::npos) {
+                        vocabDir = embPath.substr(0, lastSlash);
+                    }
+                }
+            } else {
+                LOGE("Embedding model path does not exist: %s", embPath.c_str());
+            }
+
+            std::string vocabPath = vocabDir + "/vocab.txt";
+            struct stat vocabStat;
+            if (stat(vocabPath.c_str(), &vocabStat) == 0 && S_ISREG(vocabStat.st_mode)) {
+                embConfigJson = "{\"vocab_path\":\"" + vocabPath + "\"}";
+                LOGI("Resolved vocab.txt: %s", vocabPath.c_str());
+            } else {
+                LOGI("vocab.txt not at %s, scanning subdirectories...", vocabPath.c_str());
+                DIR* dp = opendir(vocabDir.c_str());
+                if (dp) {
+                    struct dirent* entry;
+                    while ((entry = readdir(dp)) != nullptr) {
+                        if (entry->d_type != DT_DIR || entry->d_name[0] == '.') continue;
+                        std::string subVocab = vocabDir + "/" + entry->d_name + "/vocab.txt";
+                        if (stat(subVocab.c_str(), &vocabStat) == 0 && S_ISREG(vocabStat.st_mode)) {
+                            vocabPath = subVocab;
+                            embConfigJson = "{\"vocab_path\":\"" + vocabPath + "\"}";
+                            LOGI("Found vocab.txt in subdirectory: %s", vocabPath.c_str());
+                            break;
+                        }
+                    }
+                    closedir(dp);
+                }
+                if (embConfigJson.empty()) {
+                    LOGE("vocab.txt NOT found for embedding model at: %s", vocabDir.c_str());
+                    DIR* diagDp = opendir(vocabDir.c_str());
+                    if (diagDp) {
+                        LOGI("Directory contents of %s:", vocabDir.c_str());
+                        struct dirent* diagEntry;
+                        while ((diagEntry = readdir(diagDp)) != nullptr) {
+                            if (diagEntry->d_name[0] == '.') continue;
+                            LOGI("  %s (type=%d)", diagEntry->d_name, diagEntry->d_type);
+                        }
+                        closedir(diagDp);
+                    }
+                }
+            }
+        }
+
         config.embedding_model_path = embPath.c_str();
         config.llm_model_path = llmPath.empty() ? nullptr : llmPath.c_str();
         config.embedding_dimension = json.value("embeddingDimension", 384);
@@ -64,7 +140,6 @@ bool RAGBridge::createPipeline(const std::string& configJson) {
         std::string tmpl = json.value("promptTemplate", "");
         if (!tmpl.empty()) config.prompt_template = tmpl.c_str();
 
-        std::string embConfigJson = json.value("embeddingConfigJSON", "");
         if (!embConfigJson.empty()) config.embedding_config_json = embConfigJson.c_str();
 
         std::string llmConfigJson = json.value("llmConfigJSON", "");

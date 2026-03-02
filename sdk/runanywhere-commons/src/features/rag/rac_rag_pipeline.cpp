@@ -121,8 +121,9 @@ rac_result_t rac_rag_pipeline_create_standalone(
     rac_handle_t llm_handle = nullptr;
 
     try {
-        // Create embeddings service via registry
-        rac_result_t result = rac_embeddings_create(config->embedding_model_path, &embed_handle);
+        // Create embeddings service via registry, forwarding any config JSON (e.g. vocab_path)
+        rac_result_t result = rac_embeddings_create_with_config(
+            config->embedding_model_path, config->embedding_config_json, &embed_handle);
         if (result != RAC_SUCCESS || !embed_handle) {
             LOGE("Failed to create embeddings service: %d", result);
             return result != RAC_SUCCESS ? result : RAC_ERROR_INITIALIZATION_FAILED;

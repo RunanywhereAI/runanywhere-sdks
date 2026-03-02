@@ -243,7 +243,8 @@ rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request
 
     try {
         auto* handle = new onnx_embeddings_handle();
-        handle->provider = std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_path);
+        const char* cfg = request->config_json ? request->config_json : "";
+        handle->provider = std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_path, cfg);
 
         if (!handle->provider->is_ready()) {
             RAC_LOG_ERROR(LOG_CAT, "ONNX embedding provider not ready after init");

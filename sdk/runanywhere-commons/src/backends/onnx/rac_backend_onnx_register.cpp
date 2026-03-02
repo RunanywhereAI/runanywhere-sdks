@@ -292,25 +292,11 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
     return service;
 }
 
-// TTS can_handle
+// TTS can_handle — ONNX is the sole TTS backend, accept all requests
 rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
-        return RAC_TRUE;
-    }
-
-    const char* path = request->identifier;
-    if (strstr(path, "piper") != nullptr || strstr(path, "vits") != nullptr ||
-        strstr(path, ".onnx") != nullptr) {
-        return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
+    (void)request;
+    return RAC_TRUE;
 }
 
 // TTS create with vtable

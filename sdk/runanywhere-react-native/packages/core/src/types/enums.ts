@@ -96,6 +96,17 @@ export const ModelCategoryDisplayNames: Record<ModelCategory, string> = {
 };
 
 /**
+ * Model artifact type for model packaging
+ * Reference: ModelArtifactType.swift
+ */
+export enum ModelArtifactType {
+  SingleFile = 'singleFile',
+  TarGzArchive = 'tarGzArchive',
+  TarBz2Archive = 'tarBz2Archive',
+  ZipArchive = 'zipArchive',
+}
+
+/**
  * Model file formats
  * Reference: ModelFormat.swift
  */

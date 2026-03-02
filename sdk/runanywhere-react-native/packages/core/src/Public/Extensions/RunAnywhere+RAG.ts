@@ -42,6 +42,8 @@ export async function ragCreatePipeline(config: RAGConfiguration): Promise<void>
     chunkSize: config.chunkSize ?? 512,
     chunkOverlap: config.chunkOverlap ?? 50,
     promptTemplate: config.promptTemplate ?? '',
+    embeddingConfigJSON: config.embeddingConfigJSON,
+    llmConfigJSON: config.llmConfigJSON,
   };
 
   const success = await native.ragCreatePipeline(JSON.stringify(configWithDefaults));

@@ -293,12 +293,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               if (!fw || !allowedFrameworks.has(fw)) return false;
             }
 
-            // Exclude supporting files (vocab, tokenizer) from embedding selection
-            if (context === ModelSelectionContext.RagEmbedding) {
-              const id = m.id.toLowerCase();
-              if (id.endsWith('-vocab') || id.endsWith('-tokenizer')) return false;
-            }
-
             return true;
           })
         : allModels;
