@@ -205,10 +205,6 @@ if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
     message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
 endif()
 
-if(RAC_PLATFORM_WINDOWS)
-    list(APPEND ONNX_BACKEND_SOURCES rac_str_trans.cpp)
-endif()
-
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
 )
