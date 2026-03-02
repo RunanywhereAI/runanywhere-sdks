@@ -70,6 +70,9 @@ object CppBridge {
     private var _servicesInitialized: Boolean = false
 
     @Volatile
+    private var _servicesInitializing: Boolean = false
+
+    @Volatile
     private var _nativeLibraryLoaded: Boolean = false
 
     private val lock = Any()
@@ -370,15 +373,18 @@ object CppBridge {
      * Mirrors Swift SDK's completeServicesInitialization()
      */
     suspend fun initializeServices() {
+        // Guard: check and set initializing flag under lock, then release lock for I/O
         synchronized(lock) {
             if (!_isInitialized) {
                 throw IllegalStateException("CppBridge.initialize() must be called before initializeServices()")
             }
-
-            if (_servicesInitialized) {
+            if (_servicesInitialized || _servicesInitializing) {
                 return
             }
+            _servicesInitializing = true
+        }
 
+        try {
             // Step 1: Authenticate with backend for production/staging mode
             // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
             // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
@@ -498,8 +504,16 @@ object CppBridge {
                 CppBridgeEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
             }
 
-            _servicesInitialized = true
+            synchronized(lock) {
+                _servicesInitialized = true
+                _servicesInitializing = false
+            }
             logger.info("✅ Phase 2 services initialization complete")
+        } catch (e: Exception) {
+            synchronized(lock) {
+                _servicesInitializing = false
+            }
+            throw e
         }
     }
 
@@ -537,6 +551,7 @@ object CppBridge {
             Logging.sentryTeardownHook = null
 
             _servicesInitialized = false
+            _servicesInitializing = false
             _isInitialized = false
         }
     }

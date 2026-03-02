@@ -123,8 +123,9 @@ class VoiceAssistantViewModel(
     // Audio capture service for microphone input
     private var audioCaptureService: AudioCaptureService? = null
 
-    // Audio buffer for accumulating audio data
+    // Audio buffer for accumulating audio data (guarded by audioBufferLock)
     private val audioBuffer = ByteArrayOutputStream()
+    private val audioBufferLock = Any()
 
     // Voice session flow
     private var voiceSessionFlow: Flow<VoiceSessionEvent>? = null
@@ -146,6 +147,7 @@ class VoiceAssistantViewModel(
     // Audio playback (matching iOS AudioPlaybackManager)
     private var audioTrack: AudioTrack? = null
     private var audioPlaybackJob: Job? = null
+    private var processingJob: Job? = null
 
     @Volatile
     private var isPlayingAudio = false
@@ -256,13 +258,13 @@ class VoiceAssistantViewModel(
                 _uiState.update { it.copy(isSpeechDetected = false) }
 
                 // Check if we have enough audio to process
-                val audioSize = audioBuffer.size()
+                val audioSize = synchronized(audioBufferLock) { audioBuffer.size() }
                 if (audioSize >= minAudioBytes) {
                     Timber.i("🚀 Auto-triggering voice pipeline (audio: $audioSize bytes)")
                     processCurrentAudio()
                 } else {
                     Timber.d("Audio too short to process ($audioSize bytes), resetting buffer")
-                    audioBuffer.reset()
+                    synchronized(audioBufferLock) { audioBuffer.reset() }
                 }
             }
         }
@@ -284,10 +286,13 @@ class VoiceAssistantViewModel(
         isProcessingTurn = true
 
         // Get the buffered audio and reset
-        val audioData = audioBuffer.toByteArray()
-        audioBuffer.reset()
+        val audioData: ByteArray
+        synchronized(audioBufferLock) {
+            audioData = audioBuffer.toByteArray()
+            audioBuffer.reset()
+        }
 
-        viewModelScope.launch {
+        processingJob = viewModelScope.launch {
             try {
                 // Update state to processing (on main thread for UI)
                 _uiState.update {
@@ -375,7 +380,7 @@ class VoiceAssistantViewModel(
         isProcessingTurn = false
         isSpeechActive = false
         lastSpeechTime = 0L
-        audioBuffer.reset()
+        synchronized(audioBufferLock) { audioBuffer.reset() }
 
         _uiState.update {
             it.copy(
@@ -394,7 +399,7 @@ class VoiceAssistantViewModel(
                     audioCapture.startCapture().collect { audioData ->
                         if (isProcessingTurn) return@collect
 
-                        withContext(Dispatchers.IO) {
+                        synchronized(audioBufferLock) {
                             audioBuffer.write(audioData)
                         }
 
@@ -447,18 +452,32 @@ class VoiceAssistantViewModel(
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
-                    // Skip WAV header (44 bytes) if present
-                    val headerSize =
-                        if (audioData.size > 44 &&
-                            audioData[0] == 'R'.code.toByte() &&
-                            audioData[1] == 'I'.code.toByte() &&
-                            audioData[2] == 'F'.code.toByte() &&
-                            audioData[3] == 'F'.code.toByte()
-                        ) {
-                            44
-                        } else {
-                            0
+                    // Scan for WAV "data" chunk to find PCM offset
+                    val isWav = audioData.size > 44 &&
+                        audioData[0] == 'R'.code.toByte() &&
+                        audioData[1] == 'I'.code.toByte() &&
+                        audioData[2] == 'F'.code.toByte() &&
+                        audioData[3] == 'F'.code.toByte()
+
+                    val headerSize = if (isWav) {
+                        var offset = 12 // skip RIFF header (12 bytes)
+                        var dataStart = -1
+                        while (offset + 8 <= audioData.size) {
+                            val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
+                            val chunkSize = (audioData[offset + 4].toInt() and 0xFF) or
+                                ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
+                                ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
+                                ((audioData[offset + 7].toInt() and 0xFF) shl 24)
+                            if (chunkId == "data") {
+                                dataStart = offset + 8
+                                break
+                            }
+                            offset += 8 + chunkSize
                         }
+                        if (dataStart > 0) dataStart else 44 // fallback for malformed files
+                    } else {
+                        0
+                    }
 
                     val pcmData = audioData.copyOfRange(headerSize, audioData.size)
                     Timber.d("PCM data size: ${pcmData.size} bytes (skipped $headerSize byte header)")
@@ -785,7 +804,7 @@ class VoiceAssistantViewModel(
                     }
 
                 // Reset audio buffer
-                audioBuffer.reset()
+                synchronized(audioBufferLock) { audioBuffer.reset() }
 
                 // Update state to listening
                 _uiState.update {
@@ -966,14 +985,20 @@ class VoiceAssistantViewModel(
             silenceDetectionJob = null
             pipelineJob?.cancel()
             pipelineJob = null
+            processingJob?.cancel()
+            processingJob = null
 
             // Stop audio capture service
             audioCaptureService?.stopCapture()
 
             // Get the buffered audio before resetting
-            val audioData = audioBuffer.toByteArray()
-            val audioSize = audioData.size
-            audioBuffer.reset()
+            val audioData: ByteArray
+            val audioSize: Int
+            synchronized(audioBufferLock) {
+                audioData = audioBuffer.toByteArray()
+                audioSize = audioData.size
+                audioBuffer.reset()
+            }
 
             Timber.i("Captured audio: $audioSize bytes")
 
@@ -1156,16 +1181,22 @@ class VoiceAssistantViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
+        // Cancel all jobs BEFORE super.onCleared() cancels viewModelScope
         eventSubscriptionJob?.cancel()
         pipelineJob?.cancel()
         audioRecordingJob?.cancel()
         silenceDetectionJob?.cancel()
+        processingJob?.cancel()
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        viewModelScope.launch {
-            RunAnywhere.stopVoiceSession()
+        // Fire-and-forget on IO — viewModelScope is dead after super.onCleared()
+        @Suppress("OPT_IN_USAGE")
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            try {
+                RunAnywhere.stopVoiceSession()
+            } catch (_: Exception) { /* best-effort cleanup */ }
         }
+        super.onCleared()
     }
 }
