@@ -327,13 +327,23 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
              model_train_ctx, max_default_context_, adaptive_max_context);
     }
 
+    // Cap batch sizes to avoid exceeding Metal's 4 GB single-buffer limit on iOS.
+    // n_ctx controls conversation history length; n_batch/n_ubatch control how many
+    // tokens are processed in one GPU pass. llama.cpp splits larger prompts automatically.
+    static constexpr int MAX_BATCH_SIZE = 2048;
+    static constexpr int MAX_UBATCH_SIZE = 512;
+    batch_size_ = std::min(context_size_, MAX_BATCH_SIZE);
+
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
-    ctx_params.n_batch = context_size_;   // Allow processing full prompt at once
-    ctx_params.n_ubatch = context_size_;  // Physical batch size must also match
+    ctx_params.n_batch = batch_size_;
+    ctx_params.n_ubatch = std::min(batch_size_, MAX_UBATCH_SIZE);
     ctx_params.n_threads = backend_->get_num_threads();
     ctx_params.n_threads_batch = backend_->get_num_threads();
     ctx_params.no_perf = true;
+
+    LOGI("Context params: n_ctx=%d, n_batch=%d, n_ubatch=%d",
+         ctx_params.n_ctx, ctx_params.n_batch, ctx_params.n_ubatch);
 
     context_ = llama_init_from_model(model_, ctx_params);
 
@@ -594,24 +604,27 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     LOGI("Generation: prompt_tokens=%d, max_tokens=%d, context=%d",
          prompt_tokens, effective_max_tokens, n_ctx);
 
-    LOGI("generate_stream: creating batch with n_ctx=%d", n_ctx);
-    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
-    LOGI("generate_stream: batch created, adding %zu tokens", tokens_list.size());
+    const int n_batch = batch_size_ > 0 ? batch_size_ : n_ctx;
+    LOGI("generate_stream: processing %d prompt tokens in chunks of %d", prompt_tokens, n_batch);
+    llama_batch batch = llama_batch_init(n_batch, 0, 1);
 
-    batch.n_tokens = 0;
-    for (size_t i = 0; i < tokens_list.size(); i++) {
-        common_batch_add(batch, tokens_list[i], i, {0}, false);
-    }
-    batch.logits[batch.n_tokens - 1] = true;
-    LOGI("generate_stream: tokens added, n_tokens=%d", batch.n_tokens);
+    for (int chunk_start = 0; chunk_start < prompt_tokens; chunk_start += n_batch) {
+        batch.n_tokens = 0;
+        int chunk_end = std::min(chunk_start + n_batch, prompt_tokens);
+        bool is_last_chunk = (chunk_end == prompt_tokens);
 
-    LOGI("generate_stream: calling llama_decode...");
-    if (llama_decode(context_, batch) != 0) {
-        LOGE("llama_decode failed for prompt");
-        llama_batch_free(batch);
-        return false;
+        for (int i = chunk_start; i < chunk_end; i++) {
+            bool need_logits = is_last_chunk && (i == chunk_end - 1);
+            common_batch_add(batch, tokens_list[i], i, {0}, need_logits);
+        }
+
+        if (llama_decode(context_, batch) != 0) {
+            LOGE("llama_decode failed for prompt chunk [%d..%d)", chunk_start, chunk_end);
+            llama_batch_free(batch);
+            return false;
+        }
     }
-    LOGI("generate_stream: llama_decode succeeded");
+    LOGI("generate_stream: prompt decoded successfully");
 
     // Configure sampler with request parameters
     if (sampler_) {
@@ -790,17 +803,22 @@ bool LlamaCppTextGeneration::inject_system_prompt(const std::string& prompt) {
         return false;
     }
 
-    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
-    batch.n_tokens = 0;
+    const int n_batch_lim = batch_size_ > 0 ? batch_size_ : n_ctx;
+    llama_batch batch = llama_batch_init(n_batch_lim, 0, 1);
 
-    for (int i = 0; i < n_tokens; ++i) {
-        common_batch_add(batch, tokens[i], i, {0}, false);
-    }
+    for (int chunk_start = 0; chunk_start < n_tokens; chunk_start += n_batch_lim) {
+        batch.n_tokens = 0;
+        int chunk_end = std::min(chunk_start + n_batch_lim, n_tokens);
 
-    if (llama_decode(context_, batch) != 0) {
-        LOGE("inject_system_prompt: llama_decode failed");
-        llama_batch_free(batch);
-        return false;
+        for (int i = chunk_start; i < chunk_end; ++i) {
+            common_batch_add(batch, tokens[i], i, {0}, false);
+        }
+
+        if (llama_decode(context_, batch) != 0) {
+            LOGE("inject_system_prompt: llama_decode failed at chunk [%d..%d)", chunk_start, chunk_end);
+            llama_batch_free(batch);
+            return false;
+        }
     }
 
     llama_batch_free(batch);
@@ -832,17 +850,22 @@ bool LlamaCppTextGeneration::append_context(const std::string& text) {
         return false;
     }
 
-    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
-    batch.n_tokens = 0;
+    const int n_batch_lim = batch_size_ > 0 ? batch_size_ : n_ctx;
+    llama_batch batch = llama_batch_init(n_batch_lim, 0, 1);
 
-    for (int i = 0; i < n_tokens; ++i) {
-        common_batch_add(batch, tokens[i], start_pos + i, {0}, false);
-    }
+    for (int chunk_start = 0; chunk_start < n_tokens; chunk_start += n_batch_lim) {
+        batch.n_tokens = 0;
+        int chunk_end = std::min(chunk_start + n_batch_lim, n_tokens);
 
-    if (llama_decode(context_, batch) != 0) {
-        LOGE("append_context: llama_decode failed");
-        llama_batch_free(batch);
-        return false;
+        for (int i = chunk_start; i < chunk_end; ++i) {
+            common_batch_add(batch, tokens[i], start_pos + i, {0}, false);
+        }
+
+        if (llama_decode(context_, batch) != 0) {
+            LOGE("append_context: llama_decode failed at chunk [%d..%d)", chunk_start, chunk_end);
+            llama_batch_free(batch);
+            return false;
+        }
     }
 
     llama_batch_free(batch);
@@ -890,18 +913,24 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
     LOGI("generate_from_context: pos=%d, prompt_tokens=%d, max_tokens=%d",
          static_cast<int>(current_pos), n_prompt, effective_max_tokens);
 
-    llama_batch batch = llama_batch_init(n_ctx, 0, 1);
-    batch.n_tokens = 0;
+    const int n_batch_lim = batch_size_ > 0 ? batch_size_ : n_ctx;
+    llama_batch batch = llama_batch_init(n_batch_lim, 0, 1);
 
-    for (int i = 0; i < n_prompt; ++i) {
-        const bool need_logits = (i == n_prompt - 1);
-        common_batch_add(batch, tokens[i], current_pos + i, {0}, need_logits);
-    }
+    for (int chunk_start = 0; chunk_start < n_prompt; chunk_start += n_batch_lim) {
+        batch.n_tokens = 0;
+        int chunk_end = std::min(chunk_start + n_batch_lim, n_prompt);
+        bool is_last_chunk = (chunk_end == n_prompt);
 
-    if (llama_decode(context_, batch) != 0) {
-        LOGE("generate_from_context: llama_decode failed for prompt");
-        llama_batch_free(batch);
-        return result;
+        for (int i = chunk_start; i < chunk_end; ++i) {
+            bool need_logits = is_last_chunk && (i == chunk_end - 1);
+            common_batch_add(batch, tokens[i], current_pos + i, {0}, need_logits);
+        }
+
+        if (llama_decode(context_, batch) != 0) {
+            LOGE("generate_from_context: llama_decode failed at chunk [%d..%d)", chunk_start, chunk_end);
+            llama_batch_free(batch);
+            return result;
+        }
     }
 
     llama_sampler* sampler = nullptr;
@@ -1110,8 +1139,8 @@ bool LlamaCppTextGeneration::recreate_context() {
     // Create new context (adapters are now visible to it)
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
-    ctx_params.n_batch = context_size_;
-    ctx_params.n_ubatch = context_size_;
+    ctx_params.n_batch = batch_size_;
+    ctx_params.n_ubatch = std::min(batch_size_, 512);
     ctx_params.n_threads = backend_->get_num_threads();
     ctx_params.n_threads_batch = backend_->get_num_threads();
     ctx_params.no_perf = true;

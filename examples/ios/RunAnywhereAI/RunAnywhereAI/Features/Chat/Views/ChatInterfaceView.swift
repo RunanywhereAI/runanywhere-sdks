@@ -752,32 +752,63 @@ private struct LoRAManagementSheetView: View {
         if !viewModel.loraAdapters.isEmpty {
             Section("Loaded Adapters") {
                 ForEach(viewModel.loraAdapters, id: \.path) { adapter in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
-                                .font(.subheadline)
-                                .lineLimit(1)
-                            HStack(spacing: 8) {
-                                Text("Scale: \(String(format: "%.1f", adapter.scale))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                if adapter.applied {
-                                    Text("Applied")
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                HStack(spacing: 8) {
+                                    Text("Scale: \(String(format: "%.1f", adapter.scale))")
                                         .font(.caption)
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.secondary)
+                                    if adapter.applied {
+                                        Text("Applied")
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                Task { await viewModel.removeLoraAdapter(path: adapter.path) }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        let prompts = LoraExamplePrompts.forAdapterPath(adapter.path)
+                        if !prompts.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Try it out:")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                ForEach(prompts, id: \.self) { prompt in
+                                    Button {
+                                        UIPasteboard.general.string = prompt
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "doc.on.doc")
+                                                .font(.caption2)
+                                            Text(prompt)
+                                                .font(.caption)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.purple.opacity(0.15))
+                                        .foregroundColor(.purple)
+                                        .cornerRadius(8)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
                         }
-
-                        Spacer()
-
-                        Button {
-                            Task { await viewModel.removeLoraAdapter(path: adapter.path) }
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
 
