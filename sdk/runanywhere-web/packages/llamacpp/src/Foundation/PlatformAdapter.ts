@@ -33,7 +33,6 @@ interface RegisteredCallbacks {
   nowMs: number;
   getMemoryInfo: number;
   httpDownload: number;
-  extractArchive: number;
 }
 
 /**
@@ -79,7 +78,6 @@ export class PlatformAdapter {
       nowMs: this.registerNowMs(m),
       getMemoryInfo: this.registerGetMemoryInfo(m),
       httpDownload: this.registerHttpDownload(m),
-      extractArchive: this.registerExtractArchive(m),
     };
 
     // Write function pointers into the struct.
@@ -103,7 +101,8 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + offset, this.callbacks.httpDownload, '*'); offset += PTR_SIZE;
     // http_download_cancel: optional, set to 0 (null)
     m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.extractArchive, '*'); offset += PTR_SIZE;
+    // extract_archive: no-op (native libarchive compiled into WASM, bypasses platform adapter)
+    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
     // user_data: set to 0 (null)
     m.setValue(this.adapterPtr + offset, 0, '*');
 
@@ -370,27 +369,6 @@ export class PlatformAdapter {
       },
       'iiiiiiii',
     );
-  }
-
-  /**
-   * extract_archive: rac_result_t (*)(const char* archive_path, const char* dest_dir,
-   *   progress_cb, void* cb_user_data, void* user_data)
-   *
-   * NOTE: This callback is dead code as of Phase 2 (libarchive migration).
-   * rac_extract_archive() in rac_core.cpp now calls rac_extract_archive_native()
-   * directly (native libarchive compiled into WASM), bypassing the platform adapter.
-   * Kept as a no-op for struct layout compatibility.
-   */
-  private registerExtractArchive(m: LlamaCppModule): number {
-    return m.addFunction((archivePtr: number, destPtr: number, _progressCb: number, _cbUserData: number, _userData: number): number => {
-      // Native libarchive extraction is compiled into the WASM module.
-      // rac_extract_archive() calls rac_extract_archive_native() directly,
-      // so this platform adapter callback should never be reached.
-      const archivePath = m.UTF8ToString(archivePtr);
-      const destPath = m.UTF8ToString(destPtr);
-      logger.warning(`Unexpected extract_archive callback invocation: ${archivePath} -> ${destPath}`);
-      return -180;
-    }, 'iiiiii');
   }
 
   // -----------------------------------------------------------------------

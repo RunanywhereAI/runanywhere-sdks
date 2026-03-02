@@ -103,6 +103,7 @@
 
 // Download management
 #include "rac_download.h"
+#include "rac_download_orchestrator.h"
 
 // Model management
 #include "rac_model_types.h"

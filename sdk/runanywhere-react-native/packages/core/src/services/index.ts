@@ -14,11 +14,7 @@ export {
 // File System - Cross-platform file operations using react-native-fs
 export {
   FileSystem,
-  ArchiveType,
-  ArchiveStructure,
-  type ModelArtifactType,
   type DownloadProgress as FSDownloadProgress,
-  type ExtractionResult,
 } from './FileSystem';
 
 // Download Service - Native-based download (delegates to native commons)

@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
@@ -203,6 +204,9 @@ object CppBridge {
             } else {
                 logger.warn("Telemetry handle not available, analytics events will not be tracked")
             }
+
+            // Register file manager I/O callbacks for C++ file management
+            CppBridgeFileManager.register()
 
             _isInitialized = true
 

@@ -21,13 +21,13 @@ public class AlamofireDownloadService: @unchecked Sendable {
     // MARK: - Services
 
     /// Extraction service for handling archive extraction
-    let extractionService: ModelExtractionServiceProtocol
+    let extractionService: ExtractionServiceProtocol
 
     // MARK: - Initialization
 
     public init(
         configuration: DownloadConfiguration = DownloadConfiguration(),
-        extractionService: ModelExtractionServiceProtocol = DefaultModelExtractionService()
+        extractionService: ExtractionServiceProtocol = DefaultExtractionService()
     ) {
         self.extractionService = extractionService
 
@@ -134,13 +134,13 @@ public class AlamofireDownloadService: @unchecked Sendable {
         let (progressStream, progressContinuation) = AsyncStream<DownloadProgress>.makeStream()
 
         // Determine if we need extraction
-        // First check artifact type, then infer from URL if not explicitly set
+        // First check artifact type, then infer from URL via C++ rac_download_requires_extraction()
         var requiresExtraction = model.artifactType.requiresExtraction
 
         // If artifact type doesn't require extraction, check if URL indicates an archive
-        // This is a safeguard for models registered without explicit artifact type
-        if !requiresExtraction, let archiveType = ArchiveType.from(url: downloadURL) {
-            logger.info("URL indicates archive type (\(archiveType.rawValue)) but artifact type doesn't require extraction. Inferring extraction needed.")
+        // Uses C++ archive detection (handles .tar.gz, .tar.bz2, .zip, etc.)
+        if !requiresExtraction, CppBridge.Download.downloadRequiresExtraction(url: downloadURL) {
+            logger.info("URL indicates archive but artifact type doesn't require extraction. Inferring extraction needed.")
             requiresExtraction = true
         }
 
@@ -331,42 +331,26 @@ public class AlamofireDownloadService: @unchecked Sendable {
         return finalModelPath
     }
 
-    /// Determine the download destination based on extraction requirements
+    /// Determine the download destination using C++ path utilities.
+    /// C++ handles archive detection, temp path generation, and model folder resolution.
     private func determineDownloadDestination(
         for model: ModelInfo,
         modelFolderURL: URL,
         requiresExtraction: Bool
     ) -> URL {
-        if requiresExtraction {
-            // Download to temp location for archives
-            // Get archive extension - use the one from artifact type or infer from URL
-            let archiveExt = getArchiveExtensionFromModelOrURL(model)
-
-            // Note: URL.appendingPathExtension doesn't work well with multi-part extensions like "tar.gz"
-            // So we construct the filename with extension directly
-            let filename = "\(model.id)_\(UUID().uuidString).\(archiveExt)"
-            return FileManager.default.temporaryDirectory.appendingPathComponent(filename)
-        } else {
-            // Download directly to model folder
-            return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
-        }
-    }
-
-    /// Get archive extension from model's artifact type or infer from download URL
-    private func getArchiveExtensionFromModelOrURL(_ model: ModelInfo) -> String {
-        // First try to get from artifact type
-        if case .archive(let archiveType, _, _) = model.artifactType {
-            return archiveType.fileExtension
+        // Try C++ destination computation first
+        if let downloadURL = model.downloadURL,
+           let result = CppBridge.Download.computeDownloadDestination(
+               modelId: model.id,
+               downloadURL: downloadURL,
+               framework: model.framework,
+               format: model.format
+           ) {
+            return result.path
         }
 
-        // If not an explicit archive type, try to infer from download URL
-        if let url = model.downloadURL,
-           let archiveType = ArchiveType.from(url: url) {
-            return archiveType.fileExtension
-        }
-
-        // Default to archive (unknown type)
-        return "archive"
+        // Fallback: download directly to model folder
+        return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
     }
 
     /// Log download start information

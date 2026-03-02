@@ -6,7 +6,9 @@ import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 /// FFI typedef for rac_extract_archive_native
 typedef _RacExtractNative = Int32 Function(
@@ -192,23 +194,18 @@ class OnnxDownloadStrategy {
       logger.warning('Failed to delete archive file: $e');
     }
 
-    // Find the extracted model directory
-    // Sherpa-ONNX archives typically extract to a subdirectory with the model name
-    final contents = await modelFolder.list().toList();
-    logger.debug(
-        'Extracted contents: ${contents.map((e) => e.path.split('/').last).join(", ")}');
-
-    // If there's a single subdirectory, the actual model files are in there
-    var modelDir = modelFolder;
-    if (contents.length == 1 && contents.first is Directory) {
-      final subdir = contents.first as Directory;
-      final subdirStat = await subdir.stat();
-      if (subdirStat.type == FileSystemEntityType.directory) {
-        // Model files are in the subdirectory
-        modelDir = subdir;
-        logger.info(
-            'Model files are in subdirectory: ${subdir.path.split('/').last}');
-      }
+    // Use C++ to find the actual model path after extraction
+    // (handles nested directories, model file scanning for sherpa-onnx archives)
+    final foundPath = DartBridgeDownload.findModelPathAfterExtraction(
+      extractedDir: modelFolder.path,
+      structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect
+      framework: RacInferenceFramework.onnx,
+      format: RacModelFormat.onnx,
+    );
+    final modelDir = foundPath != null ? Directory(foundPath) : modelFolder;
+    if (foundPath != null && foundPath != modelFolder.path) {
+      logger.info(
+          'Model files found at: ${foundPath.split('/').last}');
     }
 
     // Report completion (100%)

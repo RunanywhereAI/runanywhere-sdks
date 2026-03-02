@@ -24,7 +24,6 @@ export interface TTSSynthesisResult {
   durationMs: number;
   /** Processing time in milliseconds */
   processingTimeMs: number;
-  [key: string]: unknown;
 }
 
 export interface TTSSynthesizeOptions {

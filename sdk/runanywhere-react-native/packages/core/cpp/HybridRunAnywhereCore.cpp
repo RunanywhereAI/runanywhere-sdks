@@ -37,6 +37,7 @@
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
 #include "bridges/ToolCallingBridge.hpp"
+#include "bridges/FileManagerBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -275,6 +276,7 @@ HybridRunAnywhereCore::~HybridRunAnywhereCore() {
     // across instances and should persist for the SDK lifetime)
     EventBridge::shared().unregisterFromEvents();
     DownloadBridge::shared().shutdown();
+    FileManagerBridge::shared().shutdown();
     StorageBridge::shared().shutdown();
     ModelRegistryBridge::shared().shutdown();
     // Note: InitBridge and TelemetryBridge are not shutdown in destructor
@@ -340,6 +342,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             LOGE("Failed to initialize storage analyzer: %d", result);
             // Continue - not fatal
         }
+
+        // 4b. Initialize file manager bridge (POSIX-based I/O for C++ business logic)
+        FileManagerBridge::shared().initialize();
 
         // 5. Initialize download manager
         result = DownloadBridge::shared().initialize();
@@ -456,6 +461,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
         TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
         EventBridge::shared().unregisterFromEvents();
         DownloadBridge::shared().shutdown();
+        FileManagerBridge::shared().shutdown();
         StorageBridge::shared().shutdown();
         ModelRegistryBridge::shared().shutdown();
         InitBridge::shared().shutdown();
@@ -1113,19 +1119,23 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDownloadProgress
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getStorageInfo() {
     return Promise<std::string>::async([]() {
+        // Use FileManagerBridge for accurate storage info via C++ recursive traversal
+        auto fmInfo = FileManagerBridge::shared().getStorageInfo();
+
+        // Also get model count from registry
         auto registryHandle = ModelRegistryBridge::shared().getHandle();
-        auto info = StorageBridge::shared().analyzeStorage(registryHandle);
+        auto storageInfo = StorageBridge::shared().analyzeStorage(registryHandle);
 
         return buildJsonObject({
-            {"totalDeviceSpace", std::to_string(info.deviceStorage.totalSpace)},
-            {"freeDeviceSpace", std::to_string(info.deviceStorage.freeSpace)},
-            {"usedDeviceSpace", std::to_string(info.deviceStorage.usedSpace)},
-            {"documentsSize", std::to_string(info.appStorage.documentsSize)},
-            {"cacheSize", std::to_string(info.appStorage.cacheSize)},
-            {"appSupportSize", std::to_string(info.appStorage.appSupportSize)},
-            {"totalAppSize", std::to_string(info.appStorage.totalSize)},
-            {"totalModelsSize", std::to_string(info.totalModelsSize)},
-            {"modelCount", std::to_string(info.models.size())}
+            {"totalDeviceSpace", std::to_string(fmInfo.device_total)},
+            {"freeDeviceSpace", std::to_string(fmInfo.device_free)},
+            {"usedDeviceSpace", std::to_string(fmInfo.device_total - fmInfo.device_free)},
+            {"documentsSize", std::to_string(fmInfo.models_size)},
+            {"cacheSize", std::to_string(fmInfo.cache_size)},
+            {"appSupportSize", std::to_string(fmInfo.temp_size)},
+            {"totalAppSize", std::to_string(fmInfo.total_app_size)},
+            {"totalModelsSize", std::to_string(fmInfo.models_size)},
+            {"modelCount", std::to_string(storageInfo.models.size())}
         });
     });
 }
@@ -1136,6 +1146,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearCache() {
 
         // Clear the model assignment cache (in-memory cache for model assignments)
         rac_model_assignment_clear_cache();
+
+        // Clear file cache and temp directories via C++ file manager
+        FileManagerBridge::shared().clearCache();
+        FileManagerBridge::shared().clearTemp();
 
         LOGI("Cache cleared successfully");
         return true;

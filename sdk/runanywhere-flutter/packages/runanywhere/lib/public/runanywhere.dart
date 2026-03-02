@@ -17,6 +17,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
@@ -2217,27 +2218,9 @@ class RunAnywhere {
     }
   }
 
-  /// Calculate directory size recursively.
+  /// Calculate directory size — delegates to C++ file manager.
   static Future<int> _getDirectorySize(String path) async {
-    try {
-      final dir = Directory(path);
-      if (!await dir.exists()) return 0;
-
-      int totalSize = 0;
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
-        if (entity is File) {
-          try {
-            totalSize += await entity.length();
-          } catch (_) {
-            // Skip files we can't read
-          }
-        }
-      }
-      return totalSize;
-    } catch (e) {
-      return 0;
-    }
+    return DartBridgeFileManager.calculateDirectorySize(path);
   }
 
   /// Get downloaded models with their file sizes.

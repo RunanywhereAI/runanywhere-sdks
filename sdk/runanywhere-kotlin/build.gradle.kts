@@ -157,7 +157,7 @@ kotlin {
                 implementation(libs.okhttp.logging)
                 implementation(libs.gson)
                 implementation(libs.commons.io)
-                implementation(libs.commons.compress)
+
                 implementation(libs.ktor.client.okhttp)
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)

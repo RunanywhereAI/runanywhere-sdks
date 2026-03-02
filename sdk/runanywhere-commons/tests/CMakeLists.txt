@@ -25,6 +25,18 @@ target_link_libraries(test_extraction PRIVATE rac_commons)
 target_compile_features(test_extraction PRIVATE cxx_std_17)
 add_test(NAME extraction_tests COMMAND test_extraction --run-all)
 
+# --- test_download_orchestrator: Always built (no backend dependency) ---
+# Tests rac_find_model_path_after_extraction(), rac_download_compute_destination(),
+# and rac_download_requires_extraction() from rac_download_orchestrator.h.
+add_executable(test_download_orchestrator test_download_orchestrator.cpp)
+target_include_directories(test_download_orchestrator PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_download_orchestrator PRIVATE rac_commons)
+target_compile_features(test_download_orchestrator PRIVATE cxx_std_17)
+add_test(NAME download_orchestrator_tests COMMAND test_download_orchestrator --run-all)
+
 # --- ONNX backend tests (VAD, STT, TTS, WakeWord) ---
 if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     # VAD test

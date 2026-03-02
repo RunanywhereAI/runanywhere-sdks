@@ -705,8 +705,25 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         ),
                     )
 
-                    // Pass the URL to determine archive type (file may be saved without extension)
-                    val extractedPath = extractArchive(downloadedFile, modelId, modelType, downloadUrl, downloadLogger)
+                    // Extract and find model path using C++ orchestrator utilities
+                    val racFramework = when (modelInfo.framework) {
+                        InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
+                        InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
+                        InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
+                        InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
+                        InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
+                        InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
+                        InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
+                    }
+                    val racFormat = when (modelInfo.format) {
+                        ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
+                        ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
+                        ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
+                        ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
+                        ModelFormat.UNKNOWN -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
+                    }
+                    val extractedPath = extractArchive(downloadedFile, modelId, racFramework, racFormat, downloadLogger)
                     downloadLogger.info("Extraction complete: $extractedPath")
                     extractedPath
                 } else {
@@ -754,17 +771,10 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
 
 /**
  * Check if URL requires extraction (is an archive).
- * Supports: .tar.gz, .tgz, .tar.bz2, .tbz2, .tar.xz, .txz, .zip
+ * Delegates to C++ rac_download_requires_extraction() for consistent behavior across all SDKs.
  */
 private fun requiresExtraction(url: String): Boolean {
-    val lowercaseUrl = url.lowercase()
-    return lowercaseUrl.endsWith(".tar.gz") ||
-        lowercaseUrl.endsWith(".tgz") ||
-        lowercaseUrl.endsWith(".tar.bz2") ||
-        lowercaseUrl.endsWith(".tbz2") ||
-        lowercaseUrl.endsWith(".tar.xz") ||
-        lowercaseUrl.endsWith(".txz") ||
-        lowercaseUrl.endsWith(".zip")
+    return RunAnywhereBridge.nativeDownloadRequiresExtraction(url)
 }
 
 /**
@@ -774,18 +784,20 @@ private fun requiresExtraction(url: String): Boolean {
  * Archives typically contain a root folder (e.g., sherpa-onnx-whisper-tiny.en/)
  * so we extract to the parent directory and the archive structure creates the model folder.
  *
+ * Post-extraction model path finding uses C++ rac_find_model_path_after_extraction()
+ * for consistent behavior across all SDKs.
+ *
  * @param archiveFile The downloaded archive file (may not have extension in filename)
  * @param modelId The model ID
- * @param modelType The model type
- * @param originalUrl The original download URL
+ * @param racFramework C++ framework constant (CppBridgeModelRegistry.Framework.*)
+ * @param racFormat C++ format constant (CppBridgeModelRegistry.ModelFormat.*)
  * @param logger Logger for debug output
  */
-@Suppress("UNUSED_PARAMETER")
 private suspend fun extractArchive(
     archiveFile: File,
     modelId: String,
-    modelType: Int,
-    originalUrl: String,
+    racFramework: Int,
+    racFormat: Int,
     logger: SDKLogger,
 ): String =
     withContext(Dispatchers.IO) {
@@ -828,18 +840,14 @@ private suspend fun extractArchive(
             }
         }
 
-        // Find the extracted model directory
-        val expectedModelDir = File(parentDir, modelId)
-        val finalPath =
-            if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
-                expectedModelDir.absolutePath
-            } else {
-                parentDir
-                    .listFiles()
-                    ?.firstOrNull {
-                        it.isDirectory && it.name.contains(modelId.substringBefore("-"))
-                    }?.absolutePath ?: parentDir.absolutePath
-            }
+        // Find the extracted model path using C++ rac_find_model_path_after_extraction()
+        // Uses UNKNOWN structure to let C++ scan for model files and nested directories
+        val finalPath = RunAnywhereBridge.nativeFindModelPathAfterExtraction(
+            parentDir.absolutePath,
+            99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN — let C++ auto-detect
+            racFramework,
+            racFormat,
+        )
 
         logger.info("Model extracted to: $finalPath")
         finalPath

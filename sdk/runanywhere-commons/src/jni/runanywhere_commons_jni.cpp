@@ -49,7 +49,9 @@
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
+#include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
+#include "rac/infrastructure/file_management/rac_file_manager.h"
 
 // NOTE: Backend headers are NOT included here.
 // Backend registration is handled by their respective JNI libraries:
@@ -4234,6 +4236,361 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDetectArchiveTyp
     rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
     rac_detect_archive_type(filePath.c_str(), &type);
     return static_cast<jint>(type);
+}
+
+// =============================================================================
+// DOWNLOAD ORCHESTRATOR
+// =============================================================================
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFindModelPathAfterExtraction(
+    JNIEnv* env, jobject /* thiz */, jstring jExtractedDir, jint jStructure, jint jFramework,
+    jint jFormat) {
+    std::string extractedDir = getCString(env, jExtractedDir);
+
+    char outPath[4096];
+    rac_result_t result = rac_find_model_path_after_extraction(
+        extractedDir.c_str(), static_cast<rac_archive_structure_t>(jStructure),
+        static_cast<rac_inference_framework_t>(jFramework),
+        static_cast<rac_model_format_t>(jFormat), outPath, sizeof(outPath));
+
+    if (RAC_SUCCEEDED(result)) {
+        return env->NewStringUTF(outPath);
+    }
+    return env->NewStringUTF(extractedDir.c_str());
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDownloadRequiresExtraction(
+    JNIEnv* env, jobject /* thiz */, jstring jUrl) {
+    std::string url = getCString(env, jUrl);
+    return static_cast<jboolean>(rac_download_requires_extraction(url.c_str()) == RAC_TRUE);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeComputeDownloadDestination(
+    JNIEnv* env, jobject /* thiz */, jstring jModelId, jstring jDownloadUrl, jint jFramework,
+    jint jFormat) {
+    std::string modelId = getCString(env, jModelId);
+    std::string downloadUrl = getCString(env, jDownloadUrl);
+
+    char outPath[4096];
+    rac_bool_t needsExtraction = RAC_FALSE;
+    rac_result_t result = rac_download_compute_destination(
+        modelId.c_str(), downloadUrl.c_str(),
+        static_cast<rac_inference_framework_t>(jFramework),
+        static_cast<rac_model_format_t>(jFormat), outPath, sizeof(outPath), &needsExtraction);
+
+    if (RAC_SUCCEEDED(result)) {
+        return env->NewStringUTF(outPath);
+    }
+    return nullptr;
+}
+
+// =============================================================================
+// File Manager JNI Wrappers
+// =============================================================================
+
+// Global reference for file callbacks object
+static jobject g_file_callbacks_obj = nullptr;
+static jmethodID g_fc_create_directory = nullptr;
+static jmethodID g_fc_delete_path = nullptr;
+static jmethodID g_fc_list_directory = nullptr;
+static jmethodID g_fc_path_exists = nullptr;
+static jmethodID g_fc_is_directory = nullptr;
+static jmethodID g_fc_get_file_size = nullptr;
+static jmethodID g_fc_get_available_space = nullptr;
+static jmethodID g_fc_get_total_space = nullptr;
+
+// JNI file callback implementations
+static rac_result_t jni_fc_create_directory(const char* path, int recursive, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    jstring jPath = env->NewStringUTF(path);
+    jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_create_directory, jPath,
+                                     static_cast<jboolean>(recursive != 0));
+    env->DeleteLocalRef(jPath);
+    return static_cast<rac_result_t>(result);
+}
+
+static rac_result_t jni_fc_delete_path(const char* path, int recursive, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    jstring jPath = env->NewStringUTF(path);
+    jint result = env->CallIntMethod(g_file_callbacks_obj, g_fc_delete_path, jPath,
+                                     static_cast<jboolean>(recursive != 0));
+    env->DeleteLocalRef(jPath);
+    return static_cast<rac_result_t>(result);
+}
+
+static rac_result_t jni_fc_list_directory(const char* path, char*** out_entries, size_t* out_count,
+                                           void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+
+    jstring jPath = env->NewStringUTF(path);
+    jobjectArray jEntries = static_cast<jobjectArray>(
+        env->CallObjectMethod(g_file_callbacks_obj, g_fc_list_directory, jPath));
+    env->DeleteLocalRef(jPath);
+
+    if (jEntries == nullptr) {
+        *out_entries = nullptr;
+        *out_count = 0;
+        return RAC_ERROR_FILE_NOT_FOUND;
+    }
+
+    jsize count = env->GetArrayLength(jEntries);
+    auto** entries = static_cast<char**>(std::malloc(count * sizeof(char*)));
+    if (entries == nullptr) {
+        env->DeleteLocalRef(jEntries);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (jsize i = 0; i < count; i++) {
+        auto jEntry = static_cast<jstring>(env->GetObjectArrayElement(jEntries, i));
+        const char* entryChars = env->GetStringUTFChars(jEntry, nullptr);
+        entries[i] = strdup(entryChars);
+        env->ReleaseStringUTFChars(jEntry, entryChars);
+        env->DeleteLocalRef(jEntry);
+    }
+
+    env->DeleteLocalRef(jEntries);
+    *out_entries = entries;
+    *out_count = static_cast<size_t>(count);
+    return RAC_SUCCESS;
+}
+
+static void jni_fc_free_entries(char** entries, size_t count, void* user_data) {
+    if (entries == nullptr) return;
+    for (size_t i = 0; i < count; i++) {
+        std::free(entries[i]);
+    }
+    std::free(entries);
+}
+
+static rac_bool_t jni_fc_path_exists(const char* path, rac_bool_t* out_is_directory,
+                                      void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return RAC_FALSE;
+
+    jstring jPath = env->NewStringUTF(path);
+    jboolean exists = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_path_exists, jPath);
+
+    if (out_is_directory != nullptr && exists) {
+        jboolean isDir = env->CallBooleanMethod(g_file_callbacks_obj, g_fc_is_directory, jPath);
+        *out_is_directory = isDir ? RAC_TRUE : RAC_FALSE;
+    }
+
+    env->DeleteLocalRef(jPath);
+    return exists ? RAC_TRUE : RAC_FALSE;
+}
+
+static int64_t jni_fc_get_file_size(const char* path, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return -1;
+    jstring jPath = env->NewStringUTF(path);
+    jlong size = env->CallLongMethod(g_file_callbacks_obj, g_fc_get_file_size, jPath);
+    env->DeleteLocalRef(jPath);
+    return static_cast<int64_t>(size);
+}
+
+static int64_t jni_fc_get_available_space(void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return -1;
+    return static_cast<int64_t>(
+        env->CallLongMethod(g_file_callbacks_obj, g_fc_get_available_space));
+}
+
+static int64_t jni_fc_get_total_space(void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr || g_file_callbacks_obj == nullptr) return -1;
+    return static_cast<int64_t>(env->CallLongMethod(g_file_callbacks_obj, g_fc_get_total_space));
+}
+
+/**
+ * Build rac_file_callbacks_t from registered JNI callbacks.
+ */
+static rac_file_callbacks_t build_jni_file_callbacks() {
+    rac_file_callbacks_t cb = {};
+    cb.create_directory = jni_fc_create_directory;
+    cb.delete_path = jni_fc_delete_path;
+    cb.list_directory = jni_fc_list_directory;
+    cb.free_entries = jni_fc_free_entries;
+    cb.path_exists = jni_fc_path_exists;
+    cb.get_file_size = jni_fc_get_file_size;
+    cb.get_available_space = jni_fc_get_available_space;
+    cb.get_total_space = jni_fc_get_total_space;
+    cb.user_data = nullptr;
+    return cb;
+}
+
+// Register file callbacks object from Kotlin
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerRegisterCallbacks(
+    JNIEnv* env, jobject /* thiz */, jobject callbacksObj) {
+    if (callbacksObj == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    // Store global reference
+    if (g_file_callbacks_obj != nullptr) {
+        env->DeleteGlobalRef(g_file_callbacks_obj);
+    }
+    g_file_callbacks_obj = env->NewGlobalRef(callbacksObj);
+
+    // Cache method IDs
+    jclass cls = env->GetObjectClass(callbacksObj);
+    g_fc_create_directory = env->GetMethodID(cls, "createDirectory", "(Ljava/lang/String;Z)I");
+    g_fc_delete_path = env->GetMethodID(cls, "deletePath", "(Ljava/lang/String;Z)I");
+    g_fc_list_directory =
+        env->GetMethodID(cls, "listDirectory", "(Ljava/lang/String;)[Ljava/lang/String;");
+    g_fc_path_exists = env->GetMethodID(cls, "pathExists", "(Ljava/lang/String;)Z");
+    g_fc_is_directory = env->GetMethodID(cls, "isDirectory", "(Ljava/lang/String;)Z");
+    g_fc_get_file_size = env->GetMethodID(cls, "getFileSize", "(Ljava/lang/String;)J");
+    g_fc_get_available_space = env->GetMethodID(cls, "getAvailableSpace", "()J");
+    g_fc_get_total_space = env->GetMethodID(cls, "getTotalSpace", "()J");
+    env->DeleteLocalRef(cls);
+
+    LOGi("File manager callbacks registered");
+    return RAC_SUCCESS;
+}
+
+// Create directory structure
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreateDirectoryStructure(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    return static_cast<jint>(rac_file_manager_create_directory_structure(&cb));
+}
+
+// Calculate directory size
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCalculateDirSize(
+    JNIEnv* env, jobject /* thiz */, jstring jPath) {
+    std::string path = getCString(env, jPath);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t result = rac_file_manager_calculate_dir_size(&cb, path.c_str(), &size);
+    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
+}
+
+// Models storage used
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModelsStorageUsed(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t result = rac_file_manager_models_storage_used(&cb, &size);
+    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
+}
+
+// Clear cache
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClearCache(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    return static_cast<jint>(rac_file_manager_clear_cache(&cb));
+}
+
+// Clear temp
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClearTemp(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    return static_cast<jint>(rac_file_manager_clear_temp(&cb));
+}
+
+// Cache size
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCacheSize(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t result = rac_file_manager_cache_size(&cb, &size);
+    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
+}
+
+// Delete model
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerDeleteModel(
+    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
+    std::string modelId = getCString(env, jModelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    return static_cast<jint>(rac_file_manager_delete_model(
+        &cb, modelId.c_str(), static_cast<rac_inference_framework_t>(jFramework)));
+}
+
+// Create model folder
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreateModelFolder(
+    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
+    std::string modelId = getCString(env, jModelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    char outPath[4096];
+    rac_result_t result = rac_file_manager_create_model_folder(
+        &cb, modelId.c_str(), static_cast<rac_inference_framework_t>(jFramework), outPath,
+        sizeof(outPath));
+    if (RAC_SUCCEEDED(result)) {
+        return env->NewStringUTF(outPath);
+    }
+    return nullptr;
+}
+
+// Model folder exists
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModelFolderExists(
+    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
+    std::string modelId = getCString(env, jModelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_bool_t exists = RAC_FALSE;
+    rac_file_manager_model_folder_exists(&cb, modelId.c_str(),
+                                          static_cast<rac_inference_framework_t>(jFramework),
+                                          &exists, nullptr);
+    return static_cast<jboolean>(exists == RAC_TRUE);
+}
+
+// Check storage availability - returns JSON string with result
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCheckStorage(
+    JNIEnv* env, jobject /* thiz */, jlong requiredBytes) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_storage_availability_t availability = {};
+    rac_result_t result =
+        rac_file_manager_check_storage(&cb, static_cast<int64_t>(requiredBytes), &availability);
+
+    if (RAC_FAILED(result)) return nullptr;
+
+    nlohmann::json j;
+    j["isAvailable"] = availability.is_available == RAC_TRUE;
+    j["requiredSpace"] = availability.required_space;
+    j["availableSpace"] = availability.available_space;
+    j["hasWarning"] = availability.has_warning == RAC_TRUE;
+    j["recommendation"] = availability.recommendation != nullptr ? availability.recommendation : "";
+
+    rac_storage_availability_free(&availability);
+
+    std::string jsonStr = j.dump();
+    return env->NewStringUTF(jsonStr.c_str());
+}
+
+// Get storage info - returns JSON string with result
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerGetStorageInfo(
+    JNIEnv* env, jobject /* thiz */) {
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_file_manager_storage_info_t info = {};
+    rac_result_t result = rac_file_manager_get_storage_info(&cb, &info);
+
+    if (RAC_FAILED(result)) return nullptr;
+
+    nlohmann::json j;
+    j["deviceTotal"] = info.device_total;
+    j["deviceFree"] = info.device_free;
+    j["modelsSize"] = info.models_size;
+    j["cacheSize"] = info.cache_size;
+    j["tempSize"] = info.temp_size;
+    j["totalAppSize"] = info.total_app_size;
+
+    std::string jsonStr = j.dump();
+    return env->NewStringUTF(jsonStr.c_str());
 }
 
 }  // extern "C"

@@ -7,8 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
@@ -197,7 +199,8 @@ class ModelDownloadService {
           final extractedPath = await _extractArchive(
             downloadPath,
             destDir.path,
-            model.artifactType,
+            framework: model.framework,
+            format: model.format,
           );
           finalModelPath = extractedPath;
 
@@ -259,11 +262,13 @@ class ModelDownloadService {
 
   /// Extract an archive to the destination using native C++ (libarchive).
   /// Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection.
+  /// Post-extraction model path finding is delegated to C++.
   Future<String> _extractArchive(
     String archivePath,
-    String destDir,
-    ModelArtifactType artifactType,
-  ) async {
+    String destDir, {
+    required InferenceFramework framework,
+    required ModelFormat format,
+  }) async {
     _logger.info('Extracting archive: $archivePath');
 
     final lib = PlatformLoader.loadCommons();
@@ -299,15 +304,16 @@ class ModelDownloadService {
 
     _logger.info('Extraction complete: $destDir');
 
-    // Return the model directory (could be a nested directory)
-    final contents = await Directory(destDir).list().toList();
-    final directories =
-        contents.whereType<Directory>().toList();
-    if (directories.length == 1) {
-      return directories.first.path;
-    }
+    // Use C++ to find the actual model path after extraction
+    // (handles nested directories, model file scanning, etc.)
+    final modelPath = DartBridgeDownload.findModelPathAfterExtraction(
+      extractedDir: destDir,
+      structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect
+      framework: framework.toC(),
+      format: format.toC(),
+    );
 
-    return destDir;
+    return modelPath ?? destDir;
   }
 
   /// Update model's local path after download
