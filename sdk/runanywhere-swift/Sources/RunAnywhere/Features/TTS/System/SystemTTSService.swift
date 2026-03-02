@@ -57,6 +57,15 @@ public final class SystemTTSService: NSObject {
         return try await Task.detached { @MainActor [self] in
             logger.info("Speaking: '\(text.prefix(50))...'")
 
+            // The audio session may still be in .record mode from the Voice Agent's
+            // audio capture phase. Switch to .playback so AVSpeechSynthesizer can
+            // actually route audio to the speaker.
+            #if os(iOS) || os(tvOS)
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers])
+            try audioSession.setActive(true)
+            #endif
+
             let utterance = createUtterance(text: text, options: options)
 
             return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in

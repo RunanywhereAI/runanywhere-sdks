@@ -608,23 +608,29 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     }
 
     // Step 4: Convert Float32 PCM to WAV format for playback
-    // TTS returns raw Float32 samples, but audio players need WAV format
+    // Platform TTS (e.g. System TTS) plays audio directly and returns no PCM data.
+    // Only convert when actual audio data is returned (e.g. Piper/ONNX TTS).
     void* wav_data = nullptr;
     size_t wav_size = 0;
-    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                      &wav_data, &wav_size);
 
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("VoiceAgent", "Failed to convert audio to WAV format");
-        rac_stt_result_free(&stt_result);
-        rac_llm_result_free(&llm_result);
-        rac_tts_result_free(&tts_result);
-        return result;
+    if (tts_result.audio_data != nullptr && tts_result.audio_size > 0) {
+        result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                          tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                     : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                          &wav_data, &wav_size);
+
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("VoiceAgent", "Failed to convert audio to WAV format");
+            rac_stt_result_free(&stt_result);
+            rac_llm_result_free(&llm_result);
+            rac_tts_result_free(&tts_result);
+            return result;
+        }
+
+        RAC_LOG_DEBUG("VoiceAgent", "Converted PCM to WAV format");
+    } else {
+        RAC_LOG_DEBUG("VoiceAgent", "Platform TTS played audio directly — no PCM data to convert");
     }
-
-    RAC_LOG_DEBUG("VoiceAgent", "Converted PCM to WAV format");
 
     // Build result (mirrors Swift's VoiceAgentResult)
     out_result->speech_detected = RAC_TRUE;
@@ -726,25 +732,29 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     }
 
     // Step 4: Convert Float32 PCM to WAV format for playback
+    // Platform TTS plays audio directly and returns no PCM data — skip conversion.
     void* wav_data = nullptr;
     size_t wav_size = 0;
-    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                      &wav_data, &wav_size);
 
-    if (result != RAC_SUCCESS) {
-        rac_stt_result_free(&stt_result);
-        rac_llm_result_free(&llm_result);
-        rac_tts_result_free(&tts_result);
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = result;
-        callback(&error_event, user_data);
-        return result;
+    if (tts_result.audio_data != nullptr && tts_result.audio_size > 0) {
+        result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                          tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                     : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                          &wav_data, &wav_size);
+
+        if (result != RAC_SUCCESS) {
+            rac_stt_result_free(&stt_result);
+            rac_llm_result_free(&llm_result);
+            rac_tts_result_free(&tts_result);
+            rac_voice_agent_event_t error_event = {};
+            error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
+            error_event.data.error_code = result;
+            callback(&error_event, user_data);
+            return result;
+        }
     }
 
-    // Emit audio synthesized event (with WAV data)
+    // Emit audio synthesized event (with WAV data, or empty for platform TTS)
     rac_voice_agent_event_t audio_event = {};
     audio_event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
     audio_event.data.audio.audio_data = wav_data;
@@ -845,23 +855,27 @@ rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle, 
         return result;
     }
 
-    // Convert Float32 PCM to WAV format for playback
-    void* wav_data = nullptr;
-    size_t wav_size = 0;
-    result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                      tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                 : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                      &wav_data, &wav_size);
+    // Platform TTS plays audio directly and returns no PCM data — skip conversion.
+    if (tts_result.audio_data != nullptr && tts_result.audio_size > 0) {
+        void* wav_data = nullptr;
+        size_t wav_size = 0;
+        result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
+                                          tts_result.sample_rate > 0 ? tts_result.sample_rate
+                                                                     : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                                          &wav_data, &wav_size);
 
-    if (result != RAC_SUCCESS) {
-        rac_tts_result_free(&tts_result);
-        return result;
+        if (result != RAC_SUCCESS) {
+            rac_tts_result_free(&tts_result);
+            return result;
+        }
+
+        *out_audio = wav_data;
+        *out_audio_size = wav_size;
+    } else {
+        *out_audio = nullptr;
+        *out_audio_size = 0;
     }
 
-    *out_audio = wav_data;
-    *out_audio_size = wav_size;
-
-    // Free the original PCM data
     rac_tts_result_free(&tts_result);
 
     return RAC_SUCCESS;
