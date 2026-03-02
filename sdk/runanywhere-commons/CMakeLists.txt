@@ -15,6 +15,9 @@ project(RunAnywhereCommons
     DESCRIPTION "RunAnywhere Commons - Standalone infrastructure library for ML inference SDKs"
 )
 
+# Enable folder organization for IDEs
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 # =============================================================================
 # ABOUT THIS LIBRARY
 # =============================================================================
@@ -37,7 +40,14 @@ option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, Syst
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
-option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
+# RAG backend is currently not supported on Windows due to a compatibility issue in the USearch library
+# when building with Unicode,
+# see https://github.com/unum-cloud/USearch/commit/20cb74202121999e28ca95cd63ad4b55147597fe#diff-1ca00f90ac7927aa1a54acac43c239bbaf6c25ab5c884d56d5ade2a99b65c47dR1782-R1783 for more details.
+if(WIN32)
+    set(RAC_BACKEND_RAG OFF CACHE BOOL "" FORCE)
+else()
+    option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
+endif()
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(APPLE)
@@ -336,6 +346,15 @@ else()
     set(RAC_WHISPERKIT_COREML_SOURCES "")
 endif()
 
+# Utilities sources
+set(RAC_UTILITIES_SOURCES
+    src/utils/rac_image_utils.cpp
+)
+
+if(RAC_PLATFORM_WINDOWS)
+    list(APPEND RAC_UTILITIES_SOURCES src/utils/rac_str_trans.cpp)
+endif()
+
 # Combine all sources
 set(RAC_COMMONS_SOURCES
     ${RAC_CORE_SOURCES}
@@ -343,6 +362,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_FEATURES_SOURCES}
     ${RAC_PLATFORM_SOURCES}
     ${RAC_WHISPERKIT_COREML_SOURCES}
+    ${RAC_UTILITIES_SOURCES}
 )
 
 # =============================================================================
