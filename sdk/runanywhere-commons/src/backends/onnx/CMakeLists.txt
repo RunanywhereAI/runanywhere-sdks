@@ -194,10 +194,6 @@ set(ONNX_BACKEND_SOURCES
     wakeword_onnx.cpp
 )
 
-if(RAC_PLATFORM_WINDOWS)
-    list(APPEND ONNX_BACKEND_SOURCES rac_str_trans.cpp)
-endif()
-
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
 )

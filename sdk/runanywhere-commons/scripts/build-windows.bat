@@ -11,10 +11,11 @@ setlocal enabledelayedexpansion
 ::
 :: OPTIONS:
 ::   --skip-backends     Build RACommons only; do not build backend frameworks
-::   --backend NAME      Build specific backend: llamacpp, onnx, all (default: all)
+::   --backend NAME      Build specific backend: llamacpp, onnx, rag, all (default: all)
 ::                       - llamacpp: LLM text generation (GGUF models)
 ::                       - onnx:     STT/TTS/VAD (ONNX Runtime + Sherpa-ONNX)
-::                       - all:      Both backends (default)
+::                       - rag:      RAG backend (embeddings + text generation)
+::                       - all:      All backends (default)
 ::   --clean             Remove build and dist directories before building
 ::   --release           Release build (default)
 ::   --debug             Debug build
@@ -27,7 +28,7 @@ setlocal enabledelayedexpansion
 ::   --help, -h          Show this help
 ::
 :: OUTPUTS:
-::   dist\windows\bin\   RACommons and backend DLLs (if shared)
+::   dist\windows\bin\   RACommons and backend DLLs (if shared): rac_commons, rac_backend_llamacpp, rac_backend_onnx, rac_backend_rag
 ::   dist\windows\lib\   Import libraries (.lib) and static libs
 ::   dist\windows\include\  Public headers
 ::
@@ -37,6 +38,9 @@ setlocal enabledelayedexpansion
 ::
 ::   REM Build only LlamaCPP backend (no ONNX dependencies)
 ::   scripts\build-windows.bat --backend llamacpp
+::
+::   REM Build only RAG backend (embeddings + text generation, needs ONNX)
+::   scripts\build-windows.bat --backend rag
 ::
 ::   REM Build only RACommons (no backends)
 ::   scripts\build-windows.bat --skip-backends
@@ -114,7 +118,7 @@ echo USAGE: scripts\build-windows.bat [options]
 echo.
 echo OPTIONS:
 echo   --skip-backends   Build RACommons only
-echo   --backend NAME    all ^| llamacpp ^| onnx  (default: all)
+echo   --backend NAME    all ^| llamacpp ^| onnx ^| rag  (default: all)
 echo   --clean           Clean build and dist first
 echo   --release         Release build (default)
 echo   --debug           Debug build
@@ -129,6 +133,7 @@ echo.
 echo EXAMPLES:
 echo   scripts\build-windows.bat                    # Full build (needs third_party deps)
 echo   scripts\build-windows.bat --backend llamacpp # LlamaCPP only
+echo   scripts\build-windows.bat --backend rag      # RAG only (uses ONNX + LlamaCPP)
 echo   scripts\build-windows.bat --clean --package  # Clean build + ZIP
 echo.
 exit /b 0
@@ -140,10 +145,11 @@ set "BACKEND_VALID=0"
 if /i "!BUILD_BACKEND!"=="all" set "BACKEND_VALID=1"
 if /i "!BUILD_BACKEND!"=="llamacpp" set "BACKEND_VALID=1"
 if /i "!BUILD_BACKEND!"=="onnx" set "BACKEND_VALID=1"
+if /i "!BUILD_BACKEND!"=="rag" set "BACKEND_VALID=1"
 
 if "!BACKEND_VALID!"=="0" (
   echo [ERROR] Invalid --backend: !BUILD_BACKEND!
-  echo [ERROR] Valid backend options are: all, llamacpp, onnx
+  echo [ERROR] Valid backend options are: all, llamacpp, onnx, rag
   exit /b 1
 )
 
@@ -223,20 +229,29 @@ if errorlevel 1 (
 set "RAC_BUILD_BACKENDS=ON"
 set "RAC_BACKEND_LLAMACPP=ON"
 set "RAC_BACKEND_ONNX=ON"
+set "RAC_BACKEND_RAG=ON"
 set "RAC_BACKEND_WHISPERCPP=OFF"
 
 if "%SKIP_BACKENDS%"=="1" (
   set "RAC_BUILD_BACKENDS=OFF"
   set "RAC_BACKEND_LLAMACPP=OFF"
   set "RAC_BACKEND_ONNX=OFF"
+  set "RAC_BACKEND_RAG=OFF"
 ) else (
   if /i "%BUILD_BACKEND%"=="llamacpp" (
     set "RAC_BACKEND_LLAMACPP=ON"
     set "RAC_BACKEND_ONNX=OFF"
+    set "RAC_BACKEND_RAG=OFF"
   )
   if /i "%BUILD_BACKEND%"=="onnx" (
     set "RAC_BACKEND_LLAMACPP=OFF"
     set "RAC_BACKEND_ONNX=ON"
+    set "RAC_BACKEND_RAG=OFF"
+  )
+  if /i "%BUILD_BACKEND%"=="rag" (
+    set "RAC_BACKEND_LLAMACPP=ON"
+    set "RAC_BACKEND_ONNX=ON"
+    set "RAC_BACKEND_RAG=ON"
   )
 )
 
@@ -258,6 +273,7 @@ set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BUILD_TESTS=OFF"
 set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BUILD_BACKENDS=%RAC_BUILD_BACKENDS%"
 set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BACKEND_LLAMACPP=%RAC_BACKEND_LLAMACPP%"
 set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BACKEND_ONNX=%RAC_BACKEND_ONNX%"
+set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BACKEND_RAG=%RAC_BACKEND_RAG%"
 set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BACKEND_WHISPERCPP=%RAC_BACKEND_WHISPERCPP%"
 set "CMAKE_ARGS=%CMAKE_ARGS% -DRAC_BUILD_SHARED=%RAC_SHARED_FLAG%"
 
@@ -313,22 +329,28 @@ if "%BUILD_OUT%"=="" set "BUILD_OUT=%BUILD_DIR%"
 if exist "%BUILD_OUT%\rac_commons.dll" copy /y "%BUILD_OUT%\rac_commons.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\rac_backend_llamacpp.dll" copy /y "%BUILD_OUT%\rac_backend_llamacpp.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\rac_backend_onnx.dll" copy /y "%BUILD_OUT%\rac_backend_onnx.dll" "%DIST_BIN%\" >nul
+if exist "%BUILD_OUT%\rac_backend_rag.dll" copy /y "%BUILD_OUT%\rac_backend_rag.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.dll" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.dll" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.dll" "%DIST_BIN%\" >nul
+if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.dll" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.dll" "%DIST_BIN%\" >nul
 
 :: Copy import libs / static libs to lib
 if exist "%BUILD_OUT%\rac_commons.lib" copy /y "%BUILD_OUT%\rac_commons.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\rac_backend_llamacpp.lib" copy /y "%BUILD_OUT%\rac_backend_llamacpp.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\rac_backend_onnx.lib" copy /y "%BUILD_OUT%\rac_backend_onnx.lib" "%DIST_LIB%\" >nul
+if exist "%BUILD_OUT%\rac_backend_rag.lib" copy /y "%BUILD_OUT%\rac_backend_rag.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.lib" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.lib" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.lib" "%DIST_LIB%\" >nul
+if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.lib" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.lib" "%DIST_LIB%\" >nul
 
 :: PDB files (optional, for debugging)
 if exist "%BUILD_OUT%\rac_commons.pdb" copy /y "%BUILD_OUT%\rac_commons.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\rac_backend_llamacpp.pdb" copy /y "%BUILD_OUT%\rac_backend_llamacpp.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\rac_backend_onnx.pdb" copy /y "%BUILD_OUT%\rac_backend_onnx.pdb" "%DIST_BIN%\" >nul
+if exist "%BUILD_OUT%\rac_backend_rag.pdb" copy /y "%BUILD_OUT%\rac_backend_rag.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.pdb" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.pdb" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.pdb" "%DIST_BIN%\" >nul
+if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.pdb" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.pdb" "%DIST_BIN%\" >nul
 
 :: Headers: rac and backends
 if exist "%PROJECT_ROOT%\include\rac" (
