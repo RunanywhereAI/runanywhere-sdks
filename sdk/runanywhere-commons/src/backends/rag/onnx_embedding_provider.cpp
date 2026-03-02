@@ -8,6 +8,10 @@
 #include "rac/core/rac_logger.h"
 #include "../onnx/onnx_backend.h"
 
+#if defined(_WIN32)
+#include "rac/utils/rac_str_trans.h"
+#endif
+
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>
 #include <filesystem>
@@ -737,12 +741,18 @@ private:
         }
         
         // Load model with session options
-        status_guard.reset(ort_api_->CreateSession(
-            ort_env_,
-            model_path.c_str(),
-            options_guard.get(),
-            &session_
-        ));
+#if defined(_WIN32)
+        int wlen = 0;
+        rac_str_utf8_to_unicode(model_path.c_str(), NULL, 0, &wlen);
+        wchar_t* wmodel_path = (wchar_t*)malloc((size_t)wlen * sizeof(wchar_t));
+        rac_str_utf8_to_unicode(model_path.c_str(), wmodel_path, wlen, NULL);
+        status_guard.reset(
+            ort_api_->CreateSession(ort_env_, wmodel_path, options_guard.get(), &session_));
+        free(wmodel_path);
+#else
+        status_guard.reset(
+            ort_api_->CreateSession(ort_env_, model_path.c_str(), options_guard.get(), &session_));
+#endif  // defined(_WIN32)
         // options_guard automatically releases session options on scope exit
         
         if (status_guard.is_error()) {

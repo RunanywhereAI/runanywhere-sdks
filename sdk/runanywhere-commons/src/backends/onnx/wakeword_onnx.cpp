@@ -21,7 +21,7 @@
 #include "rac/core/rac_logger.h"
 
 #if defined(_WIN32)
-#include "rac_str_trans.h"
+#include "rac/utils/rac_str_trans.h"
 #endif
 
 #ifdef RAC_HAS_ONNX
@@ -496,8 +496,13 @@ create_onnx_session(const Ort::Env& env, const char* model_path,
     // see constructor of Ort::Session in onnxruntime_cxx_api.h, ORTCHAR_T is defined as wchar_t on
     // Windows, so we need to convert the model_path to wchar_t
 #if defined(_WIN32)
-    std::wstring wmodel_path = runanywhere::RacStrTrans::utf8_to_unicode(model_path);
-    return std::make_unique<Ort::Session>(env, wmodel_path.c_str(), session_options);
+    int wlen = 0;
+    rac_str_utf8_to_unicode(model_path, NULL, 0, &wlen);
+    wchar_t* wmodel_path = (wchar_t*)malloc((size_t)wlen * sizeof(wchar_t));
+    rac_str_utf8_to_unicode(model_path, wmodel_path, wlen, NULL);
+    auto session = std::make_unique<Ort::Session>(env, wmodel_path, session_options);
+    free(wmodel_path);
+    return session;
 #else
     return std::make_unique<Ort::Session>(env, model_path, session_options);
 #endif
