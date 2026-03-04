@@ -11,7 +11,6 @@ import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.public.extensions.registerLoraAdapter
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
@@ -128,28 +127,17 @@ object ModelList {
     )
 
     // Genie NPU Models (Qualcomm Snapdragon 8 Gen 2+)
-    // Export models via: python -m qai_hub_models.models.<model>.export --chipset <chipset>
-    // Or use pre-built: huggingface-cli download Volko76/Llama-3.2-3B-Genie-Compatible-QNN-Binaries
-    // Push to device: adb push <model_dir> /sdcard/Android/data/com.runanywhere.runanywhereai/files/models/<model-id>/
+    // Pre-compiled QNN context binaries for Qualcomm Genie SDK.
+    // Compiled via: python -m qai_hub_models.models.<model>.export --chipset qualcomm-snapdragon-8-elite
     private val genieModels = listOf(
         AppModel(id = "qwen2_5-7b-instruct-genie", name = "Qwen 2.5 7B (NPU)",
-            url = "",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz",
             framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
             memoryRequirement = 5_000_000_000),
-        AppModel(id = "llama-3.2-3b-instruct-genie", name = "Llama 3.2 3B (NPU)",
-            url = "",
-            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 3_000_000_000),
         AppModel(id = "llama-3.2-1b-instruct-genie", name = "Llama 3.2 1B (NPU)",
-            url = "",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz",
             framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
             memoryRequirement = 1_500_000_000),
-    )
-
-    // Pre-loaded Genie model paths on device (for testing NPU models pushed via adb)
-    private val genieLocalPaths = mapOf(
-        "qwen2_5-7b-instruct-genie" to "/data/local/tmp/genie-model",
-        "llama-3.2-1b-instruct-genie" to "/data/local/tmp/genie-llama-1b",
     )
 
     // VLM
@@ -221,19 +209,6 @@ object ModelList {
                 }
             }
             Timber.i("$label models registered (${models.size})")
-        }
-
-        // Set local paths for pre-loaded Genie models (pushed to device via adb)
-        for ((modelId, localPath) in genieLocalPaths) {
-            try {
-                if (CppBridgeModelRegistry.updateDownloadStatus(modelId, localPath)) {
-                    Timber.i("Set Genie model local path: $modelId -> $localPath")
-                } else {
-                    Timber.w("Failed to set local path for Genie model: $modelId")
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Error setting Genie model path: $modelId")
-            }
         }
 
         for (adapter in loraAdapters) {

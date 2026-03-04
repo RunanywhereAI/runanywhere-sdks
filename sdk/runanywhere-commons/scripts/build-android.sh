@@ -619,27 +619,6 @@ for ABI in "${ABI_ARRAY[@]}"; do
         print_warning "librac_backend_rag_jni.so not found - JNI bridge not built by CMake"
     fi
 
-    # Genie backend (Qualcomm NPU) — pre-built artifacts only, not cmake-built.
-    # Genie is a closed-source backend. Pre-built .so files are staged from either:
-    #   - Local: GENIE_LOCAL_PATH env var, or auto-detected at ../../runanywhere-genie/dist/android/
-    #   - Remote: downloaded from GENIE_RELEASE_URL (a public release ZIP)
-    # This section only runs if pre-built artifacts are found.
-    GENIE_DIST_SRC=""
-    if [ -n "${GENIE_LOCAL_PATH:-}" ] && [ -d "${GENIE_LOCAL_PATH}/${ABI}" ]; then
-        GENIE_DIST_SRC="${GENIE_LOCAL_PATH}/${ABI}"
-    elif [ -d "${ROOT_DIR}/../../runanywhere-genie/dist/android/${ABI}" ]; then
-        GENIE_DIST_SRC="${ROOT_DIR}/../../runanywhere-genie/dist/android/${ABI}"
-    fi
-
-    if [ -n "${GENIE_DIST_SRC}" ]; then
-        mkdir -p "${DIST_DIR}/genie/${ABI}"
-        for so_file in "${GENIE_DIST_SRC}"/*.so; do
-            [ -f "$so_file" ] || continue
-            cp "$so_file" "${DIST_DIR}/genie/${ABI}/"
-            echo "  Staged: $(basename "$so_file") -> genie/${ABI}/"
-        done
-    fi
-
     # TFLite backend
     if [ "$BUILD_TFLITE" = "ON" ]; then
         mkdir -p "${DIST_DIR}/tflite/${ABI}"
