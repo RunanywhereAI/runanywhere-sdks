@@ -71,7 +71,7 @@ CLEAN_BUILD=false
 SKIP_BUILD=false
 BUILD_IOS=true
 BUILD_ANDROID=true
-ABIS="arm64-v8a"
+ABIS="arm64-v8a,x86_64"
 
 # =============================================================================
 # Colors & Logging

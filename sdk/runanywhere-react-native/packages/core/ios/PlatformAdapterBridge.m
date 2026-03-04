@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import "PlatformDownloadBridge.h"
 
 // Import the generated Swift header from the pod
 #if __has_include(<RunAnywhereCore/RunAnywhereCore-Swift.h>)
@@ -28,6 +29,206 @@
 - (NSString * _Nonnull)getPersistentDeviceUUID;
 @end
 #endif
+
+// =============================================================================
+// HTTP Download (Platform Adapter)
+// =============================================================================
+
+static const int RAC_SUCCESS = 0;
+static const int RAC_ERROR_INVALID_PARAMETER = -106;
+static const int RAC_ERROR_DOWNLOAD_FAILED = -153;
+static const int RAC_ERROR_CANCELLED = -380;
+
+@interface RunAnywhereHttpDownloadTaskInfo : NSObject
+@property(nonatomic, copy) NSString* taskId;
+@property(nonatomic, copy) NSString* destinationPath;
+@property(nonatomic, assign) BOOL cancelled;
+@end
+
+@implementation RunAnywhereHttpDownloadTaskInfo
+@end
+
+@interface RunAnywhereHttpDownloadManager : NSObject <NSURLSessionDownloadDelegate>
+@property(nonatomic, strong) NSURLSession* session;
+@property(nonatomic, strong) NSMutableDictionary<NSNumber*, RunAnywhereHttpDownloadTaskInfo*>* taskInfoByIdentifier;
+@property(nonatomic, strong) NSMutableDictionary<NSString*, NSURLSessionDownloadTask*>* taskById;
+@property(nonatomic, strong) NSMutableDictionary<NSString*, NSString*>* completedPathById;
++ (instancetype)shared;
+- (int)startDownload:(NSString*)url destination:(NSString*)destination taskId:(NSString*)taskId;
+- (BOOL)cancelDownload:(NSString*)taskId;
+@end
+
+@implementation RunAnywhereHttpDownloadManager
+
++ (instancetype)shared {
+    static RunAnywhereHttpDownloadManager* instance = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        instance = [[RunAnywhereHttpDownloadManager alloc] init];
+    });
+    return instance;
+}
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        NSURLSessionConfiguration* config = [NSURLSessionConfiguration defaultSessionConfiguration];
+        NSOperationQueue* queue = [[NSOperationQueue alloc] init];
+        queue.maxConcurrentOperationCount = 4;
+        _session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:queue];
+        _taskInfoByIdentifier = [NSMutableDictionary dictionary];
+        _taskById = [NSMutableDictionary dictionary];
+        _completedPathById = [NSMutableDictionary dictionary];
+    }
+    return self;
+}
+
+- (int)startDownload:(NSString*)url destination:(NSString*)destination taskId:(NSString*)taskId {
+    if (url.length == 0 || destination.length == 0 || taskId.length == 0) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    NSURL* downloadURL = [NSURL URLWithString:url];
+    if (!downloadURL) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    NSURLSessionDownloadTask* task = [self.session downloadTaskWithURL:downloadURL];
+    RunAnywhereHttpDownloadTaskInfo* info = [[RunAnywhereHttpDownloadTaskInfo alloc] init];
+    info.taskId = taskId;
+    info.destinationPath = destination;
+    info.cancelled = NO;
+
+    @synchronized (self) {
+        self.taskInfoByIdentifier[@(task.taskIdentifier)] = info;
+        self.taskById[taskId] = task;
+    }
+
+    [task resume];
+    return RAC_SUCCESS;
+}
+
+- (BOOL)cancelDownload:(NSString*)taskId {
+    if (taskId.length == 0) {
+        return NO;
+    }
+
+    NSURLSessionDownloadTask* task = nil;
+    @synchronized (self) {
+        task = self.taskById[taskId];
+        if (task) {
+            RunAnywhereHttpDownloadTaskInfo* info = self.taskInfoByIdentifier[@(task.taskIdentifier)];
+            if (info) {
+                info.cancelled = YES;
+            }
+        }
+    }
+
+    if (!task) {
+        return NO;
+    }
+
+    [task cancel];
+    return YES;
+}
+
+#pragma mark - NSURLSessionDownloadDelegate
+
+- (void)URLSession:(NSURLSession*)session
+      downloadTask:(NSURLSessionDownloadTask*)downloadTask
+ didWriteData:(int64_t)bytesWritten
+ totalBytesWritten:(int64_t)totalBytesWritten
+totalBytesExpectedToWrite:(int64_t)totalBytesExpectedToWrite {
+    (void)session;
+    RunAnywhereHttpDownloadTaskInfo* info = nil;
+    @synchronized (self) {
+        info = self.taskInfoByIdentifier[@(downloadTask.taskIdentifier)];
+    }
+    if (!info) {
+        return;
+    }
+    RunAnywhereHttpDownloadReportProgress(
+        info.taskId.UTF8String,
+        totalBytesWritten,
+        totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : 0
+    );
+}
+
+- (void)URLSession:(NSURLSession*)session
+      downloadTask:(NSURLSessionDownloadTask*)downloadTask
+didFinishDownloadingToURL:(NSURL*)location {
+    (void)session;
+    RunAnywhereHttpDownloadTaskInfo* info = nil;
+    @synchronized (self) {
+        info = self.taskInfoByIdentifier[@(downloadTask.taskIdentifier)];
+    }
+    if (!info) {
+        return;
+    }
+
+    NSString* destination = info.destinationPath;
+    NSString* destinationDir = [destination stringByDeletingLastPathComponent];
+    NSError* error = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:destinationDir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:&error];
+    if (error) {
+        return;
+    }
+
+    if ([[NSFileManager defaultManager] fileExistsAtPath:destination]) {
+        [[NSFileManager defaultManager] removeItemAtPath:destination error:nil];
+    }
+
+    if ([[NSFileManager defaultManager] moveItemAtURL:location
+                                                toURL:[NSURL fileURLWithPath:destination]
+                                                error:&error]) {
+        @synchronized (self) {
+            self.completedPathById[info.taskId] = destination;
+        }
+    }
+}
+
+- (void)URLSession:(NSURLSession*)session
+              task:(NSURLSessionTask*)task
+didCompleteWithError:(NSError*)error {
+    (void)session;
+    RunAnywhereHttpDownloadTaskInfo* info = nil;
+    NSString* completedPath = nil;
+
+    @synchronized (self) {
+        info = self.taskInfoByIdentifier[@(task.taskIdentifier)];
+        if (info) {
+            [self.taskInfoByIdentifier removeObjectForKey:@(task.taskIdentifier)];
+            [self.taskById removeObjectForKey:info.taskId];
+            completedPath = self.completedPathById[info.taskId];
+            if (completedPath) {
+                [self.completedPathById removeObjectForKey:info.taskId];
+            }
+        }
+    }
+
+    if (!info) {
+        return;
+    }
+
+    int result = RAC_SUCCESS;
+    if (error) {
+        if (info.cancelled || error.code == NSURLErrorCancelled) {
+            result = RAC_ERROR_CANCELLED;
+        } else {
+            result = RAC_ERROR_DOWNLOAD_FAILED;
+        }
+    } else if (!completedPath) {
+        result = RAC_ERROR_DOWNLOAD_FAILED;
+    }
+
+    const char* pathCString = completedPath ? completedPath.UTF8String : NULL;
+    RunAnywhereHttpDownloadReportComplete(info.taskId.UTF8String, result, pathCString);
+}
+
+@end
 
 // ============================================================================
 // Secure Storage (Keychain)
@@ -568,3 +769,45 @@ bool PlatformAdapter_httpPostSync(
     }
 }
 
+// ============================================================================
+// HTTP Download (Async)
+// ============================================================================
+
+int PlatformAdapter_httpDownload(
+    const char* url,
+    const char* destinationPath,
+    const char* taskId
+) {
+    @autoreleasepool {
+        if (!url || !destinationPath || !taskId) {
+            return RAC_ERROR_INVALID_PARAMETER;
+        }
+
+        NSString* urlStr = [NSString stringWithUTF8String:url];
+        NSString* destStr = [NSString stringWithUTF8String:destinationPath];
+        NSString* taskStr = [NSString stringWithUTF8String:taskId];
+
+        if (!urlStr || !destStr || !taskStr) {
+            return RAC_ERROR_INVALID_PARAMETER;
+        }
+
+        return [[RunAnywhereHttpDownloadManager shared] startDownload:urlStr
+                                                          destination:destStr
+                                                               taskId:taskStr];
+    }
+}
+
+bool PlatformAdapter_httpDownloadCancel(const char* taskId) {
+    @autoreleasepool {
+        if (!taskId) {
+            return false;
+        }
+
+        NSString* taskStr = [NSString stringWithUTF8String:taskId];
+        if (!taskStr) {
+            return false;
+        }
+
+        return [[RunAnywhereHttpDownloadManager shared] cancelDownload:taskStr];
+    }
+}

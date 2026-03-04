@@ -33,8 +33,14 @@ extension RunAnywhere {
             throw SDKError.llm(.modelNotFound, "Model '\(modelId)' is not downloaded")
         }
 
+        // Log model info for debugging
+        let logger = SDKLogger(category: "ModelManagement")
+        let localName = modelInfo.localPath?.lastPathComponent ?? "nil"
+        logger.info("Loading model: id=\(modelId), framework=\(modelInfo.framework), format=\(modelInfo.format), localPath=\(localName)")
+
         // Resolve actual model file path
         let modelPath = try resolveModelFilePath(for: modelInfo)
+        logger.info("Resolved model path: \(modelPath.lastPathComponent)")
         try await CppBridge.LLM.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
     }
 
@@ -52,6 +58,11 @@ extension RunAnywhere {
             return resolveONNXModelPath(modelFolder: modelFolder, modelId: model.id)
         }
 
+        // For WhisperKit models (directory-based), find the folder with .mlmodelc files
+        if model.framework == .whisperKitCoreML {
+            return resolveWhisperKitModelPath(modelFolder: modelFolder, modelId: model.id)
+        }
+
         // For single-file models (LlamaCpp), find the actual model file
         return try resolveSingleFileModelPath(modelFolder: modelFolder, model: model)
     }
@@ -62,14 +73,14 @@ extension RunAnywhere {
 
         // Check if there's a nested folder with the model name (from archive extraction)
         let nestedFolder = modelFolder.appendingPathComponent(modelId)
-        logger.debug("Checking nested folder: \(nestedFolder.path)")
+        logger.debug("Checking nested folder: \(nestedFolder.lastPathComponent)")
 
         if FileManager.default.fileExists(atPath: nestedFolder.path) {
             var isDir: ObjCBool = false
             if FileManager.default.fileExists(atPath: nestedFolder.path, isDirectory: &isDir), isDir.boolValue {
                 // Check if this nested folder contains model files
                 if hasONNXModelFiles(at: nestedFolder) {
-                    logger.info("Found ONNX model at nested path: \(nestedFolder.path)")
+                    logger.info("Found ONNX model at nested path: \(nestedFolder.lastPathComponent)")
                     return nestedFolder
                 }
             }
@@ -77,7 +88,7 @@ extension RunAnywhere {
 
         // Check if model files exist directly in the model folder
         if hasONNXModelFiles(at: modelFolder) {
-            logger.info("Found ONNX model at folder: \(modelFolder.path)")
+            logger.info("Found ONNX model at folder: \(modelFolder.lastPathComponent)")
             return modelFolder
         }
 
@@ -88,7 +99,7 @@ extension RunAnywhere {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
                     if hasONNXModelFiles(at: item) {
-                        logger.info("Found ONNX model in subdirectory: \(item.path)")
+                        logger.info("Found ONNX model in subdirectory: \(item.lastPathComponent)")
                         return item
                     }
                 }
@@ -96,8 +107,49 @@ extension RunAnywhere {
         }
 
         // Fallback to model folder
-        logger.warning("No ONNX model files found, falling back to: \(modelFolder.path)")
+        logger.warning("No ONNX model files found, falling back to: \(modelFolder.lastPathComponent)")
         return modelFolder
+    }
+
+    /// Resolve WhisperKit model directory path (handles nested archive extraction)
+    /// WhisperKit expects a folder containing AudioEncoder.mlmodelc, TextDecoder.mlmodelc, MelSpectrogram.mlmodelc
+    private static func resolveWhisperKitModelPath(modelFolder: URL, modelId: String) -> URL {
+        let logger = SDKLogger(category: "ModelPathResolver")
+
+        // Check if .mlmodelc files exist directly in the model folder
+        if hasWhisperKitModelFiles(at: modelFolder) {
+            logger.info("Found WhisperKit model at folder: \(modelFolder.path)")
+            return modelFolder
+        }
+
+        // Check nested folder with the model name (from archive extraction)
+        let nestedFolder = modelFolder.appendingPathComponent(modelId)
+        if hasWhisperKitModelFiles(at: nestedFolder) {
+            logger.info("Found WhisperKit model at nested path: \(nestedFolder.path)")
+            return nestedFolder
+        }
+
+        // Scan one level of subdirectories for .mlmodelc files
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for item in contents {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
+                    if hasWhisperKitModelFiles(at: item) {
+                        logger.info("Found WhisperKit model in subdirectory: \(item.path)")
+                        return item
+                    }
+                }
+            }
+        }
+
+        logger.warning("No WhisperKit model files found, falling back to: \(modelFolder.path)")
+        return modelFolder
+    }
+
+    /// Check if a directory contains WhisperKit model files (AudioEncoder.mlmodelc is the key indicator)
+    private static func hasWhisperKitModelFiles(at directory: URL) -> Bool {
+        let audioEncoder = directory.appendingPathComponent("AudioEncoder.mlmodelc")
+        return FileManager.default.fileExists(atPath: audioEncoder.path)
     }
 
     /// Check if a directory contains ONNX model files
@@ -121,6 +173,11 @@ extension RunAnywhere {
 
     /// Resolve single-file model path (LlamaCpp .gguf files)
     private static func resolveSingleFileModelPath(modelFolder: URL, model: ModelInfo) throws -> URL {
+        let logger = SDKLogger(category: "ModelPathResolver")
+        
+        // Log model metadata for debugging
+        logger.info("Resolving path for model: id=\(model.id), framework=\(model.framework), format=\(model.format)")
+        
         // Get the expected path from C++
         let expectedPath = try CppBridge.ModelPaths.getExpectedModelPath(
             modelId: model.id,
@@ -128,28 +185,58 @@ extension RunAnywhere {
             format: model.format
         )
 
+        logger.debug("Expected model path: \(expectedPath.lastPathComponent)")
+
         // If expected path exists, use it
         if FileManager.default.fileExists(atPath: expectedPath.path) {
+            logger.info("Found model at expected path: \(expectedPath.lastPathComponent)")
             return expectedPath
         }
 
-        // Find files with the expected extension
+        // Find files with the expected extension in model folder
         let expectedExtension = model.format.rawValue.lowercased()
-        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: nil) {
-            // Look for files with the model format extension
-            let modelFiles = contents.filter { url in
-                let ext = url.pathExtension.lowercased()
-                return ext == expectedExtension || ext == "gguf" || ext == "bin"
-            }
-
-            // Return the first match
-            if let modelFile = modelFiles.first {
-                return modelFile
+        if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
+            logger.info("Found model file: \(modelFile.lastPathComponent)")
+            return modelFile
+        }
+        
+        // Search in nested subdirectories (archives often create nested folders)
+        logger.debug("Searching nested directories in: \(modelFolder.lastPathComponent)")
+        if let contents = try? FileManager.default.contentsOfDirectory(at: modelFolder, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for item in contents {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
+                    if let modelFile = findModelFile(in: item, extensions: [expectedExtension, "gguf", "bin"]) {
+                        logger.info("Found model file in nested directory: \(modelFile.lastPathComponent)")
+                        return modelFile
+                    }
+                }
             }
         }
 
         // Fallback to expected path
+        logger.warning("Model file not found, falling back to: \(expectedPath.lastPathComponent)")
         return expectedPath
+    }
+    
+    /// Find a model file with specific extensions in a directory
+    private static func findModelFile(in directory: URL, extensions: [String]) -> URL? {
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else {
+            return nil
+        }
+        
+        // Look for files with the expected extensions
+        let modelFiles = contents.filter { url in
+            let ext = url.pathExtension.lowercased()
+            return extensions.contains(ext)
+        }
+        
+        // Prefer .gguf files if multiple matches
+        if let ggufFile = modelFiles.first(where: { $0.pathExtension.lowercased() == "gguf" }) {
+            return ggufFile
+        }
+        
+        return modelFiles.first
     }
 
     /// Unload the currently loaded LLM model
@@ -204,7 +291,13 @@ extension RunAnywhere {
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.STT")
         logger.info("Loading STT model from resolved path: \(modelPath.path)")
-        try await CppBridge.STT.shared.loadModel(modelPath.path, modelId: modelId, modelName: modelInfo.name)
+
+        try await CppBridge.STT.shared.loadModel(
+            modelPath.path,
+            modelId: modelId,
+            modelName: modelInfo.name,
+            framework: modelInfo.framework.toCFramework()
+        )
     }
 
     /// Load a TTS (Text-to-Speech) voice by ID
@@ -238,7 +331,7 @@ extension RunAnywhere {
         // Resolve actual model path
         let modelPath = try resolveModelFilePath(for: modelInfo)
         let logger = SDKLogger(category: "RunAnywhere.TTS")
-        logger.info("Loading TTS voice from resolved path: \(modelPath.path)")
+        logger.info("Loading TTS voice from resolved path: \(modelPath.lastPathComponent)")
         try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId, voiceName: modelInfo.name)
     }
 
@@ -246,6 +339,8 @@ extension RunAnywhere {
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else { throw SDKError.general(.notInitialized, "SDK not initialized") }
+        // Ensure services are initialized (including Platform backend registration)
+        try await ensureServicesReady()
         return await CppBridge.ModelRegistry.shared.getAll()
     }
 
@@ -276,6 +371,7 @@ extension RunAnywhere {
     public static var currentSTTModel: ModelInfo? {
         get async {
             guard isInitialized else { return nil }
+
             guard let modelId = await CppBridge.STT.shared.currentModelId else { return nil }
             let models = (try? await availableModels()) ?? []
             return models.first { $0.id == modelId }
@@ -300,5 +396,20 @@ extension RunAnywhere {
     public static func cancelGeneration() async {
         guard isInitialized else { return }
         await CppBridge.LLM.shared.cancel()
+    }
+
+    /// Scan the file system for previously downloaded models and link them to the registry.
+    ///
+    /// Call this **after** all `registerModel()` calls are complete. The `registerModel()` API
+    /// saves to the registry asynchronously, so calling this immediately after registration
+    /// ensures discovery runs only once all models are registered and can be matched to files on disk.
+    ///
+    /// - Returns: Number of models discovered on disk
+    @discardableResult
+    public static func discoverDownloadedModels() async -> Int {
+        guard isInitialized else { return 0 }
+        try? await ensureServicesReady()
+        let result = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
+        return result.discoveredCount
     }
 }

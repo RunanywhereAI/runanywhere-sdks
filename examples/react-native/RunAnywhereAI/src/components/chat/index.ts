@@ -5,3 +5,4 @@
 export { MessageBubble } from './MessageBubble';
 export { TypingIndicator } from './TypingIndicator';
 export { ChatInput } from './ChatInput';
+export { ToolCallIndicator, ToolCallingBadge } from './ToolCallIndicator';

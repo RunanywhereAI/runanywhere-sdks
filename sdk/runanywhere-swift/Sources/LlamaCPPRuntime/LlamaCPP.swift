@@ -66,6 +66,7 @@ public enum LlamaCPP: RunAnywhereModule {
     // MARK: - Registration State
 
     private static var isRegistered = false
+    private static var isVLMRegistered = false
 
     // MARK: - Registration
 
@@ -73,6 +74,7 @@ public enum LlamaCPP: RunAnywhereModule {
     ///
     /// This calls `rac_backend_llamacpp_register()` to register the
     /// LlamaCPP service provider with the C++ commons layer.
+    /// Also registers VLM backend if available.
     ///
     /// Safe to call multiple times - subsequent calls are no-ops.
     ///
@@ -87,6 +89,7 @@ public enum LlamaCPP: RunAnywhereModule {
 
         logger.info("Registering LlamaCPP backend with C++ registry...")
 
+        // Register LLM backend
         let result = rac_backend_llamacpp_register()
 
         // RAC_ERROR_MODULE_ALREADY_REGISTERED is OK
@@ -98,16 +101,44 @@ public enum LlamaCPP: RunAnywhereModule {
         }
 
         isRegistered = true
-        logger.info("LlamaCPP backend registered successfully")
+        logger.info("LlamaCPP LLM backend registered successfully")
+
+        // Register VLM backend (Vision Language Model)
+        registerVLM()
+    }
+
+    /// Register VLM (Vision Language Model) backend
+    @MainActor
+    private static func registerVLM() {
+        guard !isVLMRegistered else { return }
+
+        logger.info("Registering LlamaCPP VLM backend...")
+
+        let vlmResult = rac_backend_llamacpp_vlm_register()
+
+        if vlmResult != RAC_SUCCESS && vlmResult != RAC_ERROR_MODULE_ALREADY_REGISTERED {
+            let errorMsg = String(cString: rac_error_message(vlmResult))
+            logger.warning("LlamaCPP VLM registration failed: \(errorMsg) (VLM features may not be available)")
+            return
+        }
+
+        isVLMRegistered = true
+        logger.info("LlamaCPP VLM backend registered successfully")
     }
 
     /// Unregister the LlamaCPP backend from C++ registry.
     public static func unregister() {
-        guard isRegistered else { return }
+        if isVLMRegistered {
+            _ = rac_backend_llamacpp_vlm_unregister()
+            isVLMRegistered = false
+            logger.info("LlamaCPP VLM backend unregistered")
+        }
 
-        _ = rac_backend_llamacpp_unregister()
-        isRegistered = false
-        logger.info("LlamaCPP backend unregistered")
+        if isRegistered {
+            _ = rac_backend_llamacpp_unregister()
+            isRegistered = false
+            logger.info("LlamaCPP LLM backend unregistered")
+        }
     }
 
     // MARK: - Model Handling

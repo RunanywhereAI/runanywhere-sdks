@@ -7,8 +7,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+ModelRegistry.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../native';
-import type { LLMFramework, ModelCategory, ModelInfo } from '../types';
+import { requireNativeModule, requireDeviceInfoModule, isNativeModuleAvailable } from '../native';
+import type { LLMFramework, ModelCategory, ModelInfo, ModelCompatibilityResult } from '../types';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('ModelRegistry');
@@ -217,6 +217,47 @@ class ModelRegistryImpl {
     }
   }
 
+  /**
+   * Check if a model is compatible with the current device
+   * Checks RAM and storage requirements against device capabilities
+   * All logic runs in native C++ (runanywhere-commons)
+   */
+  async checkCompatibility(modelId: string): Promise<ModelCompatibilityResult> {
+    const defaultResult: ModelCompatibilityResult = {
+      isCompatible: false,
+      canRun: false,
+      canFit: false,
+      requiredMemory: 0,
+      availableMemory: 0,
+      requiredStorage: 0,
+      availableStorage: 0,
+    };
+
+    if (!isNativeModuleAvailable()) {
+      logger.warning('Native module not available for compatibility check');
+      return defaultResult;
+    }
+
+    try {
+      const native = requireNativeModule();
+      const json = await native.checkCompatibility(modelId);
+      const result = JSON.parse(json);
+
+      // Convert string booleans to actual booleans if needed
+      return {
+        isCompatible: result.isCompatible === true || result.isCompatible === 'true',
+        canRun: result.canRun === true || result.canRun === 'true',
+        canFit: result.canFit === true || result.canFit === 'true',
+        requiredMemory: Number(result.requiredMemory),
+        availableMemory: Number(result.availableMemory),
+        requiredStorage: Number(result.requiredStorage),
+        availableStorage: Number(result.availableStorage),
+      };
+    } catch (error) {
+      logger.error('Failed to check model compatibility:', { error });
+      return defaultResult;
+    }
+  }
   /**
    * Check if model is available
    */

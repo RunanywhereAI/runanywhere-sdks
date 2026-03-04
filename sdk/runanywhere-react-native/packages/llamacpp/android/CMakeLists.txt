@@ -19,8 +19,12 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
-    message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
-                        "Run: ./gradlew :runanywhere_llamacpp:downloadNativeLibs")
+    message(WARNING "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
+                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_llamacpp:downloadNativeLibs\n"
+                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
+    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
+    return()
 endif()
 
 add_library(rac_backend_llamacpp SHARED IMPORTED)

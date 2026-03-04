@@ -246,6 +246,15 @@ extension SDKError {
         make(code: code, message: message, category: .voiceAgent, underlyingError: underlying)
     }
 
+    /// Creates a RAG error.
+    public static func rag(
+        _ code: ErrorCode,
+        _ message: String,
+        underlying: (any Error)? = nil
+    ) -> SDKError {
+        make(code: code, message: message, category: .rag, underlyingError: underlying)
+    }
+
     /// Creates a download error.
     public static func download(
         _ code: ErrorCode,

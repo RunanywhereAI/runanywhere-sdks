@@ -41,6 +41,7 @@ object CppBridgeModelRegistry {
         const val VISION = 4 // RAC_MODEL_CATEGORY_VISION
         const val IMAGE_GENERATION = 5 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
         const val MULTIMODAL = 6 // RAC_MODEL_CATEGORY_MULTIMODAL
+        const val EMBEDDING = 7
     }
 
     /**
@@ -125,6 +126,7 @@ object CppBridgeModelRegistry {
         val downloadSize: Long,
         val contextLength: Int,
         val supportsThinking: Boolean,
+        val supportsLora: Boolean = false,
         val description: String?,
         val status: Int = ModelStatus.AVAILABLE,
     )
@@ -157,6 +159,7 @@ object CppBridgeModelRegistry {
                 downloadSize = model.downloadSize,
                 contextLength = model.contextLength,
                 supportsThinking = model.supportsThinking,
+                supportsLora = model.supportsLora,
                 description = model.description,
             )
 
@@ -272,12 +275,22 @@ object CppBridgeModelRegistry {
         }
 
         val typeDirectories =
-            mapOf(
-                "llm" to ModelCategory.LANGUAGE,
-                "stt" to ModelCategory.SPEECH_RECOGNITION,
-                "tts" to ModelCategory.SPEECH_SYNTHESIS,
-                "vad" to ModelCategory.AUDIO,
-            )
+    mapOf(
+        "llm" to ModelCategory.LANGUAGE,
+        "stt" to ModelCategory.SPEECH_RECOGNITION,
+        "tts" to ModelCategory.SPEECH_SYNTHESIS,
+        "vad" to ModelCategory.AUDIO,
+
+        // RAG
+        "embedding" to ModelType.EMBEDDING,
+
+        // Vision / VLM
+        "vision" to ModelCategory.VISION,
+        "multimodal" to ModelCategory.MULTIMODAL,
+
+        // Backward compatibility
+        "other" to -1,
+    )
 
         var restoredCount = 0
 
@@ -331,6 +344,7 @@ object CppBridgeModelRegistry {
                 downloadSize = extractLong(json, "download_size"),
                 contextLength = extractInt(json, "context_length"),
                 supportsThinking = extractBoolean(json, "supports_thinking"),
+                supportsLora = extractBoolean(json, "supports_lora"),
                 description = extractString(json, "description"),
                 status = if (extractString(json, "local_path") != null) ModelStatus.DOWNLOADED else ModelStatus.AVAILABLE,
             )

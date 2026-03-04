@@ -31,6 +31,7 @@ public enum EventCategory: String, Sendable {
     case stt
     case tts
     case voice
+    case rag
     case storage
     case device
     case network

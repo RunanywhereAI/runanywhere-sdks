@@ -18,6 +18,7 @@ class SettingsViewModel: ObservableObject {
     // Generation Settings
     @Published var temperature: Double = 0.7
     @Published var maxTokens: Int = 10000
+    @Published var systemPrompt: String = ""
 
     // API Configuration
     @Published var apiKey: String = ""
@@ -48,6 +49,7 @@ class SettingsViewModel: ObservableObject {
     private let baseURLStorageKey = "runanywhere_base_url"
     private let temperatureDefaultsKey = "defaultTemperature"
     private let maxTokensDefaultsKey = "defaultMaxTokens"
+    private let systemPromptDefaultsKey = "defaultSystemPrompt"
     private let analyticsLogKey = "analyticsLogToLocal"
     private let deviceRegisteredKey = "com.runanywhere.sdk.deviceRegistered"
 
@@ -113,6 +115,15 @@ class SettingsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Auto-save system prompt changes
+        $systemPrompt
+            .debounce(for: 0.5, scheduler: DispatchQueue.main)
+            .dropFirst() // Skip initial value to avoid saving on init
+            .sink { [weak self] newValue in
+                self?.saveSystemPrompt(newValue)
+            }
+            .store(in: &cancellables)
+
         // Auto-save analytics logging preference
         $analyticsLogToLocal
             .dropFirst() // Skip initial value to avoid saving on init
@@ -139,6 +150,9 @@ class SettingsViewModel: ObservableObject {
         // Load max tokens
         let savedMaxTokens = UserDefaults.standard.integer(forKey: maxTokensDefaultsKey)
         maxTokens = savedMaxTokens > 0 ? savedMaxTokens : 10000
+
+        // Load system prompt
+        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? ""
     }
 
     private func loadApiKeyConfiguration() {
@@ -181,11 +195,17 @@ class SettingsViewModel: ObservableObject {
         print("Settings: Saved max tokens: \(value)")
     }
 
+    private func saveSystemPrompt(_ value: String) {
+        UserDefaults.standard.set(value, forKey: systemPromptDefaultsKey)
+        print("Settings: Saved system prompt (\(value.count) chars)")
+    }
+
     /// Get current generation configuration for SDK usage
     func getGenerationConfiguration() -> GenerationConfiguration {
         GenerationConfiguration(
             temperature: temperature,
-            maxTokens: maxTokens
+            maxTokens: maxTokens,
+            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
         )
     }
 
@@ -397,4 +417,5 @@ class SettingsViewModel: ObservableObject {
 struct GenerationConfiguration {
     let temperature: Double
     let maxTokens: Int
+    let systemPrompt: String?
 }

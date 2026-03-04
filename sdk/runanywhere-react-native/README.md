@@ -315,8 +315,6 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 | `RABackendLLAMACPP.xcframework` / `librunanywhere_llamacpp.so` | ~15-25MB | LLM capability (GGUF models) |
 | `RABackendONNX.xcframework` / `librunanywhere_onnx.so` | ~50-70MB | STT, TTS, VAD (ONNX models) |
 
-For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
-
 ---
 
 ## Configuration
@@ -735,7 +733,6 @@ MIT License. See [LICENSE](../../LICENSE) for details.
 
 ## Related Documentation
 
-- [Architecture](ARCHITECTURE.md)
 - [API Reference](Docs/Documentation.md)
 - [Sample App](../../examples/react-native/RunAnywhereAI/)
 - [Swift SDK](../runanywhere-swift/)

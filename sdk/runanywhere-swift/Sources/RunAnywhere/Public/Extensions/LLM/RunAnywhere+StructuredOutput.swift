@@ -249,10 +249,21 @@ public extension RunAnywhere {
         cOptions.top_p = options.topP
         cOptions.streaming_enabled = RAC_FALSE
 
-        // Generate
+        // Generate - wrap in system_prompt lifetime scope
         var llmResult = rac_llm_result_t()
-        let generateResult = prompt.withCString { promptPtr in
-            rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+        let generateResult: rac_result_t
+        if let systemPrompt = options.systemPrompt {
+            generateResult = systemPrompt.withCString { sysPromptPtr in
+                cOptions.system_prompt = sysPromptPtr
+                return prompt.withCString { promptPtr in
+                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                }
+            }
+        } else {
+            cOptions.system_prompt = nil
+            generateResult = prompt.withCString { promptPtr in
+                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+            }
         }
 
         guard generateResult == RAC_SUCCESS else {

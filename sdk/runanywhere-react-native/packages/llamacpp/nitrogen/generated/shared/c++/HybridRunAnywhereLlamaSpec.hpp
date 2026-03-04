@@ -64,6 +64,13 @@ namespace margelo::nitro::runanywhere::llama {
       virtual std::shared_ptr<Promise<std::string>> generateStructured(const std::string& prompt, const std::string& schema, const std::optional<std::string>& optionsJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> getLastError() = 0;
       virtual std::shared_ptr<Promise<double>> getMemoryUsage() = 0;
+      virtual std::shared_ptr<Promise<bool>> registerVLMBackend() = 0;
+      virtual std::shared_ptr<Promise<bool>> loadVLMModel(const std::string& modelPath, const std::string& mmprojPath, const std::optional<std::string>& modelId, const std::optional<std::string>& modelName) = 0;
+      virtual std::shared_ptr<Promise<bool>> isVLMModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadVLMModel() = 0;
+      virtual std::shared_ptr<Promise<std::string>> processVLMImage(double imageFormat, const std::string& imageData, double imageWidth, double imageHeight, const std::string& prompt, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> processVLMImageStream(double imageFormat, const std::string& imageData, double imageWidth, double imageHeight, const std::string& prompt, const std::string& optionsJson, const std::function<void(const std::string& /* token */, bool /* isComplete */)>& callback) = 0;
+      virtual std::shared_ptr<Promise<bool>> cancelVLMGeneration() = 0;
 
     protected:
       // Hybrid Setup

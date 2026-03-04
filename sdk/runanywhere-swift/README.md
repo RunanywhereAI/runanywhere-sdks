@@ -460,8 +460,6 @@ The RunAnywhere SDK follows a modular, provider-based architecture that separate
 - **EventBus** - Pub/sub system for SDK-wide events
 - **ServiceContainer** - Dependency injection container
 
-For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
-
 ---
 
 ## Logging and Observability

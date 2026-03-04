@@ -28,6 +28,8 @@ interface SecureStorageNativeModule {
   secureStorageIsAvailable?: () => Promise<boolean>;
   secureStorageStore?: (key: string, value: string) => Promise<void>;
   secureStorageRetrieve?: (key: string) => Promise<string | null>;
+  secureStorageSet?: (key: string, value: string) => Promise<boolean>;
+  secureStorageGet?: (key: string) => Promise<string | null>;
   secureStorageDelete?: (key: string) => Promise<void>;
   secureStorageExists?: (key: string) => Promise<boolean>;
 }
@@ -64,8 +66,10 @@ class SecureStorageServiceImpl {
       // Verify native module is available by checking for secure storage methods
       // The methods are implemented in C++ and use platform callbacks
       this._isAvailable =
-        typeof native.secureStorageSet === 'function' &&
-        typeof native.secureStorageGet === 'function';
+        (typeof native.secureStorageStore === 'function' &&
+          typeof native.secureStorageRetrieve === 'function') ||
+        (typeof native.secureStorageSet === 'function' &&
+          typeof native.secureStorageGet === 'function');
       return this._isAvailable;
     } catch {
       this._isAvailable = false;
@@ -91,11 +95,12 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      // Use the new native method
-      const success = await native.secureStorageSet(key, value);
-
-      if (!success) {
-        throw new Error(`Native secureStorageSet returned false for key: ${key}`);
+      if (native.secureStorageStore) {
+        await native.secureStorageStore(key, value);
+      } else if (native.secureStorageSet) {
+        await native.secureStorageSet(key, value);
+      } else {
+        throw new Error('No secure storage store method is available');
       }
 
       // Update cache
@@ -129,8 +134,14 @@ class SecureStorageServiceImpl {
     try {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
-      // Use the new native method
-      const value = await native.secureStorageGet(key);
+      let value: string | null | undefined;
+      if (native.secureStorageRetrieve) {
+        value = await native.secureStorageRetrieve(key);
+      } else if (native.secureStorageGet) {
+        value = await native.secureStorageGet(key);
+      } else {
+        return null;
+      }
 
       if (value !== null && value !== undefined) {
         this.cache.set(key, value);
@@ -163,7 +174,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
-      await native.secureStorageDelete(key);
+      if (native.secureStorageDelete) {
+        await native.secureStorageDelete(key);
+      }
 
       // Remove from cache
       this.cache.delete(key);
@@ -199,6 +212,9 @@ class SecureStorageServiceImpl {
       const native = requireNativeModule() as unknown as SecureStorageNativeModule;
 
       // Use the new native method
+      if (!native.secureStorageExists) {
+        return false;
+      }
       return await native.secureStorageExists(key);
     } catch {
       return false;

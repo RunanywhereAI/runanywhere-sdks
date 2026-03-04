@@ -43,11 +43,12 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
 
-      # Enable microphone and speech recognition permissions for permission_handler
+      # Enable permissions for permission_handler
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_MICROPHONE=1',
         'PERMISSION_SPEECH_RECOGNIZER=1',
+        'PERMISSION_CAMERA=1',
       ]
     end
   end

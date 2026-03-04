@@ -17,6 +17,10 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/infrastructure/model_management/rac_lora_registry.h"
+#if !defined(RAC_PLATFORM_ANDROID)
+#include "rac/features/diffusion/rac_diffusion_model_registry.h"
+#endif
 
 // =============================================================================
 // STATIC STATE
@@ -31,6 +35,10 @@ static std::string s_log_tag = "RAC";
 // Global model registry
 static rac_model_registry_handle_t s_model_registry = nullptr;
 static std::mutex s_model_registry_mutex;
+
+// Global LoRA registry
+static rac_lora_registry_handle_t s_lora_registry = nullptr;
+static std::mutex s_lora_registry_mutex;
 
 // Version info
 static const char* s_version_string = "1.0.0";
@@ -104,6 +112,11 @@ rac_result_t rac_init(const rac_config_t* config) {
 
     s_initialized.store(true);
 
+#if !defined(RAC_PLATFORM_ANDROID)
+    // Initialize diffusion model registry (iOS/Apple only; extensible model definitions)
+    rac_diffusion_model_registry_init();
+#endif
+
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons initialized");
 
     return RAC_SUCCESS;
@@ -117,6 +130,11 @@ void rac_shutdown(void) {
     }
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
+
+#if !defined(RAC_PLATFORM_ANDROID)
+    // Cleanup diffusion model registry (iOS/Apple only)
+    rac_diffusion_model_registry_cleanup();
+#endif
 
     // Clear state
     s_platform_adapter = nullptr;
@@ -255,6 +273,14 @@ rac_result_t rac_get_model(const char* model_id, rac_model_info_t** out_model) {
     return rac_model_registry_get(registry, model_id, out_model);
 }
 
+rac_result_t rac_get_model_by_path(const char* local_path, rac_model_info_t** out_model) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+    return rac_model_registry_get_by_path(registry, local_path, out_model);
+}
+
 rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework) {
     // Platform services are Swift-native implementations
     // that use service registry callbacks rather than C++ backends
@@ -265,6 +291,36 @@ rac_bool_t rac_framework_is_platform_service(rac_inference_framework_t framework
         default:
             return RAC_FALSE;
     }
+}
+
+// =============================================================================
+// GLOBAL LORA REGISTRY
+// =============================================================================
+
+rac_lora_registry_handle_t rac_get_lora_registry(void) {
+    std::lock_guard<std::mutex> lock(s_lora_registry_mutex);
+    if (s_lora_registry == nullptr) {
+        rac_result_t result = rac_lora_registry_create(&s_lora_registry);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("RAC.Core", "Failed to create global LoRA registry");
+            return nullptr;
+        }
+        RAC_LOG_INFO("RAC.Core", "Global LoRA registry created");
+    }
+    return s_lora_registry;
+}
+
+rac_result_t rac_register_lora(const rac_lora_entry_t* entry) {
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (registry == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    return rac_lora_registry_register(registry, entry);
+}
+
+rac_result_t rac_get_lora_for_model(const char* model_id, rac_lora_entry_t*** out_entries,
+                                     size_t* out_count) {
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (registry == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    return rac_lora_registry_get_for_model(registry, model_id, out_entries, out_count);
 }
 
 }  // extern "C"

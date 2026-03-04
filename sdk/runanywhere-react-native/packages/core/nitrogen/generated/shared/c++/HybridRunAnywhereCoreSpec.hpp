@@ -71,6 +71,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> downloadModel(const std::string& modelId, const std::string& url, const std::string& destPath) = 0;
       virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::string>> getDownloadProgress(const std::string& modelId) = 0;
@@ -113,6 +114,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) = 0;
+      virtual std::shared_ptr<Promise<void>> secureStorageStore(const std::string& key, const std::string& value) = 0;
+      virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageRetrieve(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() = 0;
       virtual std::shared_ptr<Promise<void>> flushTelemetry() = 0;
       virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;
@@ -125,6 +128,10 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) = 0;
       virtual std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<void>> cleanupVoiceAgent() = 0;
+      virtual std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) = 0;
+      virtual std::shared_ptr<Promise<std::string>> formatToolsForPrompt(const std::string& toolsJson, const std::string& format) = 0;
+      virtual std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> buildFollowupPrompt(const std::string& originalPrompt, const std::string& toolsPrompt, const std::string& toolName, const std::string& resultJson, bool keepToolsAvailable) = 0;
 
     protected:
       // Hybrid Setup

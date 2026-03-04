@@ -19,7 +19,12 @@ public extension RunAnywhere {
     /// }
     /// ```
     static func downloadModel(_ modelId: String) async throws -> AsyncStream<DownloadProgress> {
+        let logger = SDKLogger(category: "RunAnywhere.Download")
         let models = try await availableModels()
+        logger.info("Available models count: \(models.count)")
+        for m in models where m.id == modelId {
+            logger.info("Found model \(m.id) with framework: \(m.framework.rawValue) (\(m.framework.displayName))")
+        }
         guard let model = models.first(where: { $0.id == modelId }) else {
             throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
         }
@@ -84,6 +89,8 @@ public extension RunAnywhere {
     ///   - framework: The framework the model belongs to
     static func deleteStoredModel(_ modelId: String, framework: InferenceFramework) async throws {
         try SimplifiedFileManager.shared.deleteModel(modelId: modelId, framework: framework)
+        // Mark the model as not downloaded (localPath: nil)
+        try await CppBridge.ModelRegistry.shared.updateDownloadStatus(modelId: modelId, localPath: nil)
         // Emit via C++ event system
         CppBridge.Events.emitModelDeleted(modelId: modelId)
     }

@@ -1384,7 +1384,6 @@ enum class ModelCategory {
     SPEECH_RECOGNITION,    // STT (voice-to-text)
     SPEECH_SYNTHESIS,      // TTS (text-to-voice)
     VISION,                // Image understanding
-    IMAGE_GENERATION,      // Text-to-image
     MULTIMODAL,            // Multiple modalities
     AUDIO                  // Audio processing
 }
@@ -1777,5 +1776,4 @@ if (allModelsLoaded) {
 ## See Also
 
 - [README.md](./README.md) - Getting started guide
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - SDK architecture details
 - [Sample App](../../examples/android/RunAnywhereAI/) - Working example

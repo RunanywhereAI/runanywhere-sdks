@@ -67,9 +67,14 @@ struct MessageBubbleView: View {
     let message: Message
     let isGenerating: Bool
     @State private var isThinkingExpanded = false
+    @State private var showToolCallSheet = false
 
     var hasThinking: Bool {
         message.thinkingContent != nil && !(message.thinkingContent?.isEmpty ?? true)
+    }
+
+    var hasToolCall: Bool {
+        message.toolCallInfo != nil
     }
 
     var body: some View {
@@ -81,6 +86,10 @@ struct MessageBubbleView: View {
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 if message.role == .assistant && hasThinking {
                     thinkingSection
+                }
+
+                if message.role == .assistant && hasToolCall {
+                    toolCallSection
                 }
 
                 if message.role == .assistant &&
@@ -97,6 +106,21 @@ struct MessageBubbleView: View {
 
             if message.role != .user {
                 Spacer(minLength: AppSpacing.padding60)
+            }
+        }
+        .adaptiveSheet(isPresented: $showToolCallSheet) {
+            if let toolCallInfo = message.toolCallInfo {
+                ToolCallDetailSheet(toolCallInfo: toolCallInfo)
+                    .adaptiveSheetFrame()
+            }
+        }
+    }
+
+    @ViewBuilder
+    var toolCallSection: some View {
+        if let toolCallInfo = message.toolCallInfo {
+            ToolCallIndicator(toolCallInfo: toolCallInfo) {
+                showToolCallSheet = true
             }
         }
     }

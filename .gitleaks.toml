@@ -1,0 +1,59 @@
+# =============================================================================
+# Gitleaks Configuration — RunAnywhere SDK Monorepo
+#
+# Custom rules supplement gitleaks' built-in detectors (AWS keys, JWTs, etc.).
+# These catch RunAnywhere-specific secrets and internal infrastructure URLs.
+# =============================================================================
+
+title = "RunAnywhere Secret Scanning"
+
+# -----------------------------------------------------------------------------
+# Custom Rules
+# -----------------------------------------------------------------------------
+
+[[rules]]
+id = "runanywhere-api-key"
+description = "RunAnywhere API key (runa_prod_*, runa_dev_*, runa_staging_*)"
+regex = '''runa_(prod|dev|staging)_[A-Za-z0-9_\-]{10,}'''
+keywords = ["runa_prod", "runa_dev", "runa_staging"]
+
+[[rules]]
+id = "railway-app-url"
+description = "Railway production/staging app URL"
+regex = '''https?://[a-zA-Z0-9\-]+\.up\.railway\.app'''
+keywords = ["railway.app"]
+
+[[rules]]
+id = "supabase-url"
+description = "Supabase project URL (non-placeholder)"
+regex = '''https://[a-z0-9]+\.supabase\.co'''
+keywords = ["supabase.co"]
+
+[[rules]]
+id = "supabase-anon-key"
+description = "Supabase anon/service key"
+regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}'''
+keywords = ["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"]
+
+# -----------------------------------------------------------------------------
+# Allowlists — paths and patterns that are safe to ignore
+# -----------------------------------------------------------------------------
+
+[allowlist]
+description = "Global allowlist"
+
+paths = [
+    '''\.gitleaks\.toml$''',
+    '''CLAUDE\.md$''',
+    '''\.cursor/plans/.*\.plan\.md$''',
+    '''thoughts/.*\.md$''',
+]
+
+regexTarget = "line"
+regexes = [
+    '''YOUR_PRODUCTION_API_KEY''',
+    '''YOUR_PRODUCTION_BASE_URL''',
+    '''YOUR_''',
+    '''placeholder''',
+    '''https://placeholder\.supabase\.co''',
+]

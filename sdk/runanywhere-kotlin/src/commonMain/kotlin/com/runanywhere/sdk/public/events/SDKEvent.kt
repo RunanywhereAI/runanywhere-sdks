@@ -11,6 +11,7 @@
 
 package com.runanywhere.sdk.public.events
 
+import com.runanywhere.sdk.public.extensions.RAG.RAGResult
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -50,6 +51,7 @@ enum class EventCategory(
     DEVICE("device"),
     NETWORK("network"),
     ERROR("error"),
+    RAG("rag"),
 }
 
 // MARK: - SDK Event Interface
@@ -301,4 +303,90 @@ data class ErrorEvent(
                 errorCategory?.let { put("error_category", it) }
                 component?.let { put("component", it) }
             }
+}
+
+/**
+ * RAG-related events.
+ * Mirrors Swift RAGEvent exactly.
+ */
+@OptIn(ExperimentalUuidApi::class)
+data class RAGEvent(
+    val eventType: RAGEventType,
+    val documentLength: Int? = null,
+    val chunkCount: Int? = null,
+    val durationMs: Double? = null,
+    val questionLength: Int? = null,
+    val answerLength: Int? = null,
+    val chunksRetrieved: Int? = null,
+    val retrievalTimeMs: Double? = null,
+    val generationTimeMs: Double? = null,
+    val totalTimeMs: Double? = null,
+    val errorMessage: String? = null,
+    override val id: String = Uuid.random().toString(),
+    override val timestamp: Long = System.currentTimeMillis(),
+    override val sessionId: String? = null,
+    override val destination: EventDestination = EventDestination.PUBLIC_ONLY,
+) : SDKEvent {
+    override val type: String get() = "rag.${eventType.value}"
+    override val category: EventCategory get() = EventCategory.RAG
+    override val properties: Map<String, String>
+        get() = buildMap {
+            documentLength?.let { put("documentLength", it.toString()) }
+            chunkCount?.let { put("chunkCount", it.toString()) }
+            durationMs?.let { put("durationMs", "%.1f".format(it)) }
+            questionLength?.let { put("questionLength", it.toString()) }
+            answerLength?.let { put("answerLength", it.toString()) }
+            chunksRetrieved?.let { put("chunksRetrieved", it.toString()) }
+            retrievalTimeMs?.let { put("retrievalTimeMs", "%.1f".format(it)) }
+            generationTimeMs?.let { put("generationTimeMs", "%.1f".format(it)) }
+            totalTimeMs?.let { put("totalTimeMs", "%.1f".format(it)) }
+            errorMessage?.let { put("message", it) }
+        }
+
+    enum class RAGEventType(val value: String) {
+        INGESTION_STARTED("ingestion.started"),
+        INGESTION_COMPLETE("ingestion.complete"),
+        QUERY_STARTED("query.started"),
+        QUERY_COMPLETE("query.complete"),
+        PIPELINE_CREATED("pipeline.created"),
+        PIPELINE_DESTROYED("pipeline.destroyed"),
+        ERROR("error"),
+    }
+
+    companion object {
+        fun ingestionStarted(documentLength: Int) = RAGEvent(
+            eventType = RAGEventType.INGESTION_STARTED,
+            documentLength = documentLength,
+        )
+
+        fun ingestionComplete(chunkCount: Int, durationMs: Double) = RAGEvent(
+            eventType = RAGEventType.INGESTION_COMPLETE,
+            chunkCount = chunkCount,
+            durationMs = durationMs,
+        )
+
+        fun queryStarted(question: String) = RAGEvent(
+            eventType = RAGEventType.QUERY_STARTED,
+            questionLength = question.length,
+        )
+
+        fun queryComplete(result: RAGResult) = RAGEvent(
+            eventType = RAGEventType.QUERY_COMPLETE,
+            answerLength = result.answer.length,
+            chunksRetrieved = result.retrievedChunks.size,
+            retrievalTimeMs = result.retrievalTimeMs,
+            generationTimeMs = result.generationTimeMs,
+            totalTimeMs = result.totalTimeMs,
+        )
+
+        fun pipelineCreated() = RAGEvent(eventType = RAGEventType.PIPELINE_CREATED)
+
+        fun pipelineDestroyed() = RAGEvent(eventType = RAGEventType.PIPELINE_DESTROYED)
+
+        fun error(message: String) = RAGEvent(
+            eventType = RAGEventType.ERROR,
+            errorMessage = message,
+            destination = EventDestination.ALL,
+        )
+    }
 }

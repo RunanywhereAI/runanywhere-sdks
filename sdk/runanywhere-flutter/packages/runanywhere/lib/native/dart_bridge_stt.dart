@@ -288,6 +288,16 @@ class DartBridgeSTT {
         language: language,
       );
     } finally {
+      // Free C-allocated strings inside the result (strdup'd by rac_stt_component_transcribe).
+      // Must happen before calloc.free(resultPtr) which frees the struct itself.
+      try {
+        final resultFreeFn = lib.lookupFunction<
+            Void Function(Pointer<Void>),
+            void Function(Pointer<Void>)>('rac_stt_result_free');
+        resultFreeFn(resultPtr.cast<Void>());
+      } catch (_) {
+        // Symbol may not exist in older builds — fall through to struct free
+      }
       calloc.free(dataPtr);
       calloc.free(optionsPtr);
       calloc.free(resultPtr);

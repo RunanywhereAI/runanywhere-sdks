@@ -173,6 +173,71 @@ class PermissionService {
     return true;
   }
 
+  /// Request camera permission with proper handling of all states
+  ///
+  /// Returns true if permission is granted, false otherwise.
+  /// Shows appropriate dialogs for denied/permanently denied states.
+  Future<bool> requestCameraPermission(BuildContext context) async {
+    final status = await Permission.camera.status;
+
+    if (status.isGranted) {
+      return true;
+    }
+
+    if (status.isPermanentlyDenied) {
+      if (!context.mounted) return false;
+      // Permission was permanently denied, show settings dialog
+      final shouldOpenSettings = await _showSettingsDialog(
+        context,
+        title: 'Camera Permission Required',
+        message:
+            'Camera access is required for vision features. Please enable it in Settings.',
+      );
+
+      if (shouldOpenSettings) {
+        await openAppSettings();
+      }
+      return false;
+    }
+
+    // Request permission
+    final result = await Permission.camera.request();
+
+    if (result.isGranted) {
+      return true;
+    }
+
+    if (!context.mounted) return false;
+
+    if (result.isPermanentlyDenied) {
+      // User denied with "Don't ask again", show settings dialog
+      final shouldOpenSettings = await _showSettingsDialog(
+        context,
+        title: 'Camera Permission Required',
+        message:
+            'Camera access is required for vision features. Please enable it in Settings.',
+      );
+
+      if (shouldOpenSettings) {
+        await openAppSettings();
+      }
+    } else if (result.isDenied) {
+      // User denied, show explanation
+      _showDeniedSnackbar(
+        context,
+        'Camera permission is required for vision features.',
+      );
+    }
+
+    return false;
+  }
+
+  /// Check if camera permission is granted without requesting
+  Future<bool> isCameraPermissionGranted() async {
+    final status = await Permission.camera.status;
+    return status.isGranted;
+  }
+
   /// Show dialog to guide user to settings
   Future<bool> _showSettingsDialog(
     BuildContext context, {

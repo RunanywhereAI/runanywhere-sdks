@@ -12,6 +12,7 @@ import { SDKLogger } from '@runanywhere/core';
 
 // SDKLogger instance for this module
 const log = new SDKLogger('LLM.LlamaCppProvider');
+const vlmLog = new SDKLogger('VLM.LlamaCppProvider');
 
 /**
  * LlamaCPP Module
@@ -34,11 +35,13 @@ export class LlamaCppProvider {
   static readonly version = '2.0.0';
 
   private static isRegistered = false;
+  private static isVLMRegistered = false;
 
   /**
    * Register LlamaCPP backend with the C++ service registry.
    * Calls rac_backend_llamacpp_register() to register the
    * LlamaCPP service provider with the C++ commons layer.
+   * Also registers the VLM backend (matching iOS SDK pattern).
    * Safe to call multiple times - subsequent calls are no-ops.
    * @returns Promise<boolean> true if registered successfully
    */
@@ -62,6 +65,9 @@ export class LlamaCppProvider {
       if (success) {
         this.isRegistered = true;
         log.info('LlamaCPP backend registered successfully');
+
+        // Register VLM backend (matches iOS: LlamaCPP.register() also registers VLM)
+        await this.registerVLM();
       }
       return success;
     } catch (error) {
@@ -72,20 +78,64 @@ export class LlamaCppProvider {
   }
 
   /**
+   * Register VLM (Vision Language Model) backend.
+   * Called automatically by register() to match iOS SDK pattern.
+   * Matches iOS: LlamaCPP.registerVLM()
+   */
+  private static async registerVLM(): Promise<void> {
+    if (this.isVLMRegistered) {
+      return;
+    }
+
+    if (!isNativeLlamaModuleAvailable()) {
+      return;
+    }
+
+    vlmLog.info('Registering LlamaCPP VLM backend...');
+
+    try {
+      const native = requireNativeLlamaModule();
+      const success = await native.registerVLMBackend();
+      if (success) {
+        this.isVLMRegistered = true;
+        vlmLog.info('LlamaCPP VLM backend registered successfully');
+      } else {
+        vlmLog.warning('LlamaCPP VLM registration returned false (VLM features may not be available)');
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      vlmLog.warning(`LlamaCPP VLM registration failed: ${msg} (VLM features may not be available)`);
+    }
+  }
+
+  /**
    * Unregister the LlamaCPP backend from C++ registry.
+   * Also unregisters the VLM backend (matching iOS SDK pattern).
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
-    if (!this.isRegistered) {
-      return true;
-    }
-
     if (!isNativeLlamaModuleAvailable()) {
       return false;
     }
 
+    const native = requireNativeLlamaModule();
+
+    // Unregister VLM first (matches iOS: unregister VLM before LLM)
+    if (this.isVLMRegistered) {
+      try {
+        await native.unloadVLMModel();
+        this.isVLMRegistered = false;
+        vlmLog.info('LlamaCPP VLM backend unregistered');
+      } catch (error) {
+        vlmLog.error(`LlamaCPP VLM unregistration failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    if (!this.isRegistered) {
+      return true;
+    }
+
     try {
-      const native = requireNativeLlamaModule();
       const success = await native.unregisterBackend();
       if (success) {
         this.isRegistered = false;

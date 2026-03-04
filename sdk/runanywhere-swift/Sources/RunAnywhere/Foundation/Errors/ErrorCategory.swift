@@ -36,6 +36,9 @@ public enum ErrorCategory: String, Sendable, CaseIterable {
     /// Voice Agent component errors
     case voiceAgent
 
+    /// Retrieval-Augmented Generation component errors
+    case rag
+
     /// Model download and management errors
     case download
 

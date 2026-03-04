@@ -26,6 +26,7 @@ import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
+import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/dart_bridge_voice_agent.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -300,6 +301,9 @@ class DartBridge {
 
   /// VAD bridge
   static DartBridgeVAD get vad => DartBridgeVAD.shared;
+
+  /// VLM bridge
+  static DartBridgeVLM get vlm => DartBridgeVLM.shared;
 
   /// Voice agent bridge
   static DartBridgeVoiceAgent get voiceAgent => DartBridgeVoiceAgent.shared;

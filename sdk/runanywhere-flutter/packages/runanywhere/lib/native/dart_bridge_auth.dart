@@ -459,37 +459,6 @@ class DartBridgeAuth {
     }
   }
 
-  /// Build refresh request JSON
-  /// Builds the JSON manually (same approach as React Native SDK)
-  String? _buildRefreshRequestJSON() {
-    try {
-      // Get refresh token from C++ state or secure storage
-      final refreshToken = _getRefreshToken();
-      if (refreshToken == null || refreshToken.isEmpty) {
-        _logger.debug('No refresh token available for refresh request');
-        return null;
-      }
-
-      // Get device ID
-      final deviceId = getDeviceId();
-      if (deviceId == null || deviceId.isEmpty) {
-        _logger.debug('No device ID available for refresh request');
-        return null;
-      }
-
-      // Build JSON manually (matches Swift/React Native format)
-      final requestBody = {
-        'device_id': deviceId,
-        'refresh_token': refreshToken,
-      };
-
-      return jsonEncode(requestBody);
-    } catch (e) {
-      _logger.debug('Failed to build refresh request: $e');
-      return null;
-    }
-  }
-
   /// Get refresh token from C++ state or secure storage
   String? _getRefreshToken() {
     // First try C++ state

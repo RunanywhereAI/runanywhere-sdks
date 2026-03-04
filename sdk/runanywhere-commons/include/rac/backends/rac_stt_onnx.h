@@ -44,6 +44,7 @@ typedef enum rac_stt_onnx_model_type {
     RAC_STT_ONNX_MODEL_WHISPER = 0,
     RAC_STT_ONNX_MODEL_ZIPFORMER = 1,
     RAC_STT_ONNX_MODEL_PARAFORMER = 2,
+    RAC_STT_ONNX_MODEL_NEMO_CTC = 3,
     RAC_STT_ONNX_MODEL_AUTO = 99
 } rac_stt_onnx_model_type_t;
 

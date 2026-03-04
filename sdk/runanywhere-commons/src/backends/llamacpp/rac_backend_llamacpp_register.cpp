@@ -109,6 +109,23 @@ static void llamacpp_vtable_destroy(void* impl) {
     rac_llm_llamacpp_destroy(impl);
 }
 
+// LoRA adapter management
+static rac_result_t llamacpp_vtable_load_lora(void* impl, const char* adapter_path, float scale) {
+    return rac_llm_llamacpp_load_lora(impl, adapter_path, scale);
+}
+
+static rac_result_t llamacpp_vtable_remove_lora(void* impl, const char* adapter_path) {
+    return rac_llm_llamacpp_remove_lora(impl, adapter_path);
+}
+
+static rac_result_t llamacpp_vtable_clear_lora(void* impl) {
+    return rac_llm_llamacpp_clear_lora(impl);
+}
+
+static rac_result_t llamacpp_vtable_get_lora_info(void* impl, char** out_json) {
+    return rac_llm_llamacpp_get_lora_info(impl, out_json);
+}
+
 // Static vtable for LlamaCpp
 static const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
@@ -118,6 +135,10 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .cancel = llamacpp_vtable_cancel,
     .cleanup = llamacpp_vtable_cleanup,
     .destroy = llamacpp_vtable_destroy,
+    .load_lora = llamacpp_vtable_load_lora,
+    .remove_lora = llamacpp_vtable_remove_lora,
+    .clear_lora = llamacpp_vtable_clear_lora,
+    .get_lora_info = llamacpp_vtable_get_lora_info,
 };
 
 // =============================================================================

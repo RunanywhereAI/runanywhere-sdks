@@ -301,18 +301,28 @@ struct SpeechToTextView: View {
                 }
             }
             .navigationTitle(hasModelSelected ? "Speech to Text" : "")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(!hasModelSelected)
+            #endif
             .toolbar {
                 if hasModelSelected {
+                    #if os(iOS)
                     ToolbarItem(placement: .navigationBarTrailing) {
                         modelButton
                     }
+                    #else
+                    ToolbarItem(placement: .automatic) {
+                        modelButton
+                    }
+                    #endif
                 }
             }
         }
+        #if os(iOS)
         .navigationViewStyle(.stack)
-        .sheet(isPresented: $showModelPicker) {
+        #endif
+        .adaptiveSheet(isPresented: $showModelPicker) {
             ModelSelectionSheet(context: .stt) { model in
                 Task {
                     await viewModel.loadModelFromSelection(model)

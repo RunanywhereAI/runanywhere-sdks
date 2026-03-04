@@ -36,6 +36,7 @@ export type {
   InitializationResult,
   LLMGenerationOptions,
   ModelInfo,
+  ModelCompatibilityResult,
   ModelInfoMetadata,
   PerformanceMetrics,
   SDKInitOptions,
@@ -144,3 +145,25 @@ export type {
   LLMStreamCompleteCallback,
   LLMStreamErrorCallback,
 } from './LLMTypes';
+
+// Tool Calling Types
+export type {
+  ParameterType,
+  ToolParameter,
+  ToolDefinition,
+  ToolCall,
+  ToolResult,
+  ToolExecutor,
+  RegisteredTool,
+  ToolCallingOptions,
+  ToolCallingResult,
+} from './ToolCallingTypes';
+
+// VLM Types
+export type {
+  VLMResult,
+  VLMStreamingResult,
+  VLMGenerationOptions,
+  VLMImage,
+} from './VLMTypes';
+export { VLMImageFormat, VLMErrorCode } from './VLMTypes';

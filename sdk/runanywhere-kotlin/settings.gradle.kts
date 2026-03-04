@@ -45,3 +45,8 @@ include(":modules:runanywhere-core-llamacpp")
 // Single file: ONNX.kt which calls rac_backend_onnx_register()
 // Matches iOS: Sources/ONNXRuntime/ONNX.swift
 include(":modules:runanywhere-core-onnx")
+
+// RAG module - thin wrapper that calls C++ backend registration
+// Single file: RAGModule.kt which calls rac_backend_rag_register()
+// Matches iOS: Sources/RAGRuntime/RAG.swift
+include(":modules:runanywhere-core-rag")

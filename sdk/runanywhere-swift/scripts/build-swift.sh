@@ -19,6 +19,7 @@
 #   --build-commons     Build runanywhere-commons from source
 #
 # OPTIONS:
+#   --skip-macos        Skip macOS build (iOS only). macOS is included by default.
 #   --clean             Clean build artifacts before building
 #   --release           Build in release mode (default: debug)
 #   --skip-build        Skip swift build (only setup frameworks)
@@ -27,8 +28,11 @@
 #   --help              Show this help message
 #
 # EXAMPLES:
-#   # First time setup (recommended)
+#   # First time setup (iOS + macOS, recommended)
 #   ./scripts/build-swift.sh --setup
+#
+#   # First time setup (iOS only, skip macOS)
+#   ./scripts/build-swift.sh --setup --skip-macos
 #
 #   # Rebuild after commons changes
 #   ./scripts/build-swift.sh --local --build-commons
@@ -62,6 +66,7 @@ PACKAGE_FILE="$REPO_ROOT/Package.swift"
 BUILD_MODE="debug"
 MODE=""
 BUILD_COMMONS=false
+INCLUDE_MACOS=true
 CLEAN_BUILD=false
 SKIP_BUILD=false
 SET_LOCAL_MODE=""
@@ -106,6 +111,12 @@ for arg in "$@"; do
         --build-commons)
             BUILD_COMMONS=true
             MODE="local"
+            ;;
+        --include-macos)
+            INCLUDE_MACOS=true
+            ;;
+        --skip-macos)
+            INCLUDE_MACOS=false
             ;;
         --clean)
             CLEAN_BUILD=true
@@ -210,9 +221,11 @@ build_commons() {
 
     local FLAGS=""
     [[ "$CLEAN_BUILD" == true ]] && FLAGS="$FLAGS --clean"
+    [[ "$INCLUDE_MACOS" == true ]] && FLAGS="$FLAGS --include-macos"
 
     log_step "Running: build-ios.sh $FLAGS"
     log_info "This downloads dependencies and builds all frameworks..."
+    [[ "$INCLUDE_MACOS" == true ]] && log_info "Including macOS support (this adds build time)"
     echo ""
     "$COMMONS_BUILD_SCRIPT" $FLAGS
 
@@ -229,7 +242,7 @@ install_frameworks() {
     mkdir -p "$BINARIES_DIR"
 
     # All frameworks are now in dist/ (flat structure from build-ios.sh)
-    for framework in RACommons RABackendLLAMACPP RABackendONNX; do
+    for framework in RACommons RABackendLLAMACPP RABackendONNX RABackendRAG; do
         local src="$COMMONS_DIR/dist/${framework}.xcframework"
         if [[ -d "$src" ]]; then
             log_step "Copying ${framework}.xcframework"
@@ -245,7 +258,107 @@ install_frameworks() {
         fi
     done
 
+    # Install ONNX Runtime xcframeworks (split: iOS static library + macOS dynamic framework)
+    # Remove old combined xcframework if present
+    rm -rf "$BINARIES_DIR/onnxruntime.xcframework"
+
+    if [[ "$INCLUDE_MACOS" == true ]]; then
+        # macOS included: create split iOS + macOS xcframeworks
+        local ONNX_SCRIPT="$SWIFT_SDK_DIR/scripts/create-onnxruntime-xcframework.sh"
+        if [[ -x "$ONNX_SCRIPT" ]]; then
+            log_step "Creating split ONNX Runtime xcframeworks (iOS + macOS)..."
+            "$ONNX_SCRIPT"
+        else
+            log_warn "create-onnxruntime-xcframework.sh not found, skipping ONNX Runtime"
+        fi
+    else
+        # iOS only: create library-format xcframework from pre-built iOS onnxruntime
+        local ONNX_SRC="$COMMONS_DIR/third_party/onnxruntime-ios/onnxruntime.xcframework"
+        if [[ -d "$ONNX_SRC" ]]; then
+            log_step "Creating onnxruntime-ios.xcframework (library format)"
+            local ONNX_TEMP=$(mktemp -d)
+            local XCFW_ARGS=()
+            for SLICE_DIR in "${ONNX_SRC}"/*/; do
+                local SLICE_NAME=$(basename "$SLICE_DIR")
+                [[ "$SLICE_NAME" == "Info.plist" ]] && continue
+                local DEST="${ONNX_TEMP}/${SLICE_NAME}"
+                mkdir -p "$DEST"
+                if [[ -d "${SLICE_DIR}/onnxruntime.framework" ]]; then
+                    cp "${SLICE_DIR}/onnxruntime.framework/onnxruntime" "${DEST}/libonnxruntime.a"
+                    cp -R "${SLICE_DIR}/onnxruntime.framework/Headers" "${DEST}/Headers" 2>/dev/null || true
+                fi
+                XCFW_ARGS+=(-library "${DEST}/libonnxruntime.a")
+                [[ -d "${DEST}/Headers" ]] && XCFW_ARGS+=(-headers "${DEST}/Headers")
+            done
+            rm -rf "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "$BINARIES_DIR/onnxruntime-ios.xcframework"
+            rm -rf "$ONNX_TEMP"
+            log_info "  onnxruntime-ios.xcframework created"
+        else
+            log_warn "onnxruntime.xcframework not found at $ONNX_SRC"
+        fi
+    fi
+
     log_info "Frameworks installed to: $BINARIES_DIR"
+}
+
+# =============================================================================
+# Sync CRACommons Bridge Headers
+# =============================================================================
+
+sync_headers() {
+    log_header "Syncing CRACommons bridge headers"
+
+    local BRIDGE_INCLUDE="$SWIFT_SDK_DIR/Sources/RunAnywhere/CRACommons/include"
+    local COMMONS_INCLUDE="$COMMONS_DIR/include/rac"
+
+    if [[ ! -d "$BRIDGE_INCLUDE" ]]; then
+        log_warn "CRACommons include dir not found: $BRIDGE_INCLUDE"
+        return 0
+    fi
+
+    local synced=0
+
+    # Backend headers that need to be exposed to Swift via CRACommons
+    local BACKEND_HEADERS=(
+        "backends/rac_stt_whisperkit_coreml.h"
+    )
+
+    for rel_path in "${BACKEND_HEADERS[@]}"; do
+        local src="$COMMONS_INCLUDE/$rel_path"
+        local filename="$(basename "$rel_path")"
+        local dest="$BRIDGE_INCLUDE/$filename"
+
+        if [[ -f "$src" ]]; then
+            # Copy and fix include paths (CRACommons uses flat includes)
+            sed -e 's|#include "rac/[^"]*/"||' \
+                -e 's|#include "rac/core/\(.*\)"|#include "\1"|' \
+                -e 's|#include "rac/features/[^"]*/"||' \
+                -e 's|#include "rac/features/stt/\(.*\)"|#include "\1"|' \
+                "$src" > "${dest}.tmp"
+
+            # Use sed to fix the nested path includes properly
+            sed -e 's|#include "rac/core/rac_types.h"|#include "rac_types.h"|g' \
+                -e 's|#include "rac/features/stt/rac_stt_types.h"|#include "rac_stt_types.h"|g' \
+                "$src" > "${dest}.tmp"
+
+            if ! diff -q "$dest" "${dest}.tmp" >/dev/null 2>&1; then
+                mv "${dest}.tmp" "$dest"
+                log_info "  Synced: $filename"
+                synced=$((synced + 1))
+            else
+                rm -f "${dest}.tmp"
+            fi
+        else
+            log_warn "  Source not found: $src"
+        fi
+    done
+
+    if [[ $synced -eq 0 ]]; then
+        log_info "All bridge headers up to date"
+    else
+        log_info "Synced $synced header(s)"
+    fi
 }
 
 # =============================================================================
@@ -286,14 +399,29 @@ main() {
         log_header "RunAnywhere Swift SDK - First Time Setup"
         echo ""
         echo "This will:"
-        echo "  1. Download ONNX Runtime & Sherpa-ONNX"
+        echo "  1. Download ONNX Runtime & Sherpa-ONNX (iOS)"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "  1b. Download ONNX Runtime & build Sherpa-ONNX (macOS)"
+        fi
         echo "  2. Build RACommons.xcframework"
         echo "  3. Build RABackendLLAMACPP.xcframework"
         echo "  4. Build RABackendONNX.xcframework"
-        echo "  5. Copy frameworks to Binaries/"
-        echo "  6. Set useLocalBinaries = true in Package.swift"
+        echo "  4b. Build RABackendRAG.xcframework"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "     (all xcframeworks will include macOS arm64 slices)"
+            echo "  5. Create combined ONNX Runtime xcframework (iOS + macOS)"
+            echo "  6. Copy frameworks to Binaries/"
+            echo "  7. Set useLocalBinaries = true in Package.swift"
+        else
+            echo "  5. Copy frameworks to Binaries/"
+            echo "  6. Set useLocalBinaries = true in Package.swift"
+        fi
         echo ""
-        echo "This may take 5-15 minutes..."
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            echo "This may take 15-30 minutes (includes macOS + Sherpa-ONNX build)..."
+        else
+            echo "This may take 5-15 minutes..."
+        fi
         echo ""
     else
         log_header "RunAnywhere Swift SDK - Build"
@@ -325,6 +453,9 @@ main() {
     elif [[ "$MODE" == "remote" ]]; then
         set_package_mode "remote"
     fi
+
+    # Sync backend headers to CRACommons bridge
+    sync_headers
 
     # Build the SDK
     if ! $SKIP_BUILD; then

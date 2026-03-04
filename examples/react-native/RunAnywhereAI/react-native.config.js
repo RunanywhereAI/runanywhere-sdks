@@ -8,6 +8,13 @@ module.exports = {
     },
   },
   dependencies: {
+    // Nitro modules requires Turbo codegen for iOS (NitroModulesSpec.h)
+    'react-native-nitro-modules': {
+      platforms: {
+        android: null,
+        ios: {},
+      },
+    },
     // Disable audio libraries on iOS - they're incompatible with New Architecture
     'react-native-live-audio-stream': {
       platforms: {
@@ -23,6 +30,7 @@ module.exports = {
     'react-native-sound': {
       platforms: {
         ios: null,
+        android: null,
       },
     },
     'react-native-tts': {

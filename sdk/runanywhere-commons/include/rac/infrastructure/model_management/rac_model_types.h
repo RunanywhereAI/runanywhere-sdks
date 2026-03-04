@@ -147,6 +147,7 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_IMAGE_GENERATION = 4,   /**< Text-to-image models */
     RAC_MODEL_CATEGORY_MULTIMODAL = 5,         /**< Multi-modality models */
     RAC_MODEL_CATEGORY_AUDIO = 6,              /**< Audio processing (diarization, etc.) */
+    RAC_MODEL_CATEGORY_EMBEDDING = 7,          /**< Embedding models (RAG, semantic search) */
     RAC_MODEL_CATEGORY_UNKNOWN = 99            /**< Unknown category */
 } rac_model_category_t;
 
@@ -163,6 +164,7 @@ typedef enum rac_model_format {
     RAC_MODEL_FORMAT_ORT = 1,     /**< ONNX Runtime format */
     RAC_MODEL_FORMAT_GGUF = 2,    /**< GGUF format (llama.cpp) */
     RAC_MODEL_FORMAT_BIN = 3,     /**< Binary format */
+    RAC_MODEL_FORMAT_COREML = 4,  /**< Core ML format (.mlmodelc, .mlpackage) */
     RAC_MODEL_FORMAT_UNKNOWN = 99 /**< Unknown format */
 } rac_model_format_t;
 
@@ -182,6 +184,9 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_FLUID_AUDIO = 4,       /**< FluidAudio */
     RAC_FRAMEWORK_BUILTIN = 5,           /**< Built-in (e.g., energy VAD) */
     RAC_FRAMEWORK_NONE = 6,              /**< No framework needed */
+    RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
+    RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
+    RAC_FRAMEWORK_WHISPERKIT_COREML = 9,  /**< WhisperKit CoreML (Apple Neural Engine STT) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 
@@ -242,6 +247,9 @@ typedef struct rac_model_info {
 
     /** Whether model supports thinking/reasoning */
     rac_bool_t supports_thinking;
+
+    /** Whether model supports LoRA adapters */
+    rac_bool_t supports_lora;
 
     /** Tags (NULL-terminated array of strings, can be NULL) */
     char** tags;

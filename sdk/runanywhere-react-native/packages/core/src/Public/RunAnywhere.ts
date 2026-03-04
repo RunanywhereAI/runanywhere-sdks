@@ -47,6 +47,7 @@ import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
+import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -166,14 +167,14 @@ export const RunAnywhere = {
       // This ensures HTTP is ready when C++ callbacks need it
       const envString = environment === SDKEnvironment.Development ? 'development'
         : environment === SDKEnvironment.Staging ? 'staging'
-        : 'production';
+          : 'production';
 
       // Map environment string to SDKEnvironment enum for HTTPService
       const networkEnv = environment === SDKEnvironment.Development
         ? NetworkSDKEnvironment.Development
         : environment === SDKEnvironment.Staging
-        ? NetworkSDKEnvironment.Staging
-        : NetworkSDKEnvironment.Production;
+          ? NetworkSDKEnvironment.Staging
+          : NetworkSDKEnvironment.Production;
 
       // Configure HTTPService with network settings
       HTTPService.shared.configure({
@@ -369,7 +370,7 @@ export const RunAnywhere = {
   ): Promise<void> {
     const envString = environment === SDKEnvironment.Development ? 'development'
       : environment === SDKEnvironment.Staging ? 'staging'
-      : 'production';
+        : 'production';
 
     try {
       const native = requireNativeModule();
@@ -599,10 +600,26 @@ export const RunAnywhere = {
   classify: StructuredOutput.classify,
 
   // ============================================================================
+  // Tool Calling (Delegated to Extension)
+  // ============================================================================
+
+  registerTool: ToolCalling.registerTool,
+  unregisterTool: ToolCalling.unregisterTool,
+  getRegisteredTools: ToolCalling.getRegisteredTools,
+  clearTools: ToolCalling.clearTools,
+  parseToolCall: ToolCalling.parseToolCall,
+  executeTool: ToolCalling.executeTool,
+  formatToolsForPrompt: ToolCalling.formatToolsForPrompt,
+  formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
+  generateWithTools: ToolCalling.generateWithTools,
+  continueWithToolResult: ToolCalling.continueWithToolResult,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
   getStorageInfo: Storage.getStorageInfo,
+  getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
 
   // ============================================================================
@@ -611,10 +628,13 @@ export const RunAnywhere = {
 
   getAvailableModels: Models.getAvailableModels,
   getModelInfo: Models.getModelInfo,
+  getModelPath: Models.getModelPath,
   isModelDownloaded: Models.isModelDownloaded,
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  checkCompatibility: Models.checkCompatibility,
+  registerModel: Models.registerModel,
 
   // ============================================================================
   // Utilities

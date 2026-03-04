@@ -146,9 +146,9 @@ export const ONNX = {
    * await ONNX.addModel({
    *   id: 'sherpa-onnx-whisper-small.en',
    *   name: 'Sherpa Whisper Small (ONNX)',
-   *   url: 'https://github.com/k2-fsa/sherpa-onnx/releases/.../sherpa-onnx-whisper-small.en.tar.bz2',
+   *   url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
    *   modality: ModelCategory.SpeechRecognition,
-   *   artifactType: ModelArtifactType.TarBz2Archive,
+   *   artifactType: ModelArtifactType.TarGzArchive,
    *   memoryRequirement: 250_000_000
    * });
    * ```

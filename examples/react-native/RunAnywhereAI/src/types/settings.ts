@@ -123,3 +123,13 @@ export const RoutingPolicyDescriptions: Record<RoutingPolicy, string> = {
   [RoutingPolicy.PreferCloud]:
     'Prefer cloud execution, fall back to device if offline.',
 };
+
+/**
+ * AsyncStorage keys for generation settings persistence
+ * Matches iOS/Android naming convention for cross-platform consistency
+ */
+export const GENERATION_SETTINGS_KEYS = {
+  TEMPERATURE: 'defaultTemperature',
+  MAX_TOKENS: 'defaultMaxTokens',
+  SYSTEM_PROMPT: 'defaultSystemPrompt',
+} as const;

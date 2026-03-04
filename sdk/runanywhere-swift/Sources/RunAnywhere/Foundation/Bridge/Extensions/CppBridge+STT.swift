@@ -64,8 +64,25 @@ extension CppBridge {
         // MARK: - Model Lifecycle
 
         /// Load an STT model
-        public func loadModel(_ modelPath: String, modelId: String, modelName: String) throws {
+        public func loadModel(
+            _ modelPath: String,
+            modelId: String,
+            modelName: String,
+            framework: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        ) throws {
             let handle = try getHandle()
+
+            // Configure the component with the correct framework so telemetry events
+            // carry the real framework value instead of "unknown".
+            if framework != RAC_FRAMEWORK_UNKNOWN {
+                var config = RAC_STT_CONFIG_DEFAULT
+                config.preferred_framework = Int32(framework.rawValue)
+                let configResult = rac_stt_component_configure(handle, &config)
+                if configResult != RAC_SUCCESS {
+                    logger.warning("Failed to configure STT framework: \(configResult)")
+                }
+            }
+
             let result = modelPath.withCString { pathPtr in
                 modelId.withCString { idPtr in
                     modelName.withCString { namePtr in

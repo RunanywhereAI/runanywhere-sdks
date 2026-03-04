@@ -5,7 +5,7 @@
 #
 # The commons JNI library includes:
 # - Core commons bindings (rac_init, rac_shutdown, etc.)
-# - LLM/STT/TTS/VAD component bindings
+# - LLM/STT/TTS/VAD/VLM component bindings
 # - Model registry bindings
 # - Platform adapter callbacks
 #
@@ -22,12 +22,45 @@ project(runanywhere_commons_jni)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find JNI
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
+# nlohmann_json is provided by the parent CMakeLists.txt
 
-# Include runanywhere-commons headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+# Find JNI
+# When cross-compiling for Android, we should use the NDK's JNI headers (jni.h)
+# and NOT the host JDK's JVM/AWT libraries.
+if(ANDROID)
+    # NDK sysroot contains jni.h and android/jni_md.h
+    # Detect NDK host tag dynamically instead of hardcoding
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(_NDK_HOST_TAG "darwin-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(_NDK_HOST_TAG "linux-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        set(_NDK_HOST_TAG "windows-x86_64")
+    else()
+        message(FATAL_ERROR "Unsupported host platform: ${CMAKE_HOST_SYSTEM_NAME}")
+    endif()
+    set(_NDK_PREBUILT "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_NDK_HOST_TAG}")
+    set(_NDK_SYSROOT_INCLUDE "${_NDK_PREBUILT}/sysroot/usr/include")
+
+    if(NOT EXISTS "${_NDK_SYSROOT_INCLUDE}/jni.h")
+        message(FATAL_ERROR "Could not locate NDK JNI headers at: ${_NDK_SYSROOT_INCLUDE}. Is CMAKE_ANDROID_NDK set correctly?")
+    endif()
+
+    set(JNI_INCLUDE_DIRS
+        "${_NDK_SYSROOT_INCLUDE}"
+        "${_NDK_SYSROOT_INCLUDE}/android"
+    )
+    set(JNI_LIBRARIES "")
+else()
+    # JNI detection is handled by the parent CMakeLists.txt (project-wide).
+    # If we're built standalone, fall back to find_package here.
+    if(NOT JNI_FOUND)
+        find_package(JNI QUIET)
+        if(NOT JNI_FOUND)
+            message(WARNING "JNI not found. Set JAVA_HOME to your JDK installation.")
+        endif()
+    endif()
+endif()
 
 # Source files
 set(JNI_SOURCES
@@ -37,10 +70,17 @@ set(JNI_SOURCES
 # Create shared library
 add_library(runanywhere_commons_jni SHARED ${JNI_SOURCES})
 
+# JNI and project include paths (target-level for proper IDE indexing)
+target_include_directories(runanywhere_commons_jni PRIVATE
+    ${JNI_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+)
+
 # Link against runanywhere-commons core ONLY
 # Backend libraries are NOT linked here - they have their own JNI libraries
 target_link_libraries(runanywhere_commons_jni
     rac_commons
+    nlohmann_json::nlohmann_json
     ${JNI_LIBRARIES}
 )
 

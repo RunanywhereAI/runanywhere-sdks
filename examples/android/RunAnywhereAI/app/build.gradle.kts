@@ -11,6 +11,8 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
+    ndkVersion = "27.0.12077973"
+
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
         val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -47,10 +49,7 @@ android {
         //     }
         // }
 
-        ndk {
-            // Only arm64-v8a for now (RunAnywhere Core ONNX is built for arm64-v8a)
-            abiFilters += listOf("arm64-v8a")
-        }
+        // Note: ndk.abiFilters removed — splits.abi handles ABI filtering
     }
 
     buildTypes {
@@ -106,21 +105,14 @@ android {
     // Signing configurations
     // Using default debug keystore for now
 
-    // APK splits disabled for now to focus on basic functionality
-    // splits {
-    //     abi {
-    //         isEnable = true
-    //         reset()
-    //         include("armeabi-v7a", "arm64-v8a")  // Focus on ARM architectures for mobile
-    //         isUniversalApk = true  // Also generate a universal APK
-    //     }
-    //
-    //     density {
-    //         isEnable = true
-    //         reset()
-    //         include("ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
-    //     }
-    // }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
+    }
 
     // Packaging options
     packaging {
@@ -152,16 +144,11 @@ android {
             // and 16KB alignment during packaging.
             useLegacyPackaging = true
 
-            // Handle duplicate native libraries from multiple backend modules
-            // (ONNX and LlamaCPP both include some common libraries)
-            pickFirsts += listOf(
-                "lib/arm64-v8a/libomp.so",
-                "lib/arm64-v8a/libc++_shared.so",
-                "lib/arm64-v8a/librac_commons.so",
-                "lib/armeabi-v7a/libomp.so",
-                "lib/armeabi-v7a/libc++_shared.so",
-                "lib/armeabi-v7a/librac_commons.so",
-            )
+            // Handle duplicate native libraries from multiple SDK modules.
+            // The main SDK, ONNX module, and LlamaCPP module may share common
+            // libraries (libc++_shared, libomp, librac_commons). Use a wildcard
+            // to safely pick the first copy for any ABI.
+            pickFirsts += listOf("lib/**/*.so")
         }
     }
 
@@ -225,34 +212,26 @@ android {
 }
 
 dependencies {
-    // ========================================
-    // SDK Dependencies
-    // ========================================
-    // Main SDK - high-level APIs, download, routing (no native libs)
-    implementation(project(":sdk:runanywhere-kotlin"))
+    // SDK
+    implementation(project(":runanywhere-kotlin"))
 
     // Backend modules - each is SELF-CONTAINED with all native libs
     // Pick the backends you need:
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")) // ~45MB - LLM text generation
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
+    implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
+    implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
+    implementation(project(":runanywhere-core-rag")) // RAG pipeline JNI bindings
 
-    // ========================================
     // AndroidX Core & Lifecycle
-    // ========================================
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
-    // ========================================
     // Material Design
-    // ========================================
     implementation(libs.material)
 
-    // ========================================
     // Compose
-    // ========================================
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -260,84 +239,67 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // ========================================
     // Navigation
-    // ========================================
     implementation(libs.androidx.navigation.compose)
 
-    // ========================================
     // Coroutines
-    // ========================================
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // ========================================
     // Serialization & DateTime
-    // ========================================
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
 
-    // ========================================
     // Networking
-    // ========================================
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
-    // ========================================
     // File Management & Storage
-    // ========================================
     implementation(libs.commons.io)
 
     // ========================================
-    // Background Work
+    // PDF Text Extraction (RAG document ingestion)
     // ========================================
+    implementation(libs.pdfbox.android)
+
+    // Background Work
     implementation(libs.androidx.work.runtime.ktx)
 
-    // ========================================
     // Speech Recognition & Audio Processing
-    // ========================================
     implementation(libs.whisper.jni)
     implementation(libs.android.vad.webrtc)
     implementation(libs.prdownloader)
 
-    // ========================================
     // Security
-    // ========================================
     implementation(libs.androidx.security.crypto)
 
-    // ========================================
     // DataStore
-    // ========================================
     implementation(libs.androidx.datastore.preferences)
 
-    // ========================================
     // Permissions
-    // ========================================
     implementation(libs.accompanist.permissions)
 
-    // ========================================
+    // CameraX
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
     // Database
-    // ========================================
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
 
-    // ========================================
-    // Play Services (Updated for targetSdk 34+)
-    // ========================================
+    // Play Services
     implementation(libs.google.play.app.update)
     implementation(libs.google.play.app.update.ktx)
 
-    // ========================================
     // Logging
-    // ========================================
     implementation(libs.timber)
 
-    // ========================================
     // Testing
-    // ========================================
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
@@ -350,9 +312,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // ========================================
-    // Kotlin Version Constraints
-    // ========================================
+    // Kotlin version constraints
     constraints {
         implementation("org.jetbrains.kotlin:kotlin-stdlib") {
             version {

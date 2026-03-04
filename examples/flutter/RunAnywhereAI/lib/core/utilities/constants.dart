@@ -86,5 +86,6 @@ class PreferenceKeys {
   static const String routingPolicy = 'routingPolicy';
   static const String defaultTemperature = 'defaultTemperature';
   static const String defaultMaxTokens = 'defaultMaxTokens';
+  static const String defaultSystemPrompt = 'defaultSystemPrompt';
   static const String useStreaming = 'useStreaming';
 }

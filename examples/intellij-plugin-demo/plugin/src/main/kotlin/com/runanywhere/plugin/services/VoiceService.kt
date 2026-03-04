@@ -5,19 +5,17 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.components.stt.STTStreamEvent
+import com.runanywhere.sdk.`public`.RunAnywhere
+import com.runanywhere.sdk.`public`.extensions.transcribe
+import com.runanywhere.sdk.features.stt.JvmAudioCaptureManager
+import com.runanywhere.sdk.features.stt.AudioChunk
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 /**
- * Service for managing voice capture and transcription using RunAnywhere SDK
+ * Service for managing voice capture and transcription using RunAnywhere SDK.
  *
- * This service is now deprecated in favor of directly using the SDK APIs:
- * - RunAnywhere.transcribeWithRecording() for simple recording
- * - RunAnywhere.startStreamingTranscription() for continuous streaming
- *
- * The SDK handles all audio capture internally.
+ * Uses JvmAudioCaptureManager for audio capture and RunAnywhere.transcribe() for batch transcription.
  */
 @Service(Service.Level.PROJECT)
 class VoiceService(private val project: Project) : Disposable {
@@ -25,25 +23,24 @@ class VoiceService(private val project: Project) : Disposable {
     private var isInitialized = false
     private var isRecording = false
 
-    // Create a coroutine scope with proper exception handling for IntelliJ
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        println("VoiceService: Coroutine exception: ${throwable.message}")
+        println("[VoiceService] Coroutine exception: ${throwable.message}")
     }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + exceptionHandler)
-    private var streamingJob: Job? = null
+    private var recordingJob: Job? = null
+    private var audioCaptureManager: JvmAudioCaptureManager? = null
 
     fun initialize() {
         if (!isInitialized) {
-            println("VoiceService: Initializing...")
+            println("[VoiceService] Initializing...")
             isInitialized = true
         }
     }
 
     /**
-     * Start voice capture with streaming transcription
-     * @deprecated Use RunAnywhere.startStreamingTranscription() directly
+     * Start voice capture with batch transcription.
+     * Records audio, then transcribes when stopped.
      */
-    @Deprecated("Use RunAnywhere.startStreamingTranscription() directly")
     fun startVoiceCapture(onTranscription: (String) -> Unit) {
         if (!com.runanywhere.plugin.isInitialized) {
             showNotification(
@@ -55,116 +52,58 @@ class VoiceService(private val project: Project) : Disposable {
         }
 
         if (isRecording) {
-            println("Already recording")
+            println("[VoiceService] Already recording")
             return
         }
 
         isRecording = true
+        val captureManager = JvmAudioCaptureManager()
+        audioCaptureManager = captureManager
 
         showNotification(
             "Recording",
-            "Voice recording started. Speaking will be transcribed in real-time...",
+            "Voice recording started. Press stop to transcribe...",
             NotificationType.INFORMATION
         )
 
-        // Start streaming transcription job using SDK's internal audio capture
-        streamingJob = scope.launch {
+        recordingJob = scope.launch {
+            val audioBuffer = mutableListOf<AudioChunk>()
             try {
-                // Use SDK's internal audio capture and streaming transcription
-                val transcriptionFlow = RunAnywhere.startStreamingTranscription(
-                    chunkSizeMs = 100 // 100ms chunks for real-time feedback
-                )
+                captureManager.startRecording().collect { chunk ->
+                    audioBuffer.add(chunk)
+                }
+            } catch (_: CancellationException) {
+                // Normal cancellation when stopping
+            }
 
-                // Collect transcription events
-                transcriptionFlow
-                    .catch { e ->
-                        println("VoiceService: Streaming error: ${e.message}")
-                        showNotification(
-                            "Streaming Error",
-                            "Failed during streaming: ${e.message}",
-                            NotificationType.ERROR
-                        )
+            // Transcribe accumulated audio
+            if (audioBuffer.isNotEmpty()) {
+                try {
+                    val audioData = audioBuffer.flatMap { it.data.toList() }.toByteArray()
+                    val text = RunAnywhere.transcribe(audioData)
+                    if (text.isNotEmpty()) {
+                        onTranscription(text)
+                        showNotification("Transcribed", text, NotificationType.INFORMATION)
                     }
-                    .collect { event ->
-                        when (event) {
-                            is STTStreamEvent.SpeechStarted -> {
-                                println("VoiceService: Speech detected, starting transcription...")
-                            }
-
-                            is STTStreamEvent.PartialTranscription -> {
-                                println("VoiceService: Partial: ${event.text}")
-                                // Show partial results in real-time
-                                if (event.text.isNotEmpty()) {
-                                    onTranscription("[Listening...] ${event.text}")
-                                }
-                            }
-
-                            is STTStreamEvent.FinalTranscription -> {
-                                val text = event.result.transcript
-                                println("VoiceService: Final: $text")
-                                if (text.isNotEmpty()) {
-                                    onTranscription(text)
-                                    showNotification(
-                                        "Transcribed",
-                                        text,
-                                        NotificationType.INFORMATION
-                                    )
-                                }
-                            }
-
-                            is STTStreamEvent.SpeechEnded -> {
-                                println("VoiceService: Speech ended")
-                            }
-
-                            is STTStreamEvent.SilenceDetected -> {
-                                println("VoiceService: Silence detected")
-                            }
-
-                            is STTStreamEvent.Error -> {
-                                println("VoiceService: Error: ${event.error.message}")
-                                showNotification(
-                                    "STT Error",
-                                    event.error.message,
-                                    NotificationType.ERROR
-                                )
-                            }
-
-                            else -> {
-                                // Handle other event types if needed
-                                println("VoiceService: Event: $event")
-                            }
-                        }
-                    }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // This is normal when stopping recording
-                println("VoiceService: Streaming cancelled (recording stopped)")
-                throw e // Must rethrow CancellationException
-            } catch (e: Exception) {
-                println("VoiceService: Unexpected error: ${e.message}")
-                e.printStackTrace()
-                showNotification(
-                    "Error",
-                    "Unexpected error: ${e.message}",
-                    NotificationType.ERROR
-                )
+                } catch (e: Exception) {
+                    println("[VoiceService] Transcription error: ${e.message}")
+                    showNotification("STT Error", "Transcription failed: ${e.message}", NotificationType.ERROR)
+                }
             }
         }
     }
 
     fun stopVoiceCapture() {
         if (!isRecording) {
-            println("Not recording")
+            println("[VoiceService] Not recording")
             return
         }
 
         isRecording = false
-
-        // Stop SDK's internal audio capture
-        RunAnywhere.stopStreamingTranscription()
-
-        // Cancel streaming job
-        streamingJob?.cancel()
-        streamingJob = null
+        audioCaptureManager?.stopRecording()
+        recordingJob?.cancel()
+        recordingJob = null
+        audioCaptureManager = null
 
         showNotification("Recording Stopped", "Voice capture ended", NotificationType.INFORMATION)
     }
@@ -183,6 +122,6 @@ class VoiceService(private val project: Project) : Disposable {
             stopVoiceCapture()
         }
         scope.cancel()
-        println("VoiceService disposed")
+        println("[VoiceService] Disposed")
     }
 }

@@ -19,8 +19,12 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
-    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found at ${JNILIB_DIR}/librac_backend_onnx.so\n"
-                        "Run: ./gradlew :runanywhere_onnx:downloadNativeLibs")
+    message(WARNING "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
+                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_onnx:downloadNativeLibs\n"
+                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
+    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
+    return()
 endif()
 
 add_library(rac_backend_onnx SHARED IMPORTED)
@@ -177,7 +181,7 @@ if(TARGET sherpa_onnx_jni)
 endif()
 
 # HAS_ONNX is always defined since ONNX backend is required
-target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1)
+target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_ONNX=1 HAS_RACOMMONS=1 ORT_API_VERSION=17)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance
 target_link_options(${PACKAGE_NAME} PRIVATE -Wl,-z,max-page-size=16384)

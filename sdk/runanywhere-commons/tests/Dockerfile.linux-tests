@@ -1,0 +1,35 @@
+# =============================================================================
+# Dockerfile.linux-tests - Build environment for runanywhere-commons tests
+# =============================================================================
+# Usage:
+#   docker build -f tests/Dockerfile.linux-tests -t rac-linux-tests .
+#   docker run -v ~/.local/share/runanywhere/Models:/models rac-linux-tests
+# =============================================================================
+
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake curl git bzip2 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . /src
+
+# Download Sherpa-ONNX Linux prebuilts (needed for ONNX backend)
+RUN ./scripts/linux/download-sherpa-onnx.sh
+
+# Build with tests enabled
+RUN cmake -B /build -S /src \
+    -DRAC_BUILD_TESTS=ON \
+    -DRAC_BUILD_BACKENDS=ON \
+    -DRAC_BUILD_PLATFORM=OFF \
+    -DRAC_BUILD_SHARED=OFF \
+    -DCMAKE_BUILD_TYPE=Debug \
+    && cmake --build /build -j$(nproc)
+
+# Default: run all tests (models mounted at /models)
+ENV RAC_TEST_MODEL_DIR=/models
+WORKDIR /build/tests
+CMD ["bash", "-c", "for t in test_*; do [ -x \"$t\" ] && ./$t --run-all; done"]

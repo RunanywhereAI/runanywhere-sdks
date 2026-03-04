@@ -2,13 +2,18 @@ package com.runanywhere.runanywhereai.data
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -42,6 +47,7 @@ class ConversationStore private constructor(context: Context) {
     val currentConversation: StateFlow<Conversation?> = _currentConversation.asStateFlow()
 
     private val conversationsDirectory: File
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val json =
         Json {
             prettyPrint = true
@@ -53,7 +59,7 @@ class ConversationStore private constructor(context: Context) {
         if (!conversationsDirectory.exists()) {
             conversationsDirectory.mkdirs()
         }
-        loadConversations()
+        ioScope.launch { loadConversations() }
     }
 
     // MARK: - Public Methods
@@ -65,7 +71,7 @@ class ConversationStore private constructor(context: Context) {
         val conversation =
             Conversation(
                 id = UUID.randomUUID().toString(),
-                title = title ?: "New Chat",
+                title = title,
                 messages = emptyList(),
                 createdAt = System.currentTimeMillis(),
                 updatedAt = System.currentTimeMillis(),
@@ -74,9 +80,7 @@ class ConversationStore private constructor(context: Context) {
                 performanceSummary = null,
             )
 
-        val updated = _conversations.value.toMutableList()
-        updated.add(0, conversation)
-        _conversations.value = updated
+        _conversations.update { list -> listOf(conversation) + list }
         _currentConversation.value = conversation
 
         saveConversation(conversation)
@@ -84,21 +88,40 @@ class ConversationStore private constructor(context: Context) {
     }
 
     /**
+     * Ensure a conversation is in the in-memory list and persisted.
+     * If not present (by id), adds it at the front so it appears in history.
+     */
+    fun ensureConversationInList(conversation: Conversation) {
+        var wasAdded = false
+        _conversations.update { list ->
+            if (list.any { it.id == conversation.id }) {
+                list
+            } else {
+                wasAdded = true
+                listOf(conversation) + list
+            }
+        }
+        if (wasAdded) saveConversation(conversation)
+    }
+
+    /**
      * Update an existing conversation
      */
     fun updateConversation(conversation: Conversation) {
         val updated = conversation.copy(updatedAt = System.currentTimeMillis())
-
-        val index = _conversations.value.indexOfFirst { it.id == conversation.id }
-        if (index != -1) {
-            val list = _conversations.value.toMutableList()
-            list[index] = updated
-            _conversations.value = list
-
+        var found = false
+        _conversations.update { list ->
+            list.map {
+                if (it.id == conversation.id) {
+                    found = true
+                    updated
+                } else it
+            }
+        }
+        if (found) {
             if (_currentConversation.value?.id == conversation.id) {
                 _currentConversation.value = updated
             }
-
             saveConversation(updated)
         }
     }
@@ -107,16 +130,18 @@ class ConversationStore private constructor(context: Context) {
      * Delete a conversation
      */
     fun deleteConversation(conversation: Conversation) {
-        _conversations.value = _conversations.value.filter { it.id != conversation.id }
+        _conversations.update { list -> list.filter { it.id != conversation.id } }
 
         if (_currentConversation.value?.id == conversation.id) {
             _currentConversation.value = _conversations.value.firstOrNull()
         }
 
-        // Delete file
-        val file = conversationFileURL(conversation.id)
-        if (file.exists()) {
-            file.delete()
+        // Delete file off main thread
+        ioScope.launch {
+            val file = conversationFileURL(conversation.id)
+            if (file.exists()) {
+                file.delete()
+            }
         }
     }
 
@@ -136,8 +161,10 @@ class ConversationStore private constructor(context: Context) {
                 updatedAt = System.currentTimeMillis(),
             )
 
-        // Auto-generate title from first user message if needed
-        if (updated.title == "New Chat" && message.role == MessageRole.USER && message.content.isNotEmpty()) {
+        // Use first user input as conversation title (instead of "New Chat")
+        if (message.role == MessageRole.USER && message.content.isNotEmpty() &&
+            (updated.title.isNullOrBlank() || updated.title == "New Chat")
+        ) {
             updated = updated.copy(title = generateTitle(message.content))
         }
 
@@ -160,13 +187,11 @@ class ConversationStore private constructor(context: Context) {
             try {
                 val jsonString = file.readText()
                 val loaded = json.decodeFromString<Conversation>(jsonString)
-                val list = _conversations.value.toMutableList()
-                list.add(loaded)
-                _conversations.value = list
+                _conversations.update { list -> list + loaded }
                 _currentConversation.value = loaded
                 return loaded
             } catch (e: Exception) {
-                Log.e("ConversationStore", "Failed to load conversation from disk", e)
+                Timber.e(e, "Failed to load conversation from disk")
             }
         }
 
@@ -212,7 +237,7 @@ class ConversationStore private constructor(context: Context) {
                         val jsonString = file.readText()
                         json.decodeFromString<Conversation>(jsonString)
                     } catch (e: Exception) {
-                        Log.e("ConversationStore", "Failed to load conversation: ${file.name}", e)
+                        Timber.e(e, "Failed to load conversation: ${file.name}")
                         null
                     }
                 }
@@ -222,7 +247,7 @@ class ConversationStore private constructor(context: Context) {
 
             // Don't automatically set current conversation - let ChatViewModel create a new one
         } catch (e: Exception) {
-            Log.e("ConversationStore", "Failed to load conversations", e)
+            Timber.e(e, "Failed to load conversations")
         }
     }
 
@@ -230,12 +255,14 @@ class ConversationStore private constructor(context: Context) {
      * Save a conversation to disk
      */
     private fun saveConversation(conversation: Conversation) {
-        try {
-            val file = conversationFileURL(conversation.id)
-            val jsonString = json.encodeToString(conversation)
-            file.writeText(jsonString)
-        } catch (e: Exception) {
-            Log.e("ConversationStore", "Failed to save conversation", e)
+        ioScope.launch {
+            try {
+                val file = conversationFileURL(conversation.id)
+                val jsonString = json.encodeToString(conversation)
+                file.writeText(jsonString)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to save conversation")
+            }
         }
     }
 

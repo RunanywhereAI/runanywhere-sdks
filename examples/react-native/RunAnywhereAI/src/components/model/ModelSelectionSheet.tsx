@@ -51,6 +51,7 @@ export enum ModelSelectionContext {
   STT = 'stt', // Speech-to-Text - show STT frameworks
   TTS = 'tts', // Text-to-Speech - show TTS frameworks
   Voice = 'voice', // Voice Assistant - show all voice-related
+  VLM = 'vlm', // Vision - show VLM frameworks
 }
 
 /**
@@ -66,6 +67,8 @@ const getContextTitle = (context: ModelSelectionContext): string => {
       return 'Select TTS Model';
     case ModelSelectionContext.Voice:
       return 'Select Model';
+    case ModelSelectionContext.VLM:
+      return 'Select Vision Model';
   }
 };
 
@@ -89,6 +92,8 @@ const _getRelevantCategories = (
         ModelCategory.SpeechRecognition,
         ModelCategory.SpeechSynthesis,
       ]);
+    case ModelSelectionContext.VLM:
+      return new Set([ModelCategory.Multimodal, ModelCategory.Vision]);
   }
 };
 
@@ -107,6 +112,8 @@ const getCategoryForContext = (
       return SDKModelCategory.SpeechSynthesis; // 'speech-synthesis'
     case ModelSelectionContext.Voice:
       return null; // Show all
+    case ModelSelectionContext.VLM:
+      return SDKModelCategory.Multimodal; // 'multimodal'
   }
 };
 
@@ -264,6 +271,27 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         });
         console.warn(
           '[ModelSelectionSheet] Framework fallback models:',
+          filteredModels.length
+        );
+      }
+
+      // VLM-specific fallback: if no models found with Multimodal category, try 'vision' category
+      if (
+        filteredModels.length === 0 &&
+        context === ModelSelectionContext.VLM
+      ) {
+        console.warn(
+          '[ModelSelectionSheet] VLM: No multimodal models, trying vision category fallback'
+        );
+        filteredModels = allModels.filter((m: SDKModelInfo) => {
+          const modelCategory = m.category;
+          return (
+            modelCategory === SDKModelCategory.Vision ||
+            String(modelCategory).toLowerCase() === 'vision'
+          );
+        });
+        console.warn(
+          '[ModelSelectionSheet] Vision category fallback models:',
           filteredModels.length
         );
       }

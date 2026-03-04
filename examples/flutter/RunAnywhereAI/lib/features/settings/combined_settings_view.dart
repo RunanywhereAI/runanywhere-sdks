@@ -2,12 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// CombinedSettingsView (mirroring iOS CombinedSettingsView.swift)
@@ -37,15 +40,29 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _isApiKeyConfigured = false;
   bool _isBaseURLConfigured = false;
 
+  // Generation Settings
+  double _temperature = 0.7;
+  int _maxTokens = 1000;
+  String _systemPrompt = '';
+  late final TextEditingController _systemPromptController;
+
   // Loading state
   bool _isRefreshingStorage = false;
 
   @override
   void initState() {
     super.initState();
+    _systemPromptController = TextEditingController();
     unawaited(_loadSettings());
+    unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
     unawaited(_loadStorageData());
+  }
+
+  @override
+  void dispose() {
+    _systemPromptController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadSettings() async {
@@ -54,6 +71,33 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         await KeychainHelper.loadBool(KeychainKeys.analyticsLogToLocal);
     if (mounted) {
       setState(() {});
+    }
+  }
+
+  /// Load generation settings from SharedPreferences
+  Future<void> _loadGenerationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _temperature = prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
+        _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
+        _systemPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+        _systemPromptController.text = _systemPrompt;
+      });
+    }
+  }
+
+  /// Save generation settings to SharedPreferences
+  Future<void> _saveGenerationSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PreferenceKeys.defaultTemperature, _temperature);
+    await prefs.setInt(PreferenceKeys.defaultMaxTokens, _maxTokens);
+    await prefs.setString(PreferenceKeys.defaultSystemPrompt, _systemPrompt);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generation settings saved')),
+      );
     }
   }
 
@@ -381,9 +425,19 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.large),
         children: [
+          // Tool Calling Section (matches iOS)
+          _buildSectionHeader('Tool Calling'),
+          _buildToolCallingCard(),
+          const SizedBox(height: AppSpacing.large),
+
           // API Configuration Section
           _buildSectionHeader('API Configuration (Testing)'),
           _buildApiConfigurationCard(),
+          const SizedBox(height: AppSpacing.large),
+
+          // Generation Settings Section
+          _buildSectionHeader('Generation Settings'),
+          _buildGenerationSettingsCard(),
           const SizedBox(height: AppSpacing.large),
 
           // Storage Overview Section
@@ -446,6 +500,211 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         'Refresh',
         style: AppTypography.caption(context),
       ),
+    );
+  }
+
+  Widget _buildGenerationSettingsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Temperature Slider
+            Text('Temperature', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _temperature,
+                    min: 0.0,
+                    max: 2.0,
+                    divisions: 20,
+                    label: _temperature.toStringAsFixed(1),
+                    onChanged: (value) {
+                      setState(() {
+                        _temperature = value;
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: Text(
+                    _temperature.toStringAsFixed(1),
+                    style: AppTypography.subheadlineSemibold(context),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Controls randomness. Lower = more focused, higher = more creative.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // Max Tokens Slider
+            Text('Max Tokens', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            Row(
+              children: [
+                Expanded(
+                  child: Slider(
+                    value: _maxTokens.toDouble(),
+                    min: 50,
+                    max: 4096,
+                    divisions: ((4096 - 50) / 50).round(),
+                    label: _maxTokens.toString(),
+                    onChanged: (value) {
+                      setState(() {
+                        _maxTokens = value.round();
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: 60,
+                  child: Text(
+                    _maxTokens.toString(),
+                    style: AppTypography.subheadlineSemibold(context),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              'Maximum number of tokens to generate.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // System Prompt Field
+            Text('System Prompt', style: AppTypography.subheadline(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            TextField(
+              controller: _systemPromptController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Enter a system prompt...',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                _systemPrompt = value;
+              },
+            ),
+            const SizedBox(height: AppSpacing.xSmall),
+            Text(
+              'Instructions for how the model should behave.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+
+            // Save Settings Button
+            ElevatedButton(
+              onPressed: _saveGenerationSettings,
+              child: const Text('Save Settings'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolCallingCard() {
+    return ListenableBuilder(
+      listenable: ToolSettingsViewModel.shared,
+      builder: (context, _) {
+        final viewModel = ToolSettingsViewModel.shared;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.large),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Enable toggle
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Enable Tool Calling'),
+                  subtitle: const Text(
+                    'Allow the LLM to use registered tools',
+                  ),
+                  value: viewModel.toolCallingEnabled,
+                  onChanged: (value) {
+                    viewModel.toolCallingEnabled = value;
+                  },
+                ),
+
+                if (viewModel.toolCallingEnabled) ...[
+                  const Divider(),
+
+                  // Registered tools count
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Registered Tools',
+                        style: AppTypography.subheadline(context),
+                      ),
+                      Text(
+                        '${viewModel.registeredTools.length}',
+                        style: AppTypography.subheadlineSemibold(context)
+                            .copyWith(
+                          color: AppColors.primaryAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: AppSpacing.mediumLarge),
+
+                  // Add/Clear tools buttons
+                  if (viewModel.registeredTools.isEmpty)
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await viewModel.registerDemoTools();
+                      },
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Demo Tools'),
+                    )
+                  else ...[
+                    // Show registered tools
+                    ...viewModel.registeredTools.map(
+                      (tool) => _ToolRow(tool: tool),
+                    ),
+                    const SizedBox(height: AppSpacing.mediumLarge),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await viewModel.clearAllTools();
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Clear All Tools'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primaryRed,
+                      ),
+                    ),
+                  ],
+                ],
+
+                const SizedBox(height: AppSpacing.mediumLarge),
+                Text(
+                  'Allow the LLM to use registered tools to perform actions like getting weather, time, or calculations.',
+                  style: AppTypography.caption(context).copyWith(
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -896,5 +1155,78 @@ class _StoredModelRowState extends State<_StoredModelRow> {
     } else {
       return 'Just now';
     }
+  }
+}
+
+/// Tool row widget (mirroring iOS ToolRow)
+class _ToolRow extends StatelessWidget {
+  final ToolDefinition tool;
+
+  const _ToolRow({required this.tool});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xSmall),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.build_outlined,
+                size: 12,
+                color: AppColors.primaryAccent,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                tool.name,
+                style: AppTypography.subheadlineSemibold(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            tool.description,
+            style: AppTypography.caption(context).copyWith(
+              color: AppColors.textSecondary(context),
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (tool.parameters.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                Text(
+                  'Params:',
+                  style: AppTypography.caption2(context).copyWith(
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+                ...tool.parameters.map(
+                  (param) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundTertiary(context),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      param.name,
+                      style: AppTypography.caption2(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

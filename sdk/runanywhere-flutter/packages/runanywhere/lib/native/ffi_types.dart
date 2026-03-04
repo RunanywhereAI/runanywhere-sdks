@@ -390,6 +390,14 @@ typedef RacBackendLlamacppRegisterDart = int Function();
 typedef RacBackendLlamacppUnregisterNative = Int32 Function();
 typedef RacBackendLlamacppUnregisterDart = int Function();
 
+/// rac_result_t rac_backend_llamacpp_vlm_register(void)
+typedef RacBackendLlamacppVlmRegisterNative = Int32 Function();
+typedef RacBackendLlamacppVlmRegisterDart = int Function();
+
+/// rac_result_t rac_backend_llamacpp_vlm_unregister(void)
+typedef RacBackendLlamacppVlmUnregisterNative = Int32 Function();
+typedef RacBackendLlamacppVlmUnregisterDart = int Function();
+
 // =============================================================================
 // LLM Component API Function Signatures (from rac_llm_component.h)
 // =============================================================================
@@ -825,6 +833,25 @@ typedef RacHttpCompleteCallbackNative = Void Function(
   Pointer<Void> callbackUserData,
 );
 
+/// HTTP download callback: rac_result_t (*http_download)(const char* url, const char* destination_path,
+///     rac_http_progress_callback_fn progress_callback, rac_http_complete_callback_fn complete_callback,
+///     void* callback_user_data, char** out_task_id, void* user_data)
+typedef RacHttpDownloadCallbackNative = Int32 Function(
+  Pointer<Utf8> url,
+  Pointer<Utf8> destinationPath,
+  Pointer<NativeFunction<RacHttpProgressCallbackNative>> progressCallback,
+  Pointer<NativeFunction<RacHttpCompleteCallbackNative>> completeCallback,
+  Pointer<Void> callbackUserData,
+  Pointer<Pointer<Utf8>> outTaskId,
+  Pointer<Void> userData,
+);
+
+/// HTTP download cancel callback: rac_result_t (*http_download_cancel)(const char* task_id, void* user_data)
+typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
+  Pointer<Utf8> taskId,
+  Pointer<Void> userData,
+);
+
 // =============================================================================
 // Structs (using FFI Struct for native memory layout)
 // =============================================================================
@@ -1010,6 +1037,194 @@ base class RacVadOnnxResultStruct extends Struct {
 
   @Float()
   external double probability;
+}
+
+// =============================================================================
+// VLM API Types (from rac_vlm_types.h)
+// =============================================================================
+
+/// VLM image format enumeration
+abstract class RacVlmImageFormat {
+  static const int filePath = 0; // RAC_VLM_IMAGE_FORMAT_FILE_PATH
+  static const int rgbPixels = 1; // RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
+  static const int base64 = 2; // RAC_VLM_IMAGE_FORMAT_BASE64
+}
+
+/// VLM image input structure (matches rac_vlm_image_t)
+base class RacVlmImageStruct extends Struct {
+  @Int32()
+  external int format; // rac_vlm_image_format_t
+
+  external Pointer<Utf8> filePath; // const char* file_path
+  external Pointer<Uint8> pixelData; // const uint8_t* pixel_data
+  external Pointer<Utf8> base64Data; // const char* base64_data
+
+  @Uint32()
+  external int width;
+
+  @Uint32()
+  external int height;
+
+  @IntPtr()
+  external int dataSize; // size_t
+}
+
+/// VLM generation options (matches rac_vlm_options_t)
+base class RacVlmOptionsStruct extends Struct {
+  @Int32()
+  external int maxTokens;
+
+  @Float()
+  external double temperature;
+
+  @Float()
+  external double topP;
+
+  external Pointer<Pointer<Utf8>> stopSequences;
+
+  @IntPtr()
+  external int numStopSequences;
+
+  @Int32()
+  external int streamingEnabled; // rac_bool_t
+
+  external Pointer<Utf8> systemPrompt;
+
+  @Int32()
+  external int maxImageSize;
+
+  @Int32()
+  external int nThreads;
+
+  @Int32()
+  external int useGpu; // rac_bool_t
+}
+
+/// VLM generation result (matches rac_vlm_result_t)
+base class RacVlmResultStruct extends Struct {
+  external Pointer<Utf8> text;
+
+  @Int32()
+  external int promptTokens;
+
+  @Int32()
+  external int imageTokens;
+
+  @Int32()
+  external int completionTokens;
+
+  @Int32()
+  external int totalTokens;
+
+  @Int64()
+  external int timeToFirstTokenMs;
+
+  @Int64()
+  external int imageEncodeTimeMs;
+
+  @Int64()
+  external int totalTimeMs;
+
+  @Float()
+  external double tokensPerSecond;
+}
+
+/// VLM component token callback signature
+/// rac_bool_t (*rac_vlm_component_token_callback_fn)(const char* token, void* user_data)
+typedef RacVlmComponentTokenCallbackNative = Int32 Function(
+  Pointer<Utf8> token,
+  Pointer<Void> userData,
+);
+
+/// VLM component completion callback signature
+/// void (*rac_vlm_component_complete_callback_fn)(const rac_vlm_result_t* result, void* user_data)
+typedef RacVlmComponentCompleteCallbackNative = Void Function(
+  Pointer<RacVlmResultStruct> result,
+  Pointer<Void> userData,
+);
+
+/// VLM component error callback signature
+/// void (*rac_vlm_component_error_callback_fn)(rac_result_t error_code, const char* error_message, void* user_data)
+typedef RacVlmComponentErrorCallbackNative = Void Function(
+  Int32 errorCode,
+  Pointer<Utf8> errorMessage,
+  Pointer<Void> userData,
+);
+
+// =============================================================================
+// Tool Calling FFI Types (from rac_tool_calling.h)
+// =============================================================================
+
+/// Parsed tool call from LLM output - matches rac_tool_call_t
+base class RacToolCallStruct extends Struct {
+  @Int32()
+  external int hasToolCall;
+
+  external Pointer<Utf8> toolName;
+
+  external Pointer<Utf8> argumentsJson;
+
+  external Pointer<Utf8> cleanText;
+
+  @Int64()
+  external int callId;
+}
+
+/// Tool calling options - matches rac_tool_calling_options_t
+base class RacToolCallingOptionsStruct extends Struct {
+  @Int32()
+  external int maxToolCalls;
+
+  @Int32()
+  external int autoExecute;
+
+  @Float()
+  external double temperature;
+
+  @Int32()
+  external int maxTokens;
+
+  external Pointer<Utf8> systemPrompt;
+
+  @Int32()
+  external int replaceSystemPrompt;
+
+  @Int32()
+  external int keepToolsAvailable;
+
+  @Int32()
+  external int format;
+}
+
+/// Tool parameter type enum values - matches rac_tool_param_type_t
+abstract class RacToolParamType {
+  static const int string = 0;
+  static const int number = 1;
+  static const int boolean = 2;
+  static const int object = 3;
+  static const int array = 4;
+}
+
+// =============================================================================
+// Structured Output FFI Types (from rac_llm_types.h)
+// =============================================================================
+
+/// Structured output config struct - matches rac_structured_output_config_t
+final class RacStructuredOutputConfigStruct extends Struct {
+  external Pointer<Utf8> jsonSchema;
+
+  @Int32()
+  external int includeSchemaInPrompt;
+}
+
+/// Structured output validation struct - matches rac_structured_output_validation_t
+final class RacStructuredOutputValidationStruct extends Struct {
+  @Int32()
+  external int isValid;
+
+  external Pointer<Utf8> errorMessage;
+
+  external Pointer<Utf8> extractedJson;
 }
 
 // =============================================================================

@@ -1,0 +1,14 @@
+# Generated test audio files (run ./scripts/generate-test-audio.sh to create)
+noise.wav
+white-noise.wav
+silence.wav
+random-words.wav
+similar-words.wav
+speech.wav
+hey-jarvis.wav
+wakeword-plus-speech.wav
+
+# Keep the manually created reference files
+!hey-jarvis-amplified.wav
+!hey-jarvis-real.wav
+!.gitkeep

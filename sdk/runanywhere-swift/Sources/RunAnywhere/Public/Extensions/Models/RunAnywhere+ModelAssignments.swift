@@ -1,4 +1,33 @@
 import Foundation
+import os
+
+// MARK: - Pending Registration Tracking
+
+extension RunAnywhere {
+
+    private static let pendingRegistrationsLock = OSAllocatedUnfairLock(initialState: [Task<Void, Never>]())
+
+    static func trackPendingRegistration(_ task: Task<Void, Never>) {
+        pendingRegistrationsLock.withLock { $0.append(task) }
+    }
+
+    /// Await all pending `registerModel()` saves to the C++ registry.
+    ///
+    /// `registerModel()` is synchronous and saves to the registry asynchronously.
+    /// Call this before `discoverDownloadedModels()` to ensure all models are in
+    /// the registry so discovery can match them to files on disk.
+    public static func flushPendingRegistrations() async {
+        let tasks = pendingRegistrationsLock.withLock { state -> [Task<Void, Never>] in
+            let current = state
+            state.removeAll()
+            return current
+        }
+
+        for task in tasks {
+            _ = await task.result
+        }
+    }
+}
 
 // MARK: - Model Registration API
 
@@ -50,14 +79,17 @@ public extension RunAnywhere {
             source: .local
         )
 
-        // Save to C++ registry (fire-and-forget)
-        Task {
+        let logger = SDKLogger(category: "RunAnywhere.Models")
+        logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
+        let task = Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)
+                logger.info("Model saved to registry: \(modelId)")
             } catch {
-                SDKLogger(category: "RunAnywhere.Models").error("Failed to register model: \(error)")
+                logger.error("Failed to register model: \(error)")
             }
         }
+        trackPendingRegistration(task)
 
         return modelInfo
     }
@@ -98,6 +130,72 @@ public extension RunAnywhere {
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking
         )
+    }
+
+    // MARK: - Multi-File Model Cache
+
+    /// Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays)
+    private static var multiFileModelCache: [String: [ModelFileDescriptor]] = [:]
+    private static let multiFileCacheLock = NSLock()
+
+    /// Get cached file descriptors for a multi-file model
+    static func getMultiFileDescriptors(forModelId modelId: String) -> [ModelFileDescriptor]? {
+        multiFileCacheLock.lock()
+        defer { multiFileCacheLock.unlock() }
+        return multiFileModelCache[modelId]
+    }
+
+    /// Register a multi-file model (e.g., VLM with separate main model + mmproj files)
+    /// Files are downloaded separately and stored in the same model folder
+    /// - Parameters:
+    ///   - id: Model ID (required for multi-file models)
+    ///   - name: Display name for the model
+    ///   - files: Array of file descriptors specifying URL and filename for each file
+    ///   - framework: Target inference framework
+    ///   - modality: Model category
+    ///   - memoryRequirement: Estimated memory usage in bytes
+    /// - Returns: The created ModelInfo
+    @discardableResult
+    static func registerMultiFileModel(
+        id: String,
+        name: String,
+        files: [ModelFileDescriptor],
+        framework: InferenceFramework,
+        modality: ModelCategory = .multimodal,
+        memoryRequirement: Int64? = nil
+    ) -> ModelInfo {
+        // Cache the file descriptors (C++ registry doesn't preserve them)
+        multiFileCacheLock.lock()
+        multiFileModelCache[id] = files
+        multiFileCacheLock.unlock()
+
+        // Create ModelInfo with multiFile artifact type
+        let modelInfo = ModelInfo(
+            id: id,
+            name: name,
+            category: modality,
+            format: .gguf,  // Assume GGUF for VLM models
+            framework: framework,
+            downloadURL: files.first?.url,  // Use first file URL as primary (for display)
+            localPath: nil,
+            artifactType: .multiFile(files),
+            downloadSize: memoryRequirement,
+            contextLength: nil,
+            supportsThinking: false,
+            description: "Multi-file model (\(files.count) files)",
+            source: .local
+        )
+
+        let task = Task {
+            do {
+                try await CppBridge.ModelRegistry.shared.save(modelInfo)
+            } catch {
+                SDKLogger(category: "RunAnywhere.Models").error("Failed to register multi-file model: \(error)")
+            }
+        }
+        trackPendingRegistration(task)
+
+        return modelInfo
     }
 
     // MARK: - Private Helpers

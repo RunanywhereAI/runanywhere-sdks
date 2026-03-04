@@ -30,10 +30,12 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 - **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
 - **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
 - **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
+- **Web SDK** (`sdk/runanywhere-web/`) - TypeScript/WASM SDK for browsers via Emscripten
 
 ### Example Applications
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
+- **Web Demo** (`examples/web/RunAnywhereAI/`) - Sample web app demonstrating SDK usage
 - **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
@@ -210,6 +212,73 @@ open RunAnywhereAI.xcworkspace
 **Error**: `Sandbox: rsync deny(1) file-write-create`
 **Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
 
+### Web SDK Development
+
+```bash
+# Navigate to Web SDK
+cd sdk/runanywhere-web/
+
+# First-time setup (installs emsdk, npm deps, builds WASM + TypeScript)
+./scripts/build-web.sh --setup
+
+# Build WASM + TypeScript (all backends, default)
+./scripts/build-web.sh
+
+# Build WASM with specific backends
+./scripts/build-web.sh --build-wasm --llamacpp --onnx
+./scripts/build-web.sh --build-wasm --all-backends
+./scripts/build-web.sh --build-wasm --llamacpp --vlm --webgpu
+
+# Build TypeScript only (after WASM is already built)
+./scripts/build-web.sh --build-ts
+
+# Build sherpa-onnx WASM module (TTS/VAD)
+./scripts/build-web.sh --build-sherpa
+
+# Debug build with assertions
+./scripts/build-web.sh --debug --llamacpp
+
+# Clean all build artifacts
+./scripts/build-web.sh --clean
+
+# Direct npm commands (alternative)
+npm run build:wasm            # WASM build (core only, no backends)
+npm run build:ts              # TypeScript compilation
+npm run build                 # TypeScript only (default)
+npm run dev                   # TypeScript watch mode
+npm run typecheck             # Type-check without emitting
+npm run clean                 # Remove all build outputs
+```
+
+#### Build Output Locations
+
+After a successful build:
+- **WASM module**: `packages/core/wasm/racommons.wasm` + `racommons.js`
+- **WebGPU variant**: `packages/core/wasm/racommons-webgpu.wasm` (when --webgpu is used)
+- **Sherpa-ONNX**: `packages/core/wasm/sherpa/sherpa-onnx.wasm`
+- **TypeScript**: `packages/core/dist/`
+
+#### Prerequisites
+
+- **Emscripten SDK**: v5.0.0+ (installed automatically by `--setup`)
+- **CMake**: 3.22+
+- **Node.js**: 18+
+
+### Web Example App
+
+```bash
+# Navigate to web example
+cd examples/web/RunAnywhereAI/
+
+# Install dependencies and run dev server
+npm install
+npm run dev
+```
+
+#### Known Issues - Xcode 16 Sandbox
+**Error**: `Sandbox: rsync deny(1) file-write-create`
+**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
+
 ### Pre-commit Hooks
 
 ```bash
@@ -298,6 +367,487 @@ Workflows are located in `.github/workflows/`:
 - `ios-sdk.yml` - iOS SDK CI
 - `android-app.yml` - Android example app CI
 - `ios-app.yml` - iOS example app CI
+- `web-sdk-release.yml` - Web SDK release
+
+## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
+
+### 🚨 MANDATORY: iOS as Source of Truth
+**NEVER make assumptions when implementing KMP code. ALWAYS refer to the iOS implementation as the definitive source of truth.**
+
+#### Core Principles:
+1. **iOS First**: When encountering missing logic, unimplemented features, or unclear requirements in KMP, ALWAYS:
+   - Check the corresponding iOS implementation
+   - Copy the iOS logic exactly (head-to-head translation)
+   - Adapt only for Kotlin syntax, not business logic
+
+2. **commonMain First**: ALL business logic, protocols, interfaces, and structures MUST be defined in `commonMain/`:
+   - Interfaces and abstract classes
+   - Data models and enums
+   - Business logic and algorithms
+   - Service contracts and protocols
+   - Component definitions
+   - Even platform-specific service interfaces
+
+3. **Platform Implementation Naming Convention**: Platform-specific implementations MUST use clear prefixes:
+   - `AndroidTTSService.kt` (not just `TTSService.kt`)
+   - `JvmTTSService.kt` (not just `TTSServiceImpl.kt`)
+   - `IosTTSService.kt` (for any iOS-specific bridges)
+   - `WindowsTTSService.kt`, `LinuxTTSService.kt`, etc.
+
+#### Implementation Process:
+```kotlin
+// Step 1: Check iOS implementation (e.g., TTSService.swift)
+// Step 2: Define interface in commonMain matching iOS exactly
+// commonMain/kotlin/com/runanywhere/sdk/services/tts/TTSService.kt
+interface TTSService {
+    // Match iOS protocol exactly
+    suspend fun synthesize(text: String, options: TTSOptions): ByteArray
+    val availableVoices: List<String>
+}
+
+// Step 3: Implement platform-specific versions with clear names
+// androidMain/kotlin/com/runanywhere/sdk/services/tts/AndroidTTSService.kt
+class AndroidTTSService : TTSService {
+    // Android-specific implementation
+}
+
+// jvmMain/kotlin/com/runanywhere/sdk/services/tts/JvmTTSService.kt
+class JvmTTSService : TTSService {
+    // JVM-specific implementation
+}
+```
+
+#### Common Mistakes to AVOID:
+❌ **DON'T** invent your own logic when something is unclear
+❌ **DON'T** put business logic in platform-specific modules
+❌ **DON'T** name platform files generically (e.g., `TTSServiceImpl.kt`)
+❌ **DON'T** assume behavior - check iOS implementation
+
+#### Correct Approach:
+✅ **DO** check iOS implementation for every feature
+✅ **DO** keep all logic in commonMain
+✅ **DO** use platform prefixes for all platform files
+✅ **DO** translate iOS logic exactly, adapting only syntax
+
+#### Example: When you see incomplete KMP code:
+```kotlin
+// KMP has this incomplete method:
+fun processAudio(data: ByteArray): String {
+    // TODO: implement
+    return ""
+}
+
+// WRONG approach:
+fun processAudio(data: ByteArray): String {
+    // Making assumptions about what it should do
+    return data.toString()
+}
+
+// CORRECT approach:
+// 1. Find iOS AudioProcessor.swift
+// 2. Find processAudio method
+// 3. Copy exact logic:
+fun processAudio(data: ByteArray): String {
+    // Exact translation of iOS logic
+    val rms = calculateRMS(data)  // If iOS does this
+    val normalized = normalizeAudio(data, rms)  // If iOS does this
+    return encodeToBase64(normalized)  // If iOS does this
+}
+```
+
+### KMP Best Practices
+
+The Kotlin Multiplatform SDK has been aligned with iOS architecture patterns while leveraging Kotlin's strengths. These best practices ensure consistency, maintainability, and cross-platform compatibility.
+
+### Architecture Patterns
+
+#### Component-Based Architecture
+Follow the iOS component pattern but adapted to KMP idioms:
+
+```kotlin
+// Base component with lifecycle management
+abstract class BaseComponent<TService : Any>(
+    protected val configuration: ComponentConfiguration,
+    serviceContainer: ServiceContainer? = null
+) : Component {
+
+    // Component state tracking
+    override var state: ComponentState = ComponentState.NOT_INITIALIZED
+        protected set
+
+    // Service creation (platform-specific via providers)
+    protected abstract suspend fun createService(): TService
+
+    // Lifecycle methods
+    suspend fun initialize() { /* ... */ }
+    override suspend fun cleanup() { /* ... */ }
+    override suspend fun healthCheck(): ComponentHealth { /* ... */ }
+}
+```
+
+#### Event-Driven Architecture
+Use **Flow** instead of AsyncSequence for reactive streams:
+
+```kotlin
+// Central event bus with typed events
+object EventBus {
+    private val _componentEvents = MutableSharedFlow<ComponentEvent>()
+    val componentEvents: SharedFlow<ComponentEvent> = _componentEvents.asSharedFlow()
+
+    fun publish(event: ComponentEvent) {
+        _componentEvents.tryEmit(event)
+    }
+}
+
+// Usage: Listen to component state changes
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .collect { event ->
+        println("Component ${event.component} is ready")
+    }
+```
+
+#### Service Container Pattern
+Centralized dependency injection with lazy initialization:
+
+```kotlin
+class ServiceContainer {
+    companion object {
+        val shared = ServiceContainer()
+    }
+
+    // Platform abstractions via expect/actual
+    private val fileSystem by lazy { createFileSystem() }
+    private val httpClient by lazy { createHttpClient() }
+
+    // Service dependencies
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    // Platform-specific initialization
+    fun initialize(platformContext: PlatformContext) {
+        platformContext.initialize()
+    }
+}
+```
+
+### Code Organization
+
+#### commonMain Structure
+Keep all business logic, interfaces, and data models in `commonMain/`:
+
+```
+commonMain/
+├── components/          # Component implementations
+│   ├── base/           # Base component classes
+│   ├── stt/            # Speech-to-text components
+│   ├── vad/            # Voice activity detection
+│   ├── llm/            # LLM inference components
+│   ├── tts/            # Text-to-speech components
+│   └── speakerdiarization/  # Speaker diarization
+├── data/               # Data layer
+│   ├── models/         # Data classes and enums
+│   ├── network/        # Network services
+│   └── repositories/   # Repository interfaces
+├── events/             # Event definitions
+├── foundation/         # Core infrastructure
+│   ├── ServiceContainer.kt
+│   └── SDKLogger.kt
+├── models/             # Model management
+│   ├── ModelManager.kt
+│   └── ModelDownloader.kt
+├── memory/             # Memory management
+└── generation/         # Text generation services
+```
+
+#### Platform-Specific Structure
+Use `expect/actual` **only** for platform-specific implementations:
+
+```kotlin
+// commonMain - Interface only
+expect class PlatformContext {
+    fun initialize()
+}
+
+expect fun createFileSystem(): FileSystem
+expect fun createHttpClient(): HttpClient
+
+// androidMain - Android implementation
+actual class PlatformContext(private val context: Context) {
+    actual fun initialize() {
+        // Android-specific setup
+    }
+}
+
+actual fun createFileSystem(): FileSystem = AndroidFileSystem()
+```
+
+#### Module Separation Principles
+
+**Core SDK vs Feature Modules:**
+- Core SDK (`commonMain`): Essential services, base components
+- Feature modules: Optional capabilities (WhisperKit, external AI providers)
+- Plugin architecture: `ModuleRegistry` for runtime registration
+
+```kotlin
+// Plugin registration pattern
+object ModuleRegistry {
+    fun registerSTT(provider: STTServiceProvider) {
+        sttProviders.add(provider)
+    }
+
+    fun sttProvider(modelId: String? = null): STTServiceProvider? {
+        return sttProviders.firstOrNull { it.canHandle(modelId) }
+    }
+}
+
+// External module registration
+// In WhisperKit module:
+ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
+```
+
+### API Design
+
+#### Kotlin Idioms for iOS Patterns
+
+**Flow for Reactive Streams:**
+```kotlin
+// Instead of AsyncSequence, use Flow
+fun transcribeStream(audioFlow: Flow<ByteArray>): Flow<TranscriptionUpdate> {
+    return audioFlow.map { audioData ->
+        // Process audio chunk
+        TranscriptionUpdate(text = processAudio(audioData), isFinal = false)
+    }
+}
+```
+
+**Coroutines for Async Operations:**
+```kotlin
+// Instead of async/await, use suspend functions
+suspend fun loadModel(modelId: String): ModelLoadResult {
+    return withContext(Dispatchers.IO) {
+        modelRepository.loadModel(modelId)
+    }
+}
+```
+
+#### Structured Error Handling
+
+Use **sealed classes** for type-safe error handling:
+
+```kotlin
+sealed class SDKError : Exception() {
+    data class InvalidApiKey(override val message: String) : SDKError()
+    data class NetworkError(override val cause: Throwable?) : SDKError()
+    data class ComponentNotReady(override val message: String) : SDKError()
+    data class InvalidState(override val message: String) : SDKError()
+
+    // Result wrapper for operations
+    sealed class Result<out T> {
+        data class Success<T>(val value: T) : Result<T>()
+        data class Failure(val error: SDKError) : Result<Nothing>()
+    }
+}
+```
+
+#### Strong Typing with Data Classes
+
+**Always use structured types instead of strings:**
+```kotlin
+// Component configuration
+data class STTConfiguration(
+    val modelId: String,
+    val language: Language = Language.EN,
+    val enableVAD: Boolean = true,
+    val audioFormat: AudioFormat = AudioFormat.PCM_16BIT
+) : ComponentConfiguration {
+    override fun validate() {
+        require(modelId.isNotBlank()) { "Model ID cannot be blank" }
+    }
+}
+
+// Enum for type safety
+enum class Language(val code: String) {
+    EN("en"), ES("es"), FR("fr"), DE("de"), JA("ja")
+}
+
+enum class AudioFormat { PCM_16BIT, PCM_24BIT, FLAC, MP3 }
+```
+
+### Integration Patterns
+
+#### ModuleRegistry for Plugin Architecture
+
+**Provider Pattern with Type Safety:**
+```kotlin
+interface STTServiceProvider {
+    suspend fun createSTTService(configuration: STTConfiguration): STTService
+    fun canHandle(modelId: String?): Boolean
+    val name: String
+}
+
+// Registration in app initialization:
+ModuleRegistry.registerSTT(WhisperSTTProvider())
+ModuleRegistry.registerLLM(LlamaProvider())
+```
+
+#### EventBus for Component Communication
+
+**Centralized Event System:**
+```kotlin
+// Component publishes events
+eventBus.publish(ComponentInitializationEvent.ComponentReady(
+    component = SDKComponent.STT,
+    modelId = "whisper-base"
+))
+
+// Other components subscribe to events
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .filter { it.component == SDKComponent.STT }
+    .collect { handleSTTReady(it) }
+```
+
+#### Provider Pattern for Extensibility
+
+**Service Creation with Fallbacks:**
+```kotlin
+class STTComponent(configuration: STTConfiguration) : BaseComponent<STTService>(configuration) {
+
+    override suspend fun createService(): STTService {
+        // Try external providers first
+        val provider = ModuleRegistry.sttProvider(configuration.modelId)
+
+        return provider?.createSTTService(configuration)
+            ?: throw SDKError.ComponentNotAvailable("No STT provider available for model: ${configuration.modelId}")
+    }
+}
+```
+
+### Performance Best Practices
+
+#### Memory Management
+
+**Component Lifecycle:**
+```kotlin
+abstract class BaseComponent<TService : Any> {
+
+    override suspend fun cleanup() {
+        // Proper resource cleanup
+        performCleanup()
+        service = null
+        serviceContainer = null // Allow GC
+        currentStage = null
+    }
+
+    protected open suspend fun performCleanup() {
+        // Override for component-specific cleanup
+    }
+}
+```
+
+**Service Container Memory Management:**
+```kotlin
+class ServiceContainer {
+    // Use lazy initialization to avoid memory pressure
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    suspend fun cleanup() {
+        // Cleanup components in reverse dependency order
+        sttComponent.cleanup()
+        vadComponent.cleanup()
+    }
+}
+```
+
+#### Platform-Specific Optimizations
+
+**Android optimizations in `androidMain`:**
+```kotlin
+actual fun createFileSystem(): FileSystem = AndroidFileSystem().apply {
+    // Configure for Android-specific optimizations
+    enableFileWatcher = false // Reduce battery usage
+    cacheStrategy = CacheStrategy.MEMORY_FIRST
+}
+```
+
+**JVM optimizations in `jvmMain`:**
+```kotlin
+actual fun createHttpClient(): HttpClient = HttpClient {
+    engine {
+        // JVM-specific HTTP client configuration
+        threadsCount = 4
+        pipelining = true
+    }
+}
+```
+
+### Testing Patterns
+
+#### Component Testing
+```kotlin
+class STTComponentTest {
+    @Test
+    fun `should initialize successfully with valid configuration`() = runTest {
+        val config = STTConfiguration(modelId = "whisper-base")
+        val component = STTComponent(config)
+
+        component.initialize()
+
+        assertEquals(ComponentState.READY, component.state)
+        assertTrue(component.isReady)
+    }
+
+    @Test
+    fun `should emit events during initialization`() = runTest {
+        val events = mutableListOf<ComponentEvent>()
+        val job = launch {
+            EventBus.componentEvents.collect { events.add(it) }
+        }
+
+        val component = STTComponent(STTConfiguration(modelId = "whisper-base"))
+        component.initialize()
+
+        assertTrue(events.any { it is ComponentInitializationEvent.ComponentReady })
+        job.cancel()
+    }
+}
+```
+
+#### Mock Providers for Testing
+```kotlin
+class MockSTTProvider : STTServiceProvider {
+    override val name = "MockSTT"
+
+    override suspend fun createSTTService(configuration: STTConfiguration): STTService {
+        return MockSTTService()
+    }
+
+    override fun canHandle(modelId: String?): Boolean = true
+}
+
+// In test setup:
+ModuleRegistry.clear()
+ModuleRegistry.registerSTT(MockSTTProvider())
+```
+
+### Common Patterns Summary
+
+1. **Business Logic in commonMain**: Keep all core logic platform-agnostic
+2. **expect/actual for Platform APIs**: Only use for truly platform-specific code
+3. **Flow over AsyncSequence**: Use Kotlin's reactive streams
+4. **Coroutines over async/await**: Leverage structured concurrency
+5. **Sealed Classes for Errors**: Type-safe error handling
+6. **Data Classes for Models**: Strong typing throughout
+7. **ModuleRegistry for Plugins**: Extensible architecture
+8. **EventBus for Communication**: Decoupled component communication
+9. **Service Container for DI**: Centralized dependency management
+10. **Component Lifecycle**: Proper initialization and cleanup
+
+These patterns ensure the Kotlin Multiplatform SDK maintains architectural consistency with the iOS implementation while leveraging Kotlin's strengths for cross-platform development.
 
 ## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
 

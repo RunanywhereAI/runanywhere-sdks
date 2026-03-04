@@ -120,6 +120,11 @@ enum class ErrorCategory {
      */
     VOICE_AGENT,
 
+    /**
+     * Vision Language Model (VLM) errors.
+     */
+    VLM,
+
     // ========================================================================
     // DOWNLOAD CATEGORIES
     // ========================================================================
@@ -161,6 +166,7 @@ enum class ErrorCategory {
                 TTS -> "Text-to-speech error"
                 VAD -> "Voice activity detection error"
                 VOICE_AGENT -> "Voice agent error"
+                VLM -> "Vision language model error"
                 DOWNLOAD -> "Download error"
                 AUTHENTICATION -> "Authentication error"
             }
@@ -212,6 +218,7 @@ enum class ErrorCategory {
                 ErrorCode.LLM_GENERATION_FAILED -> LLM
                 ErrorCode.VAD_DETECTION_FAILED -> VAD
                 ErrorCode.VOICE_AGENT_ERROR -> VOICE_AGENT
+                ErrorCode.VLM_PROCESSING_FAILED -> VLM
 
                 // Download errors
                 ErrorCode.DOWNLOAD_FAILED -> DOWNLOAD

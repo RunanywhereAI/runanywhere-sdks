@@ -111,4 +111,10 @@ object EventBus {
      */
     val sdkEvents: Flow<SDKEvent>
         get() = events(EventCategory.SDK)
+
+    /**
+     * Get RAG events.
+     */
+    val ragEvents: Flow<SDKEvent>
+        get() = events(EventCategory.RAG)
 }

@@ -37,7 +37,7 @@
 // Main API
 // =============================================================================
 
-export { LlamaCPP, type LlamaCPPModelOptions } from './LlamaCPP';
+export { LlamaCPP, type LlamaCPPModelOptions, type LlamaCPPVLMModelOptions } from './LlamaCPP';
 export { LlamaCppProvider, autoRegister } from './LlamaCppProvider';
 
 // =============================================================================
@@ -51,6 +51,22 @@ export {
   isNativeLlamaModuleAvailable,
 } from './native/NativeRunAnywhereLlama';
 export type { NativeRunAnywhereLlamaModule } from './native/NativeRunAnywhereLlama';
+
+// =============================================================================
+// VLM API
+// =============================================================================
+
+export {
+  registerVLMBackend,
+  loadVLMModel,
+  isVLMModelLoaded,
+  unloadVLMModel,
+  describeImage,
+  askAboutImage,
+  processImage,
+  processImageStream,
+  cancelVLMGeneration,
+} from './RunAnywhere+VLM';
 
 // =============================================================================
 // Nitrogen Spec Types

@@ -5,8 +5,13 @@
  * This module provides ONNX-based STT, TTS, and VAD capabilities.
  */
 
-import { NitroModules } from 'react-native-nitro-modules';
 import type { RunAnywhereONNX } from '../specs/RunAnywhereONNX.nitro';
+import { getNitroModulesProxySync } from '@runanywhere/core';
+
+// Use the global NitroModules initialization
+function getNitroModulesProxy(): any {
+  return getNitroModulesProxySync();
+}
 
 /**
  * The native RunAnywhereONNX module type
@@ -17,7 +22,14 @@ export type NativeRunAnywhereONNXModule = RunAnywhereONNX;
  * Get the native RunAnywhereONNX Hybrid Object
  */
 export function requireNativeONNXModule(): NativeRunAnywhereONNXModule {
-  return NitroModules.createHybridObject<RunAnywhereONNX>('RunAnywhereONNX');
+  const NitroProxy = getNitroModulesProxy();
+  if (!NitroProxy) {
+    throw new Error(
+      'NitroModules is not available. This can happen in Bridgeless mode if ' +
+      'react-native-nitro-modules is not properly linked.'
+    );
+  }
+  return NitroProxy.createHybridObject<RunAnywhereONNX>('RunAnywhereONNX');
 }
 
 /**

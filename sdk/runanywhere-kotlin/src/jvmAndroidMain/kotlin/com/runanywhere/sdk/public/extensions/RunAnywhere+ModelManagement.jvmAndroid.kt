@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
 import com.runanywhere.sdk.public.extensions.Models.ModelFormat
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import kotlinx.coroutines.CompletableDeferred
@@ -27,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
@@ -35,7 +37,24 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.HttpURLConnection
 import java.util.zip.ZipInputStream
+
+// MARK: - Multi-File Model Companion Storage
+
+/** Stores companion file (url → filename) pairs for multi-file models, keyed by modelId. */
+private val modelCompanionFiles = mutableMapOf<String, List<Pair<String, String>>>()
+private val companionFilesLock = Any()
+
+internal actual fun registerCompanionFilesInternal(modelId: String, companionFiles: List<Pair<String, String>>) {
+    synchronized(companionFilesLock) {
+        modelCompanionFiles[modelId] = companionFiles
+    }
+}
+
+private fun getCompanionFiles(modelId: String): List<Pair<String, String>>? =
+    synchronized(companionFilesLock) { modelCompanionFiles[modelId]?.toList() }
 
 // MARK: - Model Registration Implementation
 
@@ -63,7 +82,10 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
                         ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
                         ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
-                        else -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+                        ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                        ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
+                        ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                        ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
                     },
                 format =
                     when (modelInfo.format) {
@@ -89,6 +111,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                 downloadSize = modelInfo.downloadSize ?: 0,
                 contextLength = modelInfo.contextLength ?: 0,
                 supportsThinking = modelInfo.supportsThinking,
+                supportsLora = modelInfo.supportsLora,
                 description = modelInfo.description,
                 status = CppBridgeModelRegistry.ModelStatus.AVAILABLE,
             )
@@ -120,6 +143,30 @@ private fun addToModelCache(modelInfo: ModelInfo) {
 private fun getRegisteredModels(): List<ModelInfo> {
     synchronized(modelCacheLock) {
         return registeredModels.toList()
+    }
+}
+
+// MARK: - Multi-File Model Cache
+
+/** Cache for multi-file model descriptors (C++ registry doesn't preserve file arrays) */
+private val multiFileModelCache = mutableMapOf<String, List<ModelFileDescriptor>>()
+private val multiFileCacheLock = Any()
+
+/**
+ * Cache multi-file descriptors for later retrieval during download.
+ */
+internal actual fun cacheMultiFileDescriptors(modelId: String, files: List<ModelFileDescriptor>) {
+    synchronized(multiFileCacheLock) {
+        multiFileModelCache[modelId] = files
+    }
+}
+
+/**
+ * Get cached file descriptors for a multi-file model.
+ */
+actual fun getMultiFileDescriptors(modelId: String): List<ModelFileDescriptor>? {
+    synchronized(multiFileCacheLock) {
+        return multiFileModelCache[modelId]
     }
 }
 
@@ -202,7 +249,10 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
             ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
             ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
             ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
-            else -> return emptyList()
+            ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+            ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+            ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
+            ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
         }
     return CppBridgeModelRegistry.getModelsByType(type).map { bridgeModelToPublic(it) }
 }
@@ -234,6 +284,9 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
                 CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION -> ModelCategory.SPEECH_RECOGNITION
                 CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS -> ModelCategory.SPEECH_SYNTHESIS
                 CppBridgeModelRegistry.ModelCategory.AUDIO -> ModelCategory.AUDIO
+                CppBridgeModelRegistry.ModelCategory.VISION -> ModelCategory.VISION
+                CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION -> ModelCategory.IMAGE_GENERATION
+                CppBridgeModelRegistry.ModelCategory.MULTIMODAL -> ModelCategory.MULTIMODAL
                 else -> ModelCategory.LANGUAGE
             },
         format =
@@ -256,6 +309,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
         downloadSize = if (bridge.downloadSize > 0) bridge.downloadSize else null,
         contextLength = if (bridge.contextLength > 0) bridge.contextLength else null,
         supportsThinking = bridge.supportsThinking,
+        supportsLora = bridge.supportsLora,
         description = bridge.description,
     )
 }
@@ -272,8 +326,26 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
  * @param modelId The model ID to download
  * @return Flow of DownloadProgress updates
  */
-actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
-    callbackFlow {
+actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
+    // EMBEDDING models: return a simple flow that uses direct HTTP download.
+    // All files (model.onnx + companion vocab.txt) are co-located in one directory,
+    // matching iOS multi-file model download behaviour.
+    val registeredModel = getRegisteredModels().find { it.id == modelId }
+    if (registeredModel?.category == ModelCategory.EMBEDDING) {
+        val downloadUrl = registeredModel.downloadURL
+            ?: return flow { throw SDKError.model("Model '$modelId' has no download URL") }
+        val companions = getCompanionFiles(modelId) ?: emptyList()
+        return flow {
+            SDKLogger.download.info("EMBEDDING download: $modelId (${companions.size} companion file(s))")
+            downloadEmbeddingModelFiles(
+                modelId = modelId,
+                primaryUrl = downloadUrl,
+                companionFiles = companions,
+                totalSize = registeredModel.downloadSize,
+            ) { emit(it) }
+        }
+    }
+    return callbackFlow {
         val downloadLogger = SDKLogger.download
 
         // 0. Check network connectivity first (for better user experience)
@@ -320,14 +392,167 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
                 ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
                 ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
-                else -> CppBridgeModelRegistry.ModelType.LLM
+                ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL
+                ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
+                ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
+                ModelCategory.EMBEDDING -> CppBridgeModelRegistry.ModelCategory.EMBEDDING
             }
 
         // 4. Emit download started event and record start time
         val downloadStartTime = System.currentTimeMillis()
         CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
-        // 5. Create a CompletableDeferred to wait for download completion
+        // 5. Check for multi-file model (e.g., VLM with model + mmproj)
+        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern
+        val multiFileDescriptors = getMultiFileDescriptors(modelId)
+        if (multiFileDescriptors != null && multiFileDescriptors.size > 1) {
+            downloadLogger.info("Multi-file model detected with ${multiFileDescriptors.size} files")
+
+            try {
+                // Create model directory (path = {models_dir}/{type_dir}/{modelId}/)
+                val modelDirPath = CppBridgeModelPaths.getModelPath(modelId, modelType)
+                val modelDir = File(modelDirPath)
+                modelDir.mkdirs()
+                downloadLogger.info("Created model directory: ${modelDir.absolutePath}")
+
+                var totalBytesDownloaded = 0L
+                val fileCount = multiFileDescriptors.size
+                var lastProgressEmitTime = 0L
+
+                // Download each file sequentially (matches iOS pattern)
+                for ((index, fileDescriptor) in multiFileDescriptors.withIndex()) {
+                    val fileDestination = File(modelDir, fileDescriptor.filename)
+                    downloadLogger.info("Downloading file ${index + 1}/$fileCount: ${fileDescriptor.filename}")
+                    downloadLogger.info("  URL: ${fileDescriptor.url}")
+                    downloadLogger.info("  Destination: ${fileDestination.absolutePath}")
+
+                    withContext(Dispatchers.IO) {
+                        val url = java.net.URL(fileDescriptor.url)
+                        val connection = url.openConnection() as java.net.HttpURLConnection
+                        connection.connectTimeout = 30_000  // 30s for initial connection
+                        connection.readTimeout = 300_000    // 5 min for large model file transfers
+                        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
+
+                        try {
+                            val responseCode = connection.responseCode
+                            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                                throw SDKError.download(
+                                    "HTTP $responseCode downloading ${fileDescriptor.filename}",
+                                )
+                            }
+
+                            val fileTotalBytes = connection.contentLengthLong
+                            var fileBytesRead = 0L
+                            val buffer = ByteArray(8192)
+
+                            connection.inputStream.use { input ->
+                                FileOutputStream(fileDestination).use { output ->
+                                    var len: Int
+                                    while (input.read(buffer).also { len = it } != -1) {
+                                        output.write(buffer, 0, len)
+                                        fileBytesRead += len
+
+                                        // Throttle progress emissions to every 200ms
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastProgressEmitTime >= 200) {
+                                            lastProgressEmitTime = now
+                                            // iOS pattern: offset + (fileProgress * scale)
+                                            val fileProgress = if (fileTotalBytes > 0) {
+                                                fileBytesRead.toFloat() / fileTotalBytes
+                                            } else {
+                                                0f
+                                            }
+                                            val combinedProgress =
+                                                (index.toFloat() + fileProgress) / fileCount
+
+                                            trySend(
+                                                DownloadProgress(
+                                                    modelId = modelId,
+                                                    progress = combinedProgress,
+                                                    bytesDownloaded = totalBytesDownloaded + fileBytesRead,
+                                                    totalBytes = modelInfo.downloadSize,
+                                                    state = DownloadState.DOWNLOADING,
+                                                ),
+                                            )
+
+                                            // Emit SDK event every ~5% overall
+                                            val progressPercent = (combinedProgress * 100).toInt()
+                                            if (progressPercent % 5 == 0) {
+                                                CppBridgeEvents.emitDownloadProgress(
+                                                    modelId,
+                                                    combinedProgress.toDouble(),
+                                                    totalBytesDownloaded + fileBytesRead,
+                                                    modelInfo.downloadSize ?: 0,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            totalBytesDownloaded += fileBytesRead
+                            downloadLogger.info(
+                                "Completed file ${index + 1}/$fileCount: " +
+                                    "${fileDescriptor.filename} ($fileBytesRead bytes)",
+                            )
+                        } finally {
+                            connection.disconnect()
+                        }
+                    }
+                }
+
+                // All files downloaded — update registry with directory path
+                val finalPath = modelDir.absolutePath
+                val updatedModelInfo = modelInfo.copy(localPath = finalPath)
+                addToModelCache(updatedModelInfo)
+                CppBridgeModelRegistry.updateDownloadStatus(modelId, finalPath)
+
+                downloadLogger.info("Multi-file model ready at: $finalPath")
+
+                // Emit completion events
+                val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
+                CppBridgeEvents.emitDownloadCompleted(
+                    modelId,
+                    downloadDurationMs.toDouble(),
+                    totalBytesDownloaded,
+                )
+
+                trySend(
+                    DownloadProgress(
+                        modelId = modelId,
+                        progress = 1f,
+                        bytesDownloaded = totalBytesDownloaded,
+                        totalBytes = totalBytesDownloaded,
+                        state = DownloadState.COMPLETED,
+                    ),
+                )
+
+                close()
+            } catch (e: Exception) {
+                downloadLogger.error("Multi-file download error: ${e.message}")
+                // Clean up partially downloaded files
+                try {
+                    val modelDir = File(CppBridgeModelPaths.getModelPath(modelId, modelType))
+                    if (modelDir.exists()) {
+                        modelDir.deleteRecursively()
+                        downloadLogger.info("Cleaned up partial download directory: ${modelDir.absolutePath}")
+                    }
+                } catch (cleanupError: Exception) {
+                    downloadLogger.warn("Failed to clean up partial downloads: ${cleanupError.message}")
+                }
+                CppBridgeEvents.emitDownloadFailed(modelId, e.message ?: "Unknown error")
+                close(e)
+            }
+
+            awaitClose {
+                downloadLogger.debug("Multi-file download flow closed for: $modelId")
+            }
+            return@callbackFlow
+        }
+
+        // === Single-file download path (existing logic) ===
+
+        // 6. Create a CompletableDeferred to wait for download completion
         // This is used to properly suspend until the async download finishes
         data class DownloadResult(
             val success: Boolean,
@@ -337,7 +562,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         )
         val downloadCompletion = CompletableDeferred<DownloadResult>()
 
-        // 6. Set up download listener to convert callbacks to Flow
+        // 7. Set up download listener to convert callbacks to Flow
         val downloadListener =
             object : CppBridgeDownload.DownloadListener {
                 override fun onDownloadStarted(downloadId: String, modelId: String, url: String) {
@@ -433,7 +658,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
         CppBridgeDownload.downloadListener = downloadListener
 
         try {
-            // 7. Start the actual download (runs asynchronously on thread pool)
+            // 8. Start the actual download (runs asynchronously on thread pool)
             val downloadId =
                 CppBridgeDownload.startDownload(
                     url = downloadUrl,
@@ -445,10 +670,10 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
 
             downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
 
-            // 8. Wait for download to complete (suspends until callback fires)
+            // 9. Wait for download to complete (suspends until callback fires)
             val result = downloadCompletion.await()
 
-            // 9. Handle result
+            // 10. Handle result
             if (!result.success) {
                 val errorMsg = result.error ?: "Unknown download error"
                 CppBridgeEvents.emitDownloadFailed(modelId, errorMsg)
@@ -465,13 +690,13 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                 throw SDKError.download("Download failed for model: $modelId - $errorMsg")
             }
 
-            // 10. Get the downloaded file path
+            // 11. Get the downloaded file path
             val downloadedPath = result.filePath ?: CppBridgeModelPaths.getModelPath(modelId, modelType)
             val downloadedFile = File(downloadedPath)
 
             downloadLogger.info("Downloaded file: $downloadedPath (exists: ${downloadedFile.exists()}, size: ${result.fileSize})")
 
-            // 11. Handle extraction if needed (for .tar.gz, .tar.bz2, or .zip archives)
+            // 12. Handle extraction if needed (for .tar.gz, .tar.bz2, or .zip archives)
             val finalModelPath =
                 if (requiresExtraction(downloadUrl)) {
                     downloadLogger.info("Archive detected in URL, extracting...")
@@ -493,14 +718,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
                     downloadedPath
                 }
 
-            // 12. Update model in C++ registry with local path
+            // 13. Update model in C++ registry with local path
             val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
             addToModelCache(updatedModelInfo)
             CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
 
             downloadLogger.info("Model ready at: $finalModelPath")
 
-            // 13. Emit completion events
+            // 14. Emit completion events
             val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
             CppBridgeEvents.emitDownloadCompleted(modelId, downloadDurationMs.toDouble(), result.fileSize)
 
@@ -530,6 +755,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
             downloadLogger.debug("Download flow closed for: $modelId")
         }
     }
+}
 
 /**
  * Check if URL requires extraction (is an archive).
@@ -771,6 +997,130 @@ private fun extractZip(archiveFile: File, destDir: File, logger: SDKLogger) {
     }
 }
 
+// MARK: - Embedding Model Direct HTTP Download
+
+/**
+ * Download an embedding model and its companion files (e.g., vocab.txt) using direct HTTP.
+ * All files are saved into the same directory: {base}/models/embedding/{modelId}/
+ *
+ * Mirrors iOS multi-file model download behaviour: model.onnx + vocab.txt co-located.
+ * The C++ RAG pipeline looks for vocab.txt next to model.onnx, so they must be in the same dir.
+ */
+private suspend fun downloadEmbeddingModelFiles(
+    modelId: String,
+    primaryUrl: String,
+    companionFiles: List<Pair<String, String>>,
+    totalSize: Long?,
+    emit: suspend (DownloadProgress) -> Unit,
+) {
+    val logger = SDKLogger.download
+
+    // Target directory: {base}/models/embedding/{modelId}/
+    val embeddingDir = File(File(CppBridgeModelPaths.getBaseDirectory(), "models/embedding"), modelId)
+    withContext(Dispatchers.IO) { embeddingDir.mkdirs() }
+
+    emit(
+        DownloadProgress(
+            modelId = modelId,
+            progress = 0f,
+            bytesDownloaded = 0,
+            totalBytes = totalSize,
+            state = DownloadState.DOWNLOADING,
+        ),
+    )
+
+    val allFiles = listOf(primaryUrl to "model.onnx") + companionFiles
+    val fileCount = allFiles.size
+
+    allFiles.forEachIndexed { index, (url, filename) ->
+        val destFile = File(embeddingDir, filename)
+        logger.info("Downloading [$filename] from: $url")
+
+        withContext(Dispatchers.IO) {
+            downloadFileWithHttpURLConnection(url, destFile) { _ -> }
+        }
+
+        val overallProgress = (index + 1f) / fileCount
+        emit(
+            DownloadProgress(
+                modelId = modelId,
+                progress = overallProgress,
+                bytesDownloaded = 0,
+                totalBytes = totalSize,
+                state = if (overallProgress >= 1f) DownloadState.COMPLETED else DownloadState.DOWNLOADING,
+            ),
+        )
+        logger.info("Downloaded [$filename] to ${destFile.absolutePath}")
+    }
+
+    val dirPath = embeddingDir.absolutePath
+
+    // Update in-memory cache with local path
+    synchronized(modelCacheLock) {
+        val idx = registeredModels.indexOfFirst { it.id == modelId }
+        if (idx >= 0) {
+            registeredModels[idx] = registeredModels[idx].copy(localPath = dirPath)
+        }
+    }
+    CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
+    CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
+
+    logger.info("Embedding model ready at: $dirPath")
+}
+
+/**
+ * Download a file using HttpURLConnection with redirect support.
+ */
+private fun downloadFileWithHttpURLConnection(
+    url: String,
+    destFile: File,
+    progressCallback: (Float) -> Unit,
+) {
+    var currentUrl = url
+    var remainingRedirects = 10
+
+    while (remainingRedirects-- > 0) {
+        val connection = java.net.URL(currentUrl).openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 120_000
+        connection.instanceFollowRedirects = false
+        connection.connect()
+
+        val responseCode = connection.responseCode
+        if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
+            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
+            responseCode == 307 ||
+            responseCode == 308
+        ) {
+            val location = connection.getHeaderField("Location")
+            connection.disconnect()
+            if (location.isNullOrBlank()) throw IOException("Redirect with no Location header from: $currentUrl")
+            currentUrl = location
+            continue
+        }
+
+        val totalBytes = connection.contentLengthLong
+        var bytesDownloaded = 0L
+
+        connection.inputStream.use { input ->
+            destFile.outputStream().use { output ->
+                val buffer = ByteArray(8 * 1024)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    bytesDownloaded += bytesRead
+                    if (totalBytes > 0) {
+                        progressCallback(bytesDownloaded.toFloat() / totalBytes.toFloat())
+                    }
+                }
+            }
+        }
+        connection.disconnect()
+        return
+    }
+    throw IOException("Too many redirects for URL: $url")
+}
+
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
@@ -874,10 +1224,27 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeSTT.loadModel(localPath, modelId, model.name)
+    // Run native load on IO thread to avoid ANR and native crashes on main thread
+    val result =
+        withContext(Dispatchers.IO) {
+            val dir = File(localPath)
+            if (!dir.exists()) {
+                return@withContext -1
+            }
+            if (!dir.isDirectory) {
+                modelsLogger.error("STT model path is not a directory (expected extracted model dir): $localPath")
+                return@withContext -1
+            }
+            // C++ backend expects directory with encoder.onnx, decoder.onnx, tokens.txt
+            val hasEncoder = dir.listFiles()?.any { it.name.contains("encoder") && it.name.endsWith(".onnx") } == true
+            if (!hasEncoder) {
+                modelsLogger.error("STT model directory missing encoder.onnx: $localPath. Re-download the model.")
+                return@withContext -1
+            }
+            CppBridgeSTT.loadModel(localPath, modelId, model.name)
+        }
     if (result != 0) {
-        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result)")
+        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
     }
 }
 
@@ -908,8 +1275,10 @@ actual suspend fun RunAnywhere.fetchModelAssignments(forceRefresh: Boolean): Lis
         modelsLogger.info("Fetching model assignments (forceRefresh=$forceRefresh)...")
 
         try {
-            val jsonResult = com.runanywhere.sdk.foundation.bridge.extensions
-                .CppBridgeModelAssignment.fetchModelAssignments(forceRefresh)
+            val jsonResult =
+                com.runanywhere.sdk.foundation.bridge.extensions
+                    .CppBridgeModelAssignment
+                    .fetchModelAssignments(forceRefresh)
 
             // Parse JSON result to ModelInfo list
             val models = parseModelAssignmentsJson(jsonResult)
@@ -958,36 +1327,40 @@ private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
                 val contextLength = extractJsonInt(jsonObj, "contextLength") ?: 0
                 val supportsThinking = extractJsonBool(jsonObj, "supportsThinking") ?: false
 
-                val modelInfo = ModelInfo(
-                    id = id,
-                    name = name,
-                    category = when (categoryInt) {
-                        0 -> ModelCategory.LANGUAGE
-                        1 -> ModelCategory.SPEECH_RECOGNITION
-                        2 -> ModelCategory.SPEECH_SYNTHESIS
-                        3 -> ModelCategory.AUDIO
-                        else -> ModelCategory.LANGUAGE
-                    },
-                    format = when (formatInt) {
-                        1 -> ModelFormat.GGUF
-                        2 -> ModelFormat.ONNX
-                        3 -> ModelFormat.ORT
-                        else -> ModelFormat.UNKNOWN
-                    },
-                    framework = when (frameworkInt) {
-                        1 -> InferenceFramework.LLAMA_CPP
-                        2 -> InferenceFramework.ONNX
-                        3 -> InferenceFramework.FOUNDATION_MODELS
-                        4 -> InferenceFramework.SYSTEM_TTS
-                        else -> InferenceFramework.UNKNOWN
-                    },
-                    downloadURL = downloadUrl,
-                    localPath = null,
-                    downloadSize = if (downloadSize > 0) downloadSize else null,
-                    contextLength = if (contextLength > 0) contextLength else null,
-                    supportsThinking = supportsThinking,
-                    description = null,
-                )
+                val modelInfo =
+                    ModelInfo(
+                        id = id,
+                        name = name,
+                        category =
+                            when (categoryInt) {
+                                0 -> ModelCategory.LANGUAGE
+                                1 -> ModelCategory.SPEECH_RECOGNITION
+                                2 -> ModelCategory.SPEECH_SYNTHESIS
+                                3 -> ModelCategory.AUDIO
+                                else -> ModelCategory.LANGUAGE
+                            },
+                        format =
+                            when (formatInt) {
+                                1 -> ModelFormat.GGUF
+                                2 -> ModelFormat.ONNX
+                                3 -> ModelFormat.ORT
+                                else -> ModelFormat.UNKNOWN
+                            },
+                        framework =
+                            when (frameworkInt) {
+                                1 -> InferenceFramework.LLAMA_CPP
+                                2 -> InferenceFramework.ONNX
+                                3 -> InferenceFramework.FOUNDATION_MODELS
+                                4 -> InferenceFramework.SYSTEM_TTS
+                                else -> InferenceFramework.UNKNOWN
+                            },
+                        downloadURL = downloadUrl,
+                        localPath = null,
+                        downloadSize = if (downloadSize > 0) downloadSize else null,
+                        contextLength = if (contextLength > 0) contextLength else null,
+                        supportsThinking = supportsThinking,
+                        description = null,
+                    )
                 models.add(modelInfo)
             } catch (e: Exception) {
                 modelsLogger.warn("Failed to parse model at index $index: ${e.message}")
@@ -1009,17 +1382,29 @@ private fun extractJsonString(json: String, key: String): String? {
 private fun extractJsonInt(json: String, key: String): Int? {
     val pattern = "\"$key\"\\s*:\\s*(\\d+)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.toIntOrNull()
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.toIntOrNull()
 }
 
 private fun extractJsonLong(json: String, key: String): Long? {
     val pattern = "\"$key\"\\s*:\\s*(\\d+)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.toLongOrNull()
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.toLongOrNull()
 }
 
 private fun extractJsonBool(json: String, key: String): Boolean? {
     val pattern = "\"$key\"\\s*:\\s*(true|false)"
     val regex = pattern.toRegex()
-    return regex.find(json)?.groupValues?.get(1)?.let { it == "true" }
+    return regex
+        .find(json)
+        ?.groupValues
+        ?.get(1)
+        ?.let { it == "true" }
 }

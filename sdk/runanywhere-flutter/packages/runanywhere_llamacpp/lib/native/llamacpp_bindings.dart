@@ -29,6 +29,8 @@ class LlamaCppBindings {
   // Function pointers - only registration functions
   late final RacBackendLlamacppRegisterDart? _register;
   late final RacBackendLlamacppUnregisterDart? _unregister;
+  late final RacBackendLlamacppVlmRegisterDart? _registerVlm;
+  late final RacBackendLlamacppVlmUnregisterDart? _unregisterVlm;
 
   /// Create bindings using the appropriate library for each platform.
   ///
@@ -116,6 +118,21 @@ class LlamaCppBindings {
     } catch (_) {
       _unregister = null;
     }
+
+    // VLM backend registration - from RABackendLlamaCPP
+    try {
+      _registerVlm = _lib.lookupFunction<RacBackendLlamacppVlmRegisterNative,
+          RacBackendLlamacppVlmRegisterDart>('rac_backend_llamacpp_vlm_register');
+    } catch (_) {
+      _registerVlm = null;
+    }
+
+    try {
+      _unregisterVlm = _lib.lookupFunction<RacBackendLlamacppVlmUnregisterNative,
+          RacBackendLlamacppVlmUnregisterDart>('rac_backend_llamacpp_vlm_unregister');
+    } catch (_) {
+      _unregisterVlm = null;
+    }
   }
 
   /// Check if bindings are available.
@@ -139,5 +156,25 @@ class LlamaCppBindings {
       return RacResultCode.errorNotSupported;
     }
     return _unregister!();
+  }
+
+  /// Register the LlamaCPP VLM (Vision Language Model) backend.
+  ///
+  /// Returns RAC_SUCCESS (0) on success, or an error code.
+  /// Safe to call multiple times - returns RAC_ERROR_MODULE_ALREADY_REGISTERED
+  /// if already registered.
+  int registerVlm() {
+    if (_registerVlm == null) {
+      return RacResultCode.errorNotSupported;
+    }
+    return _registerVlm!();
+  }
+
+  /// Unregister the LlamaCPP VLM backend from C++ registry.
+  int unregisterVlm() {
+    if (_unregisterVlm == null) {
+      return RacResultCode.errorNotSupported;
+    }
+    return _unregisterVlm!();
   }
 }

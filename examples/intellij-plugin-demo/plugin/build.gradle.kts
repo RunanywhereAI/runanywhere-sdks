@@ -21,9 +21,9 @@ repositories {
 }
 
 dependencies {
-    // RunAnywhere KMP SDK - Use Maven Local (published separately)
-    // Run './gradlew publishSdkToMavenLocal' from root to publish SDK
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+    // RunAnywhere KMP SDK (JVM target) from Maven Local
+    // Run './gradlew publishToMavenLocal' from sdk/runanywhere-kotlin/ to publish SDK first
+    implementation("io.github.sanchitmonga22:runanywhere-sdk-jvm:0.16.1")
 }
 
 tasks {

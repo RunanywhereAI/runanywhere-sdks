@@ -9,12 +9,17 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 
 #include "rac/core/rac_core.h"
+
+namespace fs = std::filesystem;
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/platform/rac_diffusion_platform.h"
 #include "rac/features/platform/rac_llm_platform.h"
 #include "rac/features/platform/rac_tts_platform.h"
 #include "rac/features/tts/rac_tts_service.h"
@@ -269,6 +274,186 @@ static const rac_tts_service_ops_t g_platform_tts_ops = {
 };
 
 // =============================================================================
+// DIFFUSION VTABLE IMPLEMENTATION - ml-stable-diffusion
+// =============================================================================
+
+// Initialize
+static rac_result_t platform_diffusion_vtable_initialize(void* impl, const char* model_path,
+                                                         const rac_diffusion_config_t* config) {
+    (void)impl;
+    (void)model_path;
+    (void)config;
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion initialize (handled during create)");
+    return RAC_SUCCESS;
+}
+
+// Generate (blocking)
+static rac_result_t platform_diffusion_vtable_generate(void* impl,
+                                                       const rac_diffusion_options_t* options,
+                                                       rac_diffusion_result_t* out_result) {
+    if (!impl || !options || !out_result)
+        return RAC_ERROR_NULL_POINTER;
+
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion generate via Swift");
+
+    // Convert options
+    rac_diffusion_platform_options_t platform_options = {};
+    platform_options.prompt = options->prompt;
+    platform_options.negative_prompt = options->negative_prompt;
+    platform_options.width = options->width;
+    platform_options.height = options->height;
+    platform_options.steps = options->steps;
+    platform_options.guidance_scale = options->guidance_scale;
+    platform_options.seed = options->seed;
+    platform_options.scheduler = options->scheduler;
+
+    auto handle = static_cast<rac_diffusion_platform_handle_t>(impl);
+    rac_diffusion_platform_result_t platform_result = {};
+
+    rac_result_t result = rac_diffusion_platform_generate(handle, &platform_options, &platform_result);
+
+    if (result == RAC_SUCCESS) {
+        // Copy result
+        out_result->image_data = platform_result.image_data;  // Transfer ownership
+        out_result->image_size = platform_result.image_size;
+        out_result->width = platform_result.width;
+        out_result->height = platform_result.height;
+        out_result->seed_used = platform_result.seed_used;
+        out_result->safety_flagged = platform_result.safety_triggered;
+        out_result->error_code = RAC_SUCCESS;
+    }
+
+    return result;
+}
+
+// Progress callback wrapper
+struct DiffusionProgressWrapper {
+    rac_diffusion_progress_callback_fn callback;
+    void* user_data;
+};
+
+static rac_bool_t platform_diffusion_progress_adapter(float progress, int32_t step,
+                                                      int32_t total_steps, void* user_data) {
+    auto* wrapper = static_cast<DiffusionProgressWrapper*>(user_data);
+    if (!wrapper || !wrapper->callback) {
+        return RAC_TRUE;
+    }
+
+    rac_diffusion_progress_t prog = {};
+    prog.progress = progress;
+    prog.current_step = step;
+    prog.total_steps = total_steps;
+    prog.stage = "Generating";
+
+    return wrapper->callback(&prog, wrapper->user_data);
+}
+
+// Generate with progress
+static rac_result_t platform_diffusion_vtable_generate_with_progress(
+    void* impl, const rac_diffusion_options_t* options,
+    rac_diffusion_progress_callback_fn progress_callback, void* user_data,
+    rac_diffusion_result_t* out_result) {
+    if (!impl || !options || !out_result)
+        return RAC_ERROR_NULL_POINTER;
+
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion generate with progress via Swift");
+
+    // Convert options
+    rac_diffusion_platform_options_t platform_options = {};
+    platform_options.prompt = options->prompt;
+    platform_options.negative_prompt = options->negative_prompt;
+    platform_options.width = options->width;
+    platform_options.height = options->height;
+    platform_options.steps = options->steps;
+    platform_options.guidance_scale = options->guidance_scale;
+    platform_options.seed = options->seed;
+    platform_options.scheduler = options->scheduler;
+
+    auto handle = static_cast<rac_diffusion_platform_handle_t>(impl);
+    rac_diffusion_platform_result_t platform_result = {};
+
+    // Setup progress wrapper
+    DiffusionProgressWrapper wrapper = {progress_callback, user_data};
+
+    rac_result_t result = rac_diffusion_platform_generate_with_progress(
+        handle, &platform_options, platform_diffusion_progress_adapter, &wrapper, &platform_result);
+
+    if (result == RAC_SUCCESS) {
+        out_result->image_data = platform_result.image_data;
+        out_result->image_size = platform_result.image_size;
+        out_result->width = platform_result.width;
+        out_result->height = platform_result.height;
+        out_result->seed_used = platform_result.seed_used;
+        out_result->safety_flagged = platform_result.safety_triggered;
+        out_result->error_code = RAC_SUCCESS;
+    }
+
+    return result;
+}
+
+// Get info
+static rac_result_t platform_diffusion_vtable_get_info(void* impl, rac_diffusion_info_t* out_info) {
+    (void)impl;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
+
+    out_info->is_ready = RAC_TRUE;
+    out_info->current_model = nullptr;
+    out_info->model_variant = RAC_DIFFUSION_MODEL_SD_1_5;
+    out_info->supports_text_to_image = RAC_TRUE;
+    out_info->supports_image_to_image = RAC_TRUE;
+    out_info->supports_inpainting = RAC_TRUE;
+    out_info->safety_checker_enabled = RAC_TRUE;
+    out_info->max_width = 1024;
+    out_info->max_height = 1024;
+
+    return RAC_SUCCESS;
+}
+
+// Get capabilities
+static uint32_t platform_diffusion_vtable_get_capabilities(void* impl) {
+    (void)impl;
+    return RAC_DIFFUSION_CAP_TEXT_TO_IMAGE | RAC_DIFFUSION_CAP_IMAGE_TO_IMAGE |
+           RAC_DIFFUSION_CAP_INPAINTING | RAC_DIFFUSION_CAP_INTERMEDIATE_IMAGES |
+           RAC_DIFFUSION_CAP_SAFETY_CHECKER;
+}
+
+// Cancel
+static rac_result_t platform_diffusion_vtable_cancel(void* impl) {
+    if (!impl)
+        return RAC_ERROR_NULL_POINTER;
+
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion cancel via Swift");
+    return rac_diffusion_platform_cancel(static_cast<rac_diffusion_platform_handle_t>(impl));
+}
+
+// Cleanup (no-op)
+static rac_result_t platform_diffusion_vtable_cleanup(void* impl) {
+    (void)impl;
+    return RAC_SUCCESS;
+}
+
+// Destroy
+static void platform_diffusion_vtable_destroy(void* impl) {
+    if (impl) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion destroy via Swift");
+        rac_diffusion_platform_destroy(static_cast<rac_diffusion_platform_handle_t>(impl));
+    }
+}
+
+// Static vtable for Platform Diffusion
+static const rac_diffusion_service_ops_t g_platform_diffusion_ops = {
+    .initialize = platform_diffusion_vtable_initialize,
+    .generate = platform_diffusion_vtable_generate,
+    .generate_with_progress = platform_diffusion_vtable_generate_with_progress,
+    .get_info = platform_diffusion_vtable_get_info,
+    .get_capabilities = platform_diffusion_vtable_get_capabilities,
+    .cancel = platform_diffusion_vtable_cancel,
+    .cleanup = platform_diffusion_vtable_cleanup,
+    .destroy = platform_diffusion_vtable_destroy,
+};
+
+// =============================================================================
 // REGISTRY STATE
 // =============================================================================
 
@@ -277,6 +462,7 @@ struct PlatformRegistryState {
     bool registered = false;
     char provider_llm_name[32] = "AppleFoundationModels";
     char provider_tts_name[32] = "SystemTTS";
+    char provider_diffusion_name[32] = "CoreMLDiffusion";
     char module_id[16] = "platform";
 };
 
@@ -439,8 +625,207 @@ rac_handle_t platform_tts_create(const rac_service_request_t* request, void* use
 }
 
 // =============================================================================
+// DIFFUSION SERVICE PROVIDER - CoreML Diffusion
+// =============================================================================
+
+rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, void* user_data) {
+    (void)user_data;
+
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: ENTRY");
+    
+    if (request == nullptr) {
+        RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: null request -> FALSE");
+        return RAC_FALSE;
+    }
+
+    // Get the model path - prefer model_path over identifier
+    const char* path_str = request->model_path ? request->model_path : request->identifier;
+    
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d", 
+                  path_str ? path_str : "NULL", request->framework);
+
+    // CRITICAL: Check for CoreML model files FIRST, before framework hint
+    // This prevents incorrectly handling ONNX models when registry lookup fails
+    if (path_str != nullptr) {
+        fs::path model_path(path_str);
+        
+        // Check if the path itself is a .mlmodelc or .mlpackage
+        std::string extension = model_path.extension().string();
+        if (extension == ".mlmodelc" || extension == ".mlpackage") {
+            if (fs::exists(model_path) && fs::is_directory(model_path)) {
+                RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model at path -> true");
+                return RAC_TRUE;
+            }
+        }
+        
+        // Check if directory contains CoreML model subdirectories (Unet.mlmodelc, etc.)
+        if (fs::exists(model_path) && fs::is_directory(model_path)) {
+            try {
+                bool has_coreml_files = false;
+                bool has_onnx_files = false;
+                
+                for (const auto& entry : fs::directory_iterator(model_path)) {
+                    std::string name = entry.path().filename().string();
+                    
+                    // Check for CoreML model directories
+                    if (entry.is_directory()) {
+                        if (name.find(".mlmodelc") != std::string::npos ||
+                            name.find(".mlpackage") != std::string::npos) {
+                            has_coreml_files = true;
+                        }
+                    }
+                    
+                    // Check for ONNX files - if present, this is NOT a CoreML model
+                    if (entry.path().extension() == ".onnx") {
+                        has_onnx_files = true;
+                    }
+                    
+                    // Check subdirectories for ONNX files (unet/, text_encoder/, etc.)
+                    if (entry.is_directory() && !has_onnx_files) {
+                        try {
+                            for (const auto& subentry : fs::directory_iterator(entry.path())) {
+                                if (subentry.path().extension() == ".onnx") {
+                                    has_onnx_files = true;
+                                    break;
+                                }
+                            }
+                        } catch (const fs::filesystem_error&) {
+                            // Ignore
+                        }
+                    }
+                }
+                
+                // If we found ONNX files, this is NOT a CoreML model - let ONNX backend handle it
+                if (has_onnx_files) {
+                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found .onnx files, deferring to ONNX backend -> false");
+                    return RAC_FALSE;
+                }
+                
+                if (has_coreml_files) {
+                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model in directory -> true");
+                    return RAC_TRUE;
+                }
+            } catch (const fs::filesystem_error&) {
+                // Ignore filesystem errors
+            }
+        }
+    }
+
+    // Only accept framework hint if explicitly set to CoreML AND no path was provided
+    // (this handles built-in models that don't have a path)
+    if (request->framework == RAC_FRAMEWORK_COREML && path_str == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework hint COREML with no path -> true");
+        return RAC_TRUE;
+    }
+
+    // If framework explicitly set to something other than CoreML or Unknown, don't handle
+    if (request->framework != RAC_FRAMEWORK_UNKNOWN && request->framework != RAC_FRAMEWORK_COREML) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework mismatch (%d) -> false", request->framework);
+        return RAC_FALSE;
+    }
+
+    // Check if Swift callbacks are available for additional checks
+    const auto* callbacks = rac_platform_diffusion_get_callbacks();
+    if (callbacks == nullptr || callbacks->can_handle == nullptr) {
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: no Swift callbacks -> false");
+        return RAC_FALSE;
+    }
+
+    // Delegate to Swift for additional checks (e.g., model ID patterns)
+    rac_bool_t swift_result = callbacks->can_handle(request->identifier, callbacks->user_data);
+    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: Swift callback returned %d", swift_result);
+    return swift_result;
+}
+
+/**
+ * Create CoreML Diffusion service with vtable.
+ * Returns an rac_diffusion_service_t* that the generic API can dispatch through.
+ */
+rac_handle_t platform_diffusion_create(const rac_service_request_t* request, void* user_data) {
+    (void)user_data;
+
+    if (request == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "Diffusion create: null request");
+        return nullptr;
+    }
+
+    const auto* callbacks = rac_platform_diffusion_get_callbacks();
+    if (callbacks == nullptr || callbacks->create == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "Diffusion create: Swift callbacks not registered");
+        return nullptr;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Creating CoreML Diffusion service via Swift");
+
+    const char* model_path = request->model_path ? request->model_path : request->identifier;
+    rac_diffusion_platform_config_t config = {};
+    config.model_variant = RAC_DIFFUSION_MODEL_SD_1_5;
+    config.enable_safety_checker = RAC_TRUE;
+    config.reduce_memory = RAC_FALSE;
+    config.compute_units = 0;  // Auto
+
+    // Create backend-specific handle via Swift
+    rac_handle_t backend_handle = callbacks->create(model_path, &config, callbacks->user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift diffusion create callback returned null");
+        return nullptr;
+    }
+
+    // Allocate service struct with vtable
+    auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
+    if (!service) {
+        rac_diffusion_platform_destroy(static_cast<rac_diffusion_platform_handle_t>(backend_handle));
+        return nullptr;
+    }
+
+    service->ops = &g_platform_diffusion_ops;
+    service->impl = backend_handle;
+    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
+
+    RAC_LOG_INFO(LOG_CAT, "CoreML Diffusion service created successfully");
+    return service;
+}
+
+// =============================================================================
 // BUILT-IN MODEL REGISTRATION
 // =============================================================================
+
+void register_coreml_diffusion_entry() {
+    rac_model_registry* registry = rac_get_model_registry();
+    if (registry == nullptr) {
+        return;
+    }
+
+    rac_model_info_t model = {};
+    model.id = strdup("coreml-diffusion");
+    model.name = strdup("CoreML Diffusion");
+    model.category = RAC_MODEL_CATEGORY_IMAGE_GENERATION;
+    model.format = RAC_MODEL_FORMAT_COREML;
+    model.framework = RAC_FRAMEWORK_COREML;
+    model.download_url = nullptr;
+    model.local_path = strdup("builtin://coreml-diffusion");
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_BUILT_IN;
+    model.download_size = 0;
+    model.memory_required = 4000000000;  // ~4GB for SD 1.5
+    model.context_length = 0;
+    model.supports_thinking = RAC_FALSE;
+    model.tags = nullptr;
+    model.tag_count = 0;
+    model.description = strdup(
+        "Platform's Stable Diffusion implementation using Core ML. "
+        "Provides text-to-image, image-to-image, and inpainting capabilities.");
+    model.source = RAC_MODEL_SOURCE_LOCAL;
+
+    rac_result_t result = rac_model_registry_save(registry, &model);
+    if (result == RAC_SUCCESS) {
+        RAC_LOG_INFO(LOG_CAT, "Registered built-in model: %s", model.id);
+    }
+
+    free(model.id);
+    free(model.name);
+    free(model.local_path);
+    free(model.description);
+}
 
 void register_foundation_models_entry() {
     rac_model_registry* registry = rac_get_model_registry();
@@ -536,11 +921,13 @@ rac_result_t rac_backend_platform_register(void) {
     module_info.id = state.module_id;
     module_info.name = "Platform Services";
     module_info.version = "1.0.0";
-    module_info.description = "Apple platform services (Foundation Models, System TTS)";
+    module_info.description =
+        "Apple platform services (Foundation Models, System TTS, CoreML Diffusion)";
 
-    rac_capability_t capabilities[] = {RAC_CAPABILITY_TEXT_GENERATION, RAC_CAPABILITY_TTS};
+    rac_capability_t capabilities[] = {RAC_CAPABILITY_TEXT_GENERATION, RAC_CAPABILITY_TTS,
+                                       RAC_CAPABILITY_DIFFUSION};
     module_info.capabilities = capabilities;
-    module_info.num_capabilities = 2;
+    module_info.num_capabilities = 3;
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
@@ -578,9 +965,30 @@ rac_result_t rac_backend_platform_register(void) {
         return result;
     }
 
+    // Register Diffusion provider
+    RAC_LOG_INFO(LOG_CAT, "Registering CoreMLDiffusion provider with priority=100...");
+    rac_service_provider_t diffusion_provider = {};
+    diffusion_provider.name = state.provider_diffusion_name;
+    diffusion_provider.capability = RAC_CAPABILITY_DIFFUSION;
+    diffusion_provider.priority = 100;  // High priority for platform provider
+    diffusion_provider.can_handle = platform_diffusion_can_handle;
+    diffusion_provider.create = platform_diffusion_create;
+    diffusion_provider.user_data = nullptr;
+
+    result = rac_service_register_provider(&diffusion_provider);
+    if (result != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to register CoreMLDiffusion provider: %d", result);
+        rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
+        rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
+        rac_module_unregister(state.module_id);
+        return result;
+    }
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion provider registered successfully");
+
     // Register built-in models
     register_foundation_models_entry();
     register_system_tts_entry();
+    register_coreml_diffusion_entry();
 
     state.registered = true;
     RAC_LOG_INFO(LOG_CAT, "Platform backend registered successfully");
@@ -595,6 +1003,7 @@ rac_result_t rac_backend_platform_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
+    rac_service_unregister_provider(state.provider_diffusion_name, RAC_CAPABILITY_DIFFUSION);
     rac_service_unregister_provider(state.provider_tts_name, RAC_CAPABILITY_TTS);
     rac_service_unregister_provider(state.provider_llm_name, RAC_CAPABILITY_TEXT_GENERATION);
     rac_module_unregister(state.module_id);

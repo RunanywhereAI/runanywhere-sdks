@@ -125,6 +125,16 @@ class SDKError implements Exception {
         return ErrorCode.insufficientStorage;
       case SDKErrorType.voiceAgentNotReady:
         return ErrorCode.notInitialized;
+      case SDKErrorType.vlmNotInitialized:
+        return ErrorCode.notInitialized;
+      case SDKErrorType.vlmModelLoadFailed:
+        return ErrorCode.modelLoadFailed;
+      case SDKErrorType.vlmProcessingFailed:
+        return ErrorCode.generationFailed;
+      case SDKErrorType.vlmInvalidImage:
+        return ErrorCode.invalidInput;
+      case SDKErrorType.vlmCancelled:
+        return ErrorCode.generationFailed;
       case SDKErrorType.internalError:
         return ErrorCode.unknown;
     }
@@ -188,6 +198,15 @@ class SDKError implements Exception {
         return ErrorCategory.validation;
       case SDKErrorType.voiceAgentNotReady:
         return ErrorCategory.component;
+      case SDKErrorType.vlmNotInitialized:
+        return ErrorCategory.component;
+      case SDKErrorType.vlmModelLoadFailed:
+        return ErrorCategory.model;
+      case SDKErrorType.vlmProcessingFailed:
+      case SDKErrorType.vlmCancelled:
+        return ErrorCategory.generation;
+      case SDKErrorType.vlmInvalidImage:
+        return ErrorCategory.validation;
       case SDKErrorType.featureNotAvailable:
       case SDKErrorType.notImplemented:
       case SDKErrorType.internalError:
@@ -291,6 +310,17 @@ class SDKError implements Exception {
 
       case SDKErrorType.voiceAgentNotReady:
         return 'Load all required voice agent components (STT, LLM, TTS) before starting a voice session.';
+
+      case SDKErrorType.vlmNotInitialized:
+        return 'Call RunAnywhere.loadVLMModel() before processing images.';
+      case SDKErrorType.vlmModelLoadFailed:
+        return 'Ensure the VLM model is downloaded and compatible with your device.';
+      case SDKErrorType.vlmProcessingFailed:
+        return 'Check your image input and try again.';
+      case SDKErrorType.vlmInvalidImage:
+        return 'Provide a valid image in filePath, rgbPixels, or base64 format.';
+      case SDKErrorType.vlmCancelled:
+        return 'The VLM generation was cancelled by the user.';
 
       case SDKErrorType.internalError:
         return 'An internal error occurred. Please report this issue.';
@@ -620,6 +650,48 @@ class SDKError implements Exception {
     );
   }
 
+  // VLM errors
+
+  /// VLM model not initialized error
+  static SDKError vlmNotInitialized([String? message]) {
+    return SDKError(
+      message ?? 'VLM model not loaded. Call loadVLMModel() first.',
+      SDKErrorType.vlmNotInitialized,
+    );
+  }
+
+  /// VLM model load failed error
+  static SDKError vlmModelLoadFailed(String message) {
+    return SDKError(
+      'VLM model load failed: $message',
+      SDKErrorType.vlmModelLoadFailed,
+    );
+  }
+
+  /// VLM processing failed error
+  static SDKError vlmProcessingFailed(String message) {
+    return SDKError(
+      'VLM processing failed: $message',
+      SDKErrorType.vlmProcessingFailed,
+    );
+  }
+
+  /// VLM invalid image error
+  static SDKError vlmInvalidImage([String? message]) {
+    return SDKError(
+      message ?? 'Invalid image input for VLM processing.',
+      SDKErrorType.vlmInvalidImage,
+    );
+  }
+
+  /// VLM generation cancelled error
+  static SDKError vlmCancelled([String? message]) {
+    return SDKError(
+      message ?? 'VLM generation was cancelled.',
+      SDKErrorType.vlmCancelled,
+    );
+  }
+
   /// Helper to format bytes
   static String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
@@ -702,6 +774,13 @@ enum SDKErrorType {
 
   // Voice agent errors
   voiceAgentNotReady,
+
+  // VLM errors
+  vlmNotInitialized,
+  vlmModelLoadFailed,
+  vlmProcessingFailed,
+  vlmInvalidImage,
+  vlmCancelled,
 
   // General errors
   internalError,

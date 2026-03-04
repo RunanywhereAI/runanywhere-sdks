@@ -111,6 +111,7 @@ struct StorageView: View {
                 await viewModel.loadData()
             }
         }
+        .navigationViewStyle(.stack)
         #endif
     }
 

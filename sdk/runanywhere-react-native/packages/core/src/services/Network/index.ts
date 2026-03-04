@@ -26,4 +26,3 @@ export type { APIEndpointKey, APIEndpointValue } from './APIEndpoints';
 
 // Telemetry
 export { TelemetryService, TelemetryCategory } from './TelemetryService';
-export type { TelemetryEvent } from './TelemetryService';

@@ -46,8 +46,9 @@ let package = Package(
                 .product(name: "RunAnywhere", package: "runanywhere-sdks"),
 
                 // Optional modules - pick what you need:
-                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),       // STT/TTS/VAD
-                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),   // LLM
+                .product(name: "RunAnywhereONNX", package: "runanywhere-sdks"),         // STT/TTS/VAD (CPU via ONNX)
+                .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),     // LLM
+                .product(name: "RunAnywhereWhisperKit", package: "runanywhere-sdks"),   // STT (Apple Neural Engine)
             ],
             path: "RunAnywhereAI",
             exclude: [

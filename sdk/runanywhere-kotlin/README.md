@@ -568,6 +568,5 @@ Apache 2.0. See [LICENSE](../../LICENSE).
 
 ## Links
 
-- [Architecture Documentation](./ARCHITECTURE.md)
 - [API Documentation](./Documentation.md)
 - [Sample App](../../examples/android/RunAnywhereAI)

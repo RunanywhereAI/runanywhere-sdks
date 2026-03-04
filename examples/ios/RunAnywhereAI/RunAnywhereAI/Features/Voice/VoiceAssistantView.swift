@@ -29,20 +29,20 @@ struct VoiceAssistantView: View {
             iOSContent
             #endif
         }
-        .sheet(isPresented: $showModelSelection) {
+        .adaptiveSheet(isPresented: $showModelSelection) {
             modelSelectionSheet
         }
-        .sheet(isPresented: $showSTTModelSelection) {
+        .adaptiveSheet(isPresented: $showSTTModelSelection) {
             ModelSelectionSheet(context: .stt) { model in
                 viewModel.setSTTModel(model)
             }
         }
-        .sheet(isPresented: $showLLMModelSelection) {
+        .adaptiveSheet(isPresented: $showLLMModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
                 viewModel.setLLMModel(model)
             }
         }
-        .sheet(isPresented: $showTTSModelSelection) {
+        .adaptiveSheet(isPresented: $showTTSModelSelection) {
             ModelSelectionSheet(context: .tts) { model in
                 viewModel.setTTSModel(model)
             }
@@ -497,7 +497,9 @@ extension VoiceAssistantView {
             }
             #endif
         }
+        #if os(iOS)
         .navigationViewStyle(.stack)
+        #endif
     }
 
     // MARK: - Animation Helpers

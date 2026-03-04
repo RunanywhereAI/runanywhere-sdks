@@ -511,6 +511,60 @@ RAC_API rac_result_t rac_analytics_events_set_public_callback(rac_public_event_c
 RAC_API rac_bool_t rac_analytics_events_has_public_callback(void);
 
 // =============================================================================
+// PLATFORM EMIT HELPERS
+// =============================================================================
+//
+// C-linkage convenience functions for platform SDKs (Web, Kotlin) that need to
+// emit analytics events from outside the C++ component layer.  Each function
+// accepts individual parameters, constructs the C struct internally, and calls
+// rac_analytics_event_emit().  On the Web SDK these are called via Emscripten
+// ccall() which handles string marshalling automatically.
+
+RAC_API void rac_analytics_emit_stt_model_load_completed(
+    const char* model_id, const char* model_name, double duration_ms, int32_t framework);
+
+RAC_API void rac_analytics_emit_stt_model_load_failed(
+    const char* model_id, int32_t error_code, const char* error_message);
+
+RAC_API void rac_analytics_emit_stt_transcription_completed(
+    const char* transcription_id, const char* model_id, const char* text,
+    float confidence, double duration_ms, double audio_length_ms,
+    int32_t audio_size_bytes, int32_t word_count, double real_time_factor,
+    const char* language, int32_t sample_rate, int32_t framework);
+
+RAC_API void rac_analytics_emit_stt_transcription_failed(
+    const char* transcription_id, const char* model_id,
+    int32_t error_code, const char* error_message);
+
+RAC_API void rac_analytics_emit_tts_voice_load_completed(
+    const char* model_id, const char* model_name, double duration_ms, int32_t framework);
+
+RAC_API void rac_analytics_emit_tts_voice_load_failed(
+    const char* model_id, int32_t error_code, const char* error_message);
+
+RAC_API void rac_analytics_emit_tts_synthesis_completed(
+    const char* synthesis_id, const char* model_id,
+    int32_t character_count, double audio_duration_ms, int32_t audio_size_bytes,
+    double processing_duration_ms, double characters_per_second,
+    int32_t sample_rate, int32_t framework);
+
+RAC_API void rac_analytics_emit_tts_synthesis_failed(
+    const char* synthesis_id, const char* model_id,
+    int32_t error_code, const char* error_message);
+
+RAC_API void rac_analytics_emit_vad_speech_started(void);
+
+RAC_API void rac_analytics_emit_vad_speech_ended(double speech_duration_ms, float energy_level);
+
+RAC_API void rac_analytics_emit_model_download_started(const char* model_id);
+
+RAC_API void rac_analytics_emit_model_download_completed(
+    const char* model_id, int64_t file_size_bytes, double duration_ms);
+
+RAC_API void rac_analytics_emit_model_download_failed(
+    const char* model_id, const char* error_message);
+
+// =============================================================================
 // DEFAULT EVENT DATA
 // =============================================================================
 

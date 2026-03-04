@@ -5,7 +5,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.models.SessionState
@@ -39,8 +39,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-
-private const val TAG = "VoiceAssistantVM"
 
 /**
  * Model Load State matching iOS ModelLoadState
@@ -125,8 +123,9 @@ class VoiceAssistantViewModel(
     // Audio capture service for microphone input
     private var audioCaptureService: AudioCaptureService? = null
 
-    // Audio buffer for accumulating audio data
+    // Audio buffer for accumulating audio data (guarded by audioBufferLock)
     private val audioBuffer = ByteArrayOutputStream()
+    private val audioBufferLock = Any()
 
     // Voice session flow
     private var voiceSessionFlow: Flow<VoiceSessionEvent>? = null
@@ -148,6 +147,7 @@ class VoiceAssistantViewModel(
     // Audio playback (matching iOS AudioPlaybackManager)
     private var audioTrack: AudioTrack? = null
     private var audioPlaybackJob: Job? = null
+    private var processingJob: Job? = null
 
     @Volatile
     private var isPlayingAudio = false
@@ -206,7 +206,7 @@ class VoiceAssistantViewModel(
     fun initialize(context: Context) {
         if (audioCaptureService == null) {
             audioCaptureService = AudioCaptureService(context)
-            Log.i(TAG, "AudioCaptureService initialized")
+            Timber.i("AudioCaptureService initialized")
         }
     }
 
@@ -230,7 +230,7 @@ class VoiceAssistantViewModel(
         if (level > speechThreshold) {
             // Speech detected
             if (!isSpeechActive) {
-                Log.d(TAG, "🎙️ Speech started (level: $level)")
+                Timber.d("🎙️ Speech started (level: $level)")
                 isSpeechActive = true
                 _uiState.update { it.copy(isSpeechDetected = true) }
             }
@@ -253,18 +253,18 @@ class VoiceAssistantViewModel(
         if (currentLevel <= speechThreshold && lastSpeechTime > 0) {
             val silenceTime = System.currentTimeMillis() - lastSpeechTime
             if (silenceTime > silenceDurationMs) {
-                Log.d(TAG, "🔇 Speech ended after ${silenceTime}ms of silence")
+                Timber.d("🔇 Speech ended after ${silenceTime}ms of silence")
                 isSpeechActive = false
                 _uiState.update { it.copy(isSpeechDetected = false) }
 
                 // Check if we have enough audio to process
-                val audioSize = audioBuffer.size()
+                val audioSize = synchronized(audioBufferLock) { audioBuffer.size() }
                 if (audioSize >= minAudioBytes) {
-                    Log.i(TAG, "🚀 Auto-triggering voice pipeline (audio: $audioSize bytes)")
+                    Timber.i("🚀 Auto-triggering voice pipeline (audio: $audioSize bytes)")
                     processCurrentAudio()
                 } else {
-                    Log.d(TAG, "Audio too short to process ($audioSize bytes), resetting buffer")
-                    audioBuffer.reset()
+                    Timber.d("Audio too short to process ($audioSize bytes), resetting buffer")
+                    synchronized(audioBufferLock) { audioBuffer.reset() }
                 }
             }
         }
@@ -279,17 +279,20 @@ class VoiceAssistantViewModel(
      */
     private fun processCurrentAudio() {
         if (isProcessingTurn) {
-            Log.d(TAG, "Already processing a turn, skipping")
+            Timber.d("Already processing a turn, skipping")
             return
         }
 
         isProcessingTurn = true
 
         // Get the buffered audio and reset
-        val audioData = audioBuffer.toByteArray()
-        audioBuffer.reset()
+        val audioData: ByteArray
+        synchronized(audioBufferLock) {
+            audioData = audioBuffer.toByteArray()
+            audioBuffer.reset()
+        }
 
-        viewModelScope.launch {
+        processingJob = viewModelScope.launch {
             try {
                 // Update state to processing (on main thread for UI)
                 _uiState.update {
@@ -306,7 +309,7 @@ class VoiceAssistantViewModel(
                 silenceDetectionJob?.cancel()
                 audioCaptureService?.stopCapture()
 
-                Log.i(TAG, "🔄 Processing ${audioData.size} bytes through voice pipeline...")
+                Timber.i("🔄 Processing ${audioData.size} bytes through voice pipeline...")
 
                 // Process audio through STT → LLM → TTS pipeline
                 // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
@@ -318,8 +321,7 @@ class VoiceAssistantViewModel(
                 val transcription = result.transcription
                 val response = result.response
 
-                Log.i(
-                    TAG,
+                Timber.i(
                     "✅ Voice pipeline result - speechDetected: ${result.speechDetected}, " +
                         "transcription: ${transcription?.take(50)}, " +
                         "response: ${response?.take(50)}",
@@ -336,15 +338,15 @@ class VoiceAssistantViewModel(
                     // Play synthesized audio if available (matching iOS autoPlayTTS)
                     val synthesizedAudio = result.synthesizedAudio
                     if (synthesizedAudio != null && synthesizedAudio.isNotEmpty()) {
-                        Log.i(TAG, "🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
+                        Timber.i("🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
                         playAudio(synthesizedAudio)
                         // Note: resumeListening() is called after playback completes
                     } else {
-                        Log.d(TAG, "No synthesized audio, resuming listening immediately")
+                        Timber.d("No synthesized audio, resuming listening immediately")
                         resumeListening()
                     }
                 } else {
-                    Log.i(TAG, "No speech detected in audio")
+                    Timber.i("No speech detected in audio")
                     _uiState.update {
                         it.copy(
                             errorMessage = if (!result.speechDetected) "No speech detected" else null,
@@ -353,7 +355,7 @@ class VoiceAssistantViewModel(
                     resumeListening()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error processing voice: ${e.message}", e)
+                Timber.e(e, "Error processing voice: ${e.message}")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.ERROR,
@@ -378,7 +380,7 @@ class VoiceAssistantViewModel(
         isProcessingTurn = false
         isSpeechActive = false
         lastSpeechTime = 0L
-        audioBuffer.reset()
+        synchronized(audioBufferLock) { audioBuffer.reset() }
 
         _uiState.update {
             it.copy(
@@ -388,7 +390,7 @@ class VoiceAssistantViewModel(
             )
         }
 
-        Log.i(TAG, "🎙️ Resuming listening for next turn...")
+        Timber.i("🎙️ Resuming listening for next turn...")
 
         // Restart audio capture
         audioRecordingJob =
@@ -397,7 +399,7 @@ class VoiceAssistantViewModel(
                     audioCapture.startCapture().collect { audioData ->
                         if (isProcessingTurn) return@collect
 
-                        withContext(Dispatchers.IO) {
+                        synchronized(audioBufferLock) {
                             audioBuffer.write(audioData)
                         }
 
@@ -408,9 +410,9 @@ class VoiceAssistantViewModel(
                         checkSpeechState(normalizedLevel)
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
-                    Log.d(TAG, "Audio recording cancelled")
+                    Timber.d("Audio recording cancelled")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Audio capture error on resume", e)
+                    Timber.e(e, "Audio capture error on resume")
                 }
             }
 
@@ -432,16 +434,16 @@ class VoiceAssistantViewModel(
      */
     private fun playAudio(audioData: ByteArray) {
         if (audioData.isEmpty()) {
-            Log.w(TAG, "No audio data to play")
+            Timber.w("No audio data to play")
             resumeListening()
             return
         }
 
-        Log.i(TAG, "🔊 Starting TTS playback (${audioData.size} bytes)")
+        Timber.i("🔊 Starting TTS playback (${audioData.size} bytes)")
         isPlayingAudio = true
 
         _uiState.update {
-            it.copy(sessionState = SessionState.PROCESSING) // Show as "speaking"
+            it.copy(sessionState = SessionState.SPEAKING)
         }
 
         audioPlaybackJob =
@@ -450,21 +452,35 @@ class VoiceAssistantViewModel(
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
-                    // Skip WAV header (44 bytes) if present
-                    val headerSize =
-                        if (audioData.size > 44 &&
-                            audioData[0] == 'R'.code.toByte() &&
-                            audioData[1] == 'I'.code.toByte() &&
-                            audioData[2] == 'F'.code.toByte() &&
-                            audioData[3] == 'F'.code.toByte()
-                        ) {
-                            44
-                        } else {
-                            0
+                    // Scan for WAV "data" chunk to find PCM offset
+                    val isWav = audioData.size > 44 &&
+                        audioData[0] == 'R'.code.toByte() &&
+                        audioData[1] == 'I'.code.toByte() &&
+                        audioData[2] == 'F'.code.toByte() &&
+                        audioData[3] == 'F'.code.toByte()
+
+                    val headerSize = if (isWav) {
+                        var offset = 12 // skip RIFF header (12 bytes)
+                        var dataStart = -1
+                        while (offset + 8 <= audioData.size) {
+                            val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
+                            val chunkSize = (audioData[offset + 4].toInt() and 0xFF) or
+                                ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
+                                ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
+                                ((audioData[offset + 7].toInt() and 0xFF) shl 24)
+                            if (chunkId == "data") {
+                                dataStart = offset + 8
+                                break
+                            }
+                            offset += 8 + chunkSize
                         }
+                        if (dataStart > 0) dataStart else 44 // fallback for malformed files
+                    } else {
+                        0
+                    }
 
                     val pcmData = audioData.copyOfRange(headerSize, audioData.size)
-                    Log.d(TAG, "PCM data size: ${pcmData.size} bytes (skipped $headerSize byte header)")
+                    Timber.d("PCM data size: ${pcmData.size} bytes (skipped $headerSize byte header)")
 
                     val bufferSize = AudioTrack.getMinBufferSize(ttsSampleRate, channelConfig, audioFormat)
 
@@ -490,11 +506,11 @@ class VoiceAssistantViewModel(
                     audioTrack?.write(pcmData, 0, pcmData.size)
                     audioTrack?.play()
 
-                    Log.i(TAG, "🔊 TTS playback started")
+                    Timber.i("🔊 TTS playback started")
 
                     // Calculate duration and wait for playback to complete
                     val durationMs = (pcmData.size.toDouble() / (ttsSampleRate * 2) * 1000).toLong()
-                    Log.d(TAG, "Expected playback duration: ${durationMs}ms")
+                    Timber.d("Expected playback duration: ${durationMs}ms")
 
                     // Wait for playback to complete
                     var elapsed = 0L
@@ -503,14 +519,14 @@ class VoiceAssistantViewModel(
                         elapsed += 100
                     }
 
-                    Log.i(TAG, "🔊 TTS playback completed")
+                    Timber.i("🔊 TTS playback completed")
 
                     withContext(Dispatchers.Main) {
                         stopAudioPlayback()
                         resumeListening()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Audio playback error: ${e.message}", e)
+                    Timber.e(e, "Audio playback error: ${e.message}")
                     withContext(Dispatchers.Main) {
                         stopAudioPlayback()
                         resumeListening()
@@ -532,11 +548,11 @@ class VoiceAssistantViewModel(
             audioTrack?.stop()
             audioTrack?.release()
         } catch (e: Exception) {
-            Log.w(TAG, "Error stopping AudioTrack: ${e.message}")
+            Timber.w("Error stopping AudioTrack: ${e.message}")
         }
         audioTrack = null
 
-        Log.d(TAG, "Audio playback stopped")
+        Timber.d("Audio playback stopped")
     }
 
     init {
@@ -582,7 +598,7 @@ class VoiceAssistantViewModel(
                                         currentLLMModel = event.modelId,
                                     )
                                 }
-                                Log.i(TAG, "✅ LLM model loaded: ${event.modelId}")
+                                Timber.i("✅ LLM model loaded: ${event.modelId}")
                             }
                             EventCategory.STT -> {
                                 _uiState.update {
@@ -592,7 +608,7 @@ class VoiceAssistantViewModel(
                                         whisperModel = event.modelId,
                                     )
                                 }
-                                Log.i(TAG, "✅ STT model loaded: ${event.modelId}")
+                                Timber.i("✅ STT model loaded: ${event.modelId}")
                             }
                             EventCategory.TTS -> {
                                 _uiState.update {
@@ -602,7 +618,7 @@ class VoiceAssistantViewModel(
                                         ttsVoice = event.modelId,
                                     )
                                 }
-                                Log.i(TAG, "✅ TTS model loaded: ${event.modelId}")
+                                Timber.i("✅ TTS model loaded: ${event.modelId}")
                             }
                             else -> { /* Ignore other categories */ }
                         }
@@ -696,9 +712,9 @@ class VoiceAssistantViewModel(
                 )
             }
 
-            Log.i(TAG, "📊 Model states synced - STT: ${states.stt.isLoaded}, LLM: ${states.llm.isLoaded}, TTS: ${states.tts.isLoaded}")
+            Timber.i("📊 Model states synced - STT: ${states.stt.isLoaded}, LLM: ${states.llm.isLoaded}, TTS: ${states.tts.isLoaded}")
         } catch (e: Exception) {
-            Log.w(TAG, "Could not sync model states: ${e.message}")
+            Timber.w("Could not sync model states: ${e.message}")
         }
     }
 
@@ -722,7 +738,7 @@ class VoiceAssistantViewModel(
     fun startSession() {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Starting conversation...")
+                Timber.i("Starting conversation...")
 
                 _uiState.update {
                     it.copy(
@@ -736,7 +752,7 @@ class VoiceAssistantViewModel(
                 // Check if all models are loaded
                 val uiStateValue = _uiState.value
                 if (!uiStateValue.allModelsLoaded) {
-                    Log.w(TAG, "Cannot start: Not all models loaded")
+                    Timber.w("Cannot start: Not all models loaded")
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
@@ -749,7 +765,7 @@ class VoiceAssistantViewModel(
                 // Initialize audio capture if not already done
                 val audioCapture = audioCaptureService
                 if (audioCapture == null) {
-                    Log.e(TAG, "AudioCaptureService not initialized")
+                    Timber.e("AudioCaptureService not initialized")
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
@@ -761,7 +777,7 @@ class VoiceAssistantViewModel(
 
                 // Check microphone permission
                 if (!audioCapture.hasRecordPermission()) {
-                    Log.e(TAG, "No microphone permission")
+                    Timber.e("No microphone permission")
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
@@ -783,12 +799,12 @@ class VoiceAssistantViewModel(
                                 handleVoiceSessionEvent(event)
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Session event error", e)
+                            Timber.e(e, "Session event error")
                         }
                     }
 
                 // Reset audio buffer
-                audioBuffer.reset()
+                synchronized(audioBufferLock) { audioBuffer.reset() }
 
                 // Update state to listening
                 _uiState.update {
@@ -799,7 +815,7 @@ class VoiceAssistantViewModel(
                     )
                 }
 
-                Log.i(TAG, "Voice session started, starting audio capture...")
+                Timber.i("Voice session started, starting audio capture...")
 
                 // Reset speech state tracking
                 isSpeechActive = false
@@ -828,9 +844,9 @@ class VoiceAssistantViewModel(
                                 checkSpeechState(normalizedLevel)
                             }
                         } catch (e: kotlinx.coroutines.CancellationException) {
-                            Log.d(TAG, "Audio recording cancelled (expected when stopping)")
+                            Timber.d("Audio recording cancelled (expected when stopping)")
                         } catch (e: Exception) {
-                            Log.e(TAG, "Audio capture error", e)
+                            Timber.e(e, "Audio capture error")
                             _uiState.update {
                                 it.copy(
                                     errorMessage = "Audio capture error: ${e.message}",
@@ -848,7 +864,7 @@ class VoiceAssistantViewModel(
                         }
                     }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start session", e)
+                Timber.e(e, "Failed to start session")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.ERROR,
@@ -866,7 +882,7 @@ class VoiceAssistantViewModel(
     private fun handleVoiceSessionEvent(event: VoiceSessionEvent) {
         when (event) {
             is VoiceSessionEvent.Started -> {
-                Log.i(TAG, "Voice session started")
+                Timber.i("Voice session started")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.LISTENING,
@@ -880,12 +896,12 @@ class VoiceAssistantViewModel(
             }
 
             is VoiceSessionEvent.SpeechStarted -> {
-                Log.d(TAG, "Speech detected")
+                Timber.d("Speech detected")
                 _uiState.update { it.copy(isSpeechDetected = true) }
             }
 
             is VoiceSessionEvent.Processing -> {
-                Log.i(TAG, "Processing speech...")
+                Timber.i("Processing speech...")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.PROCESSING,
@@ -895,22 +911,22 @@ class VoiceAssistantViewModel(
             }
 
             is VoiceSessionEvent.Transcribed -> {
-                Log.i(TAG, "Transcription: ${event.text}")
+                Timber.i("Transcription: ${event.text}")
                 _uiState.update { it.copy(currentTranscript = event.text) }
             }
 
             is VoiceSessionEvent.Responded -> {
-                Log.i(TAG, "Response: ${event.text.take(50)}...")
+                Timber.i("Response: ${event.text.take(50)}...")
                 _uiState.update { it.copy(assistantResponse = event.text) }
             }
 
             is VoiceSessionEvent.Speaking -> {
-                Log.d(TAG, "Playing TTS audio")
-                _uiState.update { it.copy(sessionState = SessionState.PROCESSING) }
+                Timber.d("Playing TTS audio")
+                _uiState.update { it.copy(sessionState = SessionState.SPEAKING) }
             }
 
             is VoiceSessionEvent.TurnCompleted -> {
-                Log.i(TAG, "Turn completed")
+                Timber.i("Turn completed")
                 _uiState.update {
                     it.copy(
                         currentTranscript = event.transcript,
@@ -922,7 +938,7 @@ class VoiceAssistantViewModel(
             }
 
             is VoiceSessionEvent.Stopped -> {
-                Log.i(TAG, "Voice session stopped")
+                Timber.i("Voice session stopped")
                 _uiState.update {
                     it.copy(
                         sessionState = SessionState.DISCONNECTED,
@@ -932,7 +948,7 @@ class VoiceAssistantViewModel(
             }
 
             is VoiceSessionEvent.Error -> {
-                Log.e(TAG, "Voice session error: ${event.message}")
+                Timber.e("Voice session error: ${event.message}")
                 _uiState.update {
                     it.copy(
                         errorMessage = event.message,
@@ -952,7 +968,7 @@ class VoiceAssistantViewModel(
      */
     fun stopSession() {
         viewModelScope.launch {
-            Log.i(TAG, "Stopping conversation...")
+            Timber.i("Stopping conversation...")
 
             // Reset speech state
             isProcessingTurn = false
@@ -969,16 +985,22 @@ class VoiceAssistantViewModel(
             silenceDetectionJob = null
             pipelineJob?.cancel()
             pipelineJob = null
+            processingJob?.cancel()
+            processingJob = null
 
             // Stop audio capture service
             audioCaptureService?.stopCapture()
 
             // Get the buffered audio before resetting
-            val audioData = audioBuffer.toByteArray()
-            val audioSize = audioData.size
-            audioBuffer.reset()
+            val audioData: ByteArray
+            val audioSize: Int
+            synchronized(audioBufferLock) {
+                audioData = audioBuffer.toByteArray()
+                audioSize = audioData.size
+                audioBuffer.reset()
+            }
 
-            Log.i(TAG, "Captured audio: $audioSize bytes")
+            Timber.i("Captured audio: $audioSize bytes")
 
             // Only process if we have meaningful audio data (at least 0.5 seconds at 16kHz, 16-bit)
             // 16000 samples/sec * 2 bytes/sample * 0.5 sec = 16000 bytes
@@ -994,7 +1016,7 @@ class VoiceAssistantViewModel(
                 }
 
                 try {
-                    Log.i(TAG, "Processing audio through voice pipeline...")
+                    Timber.i("Processing audio through voice pipeline...")
 
                     // Process audio through STT → LLM → TTS pipeline
                     // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
@@ -1006,8 +1028,7 @@ class VoiceAssistantViewModel(
                     val transcription = result.transcription
                     val response = result.response
 
-                    Log.i(
-                        TAG,
+                    Timber.i(
                         "Voice pipeline result - speechDetected: ${result.speechDetected}, " +
                             "transcription: ${transcription?.take(50)}, " +
                             "response: ${response?.take(50)}",
@@ -1025,11 +1046,11 @@ class VoiceAssistantViewModel(
                         // Play synthesized audio on manual stop as well
                         val synthesizedAudio = result.synthesizedAudio
                         if (synthesizedAudio != null && synthesizedAudio.isNotEmpty()) {
-                            Log.i(TAG, "🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
+                            Timber.i("🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
                             playAudio(synthesizedAudio)
                         }
                     } else {
-                        Log.i(TAG, "No speech detected in audio")
+                        Timber.i("No speech detected in audio")
                         _uiState.update {
                             it.copy(
                                 sessionState = SessionState.DISCONNECTED,
@@ -1038,7 +1059,7 @@ class VoiceAssistantViewModel(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error processing voice: ${e.message}", e)
+                    Timber.e(e, "Error processing voice: ${e.message}")
                     _uiState.update {
                         it.copy(
                             sessionState = SessionState.ERROR,
@@ -1047,7 +1068,7 @@ class VoiceAssistantViewModel(
                     }
                 }
             } else {
-                Log.i(TAG, "Audio too short to process ($audioSize bytes)")
+                Timber.i("Audio too short to process ($audioSize bytes)")
                 // Reset UI state without processing
                 _uiState.update {
                     it.copy(
@@ -1064,7 +1085,7 @@ class VoiceAssistantViewModel(
             RunAnywhere.stopVoiceSession()
             voiceSessionFlow = null
 
-            Log.i(TAG, "Conversation stopped")
+            Timber.i("Conversation stopped")
         }
     }
 
@@ -1100,7 +1121,7 @@ class VoiceAssistantViewModel(
                 // Don't reset sttLoadState - model may already be loaded by ModelSelectionBottomSheet
             )
         }
-        Log.i(TAG, "STT model selected: $name ($modelId)")
+        Timber.i("STT model selected: $name ($modelId)")
         // Sync with SDK to get actual load state (model may already be loaded)
         viewModelScope.launch {
             syncModelStates()
@@ -1126,7 +1147,7 @@ class VoiceAssistantViewModel(
                 // Don't reset llmLoadState - model may already be loaded by ModelSelectionBottomSheet
             )
         }
-        Log.i(TAG, "LLM model selected: $name ($modelId)")
+        Timber.i("LLM model selected: $name ($modelId)")
         // Sync with SDK to get actual load state (model may already be loaded)
         viewModelScope.launch {
             syncModelStates()
@@ -1152,7 +1173,7 @@ class VoiceAssistantViewModel(
                 // Don't reset ttsLoadState - model may already be loaded by ModelSelectionBottomSheet
             )
         }
-        Log.i(TAG, "TTS model selected: $name ($modelId)")
+        Timber.i("TTS model selected: $name ($modelId)")
         // Sync with SDK to get actual load state (model may already be loaded)
         viewModelScope.launch {
             syncModelStates()
@@ -1160,16 +1181,22 @@ class VoiceAssistantViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
+        // Cancel all jobs BEFORE super.onCleared() cancels viewModelScope
         eventSubscriptionJob?.cancel()
         pipelineJob?.cancel()
         audioRecordingJob?.cancel()
         silenceDetectionJob?.cancel()
+        processingJob?.cancel()
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        viewModelScope.launch {
-            RunAnywhere.stopVoiceSession()
+        // Fire-and-forget on IO — viewModelScope is dead after super.onCleared()
+        @Suppress("OPT_IN_USAGE")
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            try {
+                RunAnywhere.stopVoiceSession()
+            } catch (_: Exception) { /* best-effort cleanup */ }
         }
+        super.onCleared()
     }
 }

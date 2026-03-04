@@ -29,6 +29,7 @@ enum class DeviceType {
     GPU = 1,
     METAL = 3,
     CUDA = 4,
+    WEBGPU = 5,
 };
 
 // =============================================================================
@@ -101,6 +102,21 @@ class LlamaCppBackend {
 // TEXT GENERATION IMPLEMENTATION
 // =============================================================================
 
+// =============================================================================
+// LORA ADAPTER ENTRY
+// =============================================================================
+
+struct LoraAdapterEntry {
+    llama_adapter_lora* adapter = nullptr;
+    std::string path;
+    float scale = 1.0f;
+    bool applied = false;
+};
+
+// =============================================================================
+// TEXT GENERATION IMPLEMENTATION
+// =============================================================================
+
 class LlamaCppTextGeneration {
    public:
     explicit LlamaCppTextGeneration(LlamaCppBackend* backend);
@@ -120,8 +136,16 @@ class LlamaCppTextGeneration {
     void cancel();
     nlohmann::json get_model_info() const;
 
+    // LoRA adapter management
+    bool load_lora_adapter(const std::string& adapter_path, float scale);
+    bool remove_lora_adapter(const std::string& adapter_path);
+    void clear_lora_adapters();
+    nlohmann::json get_lora_info() const;
+
    private:
     bool unload_model_internal();
+    bool recreate_context();
+    bool apply_lora_adapters();
     std::string build_prompt(const TextGenerationRequest& request);
     std::string apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
                                     const std::string& system_prompt, bool add_assistant_token);
@@ -133,6 +157,7 @@ class LlamaCppTextGeneration {
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};
+    std::atomic<bool> decode_failed_{false};
 
     std::string model_path_;
     nlohmann::json model_config_;
@@ -140,10 +165,7 @@ class LlamaCppTextGeneration {
     int context_size_ = 0;
     int max_default_context_ = 8192;
 
-    float temperature_ = 0.8f;
-    float top_p_ = 0.95f;
-    float min_p_ = 0.05f;
-    int top_k_ = 40;
+    std::vector<LoraAdapterEntry> lora_adapters_;
 
     mutable std::mutex mutex_;
 };

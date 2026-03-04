@@ -9,6 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
+import WhisperKitRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -21,6 +22,10 @@ import AppKit
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     @StateObject private var modelManager = ModelManager.shared
+    #if os(iOS)
+    @StateObject private var flowSession = FlowSessionManager.shared
+    @State private var showFlowActivation = false
+    #endif
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
 
@@ -30,6 +35,20 @@ struct RunAnywhereAIApp: App {
                 if isSDKInitialized {
                     ContentView()
                         .environmentObject(modelManager)
+                        #if os(iOS)
+                        .environmentObject(flowSession)
+                        .onOpenURL { url in
+                            guard url.scheme == SharedConstants.urlScheme,
+                                  url.host == "startFlow" else { return }
+                            logger.info("📲 Received startFlow deep link")
+                            showFlowActivation = true
+                            Task { await flowSession.handleStartFlow() }
+                        }
+                        .fullScreenCover(isPresented: $showFlowActivation) {
+                            FlowActivationView(isPresented: $showFlowActivation)
+                                .environmentObject(flowSession)
+                        }
+                        #endif
                         .onAppear {
                             logger.info("🎉 App is ready to use!")
                         }
@@ -59,6 +78,13 @@ struct RunAnywhereAIApp: App {
 
     private func initializeSDK() async {
         do {
+            // Register backends with C++ registry FIRST, before any await. Otherwise we can
+            // suspend at the next line and another task may run loadModel() → ensureServicesReady()
+            // → only Platform is registered → -422 "No provider could handle the request".
+            LlamaCPP.register(priority: 100)
+            ONNX.register(priority: 100)
+            WhisperKitSTT.register(priority: 200)
+
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
@@ -106,6 +132,15 @@ struct RunAnywhereAIApp: App {
             // Register modules and models
             await registerModulesAndModels()
 
+            // Wait for all registerModel() saves to complete, then scan disk
+            // for previously downloaded models. Order matters: flush ensures every
+            // model is in the C++ registry so discovery can match files to entries.
+            await RunAnywhere.flushPendingRegistrations()
+            let discovered = await RunAnywhere.discoverDownloadedModels()
+            if discovered > 0 {
+                logger.info("📂 Discovered \(discovered) previously downloaded models")
+            }
+
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized!")
             logger.info("⚡ Initialization time: \(String(format: "%.3f", initTime * 1000), privacy: .public)ms")
@@ -140,13 +175,8 @@ struct RunAnywhereAIApp: App {
     private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
         logger.info("📦 Registering modules with their models...")
 
-        // Register LlamaCPP backend with C++ commons
-        LlamaCPP.register(priority: 100)
-        logger.info("✅ LlamaCPP backend registered")
-
-        // Register ONNX backend service providers
-        ONNX.register(priority: 100)
-        logger.info("✅ ONNX backend registered")
+        // NOTE: LlamaCPP, ONNX, and WhisperKitSTT backends are registered once
+        // in initializeSDK() before any await. No duplicate registration needed here.
 
         // Register LLM models using the new RunAnywhere.registerModel API
         // Using explicit IDs ensures models are recognized after download across app restarts
@@ -186,6 +216,17 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 600_000_000
             )
         }
+        // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
+        // TODO: [Portal Integration] Remove once portal delivers model + adapter pairings
+        if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-1.5b-instruct-q4_k_m",
+                name: "Qwen 2.5 1.5B Instruct Q4_K_M",
+                url: qwen15BURL,
+                framework: .llamaCpp,
+                memoryRequirement: 2_500_000_000
+            )
+        }
         if let lfm2Q4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "lfm2-350m-q4_k_m",
@@ -204,7 +245,80 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 400_000_000
             )
         }
-        logger.info("✅ LLM models registered")
+
+        // Tool Calling Optimized Models
+        // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
+        if let lfm2ToolQ4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q4_k_m",
+                name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
+                url: lfm2ToolQ4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 800_000_000
+            )
+        }
+        if let lfm2ToolQ8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm2-1.2b-tool-q8_0",
+                name: "LiquidAI LFM2 1.2B Tool Q8_0",
+                url: lfm2ToolQ8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 1_400_000_000
+            )
+        }
+
+        logger.info("✅ LLM models registered (including tool-calling optimized models)")
+
+        // Register VLM (Vision Language) models
+        // VLM models require 2 files: main model + mmproj (vision projector)
+        // Bundled as tar.gz archives for easy download/extraction
+
+        // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+        if let smolVLMURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "smolvlm-500m-instruct-q8_0",
+                name: "SmolVLM 500M Instruct",
+                url: smolVLMURL,
+                framework: .llamaCpp,
+                modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .directoryBased),
+                memoryRequirement: 600_000_000
+            )
+        }
+        // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
+        // Uses multi-file download: main model (986MB) + mmproj (710MB)
+        // Downloaded separately to avoid memory-intensive tar.gz extraction on iOS
+        if let qwenMainURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+           let qwenMmprojURL = URL(string: "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
+                id: "qwen2-vl-2b-instruct-q4_k_m",
+                name: "Qwen2-VL 2B Instruct",
+                files: [
+                    ModelFileDescriptor(url: qwenMainURL, filename: "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+                    ModelFileDescriptor(url: qwenMmprojURL, filename: "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf")
+                ],
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 1_800_000_000
+            )
+        }
+        // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
+        // Uses multi-file download: main model + mmproj from HuggingFace
+        if let lfm2MainURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf"),
+           let lfm2MmprojURL = URL(string: "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf") {
+            RunAnywhere.registerMultiFileModel(
+                id: "lfm2-vl-450m-q8_0",
+                name: "LFM2-VL 450M",
+                files: [
+                    ModelFileDescriptor(url: lfm2MainURL, filename: "LFM2-VL-450M-Q8_0.gguf"),
+                    ModelFileDescriptor(url: lfm2MmprojURL, filename: "mmproj-LFM2-VL-450M-Q8_0.gguf")
+                ],
+                framework: .llamaCpp,
+                modality: .multimodal,
+                memoryRequirement: 600_000_000
+            )
+        }
+        logger.info("✅ VLM models registered")
 
         // Register ONNX STT and TTS models
         // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
@@ -242,6 +356,74 @@ struct RunAnywhereAIApp: App {
             )
         }
         logger.info("✅ ONNX STT/TTS models registered")
+
+        // Register WhisperKit STT models (Apple Neural Engine via Core ML)
+        // These run on the ANE, freeing up CPU for other tasks — ideal for background STT on iOS
+        if let whisperKitTinyURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisperkit-tiny.en",
+                name: "Whisper Tiny EN (WhisperKit)",
+                url: whisperKitTinyURL,
+                framework: .whisperKitCoreML,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 70_000_000
+            )
+        }
+        if let whisperKitBaseURL = URL(string: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisperkit-base.en",
+                name: "Whisper Base EN (WhisperKit)",
+                url: whisperKitBaseURL,
+                framework: .whisperKitCoreML,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 134_000_000
+            )
+        }
+        logger.info("✅ WhisperKit STT models registered")
+
+        // Register ONNX Embedding models for RAG
+        // all-MiniLM-L6-v2: registered as multi-file so model.onnx and vocab.txt
+        // download into the same folder - C++ RAG pipeline looks for vocab.txt
+        // next to model.onnx, so they must be co-located.
+        if let miniLMModelURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx"),
+           let miniLMVocabURL = URL(string: "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt") {
+            RunAnywhere.registerMultiFileModel(
+                id: "all-minilm-l6-v2",
+                name: "All MiniLM L6 v2 (Embedding)",
+                files: [
+                    ModelFileDescriptor(url: miniLMModelURL, filename: "model.onnx"),
+                    ModelFileDescriptor(url: miniLMVocabURL, filename: "vocab.txt")
+                ],
+                framework: .onnx,
+                modality: .embedding,
+                memoryRequirement: 25_500_000
+            )
+        }
+        logger.info("✅ ONNX Embedding models registered")
+
+        // Register Diffusion models (Apple Stable Diffusion / CoreML only; no ONNX)
+        // ============================================================================
+        // Apple SD 1.5 CoreML: palettized, split_einsum_v2 for Apple Silicon / ANE (~1.5GB)
+        if let sd15CoreMLURL = URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip") {
+            RunAnywhere.registerModel(
+                id: "sd15-coreml-palettized",
+                name: "Stable Diffusion 1.5 (CoreML)",
+                url: sd15CoreMLURL,
+                framework: .coreml,
+                modality: .imageGeneration,
+                artifactType: .archive(.zip, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000  // ~1.6GB
+            )
+        }
+
+        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
+
+        // Register LoRA adapters into SDK registry (same catalog as Android)
+        await LoRAAdapterCatalog.registerAll()
+        logger.info("✅ LoRA adapters registered (\(LoRAAdapterCatalog.adapters.count))")
+
         logger.info("🎉 All modules and models registered")
     }
 }

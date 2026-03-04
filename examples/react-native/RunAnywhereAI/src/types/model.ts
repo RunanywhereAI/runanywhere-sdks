@@ -33,7 +33,6 @@ export enum ModelCategory {
   SpeechRecognition = 'speech-recognition',
   SpeechSynthesis = 'speech-synthesis',
   Vision = 'vision',
-  ImageGeneration = 'image-generation',
   Multimodal = 'multimodal',
   Audio = 'audio',
 }
@@ -246,7 +245,6 @@ export const CategoryDisplayNames: Record<ModelCategory, string> = {
   [ModelCategory.SpeechRecognition]: 'Speech Recognition',
   [ModelCategory.SpeechSynthesis]: 'Text-to-Speech',
   [ModelCategory.Vision]: 'Vision Model',
-  [ModelCategory.ImageGeneration]: 'Image Generation',
   [ModelCategory.Multimodal]: 'Multimodal',
   [ModelCategory.Audio]: 'Audio Processing',
 };

@@ -254,7 +254,7 @@ struct ModelRequiredOverlay: View {
                 // Bottom section with glass effect button
                 VStack(spacing: AppSpacing.medium) {
                     // Primary CTA with glass effect
-                    if #available(iOS 26.0, *) {
+                    if #available(iOS 26.0, macOS 26.0, *) {
                         Button(action: onSelectModel) {
                             HStack(spacing: 8) {
                                 Image(systemName: "sparkles")
@@ -314,6 +314,9 @@ struct ModelRequiredOverlay: View {
         case .stt: return "waveform"
         case .tts: return "speaker.wave.2.fill"
         case .voice: return "mic.circle.fill"
+        case .vlm: return "camera.viewfinder"
+        case .ragEmbedding: return "doc.text.magnifyingglass"
+        case .ragLLM: return "text.bubble.fill"
         }
     }
 
@@ -323,6 +326,9 @@ struct ModelRequiredOverlay: View {
         case .stt: return .green
         case .tts: return AppColors.primaryPurple
         case .voice: return AppColors.primaryAccent
+        case .vlm: return .orange
+        case .ragEmbedding: return .teal
+        case .ragLLM: return AppColors.primaryAccent
         }
     }
 
@@ -332,6 +338,9 @@ struct ModelRequiredOverlay: View {
         case .stt: return "Voice to Text"
         case .tts: return "Read Aloud"
         case .voice: return "Voice Assistant"
+        case .vlm: return "Vision AI"
+        case .ragEmbedding: return "Embedding Model"
+        case .ragLLM: return "Language Model"
         }
     }
 
@@ -341,6 +350,9 @@ struct ModelRequiredOverlay: View {
         case .stt: return "Transcribe your speech to text with powerful on-device voice recognition."
         case .tts: return "Have any text read aloud with natural-sounding voices."
         case .voice: return "Talk naturally with your AI assistant. Let's set up the components together."
+        case .vlm: return "Point your camera at anything and get AI-powered descriptions in real-time."
+        case .ragEmbedding: return "Select an embedding model to convert documents into searchable vectors."
+        case .ragLLM: return "Select a language model to generate answers from your documents."
         }
     }
 }

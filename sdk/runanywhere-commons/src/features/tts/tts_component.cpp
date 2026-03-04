@@ -33,7 +33,10 @@ struct rac_tts_component {
     rac_tts_options_t default_options;
     std::mutex mtx;
 
-    rac_tts_component() : lifecycle(nullptr) {
+    /** Resolved inference framework (defaults to ONNX, the primary TTS backend) */
+    rac_inference_framework_t actual_framework;
+
+    rac_tts_component() : lifecycle(nullptr), actual_framework(RAC_FRAMEWORK_ONNX) {
         // Initialize with defaults - matches rac_tts_types.h rac_tts_config_t
         config = RAC_TTS_CONFIG_DEFAULT;
 
@@ -143,6 +146,14 @@ extern "C" rac_result_t rac_tts_component_configure(rac_handle_t handle,
 
     component->config = *config;
 
+    // Resolve actual framework: if caller explicitly set one (not -1=auto), use it;
+    // otherwise keep the default (RAC_FRAMEWORK_ONNX for TTS components)
+    if (config->preferred_framework >= 0 &&
+        config->preferred_framework != static_cast<int32_t>(RAC_FRAMEWORK_UNKNOWN)) {
+        component->actual_framework =
+            static_cast<rac_inference_framework_t>(config->preferred_framework);
+    }
+
     // Update default options based on config - matches rac_tts_config_t fields
     if (config->speaking_rate > 0) {
         component->default_options.rate = config->speaking_rate;
@@ -209,8 +220,50 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
     auto* component = reinterpret_cast<rac_tts_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Emit voice load started event
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_TTS_VOICE_LOAD_STARTED;
+        event.data.llm_model.model_id = voice_id;
+        event.data.llm_model.model_name = voice_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_STARTED, &event);
+    }
+
+    auto load_start = std::chrono::steady_clock::now();
+
     rac_handle_t service = nullptr;
-    return rac_lifecycle_load(component->lifecycle, voice_path, voice_id, voice_name, &service);
+    rac_result_t result =
+        rac_lifecycle_load(component->lifecycle, voice_path, voice_id, voice_name, &service);
+
+    double load_duration_ms = static_cast<double>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+                                                              load_start)
+            .count());
+
+    if (result != RAC_SUCCESS) {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_TTS_VOICE_LOAD_FAILED;
+        event.data.llm_model.model_id = voice_id;
+        event.data.llm_model.model_name = voice_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = result;
+        event.data.llm_model.error_message = "Voice load failed";
+        rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_FAILED, &event);
+    } else {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_TTS_VOICE_LOAD_COMPLETED;
+        event.data.llm_model.model_id = voice_id;
+        event.data.llm_model.model_name = voice_name;
+        event.data.llm_model.framework = component->actual_framework;
+        event.data.llm_model.duration_ms = load_duration_ms;
+        event.data.llm_model.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_COMPLETED, &event);
+    }
+
+    return result;
 }
 
 extern "C" rac_result_t rac_tts_component_unload(rac_handle_t handle) {
@@ -288,6 +341,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = static_cast<int32_t>(std::strlen(text));
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
 
@@ -301,6 +355,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "No voice loaded";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -329,6 +384,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "Synthesis failed";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -358,6 +414,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.processing_duration_ms = processing_ms;
         event_data.data.tts_synthesis.characters_per_second = chars_per_sec;
         event_data.data.tts_synthesis.sample_rate = static_cast<int32_t>(out_result->sample_rate);
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event_data);
     }
 
@@ -392,6 +449,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
     }
 
@@ -405,6 +463,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "No voice loaded";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -433,6 +492,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "Streaming synthesis failed";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -449,6 +509,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.character_count = char_count;
         event_data.data.tts_synthesis.processing_duration_ms = processing_ms;
         event_data.data.tts_synthesis.characters_per_second = chars_per_sec;
+        event_data.data.tts_synthesis.framework = component->actual_framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event_data);
     }
 

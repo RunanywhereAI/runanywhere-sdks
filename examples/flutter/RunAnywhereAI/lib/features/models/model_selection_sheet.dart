@@ -483,7 +483,12 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
       setState(() {
         _isLoadingModel = false;
       });
-      Navigator.pop(context);
+      // Defer Navigator.pop until after the current frame completes
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      });
     }
   }
 
@@ -502,50 +507,23 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     });
 
     try {
-      setState(() {
-        _loadingProgress = 'Loading model into memory...';
-      });
-
-      // Load model based on context/modality using real SDK
-      switch (widget.context) {
-        case ModelSelectionContext.llm:
-          debugPrint('🎯 Loading LLM model: ${model.id}');
-          await sdk.RunAnywhere.loadModel(model.id);
-          break;
-        case ModelSelectionContext.stt:
-          debugPrint('🎯 Loading STT model: ${model.id}');
-          await sdk.RunAnywhere.loadSTTModel(model.id);
-          break;
-        case ModelSelectionContext.tts:
-          debugPrint('🎯 Loading TTS voice: ${model.id}');
-          await sdk.RunAnywhere.loadTTSVoice(model.id);
-          break;
-        case ModelSelectionContext.voice:
-          // Determine based on model category
-          if (model.category == ModelCategory.speechRecognition) {
-            debugPrint('🎯 Loading Voice STT model: ${model.id}');
-            await sdk.RunAnywhere.loadSTTModel(model.id);
-          } else if (model.category == ModelCategory.speechSynthesis) {
-            debugPrint('🎯 Loading Voice TTS voice: ${model.id}');
-            await sdk.RunAnywhere.loadTTSVoice(model.id);
-          } else {
-            debugPrint('🎯 Loading Voice LLM model: ${model.id}');
-            await sdk.RunAnywhere.loadModel(model.id);
-          }
-          break;
-      }
-
-      setState(() {
-        _loadingProgress = 'Model loaded successfully!';
-      });
-
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-
+      // Update view model selection state
       await _viewModel.selectModel(model);
+
+      // Call the callback - this is where the actual model loading happens
+      // The callback knows the correct context and how to load the model
+      debugPrint('🎯 Model selected: ${model.id}, calling callback to load');
       await widget.onModelSelected(model);
 
       if (mounted) {
-        Navigator.pop(context);
+        // Defer Navigator.pop until after the current frame completes
+        // This prevents the !_debugLocked assertion when the callback triggers
+        // navigation (e.g., loading a VLM model may trigger state changes)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.pop(context);
+          }
+        });
       }
     } catch (e) {
       debugPrint('❌ Failed to load model: $e');

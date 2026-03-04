@@ -6,7 +6,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.util.Log
+import timber.log.Timber
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -20,8 +20,6 @@ import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.sqrt
-
-private const val TAG = "AudioCaptureService"
 
 /**
  * Service for capturing audio from the device microphone
@@ -74,7 +72,7 @@ class AudioCaptureService(
     fun startCapture(): Flow<ByteArray> =
         callbackFlow {
             if (!hasRecordPermission()) {
-                Log.e(TAG, "No RECORD_AUDIO permission")
+                Timber.e("No RECORD_AUDIO permission")
                 close(SecurityException("RECORD_AUDIO permission not granted"))
                 return@callbackFlow
             }
@@ -93,14 +91,14 @@ class AudioCaptureService(
                     )
 
                 if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                    Log.e(TAG, "AudioRecord failed to initialize")
+                    Timber.e("AudioRecord failed to initialize")
                     close(IllegalStateException("AudioRecord initialization failed"))
                     return@callbackFlow
                 }
 
                 audioRecord?.startRecording()
                 _isRecording.value = true
-                Log.i(TAG, "Audio capture started (${SAMPLE_RATE}Hz, chunk size: $chunkSize)")
+                Timber.i("Audio capture started (${SAMPLE_RATE}Hz, chunk size: $chunkSize)")
 
                 // Launch a coroutine on IO dispatcher to read audio
                 val readJob =
@@ -120,7 +118,7 @@ class AudioCaptureService(
                                 // trySend is safe to call from any context in callbackFlow
                                 trySend(chunk)
                             } else if (bytesRead < 0) {
-                                Log.w(TAG, "AudioRecord read error: $bytesRead")
+                                Timber.w("AudioRecord read error: $bytesRead")
                                 break
                             }
                         }
@@ -128,12 +126,12 @@ class AudioCaptureService(
 
                 // Wait for cancellation
                 awaitClose {
-                    Log.d(TAG, "Flow closing, stopping audio capture")
+                    Timber.d("Flow closing, stopping audio capture")
                     readJob.cancel()
                     stopCaptureInternal()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in audio capture: ${e.message}")
+                Timber.e("Error in audio capture: ${e.message}")
                 stopCaptureInternal()
                 close(e)
             }
@@ -154,9 +152,9 @@ class AudioCaptureService(
             audioRecord = null
             _isRecording.value = false
             _audioLevel.value = 0f
-            Log.d(TAG, "Audio capture stopped")
+            Timber.d("Audio capture stopped")
         } catch (e: Exception) {
-            Log.w(TAG, "Error stopping audio capture: ${e.message}")
+            Timber.w("Error stopping audio capture: ${e.message}")
         }
     }
 

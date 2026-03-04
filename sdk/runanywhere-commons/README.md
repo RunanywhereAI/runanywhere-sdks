@@ -239,7 +239,7 @@ rac_shutdown();
 | `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
 | `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
 | `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
-| `RAC_BACKEND_WHISPERCPP` | ON | Build WhisperCPP backend (when BACKENDS=ON) |
+| `RAC_BACKEND_WHISPERCPP` | OFF | Build WhisperCPP backend (when BACKENDS=ON) |
 
 ### Platform-Specific Builds
 

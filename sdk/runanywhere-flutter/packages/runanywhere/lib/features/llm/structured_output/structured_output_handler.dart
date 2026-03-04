@@ -1,7 +1,6 @@
-import 'dart:async';
-
 import 'dart:convert';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/public/types/structured_output_types.dart';
 
 /// Handles structured output generation and validation
 /// Matches iOS StructuredOutputHandler from Features/LLM/StructuredOutput/StructuredOutputHandler.swift
@@ -50,9 +49,6 @@ Remember: Output ONLY the JSON object, nothing else.
     final instructions = '''
 CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
 
-JSON Schema:
-${config.schema}
-
 RULES:
 1. Start your response with { and end with }
 2. Include NO text before the opening {
@@ -67,8 +63,11 @@ IMPORTANT: Your entire response must be valid JSON that can be parsed. Do not in
 
     return '''
 System: You are a JSON generator. You must output only valid JSON.
-
+Convert this data:
 $originalPrompt
+
+Use the following JSON Schema:
+${config.schema}
 
 $instructions
 
@@ -83,15 +82,22 @@ Remember: Output ONLY the JSON object, nothing else.
     final jsonString = extractJSON(text);
 
     // Parse JSON
-    final jsonData = jsonDecode(jsonString);
+    try {
+      final jsonData = jsonDecode(jsonString);
 
-    if (jsonData is! Map<String, dynamic>) {
-      throw StructuredOutputError.validationFailed(
-        'Expected JSON object, got ${jsonData.runtimeType}',
-      );
+      if (jsonData is! Map<String, dynamic>) {
+        throw StructuredOutputError.validationFailed(
+          'Expected JSON object, got ${jsonData.runtimeType}',
+        );
+      }
+
+      return fromJson(jsonData);
+    } on FormatException catch (e) {
+      throw StructuredOutputError.invalidJSON(
+          'Invalid JSON format: ${e.message}');
+    } catch (e) {
+      throw StructuredOutputError.invalidJSON(e.toString());
     }
-
-    return fromJson(jsonData);
   }
 
   /// Extract JSON from potentially mixed text
@@ -240,89 +246,4 @@ class _BraceMatch {
   final int start;
   final int end;
   _BraceMatch({required this.start, required this.end});
-}
-
-/// Structured output validation result
-/// Matches iOS StructuredOutputValidation
-class StructuredOutputValidation {
-  final bool isValid;
-  final bool containsJSON;
-  final String? error;
-
-  const StructuredOutputValidation({
-    required this.isValid,
-    required this.containsJSON,
-    this.error,
-  });
-}
-
-/// Structured output errors
-/// Matches iOS StructuredOutputError
-class StructuredOutputError implements Exception {
-  final String message;
-
-  StructuredOutputError(this.message);
-
-  factory StructuredOutputError.invalidJSON(String detail) {
-    return StructuredOutputError('Invalid JSON: $detail');
-  }
-
-  factory StructuredOutputError.validationFailed(String detail) {
-    return StructuredOutputError('Validation failed: $detail');
-  }
-
-  factory StructuredOutputError.extractionFailed(String detail) {
-    return StructuredOutputError(
-        'Failed to extract structured output: $detail');
-  }
-
-  factory StructuredOutputError.unsupportedType(String type) {
-    return StructuredOutputError(
-        'Unsupported type for structured output: $type');
-  }
-
-  @override
-  String toString() => message;
-}
-
-/// Configuration for structured output generation
-/// Matches iOS StructuredOutputConfig from Features/LLM/StructuredOutput/
-class StructuredOutputConfig {
-  /// The type being generated
-  final Type type;
-
-  /// JSON schema describing the expected output
-  final String schema;
-
-  /// Whether to include schema instructions in the prompt
-  final bool includeSchemaInPrompt;
-
-  /// Name for the structured output (optional)
-  final String? name;
-
-  /// Whether to enforce strict schema validation
-  final bool strict;
-
-  const StructuredOutputConfig({
-    required this.type,
-    required this.schema,
-    this.includeSchemaInPrompt = true,
-    this.name,
-    this.strict = false,
-  });
-}
-
-/// Result container for streaming structured output
-/// Matches iOS StructuredOutputStreamResult from Features/LLM/StructuredOutput/
-class StructuredOutputStreamResult<T> {
-  /// Stream of individual tokens as they are generated
-  final Stream<String> stream;
-
-  /// Future that resolves to the final parsed object
-  final Future<T> result;
-
-  const StructuredOutputStreamResult({
-    required this.stream,
-    required this.result,
-  });
 }

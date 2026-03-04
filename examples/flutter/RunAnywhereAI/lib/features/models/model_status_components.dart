@@ -249,6 +249,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return Icons.volume_up;
       case ModelSelectionContext.voice:
         return Icons.mic;
+      case ModelSelectionContext.vlm:
+        return Icons.center_focus_strong;
     }
   }
 
@@ -262,6 +264,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Text to Speech';
       case ModelSelectionContext.voice:
         return 'Voice Assistant';
+      case ModelSelectionContext.vlm:
+        return 'Vision Language Model';
     }
   }
 
@@ -275,6 +279,8 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Select a text-to-speech model to generate audio. Choose from Piper TTS or System TTS.';
       case ModelSelectionContext.voice:
         return 'Voice assistant requires multiple models. Let\'s set them up together.';
+      case ModelSelectionContext.vlm:
+        return 'Select a vision-language model to analyze images. Point your camera or pick a photo to get AI descriptions.';
     }
   }
 }

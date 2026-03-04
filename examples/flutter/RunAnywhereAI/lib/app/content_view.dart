@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/features/chat/chat_interface_view.dart';
 import 'package:runanywhere_ai/features/settings/combined_settings_view.dart';
+import 'package:runanywhere_ai/features/tools/tools_view.dart';
+import 'package:runanywhere_ai/features/vision/vision_hub_view.dart';
 import 'package:runanywhere_ai/features/voice/speech_to_text_view.dart';
 import 'package:runanywhere_ai/features/voice/text_to_speech_view.dart';
 import 'package:runanywhere_ai/features/voice/voice_assistant_view.dart';
@@ -9,7 +11,7 @@ import 'package:runanywhere_ai/features/voice/voice_assistant_view.dart';
 /// ContentView (mirroring iOS ContentView.swift)
 ///
 /// Main tab-based navigation for the app.
-/// Tabs exactly match iOS: Chat, Transcribe (STT), Speak (TTS), Voice, Settings
+/// Tabs: Chat, Vision, Transcribe (STT), Speak (TTS), Voice, Tools, Settings
 class ContentView extends StatefulWidget {
   const ContentView({super.key});
 
@@ -23,10 +25,12 @@ class _ContentViewState extends State<ContentView> {
   // Tab pages matching iOS structure exactly
   final List<Widget> _pages = const [
     ChatInterfaceView(), // Tab 0: Chat (LLM)
-    SpeechToTextView(), // Tab 1: Speech-to-Text (Transcribe)
-    TextToSpeechView(), // Tab 2: Text-to-Speech (Speak)
-    VoiceAssistantView(), // Tab 3: Voice Assistant (STT + LLM + TTS)
-    CombinedSettingsView(), // Tab 4: Settings (includes Storage)
+    VisionHubView(), // Tab 1: Vision (VLM + Image Generation)
+    SpeechToTextView(), // Tab 2: Speech-to-Text (Transcribe)
+    TextToSpeechView(), // Tab 3: Text-to-Speech (Speak)
+    VoiceAssistantView(), // Tab 4: Voice Assistant (STT + LLM + TTS)
+    ToolsView(), // Tab 5: Tools (Tool Calling)
+    CombinedSettingsView(), // Tab 6: Settings (includes Storage)
   ];
 
   @override
@@ -52,6 +56,11 @@ class _ContentViewState extends State<ContentView> {
             label: 'Chat',
           ),
           NavigationDestination(
+            icon: Icon(Icons.visibility_outlined),
+            selectedIcon: Icon(Icons.visibility),
+            label: 'Vision',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.graphic_eq_outlined),
             selectedIcon: Icon(Icons.graphic_eq),
             label: 'Transcribe',
@@ -65,6 +74,11 @@ class _ContentViewState extends State<ContentView> {
             icon: Icon(Icons.mic_none),
             selectedIcon: Icon(Icons.mic),
             label: 'Voice',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.build_outlined),
+            selectedIcon: Icon(Icons.build),
+            label: 'Tools',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

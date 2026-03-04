@@ -149,6 +149,7 @@ struct FlatModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
+    @State private var downloadStage: DownloadStage = .downloading
 
     private var frameworkColor: Color {
         switch model.framework {
@@ -259,7 +260,7 @@ struct FlatModelRow: View {
                 HStack(spacing: AppSpacing.xSmall) {
                     ProgressView()
                         .scaleEffect(0.6)
-                    Text("\(Int(downloadProgress * 100))%")
+                    Text("\(downloadStage.displayName)… \(Int(downloadProgress * 100))%")
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -348,21 +349,19 @@ struct FlatModelRow: View {
         await MainActor.run {
             isDownloading = true
             downloadProgress = 0.0
+            downloadStage = .downloading
         }
 
         do {
             let progressStream = try await RunAnywhere.downloadModel(model.id)
 
             for await progress in progressStream {
-                await MainActor.run {
-                    self.downloadProgress = progress.percentage
-                }
-
                 switch progress.state {
                 case .completed:
                     await MainActor.run {
                         self.downloadProgress = 1.0
                         self.isDownloading = false
+                        self.downloadStage = .downloading
                         onDownloadCompleted()
                     }
                     return
@@ -371,10 +370,15 @@ struct FlatModelRow: View {
                     await MainActor.run {
                         self.downloadProgress = 0.0
                         self.isDownloading = false
+                        self.downloadStage = .downloading
                     }
                     return
 
                 default:
+                    await MainActor.run {
+                        self.downloadProgress = progress.overallProgress
+                        self.downloadStage = progress.stage
+                    }
                     continue
                 }
             }
@@ -382,6 +386,7 @@ struct FlatModelRow: View {
             await MainActor.run {
                 downloadProgress = 0.0
                 isDownloading = false
+                downloadStage = .downloading
             }
         }
     }

@@ -5,6 +5,13 @@ All notable changes to the RunAnywhere LlamaCpp Backend will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-14
+
+### Changed
+- Updated runanywhere dependency to ^0.16.0
+- Rebuilt native LlamaCPP backend binaries with latest llama.cpp (b7650)
+- Includes parameter piping fix (#340) and network layer improvements from core SDK
+
 ## [0.15.9] - 2025-01-11
 
 ### Changed

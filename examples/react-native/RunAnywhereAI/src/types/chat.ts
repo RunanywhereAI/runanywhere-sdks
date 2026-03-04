@@ -86,6 +86,27 @@ export interface MessageModelInfo {
 }
 
 /**
+ * Tool call information attached to a message
+ * Matches iOS ToolCallInfo
+ */
+export interface ToolCallInfo {
+  /** Name of the tool that was called */
+  toolName: string;
+
+  /** Arguments passed to the tool (JSON string) */
+  arguments: string;
+
+  /** Result from the tool (JSON string, if successful) */
+  result?: string;
+
+  /** Whether the tool call was successful */
+  success: boolean;
+
+  /** Error message (if failed) */
+  error?: string;
+}
+
+/**
  * Chat message
  */
 export interface Message {
@@ -109,6 +130,9 @@ export interface Message {
 
   /** Model info */
   modelInfo?: MessageModelInfo;
+
+  /** Tool call info (for messages that used tools) */
+  toolCallInfo?: ToolCallInfo;
 
   /** Whether the message is still streaming */
   isStreaming?: boolean;

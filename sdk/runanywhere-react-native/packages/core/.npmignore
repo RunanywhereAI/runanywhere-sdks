@@ -7,6 +7,10 @@
 *.log
 .cxx/
 build/
+android/build/
+android/.cxx/
+android/.gradle/
+ios/build/
 
 # IDE
 .idea/

@@ -5,6 +5,23 @@ All notable changes to the RunAnywhere Flutter SDK will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-14
+
+### Added
+- **API Configuration**: Custom API configuration management for flexible backend routing
+- **Keychain Store**: Secure credential storage capabilities via platform keychain
+- **Dev Mode**: Development configuration support for local testing and debugging
+
+### Fixed
+- **Parameter Piping**: Fixed parameter propagation through SDK layers (#340)
+- **Network Layer**: Resolved authentication and dev config networking issues
+- **Simulator Scripts**: Fixed build scripts for iOS simulator targets
+- **Android Models**: Updated model support handling for Android platform
+
+### Changed
+- Updated native binaries (RACommons, RABackendLLAMACPP, RABackendONNX) to latest builds
+- Addressed PR #309 review feedback with critical fixes
+
 ## [0.15.11] - 2025-01-11
 
 ### Fixed

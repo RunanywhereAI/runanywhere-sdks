@@ -19,14 +19,14 @@
 # =============================================================================
 # Version Constants (MUST match Swift Package.swift)
 # =============================================================================
-ONNX_VERSION = "0.1.4"
+ONNX_VERSION = "0.1.6"
 ONNXRUNTIME_VERSION = "1.17.1"
 
 # =============================================================================
 # Binary Source - RABackendONNX from runanywhere-binaries
 # =============================================================================
 GITHUB_ORG = "RunanywhereAI"
-BINARIES_REPO = "runanywhere-binaries"
+BINARIES_REPO = "runanywhere-sdks"
 
 # =============================================================================
 # testLocal Toggle
@@ -36,7 +36,7 @@ TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.tes
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_onnx'
-  s.version          = '0.15.11'
+  s.version          = '0.16.0'
   s.summary          = 'RunAnywhere ONNX: STT, TTS, VAD for Flutter'
   s.description      = <<-DESC
 ONNX Runtime backend for RunAnywhere Flutter SDK. Provides speech-to-text (STT),
@@ -105,7 +105,7 @@ https://github.com/RunanywhereAI/runanywhere-binaries
       rm -rf "$FRAMEWORK_DIR/RABackendONNX.xcframework"
 
       # Download from runanywhere-binaries
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{BINARIES_REPO}/releases/download/core-v$VERSION/RABackendONNX-ios-v$VERSION.zip"
+      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{BINARIES_REPO}/releases/download/commons-v$VERSION/RABackendONNX-ios-v$VERSION.zip"
       ZIP_FILE="/tmp/RABackendONNX.zip"
 
       echo "   URL: $DOWNLOAD_URL"

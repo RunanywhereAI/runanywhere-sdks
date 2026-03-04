@@ -2,6 +2,12 @@
 # See https://pre-commit.com for more information
 
 repos:
+  # Secret scanning (blocks commits containing API keys, tokens, URLs)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
   # General hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
@@ -73,6 +79,7 @@ default_language_version:
 # Skip these hooks during CI (they run in dedicated CI jobs)
 ci:
   skip:
+    - gitleaks
     - android-sdk-lint
     - android-app-lint
     - ios-sdk-swiftlint-fix

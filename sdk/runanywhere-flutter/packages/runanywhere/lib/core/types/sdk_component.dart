@@ -47,6 +47,7 @@ abstract class ComponentOutput {
 enum SDKComponent {
   llm('LLM', 'Language Model', 'llm'),
   stt('STT', 'Speech to Text', 'stt'),
+  vlm('VLM', 'Vision Language Model', 'vlm'),
   tts('TTS', 'Text to Speech', 'tts'),
   vad('VAD', 'Voice Activity Detection', 'vad'),
   voice('VOICE', 'Voice Agent', 'voice'),

@@ -112,4 +112,25 @@ internal object LlamaCPPBridge {
      */
     @JvmStatic
     external fun nativeGetVersion(): String
+
+    // ==========================================================================
+    // VLM Registration JNI Methods
+    // ==========================================================================
+
+    /**
+     * Register the LlamaCPP VLM backend with the C++ service registry.
+     * Mirrors iOS LlamaCPP.registerVLM() pattern.
+     *
+     * @return 0 (RAC_SUCCESS) on success, error code on failure
+     */
+    @JvmStatic
+    external fun nativeRegisterVlm(): Int
+
+    /**
+     * Unregister the LlamaCPP VLM backend from the C++ service registry.
+     *
+     * @return 0 (RAC_SUCCESS) on success, error code on failure
+     */
+    @JvmStatic
+    external fun nativeUnregisterVlm(): Int
 }

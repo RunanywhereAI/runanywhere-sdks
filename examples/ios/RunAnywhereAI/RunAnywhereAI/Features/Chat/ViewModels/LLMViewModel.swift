@@ -33,10 +33,26 @@ final class LLMViewModel {
     private(set) var modelSupportsStreaming = true
     private(set) var currentConversation: Conversation?
 
+    // MARK: - LoRA Adapter State
+
+    private(set) var loraAdapters: [LoRAAdapterInfo] = []
+    private(set) var isLoadingLoRA = false
+
+    // MARK: - LoRA Adapter Catalog State
+
+    private(set) var availableAdapters: [LoraAdapterCatalogEntry] = []
+    private(set) var adapterDownloadProgress: [String: Double] = [:]
+    private(set) var downloadedAdapterPaths: [String: String] = [:]
+    private(set) var isDownloadingAdapter: [String: Bool] = [:]
+
     // MARK: - User Settings
 
     var currentInput = ""
     var useStreaming = true
+    var useToolCalling: Bool {
+        get { ToolSettingsViewModel.shared.toolCallingEnabled }
+        set { ToolSettingsViewModel.shared.toolCallingEnabled = newValue }
+    }
 
     // MARK: - Dependencies
 
@@ -241,6 +257,16 @@ final class LLMViewModel {
         options: LLMGenerationOptions,
         messageIndex: Int
     ) async throws {
+        // Check if tool calling is enabled and we have registered tools
+        let registeredTools = await RunAnywhere.getRegisteredTools()
+        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
+
+        if shouldUseToolCalling {
+            logger.info("Using tool calling with \(registeredTools.count) registered tools")
+            try await generateWithToolCalling(prompt: prompt, options: options, messageIndex: messageIndex)
+            return
+        }
+
         let modelSupportsStreaming = await RunAnywhere.supportsLLMStreaming
         let effectiveUseStreaming = useStreaming && modelSupportsStreaming
 
@@ -257,7 +283,7 @@ final class LLMViewModel {
 
     func clearChat() {
         generationTask?.cancel()
-        
+
         // Generate smart title for the old conversation before creating new one
         if let oldConversation = currentConversation,
            oldConversation.messages.count >= 2 {
@@ -266,7 +292,7 @@ final class LLMViewModel {
                 await self.conversationStore.generateSmartTitleForConversation(conversationId)
             }
         }
-        
+
         messages.removeAll()
         currentInput = ""
         isGenerating = false
@@ -294,6 +320,137 @@ final class LLMViewModel {
         clearChat()
     }
 
+    // MARK: - LoRA Adapter Management
+
+    func loadLoraAdapter(path: String, scale: Float) async {
+        isLoadingLoRA = true
+        error = nil
+        do {
+            try await RunAnywhere.loadLoraAdapter(LoRAAdapterConfig(path: path, scale: scale))
+            await refreshLoraAdapters()
+            logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
+        } catch {
+            logger.error("Failed to load LoRA adapter: \(error)")
+            self.error = error
+        }
+        isLoadingLoRA = false
+    }
+
+    func removeLoraAdapter(path: String) async {
+        do {
+            try await RunAnywhere.removeLoraAdapter(path)
+            await refreshLoraAdapters()
+        } catch {
+            logger.error("Failed to remove LoRA adapter: \(error)")
+            self.error = error
+        }
+    }
+
+    func clearLoraAdapters() async {
+        do {
+            try await RunAnywhere.clearLoraAdapters()
+            loraAdapters = []
+        } catch {
+            logger.error("Failed to clear LoRA adapters: \(error)")
+            self.error = error
+        }
+    }
+
+    func refreshLoraAdapters() async {
+        do {
+            loraAdapters = try await RunAnywhere.getLoadedLoraAdapters()
+        } catch {
+            logger.error("Failed to refresh LoRA adapters: \(error)")
+        }
+    }
+
+    // MARK: - LoRA Adapter Catalog & Download
+
+    /// Refreshes the list of available adapters for the currently loaded model from the SDK registry.
+    func refreshAvailableAdapters() async {
+        guard let modelId = ModelListViewModel.shared.currentModel?.id else {
+            availableAdapters = []
+            return
+        }
+        availableAdapters = await RunAnywhere.loraAdaptersForModel(modelId)
+        syncDownloadedAdapterPaths()
+    }
+
+    func isAdapterDownloaded(_ adapter: LoraAdapterCatalogEntry) -> Bool {
+        downloadedAdapterPaths[adapter.id] != nil
+    }
+
+    func localPath(for adapter: LoraAdapterCatalogEntry) -> String? {
+        downloadedAdapterPaths[adapter.id]
+    }
+
+    /// Downloads a catalog adapter from its URL, then loads it.
+    func downloadAndLoadAdapter(_ adapter: LoraAdapterCatalogEntry, scale: Float) async {
+        guard isDownloadingAdapter[adapter.id] != true else { return }
+
+        isDownloadingAdapter[adapter.id] = true
+        adapterDownloadProgress[adapter.id] = 0.0
+        error = nil
+
+        do {
+            let localPath: String
+            if let existing = downloadedAdapterPaths[adapter.id] {
+                localPath = existing
+            } else {
+                localPath = try await downloadAdapter(adapter)
+            }
+            await loadLoraAdapter(path: localPath, scale: scale)
+        } catch {
+            logger.error("Failed to download/load adapter \(adapter.id): \(error)")
+            self.error = error
+        }
+
+        isDownloadingAdapter[adapter.id] = false
+        adapterDownloadProgress[adapter.id] = nil
+    }
+
+    private func downloadAdapter(_ adapter: LoraAdapterCatalogEntry) async throws -> String {
+        let loraDir = Self.loraDownloadDirectory()
+        try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
+        let destinationURL = loraDir.appendingPathComponent(adapter.filename)
+
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            downloadedAdapterPaths[adapter.id] = destinationURL.path
+            return destinationURL.path
+        }
+
+        let delegate = DownloadProgressDelegate { [weak self] progress in
+            Task { @MainActor in
+                self?.adapterDownloadProgress[adapter.id] = progress
+            }
+        }
+
+        let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+
+        downloadedAdapterPaths[adapter.id] = destinationURL.path
+        logger.info("Adapter downloaded to \(destinationURL.path)")
+        return destinationURL.path
+    }
+
+    private func syncDownloadedAdapterPaths() {
+        let loraDir = Self.loraDownloadDirectory()
+        for adapter in availableAdapters {
+            let path = loraDir.appendingPathComponent(adapter.filename).path
+            if FileManager.default.fileExists(atPath: path) {
+                downloadedAdapterPaths[adapter.id] = path
+            }
+        }
+    }
+
+    static func loraDownloadDirectory() -> URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return docs.appendingPathComponent("LoRA", isDirectory: true)
+    }
+
     // MARK: - Private Methods - Message Generation
 
     private func ensureModelIsLoaded() async throws {
@@ -310,17 +467,30 @@ final class LLMViewModel {
     private func getGenerationOptions() -> LLMGenerationOptions {
         let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
 
         let effectiveSettings = (
             temperature: savedTemperature != 0 ? savedTemperature : Self.defaultTemperatureValue,
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
-        return LLMGenerationOptions(
-            maxTokens: effectiveSettings.maxTokens,
-            temperature: Float(effectiveSettings.temperature)
-        )
-    }
+        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+
+    let systemPromptInfo: String = {
+        guard let prompt = effectiveSystemPrompt else { return "nil" }
+        return "set(\(prompt.count) chars)"
+    }()
+
+    logger.info(
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(systemPromptInfo)"
+    )
+
+    return LLMGenerationOptions(
+        maxTokens: effectiveSettings.maxTokens,
+        temperature: Float(effectiveSettings.temperature),
+        systemPrompt: effectiveSystemPrompt
+    )
+}
 
     // MARK: - Internal Methods - Helpers
 
@@ -336,10 +506,12 @@ final class LLMViewModel {
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
 
+        let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
+
         UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
-        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens)")
+        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")")
     }
 
     @objc
@@ -358,6 +530,7 @@ final class LLMViewModel {
                         self.messages.removeFirst()
                     }
                     self.addSystemMessage()
+                    Task { await self.refreshAvailableAdapters() }
                 }
             } else {
                 await self.checkModelStatus()

@@ -1065,5 +1065,3 @@ Integration tests run through platform SDKs:
 
 - [README.md](./README.md) - Getting started guide
 - [../CLAUDE.md](../CLAUDE.md) - AI context and coding guidelines
-- [../../runanywhere-swift/docs/ARCHITECTURE.md](../../runanywhere-swift/docs/ARCHITECTURE.md) - Swift SDK architecture
-- [../../runanywhere-kotlin/docs/ARCHITECTURE.md](../../runanywhere-kotlin/docs/ARCHITECTURE.md) - Kotlin SDK architecture

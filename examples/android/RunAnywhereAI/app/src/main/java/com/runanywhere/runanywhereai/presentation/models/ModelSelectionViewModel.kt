@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.models
 
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,10 +17,14 @@ import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
+import com.runanywhere.sdk.public.extensions.currentVLMModelId
 import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,24 +57,24 @@ class ModelSelectionViewModel(
      */
     private fun subscribeToDownloadEvents() {
         viewModelScope.launch {
-            Log.d(TAG, "📡 Subscribed to download progress events")
+            Timber.d("📡 Subscribed to download progress events")
             EventBus.events
                 .filterIsInstance<ModelEvent>()
                 .collect { event ->
                     when (event.eventType) {
                         ModelEvent.ModelEventType.DOWNLOAD_PROGRESS -> {
                             val progressPercent = ((event.progress ?: 0f) * 100).toInt()
-                            Log.d(TAG, "📊 Download progress: ${event.modelId} - $progressPercent%")
+                            Timber.d("📊 Download progress: ${event.modelId} - $progressPercent%")
                             _uiState.update {
                                 it.copy(loadingProgress = "Downloading... $progressPercent%")
                             }
                         }
                         ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                            Log.d(TAG, "✅ Download completed: ${event.modelId}")
+                            Timber.d("✅ Download completed: ${event.modelId}")
                             loadModelsAndFrameworks() // Refresh models list
                         }
                         ModelEvent.ModelEventType.DOWNLOAD_FAILED -> {
-                            Log.e(TAG, "❌ Download failed: ${event.modelId} - ${event.error}")
+                            Timber.e("❌ Download failed: ${event.modelId} - ${event.error}")
                             _uiState.update {
                                 it.copy(
                                     isLoadingModel = false,
@@ -99,18 +103,18 @@ class ModelSelectionViewModel(
     private fun loadModelsAndFrameworks() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "🔄 Loading models and frameworks for context: $context")
+                Timber.d("🔄 Loading models and frameworks for context: $context")
 
                 // Call SDK to get available models
                 val allModels = RunAnywhere.availableModels()
-                Log.d(TAG, "📦 Fetched ${allModels.size} total models from SDK")
+                Timber.d("📦 Fetched ${allModels.size} total models from SDK")
 
                 // Filter models by context - matches iOS relevantCategories filtering
                 val filteredModels =
                     allModels.filter { model ->
                         isModelRelevantForContext(model.category, context)
                     }
-                Log.d(TAG, "📦 Filtered to ${filteredModels.size} models for context $context")
+                Timber.d("📦 Filtered to ${filteredModels.size} models for context $context")
 
                 // Extract unique frameworks from filtered models
                 val relevantFrameworks =
@@ -123,12 +127,12 @@ class ModelSelectionViewModel(
                 // For TTS context, ensure System TTS is included (matches iOS behavior)
                 if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(InferenceFramework.SYSTEM_TTS)) {
                     relevantFrameworks.add(0, InferenceFramework.SYSTEM_TTS)
-                    Log.d(TAG, "📱 Added System TTS for TTS context")
+                    Timber.d("📱 Added System TTS for TTS context")
                 }
 
-                Log.d(TAG, "✅ Loaded ${filteredModels.size} models and ${relevantFrameworks.size} frameworks")
+                Timber.d("✅ Loaded ${filteredModels.size} models and ${relevantFrameworks.size} frameworks")
                 relevantFrameworks.forEach { fw ->
-                    Log.d(TAG, "   Framework: ${fw.displayName}")
+                    Timber.d("   Framework: ${fw.displayName}")
                 }
 
                 // Sync with currently loaded model from SDK
@@ -142,7 +146,7 @@ class ModelSelectionViewModel(
                     }
 
                 if (currentLoadedModel != null) {
-                    Log.d(TAG, "✅ Found currently loaded model for context $context: ${currentLoadedModel.id}")
+                    Timber.d("✅ Found currently loaded model for context $context: ${currentLoadedModel.id}")
                 }
 
                 _uiState.update {
@@ -155,7 +159,7 @@ class ModelSelectionViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Failed to load models: ${e.message}", e)
+                Timber.e(e, "❌ Failed to load models: ${e.message}")
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -170,46 +174,55 @@ class ModelSelectionViewModel(
      * Get the currently loaded model ID for this context from the SDK.
      * This syncs the selection sheet with what's actually loaded in memory.
      * Matches iOS's pattern of querying currentModelId from CppBridge.
+     *
+     * RAG contexts (RAG_EMBEDDING, RAG_LLM) return null — RAG models are selected
+     * by file path at pipeline creation time and are not pre-loaded into memory.
+     * This mirrors iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
     private fun getCurrentLoadedModelIdForContext(): String? {
-        return when (context) {
-            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
-            ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
-            ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
-            ModelSelectionContext.VOICE -> {
-                // For voice context, we could return any of the three
-                // but typically the voice sheet doesn't auto-select
-                null
-            }
-        }
+    return when (context) {
+        ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
+        ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
+        ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
+        ModelSelectionContext.VOICE -> null
+        ModelSelectionContext.RAG_EMBEDDING,
+        ModelSelectionContext.RAG_LLM -> null
+        ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
     }
+}
 
     /**
      * Check if a model category is relevant for the current selection context
      */
     private fun isModelRelevantForContext(
-        category: ModelCategory,
-        ctx: ModelSelectionContext,
-    ): Boolean {
-        return when (ctx) {
-            ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
-            ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
-            ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
-            ModelSelectionContext.VOICE ->
-                category in
-                    listOf(
-                        ModelCategory.LANGUAGE,
-                        ModelCategory.SPEECH_RECOGNITION,
-                        ModelCategory.SPEECH_SYNTHESIS,
-                    )
-        }
+    category: ModelCategory,
+    ctx: ModelSelectionContext,
+): Boolean {
+    return when (ctx) {
+        ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
+        ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
+        ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+        ModelSelectionContext.VOICE ->
+            category in listOf(
+                ModelCategory.LANGUAGE,
+                ModelCategory.SPEECH_RECOGNITION,
+                ModelCategory.SPEECH_SYNTHESIS,
+            )
+        ModelSelectionContext.RAG_EMBEDDING ->
+            category == ModelCategory.EMBEDDING
+        ModelSelectionContext.RAG_LLM ->
+            category == ModelCategory.LANGUAGE
+        ModelSelectionContext.VLM ->
+            category == ModelCategory.MULTIMODAL ||
+            category == ModelCategory.VISION
     }
+}
 
     /**
      * Toggle framework expansion
      */
     fun toggleFramework(framework: InferenceFramework) {
-        Log.d(TAG, "🔀 Toggling framework: ${framework.displayName}")
+        Timber.d("🔀 Toggling framework: ${framework.displayName}")
         _uiState.update {
             it.copy(
                 expandedFramework = if (it.expandedFramework == framework) null else framework,
@@ -232,7 +245,7 @@ class ModelSelectionViewModel(
     fun startDownload(modelId: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "⬇️ Starting download for model: $modelId")
+                Timber.d("⬇️ Starting download for model: $modelId")
 
                 _uiState.update {
                     it.copy(
@@ -245,7 +258,7 @@ class ModelSelectionViewModel(
                 // Call SDK download API - it returns a Flow<DownloadProgress>
                 RunAnywhere.downloadModel(modelId)
                     .catch { e ->
-                        Log.e(TAG, "❌ Download stream error: ${e.message}")
+                        Timber.e("❌ Download stream error: ${e.message}")
                         _uiState.update {
                             it.copy(
                                 isLoadingModel = false,
@@ -257,13 +270,13 @@ class ModelSelectionViewModel(
                     }
                     .collect { progress ->
                         val percent = (progress.progress * 100).toInt()
-                        Log.d(TAG, "📥 Download progress: $percent%")
+                        Timber.d("📥 Download progress: $percent%")
                         _uiState.update {
                             it.copy(loadingProgress = "Downloading... $percent%")
                         }
                     }
 
-                Log.d(TAG, "✅ Download completed for $modelId")
+                Timber.d("✅ Download completed for $modelId")
 
                 // Small delay to ensure registry update propagates
                 delay(500)
@@ -279,7 +292,7 @@ class ModelSelectionViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Download failed for $modelId: ${e.message}", e)
+                Timber.e(e, "❌ Download failed for $modelId: ${e.message}")
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
@@ -295,10 +308,14 @@ class ModelSelectionViewModel(
     /**
      * Select and load model - context-aware loading
      * Matches iOS context-based loading
+     *
+     * For RAG contexts (RAG_EMBEDDING, RAG_LLM), the model is selected but NOT loaded into
+     * memory — RAG models are referenced by file path at pipeline creation time.
+     * This matches iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
     suspend fun selectModel(modelId: String) {
         try {
-            Log.d(TAG, "🔄 Loading model into memory: $modelId (context: $context)")
+            Timber.d("🔄 Loading model into memory: $modelId (context: $context)")
 
             _uiState.update {
                 it.copy(
@@ -310,41 +327,48 @@ class ModelSelectionViewModel(
 
             // Context-aware model loading - matches iOS exactly
             when (context) {
-                ModelSelectionContext.LLM -> {
-                    RunAnywhere.loadLLMModel(modelId)
-                }
-                ModelSelectionContext.STT -> {
-                    RunAnywhere.loadSTTModel(modelId)
-                }
-                ModelSelectionContext.TTS -> {
-                    RunAnywhere.loadTTSVoice(modelId)
-                }
-                ModelSelectionContext.VOICE -> {
-                    // For voice context, determine from model category
-                    val model = _uiState.value.models.find { it.id == modelId }
-                    when (model?.category) {
-                        ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
-                        ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
-                        else -> RunAnywhere.loadLLMModel(modelId)
-                    }
-                }
-            }
+    ModelSelectionContext.LLM -> {
+        RunAnywhere.loadLLMModel(modelId)
+    }
+    ModelSelectionContext.STT -> {
+        RunAnywhere.loadSTTModel(modelId)
+    }
+    ModelSelectionContext.TTS -> {
+        RunAnywhere.loadTTSVoice(modelId)
+    }
+    ModelSelectionContext.VOICE -> {
+        val model = _uiState.value.models.find { it.id == modelId }
+        when (model?.category) {
+            ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
+            ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
+            else -> RunAnywhere.loadLLMModel(modelId)
+        }
+    }
+    ModelSelectionContext.RAG_EMBEDDING,
+    ModelSelectionContext.RAG_LLM -> {
+        // RAG models are referenced by file path only
+        Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
+    }
+    ModelSelectionContext.VLM -> {
+        RunAnywhere.loadVLMModel(modelId)
+    }
+}
 
-            Log.d(TAG, "✅ Model loaded successfully: $modelId")
+            Timber.d("✅ Model selected successfully: $modelId")
 
             // Get the loaded model
             val loadedModel = _uiState.value.models.find { it.id == modelId }
 
             _uiState.update {
                 it.copy(
-                    loadingProgress = "Model loaded successfully!",
+                    loadingProgress = "Model selected!",
                     isLoadingModel = false,
                     selectedModelId = null,
                     currentModel = loadedModel,
                 )
             }
         } catch (e: Exception) {
-            Log.e(TAG, "❌ Failed to load model $modelId: ${e.message}", e)
+            Timber.e(e, "❌ Failed to load model $modelId: ${e.message}")
             _uiState.update {
                 it.copy(
                     isLoadingModel = false,
@@ -386,9 +410,7 @@ class ModelSelectionViewModel(
         }
     }
 
-    companion object {
-        private const val TAG = "ModelSelectionVM"
-    }
+    companion object
 }
 
 /**

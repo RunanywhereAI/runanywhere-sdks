@@ -69,15 +69,21 @@ object LlamaCPP : RunAnywhereModule {
     @Volatile
     private var isRegistered = false
 
+    @Volatile
+    private var isVlmRegistered = false
+
     // MARK: - Registration
 
     /**
      * Register LlamaCPP backend with the C++ service registry.
      *
      * This calls `rac_backend_llamacpp_register()` to register the
-     * LlamaCPP service provider with the C++ commons layer.
+     * LlamaCPP service provider with the C++ commons layer, then
+     * also registers the VLM (Vision Language Model) backend.
      *
      * Safe to call multiple times - subsequent calls are no-ops.
+     *
+     * Matches iOS LlamaCPP.register() which registers both LLM and VLM.
      *
      * @param priority Ignored (C++ uses its own priority system)
      */
@@ -102,7 +108,41 @@ object LlamaCPP : RunAnywhereModule {
         }
 
         isRegistered = true
-        logger.info("LlamaCPP backend registered successfully")
+        logger.info("LlamaCPP LLM backend registered successfully")
+
+        // Register VLM backend (Vision Language Model) — matches iOS pattern
+        registerVLM()
+    }
+
+    /**
+     * Register VLM (Vision Language Model) backend.
+     * Matches iOS LlamaCPP.registerVLM() exactly.
+     *
+     * Wrapped in UnsatisfiedLinkError handling because the VLM JNI symbols
+     * may not be present in older native library builds. In that case, LLM
+     * features continue to work normally — only VLM is unavailable.
+     */
+    private fun registerVLM() {
+        if (isVlmRegistered) return
+
+        logger.info("Registering LlamaCPP VLM backend...")
+
+        try {
+            val vlmResult = registerVlmNative()
+
+            if (vlmResult != 0 && vlmResult != -4) { // RAC_ERROR_MODULE_ALREADY_REGISTERED = -4
+                logger.warning("LlamaCPP VLM registration failed with code: $vlmResult (VLM features may not be available)")
+                return
+            }
+
+            isVlmRegistered = true
+            logger.info("LlamaCPP VLM backend registered successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            logger.warning(
+                "LlamaCPP VLM native symbols not found — native library does not include VLM support. " +
+                    "LLM features work normally. VLM will be available when native libs are rebuilt with VLM support.",
+            )
+        }
     }
 
     /**
@@ -110,6 +150,18 @@ object LlamaCPP : RunAnywhereModule {
      */
     fun unregister() {
         if (!isRegistered) return
+
+        // Unregister VLM backend first (matches iOS unregister order)
+        if (isVlmRegistered) {
+            try {
+                unregisterVlmNative()
+                isVlmRegistered = false
+                logger.info("LlamaCPP VLM backend unregistered")
+            } catch (e: UnsatisfiedLinkError) {
+                isVlmRegistered = false
+                logger.warning("LlamaCPP VLM unregister skipped — native symbols not available")
+            }
+        }
 
         unregisterNative()
         isRegistered = false
@@ -149,3 +201,15 @@ internal expect fun LlamaCPP.registerNative(): Int
  * Calls rac_backend_llamacpp_unregister() via JNI.
  */
 internal expect fun LlamaCPP.unregisterNative(): Int
+
+/**
+ * Platform-specific VLM native registration.
+ * Calls rac_backend_llamacpp_vlm_register() via JNI.
+ */
+internal expect fun LlamaCPP.registerVlmNative(): Int
+
+/**
+ * Platform-specific VLM native unregistration.
+ * Calls rac_backend_llamacpp_vlm_unregister() via JNI.
+ */
+internal expect fun LlamaCPP.unregisterVlmNative(): Int

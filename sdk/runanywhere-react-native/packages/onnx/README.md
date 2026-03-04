@@ -31,7 +31,7 @@ ONNX Runtime backend for the RunAnywhere React Native SDK. Provides on-device Sp
 ## Requirements
 
 - `@runanywhere/core` (peer dependency)
-- React Native 0.71+
+- React Native 0.74+
 - iOS 15.1+ / Android API 24+
 - Microphone permission (for live recording)
 
@@ -222,9 +222,9 @@ await ONNX.addModel({
 await ONNX.addModel({
   id: 'sherpa-onnx-whisper-small.en',
   name: 'Sherpa Whisper Small (English)',
-  url: 'https://github.com/k2-fsa/sherpa-onnx/releases/.../sherpa-onnx-whisper-small.en.tar.bz2',
+  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
   modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarBz2Archive,
+  artifactType: ModelArtifactType.TarGzArchive,
   memoryRequirement: 250_000_000,
 });
 

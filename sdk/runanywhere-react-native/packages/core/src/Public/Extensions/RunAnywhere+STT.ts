@@ -124,6 +124,9 @@ export async function transcribe(
 
   try {
     const result = JSON.parse(resultJson);
+    if (result.error) {
+      throw new Error(result.error);
+    }
     return {
       text: result.text ?? '',
       segments: result.segments ?? [],
@@ -132,9 +135,11 @@ export async function transcribe(
       duration: result.duration ?? 0,
       alternatives: result.alternatives ?? [],
     };
-  } catch {
+  } catch (err) {
+    if (err instanceof Error) throw err;
     if (resultJson.includes('error')) {
-      throw new Error(resultJson);
+      const errorMatch = resultJson.match(/"error":\s*"([^"]+)"/);
+      throw new Error(errorMatch ? errorMatch[1] : resultJson);
     }
     return {
       text: resultJson,

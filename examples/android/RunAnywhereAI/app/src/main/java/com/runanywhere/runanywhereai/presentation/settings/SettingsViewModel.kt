@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.presentation.settings
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
+import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -34,6 +34,8 @@ data class StoredModelInfo(
  */
 @OptIn(kotlin.time.ExperimentalTime::class)
 data class SettingsUiState(
+    // Logging Configuration
+    val analyticsLogToLocal: Boolean = false,
     // Storage Overview
     val totalStorageSize: Long = 0L,
     val availableSpace: Long = 0L,
@@ -47,6 +49,10 @@ data class SettingsUiState(
     val isBaseURLConfigured: Boolean = false,
     val showApiConfigSheet: Boolean = false,
     val showRestartDialog: Boolean = false,
+    // Generation Settings
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 1000,
+    val systemPrompt: String = "",
     // Loading states
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -77,12 +83,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    // Preference file for general app settings (Analytics, etc)
+    private val settingsPrefs by lazy {
+        application.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
+    }
+
+    // Preference file specifically for LLM generation parameters
+    private val generationPrefs by lazy {
+        application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
     companion object {
-        private const val TAG = "SettingsViewModel"
         private const val ENCRYPTED_PREFS_FILE = "runanywhere_secure_prefs"
+        private const val SETTINGS_PREFS = "runanywhere_settings"
         private const val KEY_API_KEY = "runanywhere_api_key"
         private const val KEY_BASE_URL = "runanywhere_base_url"
         private const val KEY_DEVICE_REGISTERED = "com.runanywhere.sdk.deviceRegistered"
+        private const val KEY_ANALYTICS_LOG_LOCAL = "analyticsLogToLocal"
+
+        // Generation settings constants (match iOS key names)
+        private const val PREFS_NAME = "generation_settings"
+        private const val KEY_TEMPERATURE = "defaultTemperature"
+        private const val KEY_MAX_TOKENS = "defaultMaxTokens"
+        private const val KEY_SYSTEM_PROMPT = "defaultSystemPrompt"
 
         /**
          * Get stored API key (for use at app launch)
@@ -102,7 +125,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val value = prefs.getString(KEY_API_KEY, null)
                 if (value.isNullOrEmpty()) null else value
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to get stored API key", e)
+                Timber.e(e, "Failed to get stored API key")
                 null
             }
         }
@@ -134,7 +157,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     "https://$trimmed"
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to get stored base URL", e)
+                Timber.e(e, "Failed to get stored base URL")
                 null
             }
         }
@@ -145,12 +168,49 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         fun hasCustomConfiguration(context: Context): Boolean {
             return getStoredApiKey(context) != null && getStoredBaseURL(context) != null
         }
+
+        /**
+         * Data class for generation settings
+         */
+        data class GenerationSettings(
+            val temperature: Float,
+            val maxTokens: Int,
+            val systemPrompt: String?
+        )
+
+        /**
+         * Get generation settings (for use by ChatViewModel)
+         */
+        fun getGenerationSettings(context: Context): GenerationSettings {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val temperature = prefs.getFloat(KEY_TEMPERATURE, 0.7f)
+            val maxTokens = prefs.getInt(KEY_MAX_TOKENS, 1000)
+            val systemPrompt = prefs.getString(KEY_SYSTEM_PROMPT, "")
+
+            return GenerationSettings(
+                temperature = temperature,
+                maxTokens = maxTokens,
+                systemPrompt = if (systemPrompt.isNullOrEmpty()) null else systemPrompt
+            )
+        }
     }
 
     init {
+        loadAnalyticsPreference()
         loadApiConfiguration()
+        loadGenerationSettings()
         loadStorageData()
         subscribeToModelEvents()
+    }
+
+    private fun loadAnalyticsPreference() {
+        val value = settingsPrefs.getBoolean(KEY_ANALYTICS_LOG_LOCAL, false)
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+    }
+
+    fun updateAnalyticsLogToLocal(value: Boolean) {
+        _uiState.update { it.copy(analyticsLogToLocal = value) }
+        settingsPrefs.edit().putBoolean(KEY_ANALYTICS_LOG_LOCAL, value).apply()
     }
 
     /**
@@ -163,11 +223,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 .collect { event ->
                     when (event.eventType) {
                         ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
-                            Log.d(TAG, "📥 Model download completed: ${event.modelId}, refreshing storage...")
+                            Timber.d("📥 Model download completed: ${event.modelId}, refreshing storage...")
                             loadStorageData()
                         }
                         ModelEvent.ModelEventType.DELETED -> {
-                            Log.d(TAG, "🗑️ Model deleted: ${event.modelId}, refreshing storage...")
+                            Timber.d("🗑️ Model deleted: ${event.modelId}, refreshing storage...")
                             loadStorageData()
                         }
                         else -> {
@@ -186,7 +246,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                Log.d(TAG, "Loading storage info via storageInfo()...")
+                Timber.d("Loading storage info via storageInfo()...")
 
                 // Use SDK's storageInfo()
                 val storageInfo = RunAnywhere.storageInfo()
@@ -201,11 +261,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         )
                     }
 
-                Log.d(TAG, "Storage info received:")
-                Log.d(TAG, "  - Total space: ${storageInfo.deviceStorage.totalSpace}")
-                Log.d(TAG, "  - Free space: ${storageInfo.deviceStorage.freeSpace}")
-                Log.d(TAG, "  - Model storage size: ${storageInfo.totalModelsSize}")
-                Log.d(TAG, "  - Stored models count: ${storedModels.size}")
+                Timber.d("Storage info received:")
+                Timber.d("  - Total space: ${storageInfo.deviceStorage.totalSpace}")
+                Timber.d("  - Free space: ${storageInfo.deviceStorage.freeSpace}")
+                Timber.d("  - Model storage size: ${storageInfo.totalModelsSize}")
+                Timber.d("  - Stored models count: ${storedModels.size}")
 
                 _uiState.update {
                     it.copy(
@@ -217,9 +277,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                Log.d(TAG, "Storage data loaded successfully")
+                Timber.d("Storage data loaded successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to load storage data", e)
+                Timber.e(e, "Failed to load storage data")
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -243,15 +303,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun deleteModelById(modelId: String) {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Deleting model: $modelId")
+                Timber.d("Deleting model: $modelId")
                 // Use SDK's deleteModel extension function
                 RunAnywhere.deleteModel(modelId)
-                Log.d(TAG, "Model deleted successfully: $modelId")
+                Timber.d("Model deleted successfully: $modelId")
 
                 // Refresh storage data after deletion
                 loadStorageData()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete model: $modelId", e)
+                Timber.e(e, "Failed to delete model: $modelId")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to delete model: ${e.message}")
                 }
@@ -265,14 +325,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun clearCache() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Clearing cache via clearCache()...")
+                Timber.d("Clearing cache via clearCache()...")
                 RunAnywhere.clearCache()
-                Log.d(TAG, "Cache cleared successfully")
+                Timber.d("Cache cleared successfully")
 
                 // Refresh storage data after clearing cache
                 loadStorageData()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear cache", e)
+                Timber.e(e, "Failed to clear cache")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to clear cache: ${e.message}")
                 }
@@ -286,17 +346,85 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Cleaning temp files (via clearing cache)...")
+                Timber.d("Cleaning temp files (via clearing cache)...")
                 // Clean temp files by clearing cache
                 RunAnywhere.clearCache()
-                Log.d(TAG, "Temp files cleaned successfully")
+                Timber.d("Temp files cleaned successfully")
 
                 // Refresh storage data after cleaning
                 loadStorageData()
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clean temp files", e)
+                Timber.e(e, "Failed to clean temp files")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to clean temporary files: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // ========== Generation Settings Management ==========
+
+    /**
+     * Load generation settings from SharedPreferences
+     */
+    private fun loadGenerationSettings() {
+        try {
+            val temperature = generationPrefs.getFloat(KEY_TEMPERATURE, 0.7f)
+            val maxTokens = generationPrefs.getInt(KEY_MAX_TOKENS, 1000)
+            val systemPrompt = generationPrefs.getString(KEY_SYSTEM_PROMPT, "") ?: ""
+
+            _uiState.update {
+                it.copy(
+                    temperature = temperature,
+                    maxTokens = maxTokens,
+                    systemPrompt = systemPrompt
+                )
+            }
+            Timber.d("Generation settings loaded - temperature: $temperature, maxTokens: $maxTokens, systemPrompt length: ${systemPrompt.length}")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to load generation settings")
+        }
+    }
+
+    /**
+     * Update temperature in UI state
+     */
+    fun updateTemperature(value: Float) {
+        _uiState.update { it.copy(temperature = value) }
+    }
+
+    /**
+     * Update max tokens in UI state
+     */
+    fun updateMaxTokens(value: Int) {
+        _uiState.update { it.copy(maxTokens = value) }
+    }
+
+    /**
+     * Update system prompt in UI state
+     */
+    fun updateSystemPrompt(value: String) {
+        _uiState.update { it.copy(systemPrompt = value) }
+    }
+
+    /**
+     * Save generation settings to SharedPreferences
+     */
+    fun saveGenerationSettings() {
+        viewModelScope.launch {
+            try {
+                val currentState = _uiState.value
+                generationPrefs.edit()
+                    .putFloat(KEY_TEMPERATURE, currentState.temperature)
+                    .putInt(KEY_MAX_TOKENS, currentState.maxTokens)
+                    .putString(KEY_SYSTEM_PROMPT, currentState.systemPrompt)
+                    .apply()
+
+                Timber.d("Generation settings saved successfully - temperature: ${currentState.temperature}, maxTokens: ${currentState.maxTokens}")
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to save generation settings")
+                _uiState.update {
+                    it.copy(errorMessage = "Failed to save generation settings: ${e.message}")
                 }
             }
         }
@@ -320,9 +448,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     isBaseURLConfigured = storedBaseURL.isNotEmpty()
                 )
             }
-            Log.d(TAG, "API configuration loaded - apiKey configured: ${storedApiKey.isNotEmpty()}, baseURL configured: ${storedBaseURL.isNotEmpty()}")
+            Timber.d("API configuration loaded - apiKey configured: ${storedApiKey.isNotEmpty()}, baseURL configured: ${storedBaseURL.isNotEmpty()}")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load API configuration", e)
+            Timber.e(e, "Failed to load API configuration")
         }
     }
 
@@ -379,9 +507,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                Log.d(TAG, "API configuration saved successfully - URL: $normalizedURL")
+                Timber.d("API configuration saved successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to save API configuration", e)
+                Timber.e(e, "Failed to save API configuration")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to save API configuration: ${e.message}")
                 }
@@ -413,9 +541,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                Log.d(TAG, "API configuration cleared successfully")
+                Timber.d("API configuration cleared successfully")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear API configuration", e)
+                Timber.e(e, "Failed to clear API configuration")
                 _uiState.update {
                     it.copy(errorMessage = "Failed to clear API configuration: ${e.message}")
                 }
@@ -432,7 +560,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             .edit()
             .remove(KEY_DEVICE_REGISTERED)
             .apply()
-        Log.d(TAG, "Device registration cleared - will re-register on next launch")
+        Timber.d("Device registration cleared - will re-register on next launch")
     }
 
     /**

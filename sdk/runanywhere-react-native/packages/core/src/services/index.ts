@@ -58,7 +58,6 @@ export {
   // Telemetry
   TelemetryService,
   TelemetryCategory,
-  type TelemetryEvent,
   // Endpoints
   APIEndpoints,
   type APIEndpointKey,

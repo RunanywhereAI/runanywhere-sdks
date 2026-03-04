@@ -15,6 +15,12 @@
  */
 
 // =============================================================================
+// Global NitroModules Initialization (MUST be first!)
+// =============================================================================
+
+export { initializeNitroModulesGlobally, getNitroModulesProxySync, isNitroModulesInitialized } from './native/NitroModulesGlobalInit';
+
+// =============================================================================
 // Main SDK
 // =============================================================================
 
@@ -183,7 +189,6 @@ export type {
   HTTPServiceConfig,
   DevModeConfig,
   NetworkConfig,
-  TelemetryEvent,
   APIEndpointKey,
   APIEndpointValue,
 } from './services';
@@ -230,6 +235,23 @@ export {
   requireFileSystemModule,
 } from './native/NativeRunAnywhereCore';
 export type { NativeRunAnywhereCoreModule, FileSystemModule } from './native/NativeRunAnywhereCore';
+
+// =============================================================================
+// Public Extensions (standalone function exports)
+// These are also available via RunAnywhere.* but exported here for direct import
+// =============================================================================
+
+export {
+  getMmprojPath,
+  getModelPath,
+  getAvailableModels,
+  getModelInfo,
+  isModelDownloaded,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  registerModel,
+} from './Public/Extensions/RunAnywhere+Models';
 
 // =============================================================================
 // Nitrogen Spec Types

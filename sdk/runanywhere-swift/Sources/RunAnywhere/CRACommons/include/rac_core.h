@@ -324,6 +324,47 @@ RAC_API rac_result_t rac_register_model(const struct rac_model_info* model);
  */
 RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info** out_model);
 
+/**
+ * Gets model info from the global registry by local path.
+ * Useful when loading models by path instead of model_id.
+ *
+ * @param local_path Local path to search for
+ * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
+ * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
+ */
+RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+
+// =============================================================================
+// GLOBAL LORA REGISTRY API
+// =============================================================================
+
+/**
+ * @brief Get the global LoRA adapter registry singleton
+ *
+ * The registry is lazily created on first access and lives for the process lifetime.
+ *
+ * @return Handle to the global registry (never NULL after first successful call)
+ */
+RAC_API struct rac_lora_registry* rac_get_lora_registry(void);
+
+/**
+ * @brief Register a LoRA adapter in the global registry
+ * @param entry Adapter entry to register (deep-copied internally)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
+
+/**
+ * @brief Query the global registry for adapters compatible with a model
+ * @param model_id Model ID to match
+ * @param out_entries Output: array of matching entries (caller must free with rac_lora_entry_array_free)
+ * @param out_count Output: number of matching entries
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
+                                             struct rac_lora_entry*** out_entries,
+                                             size_t* out_count);
+
 #ifdef __cplusplus
 }
 #endif

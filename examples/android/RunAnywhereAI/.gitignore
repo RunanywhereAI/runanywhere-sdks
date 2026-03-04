@@ -115,3 +115,15 @@ hs_err_pid*
 
 # Detekt
 detekt.sarif
+
+# Native libraries - these come from SDK module dependencies, NOT local copies.
+# NEVER put .so files directly in app/src/main/jniLibs/. They are provided by:
+#   - :sdk:runanywhere-kotlin (core + commons)
+#   - :sdk:runanywhere-kotlin:modules:runanywhere-core-onnx (ONNX/Sherpa-ONNX)
+#   - :sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp (LlamaCPP)
+# Having stale .so here will OVERRIDE the SDK module versions and cause crashes.
+app/src/main/jniLibs/
+
+# Crash/debug log captures
+stt_crash_logcat.txt
+app_logcat.txt
