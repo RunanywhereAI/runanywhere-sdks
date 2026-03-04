@@ -19,6 +19,13 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "RAC_SVC_REG", __VA_ARGS__)
+#else
+#define ALOGD(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -177,30 +184,37 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
     // Find first provider that can handle the request (already sorted by priority)
     // This matches Swift's pattern: registrations.sorted(by:).first(where: canHandle)
     for (const auto& provider : it->second) {
+        ALOGD("Checking provider '%s' (priority=%d)", provider.name.c_str(), provider.priority);
         RAC_LOG_INFO(LOG_CAT, "rac_service_create: Checking provider '%s' (priority=%d)",
                      provider.name.c_str(), provider.priority);
 
         bool can_handle = provider.can_handle(request, provider.user_data);
+        ALOGD("Provider '%s' can_handle=%s", provider.name.c_str(), can_handle ? "TRUE" : "FALSE");
         RAC_LOG_INFO(LOG_CAT, "rac_service_create: Provider '%s' can_handle=%s",
                      provider.name.c_str(), can_handle ? "TRUE" : "FALSE");
 
         if (can_handle) {
+            ALOGD("Calling create for provider '%s'", provider.name.c_str());
             RAC_LOG_INFO(LOG_CAT, "rac_service_create: Calling create for provider '%s'",
                          provider.name.c_str());
             rac_handle_t handle = provider.create(request, provider.user_data);
+            ALOGD("Provider '%s' create returned handle=%p", provider.name.c_str(), handle);
             if (handle != nullptr) {
                 *out_handle = handle;
+                ALOGD("Service created by provider '%s'", provider.name.c_str());
                 RAC_LOG_INFO(LOG_CAT,
                              "rac_service_create: Service created by provider '%s', handle=%p",
                              provider.name.c_str(), handle);
                 return RAC_SUCCESS;
             } else {
+                ALOGD("Provider '%s' create returned nullptr!", provider.name.c_str());
                 RAC_LOG_ERROR(LOG_CAT, "rac_service_create: Provider '%s' create returned nullptr",
                               provider.name.c_str());
             }
         }
     }
 
+    ALOGD("No provider could handle the request");
     RAC_LOG_ERROR(LOG_CAT, "rac_service_create: No provider could handle the request");
     rac_error_set_details("No provider could handle the request");
     return RAC_ERROR_NO_CAPABLE_PROVIDER;

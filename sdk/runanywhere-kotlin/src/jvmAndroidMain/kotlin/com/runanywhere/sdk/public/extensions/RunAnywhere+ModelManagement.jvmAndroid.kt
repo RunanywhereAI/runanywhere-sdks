@@ -104,6 +104,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
                         InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
                         InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.GENIE -> CppBridgeModelRegistry.Framework.GENIE
                         InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
                     },
                 downloadUrl = modelInfo.downloadURL,
@@ -302,6 +303,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
                 CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
                 CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
                 CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+                CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
                 else -> InferenceFramework.UNKNOWN
             },
         downloadURL = bridge.downloadUrl,
@@ -1352,6 +1354,7 @@ private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
                                 2 -> InferenceFramework.ONNX
                                 3 -> InferenceFramework.FOUNDATION_MODELS
                                 4 -> InferenceFramework.SYSTEM_TTS
+                                10 -> InferenceFramework.GENIE
                                 else -> InferenceFramework.UNKNOWN
                             },
                         downloadURL = downloadUrl,

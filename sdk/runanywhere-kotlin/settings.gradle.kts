@@ -50,3 +50,7 @@ include(":modules:runanywhere-core-onnx")
 // Single file: RAGModule.kt which calls rac_backend_rag_register()
 // Matches iOS: Sources/RAGRuntime/RAG.swift
 include(":modules:runanywhere-core-rag")
+
+// Genie module - now distributed as a closed-source AAR from private repo:
+//   com.runanywhere.sdk:runanywhere-genie-android:<version>
+// See: https://github.com/RunanywhereAI/runanywhere-genie

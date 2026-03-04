@@ -57,3 +57,8 @@ project(":runanywhere-core-onnx").projectDir =
 include(":runanywhere-core-rag")
 project(":runanywhere-core-rag").projectDir =
     file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-rag")
+
+// Genie module - Qualcomm NPU-accelerated LLM (Snapdragon 8 Gen 2+)
+// Now distributed as a closed-source AAR from a private repo.
+// Add the dependency in app/build.gradle.kts:
+//   implementation("com.runanywhere.sdk:runanywhere-genie-android:<version>")

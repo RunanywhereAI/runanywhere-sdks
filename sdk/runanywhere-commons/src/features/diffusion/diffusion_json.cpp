@@ -216,6 +216,7 @@ static rac_inference_framework_t parse_preferred_framework(
     if (val == "none") return RAC_FRAMEWORK_NONE;
     if (val == "mlx") return RAC_FRAMEWORK_MLX;
     if (val == "coreml" || val == "core_ml") return RAC_FRAMEWORK_COREML;
+    if (val == "genie" || val == "qnn_genie") return RAC_FRAMEWORK_GENIE;
     if (val == "unknown") return RAC_FRAMEWORK_UNKNOWN;
 
     return fallback;

@@ -220,6 +220,8 @@ dependencies {
     implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
     implementation(project(":runanywhere-core-rag")) // RAG pipeline JNI bindings
+    // Genie: closed-source AAR from private repo (or mavenLocal for dev)
+    implementation("com.runanywhere.sdk:runanywhere-genie-android:0.1.5-SNAPSHOT")
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)

@@ -67,6 +67,7 @@ MAIN_JNILIBS_DIR="${KOTLIN_SDK_DIR}/src/androidMain/jniLibs"
 LLAMACPP_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"
 ONNX_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-onnx/src/androidMain/jniLibs"
 RAG_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-rag/src/androidMain/jniLibs"
+GENIE_JNILIBS_DIR="${KOTLIN_SDK_DIR}/modules/runanywhere-core-genie/src/androidMain/jniLibs"
 
 # Defaults
 MODE="local"
@@ -319,6 +320,7 @@ copy_jni_libs() {
         mkdir -p "${LLAMACPP_JNILIBS_DIR}/${ABI}"
         mkdir -p "${ONNX_JNILIBS_DIR}/${ABI}"
         mkdir -p "${RAG_JNILIBS_DIR}/${ABI}"
+        mkdir -p "${GENIE_JNILIBS_DIR}/${ABI}"
 
         # =======================================================================
         # Main SDK (Commons): Core JNI + libc++_shared.so + librac_commons.so
@@ -440,7 +442,32 @@ copy_jni_libs() {
         else
             log_warn "RAG: librac_backend_rag_jni.so NOT FOUND - JNI bridge missing!"
         fi
-        
+
+        # =======================================================================
+        # Genie Module: Backend + JNI bridge (optional, Qualcomm NPU only)
+        # Pre-built artifacts sourced from:
+        #   1. Commons dist (if build-android.sh staged them)
+        #   2. GENIE_LOCAL_PATH env var
+        #   3. Sibling folder: ../../runanywhere-genie/dist/android/
+        # =======================================================================
+        GENIE_SRC=""
+        if [ -d "${COMMONS_DIST}/genie/${ABI}" ] && [ "$(ls -A "${COMMONS_DIST}/genie/${ABI}/" 2>/dev/null)" ]; then
+            GENIE_SRC="${COMMONS_DIST}/genie/${ABI}"
+        elif [ -n "${GENIE_LOCAL_PATH:-}" ] && [ -d "${GENIE_LOCAL_PATH}/${ABI}" ]; then
+            GENIE_SRC="${GENIE_LOCAL_PATH}/${ABI}"
+        elif [ -d "${KOTLIN_SDK_DIR}/../../runanywhere-genie/dist/android/${ABI}" ]; then
+            GENIE_SRC="${KOTLIN_SDK_DIR}/../../runanywhere-genie/dist/android/${ABI}"
+        fi
+
+        if [ -n "${GENIE_SRC}" ]; then
+            mkdir -p "${GENIE_JNILIBS_DIR}/${ABI}"
+            for so_file in "${GENIE_SRC}"/*.so; do
+                [ -f "$so_file" ] || continue
+                cp "$so_file" "${GENIE_JNILIBS_DIR}/${ABI}/"
+                log_info "Genie: $(basename "$so_file")"
+            done
+        fi
+
     done
 
     log_info "JNI libraries installed"
