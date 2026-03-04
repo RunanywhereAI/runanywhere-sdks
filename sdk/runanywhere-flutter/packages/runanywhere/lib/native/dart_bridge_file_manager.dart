@@ -162,6 +162,112 @@ class DartBridgeFileManager {
     }
   }
 
+  /// Create a model folder and return its path.
+  static String? createModelFolder(String modelId, int framework) {
+    final fn = _lookup<
+        Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
+            Pointer<Utf8>, Size),
+        int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
+            Pointer<Utf8>, int)>('rac_file_manager_create_model_folder');
+    if (fn == null || _callbacksPtr == null) return null;
+
+    final modelIdPtr = modelId.toNativeUtf8();
+    const bufSize = 1024;
+    final outPath = calloc<Uint8>(bufSize).cast<Utf8>();
+    try {
+      final result = fn(_callbacksPtr!, modelIdPtr, framework, outPath, bufSize);
+      if (result != RacResultCode.success) return null;
+      return outPath.toDartString();
+    } finally {
+      calloc.free(modelIdPtr);
+      calloc.free(outPath);
+    }
+  }
+
+  /// Check if a model folder exists.
+  static bool modelFolderExists(String modelId, int framework) {
+    final fn = _lookup<
+        Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
+            Pointer<Int32>, Pointer<Int32>),
+        int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
+            Pointer<Int32>, Pointer<Int32>)>(
+        'rac_file_manager_model_folder_exists');
+    if (fn == null || _callbacksPtr == null) return false;
+
+    final modelIdPtr = modelId.toNativeUtf8();
+    final existsPtr = calloc<Int32>();
+    try {
+      fn(_callbacksPtr!, modelIdPtr, framework, existsPtr, nullptr);
+      return existsPtr.value == RAC_TRUE;
+    } finally {
+      calloc.free(modelIdPtr);
+      calloc.free(existsPtr);
+    }
+  }
+
+  /// Get combined storage information.
+  static StorageInfo? getStorageInfo() {
+    final fn = _lookup<
+        Int32 Function(
+            Pointer<RacFileCallbacksStruct>, Pointer<RacFileManagerStorageInfoStruct>),
+        int Function(Pointer<RacFileCallbacksStruct>,
+            Pointer<RacFileManagerStorageInfoStruct>)>(
+        'rac_file_manager_get_storage_info');
+    if (fn == null || _callbacksPtr == null) return null;
+
+    final infoPtr = calloc<RacFileManagerStorageInfoStruct>();
+    try {
+      final result = fn(_callbacksPtr!, infoPtr);
+      if (result != RacResultCode.success) return null;
+      return StorageInfo(
+        deviceTotal: infoPtr.ref.deviceTotal,
+        deviceFree: infoPtr.ref.deviceFree,
+        modelsSize: infoPtr.ref.modelsSize,
+        cacheSize: infoPtr.ref.cacheSize,
+        tempSize: infoPtr.ref.tempSize,
+        totalAppSize: infoPtr.ref.totalAppSize,
+      );
+    } finally {
+      calloc.free(infoPtr);
+    }
+  }
+
+  /// Check storage availability via C++ rac_file_manager_check_storage.
+  /// Returns full availability result including warnings and recommendations.
+  static StorageAvailability? checkStorageAvailability(int requiredBytes) {
+    final fn = _lookup<
+        Int32 Function(Pointer<RacFileCallbacksStruct>, Int64,
+            Pointer<RacStorageAvailabilityStruct>),
+        int Function(Pointer<RacFileCallbacksStruct>, int,
+            Pointer<RacStorageAvailabilityStruct>)>(
+        'rac_file_manager_check_storage');
+    if (fn == null || _callbacksPtr == null) return null;
+
+    final availPtr = calloc<RacStorageAvailabilityStruct>();
+    try {
+      final result = fn(_callbacksPtr!, requiredBytes, availPtr);
+      if (result != RacResultCode.success) return null;
+      final rec = availPtr.ref.recommendation;
+      return StorageAvailability(
+        isAvailable: availPtr.ref.isAvailable == RAC_TRUE,
+        requiredSpace: availPtr.ref.requiredSpace,
+        availableSpace: availPtr.ref.availableSpace,
+        hasWarning: availPtr.ref.hasWarning == RAC_TRUE,
+        recommendation: rec != nullptr ? rec.toDartString() : null,
+      );
+    } finally {
+      calloc.free(availPtr);
+    }
+  }
+
+  /// Check storage availability for a given number of bytes.
+  /// Convenience wrapper that returns a simple bool.
+  static bool checkStorage(int requiredBytes) {
+    final result = checkStorageAvailability(requiredBytes);
+    if (result == null) return true; // Default to available if check fails
+    return result.isAvailable;
+  }
+
   /// Delete a model folder.
   static bool deleteModel(String modelId, int framework) {
     final fn = _lookup<
@@ -193,6 +299,46 @@ class DartBridgeFileManager {
       return null;
     }
   }
+}
+
+// =============================================================================
+// Storage Info Data Class
+// =============================================================================
+
+/// Storage availability result from C++ rac_file_manager_check_storage.
+class StorageAvailability {
+  final bool isAvailable;
+  final int requiredSpace;
+  final int availableSpace;
+  final bool hasWarning;
+  final String? recommendation;
+
+  const StorageAvailability({
+    required this.isAvailable,
+    required this.requiredSpace,
+    required this.availableSpace,
+    required this.hasWarning,
+    this.recommendation,
+  });
+}
+
+/// Combined storage information from C++ file manager.
+class StorageInfo {
+  final int deviceTotal;
+  final int deviceFree;
+  final int modelsSize;
+  final int cacheSize;
+  final int tempSize;
+  final int totalAppSize;
+
+  const StorageInfo({
+    required this.deviceTotal,
+    required this.deviceFree,
+    required this.modelsSize,
+    required this.cacheSize,
+    required this.tempSize,
+    required this.totalAppSize,
+  });
 }
 
 // =============================================================================

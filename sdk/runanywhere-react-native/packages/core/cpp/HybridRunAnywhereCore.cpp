@@ -411,6 +411,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
 
         // 4b. Initialize file manager bridge (POSIX-based I/O for C++ business logic)
         FileManagerBridge::shared().initialize();
+        FileManagerBridge::shared().createDirectoryStructure();
 
         // 5. Initialize download manager
         result = DownloadBridge::shared().initialize();
@@ -1233,7 +1234,19 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::deleteModel(
     const std::string& modelId) {
     return Promise<bool>::async([modelId]() {
         LOGI("Deleting model: %s", modelId.c_str());
+
+        // Get framework from registry before removing, so we can delete files
+        auto modelInfo = ModelRegistryBridge::shared().getModel(modelId);
+        int framework = modelInfo ? static_cast<int>(modelInfo->framework) : -1;
+
+        // Remove from registry
         rac_result_t result = ModelRegistryBridge::shared().removeModel(modelId);
+
+        // Delete files from disk
+        if (framework >= 0) {
+            FileManagerBridge::shared().deleteModel(modelId, framework);
+        }
+
         return result == RAC_SUCCESS;
     });
 }

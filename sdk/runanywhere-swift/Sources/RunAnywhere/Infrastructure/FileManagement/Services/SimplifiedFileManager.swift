@@ -43,10 +43,9 @@ public class SimplifiedFileManager {
     }
 
     private func createDirectoryStructure() throws {
-        _ = try baseFolder.createSubfolderIfNeeded(withName: "Models")
-        _ = try baseFolder.createSubfolderIfNeeded(withName: "Cache")
-        _ = try baseFolder.createSubfolderIfNeeded(withName: "Temp")
-        _ = try baseFolder.createSubfolderIfNeeded(withName: "Downloads")
+        guard CppBridge.FileManager.createDirectoryStructure() else {
+            throw SDKError.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
+        }
     }
 
     // MARK: - Model Folder Access

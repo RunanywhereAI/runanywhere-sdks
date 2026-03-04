@@ -240,10 +240,10 @@ actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> 
     }
     val type =
         when (category) {
-            ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelType.LLM
-            ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelType.STT
-            ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelType.TTS
-            ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelType.VAD
+            ModelCategory.LANGUAGE -> CppBridgeModelRegistry.ModelCategory.LANGUAGE
+            ModelCategory.SPEECH_RECOGNITION -> CppBridgeModelRegistry.ModelCategory.SPEECH_RECOGNITION
+            ModelCategory.SPEECH_SYNTHESIS -> CppBridgeModelRegistry.ModelCategory.SPEECH_SYNTHESIS
+            ModelCategory.AUDIO -> CppBridgeModelRegistry.ModelCategory.AUDIO
             ModelCategory.VISION -> CppBridgeModelRegistry.ModelCategory.VISION
             ModelCategory.IMAGE_GENERATION -> CppBridgeModelRegistry.ModelCategory.IMAGE_GENERATION
             ModelCategory.MULTIMODAL -> CppBridgeModelRegistry.ModelCategory.MULTIMODAL

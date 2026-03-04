@@ -116,6 +116,9 @@
 // Storage
 #include "rac_storage_analyzer.h"
 
+// File Management
+#include "rac_file_manager.h"
+
 // Device
 #include "rac_device_manager.h"
 

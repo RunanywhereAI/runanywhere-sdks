@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>
+#include <memory>
 #include <string>
 #include <sys/stat.h>
 #include <vector>
@@ -251,6 +252,13 @@ static std::string find_nested_directory(const char* extracted_dir) {
         return visible_dirs[0];
     }
 
+    if (visible_dirs.size() > 1) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "find_nested_directory: found %zu subdirectories in '%s', "
+                        "falling back to root (expected exactly 1)",
+                        visible_dirs.size(), extracted_dir);
+    }
+
     return extracted_dir;
 }
 
@@ -284,24 +292,45 @@ struct orchestrate_context {
 };
 
 /**
+ * Prevent double-free of orchestrate_context when async callbacks race with error paths.
+ *
+ * The context is wrapped in a shared_ptr stored in a shared_ctx_holder.
+ * The holder is passed as raw void* to C callbacks.
+ * Both the caller and the callback own a reference via the shared_ptr,
+ * ensuring the context outlives all users.
+ */
+struct shared_ctx_holder {
+    std::shared_ptr<orchestrate_context> ctx;
+};
+
+/**
  * HTTP progress callback — forwards to download manager which recalculates overall progress.
  */
 static void orchestrate_http_progress(int64_t bytes_downloaded, int64_t total_bytes,
                                       void* callback_user_data) {
-    auto* ctx = static_cast<orchestrate_context*>(callback_user_data);
-    if (!ctx || !ctx->dm_handle) return;
+    auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
+    if (!holder || !holder->ctx || !holder->ctx->dm_handle) return;
 
+    auto& ctx = holder->ctx;
     rac_download_manager_update_progress(ctx->dm_handle, ctx->task_id.c_str(), bytes_downloaded,
                                          total_bytes);
 }
 
 /**
  * HTTP completion callback — handles post-download extraction and cleanup.
+ * Deletes the holder (releasing its shared_ptr reference) when done.
  */
 static void orchestrate_http_complete(rac_result_t result, const char* downloaded_path,
                                       void* callback_user_data) {
-    auto* ctx = static_cast<orchestrate_context*>(callback_user_data);
-    if (!ctx) return;
+    auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
+    if (!holder || !holder->ctx) {
+        delete holder;
+        return;
+    }
+
+    // Take ownership — holder is deleted at every exit path below
+    auto ctx = holder->ctx;
+    delete holder;
 
     if (result != RAC_SUCCESS) {
         // HTTP download failed
@@ -312,7 +341,6 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
         if (ctx->user_complete_callback) {
             ctx->user_complete_callback(ctx->task_id.c_str(), result, nullptr, ctx->user_data);
         }
-        delete ctx;
         return;
     }
 
@@ -345,7 +373,6 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
 
             // Cleanup temp archive
             delete_file(ctx->download_dest_path.c_str());
-            delete ctx;
             return;
         }
 
@@ -392,8 +419,6 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
         ctx->user_complete_callback(ctx->task_id.c_str(), RAC_SUCCESS, final_path.c_str(),
                                     ctx->user_data);
     }
-
-    delete ctx;
 }
 
 // =============================================================================
@@ -469,8 +494,8 @@ rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle,
         return start_result;
     }
 
-    // 5. Create orchestration context for callbacks
-    auto* ctx = new orchestrate_context();
+    // 5. Create orchestration context for callbacks (shared_ptr for safe async lifetime)
+    auto ctx = std::make_shared<orchestrate_context>();
     ctx->dm_handle = dm_handle;
     ctx->model_id = model_id;
     ctx->download_url = download_url;
@@ -485,17 +510,20 @@ rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle,
     ctx->user_complete_callback = complete_callback;
     ctx->user_data = user_data;
 
+    // Wrap in holder for C callback void* — callback takes ownership and deletes holder
+    auto* holder = new shared_ctx_holder{ctx};
+
     // 6. Start HTTP download via platform adapter
     char* http_task_id = nullptr;
     rac_result_t http_result =
         rac_http_download(download_url, download_dest.c_str(), orchestrate_http_progress,
-                          orchestrate_http_complete, ctx, &http_task_id);
+                          orchestrate_http_complete, holder, &http_task_id);
 
     if (http_result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_TAG, "Failed to start HTTP download for: %s", model_id);
         rac_download_manager_mark_failed(dm_handle, task_id, http_result,
                                          "Failed to start HTTP download");
-        delete ctx;
+        delete holder;  // Safe — ctx shared_ptr ref still alive until scope exit
         rac_free(task_id);
         return http_result;
     }
@@ -583,26 +611,37 @@ rac_result_t rac_download_orchestrate_multi(
         // For now we use the platform adapter's synchronous path.
         char* http_task_id = nullptr;
 
-        // For multi-file we need a simpler blocking approach
-        // The complete callback will be called by the platform when done
+        // For multi-file we need a simpler blocking approach.
+        // Use shared_ptr to prevent double-free if callback fires unexpectedly.
         struct multi_file_ctx {
             bool completed;
             rac_result_t result;
             std::string downloaded_path;
         };
 
-        auto* file_ctx = new multi_file_ctx{false, RAC_SUCCESS, ""};
+        auto file_ctx = std::make_shared<multi_file_ctx>(multi_file_ctx{false, RAC_SUCCESS, ""});
+
+        // Wrap in a raw holder for C callback void* — callback takes ownership of the holder
+        struct multi_file_holder {
+            std::shared_ptr<multi_file_ctx> ctx;
+        };
+        auto* file_holder = new multi_file_holder{file_ctx};
 
         auto file_complete = [](rac_result_t result, const char* path, void* ud) {
-            auto* fctx = static_cast<multi_file_ctx*>(ud);
-            fctx->completed = true;
-            fctx->result = result;
-            if (path) fctx->downloaded_path = path;
+            auto* holder = static_cast<multi_file_holder*>(ud);
+            if (!holder || !holder->ctx) {
+                delete holder;
+                return;
+            }
+            holder->ctx->completed = true;
+            holder->ctx->result = result;
+            if (path) holder->ctx->downloaded_path = path;
+            delete holder;
         };
 
         rac_result_t http_result = rac_http_download(
             file_url.c_str(), dest_path.c_str(), nullptr /* no per-file progress */, file_complete,
-            file_ctx, &http_task_id);
+            file_holder, &http_task_id);
 
         if (http_task_id) rac_free(http_task_id);
 
@@ -611,19 +650,18 @@ rac_result_t rac_download_orchestrate_multi(
                 any_failed = true;
                 RAC_LOG_ERROR(LOG_TAG, "Required file download failed to start: %s",
                               file.relative_path);
-                delete file_ctx;
+                // Download never started, so callback won't fire — delete holder safely
+                delete file_holder;
                 break;
             }
             RAC_LOG_WARNING(LOG_TAG, "Optional file download failed to start: %s",
                             file.relative_path);
-            delete file_ctx;
+            // Download never started, so callback won't fire — delete holder safely
+            delete file_holder;
             continue;
         }
 
-        // Note: The HTTP download is asynchronous. For multi-file orchestration,
-        // the platform SDK should handle sequencing. This is a best-effort sequential trigger.
-        // The actual completion will be handled by the platform's async dispatch.
-        delete file_ctx;
+        // Download started — async callback will delete file_holder
     }
 
     if (any_failed) {

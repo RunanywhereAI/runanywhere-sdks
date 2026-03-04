@@ -74,7 +74,7 @@ extension AlamofireDownloadService {
             }
             .validate()
 
-        activeDownloadRequests[taskId] = downloadRequest
+        storeDownloadRequest(downloadRequest, forKey: taskId)
 
         return try await withCheckedThrowingContinuation { continuation in
             downloadRequest.response { response in

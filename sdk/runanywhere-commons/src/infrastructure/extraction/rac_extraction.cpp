@@ -260,23 +260,30 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
             size_t size;
             la_int64_t offset;
 
+            bool data_error = false;
             while (true) {
                 r = archive_read_data_block(a, &buff, &size, &offset);
                 if (r == ARCHIVE_EOF) break;
                 if (r != ARCHIVE_OK) {
                     const char* err = archive_error_string(a);
-                    RAC_LOG_WARNING(kLogTag, "Error reading data for: %s (%s)", pathname,
-                                    err ? err : "unknown");
+                    RAC_LOG_ERROR(kLogTag, "Error reading data for: %s (%s)", pathname,
+                                  err ? err : "unknown");
+                    data_error = true;
                     break;
                 }
                 r = archive_write_data_block(ext, buff, size, offset);
                 if (r != ARCHIVE_OK) {
                     const char* err = archive_error_string(ext);
-                    RAC_LOG_WARNING(kLogTag, "Error writing data for: %s (%s)", pathname,
-                                    err ? err : "unknown");
+                    RAC_LOG_ERROR(kLogTag, "Error writing data for: %s (%s)", pathname,
+                                  err ? err : "unknown");
+                    data_error = true;
                     break;
                 }
                 result.bytes_extracted += static_cast<int64_t>(size);
+            }
+            if (data_error) {
+                status = RAC_ERROR_EXTRACTION_FAILED;
+                break;
             }
         }
 

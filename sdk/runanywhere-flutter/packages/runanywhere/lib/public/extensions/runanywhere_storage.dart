@@ -7,7 +7,6 @@ library runanywhere_storage;
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
-import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -28,15 +27,8 @@ extension RunAnywhereStorage on RunAnywhere {
     double safetyMargin = 0.1,
   }) async {
     try {
-      // C++ file manager handles storage availability checks
-      final modelsDir =
-          DartBridgeModelPaths.instance.getModelsDirectory();
-      if (modelsDir == null) return true;
-
-      final modelsSize = DartBridgeFileManager.modelsStorageUsed();
       final requiredWithMargin = (modelSize * (1 + safetyMargin)).toInt();
-
-      return modelsSize > requiredWithMargin;
+      return DartBridgeFileManager.checkStorage(requiredWithMargin);
     } catch (_) {
       // Default to available if check fails
       return true;

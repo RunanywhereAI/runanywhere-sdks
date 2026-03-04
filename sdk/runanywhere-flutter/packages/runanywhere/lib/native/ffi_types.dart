@@ -1470,6 +1470,19 @@ final class RacFileManagerStorageInfoStruct extends Struct {
   external int totalAppSize;
 }
 
+/// Storage availability struct matching rac_storage_availability_t
+final class RacStorageAvailabilityStruct extends Struct {
+  @Int32()
+  external int isAvailable;
+  @Int64()
+  external int requiredSpace;
+  @Int64()
+  external int availableSpace;
+  @Int32()
+  external int hasWarning;
+  external Pointer<Utf8> recommendation;
+}
+
 // =============================================================================
 // Backward Compatibility Aliases
 // =============================================================================

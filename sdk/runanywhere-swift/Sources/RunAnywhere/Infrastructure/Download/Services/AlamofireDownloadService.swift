@@ -15,7 +15,8 @@ public class AlamofireDownloadService: @unchecked Sendable {
     // MARK: - Properties
 
     let session: Session
-    var activeDownloadRequests: [String: DownloadRequest] = [:]
+    private var activeDownloadRequests: [String: DownloadRequest] = [:]
+    private let requestsQueue = DispatchQueue(label: "com.runanywhere.download.requests")
     let logger = SDKLogger(category: "AlamofireDownloadService")
 
     // MARK: - Services
@@ -67,9 +68,14 @@ public class AlamofireDownloadService: @unchecked Sendable {
     }
 
     public func cancelDownload(taskId: String) {
-        if let downloadRequest = activeDownloadRequests[taskId] {
-            downloadRequest.cancel()
+        let downloadRequest: DownloadRequest? = requestsQueue.sync {
+            guard let request = activeDownloadRequests[taskId] else { return nil }
             activeDownloadRequests.removeValue(forKey: taskId)
+            return request
+        }
+
+        if let downloadRequest {
+            downloadRequest.cancel()
 
             // Notify C++ bridge
             Task {
@@ -85,7 +91,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
 
     /// Pause all active downloads
     public func pauseAll() {
-        activeDownloadRequests.values.forEach { $0.suspend() }
+        requestsQueue.sync { activeDownloadRequests.values }.forEach { $0.suspend() }
         Task {
             try? await CppBridge.Download.shared.pauseAll()
         }
@@ -94,7 +100,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
 
     /// Resume all paused downloads
     public func resumeAll() {
-        activeDownloadRequests.values.forEach { $0.resume() }
+        requestsQueue.sync { activeDownloadRequests.values }.forEach { $0.resume() }
         Task {
             try? await CppBridge.Download.shared.resumeAll()
         }
@@ -167,7 +173,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
             result: Task {
                 defer {
                     progressContinuation.finish()
-                    self.activeDownloadRequests.removeValue(forKey: taskId)
+                    self.requestsQueue.sync { self.activeDownloadRequests.removeValue(forKey: taskId) }
                 }
 
                 do {
@@ -219,7 +225,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
             result: Task {
                 defer {
                     progressContinuation.finish()
-                    self.activeDownloadRequests.removeValue(forKey: taskId)
+                    self.requestsQueue.sync { self.activeDownloadRequests.removeValue(forKey: taskId) }
                 }
 
                 do {
@@ -419,6 +425,16 @@ public class AlamofireDownloadService: @unchecked Sendable {
             "localPath": finalPath.path,
             "fileSize": fileSize
         ])
+    }
+
+    // MARK: - Thread-Safe Request Management
+
+    func storeDownloadRequest(_ request: DownloadRequest, forKey key: String) {
+        requestsQueue.sync { activeDownloadRequests[key] = request }
+    }
+
+    func removeDownloadRequest(forKey key: String) {
+        requestsQueue.sync { _ = activeDownloadRequests.removeValue(forKey: key) }
     }
 
     // MARK: - Helper Methods
