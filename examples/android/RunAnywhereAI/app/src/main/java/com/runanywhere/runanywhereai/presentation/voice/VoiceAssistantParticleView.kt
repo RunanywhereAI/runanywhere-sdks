@@ -388,19 +388,8 @@ private fun DrawScope.drawParticlesBatched(
         }
     }
 
-    // Batch draw all small particles in one call
+    // Batch draw all small particles grouped by quantized color
     if (batchPoints.isNotEmpty()) {
-        // drawPoints with StrokeCap.Round renders small circles efficiently
-        drawPoints(
-            points = batchPoints,
-            pointMode = PointMode.Points,
-            color = Color.Transparent, // overridden per-point below
-            strokeWidth = 4f,
-            cap = StrokeCap.Round,
-        )
-        // Unfortunately drawPoints doesn't support per-point color,
-        // so we draw in color buckets for efficiency.
-        // Group by quantized color to reduce draw calls.
         drawBatchedByColor(batchPoints, batchColors)
     }
 }
