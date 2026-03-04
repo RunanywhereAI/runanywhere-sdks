@@ -13,20 +13,15 @@
 #include <cstring>
 #include <cstdio>
 
-#ifdef __ANDROID__
-#include <android/log.h>
-#define TAG "RACRagJNI"
-#define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
-#define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-#define LOGw(...) __android_log_print(ANDROID_LOG_WARN, TAG, __VA_ARGS__)
-#else
-#define LOGi(...) fprintf(stdout, "[INFO] " __VA_ARGS__); fprintf(stdout, "\n")
-#define LOGe(...) fprintf(stderr, "[ERROR] " __VA_ARGS__); fprintf(stderr, "\n")
-#define LOGw(...) fprintf(stdout, "[WARN] " __VA_ARGS__); fprintf(stdout, "\n")
-#endif
-
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+
+// Route JNI logging through unified RAC_LOG_* system
+static const char* LOG_TAG = "JNI.RAG";
+#define LOGi(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
+#define LOGe(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+#define LOGw(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 #include "rac/features/rag/rac_rag_pipeline.h"
 
 // Forward declarations

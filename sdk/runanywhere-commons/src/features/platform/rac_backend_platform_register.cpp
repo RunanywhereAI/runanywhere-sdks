@@ -799,11 +799,24 @@ void register_coreml_diffusion_entry() {
     rac_model_info_t model = {};
     model.id = strdup("coreml-diffusion");
     model.name = strdup("CoreML Diffusion");
+    model.local_path = strdup("builtin://coreml-diffusion");
+    model.description = strdup(
+        "Platform's Stable Diffusion implementation using Core ML. "
+        "Provides text-to-image, image-to-image, and inpainting capabilities.");
+
+    if (!model.id || !model.name || !model.local_path || !model.description) {
+        RAC_LOG_ERROR(LOG_CAT, "OOM registering coreml-diffusion model");
+        free(model.id);
+        free(model.name);
+        free(model.local_path);
+        free(model.description);
+        return;
+    }
+
     model.category = RAC_MODEL_CATEGORY_IMAGE_GENERATION;
     model.format = RAC_MODEL_FORMAT_COREML;
     model.framework = RAC_FRAMEWORK_COREML;
     model.download_url = nullptr;
-    model.local_path = strdup("builtin://coreml-diffusion");
     model.artifact_info.kind = RAC_ARTIFACT_KIND_BUILT_IN;
     model.download_size = 0;
     model.memory_required = 4000000000;  // ~4GB for SD 1.5
@@ -811,9 +824,6 @@ void register_coreml_diffusion_entry() {
     model.supports_thinking = RAC_FALSE;
     model.tags = nullptr;
     model.tag_count = 0;
-    model.description = strdup(
-        "Platform's Stable Diffusion implementation using Core ML. "
-        "Provides text-to-image, image-to-image, and inpainting capabilities.");
     model.source = RAC_MODEL_SOURCE_LOCAL;
 
     rac_result_t result = rac_model_registry_save(registry, &model);
@@ -837,11 +847,24 @@ void register_foundation_models_entry() {
     rac_model_info_t model = {};
     model.id = strdup("foundation-models-default");
     model.name = strdup("Platform LLM");
+    model.local_path = strdup("builtin://foundation-models");
+    model.description = strdup(
+        "Platform's built-in language model. "
+        "Uses the device's native AI capabilities when available.");
+
+    if (!model.id || !model.name || !model.local_path || !model.description) {
+        RAC_LOG_ERROR(LOG_CAT, "OOM registering foundation-models-default model");
+        free(model.id);
+        free(model.name);
+        free(model.local_path);
+        free(model.description);
+        return;
+    }
+
     model.category = RAC_MODEL_CATEGORY_LANGUAGE;
     model.format = RAC_MODEL_FORMAT_UNKNOWN;
     model.framework = RAC_FRAMEWORK_FOUNDATION_MODELS;
     model.download_url = nullptr;
-    model.local_path = strdup("builtin://foundation-models");
     model.artifact_info.kind = RAC_ARTIFACT_KIND_BUILT_IN;
     model.download_size = 0;
     model.memory_required = 0;
@@ -849,9 +872,6 @@ void register_foundation_models_entry() {
     model.supports_thinking = RAC_FALSE;
     model.tags = nullptr;
     model.tag_count = 0;
-    model.description = strdup(
-        "Platform's built-in language model. "
-        "Uses the device's native AI capabilities when available.");
     model.source = RAC_MODEL_SOURCE_LOCAL;
 
     rac_result_t result = rac_model_registry_save(registry, &model);
@@ -874,11 +894,22 @@ void register_system_tts_entry() {
     rac_model_info_t model = {};
     model.id = strdup("system-tts");
     model.name = strdup("Platform TTS");
+    model.local_path = strdup("builtin://system-tts");
+    model.description = strdup("Platform's built-in Text-to-Speech using native synthesis.");
+
+    if (!model.id || !model.name || !model.local_path || !model.description) {
+        RAC_LOG_ERROR(LOG_CAT, "OOM registering system-tts model");
+        free(model.id);
+        free(model.name);
+        free(model.local_path);
+        free(model.description);
+        return;
+    }
+
     model.category = RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS;
     model.format = RAC_MODEL_FORMAT_UNKNOWN;
     model.framework = RAC_FRAMEWORK_SYSTEM_TTS;
     model.download_url = nullptr;
-    model.local_path = strdup("builtin://system-tts");
     model.artifact_info.kind = RAC_ARTIFACT_KIND_BUILT_IN;
     model.download_size = 0;
     model.memory_required = 0;
@@ -886,7 +917,6 @@ void register_system_tts_entry() {
     model.supports_thinking = RAC_FALSE;
     model.tags = nullptr;
     model.tag_count = 0;
-    model.description = strdup("Platform's built-in Text-to-Speech using native synthesis.");
     model.source = RAC_MODEL_SOURCE_LOCAL;
 
     rac_result_t result = rac_model_registry_save(registry, &model);

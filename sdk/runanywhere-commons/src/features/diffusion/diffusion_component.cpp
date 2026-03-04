@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <random>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -115,11 +116,10 @@ static rac_diffusion_options_t merge_diffusion_options(
  * Generate a unique ID for generation tracking.
  */
 static std::string generate_unique_id() {
-    auto now = std::chrono::high_resolution_clock::now();
-    auto epoch = now.time_since_epoch();
-    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch).count();
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "diffusion_%lld", static_cast<long long>(ns));
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<uint32_t> dis;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "diff_%08x%08x", dis(gen), dis(gen));
     return std::string(buffer);
 }
 
@@ -386,29 +386,27 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_diffusion_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Reset cancellation flag
-    component->cancel_requested = false;
-
-    // Generate unique ID for this generation
-    std::string generation_id = generate_unique_id();
-
-    // Get model ID and name from lifecycle manager
-    const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
-    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
-
-    // Get service from lifecycle manager
+    // Acquire lock only for state reads; release before long-running generation
     rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
-        return result;
-    }
+    rac_diffusion_options_t effective_options;
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Merge user options over component defaults
-    rac_diffusion_options_t effective_options = merge_diffusion_options(
-        component->default_options, options);
+        // Reset cancellation flag (also atomic, but set under lock for consistency)
+        component->cancel_requested = false;
+
+        // Get service from lifecycle manager
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
+            return result;
+        }
+
+        // Merge user options over component defaults
+        effective_options = merge_diffusion_options(component->default_options, options);
+    }
+    // Lock released — safe to do long-running generation
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation: %dx%d, %d steps, guidance=%.1f, scheduler=%d",
@@ -417,8 +415,8 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
 
     auto start_time = std::chrono::steady_clock::now();
 
-    // Perform generation
-    result = rac_diffusion_generate(service, &effective_options, out_result);
+    // Perform generation outside lock
+    rac_result_t result = rac_diffusion_generate(service, &effective_options, out_result);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Generation failed: %d", result);
@@ -483,25 +481,30 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_diffusion_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Reset cancellation flag
-    component->cancel_requested = false;
-
-    // Get service from lifecycle manager
+    // Acquire lock only for state reads; release before long-running generation
     rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
-        if (error_callback) {
-            error_callback(result, "No model loaded", user_data);
-        }
-        return result;
-    }
+    rac_diffusion_options_t effective_options;
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Merge user options over component defaults
-    rac_diffusion_options_t effective_options = merge_diffusion_options(
-        component->default_options, options);
+        // Reset cancellation flag
+        component->cancel_requested = false;
+
+        // Get service from lifecycle manager
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
+            if (error_callback) {
+                error_callback(result, "No model loaded", user_data);
+            }
+            return result;
+        }
+
+        // Merge user options over component defaults
+        effective_options = merge_diffusion_options(component->default_options, options);
+    }
+    // Lock released — safe to do long-running generation
 
     RAC_LOG_INFO("Diffusion.Component",
                  "Starting generation with callbacks: %dx%d, %d steps, stride=%d",
@@ -518,10 +521,10 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
     ctx.start_time = std::chrono::steady_clock::now();
     ctx.generation_id = generate_unique_id();
 
-    // Perform generation with progress
+    // Perform generation with progress (outside lock)
     rac_diffusion_result_t gen_result = {};
-    result = rac_diffusion_generate_with_progress(service, &effective_options,
-                                                  diffusion_progress_wrapper, &ctx, &gen_result);
+    rac_result_t result = rac_diffusion_generate_with_progress(service, &effective_options,
+                                                               diffusion_progress_wrapper, &ctx, &gen_result);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Generation failed: %d", result);

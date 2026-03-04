@@ -33,16 +33,8 @@ int64_t getCurrentTimestamp() {
 }
 
 std::string extractModelIdFromPath(const std::string& path) {
-    std::filesystem::path fsPath(path);
-    std::string filename = fsPath.stem().string();
-
-    // Remove common extensions like .gguf
-    if (fsPath.extension() == ".gguf") {
-        // Already handled by stem()
-    }
-
-    // Clean up the name
-    return filename;
+    const std::filesystem::path fsPath(path);
+    return fsPath.stem().string();
 }
 
 // =============================================================================
@@ -63,60 +55,66 @@ HttpServer::~HttpServer() {
 }
 
 rac_result_t HttpServer::start(const rac_server_config_t& config) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    static constexpr int SERVER_START_POLL_ITERATIONS = 100;
+    static constexpr int SERVER_START_POLL_MS = 100;
 
-    if (running_) {
-        return RAC_ERROR_SERVER_ALREADY_RUNNING;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (running_) {
+            return RAC_ERROR_SERVER_ALREADY_RUNNING;
+        }
+
+        // Validate config
+        if (!config.model_path) {
+            RAC_LOG_ERROR("Server", "model_path is required");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        // Check if model file exists
+        if (!std::filesystem::exists(config.model_path)) {
+            RAC_LOG_ERROR("Server", "Model file not found: %s", config.model_path);
+            return RAC_ERROR_SERVER_MODEL_NOT_FOUND;
+        }
+
+        // Copy configuration
+        config_ = config;
+        host_ = config.host ? config.host : "127.0.0.1";
+        modelPath_ = config.model_path;
+        modelId_ = config.model_id ? config.model_id : extractModelIdFromPath(modelPath_);
+
+        // Load the model
+        rac_result_t rc = loadModel(modelPath_);
+        if (RAC_FAILED(rc)) {
+            return rc;
+        }
+
+        // Create HTTP server
+        server_ = std::make_unique<httplib::Server>();
+
+        // Setup CORS if enabled
+        if (config.enable_cors == RAC_TRUE) {
+            setupCors();
+        }
+
+        // Setup routes
+        setupRoutes();
+
+        // Reset state
+        shouldStop_ = false;
+        activeRequests_ = 0;
+        totalRequests_ = 0;
+        totalTokensGenerated_ = 0;
+        startTime_ = std::chrono::steady_clock::now();
+
+        // Start server thread
+        serverThread_ = std::thread(&HttpServer::serverThread, this);
     }
-
-    // Validate config
-    if (!config.model_path) {
-        RAC_LOG_ERROR("Server", "model_path is required");
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    // Check if model file exists
-    if (!std::filesystem::exists(config.model_path)) {
-        RAC_LOG_ERROR("Server", "Model file not found: %s", config.model_path);
-        return RAC_ERROR_SERVER_MODEL_NOT_FOUND;
-    }
-
-    // Copy configuration
-    config_ = config;
-    host_ = config.host ? config.host : "127.0.0.1";
-    modelPath_ = config.model_path;
-    modelId_ = config.model_id ? config.model_id : extractModelIdFromPath(modelPath_);
-
-    // Load the model
-    rac_result_t rc = loadModel(modelPath_);
-    if (RAC_FAILED(rc)) {
-        return rc;
-    }
-
-    // Create HTTP server
-    server_ = std::make_unique<httplib::Server>();
-
-    // Setup CORS if enabled
-    if (config.enable_cors == RAC_TRUE) {
-        setupCors();
-    }
-
-    // Setup routes
-    setupRoutes();
-
-    // Reset state
-    shouldStop_ = false;
-    activeRequests_ = 0;
-    totalRequests_ = 0;
-    totalTokensGenerated_ = 0;
-    startTime_ = std::chrono::steady_clock::now();
-
-    // Start server thread
-    serverThread_ = std::thread(&HttpServer::serverThread, this);
+    // Lock released — running_ and shouldStop_ are atomic, safe to poll without lock
 
     // Wait for server to be ready (with timeout)
-    for (int i = 0; i < 100; ++i) {  // 10 second timeout
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    for (int i = 0; i < SERVER_START_POLL_ITERATIONS; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_START_POLL_MS));
         if (running_) {
             RAC_LOG_INFO("Server", "RunAnywhere Server started on http://%s:%d",
                          host_.c_str(), config_.port);
@@ -125,12 +123,15 @@ rac_result_t HttpServer::start(const rac_server_config_t& config) {
         }
     }
 
-    // Timeout - something went wrong
+    // Timeout - clean up (shouldStop_ is atomic)
     shouldStop_ = true;
     if (serverThread_.joinable()) {
         serverThread_.join();
     }
+
+    std::lock_guard<std::mutex> lock(mutex_);
     unloadModel();
+    server_.reset();
 
     RAC_LOG_ERROR("Server", "Failed to start server");
     return RAC_ERROR_SERVER_BIND_FAILED;
@@ -172,10 +173,16 @@ bool HttpServer::isRunning() const {
 void HttpServer::getStatus(rac_server_status_t& status) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    // Use thread_local copies so c_str() pointers remain valid after lock release
+    thread_local std::string tl_host;
+    thread_local std::string tl_model_id;
+    tl_host = host_;
+    tl_model_id = modelId_;
+
     status.is_running = running_ ? RAC_TRUE : RAC_FALSE;
-    status.host = host_.c_str();
+    status.host = tl_host.c_str();
     status.port = config_.port;
-    status.model_id = modelId_.c_str();
+    status.model_id = tl_model_id.c_str();
     status.active_requests = activeRequests_;
     status.total_requests = totalRequests_;
     status.total_tokens_generated = totalTokensGenerated_;
@@ -197,11 +204,13 @@ int HttpServer::wait() {
 }
 
 void HttpServer::setRequestCallback(rac_server_request_callback_fn callback, void* userData) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
     requestCallback_ = callback;
     requestCallbackUserData_ = userData;
 }
 
 void HttpServer::setErrorCallback(rac_server_error_callback_fn callback, void* userData) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
     errorCallback_ = callback;
     errorCallbackUserData_ = userData;
 }
@@ -213,8 +222,11 @@ void HttpServer::setupRoutes() {
     // GET /v1/models
     server_->Get("/v1/models", [this, handler](const httplib::Request& req, httplib::Response& res) {
         totalRequests_++;
-        if (requestCallback_) {
-            requestCallback_("GET", "/v1/models", requestCallbackUserData_);
+        {
+            std::lock_guard<std::mutex> lock(callback_mutex_);
+            if (requestCallback_) {
+                requestCallback_("GET", "/v1/models", requestCallbackUserData_);
+            }
         }
         handler->handleModels(req, res);
     });
@@ -224,16 +236,22 @@ void HttpServer::setupRoutes() {
         totalRequests_++;
         activeRequests_++;
 
-        if (requestCallback_) {
-            requestCallback_("POST", "/v1/chat/completions", requestCallbackUserData_);
+        {
+            std::lock_guard<std::mutex> lock(callback_mutex_);
+            if (requestCallback_) {
+                requestCallback_("POST", "/v1/chat/completions", requestCallbackUserData_);
+            }
         }
 
         try {
             handler->handleChatCompletions(req, res);
         } catch (const std::exception& e) {
             RAC_LOG_ERROR("Server", "Error handling chat completions: %s", e.what());
-            if (errorCallback_) {
-                errorCallback_("/v1/chat/completions", RAC_ERROR_UNKNOWN, e.what(), errorCallbackUserData_);
+            {
+                std::lock_guard<std::mutex> lock(callback_mutex_);
+                if (errorCallback_) {
+                    errorCallback_("/v1/chat/completions", RAC_ERROR_UNKNOWN, e.what(), errorCallbackUserData_);
+                }
             }
             res.status = 500;
             res.set_content("{\"error\": {\"message\": \"Internal server error\"}}", "application/json");

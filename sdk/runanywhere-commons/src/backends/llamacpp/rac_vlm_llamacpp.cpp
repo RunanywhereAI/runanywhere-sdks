@@ -35,6 +35,14 @@
 static const char* LOG_CAT = "VLM.LlamaCPP";
 
 // =============================================================================
+// NAMED CONSTANTS
+// =============================================================================
+
+static constexpr int kDefaultMaxContextSize = 4096;
+static constexpr int kDefaultBatchSize = 512;
+static constexpr int kDefaultMaxTokens = 2048;
+
+// =============================================================================
 // INTERNAL BACKEND STATE
 // =============================================================================
 
@@ -73,6 +81,10 @@ struct LlamaCppVLMBackend {
     // Detected model type for chat template
     VLMModelType model_type = static_cast<VLMModelType>(0); // Unknown
 
+    // Cached sampler parameters to avoid unnecessary rebuilds
+    float cached_temperature = -1.0f;
+    float cached_top_p = -1.0f;
+
     // Thread safety
     mutable std::mutex mutex;
 };
@@ -80,12 +92,12 @@ struct LlamaCppVLMBackend {
 /**
  * Get number of CPU threads to use.
  */
-int get_num_threads(int config_threads) {
+int get_num_threads(const int config_threads) {
     if (config_threads > 0)
         return config_threads;
 
     // Auto-detect based on hardware
-    int threads = std::thread::hardware_concurrency();
+    int threads = static_cast<int>(std::thread::hardware_concurrency());
     if (threads <= 0)
         threads = 4;
     if (threads > 8)
@@ -211,59 +223,6 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
 }
 
 /**
- * Legacy format function for backward compatibility.
- * Uses model type detection for manual template selection.
- */
-std::string format_vlm_prompt(VLMModelType model_type, const std::string& user_prompt,
-                               const char* image_marker, bool has_image) {
-    std::string formatted;
-
-    // Build user content with image marker
-    std::string user_content;
-    if (has_image) {
-        user_content = std::string(image_marker) + user_prompt;
-    } else {
-        user_content = user_prompt;
-    }
-
-    switch (model_type) {
-        case VLMModelType::SmolVLM:
-            // SmolVLM format: <|im_start|>User: content \nAssistant:
-            formatted = "<|im_start|>User: ";
-            formatted += user_content;
-            formatted += " \nAssistant:";
-            break;
-
-        case VLMModelType::Qwen2VL:
-            // Qwen2-VL chatml format
-            formatted = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n";
-            formatted += "<|im_start|>user\n";
-            formatted += user_content;
-            formatted += "<|im_end|>\n<|im_start|>assistant\n";
-            break;
-
-        case VLMModelType::LLaVA:
-            // LLaVA/Vicuna format
-            formatted = "USER: ";
-            formatted += user_content;
-            formatted += "\nASSISTANT:";
-            break;
-
-        case VLMModelType::Generic:
-        default:
-            // Generic chatml format
-            formatted = "<|im_start|>user\n";
-            formatted += user_content;
-            formatted += "<|im_end|>\n<|im_start|>assistant\n";
-            break;
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "Formatted prompt (%d chars): %.100s...",
-                  (int)formatted.length(), formatted.c_str());
-    return formatted;
-}
-
-/**
  * Get the image marker string.
  * When mtmd is available, uses the default marker from mtmd.
  * Otherwise falls back to a generic "<image>" marker.
@@ -278,15 +237,10 @@ const char* get_image_marker() {
 
 /**
  * Configure the sampler chain with the given generation parameters.
- * Rebuilds the sampler to apply per-request temperature, top_p, etc.
+ * Only rebuilds the sampler when parameters actually change, avoiding
+ * unnecessary heap allocations on every inference call.
  */
 void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* options) {
-    // Free existing sampler
-    if (backend->sampler) {
-        llama_sampler_free(backend->sampler);
-        backend->sampler = nullptr;
-    }
-
     // Determine parameters from options or use defaults
     float temperature = 0.7f;
     float top_p = 0.9f;
@@ -300,15 +254,167 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
         }
     }
 
-    // Build new sampler chain
+    // Skip rebuild if params haven't changed and sampler already exists
+    if (backend->sampler &&
+        backend->cached_temperature == temperature &&
+        backend->cached_top_p == top_p) {
+        return;
+    }
+
+    // Free existing sampler
+    if (backend->sampler) {
+        llama_sampler_free(backend->sampler);
+        backend->sampler = nullptr;
+    }
+
+    // Build new sampler chain (consistent with LLM backend: greedy when temp <= 0)
     llama_sampler_chain_params sampler_params = llama_sampler_chain_default_params();
+    sampler_params.no_perf = true;  // Disable perf tracking (consistent with LLM backend)
     backend->sampler = llama_sampler_chain_init(sampler_params);
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(top_p, 1));
-    llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+    if (temperature > 0.0f) {
+        llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(top_p, 1));
+        llama_sampler_chain_add(backend->sampler, llama_sampler_init_temp(temperature));
+        llama_sampler_chain_add(backend->sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    } else {
+        llama_sampler_chain_add(backend->sampler, llama_sampler_init_greedy());
+    }
+
+    // Cache the params for next comparison
+    backend->cached_temperature = temperature;
+    backend->cached_top_p = top_p;
 
     RAC_LOG_DEBUG(LOG_CAT, "Sampler configured: temp=%.2f, top_p=%.2f", temperature, top_p);
 }
+
+/**
+ * Prepare the VLM context for generation: reset state, configure sampler,
+ * build prompt, load image (if provided), tokenize, and evaluate.
+ * After success, the backend is ready for token sampling (n_past is set).
+ *
+ * Shared between rac_vlm_llamacpp_process() and rac_vlm_llamacpp_process_stream()
+ * to eliminate code duplication (~100 lines of identical prompt prep logic).
+ */
+rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
+                                  const rac_vlm_image_t* image,
+                                  const char* prompt,
+                                  const rac_vlm_options_t* options) {
+    backend->cancel_requested = false;
+    configure_sampler(backend, options);
+
+    // Clear KV cache before each new request
+    llama_memory_t mem = llama_get_memory(backend->ctx);
+    if (mem) {
+        llama_memory_clear(mem, true);
+    }
+    backend->n_past = 0;
+
+    // Build prompt with image handling
+    std::string full_prompt;
+    bool has_image = false;
+    const char* image_marker = get_image_marker();
+
+#ifdef RAC_VLM_USE_MTMD
+    mtmd_bitmap* bitmap = nullptr;
+
+    if (image && backend->mtmd_ctx) {
+        if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
+            bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
+        } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
+            bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
+        } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64 && image->base64_data) {
+            RAC_LOG_WARNING(LOG_CAT, "Base64 image format not yet supported, using text-only");
+        }
+
+        has_image = (bitmap != nullptr);
+        if (!has_image && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
+            return RAC_ERROR_INVALID_INPUT;
+        }
+    }
+
+    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
+
+    // Tokenize and evaluate with MTMD if image present
+    if (backend->mtmd_ctx && bitmap) {
+        mtmd_input_chunks* chunks = mtmd_input_chunks_init();
+
+        mtmd_input_text text;
+        text.text = full_prompt.c_str();
+        text.add_special = true;
+        text.parse_special = true;
+
+        const mtmd_bitmap* bitmaps[] = { bitmap };
+        int32_t tokenize_result = mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
+
+        if (tokenize_result != 0) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to tokenize prompt with image: %d", tokenize_result);
+            mtmd_bitmap_free(bitmap);
+            mtmd_input_chunks_free(chunks);
+            return RAC_ERROR_PROCESSING_FAILED;
+        }
+
+        llama_pos new_n_past = 0;
+        int32_t eval_result = mtmd_helper_eval_chunks(
+            backend->mtmd_ctx, backend->ctx, chunks,
+            0, 0,
+            backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize,
+            true, &new_n_past
+        );
+
+        mtmd_bitmap_free(bitmap);
+        mtmd_input_chunks_free(chunks);
+
+        if (eval_result != 0) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to evaluate chunks: %d", eval_result);
+            return RAC_ERROR_PROCESSING_FAILED;
+        }
+
+        backend->n_past = new_n_past;
+    } else
+#endif
+    {
+        // Text-only mode
+        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
+
+        const llama_vocab* vocab = llama_model_get_vocab(backend->model);
+        std::vector<llama_token> tokens(full_prompt.size() + 16);
+        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
+                                      tokens.data(), tokens.size(), true, true);
+        if (n_tokens < 0) {
+            tokens.resize(-n_tokens);
+            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
+                                      tokens.data(), tokens.size(), true, true);
+        }
+        tokens.resize(n_tokens);
+
+        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
+        for (int i = 0; i < n_tokens; i++) {
+            batch.token[i] = tokens[i];
+            batch.pos[i] = i;
+            batch.n_seq_id[i] = 1;
+            batch.seq_id[i][0] = 0;
+            batch.logits[i] = (i == n_tokens - 1);
+        }
+        batch.n_tokens = n_tokens;
+
+        if (llama_decode(backend->ctx, batch) != 0) {
+            llama_batch_free(batch);
+            RAC_LOG_ERROR(LOG_CAT, "Failed to decode prompt");
+            return RAC_ERROR_PROCESSING_FAILED;
+        }
+
+        llama_batch_free(batch);
+        backend->n_past = n_tokens;
+    }
+
+    return RAC_SUCCESS;
+}
+
+// Verify backend struct size hasn't grown unexpectedly (catches accidental
+// large member additions that might hurt cache locality).
+static_assert(sizeof(LlamaCppVLMBackend) <= 512,
+              "LlamaCppVLMBackend grew unexpectedly — review member layout");
 
 }  // namespace
 
@@ -383,7 +489,7 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     int ctx_size = backend->config.context_size;
     if (ctx_size <= 0) {
         ctx_size = llama_model_n_ctx_train(backend->model);
-        if (ctx_size > 4096) ctx_size = 4096;  // Cap for mobile
+        if (ctx_size > kDefaultMaxContextSize) ctx_size = kDefaultMaxContextSize;  // Cap for mobile
     }
     backend->context_size = ctx_size;
 
@@ -391,7 +497,7 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     int n_threads = get_num_threads(backend->config.num_threads);
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = ctx_size;
-    ctx_params.n_batch = backend->config.batch_size > 0 ? backend->config.batch_size : 512;
+    ctx_params.n_batch = backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
@@ -512,134 +618,20 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
         return RAC_ERROR_MODEL_NOT_LOADED;
     }
 
-    backend->cancel_requested = false;
-
-    // Reconfigure sampler with per-request options (temperature, top_p)
-    configure_sampler(backend, options);
-
-    // Clear KV cache (memory) before each new request to avoid position conflicts
-    llama_memory_t mem = llama_get_memory(backend->ctx);
-    if (mem) {
-        llama_memory_clear(mem, true);
-    }
-    backend->n_past = 0;
-
-    // Build the prompt with proper chat template formatting
-    std::string full_prompt;
-    bool has_image = false;
-    const char* image_marker = get_image_marker();
-
-#ifdef RAC_VLM_USE_MTMD
-    mtmd_bitmap* bitmap = nullptr;
-
-    if (image && backend->mtmd_ctx) {
-        // Load image based on format
-        if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
-            bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
-        } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
-            bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
-        } else if (image->format == RAC_VLM_IMAGE_FORMAT_BASE64 && image->base64_data) {
-            // Decode base64 first
-            // For now, skip base64 - would need base64 decoder
-            RAC_LOG_WARNING(LOG_CAT, "Base64 image format not yet supported, using text-only");
-        }
-
-        has_image = (bitmap != nullptr);
-        if (!has_image && image->format != RAC_VLM_IMAGE_FORMAT_BASE64) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to load image");
-            return RAC_ERROR_INVALID_INPUT;
-        }
+    // Shared context preparation: reset, configure sampler, build prompt, evaluate
+    rac_result_t prep_result = prepare_vlm_context(backend, image, prompt, options);
+    if (prep_result != RAC_SUCCESS) {
+        return prep_result;
     }
 
-    // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
-
-    // Tokenize and evaluate
-    if (backend->mtmd_ctx && bitmap) {
-        mtmd_input_chunks* chunks = mtmd_input_chunks_init();
-
-        mtmd_input_text text;
-        text.text = full_prompt.c_str();
-        text.add_special = true;
-        text.parse_special = true;
-
-        const mtmd_bitmap* bitmaps[] = { bitmap };
-        int32_t tokenize_result = mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
-
-        if (tokenize_result != 0) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to tokenize prompt with image: %d", tokenize_result);
-            mtmd_bitmap_free(bitmap);
-            mtmd_input_chunks_free(chunks);
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        // Evaluate chunks
-        llama_pos new_n_past = 0;
-        int32_t eval_result = mtmd_helper_eval_chunks(
-            backend->mtmd_ctx,
-            backend->ctx,
-            chunks,
-            0,  // n_past
-            0,  // seq_id
-            backend->config.batch_size > 0 ? backend->config.batch_size : 512,
-            true,  // logits_last
-            &new_n_past
-        );
-
-        mtmd_bitmap_free(bitmap);
-        mtmd_input_chunks_free(chunks);
-
-        if (eval_result != 0) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to evaluate chunks: %d", eval_result);
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        backend->n_past = new_n_past;
-    } else
-#endif
-    {
-        // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
-
-        const llama_vocab* vocab = llama_model_get_vocab(backend->model);
-        std::vector<llama_token> tokens(full_prompt.size() + 16);
-        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
-        if (n_tokens < 0) {
-            tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
-        }
-        tokens.resize(n_tokens);
-
-        // Create batch and decode
-        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
-        for (int i = 0; i < n_tokens; i++) {
-            batch.token[i] = tokens[i];
-            batch.pos[i] = i;
-            batch.n_seq_id[i] = 1;
-            batch.seq_id[i][0] = 0;
-            batch.logits[i] = (i == n_tokens - 1);
-        }
-        batch.n_tokens = n_tokens;
-
-        if (llama_decode(backend->ctx, batch) != 0) {
-            llama_batch_free(batch);
-            RAC_LOG_ERROR(LOG_CAT, "Failed to decode prompt");
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        llama_batch_free(batch);
-        backend->n_past = n_tokens;
-    }
-
-    // Generate response
-    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 2048;
+    // Generate response (batch mode — accumulate all tokens)
+    const int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
     std::string response;
+    response.reserve(kDefaultMaxTokens);  // Typical VLM responses are a few hundred tokens
     int tokens_generated = 0;
 
     llama_batch batch = llama_batch_init(1, 0, 1);
-    const llama_vocab* vocab = llama_model_get_vocab(backend->model);
+    const llama_vocab* const vocab = llama_model_get_vocab(backend->model);
 
     for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
         llama_token token = llama_sampler_sample(backend->sampler, backend->ctx, -1);
@@ -650,7 +642,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
         }
 
         char buf[256];
-        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, true);
+        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
         if (len > 0) {
             response.append(buf, len);
         }
@@ -673,6 +665,10 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 
     // Fill result
     out_result->text = strdup(response.c_str());
+    if (!out_result->text) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate result text");
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->completion_tokens = tokens_generated;
     out_result->prompt_tokens = backend->n_past - tokens_generated;
     out_result->total_tokens = backend->n_past;
@@ -697,126 +693,17 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         return RAC_ERROR_MODEL_NOT_LOADED;
     }
 
-    backend->cancel_requested = false;
-
-    // Reconfigure sampler with per-request options (temperature, top_p)
-    configure_sampler(backend, options);
-
-    // Clear KV cache (memory) before each new request to avoid position conflicts
-    llama_memory_t mem = llama_get_memory(backend->ctx);
-    if (mem) {
-        llama_memory_clear(mem, true);
-    }
-    backend->n_past = 0;
-    RAC_LOG_DEBUG(LOG_CAT, "Cleared KV cache for new request");
-
-    // Build the prompt with proper chat template formatting
-    std::string full_prompt;
-    bool has_image = false;
-    const char* image_marker = get_image_marker();
-
-#ifdef RAC_VLM_USE_MTMD
-    mtmd_bitmap* bitmap = nullptr;
-
-    if (image && backend->mtmd_ctx) {
-        // Load image based on format
-        if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
-            bitmap = mtmd_helper_bitmap_init_from_file(backend->mtmd_ctx, image->file_path);
-        } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
-            bitmap = mtmd_bitmap_init(image->width, image->height, image->pixel_data);
-        }
-
-        has_image = (bitmap != nullptr);
-        if (!has_image) {
-            RAC_LOG_WARNING(LOG_CAT, "Failed to load image, using text-only");
-        }
+    // Shared context preparation: reset, configure sampler, build prompt, evaluate
+    rac_result_t prep_result = prepare_vlm_context(backend, image, prompt, options);
+    if (prep_result != RAC_SUCCESS) {
+        return prep_result;
     }
 
-    // Format prompt using model's built-in chat template
-    full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, has_image);
-
-    // Tokenize and evaluate
-    if (backend->mtmd_ctx && bitmap) {
-        mtmd_input_chunks* chunks = mtmd_input_chunks_init();
-
-        mtmd_input_text text;
-        text.text = full_prompt.c_str();
-        text.add_special = true;
-        text.parse_special = true;
-
-        const mtmd_bitmap* bitmaps[] = { bitmap };
-        int32_t tokenize_result = mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
-
-        if (tokenize_result != 0) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to tokenize prompt with image: %d", tokenize_result);
-            mtmd_bitmap_free(bitmap);
-            mtmd_input_chunks_free(chunks);
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        // Evaluate chunks
-        llama_pos new_n_past = 0;
-        int32_t eval_result = mtmd_helper_eval_chunks(
-            backend->mtmd_ctx,
-            backend->ctx,
-            chunks,
-            0,  // n_past
-            0,  // seq_id
-            backend->config.batch_size > 0 ? backend->config.batch_size : 512,
-            true,  // logits_last
-            &new_n_past
-        );
-
-        mtmd_bitmap_free(bitmap);
-        mtmd_input_chunks_free(chunks);
-
-        if (eval_result != 0) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to evaluate chunks: %d", eval_result);
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        backend->n_past = new_n_past;
-    } else
-#endif
-    {
-        // Text-only mode - still apply chat template for consistent formatting
-        full_prompt = format_vlm_prompt_with_template(backend->model, prompt, image_marker, false);
-
-        const llama_vocab* vocab = llama_model_get_vocab(backend->model);
-        std::vector<llama_token> tokens(full_prompt.size() + 16);
-        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
-        if (n_tokens < 0) {
-            tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
-        }
-        tokens.resize(n_tokens);
-
-        llama_batch batch = llama_batch_init(n_tokens, 0, 1);
-        for (int i = 0; i < n_tokens; i++) {
-            batch.token[i] = tokens[i];
-            batch.pos[i] = i;
-            batch.n_seq_id[i] = 1;
-            batch.seq_id[i][0] = 0;
-            batch.logits[i] = (i == n_tokens - 1);
-        }
-        batch.n_tokens = n_tokens;
-
-        if (llama_decode(backend->ctx, batch) != 0) {
-            llama_batch_free(batch);
-            return RAC_ERROR_PROCESSING_FAILED;
-        }
-
-        llama_batch_free(batch);
-        backend->n_past = n_tokens;
-    }
-
-    // Generate response with streaming
-    int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : 2048;
+    // Generate response (streaming mode — callback per token)
+    const int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
 
     llama_batch batch = llama_batch_init(1, 0, 1);
-    const llama_vocab* vocab = llama_model_get_vocab(backend->model);
+    const llama_vocab* const vocab = llama_model_get_vocab(backend->model);
 
     for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
         llama_token token = llama_sampler_sample(backend->sampler, backend->ctx, -1);
@@ -825,7 +712,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
         bool is_eog = llama_vocab_is_eog(vocab, token);
 
         char buf[256];
-        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, true);
+        int len = llama_token_to_piece(vocab, token, buf, sizeof(buf) - 1, 0, true);
         if (len > 0) {
             buf[len] = '\0';
             if (callback(buf, is_eog ? RAC_TRUE : RAC_FALSE, user_data) == RAC_FALSE) {
@@ -886,6 +773,9 @@ rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
     );
 
     *out_json = strdup(buffer);
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     return RAC_SUCCESS;
 }
 

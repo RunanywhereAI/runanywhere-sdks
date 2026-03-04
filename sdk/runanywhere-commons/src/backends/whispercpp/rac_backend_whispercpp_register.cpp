@@ -51,6 +51,9 @@ static rac_result_t whispercpp_stt_vtable_transcribe(void* impl, const void* aud
                                                      size_t audio_size,
                                                      const rac_stt_options_t* options,
                                                      rac_stt_result_t* out_result) {
+    if (!audio_data || audio_size == 0 || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
     return rac_stt_whispercpp_transcribe(impl, float_samples.data(), float_samples.size(), options,
                                          out_result);
@@ -71,6 +74,7 @@ static rac_result_t whispercpp_stt_vtable_transcribe_stream(void* impl, const vo
     if (status == RAC_SUCCESS && callback && result.text) {
         callback(result.text, RAC_TRUE, user_data);
     }
+    rac_stt_result_free(&result);
     return status;
 }
 

@@ -1,11 +1,11 @@
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
@@ -160,102 +160,23 @@ class DartBridgeModelPaths {
   }
 
   // MARK: - Model File Resolution
-  // Matches Swift: resolveModelFilePath(for:)
 
   /// Resolve the actual model file path for loading.
-  /// For single-file models (LlamaCpp), finds the actual .gguf file.
-  /// For directory-based models (ONNX), returns the folder.
+  /// Delegates to C++ rac_find_model_path_after_extraction() which handles
+  /// all model types: ONNX directories, LlamaCpp .gguf files, nested structures.
   Future<String?> resolveModelFilePath(ModelInfo model) async {
     final modelFolder = getModelFolder(model.id, model.framework);
     if (modelFolder == null) return null;
 
-    // For ONNX models (directory-based), find the model directory
-    if (model.framework == InferenceFramework.onnx) {
-      return _resolveONNXModelPath(modelFolder, model.id);
-    }
+    // Use C++ to find the actual model path (handles all frameworks/formats)
+    final resolved = DartBridgeDownload.findModelPathAfterExtraction(
+      extractedDir: modelFolder,
+      structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect
+      framework: _frameworkToCValue(model.framework),
+      format: model.format.toC(),
+    );
 
-    // For single-file models (LlamaCpp), find the actual file
-    return _resolveSingleFileModelPath(modelFolder, model);
-  }
-
-  /// Resolve ONNX model directory path
-  String _resolveONNXModelPath(String modelFolder, String modelId) {
-    // Check if there's a nested folder with the model name
-    final nestedFolder = '$modelFolder/$modelId';
-    if (Directory(nestedFolder).existsSync()) {
-      if (_hasONNXModelFiles(nestedFolder)) {
-        _logger.info('Found ONNX model at nested path: $nestedFolder');
-        return nestedFolder;
-      }
-    }
-
-    // Check if model files exist directly in the folder
-    if (_hasONNXModelFiles(modelFolder)) {
-      _logger.info('Found ONNX model at folder: $modelFolder');
-      return modelFolder;
-    }
-
-    // Scan for any subdirectory with model files
-    final dir = Directory(modelFolder);
-    if (dir.existsSync()) {
-      for (final entity in dir.listSync()) {
-        if (entity is Directory && _hasONNXModelFiles(entity.path)) {
-          _logger.info('Found ONNX model in subdirectory: ${entity.path}');
-          return entity.path;
-        }
-      }
-    }
-
-    // Fallback
-    _logger.warning('No ONNX model files found, using: $modelFolder');
-    return modelFolder;
-  }
-
-  /// Check if directory contains ONNX model files
-  bool _hasONNXModelFiles(String directory) {
-    final dir = Directory(directory);
-    if (!dir.existsSync()) return false;
-
-    try {
-      return dir.listSync().any((entity) {
-        if (entity is! File) return false;
-        final name = entity.path.toLowerCase();
-        return name.endsWith('.onnx') ||
-            name.endsWith('.ort') ||
-            name.contains('encoder') ||
-            name.contains('decoder') ||
-            name.contains('tokens');
-      });
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Resolve single-file model path (LlamaCpp .gguf files)
-  String? _resolveSingleFileModelPath(String modelFolder, ModelInfo model) {
-    final dir = Directory(modelFolder);
-    if (!dir.existsSync()) {
-      _logger.warning('Model folder does not exist: $modelFolder');
-      return null;
-    }
-
-    // Find the model file
-    try {
-      for (final entity in dir.listSync()) {
-        if (entity is File) {
-          final name = entity.path.toLowerCase();
-          if (name.endsWith('.gguf') || name.endsWith('.bin')) {
-            _logger.info('Found model file: ${entity.path}');
-            return entity.path;
-          }
-        }
-      }
-    } catch (e) {
-      _logger.warning('Error scanning model folder: $e');
-    }
-
-    _logger.warning('No model file found in: $modelFolder');
-    return null;
+    return resolved ?? modelFolder;
   }
 
   // MARK: - Path Analysis

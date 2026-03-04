@@ -38,6 +38,7 @@
 #include "bridges/TelemetryBridge.hpp"
 #include "bridges/ToolCallingBridge.hpp"
 #include "bridges/RAGBridge.hpp"
+#include "bridges/FileManagerBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -54,6 +55,7 @@
 #include "rac_voice_agent.h"
 #include "rac_types.h"
 #include "rac_model_assignment.h"
+#include "rac_extraction.h"
 
 #include <sstream>
 #include <chrono>
@@ -340,6 +342,7 @@ HybridRunAnywhereCore::~HybridRunAnywhereCore() {
     // across instances and should persist for the SDK lifetime)
     EventBridge::shared().unregisterFromEvents();
     DownloadBridge::shared().shutdown();
+    FileManagerBridge::shared().shutdown();
     StorageBridge::shared().shutdown();
     ModelRegistryBridge::shared().shutdown();
     // Note: InitBridge and TelemetryBridge are not shutdown in destructor
@@ -405,6 +408,9 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             LOGE("Failed to initialize storage analyzer: %d", result);
             // Continue - not fatal
         }
+
+        // 4b. Initialize file manager bridge (POSIX-based I/O for C++ business logic)
+        FileManagerBridge::shared().initialize();
 
         // 5. Initialize download manager
         result = DownloadBridge::shared().initialize();
@@ -521,6 +527,7 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
         TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
         EventBridge::shared().unregisterFromEvents();
         DownloadBridge::shared().shutdown();
+        FileManagerBridge::shared().shutdown();
         StorageBridge::shared().shutdown();
         ModelRegistryBridge::shared().shutdown();
         InitBridge::shared().shutdown();
@@ -1185,19 +1192,23 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDownloadProgress
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getStorageInfo() {
     return Promise<std::string>::async([]() {
+        // Use FileManagerBridge for accurate storage info via C++ recursive traversal
+        auto fmInfo = FileManagerBridge::shared().getStorageInfo();
+
+        // Also get model count from registry
         auto registryHandle = ModelRegistryBridge::shared().getHandle();
-        auto info = StorageBridge::shared().analyzeStorage(registryHandle);
+        auto storageInfo = StorageBridge::shared().analyzeStorage(registryHandle);
 
         return buildJsonObject({
-            {"totalDeviceSpace", std::to_string(info.deviceStorage.totalSpace)},
-            {"freeDeviceSpace", std::to_string(info.deviceStorage.freeSpace)},
-            {"usedDeviceSpace", std::to_string(info.deviceStorage.usedSpace)},
-            {"documentsSize", std::to_string(info.appStorage.documentsSize)},
-            {"cacheSize", std::to_string(info.appStorage.cacheSize)},
-            {"appSupportSize", std::to_string(info.appStorage.appSupportSize)},
-            {"totalAppSize", std::to_string(info.appStorage.totalSize)},
-            {"totalModelsSize", std::to_string(info.totalModelsSize)},
-            {"modelCount", std::to_string(info.models.size())}
+            {"totalDeviceSpace", std::to_string(fmInfo.device_total)},
+            {"freeDeviceSpace", std::to_string(fmInfo.device_free)},
+            {"usedDeviceSpace", std::to_string(fmInfo.device_total - fmInfo.device_free)},
+            {"documentsSize", std::to_string(fmInfo.models_size)},
+            {"cacheSize", std::to_string(fmInfo.cache_size)},
+            {"appSupportSize", std::to_string(fmInfo.temp_size)},
+            {"totalAppSize", std::to_string(fmInfo.total_app_size)},
+            {"totalModelsSize", std::to_string(fmInfo.models_size)},
+            {"modelCount", std::to_string(storageInfo.models.size())}
         });
     });
 }
@@ -1208,6 +1219,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::clearCache() {
 
         // Clear the model assignment cache (in-memory cache for model assignments)
         rac_model_assignment_clear_cache();
+
+        // Clear file cache and temp directories via C++ file manager
+        FileManagerBridge::shared().clearCache();
+        FileManagerBridge::shared().clearTemp();
 
         LOGI("Cache cleared successfully");
         return true;
@@ -1310,47 +1325,29 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getLastError() {
     return Promise<std::string>::async([this]() { return lastError_; });
 }
 
-// Forward declaration for platform-specific archive extraction
-#if defined(__APPLE__)
-extern "C" bool ArchiveUtility_extract(const char* archivePath, const char* destinationPath);
-#elif defined(__ANDROID__)
-// On Android, we'll call the Kotlin ArchiveUtility via JNI in a separate helper
-extern "C" bool ArchiveUtility_extractAndroid(const char* archivePath, const char* destinationPath);
-#endif
-
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::extractArchive(
     const std::string& archivePath,
     const std::string& destPath) {
     return Promise<bool>::async([this, archivePath, destPath]() {
         LOGI("extractArchive: %s -> %s", archivePath.c_str(), destPath.c_str());
 
-#if defined(__APPLE__)
-        // iOS: Call Swift ArchiveUtility
-        bool success = ArchiveUtility_extract(archivePath.c_str(), destPath.c_str());
-        if (success) {
-            LOGI("iOS archive extraction succeeded");
+        // Use native C++ extraction (libarchive) — works on all platforms
+        rac_result_t result = rac_extract_archive_native(
+            archivePath.c_str(), destPath.c_str(),
+            nullptr,  // default options
+            nullptr,  // no progress callback
+            nullptr,  // no user data
+            nullptr   // no result output
+        );
+
+        if (result == RAC_SUCCESS) {
+            LOGI("Native archive extraction succeeded");
             return true;
         } else {
-            LOGE("iOS archive extraction failed");
+            LOGE("Native archive extraction failed with code: %d", result);
             setLastError("Archive extraction failed");
             return false;
         }
-#elif defined(__ANDROID__)
-        // Android: Call Kotlin ArchiveUtility via JNI
-        bool success = ArchiveUtility_extractAndroid(archivePath.c_str(), destPath.c_str());
-        if (success) {
-            LOGI("Android archive extraction succeeded");
-            return true;
-        } else {
-            LOGE("Android archive extraction failed");
-            setLastError("Archive extraction failed");
-            return false;
-        }
-#else
-        LOGW("Archive extraction not supported on this platform");
-        setLastError("Archive extraction not supported");
-        return false;
-#endif
     });
 }
 

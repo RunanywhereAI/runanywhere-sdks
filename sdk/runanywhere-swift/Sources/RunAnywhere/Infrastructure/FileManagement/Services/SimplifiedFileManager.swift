@@ -59,10 +59,7 @@ public class SimplifiedFileManager {
 
     /// Check if a model folder exists and contains files
     public func modelFolderExists(modelId: String, framework: InferenceFramework) -> Bool {
-        guard let folderURL = try? CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework) else {
-            return false
-        }
-        return folderExistsAndHasContents(at: folderURL)
+        return CppBridge.FileManager.modelFolderHasContents(modelId: modelId, framework: framework)
     }
 
     /// Get the model folder URL (without creating it)
@@ -72,14 +69,10 @@ public class SimplifiedFileManager {
 
     /// Delete a model folder and all its contents
     public func deleteModel(modelId: String, framework: InferenceFramework) throws {
-        let folderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
-
-        if FileManager.default.fileExists(atPath: folderURL.path) {
-            try FileManager.default.removeItem(at: folderURL)
-            logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
-        } else {
-            logger.info("\(modelId) does NOT exist in \(framework.rawValue)")
+        guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
+            throw SDKError.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
         }
+        logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
     }
 
     // MARK: - Model Discovery
@@ -128,15 +121,7 @@ public class SimplifiedFileManager {
     /// Check if a specific model is downloaded
     @MainActor
     public func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool {
-        // Check if the folder exists and has contents
-        guard let folderURL = try? CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework),
-              folderExistsAndHasContents(at: folderURL) else {
-            return false
-        }
-
-        // Folder exists with contents - model is downloaded
-        // Module-specific validation can be done by the service when loading
-        return true
+        return CppBridge.FileManager.modelFolderHasContents(modelId: modelId, framework: framework)
     }
 
     // MARK: - Download Management
@@ -165,9 +150,8 @@ public class SimplifiedFileManager {
     }
 
     public func clearCache() throws {
-        let cacheFolder = try baseFolder.subfolder(named: "Cache")
-        for file in cacheFolder.files {
-            try file.delete()
+        guard CppBridge.FileManager.clearCache() else {
+            throw SDKError.fileManagement(.deleteFailed, "Failed to clear cache")
         }
         logger.info("Cleared cache")
     }
@@ -175,45 +159,16 @@ public class SimplifiedFileManager {
     // MARK: - Temp Files
 
     public func cleanTempFiles() throws {
-        let tempFolder = try baseFolder.subfolder(named: "Temp")
-        for file in tempFolder.files {
-            try file.delete()
+        guard CppBridge.FileManager.clearTemp() else {
+            throw SDKError.fileManagement(.deleteFailed, "Failed to clean temp files")
         }
         logger.info("Cleaned temp files")
     }
 
     // MARK: - Storage Info
 
-    public func getAvailableSpace() -> Int64 {
-        do {
-            let values = try URL(fileURLWithPath: baseFolder.path).resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            return values.volumeAvailableCapacityForImportantUsage ?? 0
-        } catch {
-            return 0
-        }
-    }
-
-    public func getDeviceStorageInfo() -> DeviceStorageInfo {
-        do {
-            let attributes = try FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
-            let totalSpace = (attributes[.systemSize] as? Int64) ?? 0
-            let freeSpace = (attributes[.systemFreeSize] as? Int64) ?? 0
-            return DeviceStorageInfo(totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: totalSpace - freeSpace)
-        } catch {
-            return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
-        }
-    }
-
     public func calculateDirectorySize(at url: URL) -> Int64 {
-        var totalSize: Int64 = 0
-        if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: []) {
-            for case let fileURL as URL in enumerator {
-                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                    totalSize += Int64(fileSize)
-                }
-            }
-        }
-        return totalSize
+        return CppBridge.FileManager.calculateDirectorySize(at: url)
     }
 
     public func getBaseDirectoryURL() -> URL {

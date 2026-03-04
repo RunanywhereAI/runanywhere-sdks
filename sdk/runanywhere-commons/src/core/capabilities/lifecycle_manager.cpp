@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -46,7 +47,7 @@ struct LifecycleManager {
     std::string
         current_model_id{};  // Model identifier for telemetry (e.g., "sherpa-onnx-whisper-tiny.en")
     std::string current_model_name{};  // Human-readable name (e.g., "Sherpa Whisper Tiny (ONNX)")
-    rac_handle_t current_service{nullptr};
+    std::atomic<rac_handle_t> current_service{nullptr};
 
     // Metrics (mirrors Swift's ManagedLifecycle metrics)
     int32_t load_count{0};
@@ -134,7 +135,10 @@ rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
         return RAC_ERROR_NULL_POINTER;
     }
 
-    auto* mgr = new LifecycleManager();
+    auto* mgr = new (std::nothrow) LifecycleManager();
+    if (!mgr) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     mgr->resource_type = config->resource_type;
     mgr->logger_category = config->logger_category ? config->logger_category : "Lifecycle";
     mgr->user_data = config->user_data;
@@ -166,10 +170,10 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
     // Check if already loaded with same path - skip duplicate events
     // Mirrors Swift: if await lifecycle.currentResourceId == modelId
     if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_model_path == model_path &&
-        mgr->current_service != nullptr) {
+        mgr->current_service.load() != nullptr) {
         // Mirrors Swift: logger.info("Model already loaded, skipping duplicate load")
         RAC_LOG_INFO(mgr->logger_category.c_str(), "Model already loaded, skipping duplicate load");
-        *out_service = mgr->current_service;
+        *out_service = mgr->current_service.load();
         return RAC_SUCCESS;
     }
 
@@ -192,7 +196,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         mgr->current_model_path = model_path;
         mgr->current_model_id = model_id;      // Model identifier for telemetry
         mgr->current_model_name = model_name;  // Human-readable name for telemetry
-        mgr->current_service = service;
+        mgr->current_service.store(service);
         mgr->state.store(RAC_LIFECYCLE_STATE_LOADED);
 
         // Track load completed (mirrors Swift: trackEvent(type: .loadCompleted))
@@ -234,9 +238,13 @@ rac_result_t rac_lifecycle_unload(rac_handle_t handle) {
         RAC_LOG_INFO(mgr->logger_category.c_str(), "Unloading model: %s",
                      mgr->current_model_id.c_str());
 
-        // Destroy service if callback provided
-        if (mgr->destroy_fn != nullptr && mgr->current_service != nullptr) {
-            mgr->destroy_fn(mgr->current_service, mgr->user_data);
+        // Destroy service if callback provided.
+        // Store nullptr BEFORE calling destroy_fn so that concurrent cancel()
+        // reads via get_service() see nullptr rather than a dangling pointer.
+        rac_handle_t svc = mgr->current_service.load();
+        mgr->current_service.store(nullptr);
+        if (mgr->destroy_fn != nullptr && svc != nullptr) {
+            mgr->destroy_fn(svc, mgr->user_data);
         }
 
         // Track unload event (mirrors Swift: trackEvent(type: .unloaded))
@@ -249,7 +257,7 @@ rac_result_t rac_lifecycle_unload(rac_handle_t handle) {
     mgr->current_model_path.clear();
     mgr->current_model_id.clear();
     mgr->current_model_name.clear();
-    mgr->current_service = nullptr;
+    mgr->current_service.store(nullptr);
     mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
 
     return RAC_SUCCESS;
@@ -267,9 +275,11 @@ rac_result_t rac_lifecycle_reset(rac_handle_t handle) {
     if (!mgr->current_model_id.empty()) {
         track_lifecycle_event(mgr, "unloaded", mgr->current_model_id.c_str(), 0.0, RAC_SUCCESS);
 
-        // Destroy service if callback provided
-        if (mgr->destroy_fn != nullptr && mgr->current_service != nullptr) {
-            mgr->destroy_fn(mgr->current_service, mgr->user_data);
+        // Store nullptr BEFORE calling destroy_fn (same reasoning as unload)
+        rac_handle_t svc = mgr->current_service.load();
+        mgr->current_service.store(nullptr);
+        if (mgr->destroy_fn != nullptr && svc != nullptr) {
+            mgr->destroy_fn(svc, mgr->user_data);
         }
     }
 
@@ -277,7 +287,7 @@ rac_result_t rac_lifecycle_reset(rac_handle_t handle) {
     mgr->current_model_path.clear();
     mgr->current_model_id.clear();
     mgr->current_model_name.clear();
-    mgr->current_service = nullptr;
+    mgr->current_service.store(nullptr);
     mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
 
     return RAC_SUCCESS;
@@ -335,7 +345,10 @@ rac_handle_t rac_lifecycle_get_service(rac_handle_t handle) {
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
-    return mgr->current_service;
+    // Atomic load — safe to call without the lifecycle mutex.
+    // This is used by cancel() paths which intentionally skip locking
+    // to avoid deadlock with streaming operations.
+    return mgr->current_service.load(std::memory_order_acquire);
 }
 
 rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* out_service) {
@@ -345,12 +358,12 @@ rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* ou
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
 
-    if (mgr->state.load() != RAC_LIFECYCLE_STATE_LOADED || mgr->current_service == nullptr) {
+    if (mgr->state.load() != RAC_LIFECYCLE_STATE_LOADED || mgr->current_service.load() == nullptr) {
         rac_error_set_details("Service not loaded - call load() first");
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
-    *out_service = mgr->current_service;
+    *out_service = mgr->current_service.load();
     return RAC_SUCCESS;
 }
 
@@ -436,6 +449,10 @@ const char* rac_resource_type_name(rac_resource_type_t type) {
             return "vadModel";
         case RAC_RESOURCE_TYPE_DIARIZATION_MODEL:
             return "diarizationModel";
+        case RAC_RESOURCE_TYPE_VLM_MODEL:
+            return "vlmModel";
+        case RAC_RESOURCE_TYPE_DIFFUSION_MODEL:
+            return "diffusionModel";
         default:
             return "unknown";
     }

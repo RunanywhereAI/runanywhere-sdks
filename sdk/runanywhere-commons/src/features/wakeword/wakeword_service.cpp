@@ -130,7 +130,13 @@ RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
 
     // Calculate samples per frame
     service->samples_per_frame =
-        (service->config.sample_rate * service->config.frame_length_ms) / 1000;
+        (static_cast<size_t>(service->config.sample_rate) * service->config.frame_length_ms) / 1000;
+
+    if (service->samples_per_frame == 0) {
+        RAC_LOG_ERROR("WakeWord", "Invalid config: samples_per_frame is 0 (sample_rate=%d, frame_length_ms=%d)",
+                      service->config.sample_rate, service->config.frame_length_ms);
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
 
     // Reserve audio buffer
     service->audio_buffer.reserve(service->samples_per_frame * 2);
@@ -503,6 +509,9 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
         void* det_ud = nullptr;
         rac_wakeword_event_t event = {};
         bool should_invoke_detection = false;
+        // Local copies to outlive lock release (c_str() would dangle)
+        std::string event_keyword_name;
+        std::string event_model_id;
 
         if (detected && keyword_index >= 0) {
             int64_t now = get_timestamp_ms();
@@ -521,9 +530,11 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
                 if (service->detection_callback && keyword_index < (int32_t)service->models.size()) {
                     det_cb = service->detection_callback;
                     det_ud = service->detection_user_data;
+                    event_keyword_name = service->models[keyword_index].wake_word;
+                    event_model_id = service->models[keyword_index].model_id;
                     event.keyword_index = keyword_index;
-                    event.keyword_name = service->models[keyword_index].wake_word.c_str();
-                    event.model_id = service->models[keyword_index].model_id.c_str();
+                    event.keyword_name = event_keyword_name.c_str();
+                    event.model_id = event_model_id.c_str();
                     event.confidence = confidence;
                     event.timestamp_ms = now - service->stream_start_time;
                     event.duration_ms = service->config.frame_length_ms;

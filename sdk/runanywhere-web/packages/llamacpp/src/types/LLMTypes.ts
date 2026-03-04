@@ -31,7 +31,6 @@ export interface LLMGenerationResult {
   timeToFirstTokenMs?: number;
   thinkingTokens: number;
   responseTokens: number;
-  [key: string]: unknown;
 }
 
 export interface LLMStreamingResult {

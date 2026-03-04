@@ -30,16 +30,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream
-import java.io.BufferedInputStream
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.util.zip.ZipInputStream
 
 // MARK: - Multi-File Model Companion Storage
 
@@ -710,8 +705,25 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         ),
                     )
 
-                    // Pass the URL to determine archive type (file may be saved without extension)
-                    val extractedPath = extractArchive(downloadedFile, modelId, modelType, downloadUrl, downloadLogger)
+                    // Extract and find model path using C++ orchestrator utilities
+                    val racFramework = when (modelInfo.framework) {
+                        InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
+                        InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
+                        InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
+                        InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
+                        InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
+                        InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
+                        InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
+                    }
+                    val racFormat = when (modelInfo.format) {
+                        ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
+                        ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
+                        ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
+                        ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
+                        ModelFormat.UNKNOWN -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
+                    }
+                    val extractedPath = extractArchive(downloadedFile, modelId, racFramework, racFormat, downloadLogger)
                     downloadLogger.info("Extraction complete: $extractedPath")
                     extractedPath
                 } else {
@@ -759,46 +771,36 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
 
 /**
  * Check if URL requires extraction (is an archive).
- * Supports: .tar.gz, .tgz, .tar.bz2, .tbz2, .zip
+ * Delegates to C++ rac_download_requires_extraction() for consistent behavior across all SDKs.
  */
 private fun requiresExtraction(url: String): Boolean {
-    val lowercaseUrl = url.lowercase()
-    return lowercaseUrl.endsWith(".tar.gz") ||
-        lowercaseUrl.endsWith(".tgz") ||
-        lowercaseUrl.endsWith(".tar.bz2") ||
-        lowercaseUrl.endsWith(".tbz2") ||
-        lowercaseUrl.endsWith(".zip")
+    return RunAnywhereBridge.nativeDownloadRequiresExtraction(url)
 }
 
 /**
- * Extract an archive to the model directory.
+ * Extract an archive to the model directory using native C++ extraction (libarchive).
  *
- * Supports:
- * - .tar.gz / .tgz → Uses Apache Commons Compress
- * - .tar.bz2 / .tbz2 → Uses Apache Commons Compress
- * - .zip → Uses java.util.zip
- *
+ * Supports all formats via auto-detection: ZIP, TAR.GZ, TAR.BZ2, TAR.XZ.
  * Archives typically contain a root folder (e.g., sherpa-onnx-whisper-tiny.en/)
  * so we extract to the parent directory and the archive structure creates the model folder.
  *
+ * Post-extraction model path finding uses C++ rac_find_model_path_after_extraction()
+ * for consistent behavior across all SDKs.
+ *
  * @param archiveFile The downloaded archive file (may not have extension in filename)
  * @param modelId The model ID
- * @param modelType The model type
- * @param originalUrl The original download URL (used to determine archive type)
+ * @param racFramework C++ framework constant (CppBridgeModelRegistry.Framework.*)
+ * @param racFormat C++ format constant (CppBridgeModelRegistry.ModelFormat.*)
  * @param logger Logger for debug output
  */
-@Suppress("UNUSED_PARAMETER")
 private suspend fun extractArchive(
     archiveFile: File,
     modelId: String,
-    modelType: Int, // Reserved for future type-specific extraction logic
-    originalUrl: String,
+    racFramework: Int,
+    racFormat: Int,
     logger: SDKLogger,
 ): String =
     withContext(Dispatchers.IO) {
-        // Extract to parent directory - the archive typically contains a root folder
-        // e.g., archive contains: sherpa-onnx-whisper-tiny.en/tiny.en-decoder.onnx
-        // So we extract to /models/stt/ and get /models/stt/sherpa-onnx-whisper-tiny.en/
         val parentDir = archiveFile.parentFile
         if (parentDir == null || !parentDir.exists()) {
             throw SDKError.download("Cannot determine extraction directory for: ${archiveFile.absolutePath}")
@@ -806,196 +808,50 @@ private suspend fun extractArchive(
 
         logger.info("Extracting to parent: ${parentDir.absolutePath}")
         logger.debug("Archive file: ${archiveFile.absolutePath}")
-        logger.debug("Original URL: $originalUrl")
 
-        // Use the URL to determine archive type (file may be saved without extension)
-        val lowercaseUrl = originalUrl.lowercase()
-
-        // IMPORTANT: The archive file name might conflict with the folder inside the archive
-        // (e.g., file "sherpa-onnx-whisper-tiny.en" and archive contains folder "sherpa-onnx-whisper-tiny.en/")
-        // We need to rename/move the archive before extracting to avoid ENOTDIR errors
+        // Rename archive to temp to avoid name conflicts with extracted contents
         val tempArchiveFile = File(parentDir, "${archiveFile.name}.tmp_archive")
         try {
             if (!archiveFile.renameTo(tempArchiveFile)) {
-                // If rename fails, copy and delete
                 archiveFile.copyTo(tempArchiveFile, overwrite = true)
                 archiveFile.delete()
             }
-            logger.debug("Moved archive to temp: ${tempArchiveFile.absolutePath}")
         } catch (e: Exception) {
-            logger.error("Failed to move archive to temp location: ${e.message}")
             throw SDKError.download("Failed to prepare archive for extraction: ${e.message}")
         }
 
         try {
-            when {
-                lowercaseUrl.endsWith(".tar.gz") || lowercaseUrl.endsWith(".tgz") -> {
-                    logger.info("Extracting tar.gz archive...")
-                    extractTarGz(tempArchiveFile, parentDir, logger)
-                }
-                lowercaseUrl.endsWith(".tar.bz2") || lowercaseUrl.endsWith(".tbz2") -> {
-                    logger.info("Extracting tar.bz2 archive...")
-                    extractTarBz2(tempArchiveFile, parentDir, logger)
-                }
-                lowercaseUrl.endsWith(".zip") -> {
-                    logger.info("Extracting zip archive...")
-                    extractZip(tempArchiveFile, parentDir, logger)
-                }
-                else -> {
-                    logger.warn("Unknown archive type for URL: $originalUrl")
-                    // Restore the original file
-                    tempArchiveFile.renameTo(archiveFile)
-                    return@withContext archiveFile.absolutePath
-                }
+            // Use native C++ extraction (libarchive) — auto-detects format from magic bytes
+            val result = RunAnywhereBridge.nativeExtractArchive(
+                tempArchiveFile.absolutePath,
+                parentDir.absolutePath,
+            )
+            if (result != 0) {
+                throw SDKError.download("Native extraction failed with code: $result")
             }
+            logger.info("Native extraction completed successfully")
         } finally {
-            // Always clean up the temp archive file
             try {
                 if (tempArchiveFile.exists()) {
                     tempArchiveFile.delete()
-                    logger.debug("Cleaned up temp archive: ${tempArchiveFile.absolutePath}")
                 }
             } catch (e: Exception) {
                 logger.warn("Failed to clean up temp archive: ${e.message}")
             }
         }
 
-        // Find the extracted model directory
-        // The archive should have created a folder with the model ID name
-        val expectedModelDir = File(parentDir, modelId)
-        val finalPath =
-            if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
-                expectedModelDir.absolutePath
-            } else {
-                // Fallback: look for any new directory created
-                parentDir
-                    .listFiles()
-                    ?.firstOrNull {
-                        it.isDirectory && it.name.contains(modelId.substringBefore("-"))
-                    }?.absolutePath ?: parentDir.absolutePath
-            }
+        // Find the extracted model path using C++ rac_find_model_path_after_extraction()
+        // Uses UNKNOWN structure to let C++ scan for model files and nested directories
+        val finalPath = RunAnywhereBridge.nativeFindModelPathAfterExtraction(
+            parentDir.absolutePath,
+            99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN — let C++ auto-detect
+            racFramework,
+            racFormat,
+        )
 
         logger.info("Model extracted to: $finalPath")
         finalPath
     }
-
-/**
- * Extract a .tar.gz archive.
- */
-private fun extractTarGz(archiveFile: File, destDir: File, logger: SDKLogger) {
-    logger.debug("Extracting tar.gz: ${archiveFile.absolutePath}")
-
-    FileInputStream(archiveFile).use { fis ->
-        BufferedInputStream(fis).use { bis ->
-            GzipCompressorInputStream(bis).use { gzis ->
-                TarArchiveInputStream(gzis).use { tais ->
-                    var entry = tais.nextEntry
-                    var fileCount = 0
-
-                    while (entry != null) {
-                        val destFile = File(destDir, entry.name)
-
-                        // Security check - prevent path traversal
-                        if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
-                            throw SecurityException("Tar entry outside destination: ${entry.name}")
-                        }
-
-                        if (entry.isDirectory) {
-                            destFile.mkdirs()
-                        } else {
-                            destFile.parentFile?.mkdirs()
-                            FileOutputStream(destFile).use { fos ->
-                                tais.copyTo(fos)
-                            }
-                            fileCount++
-                        }
-
-                        entry = tais.nextEntry
-                    }
-
-                    logger.info("Extracted $fileCount files from tar.gz")
-                }
-            }
-        }
-    }
-}
-
-/**
- * Extract a .tar.bz2 archive.
- */
-private fun extractTarBz2(archiveFile: File, destDir: File, logger: SDKLogger) {
-    logger.debug("Extracting tar.bz2: ${archiveFile.absolutePath}")
-
-    FileInputStream(archiveFile).use { fis ->
-        BufferedInputStream(fis).use { bis ->
-            BZip2CompressorInputStream(bis).use { bzis ->
-                TarArchiveInputStream(bzis).use { tais ->
-                    var entry = tais.nextEntry
-                    var fileCount = 0
-
-                    while (entry != null) {
-                        val destFile = File(destDir, entry.name)
-
-                        // Security check - prevent path traversal
-                        if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
-                            throw SecurityException("Tar entry outside destination: ${entry.name}")
-                        }
-
-                        if (entry.isDirectory) {
-                            destFile.mkdirs()
-                        } else {
-                            destFile.parentFile?.mkdirs()
-                            FileOutputStream(destFile).use { fos ->
-                                tais.copyTo(fos)
-                            }
-                            fileCount++
-                        }
-
-                        entry = tais.nextEntry
-                    }
-
-                    logger.info("Extracted $fileCount files from tar.bz2")
-                }
-            }
-        }
-    }
-}
-
-/**
- * Extract a .zip archive.
- */
-private fun extractZip(archiveFile: File, destDir: File, logger: SDKLogger) {
-    logger.debug("Extracting zip: ${archiveFile.absolutePath}")
-
-    ZipInputStream(FileInputStream(archiveFile)).use { zis ->
-        var entry = zis.nextEntry
-        var fileCount = 0
-
-        while (entry != null) {
-            val destFile = File(destDir, entry.name)
-
-            // Security check - prevent path traversal
-            if (!destFile.canonicalPath.startsWith(destDir.canonicalPath)) {
-                throw SecurityException("Zip entry outside destination: ${entry.name}")
-            }
-
-            if (entry.isDirectory) {
-                destFile.mkdirs()
-            } else {
-                destFile.parentFile?.mkdirs()
-                FileOutputStream(destFile).use { fos ->
-                    zis.copyTo(fos)
-                }
-                fileCount++
-            }
-
-            zis.closeEntry()
-            entry = zis.nextEntry
-        }
-
-        logger.info("Extracted $fileCount files from zip")
-    }
-}
 
 // MARK: - Embedding Model Direct HTTP Download
 

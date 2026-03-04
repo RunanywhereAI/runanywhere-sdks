@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <random>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -76,11 +77,10 @@ static int32_t estimate_tokens(const char* text) {
  * Generate a unique ID for generation tracking.
  */
 static std::string generate_unique_id() {
-    auto now = std::chrono::high_resolution_clock::now();
-    auto epoch = now.time_since_epoch();
-    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch).count();
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "gen_%lld", static_cast<long long>(ns));
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<uint32_t> dis;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "gen_%08x%08x", dis(gen), dis(gen));
     return std::string(buffer);
 }
 
@@ -667,6 +667,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
+    // Pre-allocate to avoid repeated reallocations during streaming
+    ctx.full_text.reserve(2048);
 
     // Perform streaming generation
     result = rac_llm_generate_stream(service, prompt, effective_options, llm_stream_token_callback,
@@ -701,6 +703,13 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
+    if (!final_result.text) {
+        log_error("LLM.Component", "Failed to allocate result text");
+        if (error_callback) {
+            error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     final_result.prompt_tokens = ctx.prompt_tokens;
     final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
@@ -761,8 +770,11 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
         return RAC_ERROR_INVALID_HANDLE;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Do NOT acquire component->mtx here. generate_stream() holds the mutex
+    // for the entire streaming duration, so locking here would deadlock until
+    // generation finishes — defeating the purpose of cancel.
+    // rac_llm_cancel() ultimately sets an atomic bool, which is safe without the lock.
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (service) {
         rac_llm_cancel(service);
