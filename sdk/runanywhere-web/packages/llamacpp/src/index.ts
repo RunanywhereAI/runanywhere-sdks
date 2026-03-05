@@ -32,6 +32,8 @@ export type { LlamaCppModule } from './Foundation/LlamaCppBridge';
 // Extensions (backend-specific implementations)
 export { TextGeneration } from './Extensions/RunAnywhere+TextGeneration';
 export { VLM, VLMModelFamily } from './Extensions/RunAnywhere+VLM';
+export { VLMImageFormat } from './Extensions/VLMTypes';
+export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './Extensions/VLMTypes';
 export { ToolCalling, ToolCallFormat, toToolValue, fromToolValue, getStringArg, getNumberArg } from './Extensions/RunAnywhere+ToolCalling';
 export type {
   ToolValue, ToolParameterType, ToolParameter, ToolDefinition,

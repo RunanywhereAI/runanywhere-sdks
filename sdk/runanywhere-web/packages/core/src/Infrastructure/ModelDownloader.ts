@@ -221,22 +221,21 @@ export class ModelDownloader {
 
     try {
       const totalFiles = 1 + (model.additionalFiles?.length ?? 0);
-      let totalBytesDownloaded = 0;
-      let totalBytesExpected = 0;
+      let cumulativeBytesDownloaded = 0;
+      let cumulativeBytesExpected = 0;
+      const completedFileSizes: number[] = [];
 
-      // Try streaming the primary file directly to storage (keeps memory constant).
-      // Falls back to buffered download + store if streaming is not possible.
       const primaryProgressCb = (progress: number, bytesDown: number, bytesTotal: number) => {
-        totalBytesDownloaded = bytesDown;
-        totalBytesExpected = bytesTotal * totalFiles;
+        cumulativeBytesDownloaded = bytesDown;
+        cumulativeBytesExpected = bytesTotal * totalFiles;
         const overallProgress = progress / totalFiles;
         this.registry.updateModel(modelId, { downloadProgress: overallProgress });
         this.emitDownloadProgress({
           modelId,
           stage: DownloadStage.Downloading,
           progress: overallProgress,
-          bytesDownloaded: totalBytesDownloaded,
-          totalBytes: totalBytesExpected,
+          bytesDownloaded: cumulativeBytesDownloaded,
+          totalBytes: cumulativeBytesExpected,
           currentFile: model.url.split('/').pop(),
           filesCompleted: 0,
           filesTotal: totalFiles,
@@ -249,13 +248,18 @@ export class ModelDownloader {
         await this.storeInOPFS(modelId, primaryData);
         primarySize = primaryData.length;
       }
+      completedFileSizes.push(primarySize);
 
       // Download additional files (e.g., mmproj for VLM)
       if (model.additionalFiles && model.additionalFiles.length > 0) {
         for (let i = 0; i < model.additionalFiles.length; i++) {
           const file = model.additionalFiles[i];
           const fileKey = this.additionalFileKey(modelId, file.filename);
+          const priorCompleted = completedFileSizes.reduce((a, b) => a + b, 0);
+
           const fileProgressCb = (progress: number, bytesDown: number, bytesTotal: number) => {
+            cumulativeBytesDownloaded = priorCompleted + bytesDown;
+            cumulativeBytesExpected = priorCompleted + bytesTotal;
             const baseProgress = (1 + i) / totalFiles;
             const fileProgress = progress / totalFiles;
             const overallProgress = baseProgress + fileProgress;
@@ -264,41 +268,39 @@ export class ModelDownloader {
               modelId,
               stage: DownloadStage.Downloading,
               progress: overallProgress,
-              bytesDownloaded: bytesDown,
-              totalBytes: bytesTotal,
+              bytesDownloaded: cumulativeBytesDownloaded,
+              totalBytes: cumulativeBytesExpected,
               currentFile: file.filename,
               filesCompleted: 1 + i,
               filesTotal: totalFiles,
             });
           };
 
+          let fileSize: number;
           const streamedSize = await this.downloadAndStoreStreaming(file.url, fileKey, fileProgressCb);
           if (streamedSize === null) {
             const fileData = await this.downloadFile(file.url, fileProgressCb);
             await this.storeInOPFS(fileKey, fileData);
+            fileSize = fileData.length;
+          } else {
+            fileSize = streamedSize;
           }
+          completedFileSizes.push(fileSize);
         }
       }
+
+      const totalSize = completedFileSizes.reduce((a, b) => a + b, 0);
 
       // Validating stage
       this.emitDownloadProgress({
         modelId,
         stage: DownloadStage.Validating,
         progress: 0.95,
-        bytesDownloaded: totalBytesDownloaded,
-        totalBytes: totalBytesExpected,
+        bytesDownloaded: totalSize,
+        totalBytes: totalSize,
         filesCompleted: totalFiles,
         filesTotal: totalFiles,
       });
-
-      let totalSize = primarySize;
-      if (model.additionalFiles) {
-        for (const file of model.additionalFiles) {
-          const fileKey = this.additionalFileKey(modelId, file.filename);
-          const size = await this.storage.getFileSize(fileKey);
-          if (size !== null) totalSize += size;
-        }
-      }
 
       this.registry.updateModel(modelId, {
         status: ModelStatus.Downloaded,

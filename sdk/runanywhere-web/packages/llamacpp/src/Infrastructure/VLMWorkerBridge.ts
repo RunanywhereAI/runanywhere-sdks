@@ -251,7 +251,7 @@ export class VLMWorkerBridge {
     // TODO: re-test on WebGPU periodically as llama.cpp's WebGPU backend
     // matures — the Vulkan fp16 FA fix (b8168) may eventually be ported.
     const bridge = LlamaCppBridge.shared;
-    const isQwenVL = /qwen/i.test(params.modelId) || /qwen/i.test(params.modelName);
+    const isQwenVL = /qwen.*vl/i.test(params.modelId) || /qwen.*vl/i.test(params.modelName);
     if (isQwenVL && bridge.accelerationMode === 'webgpu') {
       const currentUrl = bridge.wasmUrl ?? '';
       const cpuUrl = currentUrl.replace(/-webgpu\.js$/, '.js');

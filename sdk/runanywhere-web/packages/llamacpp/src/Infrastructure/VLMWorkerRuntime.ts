@@ -47,14 +47,22 @@ let offsets: AllOffsets | null = null;
 // module's _rac_wasm_offsetof_* / _rac_wasm_sizeof_* exports.
 // ---------------------------------------------------------------------------
 
-function workerOffsetOf(m: any, name: string): number {
+function workerOffsetOf(m: any, name: string, required = true): number {
   const fn = m[`_rac_wasm_offsetof_${name}`];
-  return typeof fn === 'function' ? fn() : 0;
+  if (typeof fn === 'function') return fn();
+  if (required) {
+    throw new Error(`Missing WASM offsetof export: _rac_wasm_offsetof_${name} — ABI mismatch between WASM binary and TS`);
+  }
+  return 0;
 }
 
-function workerSizeOf(m: any, name: string): number {
+function workerSizeOf(m: any, name: string, required = true): number {
   const fn = m[`_rac_wasm_sizeof_${name}`];
-  return typeof fn === 'function' ? fn() : 0;
+  if (typeof fn === 'function') return fn();
+  if (required) {
+    throw new Error(`Missing WASM sizeof export: _rac_wasm_sizeof_${name} — ABI mismatch between WASM binary and TS`);
+  }
+  return 0;
 }
 
 function loadOffsetsFromModule(m: any): AllOffsets {

@@ -178,7 +178,7 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
     }
 
     // Resolve system prompt: use explicit value, or inject a default for Qwen2-VL
-    const char* effective_system = system_prompt;
+    const char* effective_system = (system_prompt && system_prompt[0] != '\0') ? system_prompt : nullptr;
     if (!effective_system && model_type == VLMModelType::Qwen2VL) {
         effective_system = "You are a helpful assistant.";
     }
@@ -208,15 +208,14 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
                     return formatted;
                 }
             }
-            bool has_explicit_system = (system_prompt && system_prompt[0] != '\0');
-            if (has_explicit_system) {
+            if (effective_system) {
                 RAC_LOG_WARNING(LOG_CAT, "Template with system failed (size=%d); falling back to manual to preserve explicit system prompt", size);
             } else {
                 RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system failed (size=%d), trying without", size);
             }
             // If the caller passed an explicit system prompt, skip user-only
             // template to avoid silently dropping it -- go straight to manual.
-            if (has_explicit_system) {
+            if (effective_system) {
                 goto manual_fallback;
             }
         }
@@ -374,6 +373,22 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
 
     RAC_LOG_INFO(LOG_CAT, "[v3] Sampler: temp=%.2f top_p=%.2f repeat=1.3 freq=0.1 pres=0.1 DRY=0.8 min_p=0.1 + repeat_guard=4",
                  temperature, top_p);
+}
+
+/**
+ * Resolve the effective VLM model type from options override or auto-detected default.
+ */
+static VLMModelType resolve_effective_model_type(VLMModelType detected,
+                                                  const rac_vlm_options_t* options) {
+    if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
+        switch (options->model_family) {
+            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: return VLMModelType::Qwen2VL;
+            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  return VLMModelType::SmolVLM;
+            case RAC_VLM_MODEL_FAMILY_LLAVA:     return VLMModelType::LLaVA;
+            default:                             return VLMModelType::Generic;
+        }
+    }
+    return detected;
 }
 
 }  // namespace
@@ -629,15 +644,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     backend->n_past = 0;
 
     // Resolve effective model type: options override > auto-detected at load time
-    VLMModelType effective_model_type = backend->model_type;
-    if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
-        switch (options->model_family) {
-            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: effective_model_type = VLMModelType::Qwen2VL; break;
-            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  effective_model_type = VLMModelType::SmolVLM; break;
-            case RAC_VLM_MODEL_FAMILY_LLAVA:     effective_model_type = VLMModelType::LLaVA;   break;
-            default:                             effective_model_type = VLMModelType::Generic;  break;
-        }
-    }
+    VLMModelType effective_model_type = resolve_effective_model_type(backend->model_type, options);
 
     const char* system_prompt = (options && options->system_prompt) ? options->system_prompt : nullptr;
 
@@ -772,6 +779,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
 
     for (int i = 0; i < max_tokens && !backend->cancel_requested; i++) {
         // Diagnostic: on first token, inspect logits for NaN/corruption
+#ifdef RAC_VLM_ENABLE_DIAGNOSTICS
         if (i == 0) {
             float* logits = llama_get_logits(backend->ctx);
             int n_vocab = llama_vocab_n_tokens(vocab);
@@ -806,6 +814,7 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
                               top5_idx[4], top5_val[4]);
             }
         }
+#endif
 
         llama_token token = llama_sampler_sample(backend->sampler, backend->ctx, -1);
         llama_sampler_accept(backend->sampler, token);
@@ -889,15 +898,7 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     RAC_LOG_DEBUG(LOG_CAT, "Cleared KV cache for new request");
 
     // Resolve effective model type: options override > auto-detected at load time
-    VLMModelType effective_model_type = backend->model_type;
-    if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
-        switch (options->model_family) {
-            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: effective_model_type = VLMModelType::Qwen2VL; break;
-            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  effective_model_type = VLMModelType::SmolVLM; break;
-            case RAC_VLM_MODEL_FAMILY_LLAVA:     effective_model_type = VLMModelType::LLaVA;   break;
-            default:                             effective_model_type = VLMModelType::Generic;  break;
-        }
-    }
+    VLMModelType effective_model_type = resolve_effective_model_type(backend->model_type, options);
 
     const char* system_prompt = (options && options->system_prompt) ? options->system_prompt : nullptr;
 

@@ -33,5 +33,14 @@ export type { TTSVoiceConfig } from './Extensions/RunAnywhere+TTS';
 export { VAD } from './Extensions/RunAnywhere+VAD';
 export type { VADModelConfig } from './Extensions/RunAnywhere+VAD';
 
+// Backward-compatible re-exports of shared contract types
+export type {
+  STTTranscriptionResult, STTWord, STTTranscribeOptions,
+  STTStreamCallback, STTStreamingSession,
+  TTSSynthesisResult, TTSSynthesizeOptions,
+  SpeechActivityCallback, SpeechSegment,
+} from '@runanywhere/web';
+export { SpeechActivity } from '@runanywhere/web';
+
 // Foundation
 export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
