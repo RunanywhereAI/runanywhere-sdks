@@ -134,6 +134,33 @@ class LlamaCppTextGeneration {
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
                          int* out_prompt_tokens);
     void cancel();
+
+    /**
+     * @brief Inject a system prompt into the KV cache at position 0.
+     * Clears existing KV cache first, then decodes the prompt tokens.
+     * @return true on success, false on error.
+     */
+    bool inject_system_prompt(const std::string& prompt);
+
+    /**
+     * @brief Append text to the KV cache after current content.
+     * Does not clear existing KV cache — adds at current position.
+     * @return true on success, false on error.
+     */
+    bool append_context(const std::string& text);
+
+    /**
+     * @brief Generate a response from accumulated KV cache state.
+     * Unlike generate(), does NOT clear the KV cache first.
+     * @return TextGenerationResult with generated text.
+     */
+    TextGenerationResult generate_from_context(const TextGenerationRequest& request);
+
+    /**
+     * @brief Clear all KV cache state.
+     */
+    void clear_context();
+
     nlohmann::json get_model_info() const;
 
     // LoRA adapter management
@@ -164,6 +191,7 @@ class LlamaCppTextGeneration {
 
     int context_size_ = 0;
     int max_default_context_ = 1024;
+    int batch_size_ = 0;
 
     std::vector<LoraAdapterEntry> lora_adapters_;
 

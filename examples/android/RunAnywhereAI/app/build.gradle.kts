@@ -219,7 +219,7 @@ dependencies {
     // Pick the backends you need:
     implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
-    implementation(project(":runanywhere-core-rag")) // RAG pipeline JNI bindings
+    // RAG pipeline is now part of the core SDK (not a separate module)
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)

@@ -718,4 +718,49 @@ export interface RunAnywhereCore
     resultJson: string,
     keepToolsAvailable: boolean
   ): Promise<string>;
+
+  // ===========================================================================
+  // RAG Pipeline (Retrieval-Augmented Generation)
+  // ===========================================================================
+
+  /**
+   * Create a RAG pipeline with the given configuration.
+   * @param configJson JSON with: embeddingModelPath, llmModelPath, embeddingDimension, topK, similarityThreshold, maxContextTokens, chunkSize, chunkOverlap, promptTemplate
+   */
+  ragCreatePipeline(configJson: string): Promise<boolean>;
+
+  /** Destroy the RAG pipeline and release resources. */
+  ragDestroyPipeline(): Promise<boolean>;
+
+  /**
+   * Add a document to the RAG pipeline for chunking, embedding, and indexing.
+   * @param text Document text
+   * @param metadataJson Optional JSON metadata
+   */
+  ragAddDocument(text: string, metadataJson: string): Promise<boolean>;
+
+  /**
+   * Add multiple documents in batch.
+   * @param documentsJson JSON array of {text, metadataJson} objects
+   */
+  ragAddDocumentsBatch(documentsJson: string): Promise<boolean>;
+
+  /**
+   * Query the RAG pipeline.
+   * @param queryJson JSON with: question, systemPrompt, maxTokens, temperature, topP, topK
+   * @returns JSON with: answer, retrievedChunks[], contextUsed, retrievalTimeMs, generationTimeMs, totalTimeMs
+   */
+  ragQuery(queryJson: string): Promise<string>;
+
+  /** Clear all documents from the pipeline. */
+  ragClearDocuments(): Promise<boolean>;
+
+  /** Get the number of indexed document chunks. */
+  ragGetDocumentCount(): Promise<number>;
+
+  /**
+   * Get pipeline statistics.
+   * @returns JSON with stats
+   */
+  ragGetStatistics(): Promise<string>;
 }

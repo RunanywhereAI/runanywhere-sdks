@@ -1228,6 +1228,184 @@ final class RacStructuredOutputValidationStruct extends Struct {
 }
 
 // =============================================================================
+// RAG Pipeline API Types (from rac_rag_pipeline.h and rac_rag.h)
+// =============================================================================
+
+/// RAG pipeline configuration struct matching rac_rag_config_t
+base class RacRagConfigStruct extends Struct {
+  /// Path to embedding model (ONNX)
+  external Pointer<Utf8> embeddingModelPath;
+
+  /// Path to LLM model (GGUF)
+  external Pointer<Utf8> llmModelPath;
+
+  /// Embedding dimension (default 384 for all-MiniLM-L6-v2)
+  @IntPtr()
+  external int embeddingDimension;
+
+  /// Number of top chunks to retrieve (default 3)
+  @IntPtr()
+  external int topK;
+
+  /// Minimum similarity threshold 0.0-1.0 (default 0.7)
+  @Float()
+  external double similarityThreshold;
+
+  /// Maximum tokens for context (default 2048)
+  @IntPtr()
+  external int maxContextTokens;
+
+  /// Tokens per chunk when splitting documents (default 512)
+  @IntPtr()
+  external int chunkSize;
+
+  /// Overlap tokens between chunks (default 50)
+  @IntPtr()
+  external int chunkOverlap;
+
+  /// Prompt template with {context} and {query} placeholders
+  external Pointer<Utf8> promptTemplate;
+
+  /// Configuration JSON for embedding model (optional)
+  external Pointer<Utf8> embeddingConfigJson;
+
+  /// Configuration JSON for LLM model (optional)
+  external Pointer<Utf8> llmConfigJson;
+}
+
+/// RAG query parameters struct matching rac_rag_query_t
+base class RacRagQueryStruct extends Struct {
+  /// User question
+  external Pointer<Utf8> question;
+
+  /// Optional system prompt override
+  external Pointer<Utf8> systemPrompt;
+
+  /// Max tokens to generate (default 512)
+  @Int32()
+  external int maxTokens;
+
+  /// Sampling temperature (default 0.7)
+  @Float()
+  external double temperature;
+
+  /// Nucleus sampling (default 0.9)
+  @Float()
+  external double topP;
+
+  /// Top-k sampling (default 40)
+  @Int32()
+  external int topK;
+}
+
+/// Search result from vector retrieval matching rac_search_result_t
+base class RacSearchResultStruct extends Struct {
+  /// Chunk ID (caller must free)
+  external Pointer<Utf8> chunkId;
+
+  /// Chunk text (caller must free)
+  external Pointer<Utf8> text;
+
+  /// Cosine similarity (0.0-1.0)
+  @Float()
+  external double similarityScore;
+
+  /// Metadata JSON (caller must free)
+  external Pointer<Utf8> metadataJson;
+}
+
+/// RAG result with answer and context matching rac_rag_result_t
+base class RacRagResultStruct extends Struct {
+  /// Generated answer (caller must free via rac_rag_result_free)
+  external Pointer<Utf8> answer;
+
+  /// Retrieved chunks (caller must free via rac_rag_result_free)
+  external Pointer<RacSearchResultStruct> retrievedChunks;
+
+  /// Number of chunks retrieved
+  @IntPtr()
+  external int numChunks;
+
+  /// Full context sent to LLM (caller must free via rac_rag_result_free)
+  external Pointer<Utf8> contextUsed;
+
+  /// Time for retrieval phase (ms)
+  @Double()
+  external double retrievalTimeMs;
+
+  /// Time for LLM generation (ms)
+  @Double()
+  external double generationTimeMs;
+
+  /// Total query time (ms)
+  @Double()
+  external double totalTimeMs;
+}
+
+// RAG Pipeline Lifecycle
+// rac_result_t rac_rag_pipeline_create(const rac_rag_config_t* config, rac_rag_pipeline_t** out_pipeline)
+typedef RacRagPipelineCreateNative = Int32 Function(
+  Pointer<RacRagConfigStruct> config,
+  Pointer<Pointer<Void>> outPipeline,
+);
+typedef RacRagPipelineCreateDart = int Function(
+  Pointer<RacRagConfigStruct> config,
+  Pointer<Pointer<Void>> outPipeline,
+);
+
+// void rac_rag_pipeline_destroy(rac_rag_pipeline_t* pipeline)
+typedef RacRagPipelineDestroyNative = Void Function(Pointer<Void> pipeline);
+typedef RacRagPipelineDestroyDart = void Function(Pointer<Void> pipeline);
+
+// RAG Document Management
+// rac_result_t rac_rag_add_document(rac_rag_pipeline_t* pipeline, const char* document_text, const char* metadata_json)
+typedef RacRagAddDocumentNative = Int32 Function(
+  Pointer<Void> pipeline,
+  Pointer<Utf8> documentText,
+  Pointer<Utf8> metadataJson,
+);
+typedef RacRagAddDocumentDart = int Function(
+  Pointer<Void> pipeline,
+  Pointer<Utf8> documentText,
+  Pointer<Utf8> metadataJson,
+);
+
+// rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline)
+typedef RacRagClearDocumentsNative = Int32 Function(Pointer<Void> pipeline);
+typedef RacRagClearDocumentsDart = int Function(Pointer<Void> pipeline);
+
+// size_t rac_rag_get_document_count(rac_rag_pipeline_t* pipeline)
+typedef RacRagGetDocumentCountNative = IntPtr Function(Pointer<Void> pipeline);
+typedef RacRagGetDocumentCountDart = int Function(Pointer<Void> pipeline);
+
+// RAG Query
+// rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query, rac_rag_result_t* out_result)
+typedef RacRagQueryNative = Int32 Function(
+  Pointer<Void> pipeline,
+  Pointer<RacRagQueryStruct> query,
+  Pointer<RacRagResultStruct> outResult,
+);
+typedef RacRagQueryDart = int Function(
+  Pointer<Void> pipeline,
+  Pointer<RacRagQueryStruct> query,
+  Pointer<RacRagResultStruct> outResult,
+);
+
+// void rac_rag_result_free(rac_rag_result_t* result)
+typedef RacRagResultFreeNative = Void Function(
+    Pointer<RacRagResultStruct> result);
+typedef RacRagResultFreeDart = void Function(Pointer<RacRagResultStruct> result);
+
+// RAG Backend Registration
+// rac_result_t rac_backend_rag_register(void)
+typedef RacBackendRagRegisterNative = Int32 Function();
+typedef RacBackendRagRegisterDart = int Function();
+
+// rac_result_t rac_backend_rag_unregister(void)
+typedef RacBackendRagUnregisterNative = Int32 Function();
+typedef RacBackendRagUnregisterDart = int Function();
+
+// =============================================================================
 // Backward Compatibility Aliases
 // =============================================================================
 

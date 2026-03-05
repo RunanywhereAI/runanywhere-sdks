@@ -8,6 +8,7 @@
 #include "VLMBridge.hpp"
 #include <stdexcept>
 #include <cstring>
+#include <sys/stat.h>
 
 namespace runanywhere {
 namespace bridges {
@@ -38,7 +39,6 @@ void VLMBridge::loadModel(const std::string& modelPath,
                           const std::string& mmprojPath,
                           const std::string& modelId,
                           const std::string& modelName) {
-    // Create component if needed
     if (!handle_) {
         rac_result_t result = rac_vlm_component_create(&handle_);
         if (result != RAC_SUCCESS) {
@@ -46,23 +46,42 @@ void VLMBridge::loadModel(const std::string& modelPath,
         }
     }
 
-    // Use modelPath as modelId if not provided
     std::string effectiveModelId = modelId.empty() ? modelPath : modelId;
     std::string effectiveModelName = modelName.empty() ? effectiveModelId : modelName;
 
-    // Unload existing model if different
     if (isLoaded() && loadedModelId_ != effectiveModelId) {
         rac_vlm_component_cleanup(handle_);
     }
 
-    // Handle mmprojPath - pass nullptr if empty string
-    const char* mmprojPathPtr = mmprojPath.empty() ? nullptr : mmprojPath.c_str();
+    // Resolve directory paths to actual .gguf files (matches iOS loadModelById behavior).
+    // When localPath is a directory containing model + mmproj .gguf files,
+    // rac_vlm_resolve_model_files scans and separates them.
+    std::string resolvedModelPath = modelPath;
+    std::string resolvedMmprojPath = mmprojPath;
 
-    // Load new model with correct 5-arg signature
-    // rac_vlm_component_load_model(handle, model_path, mmproj_path, model_id, model_name)
+    struct stat pathStat;
+    if (stat(modelPath.c_str(), &pathStat) == 0 && S_ISDIR(pathStat.st_mode)) {
+        char modelBuf[4096] = {};
+        char mmprojBuf[4096] = {};
+        rac_result_t resolveResult = rac_vlm_resolve_model_files(
+            modelPath.c_str(), modelBuf, sizeof(modelBuf), mmprojBuf, sizeof(mmprojBuf));
+        if (resolveResult == RAC_SUCCESS && modelBuf[0] != '\0') {
+            resolvedModelPath = modelBuf;
+            if (mmprojBuf[0] != '\0') {
+                resolvedMmprojPath = mmprojBuf;
+            }
+        } else {
+            throw std::runtime_error(
+                "VLMBridge: Failed to resolve model files in directory '" + modelPath +
+                "'. Ensure it contains .gguf files. Error: " + std::to_string(resolveResult));
+        }
+    }
+
+    const char* mmprojPathPtr = resolvedMmprojPath.empty() ? nullptr : resolvedMmprojPath.c_str();
+
     rac_result_t result = rac_vlm_component_load_model(
         handle_,
-        modelPath.c_str(),
+        resolvedModelPath.c_str(),
         mmprojPathPtr,
         effectiveModelId.c_str(),
         effectiveModelName.c_str()

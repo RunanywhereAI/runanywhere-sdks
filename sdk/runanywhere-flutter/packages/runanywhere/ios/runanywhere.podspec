@@ -2,7 +2,8 @@
 # RunAnywhere Core SDK - iOS
 #
 # This podspec integrates RACommons.xcframework into Flutter iOS apps.
-# RACommons provides the core infrastructure for on-device AI capabilities.
+# RACommons provides the core infrastructure for on-device AI capabilities,
+# including the RAG pipeline (compiled directly into RACommons).
 #
 # Binary Configuration:
 #   - Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
@@ -35,7 +36,7 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
 infrastructure (RACommons) for speech-to-text (STT), text-to-speech (TTS),
-language models (LLM), voice activity detection (VAD), and embeddings.
+language models (LLM), voice activity detection (VAD), embeddings, and RAG.
 Pre-built binaries are downloaded from:
 https://github.com/RunanywhereAI/runanywhere-sdks
                        DESC
@@ -54,60 +55,73 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   s.dependency 'Flutter'
 
   # =============================================================================
-  # RACommons XCFramework - Core infrastructure
-  # Downloaded from runanywhere-sdks releases (NOT runanywhere-binaries)
+  # RACommons XCFramework - Core infrastructure (includes RAG pipeline)
+  # Downloaded from runanywhere-sdks releases
   # =============================================================================
   if TEST_LOCAL
     puts "[runanywhere] Using LOCAL RACommons from Frameworks/"
-    s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
+    s.vendored_frameworks = [
+      'Frameworks/RACommons.xcframework'
+    ]
   else
     s.prepare_command = <<-CMD
       set -e
 
       FRAMEWORK_DIR="Frameworks"
-      VERSION="#{COMMONS_VERSION}"
-      VERSION_FILE="$FRAMEWORK_DIR/.racommons_version"
+
+      # ---------------------------------------------------------------------------
+      # RACommons
+      # ---------------------------------------------------------------------------
+      COMMONS_VERSION="#{COMMONS_VERSION}"
+      COMMONS_VERSION_FILE="$FRAMEWORK_DIR/.racommons_version"
 
       # Check if already downloaded with correct version
-      if [ -f "$VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
-        CURRENT_VERSION=$(cat "$VERSION_FILE")
-        if [ "$CURRENT_VERSION" = "$VERSION" ]; then
-          echo "✅ RACommons.xcframework version $VERSION already downloaded"
-          exit 0
+      if [ -f "$COMMONS_VERSION_FILE" ] && [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
+        CURRENT_VERSION=$(cat "$COMMONS_VERSION_FILE")
+        if [ "$CURRENT_VERSION" = "$COMMONS_VERSION" ]; then
+          echo "RACommons.xcframework version $COMMONS_VERSION already downloaded"
+        else
+          SKIP_COMMONS=false
+        fi
+      else
+        SKIP_COMMONS=false
+      fi
+
+      if [ "${SKIP_COMMONS:-true}" != "true" ]; then
+        echo "Downloading RACommons.xcframework version $COMMONS_VERSION..."
+
+        mkdir -p "$FRAMEWORK_DIR"
+        rm -rf "$FRAMEWORK_DIR/RACommons.xcframework"
+
+        COMMONS_DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$COMMONS_VERSION/RACommons-ios-v$COMMONS_VERSION.zip"
+        COMMONS_ZIP_FILE="/tmp/RACommons.zip"
+
+        echo "   URL: $COMMONS_DOWNLOAD_URL"
+
+        curl -L -f -o "$COMMONS_ZIP_FILE" "$COMMONS_DOWNLOAD_URL" || {
+          echo "Failed to download RACommons from $COMMONS_DOWNLOAD_URL"
+          exit 1
+        }
+
+        echo "Extracting RACommons.xcframework..."
+        unzip -q -o "$COMMONS_ZIP_FILE" -d "$FRAMEWORK_DIR/"
+        rm -f "$COMMONS_ZIP_FILE"
+
+        echo "$COMMONS_VERSION" > "$COMMONS_VERSION_FILE"
+
+        if [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
+          echo "RACommons.xcframework installed successfully"
+        else
+          echo "RACommons.xcframework extraction failed"
+          exit 1
         fi
       fi
 
-      echo "📦 Downloading RACommons.xcframework version $VERSION..."
-
-      mkdir -p "$FRAMEWORK_DIR"
-      rm -rf "$FRAMEWORK_DIR/RACommons.xcframework"
-
-      # Download from runanywhere-sdks
-      DOWNLOAD_URL="https://github.com/#{GITHUB_ORG}/#{COMMONS_REPO}/releases/download/commons-v$VERSION/RACommons-ios-v$VERSION.zip"
-      ZIP_FILE="/tmp/RACommons.zip"
-
-      echo "   URL: $DOWNLOAD_URL"
-
-      curl -L -f -o "$ZIP_FILE" "$DOWNLOAD_URL" || {
-        echo "❌ Failed to download RACommons from $DOWNLOAD_URL"
-        exit 1
-      }
-
-      echo "📂 Extracting RACommons.xcframework..."
-      unzip -q -o "$ZIP_FILE" -d "$FRAMEWORK_DIR/"
-      rm -f "$ZIP_FILE"
-
-      echo "$VERSION" > "$VERSION_FILE"
-
-      if [ -d "$FRAMEWORK_DIR/RACommons.xcframework" ]; then
-        echo "✅ RACommons.xcframework installed successfully"
-      else
-        echo "❌ RACommons.xcframework extraction failed"
-        exit 1
-      fi
     CMD
 
-    s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
+    s.vendored_frameworks = [
+      'Frameworks/RACommons.xcframework'
+    ]
   end
 
   s.preserve_paths = 'Frameworks/**/*'

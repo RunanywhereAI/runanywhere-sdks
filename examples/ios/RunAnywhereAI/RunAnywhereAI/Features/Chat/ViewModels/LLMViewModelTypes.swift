@@ -11,11 +11,14 @@ import Foundation
 
 enum LLMError: LocalizedError {
     case noModelLoaded
+    case custom(String)
 
     var errorDescription: String? {
         switch self {
         case .noModelLoaded:
             return "No model is loaded. Please select and load a model from the Models tab first."
+        case .custom(let message):
+            return message
         }
     }
 }

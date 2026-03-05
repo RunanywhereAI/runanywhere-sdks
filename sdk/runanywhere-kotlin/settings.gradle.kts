@@ -46,7 +46,6 @@ include(":modules:runanywhere-core-llamacpp")
 // Matches iOS: Sources/ONNXRuntime/ONNX.swift
 include(":modules:runanywhere-core-onnx")
 
-// RAG module - thin wrapper that calls C++ backend registration
-// Single file: RAGModule.kt which calls rac_backend_rag_register()
-// Matches iOS: Sources/RAGRuntime/RAG.swift
-include(":modules:runanywhere-core-rag")
+// RAG pipeline — NOT a separate module. RAG is an orchestration pipeline (like Voice Agent)
+// that uses existing LLM + Embeddings services. Registration is handled by the core SDK
+// when ragCreatePipeline() is called. See: RunAnywhere+RAG.jvmAndroid.kt

@@ -122,6 +122,36 @@ const RUN_ANYWHERE_DIR = 'RunAnywhere';
 const MODELS_DIR = 'Models';
 
 /**
+ * Describes a single file within a multi-file model.
+ * Mirrors Swift SDK's ModelFileDescriptor.
+ */
+export interface ModelFileDescriptor {
+  url: string;
+  filename: string;
+}
+
+/**
+ * In-memory cache for multi-file model descriptors.
+ * Mirrors Swift SDK's multiFileModelCache on RunAnywhere.
+ */
+const multiFileCache = new Map<string, ModelFileDescriptor[]>();
+
+export const MultiFileModelCache = {
+  set(modelId: string, files: ModelFileDescriptor[]): void {
+    multiFileCache.set(modelId, files);
+  },
+  get(modelId: string): ModelFileDescriptor[] | undefined {
+    return multiFileCache.get(modelId);
+  },
+  has(modelId: string): boolean {
+    return multiFileCache.has(modelId);
+  },
+  delete(modelId: string): void {
+    multiFileCache.delete(modelId);
+  },
+};
+
+/**
  * Download progress information
  */
 export interface DownloadProgress {
@@ -608,34 +638,32 @@ if (fw === 'LlamaCpp' && archiveType === null) {
     try {
       const contents = await RNFS.readDir(extractedFolder);
 
-      // Check for .onnx files in the current directory first (SingleFile models)
-      const onnxFiles = contents.filter(
-        item => item.isFile() && item.name.toLowerCase().endsWith('.onnx')
+      // If the directory contains .onnx files or other model files (tokens.txt, espeak-ng-data),
+      // return the DIRECTORY path — the C++ backend scans it internally for all needed files
+      // (encoder.onnx, decoder.onnx, tokens.txt, espeak-ng-data/, vocab.txt, etc.).
+      // This matches the iOS SDK which always passes directory paths for ONNX models.
+      const hasModelFiles = contents.some(
+        item => item.isFile() && (
+          item.name.toLowerCase().endsWith('.onnx') ||
+          item.name === 'tokens.txt' ||
+          item.name === 'vocab.txt'
+        )
       );
-      if (onnxFiles.length > 0) {
-        // Return the first .onnx file found (or model.onnx if it exists)
-        const modelOnnx = onnxFiles.find(f => f.name === 'model.onnx');
-        if (modelOnnx) {
-          logger.info(`Found model.onnx: ${modelOnnx.path}`);
-          return modelOnnx.path;
-        }
-        // Otherwise use the first .onnx file found
-        logger.info(`Found ONNX model: ${onnxFiles[0].path}`);
-        return onnxFiles[0].path;
+      if (hasModelFiles) {
+        logger.info(`Found model files in directory: ${extractedFolder}`);
+        return extractedFolder;
       }
 
-      // If there's exactly one directory and no files, it might be a nested structure
+      // If there's exactly one directory and no model files, it's a nested archive structure
       const directories = contents.filter(item => item.isDirectory());
       const files = contents.filter(item => item.isFile());
 
       if (directories.length === 1 && files.length === 0) {
-        // Nested directory - recursively check inside
         const nestedDir = directories[0];
         logger.info(`Found nested directory structure: ${nestedDir.name}`);
         return this.findModelPathAfterExtraction(nestedDir.path);
       }
 
-      // Otherwise, the extracted folder contains the model directly
       return extractedFolder;
     } catch (error) {
       logger.error(`Error finding model path: ${error}`);
@@ -740,6 +768,81 @@ if (fw === 'LlamaCpp' && archiveType === null) {
 
     await processDir(folder);
     return { totalSize, fileCount };
+  },
+
+  /**
+   * Download a multi-file model.
+   * All files are placed in the same directory: Models/{framework}/{modelId}/
+   * Returns the folder path (not a file path), matching the Swift SDK behavior.
+   */
+  async downloadMultiFileModel(
+    modelId: string,
+    files: ModelFileDescriptor[],
+    onProgress?: (progress: DownloadProgress) => void,
+    framework?: string
+  ): Promise<string> {
+    if (!RNFS) {
+      throw new Error('react-native-fs not installed');
+    }
+
+    const fw = framework || 'ONNX';
+    const baseId = getBaseModelId(modelId);
+    const folder = `${this.getFrameworkDirectory(fw)}/${baseId}`;
+
+    await this.ensureDirectory(this.getRunAnywhereDirectory());
+    await this.ensureDirectory(this.getModelsDirectory());
+    await this.ensureDirectory(this.getFrameworkDirectory(fw));
+    await this.ensureDirectory(folder);
+
+    logger.info(`Downloading multi-file model: ${modelId} (${files.length} files)`);
+
+    let totalBytesWritten = 0;
+    let totalContentLength = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const fileDesc = files[i];
+      const destPath = `${folder}/${fileDesc.filename}`;
+
+      const exists = await RNFS.exists(destPath);
+      if (exists) {
+        logger.info(`File already exists, skipping: ${fileDesc.filename}`);
+        continue;
+      }
+
+      logger.info(`Downloading file ${i + 1}/${files.length}: ${fileDesc.filename}`);
+
+      const downloadResult = RNFS.downloadFile({
+        fromUrl: fileDesc.url,
+        toFile: destPath,
+        background: true,
+        progressDivider: 1,
+        begin: (res) => {
+          totalContentLength += res.contentLength;
+          logger.info(`File download started: ${fileDesc.filename} (${res.contentLength} bytes)`);
+        },
+        progress: (res) => {
+          if (onProgress && totalContentLength > 0) {
+            onProgress({
+              bytesWritten: totalBytesWritten + res.bytesWritten,
+              contentLength: totalContentLength,
+              progress: (totalBytesWritten + res.bytesWritten) / totalContentLength,
+            });
+          }
+        },
+      });
+
+      const result = await downloadResult.promise;
+
+      if (result.statusCode !== 200) {
+        throw new Error(`Download failed for ${fileDesc.filename}: status ${result.statusCode}`);
+      }
+
+      totalBytesWritten += result.bytesWritten;
+      logger.info(`File downloaded: ${fileDesc.filename} (${result.bytesWritten} bytes)`);
+    }
+
+    logger.info(`Multi-file model download complete: ${folder}`);
+    return folder;
   },
 
   /**
