@@ -29,10 +29,15 @@ rac_result_t rac_backend_rag_register(void) {
     LOGI("Registering RAG backend module...");
 
     // Register module
-    rac_capability_t capabilities[] = {
-        // RAG doesn't register as a service provider yet
-        // It's a higher-level pipeline using existing services
-    };
+
+    // RAG doesn't register as a service provider yet
+    // It's a higher-level pipeline using existing services
+    #if defined(_WIN32)
+    // error C2466: cannot allocate an array of constant size 0
+    rac_capability_t* capabilities = nullptr;
+#else
+    rac_capability_t capabilities[] = {};
+#endif  // defined(_WIN32)
 
     rac_module_info_t module_info = {
         .id = MODULE_ID,

@@ -7,6 +7,11 @@
 #include "backends/rag/ort_guards.h"
 
 #include "rac/core/rac_logger.h"
+
+#if defined(_WIN32)
+#include "rac/utils/rac_str_trans.h"
+#endif
+
 #include <nlohmann/json.hpp>
 #include <chrono>
 #include <sstream>
@@ -257,7 +262,18 @@ public:
         
         // Load model and create session
         LOGI("Loading ONNX model: %s", model_path.c_str());
-        status_guard.reset(cached_api->CreateSession(ort_env, model_path.c_str(), session_options, &session));
+#if defined(_WIN32)
+        int wlen = 0;
+        rac_str_utf8_to_unicode(model_path.c_str(), NULL, 0, &wlen);
+        wchar_t* wmodel_path = (wchar_t*)malloc((size_t)wlen * sizeof(wchar_t));
+        rac_str_utf8_to_unicode(model_path.c_str(), wmodel_path, wlen, NULL);
+        status_guard.reset(
+            cached_api->CreateSession(ort_env, wmodel_path, session_options, &session));
+        free(wmodel_path);
+#else
+        status_guard.reset(
+            cached_api->CreateSession(ort_env, model_path.c_str(), session_options, &session));
+#endif  // defined(_WIN32)
         if (status_guard.is_error()) {
             LOGE("Failed to create ONNX session: %s", status_guard.error_message());
             return false;

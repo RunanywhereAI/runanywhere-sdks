@@ -14,8 +14,20 @@
 
 #include "onnx_backend.h"
 
+#if !defined(_WIN32)
 #include <dirent.h>
+#else
+#include <filesystem>
+#endif
 #include <sys/stat.h>
+#if defined(_WIN32)
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
+#endif
 
 #include <cstring>
 
@@ -156,6 +168,31 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     std::string nemo_ctc_model_path;  // Single-file CTC model (model.int8.onnx or model.onnx)
 
     if (S_ISDIR(path_stat.st_mode)) {
+#if defined(_WIN32)
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(model_path)) {
+                std::string filename = entry.path().filename().string();
+                std::string full_path = entry.path().string();
+
+                if (filename.find("encoder") != std::string::npos && filename.size() > 5 &&
+                    filename.substr(filename.size() - 5) == ".onnx") {
+                    encoder_path = full_path;
+                    RAC_LOG_DEBUG("ONNX.STT", "Found encoder: %s", encoder_path.c_str());
+                } else if (filename.find("decoder") != std::string::npos && filename.size() > 5 &&
+                           filename.substr(filename.size() - 5) == ".onnx") {
+                    decoder_path = full_path;
+                    RAC_LOG_DEBUG("ONNX.STT", "Found decoder: %s", decoder_path.c_str());
+                } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
+                                                        filename.find(".txt") != std::string::npos)) {
+                    tokens_path = full_path;
+                    RAC_LOG_DEBUG("ONNX.STT", "Found tokens: %s", tokens_path.c_str());
+                }
+            }
+        } catch (const std::filesystem::filesystem_error&) {
+            RAC_LOG_ERROR("ONNX.STT", "Cannot open model directory: %s", model_path.c_str());
+            return false;
+        }
+#else
         DIR* dir = opendir(model_path.c_str());
         if (!dir) {
             RAC_LOG_ERROR("ONNX.STT", "Cannot open model directory: %s", model_path.c_str());
@@ -189,6 +226,7 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
             }
         }
         closedir(dir);
+#endif
 
         if (encoder_path.empty()) {
             std::string test_path = model_path + "/encoder.onnx";
@@ -678,6 +716,20 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
 
         // Try model.onnx first, then model.int8.onnx (for int8 quantized Kokoro)
         if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
+#if defined(_WIN32)
+            try {
+                for (const auto& entry : std::filesystem::directory_iterator(model_path)) {
+                    std::string filename = entry.path().filename().string();
+                    if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
+                        model_onnx_path = entry.path().string();
+                        RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
+                        break;
+                    }
+                }
+            } catch (const std::filesystem::filesystem_error&) {
+                /* ignore */
+            }
+#else
             std::string int8_model_path = model_path + "/model.int8.onnx";
             if (stat(int8_model_path.c_str(), &path_stat) == 0) {
                 model_onnx_path = int8_model_path;
@@ -698,6 +750,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
                     closedir(dir);
                 }
             }
+#endif
         }
 
         if (stat(data_dir.c_str(), &path_stat) != 0) {
