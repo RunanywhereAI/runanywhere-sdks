@@ -13,6 +13,16 @@
 import { LlamaCppBridge } from './Foundation/LlamaCppBridge';
 import { LlamaCppProvider } from './LlamaCppProvider';
 
+/** Options for `LlamaCPP.register()`. */
+export interface LlamaCPPRegisterOptions {
+  /** Override URL to the racommons-llamacpp.js glue file (CPU variant). */
+  wasmUrl?: string;
+  /** Override URL to the racommons-llamacpp-webgpu.js glue file. */
+  webgpuWasmUrl?: string;
+  /** Hardware acceleration strategy (default: 'auto'). */
+  acceleration?: 'auto' | 'webgpu' | 'cpu';
+}
+
 /** Module identifier. */
 const MODULE_ID = 'llamacpp';
 
@@ -35,9 +45,16 @@ export const LlamaCPP = {
   /**
    * Register the llama.cpp backend.
    * Call after `RunAnywhere.initialize()`.
+   *
+   * @param options - Optional WASM URL overrides and acceleration preference.
+   *                  Use `wasmUrl` / `webgpuWasmUrl` when the default
+   *                  `import.meta.url`-based resolution doesn't work (e.g. bundled apps).
    */
-  async register(): Promise<void> {
-    return LlamaCppProvider.register();
+  async register(options?: LlamaCPPRegisterOptions): Promise<void> {
+    const bridge = LlamaCppBridge.shared;
+    if (options?.wasmUrl) bridge.wasmUrl = options.wasmUrl;
+    if (options?.webgpuWasmUrl) bridge.webgpuWasmUrl = options.webgpuWasmUrl;
+    return LlamaCppProvider.register(options?.acceleration);
   },
 
   /**
