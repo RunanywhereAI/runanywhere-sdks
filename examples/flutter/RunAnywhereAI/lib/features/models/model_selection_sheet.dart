@@ -507,15 +507,8 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
     });
 
     try {
-      // RAG contexts record the selection only — do NOT pre-load into memory.
-      // The RAG pipeline loads models on demand when the document is ingested.
-      final isRagContext = widget.context == ModelSelectionContext.ragEmbedding ||
-          widget.context == ModelSelectionContext.ragLLM;
-
-      if (!isRagContext) {
-        // Update view model selection state (loads the model into memory)
-        await _viewModel.selectModel(model);
-      }
+      // Update view model selection state
+      await _viewModel.selectModel(model);
 
       // Call the callback - this is where the actual model loading happens
       // The callback knows the correct context and how to load the model

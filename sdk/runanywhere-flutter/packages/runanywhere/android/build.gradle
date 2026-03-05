@@ -1,8 +1,7 @@
 // RunAnywhere Core SDK - Android
 //
 // This plugin bundles RACommons native libraries (.so files) for Android.
-// RACommons provides the core infrastructure for on-device AI capabilities,
-// including the RAG pipeline (compiled directly into librac_commons.so).
+// RACommons provides the core infrastructure for on-device AI capabilities.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -97,7 +96,7 @@ def calculateChecksum(File file) {
 }
 
 // =============================================================================
-// Binary Download Task: RACommons (runs when testLocal = false)
+// Binary Download Task (runs when testLocal = false)
 // =============================================================================
 task downloadNativeLibs {
     group = 'runanywhere'
@@ -181,5 +180,5 @@ task downloadNativeLibs {
     }
 }
 
-// Run downloadNativeLibs before preBuild (RAG pipeline is now part of RACommons)
+// Run downloadNativeLibs before preBuild
 preBuild.dependsOn downloadNativeLibs

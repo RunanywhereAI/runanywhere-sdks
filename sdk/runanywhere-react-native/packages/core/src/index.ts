@@ -148,7 +148,6 @@ export {
 export {
   ModelRegistry,
   FileSystem,
-  MultiFileModelCache,
   DownloadService,
   DownloadState,
   SystemTTSService,
@@ -158,7 +157,6 @@ export {
   PlatformVoices,
   type ModelCriteria,
   type AddModelFromURLOptions,
-  type ModelFileDescriptor,
   type DownloadProgress,
   type DownloadTask,
   type DownloadConfiguration,
@@ -253,48 +251,7 @@ export {
   cancelDownload,
   deleteModel,
   registerModel,
-  registerMultiFileModel,
 } from './Public/Extensions/RunAnywhere+Models';
-
-// =============================================================================
-// RAG Pipeline
-// =============================================================================
-
-export {
-  ragCreatePipeline,
-  ragDestroyPipeline,
-  ragIngest,
-  ragAddDocumentsBatch,
-  ragQuery,
-  ragClearDocuments,
-  ragGetDocumentCount,
-  ragGetStatistics,
-} from './Public/Extensions/RunAnywhere+RAG';
-
-// =============================================================================
-// Vision Language Model
-// =============================================================================
-
-export {
-  registerVLMBackend,
-  loadVLMModel,
-  loadVLMModelById,
-  isVLMModelLoaded,
-  unloadVLMModel,
-  describeImage,
-  askAboutImage,
-  processImage,
-  processImageStream,
-  cancelVLMGeneration,
-} from './Public/Extensions/RunAnywhere+VLM';
-
-export type {
-  RAGConfiguration,
-  RAGQueryOptions,
-  RAGResult,
-  RAGSearchResult,
-  RAGStatistics,
-} from './types/RAGTypes';
 
 // =============================================================================
 // Nitrogen Spec Types

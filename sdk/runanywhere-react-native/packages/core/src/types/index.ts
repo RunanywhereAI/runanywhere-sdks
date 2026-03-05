@@ -21,7 +21,6 @@ export {
   SDKComponent,
   SDKEnvironment,
   SDKEventType,
-  ModelArtifactType,
 } from './enums';
 
 // Models

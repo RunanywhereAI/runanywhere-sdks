@@ -4,11 +4,12 @@
  *
  * RAG Native Bridge
  *
- * JNI bridge for the RAG pipeline module.
- * RAG pipeline code is compiled into librac_commons.so.
- * This bridge (librac_backend_rag_jni.so) provides JNI wrappers
- * that call into rac_commons for:
- * - rac_backend_rag_register() / unregister()
+ * Self-contained JNI bridge for the RAG backend module.
+ * This mirrors the Swift RAGBackend XCFramework architecture.
+ *
+ * The native library (librac_backend_rag_jni.so) contains:
+ * - rac_backend_rag_register()
+ * - rac_backend_rag_unregister()
  * - rac_rag_pipeline_* (pipeline operations)
  */
 
@@ -17,15 +18,16 @@ package com.runanywhere.sdk.rag
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
- * Native bridge for RAG pipeline registration and operations.
+ * Native bridge for RAG backend registration and pipeline operations.
  *
- * This object handles loading the RAG JNI library and provides
+ * This object handles loading the RAG-specific JNI library and provides
  * JNI methods for backend registration with the C++ service registry,
  * as well as all RAG pipeline operations (create, query, add documents, etc.).
  *
  * Architecture:
- * - librac_backend_rag_jni.so - Thin JNI wrapper (this bridge)
- * - Links to librac_commons.so - Contains RAG pipeline + service registry
+ * - librac_backend_rag_jni.so - RAG JNI (this bridge)
+ * - Links to librac_backend_rag.so - RAG C++ backend
+ * - Links to librac_commons.so - Commons library with service registry
  */
 object RAGBridge {
     private val logger = SDKLogger.rag
@@ -38,8 +40,9 @@ object RAGBridge {
     /**
      * Ensure the RAG JNI library is loaded.
      *
-     * Loads librac_backend_rag_jni.so which links against librac_commons.so
-     * (the main SDK's librunanywhere_jni.so must be loaded first).
+     * Loads librac_backend_rag_jni.so and its dependencies:
+     * - librac_backend_rag.so (RAG C++ backend)
+     * - librac_commons.so (commons library - must be loaded first)
      *
      * @return true if loaded successfully, false otherwise
      */
@@ -80,7 +83,7 @@ object RAGBridge {
     // ==========================================================================
 
     /**
-     * Register the RAG pipeline with the C++ service registry.
+     * Register the RAG backend with the C++ service registry.
      *
      * @return 0 (RAC_SUCCESS) on success, error code on failure
      */
@@ -88,7 +91,7 @@ object RAGBridge {
     external fun nativeRegister(): Int
 
     /**
-     * Unregister the RAG pipeline from the C++ service registry.
+     * Unregister the RAG backend from the C++ service registry.
      *
      * @return 0 (RAC_SUCCESS) on success, error code on failure
      */
@@ -96,7 +99,7 @@ object RAGBridge {
     external fun nativeUnregister(): Int
 
     /**
-     * Check if the RAG pipeline is registered.
+     * Check if the RAG backend is registered.
      *
      * @return true if registered
      */

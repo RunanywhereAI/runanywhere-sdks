@@ -92,6 +92,7 @@ struct STTResult {
 
 enum class TTSModelType {
     PIPER,
+    KOKORO,  // Kokoro TTS (high quality, 24kHz, multi-speaker)
     COQUI,
     BARK,
     ESPEAK,
@@ -326,7 +327,6 @@ class ONNXTTS {
     std::atomic<int> active_synthesis_count_{0};
     std::vector<VoiceInfo> voices_;
     std::string model_dir_;
-    std::string espeak_data_dir_;
     int sample_rate_ = 22050;
     mutable std::mutex mutex_;
 };

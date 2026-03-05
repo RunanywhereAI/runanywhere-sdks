@@ -30,7 +30,6 @@ export enum LLMFramework {
  */
 export enum ModelCategory {
   Language = 'language',
-  Embedding = 'embedding',
   SpeechRecognition = 'speech-recognition',
   SpeechSynthesis = 'speech-synthesis',
   Vision = 'vision',
@@ -243,7 +242,6 @@ export const FrameworkDisplayNames: Record<LLMFramework, string> = {
  */
 export const CategoryDisplayNames: Record<ModelCategory, string> = {
   [ModelCategory.Language]: 'Language Model',
-  [ModelCategory.Embedding]: 'Embedding Model',
   [ModelCategory.SpeechRecognition]: 'Speech Recognition',
   [ModelCategory.SpeechSynthesis]: 'Text-to-Speech',
   [ModelCategory.Vision]: 'Vision Model',

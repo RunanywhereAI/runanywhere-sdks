@@ -106,8 +106,6 @@ class ModelListViewModel extends ChangeNotifier {
         return ModelCategory.imageGeneration;
       case sdk.ModelCategory.audio:
         return ModelCategory.audio;
-      case sdk.ModelCategory.embedding:
-        return ModelCategory.embedding;
     }
   }
 

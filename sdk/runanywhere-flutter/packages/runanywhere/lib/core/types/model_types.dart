@@ -59,8 +59,7 @@ enum ModelCategory {
   vision('vision', 'Vision Model'),
   imageGeneration('image-generation', 'Image Generation'),
   multimodal('multimodal', 'Multimodal'),
-  audio('audio', 'Audio Processing'),
-  embedding('embedding', 'Embedding Model');
+  audio('audio', 'Audio Processing');
 
   final String rawValue;
   final String displayName;
@@ -220,32 +219,22 @@ class ExpectedModelFiles {
       Object.hash(requiredPatterns.length, optionalPatterns.length);
 }
 
-/// Describes a file that needs to be downloaded as part of a multi-file model.
-///
-/// Matches Swift ModelFileDescriptor from Public/Extensions/Models/ModelTypes.swift.
+/// Describes a file that needs to be downloaded as part of a multi-file model
 class ModelFileDescriptor {
   final String relativePath;
   final String destinationPath;
   final bool isRequired;
 
-  /// The individual download URL for this file.
-  ///
-  /// When set, the download service fetches this specific URL instead of deriving
-  /// the URL from the parent model's downloadURL.
-  final Uri? url;
-
   const ModelFileDescriptor({
     required this.relativePath,
     required this.destinationPath,
     this.isRequired = true,
-    this.url,
   });
 
   Map<String, dynamic> toJson() => {
         'relativePath': relativePath,
         'destinationPath': destinationPath,
         'isRequired': isRequired,
-        if (url != null) 'url': url.toString(),
       };
 
   factory ModelFileDescriptor.fromJson(Map<String, dynamic> json) {
@@ -253,7 +242,6 @@ class ModelFileDescriptor {
       relativePath: json['relativePath'] as String,
       destinationPath: json['destinationPath'] as String,
       isRequired: json['isRequired'] as bool? ?? true,
-      url: json['url'] != null ? Uri.parse(json['url'] as String) : null,
     );
   }
 }

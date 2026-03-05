@@ -7,24 +7,32 @@
  * ## Usage
  *
  * ```typescript
- * import { RunAnywhere, ModelCategory, LLMFramework, ModelArtifactType } from '@runanywhere/core';
- * import { ONNX } from '@runanywhere/onnx';
+ * import { RunAnywhere, ModelCategory } from '@runanywhere/core';
+ * import { ONNX, ONNXProvider, ModelArtifactType } from '@runanywhere/onnx';
  *
  * // Initialize core SDK
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
- * // Register ONNX backend
- * await ONNX.register();
+ * // Register ONNX backend (calls native rac_backend_onnx_register)
+ * await ONNXProvider.register();
  *
- * // Register models via RunAnywhere (matching iOS pattern)
- * await RunAnywhere.registerModel({
+ * // Add STT model
+ * ONNX.addModel({
  *   id: 'sherpa-onnx-whisper-tiny.en',
  *   name: 'Sherpa Whisper Tiny',
  *   url: 'https://github.com/.../sherpa-onnx-whisper-tiny.en.tar.gz',
- *   framework: LLMFramework.ONNX,
  *   modality: ModelCategory.SpeechRecognition,
  *   artifactType: ModelArtifactType.TarGzArchive,
  *   memoryRequirement: 75_000_000
+ * });
+ *
+ * // Add TTS model
+ * ONNX.addModel({
+ *   id: 'vits-piper-en_US-lessac-medium',
+ *   name: 'Piper TTS (US English)',
+ *   url: 'https://github.com/.../vits-piper-en_US-lessac-medium.tar.gz',
+ *   modality: ModelCategory.SpeechSynthesis,
+ *   memoryRequirement: 65_000_000
  * });
  *
  * // Download and use
@@ -40,7 +48,7 @@
 // Main API
 // =============================================================================
 
-export { ONNX } from './ONNX';
+export { ONNX, ModelArtifactType, type ONNXModelOptions } from './ONNX';
 export { ONNXProvider, autoRegister } from './ONNXProvider';
 
 // =============================================================================

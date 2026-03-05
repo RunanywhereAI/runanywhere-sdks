@@ -70,7 +70,10 @@ extension RunAnywhereFrameworks on RunAnywhere {
       break;
 
     case SDKComponent.embedding:
-      relevantCategories = {ModelCategory.embedding};
+      relevantCategories = {
+        ModelCategory.language,
+        ModelCategory.multimodal
+      };
       break;
 
     case SDKComponent.vlm:
@@ -78,7 +81,7 @@ extension RunAnywhereFrameworks on RunAnywhere {
       break;
   }
 
-
+    
 
     final allModels = await RunAnywhere.availableModels();
     for (final model in allModels) {
