@@ -17,9 +17,12 @@ Pod::Spec.new do |s|
   # =============================================================================
   # Core SDK - RACommons xcframework is bundled in npm package
   # No downloads needed - framework is included in ios/Binaries/
+  # RAG pipeline is compiled directly into RACommons.
   # =============================================================================
-  puts "[RunAnywhereCore] Using bundled RACommons.xcframework from npm package"
-  s.vendored_frameworks = "ios/Binaries/RACommons.xcframework"
+  puts "[RunAnywhereCore] Using bundled xcframeworks from npm package"
+  s.vendored_frameworks = [
+    "ios/Binaries/RACommons.xcframework",
+  ]
 
   # Source files
   s.source_files = [
@@ -37,15 +40,8 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
       "$(PODS_TARGET_SRCROOT)/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",
-      # Need headers directory for direct includes like "rac_telemetry_manager.h" from bridge files
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/RACommons.framework/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/RACommons.framework/Headers",
-    ].join(" "),
-    # Framework search paths for framework-style includes like <RACommons/...>
-    "FRAMEWORK_SEARCH_PATHS" => [
-      "$(inherited)",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-x86_64-simulator/Headers",
     ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
     "DEFINES_MODULE" => "YES",

@@ -75,6 +75,21 @@ typedef struct rac_embeddings_service {
 RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
+ * @brief Create an embeddings service with additional configuration JSON.
+ *
+ * Same as rac_embeddings_create but forwards config_json (e.g. {"vocab_path":"..."})
+ * to the embedding provider so it can locate companion files.
+ *
+ * @param model_id   Model identifier or path
+ * @param config_json JSON string with provider-specific config (can be NULL)
+ * @param out_handle  Output: Service handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
+                                                        const char* config_json,
+                                                        rac_handle_t* out_handle);
+
+/**
  * @brief Initialize the service with a model
  *
  * @param handle Service handle

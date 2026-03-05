@@ -110,10 +110,10 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # =============================================================================
-# RAG Backend Tests (GoogleTest)
+# RAG Pipeline Tests (GoogleTest)
 # =============================================================================
 
-if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
+if(RAC_BACKEND_RAG)
     include(FetchContent)
     find_package(Threads REQUIRED)
 
@@ -127,13 +127,13 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
 
-    # RAG backend thread safety test
+    # RAG pipeline thread safety test
     add_executable(rac_rag_backend_thread_safety_test
         rag_backend_thread_safety_test.cpp
     )
     target_link_libraries(rac_rag_backend_thread_safety_test
         PRIVATE
-        rac_backend_rag
+        rac_commons
         Threads::Threads
         GTest::gtest_main
     )
@@ -153,7 +153,7 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
     )
     target_link_libraries(rac_chunker_test
         PRIVATE
-        rac_backend_rag
+        rac_commons
         Threads::Threads
         GTest::gtest_main
     )
@@ -172,7 +172,7 @@ if(RAC_BACKEND_RAG AND TARGET rac_backend_rag)
     )
     target_link_libraries(rac_simple_tokenizer_test
         PRIVATE
-        rac_backend_rag
+        rac_commons
         Threads::Threads
         GTest::gtest_main
     )

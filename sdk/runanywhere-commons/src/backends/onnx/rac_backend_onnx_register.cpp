@@ -9,6 +9,7 @@
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
+#include "rac/backends/rac_embeddings_onnx.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -291,25 +292,11 @@ rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_da
     return service;
 }
 
-// TTS can_handle
+// TTS can_handle — ONNX is the sole TTS backend, accept all requests
 rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
-        return RAC_TRUE;
-    }
-
-    const char* path = request->identifier;
-    if (strstr(path, "piper") != nullptr || strstr(path, "vits") != nullptr ||
-        strstr(path, ".onnx") != nullptr) {
-        return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
+    (void)request;
+    return RAC_TRUE;
 }
 
 // TTS create with vtable
@@ -553,8 +540,14 @@ rac_result_t rac_backend_onnx_register(void) {
         return result;
     }
 
+    // Register ONNX embeddings provider (for RAG pipeline).
+    // The provider code is compiled into this backend; registration was
+    // previously done by rac_backend_rag_register() when the sources lived
+    // in the RAG OBJECT library.
+    rac_backend_onnx_embeddings_register();
+
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD + Embeddings)");
     return RAC_SUCCESS;
 }
 
@@ -563,6 +556,7 @@ rac_result_t rac_backend_onnx_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
+    rac_backend_onnx_embeddings_unregister();
     rac_model_strategy_unregister(RAC_FRAMEWORK_ONNX);
     rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
     rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);

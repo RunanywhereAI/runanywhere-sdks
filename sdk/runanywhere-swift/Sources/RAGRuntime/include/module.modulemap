@@ -1,6 +1,0 @@
-module RAGBackend {
-    umbrella header "RAGBackend.h"
-
-    export *
-    module * { export * }
-}
