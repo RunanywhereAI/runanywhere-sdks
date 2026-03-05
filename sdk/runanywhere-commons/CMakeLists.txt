@@ -197,6 +197,7 @@ set(RAC_CORE_SOURCES
     src/core/sdk_state.cpp
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
+    src/core/rac_error_model.cpp
 )
 
 # Infrastructure sources - registry, model management, network, telemetry
