@@ -1,12 +1,17 @@
-/** RunAnywhere Web SDK - VAD Types */
+/**
+ * RunAnywhere Web SDK - VAD Types (ONNX Backend)
+ *
+ * Re-exports generic VAD types from core and defines backend-specific
+ * model configuration for sherpa-onnx Silero VAD.
+ */
 
-export enum SpeechActivity {
-  Started = 'started',
-  Ended = 'ended',
-  Ongoing = 'ongoing',
-}
+// Re-export generic VAD types from core
+export { SpeechActivity } from '@runanywhere/web';
+export type { SpeechActivityCallback, SpeechSegment } from '@runanywhere/web';
 
-export type SpeechActivityCallback = (activity: SpeechActivity) => void;
+// ---------------------------------------------------------------------------
+// Backend-specific: sherpa-onnx VAD model configuration
+// ---------------------------------------------------------------------------
 
 export interface VADModelConfig {
   /** Path to Silero VAD ONNX model in sherpa-onnx virtual FS */
@@ -23,11 +28,4 @@ export interface VADModelConfig {
   sampleRate?: number;
   /** Window size in samples (default: 512 for Silero) */
   windowSize?: number;
-}
-
-export interface SpeechSegment {
-  /** Start time in seconds */
-  startTime: number;
-  /** Audio samples of the speech segment */
-  samples: Float32Array;
 }

@@ -370,6 +370,7 @@ bool LlamaCppTextGeneration::unload_model_internal() {
 
     // Clear LoRA adapters from context before freeing
     // (adapter memory is freed automatically with the model per llama.cpp API)
+    // Best-effort during teardown: log but don't fail unload on error.
     if (context_ && !lora_adapters_.empty()) {
         llama_set_adapters_lora(context_, nullptr, 0, nullptr);
     }
@@ -829,7 +830,6 @@ bool LlamaCppTextGeneration::recreate_context() {
 
 bool LlamaCppTextGeneration::apply_lora_adapters() {
     if (lora_adapters_.empty()) {
-        // Clear all adapters from context
         llama_set_adapters_lora(context_, nullptr, 0, nullptr);
         return true;
     }
@@ -930,8 +930,6 @@ bool LlamaCppTextGeneration::remove_lora_adapter(const std::string& adapter_path
         return false;
     }
 
-    // Remove from tracking (adapter memory is freed automatically with the model
-    // per llama.cpp API — llama_adapter_lora_free is deprecated since b8011)
     lora_adapters_.erase(it);
 
     // Re-apply remaining adapters (or clear if none left)

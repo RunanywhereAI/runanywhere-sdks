@@ -21,7 +21,7 @@ import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
 import type { ModelLoadContext } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
-import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '../types/LLMTypes';
+import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '@runanywhere/web';
 
 const logger = new SDKLogger('TextGeneration');
 
