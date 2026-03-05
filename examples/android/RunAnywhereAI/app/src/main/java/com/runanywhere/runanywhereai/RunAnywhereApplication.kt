@@ -208,11 +208,12 @@ class RunAnywhereApplication : Application() {
         isSDKInitialized = RunAnywhere.isInitialized
 
         // Update observable state for Compose UI
+        val error = initializationError
         if (isSDKInitialized) {
             _initializationState.value = SDKInitializationState.Ready
             Timber.i("🎉 App is ready to use!")
-        } else if (initializationError != null) {
-            _initializationState.value = SDKInitializationState.Error(initializationError!!)
+        } else if (error != null) {
+            _initializationState.value = SDKInitializationState.Error(error)
         } else {
             // SDK reported not initialized but no error - treat as ready for offline mode
             _initializationState.value = SDKInitializationState.Ready

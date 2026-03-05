@@ -372,10 +372,7 @@ bool LlamaCppTextGeneration::unload_model_internal() {
     // (adapter memory is freed automatically with the model per llama.cpp API)
     // Best-effort during teardown: log but don't fail unload on error.
     if (context_ && !lora_adapters_.empty()) {
-        int32_t rc = llama_set_adapters_lora(context_, nullptr, 0, nullptr);
-        if (rc != 0) {
-            LOGE("Failed to clear LoRA adapters during unload (error=%d)", rc);
-        }
+        llama_set_adapters_lora(context_, nullptr, 0, nullptr);
     }
     lora_adapters_.clear();
 
@@ -833,6 +830,7 @@ bool LlamaCppTextGeneration::recreate_context() {
 
 bool LlamaCppTextGeneration::apply_lora_adapters() {
     if (lora_adapters_.empty()) {
+        llama_set_adapters_lora(context_, nullptr, 0, nullptr);
         return true;
     }
 
@@ -846,11 +844,12 @@ bool LlamaCppTextGeneration::apply_lora_adapters() {
         scales.push_back(entry.scale);
     }
 
-    int32_t result = llama_set_adapters_lora(context_, adapters.data(),
-                                             adapters.size(), scales.data());
+    int32_t result = llama_set_adapters_lora(context_, adapters.data(), adapters.size(), scales.data());
     if (result != 0) {
         LOGE("Failed to apply LoRA adapters (error=%d)", result);
-        for (auto& entry : lora_adapters_) { entry.applied = false; }
+        for (auto& entry : lora_adapters_) {
+            entry.applied = false;
+        }
         return false;
     }
 
@@ -931,23 +930,13 @@ bool LlamaCppTextGeneration::remove_lora_adapter(const std::string& adapter_path
         return false;
     }
 
-    // Build remaining adapter list BEFORE mutating tracking state
-    std::vector<llama_adapter_lora*> adapters;
-    std::vector<float> scales;
-    for (auto iter = lora_adapters_.begin(); iter != lora_adapters_.end(); ++iter) {
-        if (iter == it) continue;
-        adapters.push_back(iter->adapter);
-        scales.push_back(iter->scale);
-    }
+    lora_adapters_.erase(it);
 
-    int32_t rc = llama_set_adapters_lora(context_, adapters.empty() ? nullptr : adapters.data(),
-                                          adapters.size(), adapters.empty() ? nullptr : scales.data());
-    if (rc != 0) {
-        LOGE("Failed to re-apply LoRA adapters after removal (error=%d)", rc);
+    // Re-apply remaining adapters (or clear if none left)
+    if (!apply_lora_adapters()) {
+        LOGE("Failed to re-apply remaining LoRA adapters after removal");
         return false;
     }
-
-    lora_adapters_.erase(it);
 
     // Clear KV cache after adapter changes
     llama_memory_clear(llama_get_memory(context_), true);
@@ -964,11 +953,7 @@ void LlamaCppTextGeneration::clear_lora_adapters() {
     }
 
     if (context_) {
-        int32_t rc = llama_set_adapters_lora(context_, nullptr, 0, nullptr);
-        if (rc != 0) {
-            LOGE("Failed to clear all LoRA adapters (error=%d)", rc);
-            return;
-        }
+        llama_set_adapters_lora(context_, nullptr, 0, nullptr);
         llama_memory_clear(llama_get_memory(context_), true);
     }
 

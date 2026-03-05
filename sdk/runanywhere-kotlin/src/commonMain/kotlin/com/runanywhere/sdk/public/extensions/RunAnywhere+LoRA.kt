@@ -14,6 +14,8 @@ package com.runanywhere.sdk.public.extensions
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
+import kotlinx.coroutines.flow.Flow
 
 // MARK: - LoRA Adapter Management
 
@@ -105,3 +107,31 @@ expect fun RunAnywhere.loraAdaptersForModel(modelId: String): List<LoraAdapterCa
  * @return List of all adapter catalog entries
  */
 expect fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry>
+
+// MARK: - LoRA Adapter Downloads
+
+/**
+ * Download a LoRA adapter GGUF file by its registered catalog ID.
+ * Returns a Flow of download progress matching the model download pattern.
+ *
+ * @param adapterId Adapter ID from the catalog registry
+ * @return Flow of download progress events
+ * @throws SDKError if adapter not found or download fails
+ */
+expect fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress>
+
+/**
+ * Get the local file path for a downloaded LoRA adapter.
+ *
+ * @param adapterId Adapter ID from the catalog registry
+ * @return Absolute file path if downloaded, null otherwise
+ */
+expect fun RunAnywhere.loraAdapterLocalPath(adapterId: String): String?
+
+/**
+ * Delete a downloaded LoRA adapter file from disk.
+ *
+ * @param adapterId Adapter ID from the catalog registry
+ * @return true if file was deleted, false if not found
+ */
+expect fun RunAnywhere.deleteDownloadedLoraAdapter(adapterId: String): Boolean
