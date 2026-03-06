@@ -88,6 +88,12 @@ export class VoicePipeline {
     options?: VoicePipelineOptions,
     callbacks?: VoicePipelineCallbacks,
   ): Promise<VoicePipelineTurnResult> {
+    // Validate all providers upfront so a missing TTS doesn't surface
+    // only after STT + LLM have already completed.
+    const stt = requireSTT();
+    const textGen = requireTextGeneration();
+    const tts = requireTTS();
+
     const opts = { ...DEFAULT_OPTIONS, ...options };
     const totalStart = performance.now();
 
@@ -96,8 +102,6 @@ export class VoicePipeline {
 
     const sttStart = performance.now();
     logger.info(`STT: ${(audioData.length / opts.sampleRate).toFixed(1)}s of audio`);
-
-    const stt = requireSTT();
     const sttResult = await stt.transcribe(audioData, {
       sampleRate: opts.sampleRate,
     });
@@ -120,7 +124,6 @@ export class VoicePipeline {
     this.transition(PipelineState.GeneratingResponse, callbacks);
 
     const llmStart = performance.now();
-    const textGen = requireTextGeneration();
     const { stream, result: llmResultPromise, cancel } = await textGen.generateStream(
       userText,
       {
@@ -159,7 +162,6 @@ export class VoicePipeline {
     this.transition(PipelineState.PlayingTTS, callbacks);
 
     const ttsStart = performance.now();
-    const tts = requireTTS();
     const ttsResult = await tts.synthesize(fullResponse.trim(), {
       speed: opts.ttsSpeed,
     });

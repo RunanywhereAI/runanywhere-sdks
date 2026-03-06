@@ -201,7 +201,7 @@ class LlamaCppTextGeneration {
     nlohmann::json model_config_;
 
     int context_size_ = 0;
-    int max_default_context_ = 8192;
+    int max_default_context_ = 1024;
     int batch_size_ = 0;
 
     std::vector<LoraAdapterEntry> lora_adapters_;

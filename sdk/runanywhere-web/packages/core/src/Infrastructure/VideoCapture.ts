@@ -26,7 +26,7 @@
  *   ```
  */
 
-import { SDKLogger } from '@runanywhere/web';
+import { SDKLogger } from '../Foundation/SDKLogger';
 
 const logger = new SDKLogger('VideoCapture');
 

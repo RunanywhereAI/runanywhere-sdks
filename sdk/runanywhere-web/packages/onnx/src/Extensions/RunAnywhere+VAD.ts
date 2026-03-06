@@ -25,8 +25,7 @@ import type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VA
 
 import { loadVADHelpers } from '../Foundation/SherpaHelperLoader';
 
-export { SpeechActivity } from './VADTypes';
-export type { SpeechActivityCallback, VADModelConfig, SpeechSegment } from './VADTypes';
+export type { VADModelConfig } from './VADTypes';
 
 const logger = new SDKLogger('VAD');
 

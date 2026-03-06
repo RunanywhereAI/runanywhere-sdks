@@ -55,6 +55,16 @@ export type {
   DiffusionResultOffsets,
 } from './Foundation/StructOffsets';
 
+// I/O Infrastructure (backend-agnostic capture/playback)
+export { AudioCapture } from './Infrastructure/AudioCapture';
+export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
+export { AudioPlayback } from './Infrastructure/AudioPlayback';
+export type { PlaybackCompleteCallback, PlaybackConfig } from './Infrastructure/AudioPlayback';
+export { AudioFileLoader } from './Infrastructure/AudioFileLoader';
+export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';
+export { VideoCapture } from './Infrastructure/VideoCapture';
+export type { VideoCaptureConfig, CapturedFrame } from './Infrastructure/VideoCapture';
+
 // Infrastructure
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
