@@ -231,7 +231,6 @@ private fun convertToModelStorageMetrics(
             CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
             CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
             CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
-            CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
             else -> ModelFormat.UNKNOWN
         }
 

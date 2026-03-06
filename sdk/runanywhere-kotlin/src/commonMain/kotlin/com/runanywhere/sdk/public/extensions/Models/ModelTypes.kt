@@ -45,7 +45,6 @@ enum class ModelFormat(
     ORT("ort"),
     GGUF("gguf"),
     BIN("bin"),
-    QNN_CONTEXT("qnn_context"),
     UNKNOWN("unknown"),
 }
 

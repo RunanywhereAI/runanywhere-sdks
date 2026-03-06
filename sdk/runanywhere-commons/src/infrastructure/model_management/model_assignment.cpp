@@ -220,8 +220,6 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->format = RAC_MODEL_FORMAT_BIN;
         else if (format == "coreml" || format == "mlmodelc" || format == "mlpackage")
             model->format = RAC_MODEL_FORMAT_COREML;
-        else if (format == "qnn_context" || format == "qnn")
-            model->format = RAC_MODEL_FORMAT_QNN_CONTEXT;
         else
             model->format = RAC_MODEL_FORMAT_UNKNOWN;
 

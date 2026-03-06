@@ -23,7 +23,7 @@
 #include <android/log.h>
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "RAC_SVC_REG", __VA_ARGS__)
 #else
-#define ALOGD(...) do { fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); } while(0)
+#define ALOGD(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
 #include "rac/core/rac_core.h"

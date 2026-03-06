@@ -79,7 +79,6 @@ object CppBridgeModelRegistry {
         const val ORT = 3 // RAC_MODEL_FORMAT_ORT
         const val BIN = 4 // RAC_MODEL_FORMAT_BIN
         const val COREML = 5 // RAC_MODEL_FORMAT_COREML
-        const val QNN_CONTEXT = 5 // RAC_MODEL_FORMAT_QNN_CONTEXT (same C++ value; COREML is 4 in C++)
         const val TFLITE = 6 // RAC_MODEL_FORMAT_TFLITE
     }
 

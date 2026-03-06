@@ -403,9 +403,6 @@ rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
         case RAC_MODEL_FORMAT_BIN:
             *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
             return RAC_TRUE;
-        case RAC_MODEL_FORMAT_QNN_CONTEXT:
-            *out_framework = RAC_FRAMEWORK_GENIE;
-            return RAC_TRUE;
         default:
             return RAC_FALSE;
     }
