@@ -124,7 +124,9 @@ enum ModelSelectionContext {
   stt,
   tts,
   voice,
-  vlm;
+  vlm,
+  ragEmbedding,
+  ragLLM;
 
   String get title {
     switch (this) {
@@ -138,6 +140,10 @@ enum ModelSelectionContext {
         return 'Select Model';
       case ModelSelectionContext.vlm:
         return 'Select VLM Model';
+      case ModelSelectionContext.ragEmbedding:
+        return 'Select Embedding Model';
+      case ModelSelectionContext.ragLLM:
+        return 'Select LLM Model';
     }
   }
 
@@ -158,6 +164,10 @@ enum ModelSelectionContext {
         };
       case ModelSelectionContext.vlm:
         return {ModelCategory.vision, ModelCategory.multimodal};
+      case ModelSelectionContext.ragEmbedding:
+        return {ModelCategory.embedding};
+      case ModelSelectionContext.ragLLM:
+        return {ModelCategory.language};
     }
   }
 }

@@ -25,45 +25,47 @@ enum LoRAAdapterCatalog {
     }
 
     /// All hardcoded adapters (matches Android's ModelList.kt)
+    /// All adapters are from Void2377/Qwen HuggingFace repo — trained on Qwen 2.5 0.5B.
     static let adapters: [LoraAdapterCatalogEntry] = [
+        // --- Adapters matching Android's ModelList.kt ---
         LoraAdapterCatalogEntry(
-            id: "chat-assistant-lora",
-            name: "Chat Assistant",
-            description: "Enhances conversational chat ability",
-            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/chat_assistant-lora-Q8_0.gguf")!,
-            filename: "chat_assistant-lora-Q8_0.gguf",
-            compatibleModelIds: ["lfm2-350m-q4_k_m", "lfm2-350m-q8_0"],
-            fileSize: 690_176,
+            id: "code-assistant-lora",
+            name: "Code Assistant",
+            description: "Enhances code generation and programming assistance",
+            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/code-assistant-Q8_0.gguf")!,
+            filename: "code-assistant-Q8_0.gguf",
+            compatibleModelIds: ["qwen2.5-0.5b-instruct-q6_k"],
+            fileSize: 765_952,
             defaultScale: 1.0
         ),
         LoraAdapterCatalogEntry(
-            id: "summarizer-lora",
-            name: "Summarizer",
-            description: "Specialized for text summarization tasks",
-            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/summarizer-lora-Q8_0.gguf")!,
-            filename: "summarizer-lora-Q8_0.gguf",
-            compatibleModelIds: ["lfm2-350m-q4_k_m", "lfm2-350m-q8_0"],
-            fileSize: 690_176,
+            id: "reasoning-logic-lora",
+            name: "Reasoning Logic",
+            description: "Improves logical reasoning and step-by-step problem solving",
+            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/reasoning-logic-Q8_0.gguf")!,
+            filename: "reasoning-logic-Q8_0.gguf",
+            compatibleModelIds: ["qwen2.5-0.5b-instruct-q6_k"],
+            fileSize: 765_952,
             defaultScale: 1.0
         ),
         LoraAdapterCatalogEntry(
-            id: "translator-lora",
-            name: "Translator",
-            description: "Improves translation between languages",
-            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/translator-lora-Q8_0.gguf")!,
-            filename: "translator-lora-Q8_0.gguf",
-            compatibleModelIds: ["lfm2-350m-q4_k_m", "lfm2-350m-q8_0"],
-            fileSize: 690_176,
+            id: "medical-qa-lora",
+            name: "Medical QA",
+            description: "Enhances medical question answering and health-related responses",
+            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/medical-qa-Q8_0.gguf")!,
+            filename: "medical-qa-Q8_0.gguf",
+            compatibleModelIds: ["qwen2.5-0.5b-instruct-q6_k"],
+            fileSize: 765_952,
             defaultScale: 1.0
         ),
         LoraAdapterCatalogEntry(
-            id: "sentiment-lora",
-            name: "Sentiment Analysis",
-            description: "Fine-tuned for sentiment analysis tasks",
-            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/sentiment-lora-Q8_0.gguf")!,
-            filename: "sentiment-lora-Q8_0.gguf",
-            compatibleModelIds: ["lfm2-350m-q4_k_m", "lfm2-350m-q8_0"],
-            fileSize: 690_176,
+            id: "creative-writing-lora",
+            name: "Creative Writing",
+            description: "Improves creative writing, storytelling, and literary style",
+            downloadURL: URL(string: "https://huggingface.co/Void2377/Qwen/resolve/main/lora/creative-writing-Q8_0.gguf")!,
+            filename: "creative-writing-Q8_0.gguf",
+            compatibleModelIds: ["qwen2.5-0.5b-instruct-q6_k"],
+            fileSize: 765_952,
             defaultScale: 1.0
         ),
     ]

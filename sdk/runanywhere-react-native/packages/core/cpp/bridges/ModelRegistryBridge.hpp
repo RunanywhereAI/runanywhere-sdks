@@ -164,11 +164,15 @@ private:
     ModelRegistryBridge(const ModelRegistryBridge&) = delete;
     ModelRegistryBridge& operator=(const ModelRegistryBridge&) = delete;
 
-    // Convert C model info to C++ wrapper
-    static ModelInfo fromRac(const rac_model_info_t& cModel);
+    // Thread-safe storage for toRac (avoids static variables)
+    struct ToRacStorage {
+        std::string id, name, desc, url, path;
+        std::vector<std::string> tags;
+        std::vector<const char*> tagPtrs;
+    };
 
-    // Convert C++ wrapper to C model info
-    static void toRac(const ModelInfo& model, rac_model_info_t& cModel);
+    static ModelInfo fromRac(const rac_model_info_t& cModel);
+    static void toRac(const ModelInfo& model, rac_model_info_t& cModel, ToRacStorage& storage);
 
     rac_model_registry_handle_t handle_ = nullptr;
 };

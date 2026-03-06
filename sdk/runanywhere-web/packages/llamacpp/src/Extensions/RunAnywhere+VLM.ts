@@ -22,8 +22,7 @@ import type { VLMImage, VLMGenerationOptions, VLMGenerationResult } from './VLMT
 
 const logger = new SDKLogger('VLM');
 
-export type { VLMImage, VLMGenerationOptions, VLMGenerationResult, VLMStreamingResult } from './VLMTypes';
-export { VLMImageFormat, VLMModelFamily } from './VLMTypes';
+export { VLMModelFamily } from './VLMTypes';
 
 // ---------------------------------------------------------------------------
 // VLM Extension

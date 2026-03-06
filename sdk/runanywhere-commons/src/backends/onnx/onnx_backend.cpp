@@ -17,9 +17,19 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include <cctype>
+#include <cstdio>
 #include <cstring>
 
 #include "rac/core/rac_logger.h"
+
+#if SHERPA_ONNX_AVAILABLE
+extern "C" {
+    int espeak_Initialize(int output, int buflength, const char *path, int options);
+    int espeak_SetVoiceByName(const char *name);
+}
+#define ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS 0x0003
+#endif
 
 namespace runanywhere {
 
@@ -642,6 +652,144 @@ bool ONNXTTS::is_ready() const {
     return model_loaded_ && sherpa_tts_ != nullptr;
 }
 
+/**
+ * Ensures espeak-ng voice files from lang/ subdirectories are also
+ * accessible directly under voices/ so that espeak_SetVoiceByName()
+ * can find them via the fast direct-file-lookup path.
+ *
+ * espeak's LoadVoice("en-us", 1) tries voices/en-us then lang/en-us
+ * but NOT lang/gmw/en-US (the actual location in Piper archives).
+ * The fallback (espeak_ListVoices -> directory scan) should handle
+ * this but fails at runtime on iOS. This function creates copies
+ * of lang voice files directly in voices/ to bypass the issue.
+ */
+static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
+    std::string lang_dir = espeak_data_dir + "/lang";
+    std::string voices_dir = espeak_data_dir + "/voices";
+
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] lang_dir=%s, voices_dir=%s", lang_dir.c_str(), voices_dir.c_str());
+
+    struct stat st;
+    if (stat(lang_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] lang/ directory NOT FOUND or not a dir: %s (errno=%d)", lang_dir.c_str(), errno);
+        return;
+    }
+
+    if (stat(voices_dir.c_str(), &st) != 0) {
+        int mk = mkdir(voices_dir.c_str(), 0755);
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk, errno);
+    } else {
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] voices/ dir already exists");
+    }
+
+    DIR* lang_root = opendir(lang_dir.c_str());
+    if (!lang_root) {
+        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] Failed to open lang/ dir (errno=%d)", errno);
+        return;
+    }
+
+    int copied = 0;
+    int skipped = 0;
+    int errors = 0;
+    struct dirent* family_entry;
+    while ((family_entry = readdir(lang_root)) != nullptr) {
+        if (family_entry->d_name[0] == '.') continue;
+
+        std::string family_path = lang_dir + "/" + family_entry->d_name;
+        if (stat(family_path.c_str(), &st) != 0) continue;
+
+        if (S_ISREG(st.st_mode)) {
+            std::string basename = family_entry->d_name;
+            std::string lowercase_name;
+            for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
+
+            std::string dest = voices_dir + "/" + lowercase_name;
+            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+
+            FILE* src_f = fopen(family_path.c_str(), "rb");
+            FILE* dst_f = fopen(dest.c_str(), "wb");
+            if (src_f && dst_f) {
+                char buf[4096];
+                size_t n;
+                while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
+                    fwrite(buf, 1, n, dst_f);
+                }
+                copied++;
+                RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Copied: %s -> %s", family_path.c_str(), dest.c_str());
+            } else {
+                errors++;
+                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED to copy %s -> %s (src=%p dst=%p errno=%d)",
+                    family_path.c_str(), dest.c_str(), (void*)src_f, (void*)dst_f, errno);
+            }
+            if (src_f) fclose(src_f);
+            if (dst_f) fclose(dst_f);
+            continue;
+        }
+
+        if (!S_ISDIR(st.st_mode)) continue;
+
+        RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Scanning family dir: %s", family_entry->d_name);
+        DIR* family_dir = opendir(family_path.c_str());
+        if (!family_dir) continue;
+
+        struct dirent* voice_entry;
+        while ((voice_entry = readdir(family_dir)) != nullptr) {
+            if (voice_entry->d_name[0] == '.') continue;
+
+            std::string voice_path = family_path + "/" + voice_entry->d_name;
+            if (stat(voice_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
+
+            std::string basename = voice_entry->d_name;
+            std::string lowercase_name;
+            for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
+
+            std::string dest = voices_dir + "/" + lowercase_name;
+            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+
+            FILE* src_f = fopen(voice_path.c_str(), "rb");
+            FILE* dst_f = fopen(dest.c_str(), "wb");
+            if (src_f && dst_f) {
+                char buf[4096];
+                size_t n;
+                while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
+                    fwrite(buf, 1, n, dst_f);
+                }
+                copied++;
+                RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Copied: %s -> voices/%s", voice_entry->d_name, lowercase_name.c_str());
+            } else {
+                errors++;
+                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED: %s -> voices/%s (src=%p dst=%p errno=%d)",
+                    voice_entry->d_name, lowercase_name.c_str(), (void*)src_f, (void*)dst_f, errno);
+            }
+            if (src_f) fclose(src_f);
+            if (dst_f) fclose(dst_f);
+        }
+        closedir(family_dir);
+    }
+    closedir(lang_root);
+
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Done: copied=%d skipped=%d errors=%d", copied, skipped, errors);
+
+    // Dump voices/ directory contents for verification
+    DIR* vdir = opendir(voices_dir.c_str());
+    if (vdir) {
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] === voices/ directory contents ===");
+        struct dirent* ve;
+        int count = 0;
+        while ((ve = readdir(vdir)) != nullptr) {
+            if (ve->d_name[0] == '.') continue;
+            std::string vpath = voices_dir + "/" + ve->d_name;
+            struct stat vs;
+            stat(vpath.c_str(), &vs);
+            RAC_LOG_INFO("ONNX.TTS", "[ensure_voices]   [%s] %s (%lld bytes)",
+                S_ISDIR(vs.st_mode) ? "DIR" : "FILE", ve->d_name, (long long)vs.st_size);
+            count++;
+        }
+        closedir(vdir);
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] === Total: %d entries ===", count);
+    }
+}
+
 bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
                          const nlohmann::json& config) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -655,13 +803,15 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     model_type_ = model_type;
     model_dir_ = model_path;
 
-    RAC_LOG_INFO("ONNX.TTS", "Loading model from: %s", model_path.c_str());
+    RAC_LOG_INFO("ONNX.TTS", "[BUILD_V5] Loading model from: %s", model_path.c_str());
 
     std::string model_onnx_path;
     std::string tokens_path;
-    std::string data_dir;
     std::string lexicon_path;
-    std::string voices_path;  // For Kokoro TTS
+    // sherpa-onnx data_dir: the espeak-ng-data directory path itself.
+    // espeak's check_data_path tries path+"/espeak-ng-data" first, then path itself.
+    // Passing the espeak-ng-data dir directly works via the fallback branch.
+    std::string espeak_data_dir;
 
     struct stat path_stat;
     if (stat(model_path.c_str(), &path_stat) != 0) {
@@ -669,41 +819,52 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         return false;
     }
 
+    // Diagnostic: list top-level directory contents
+    if (S_ISDIR(path_stat.st_mode)) {
+        DIR* diag_dir = opendir(model_path.c_str());
+        if (diag_dir) {
+            RAC_LOG_INFO("ONNX.TTS", "=== Model directory contents: %s ===", model_path.c_str());
+            struct dirent* diag_entry;
+            while ((diag_entry = readdir(diag_dir)) != nullptr) {
+                if (diag_entry->d_name[0] == '.') continue;
+                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s",
+                    diag_entry->d_type == DT_DIR ? "DIR" : "FILE",
+                    diag_entry->d_name);
+            }
+            closedir(diag_dir);
+            RAC_LOG_INFO("ONNX.TTS", "=== End directory listing ===");
+        }
+    }
+
     if (S_ISDIR(path_stat.st_mode)) {
         model_onnx_path = model_path + "/model.onnx";
         tokens_path = model_path + "/tokens.txt";
-        data_dir = model_path + "/espeak-ng-data";
         lexicon_path = model_path + "/lexicon.txt";
-        voices_path = model_path + "/voices.bin";  // Kokoro specific
 
-        // Try model.onnx first, then model.int8.onnx (for int8 quantized Kokoro)
         if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
-            std::string int8_model_path = model_path + "/model.int8.onnx";
-            if (stat(int8_model_path.c_str(), &path_stat) == 0) {
-                model_onnx_path = int8_model_path;
-                RAC_LOG_DEBUG("ONNX.TTS", "Found int8 model file: %s", model_onnx_path.c_str());
-            } else {
-                // Fallback: search for any .onnx file
-                DIR* dir = opendir(model_path.c_str());
-                if (dir) {
-                    struct dirent* entry;
-                    while ((entry = readdir(dir)) != nullptr) {
-                        std::string filename = entry->d_name;
-                        if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
-                            model_onnx_path = model_path + "/" + filename;
-                            RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
-                            break;
-                        }
+            DIR* dir = opendir(model_path.c_str());
+            if (dir) {
+                struct dirent* entry;
+                while ((entry = readdir(dir)) != nullptr) {
+                    std::string filename = entry->d_name;
+                    if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
+                        model_onnx_path = model_path + "/" + filename;
+                        RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
+                        break;
                     }
-                    closedir(dir);
                 }
+                closedir(dir);
             }
         }
 
-        if (stat(data_dir.c_str(), &path_stat) != 0) {
-            std::string alt_data_dir = model_path + "/data";
-            if (stat(alt_data_dir.c_str(), &path_stat) == 0) {
-                data_dir = alt_data_dir;
+        // Look for espeak-ng-data directory
+        std::string candidate = model_path + "/espeak-ng-data";
+        if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+            espeak_data_dir = candidate;
+        } else {
+            candidate = model_path + "/data/espeak-ng-data";
+            if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+                espeak_data_dir = candidate;
             }
         }
 
@@ -713,18 +874,6 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
                 lexicon_path = alt_lexicon;
             }
         }
-
-        // Try to find combined lexicon files for Kokoro
-        std::string lexicon_us_en = model_path + "/lexicon-us-en.txt";
-        std::string lexicon_zh = model_path + "/lexicon-zh.txt";
-        std::string lexicon_gb_en = model_path + "/lexicon-gb-en.txt";
-        if (stat(lexicon_us_en.c_str(), &path_stat) == 0) {
-            lexicon_path = lexicon_us_en;
-            // Check for additional lexicons and combine paths
-            if (stat(lexicon_zh.c_str(), &path_stat) == 0) {
-                lexicon_path = lexicon_us_en + "," + lexicon_zh;
-            }
-        }
     } else {
         model_onnx_path = model_path;
 
@@ -732,15 +881,19 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         if (last_slash != std::string::npos) {
             std::string dir = model_path.substr(0, last_slash);
             tokens_path = dir + "/tokens.txt";
-            data_dir = dir + "/espeak-ng-data";
             lexicon_path = dir + "/lexicon.txt";
-            voices_path = dir + "/voices.bin";
             model_dir_ = dir;
+
+            std::string candidate = dir + "/espeak-ng-data";
+            if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+                espeak_data_dir = candidate;
+            }
         }
     }
 
     RAC_LOG_INFO("ONNX.TTS", "Model ONNX: %s", model_onnx_path.c_str());
     RAC_LOG_INFO("ONNX.TTS", "Tokens: %s", tokens_path.c_str());
+    RAC_LOG_INFO("ONNX.TTS", "espeak_data_dir: %s", espeak_data_dir.c_str());
 
     if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
         RAC_LOG_ERROR("ONNX.TTS", "Model ONNX file not found: %s", model_onnx_path.c_str());
@@ -752,62 +905,50 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         return false;
     }
 
-    // Detect Kokoro model: either explicitly set as KOKORO type, or has voices.bin file
-    bool is_kokoro = (model_type == TTSModelType::KOKORO) ||
-                     (stat(voices_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode));
+    if (!espeak_data_dir.empty()) {
+        // Verify key files exist
+        std::string lang_gmw_dir = espeak_data_dir + "/lang/gmw";
+        std::string en_us_voice = lang_gmw_dir + "/en-US";
+        RAC_LOG_INFO("ONNX.TTS", "Checking lang/gmw/en-US: %s",
+            stat(en_us_voice.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
 
-    if (is_kokoro) {
-        model_type_ = TTSModelType::KOKORO;
-        RAC_LOG_INFO("ONNX.TTS", "Detected Kokoro TTS model");
+        // Ensure voice files are accessible directly from voices/
+        ensure_espeak_voice_files(espeak_data_dir);
+
+        // Verify voices/en-us now exists
+        std::string voices_en_us = espeak_data_dir + "/voices/en-us";
+        RAC_LOG_INFO("ONNX.TTS", "voices/en-us after ensure: %s",
+            stat(voices_en_us.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
     }
 
     SherpaOnnxOfflineTtsConfig tts_config;
     memset(&tts_config, 0, sizeof(tts_config));
 
-    if (is_kokoro) {
-        // Configure for Kokoro TTS (high quality, multi-speaker, 24kHz)
-        tts_config.model.kokoro.model = model_onnx_path.c_str();
-        tts_config.model.kokoro.tokens = tokens_path.c_str();
-        tts_config.model.kokoro.voices = voices_path.c_str();
-        tts_config.model.kokoro.length_scale = 1.0f;  // Normal speed
+    tts_config.model.vits.model = model_onnx_path.c_str();
+    tts_config.model.vits.tokens = tokens_path.c_str();
 
-        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-            tts_config.model.kokoro.data_dir = data_dir.c_str();
-            RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
-        }
-
-        if (!lexicon_path.empty() && stat(lexicon_path.c_str(), &path_stat) == 0) {
-            tts_config.model.kokoro.lexicon = lexicon_path.c_str();
-            RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon: %s", lexicon_path.c_str());
-        }
-
-        RAC_LOG_INFO("ONNX.TTS", "Voices file: %s", voices_path.c_str());
-    } else {
-        // Configure for VITS/Piper TTS
-        tts_config.model.vits.model = model_onnx_path.c_str();
-        tts_config.model.vits.tokens = tokens_path.c_str();
-
-        if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
-            tts_config.model.vits.lexicon = lexicon_path.c_str();
-            RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
-        }
-
-        if (stat(data_dir.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-            tts_config.model.vits.data_dir = data_dir.c_str();
-            RAC_LOG_DEBUG("ONNX.TTS", "Using espeak-ng data dir: %s", data_dir.c_str());
-        }
-
-        tts_config.model.vits.noise_scale = 0.667f;
-        tts_config.model.vits.noise_scale_w = 0.8f;
-        tts_config.model.vits.length_scale = 1.0f;
+    if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
+        tts_config.model.vits.lexicon = lexicon_path.c_str();
+        RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
     }
+
+    espeak_data_dir_ = espeak_data_dir;
+    if (!espeak_data_dir.empty()) {
+        tts_config.model.vits.data_dir = espeak_data_dir_.c_str();
+        RAC_LOG_INFO("ONNX.TTS", "Using espeak data_dir: %s", espeak_data_dir_.c_str());
+    } else {
+        RAC_LOG_WARNING("ONNX.TTS", "espeak-ng-data NOT FOUND in model dir — Piper TTS will fail");
+    }
+
+    tts_config.model.vits.noise_scale = 0.667f;
+    tts_config.model.vits.noise_scale_w = 0.8f;
+    tts_config.model.vits.length_scale = 1.0f;
 
     tts_config.model.provider = "cpu";
     tts_config.model.num_threads = 2;
     tts_config.model.debug = 1;
 
-    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts (%s)...",
-                 is_kokoro ? "Kokoro" : "VITS/Piper");
+    RAC_LOG_INFO("ONNX.TTS", "Creating SherpaOnnxOfflineTts (VITS/Piper)...");
 
     const SherpaOnnxOfflineTts* new_tts = nullptr;
     try {
@@ -827,6 +968,25 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
 
     sherpa_tts_ = new_tts;
 
+    // Force espeak-ng to use THIS model's data_dir.
+    // Sherpa-ONNX uses std::once_flag for espeak_Initialize, so only the first
+    // model loaded gets its data_dir registered. Re-calling espeak_Initialize
+    // directly resets the internal path_home to the current model's directory.
+    if (!espeak_data_dir_.empty()) {
+        int reinit = espeak_Initialize(ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS, 0, espeak_data_dir_.c_str(), 0);
+        RAC_LOG_INFO("ONNX.TTS", "espeak_Initialize override: result=%d (expected 22050), data_dir=%s",
+            reinit, espeak_data_dir_.c_str());
+
+        if (reinit == 22050) {
+            int voice_test = espeak_SetVoiceByName("en-us");
+            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-us') test: result=%d (0=success)", voice_test);
+            int voice_test_gb = espeak_SetVoiceByName("en-gb");
+            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-gb') test: result=%d (0=success)", voice_test_gb);
+        } else {
+            RAC_LOG_ERROR("ONNX.TTS", "espeak_Initialize override FAILED with code %d", reinit);
+        }
+    }
+
     sample_rate_ = SherpaOnnxOfflineTtsSampleRate(sherpa_tts_);
     int num_speakers = SherpaOnnxOfflineTtsNumSpeakers(sherpa_tts_);
 
@@ -834,60 +994,13 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     RAC_LOG_INFO("ONNX.TTS", "Sample rate: %d, speakers: %d", sample_rate_, num_speakers);
 
     voices_.clear();
-
-    if (is_kokoro && num_speakers >= 53) {
-        // Kokoro multi-lang v1.0 speaker names
-        // Reference: https://k2-fsa.github.io/sherpa/onnx/tts/pretrained_models/kokoro.html
-        const char* kokoro_speakers[] = {
-            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
-            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah",
-            "af_sky", "am_adam", "am_echo", "am_eric", "am_fenrir",
-            "am_liam", "am_michael", "am_onyx", "am_puck", "am_santa",
-            "bf_alice", "bf_emma", "bf_isabella", "bf_lily", "bm_daniel",
-            "bm_fable", "bm_george", "bm_lewis", "ef_dora", "em_alex",
-            "ff_siwis", "hf_alpha", "hf_beta", "hm_omega", "hm_psi",
-            "if_sara", "im_nicola", "jf_alpha", "jf_gongitsune", "jf_nezumi",
-            "jf_tebukuro", "jm_kumo", "pf_dora", "pm_alex", "pm_santa",
-            "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi", "zm_yunjian",
-            "zm_yunxi", "zm_yunxia", "zm_yunyang"
-        };
-
-        for (int i = 0; i < std::min(num_speakers, 53); ++i) {
-            VoiceInfo voice;
-            voice.id = std::to_string(i);
-            voice.name = kokoro_speakers[i];
-            // Determine language from speaker prefix
-            if (voice.name[0] == 'a' || voice.name[0] == 'b') {
-                voice.language = "en";
-            } else if (voice.name[0] == 'z') {
-                voice.language = "zh";
-            } else {
-                voice.language = "en";
-            }
-            // Determine gender from speaker prefix
-            voice.gender = (voice.name[1] == 'm') ? "male" : "female";
-            voice.sample_rate = 24000;  // Kokoro is 24kHz
-            voices_.push_back(voice);
-        }
-        // Add remaining speakers if any
-        for (int i = 53; i < num_speakers; ++i) {
-            VoiceInfo voice;
-            voice.id = std::to_string(i);
-            voice.name = "Speaker " + std::to_string(i);
-            voice.language = "en";
-            voice.sample_rate = 24000;
-            voices_.push_back(voice);
-        }
-    } else {
-        // Generic speaker names for VITS/Piper or other models
-        for (int i = 0; i < num_speakers; ++i) {
-            VoiceInfo voice;
-            voice.id = std::to_string(i);
-            voice.name = "Speaker " + std::to_string(i);
-            voice.language = "en";
-            voice.sample_rate = sample_rate_;
-            voices_.push_back(voice);
-        }
+    for (int i = 0; i < num_speakers; ++i) {
+        VoiceInfo voice;
+        voice.id = std::to_string(i);
+        voice.name = "Speaker " + std::to_string(i);
+        voice.language = "en";
+        voice.sample_rate = sample_rate_;
+        voices_.push_back(voice);
     }
 
     model_loaded_ = true;
@@ -969,11 +1082,24 @@ TTSResult ONNXTTS::synthesize(const TTSRequest& request) {
 
     RAC_LOG_DEBUG("ONNX.TTS", "Speaker ID: %d, Speed: %.2f", speaker_id, speed);
 
-    const SherpaOnnxGeneratedAudio* audio =
-        SherpaOnnxOfflineTtsGenerate(tts_ptr, request.text.c_str(), speaker_id, speed);
+    const SherpaOnnxGeneratedAudio* audio = nullptr;
+    try {
+        audio = SherpaOnnxOfflineTtsGenerate(tts_ptr, request.text.c_str(), speaker_id, speed);
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("ONNX.TTS", "Exception during TTS synthesis: %s", e.what());
+        RAC_LOG_ERROR("ONNX.TTS", "Model dir: %s, espeak data was: %s",
+                     model_dir_.c_str(),
+                     espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
+        return result;
+    } catch (...) {
+        RAC_LOG_ERROR("ONNX.TTS", "Unknown exception during TTS synthesis");
+        return result;
+    }
 
     if (!audio || audio->n <= 0) {
-        RAC_LOG_ERROR("ONNX.TTS", "Failed to generate audio");
+        RAC_LOG_ERROR("ONNX.TTS", "Synthesis returned null/empty audio. Model dir: %s, espeak data: %s",
+                     model_dir_.c_str(),
+                     espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
         return result;
     }
 

@@ -35,12 +35,15 @@ export interface AddModelFromURLOptions {
 }
 
 /**
- * Model Registry - Thin wrapper over native
+ * Model Registry - Wrapper over native model registry with local cache fallback.
  *
- * All model management logic lives in native commons.
+ * Primary source of truth is native commons. A JS-side cache ensures models
+ * registered via registerModel() are always available even if the native
+ * getAvailableModels() call fails (e.g. timing issues during init).
  */
 class ModelRegistryImpl {
   private initialized = false;
+  private localCache = new Map<string, ModelInfo>();
 
   /**
    * Initialize the registry (calls native)
@@ -49,52 +52,70 @@ class ModelRegistryImpl {
     if (this.initialized) return;
 
     if (!isNativeModuleAvailable()) {
-      logger.warning('Native module not available');
+      logger.warning('Native module not available, using local cache only');
       this.initialized = true;
       return;
     }
 
     try {
-      // Just get available models to verify registry is working
       await this.getAllModels();
       this.initialized = true;
       logger.info('Model registry initialized via native');
     } catch (error) {
-      logger.warning('Failed to initialize registry:', { error });
+      logger.warning('Failed to initialize registry, using local cache:', { error });
       this.initialized = true;
     }
   }
 
   /**
-   * Get all models (native)
+   * Get all models — tries native first, falls back to local cache
    */
   async getAllModels(): Promise<ModelInfo[]> {
-    if (!isNativeModuleAvailable()) return [];
+    if (!isNativeModuleAvailable()) {
+      return Array.from(this.localCache.values());
+    }
 
     try {
       const native = requireNativeModule();
       const json = await native.getAvailableModels();
-      return JSON.parse(json);
-    } catch (error) {
-      logger.error('Failed to get available models:', { error });
+      const nativeModels: ModelInfo[] = JSON.parse(json);
+
+      if (nativeModels.length > 0) {
+        return nativeModels;
+      }
+
+      // Native returned empty — merge with local cache (models may not have synced yet)
+      if (this.localCache.size > 0) {
+        logger.debug(`Native returned 0 models, using ${this.localCache.size} from local cache`);
+        return Array.from(this.localCache.values());
+      }
+
       return [];
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warning(`Native getAvailableModels failed (${msg}), using local cache (${this.localCache.size} models)`);
+      return Array.from(this.localCache.values());
     }
   }
 
   /**
-   * Get a model by ID (native)
+   * Get a model by ID — tries native first, falls back to local cache
    */
   async getModel(id: string): Promise<ModelInfo | null> {
-    if (!isNativeModuleAvailable()) return null;
+    if (!isNativeModuleAvailable()) {
+      return this.localCache.get(id) ?? null;
+    }
 
     try {
       const native = requireNativeModule();
       const json = await native.getModelInfo(id);
-      if (!json || json === '{}') return null;
+      if (!json || json === '{}') {
+        return this.localCache.get(id) ?? null;
+      }
       return JSON.parse(json);
     } catch (error) {
-      logger.error('Failed to get model info:', { error });
-      return null;
+      logger.debug(`Failed to get model info from native for ${id}, checking cache`);
+      return this.localCache.get(id) ?? null;
     }
   }
 
@@ -104,7 +125,6 @@ class ModelRegistryImpl {
   async filterModels(criteria: ModelCriteria): Promise<ModelInfo[]> {
     const allModels = await this.getAllModels();
 
-    // Simple filtering on JS side since native returns all
     let models = allModels;
 
     if (criteria.framework) {
@@ -124,13 +144,19 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Register a model (native)
+   * Register a model — saves to both native and local cache
    */
   async registerModel(model: ModelInfo): Promise<void> {
+    this.localCache.set(model.id, model);
+
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.registerModel(JSON.stringify(model));
+    try {
+      const native = requireNativeModule();
+      await native.registerModel(JSON.stringify(model));
+    } catch (error) {
+      logger.debug(`Native registerModel failed for ${model.id}, model is in local cache`);
+    }
   }
 
   /**
@@ -141,13 +167,19 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Remove a model (native)
+   * Remove a model (native + cache)
    */
   async removeModel(id: string): Promise<void> {
+    this.localCache.delete(id);
+
     if (!isNativeModuleAvailable()) return;
 
-    const native = requireNativeModule();
-    await native.deleteModel(id);
+    try {
+      const native = requireNativeModule();
+      await native.deleteModel(id);
+    } catch (error) {
+      logger.debug(`Native deleteModel failed for ${id}`);
+    }
   }
 
   /**
@@ -204,16 +236,18 @@ class ModelRegistryImpl {
   }
 
   /**
-   * Check if model is downloaded (native)
+   * Check if model is downloaded (native, falls back to cache)
    */
   async isModelDownloaded(modelId: string): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
+    if (!isNativeModuleAvailable()) {
+      return this.localCache.get(modelId)?.isDownloaded ?? false;
+    }
 
     try {
       const native = requireNativeModule();
       return native.isModelDownloaded(modelId);
     } catch {
-      return false;
+      return this.localCache.get(modelId)?.isDownloaded ?? false;
     }
   }
 
@@ -274,10 +308,21 @@ class ModelRegistryImpl {
   }
 
   /**
+   * Update a cached model's info (e.g. after download completes)
+   */
+  updateCachedModel(modelId: string, updates: Partial<ModelInfo>): void {
+    const existing = this.localCache.get(modelId);
+    if (existing) {
+      this.localCache.set(modelId, { ...existing, ...updates });
+    }
+  }
+
+  /**
    * Reset (for testing)
    */
   reset(): void {
     this.initialized = false;
+    this.localCache.clear();
   }
 }
 

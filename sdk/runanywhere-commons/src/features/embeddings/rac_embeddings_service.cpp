@@ -25,7 +25,9 @@ static const char* LOG_CAT = "Embeddings.Service";
 
 extern "C" {
 
-rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle) {
+static rac_result_t embeddings_create_internal(const char* model_id,
+                                                const char* config_json,
+                                                rac_handle_t* out_handle) {
     if (!model_id || !out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -44,7 +46,6 @@ rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handl
         result = rac_get_model_by_path(model_id, &model_info);
     }
 
-    // Default to llama.cpp for embeddings (supports GGUF embedding models)
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
     const char* model_path = model_id;
 
@@ -55,8 +56,17 @@ rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handl
                      model_info->id ? model_info->id : "NULL",
                      static_cast<int>(framework), model_path ? model_path : "NULL");
     } else {
+        // Model not in registry — infer framework from file extension
+        // so the correct service provider handles it (ONNX for .onnx files).
+        size_t path_len = model_id ? strlen(model_id) : 0;
+        if (path_len >= 5) {
+            const char* ext = model_id + path_len - 5;
+            if (strcmp(ext, ".onnx") == 0 || strcmp(ext, ".ONNX") == 0) {
+                framework = RAC_FRAMEWORK_ONNX;
+            }
+        }
         RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry (result=%d), using default framework=%d",
+                        "Model NOT found in registry (result=%d), inferred framework=%d from path",
                         result, static_cast<int>(framework));
     }
 
@@ -66,10 +76,12 @@ rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handl
     request.capability = RAC_CAPABILITY_EMBEDDINGS;
     request.framework = framework;
     request.model_path = model_path;
+    request.config_json = config_json;
 
-    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
+    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s, has_config=%s",
                  static_cast<int>(request.framework),
-                 request.model_path ? request.model_path : "NULL");
+                 request.model_path ? request.model_path : "NULL",
+                 config_json ? "yes" : "no");
 
     // Service registry returns an rac_embeddings_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_EMBEDDINGS, &request, out_handle);
@@ -85,6 +97,16 @@ rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handl
 
     RAC_LOG_INFO(LOG_CAT, "Embeddings service created");
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle) {
+    return embeddings_create_internal(model_id, nullptr, out_handle);
+}
+
+rac_result_t rac_embeddings_create_with_config(const char* model_id,
+                                                const char* config_json,
+                                                rac_handle_t* out_handle) {
+    return embeddings_create_internal(model_id, config_json, out_handle);
 }
 
 // =============================================================================

@@ -1,4 +1,16 @@
-/** RunAnywhere Web SDK - TTS Types */
+/**
+ * RunAnywhere Web SDK - TTS Types (ONNX Backend)
+ *
+ * Re-exports generic TTS types from core and defines backend-specific
+ * voice configuration for sherpa-onnx Piper/VITS models.
+ */
+
+// Re-export generic TTS types from core
+export type { TTSSynthesisResult, TTSSynthesizeOptions } from '@runanywhere/web';
+
+// ---------------------------------------------------------------------------
+// Backend-specific: sherpa-onnx voice configuration
+// ---------------------------------------------------------------------------
 
 export interface TTSVoiceConfig {
   voiceId: string;
@@ -12,24 +24,4 @@ export interface TTSVoiceConfig {
   lexicon?: string;
   /** Number of threads (default: 1) */
   numThreads?: number;
-}
-
-export interface TTSSynthesisResult {
-  [key: string]: unknown;
-  /** Raw PCM audio data */
-  audioData: Float32Array;
-  /** Audio sample rate */
-  sampleRate: number;
-  /** Duration in milliseconds */
-  durationMs: number;
-  /** Processing time in milliseconds */
-  processingTimeMs: number;
-  [key: string]: unknown;
-}
-
-export interface TTSSynthesizeOptions {
-  /** Speaker ID for multi-speaker models (default: 0) */
-  speakerId?: number;
-  /** Speed factor (default: 1.0, >1 = faster, <1 = slower) */
-  speed?: number;
 }

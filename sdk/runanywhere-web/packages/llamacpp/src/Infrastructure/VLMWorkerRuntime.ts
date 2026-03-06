@@ -47,14 +47,22 @@ let offsets: AllOffsets | null = null;
 // module's _rac_wasm_offsetof_* / _rac_wasm_sizeof_* exports.
 // ---------------------------------------------------------------------------
 
-function workerOffsetOf(m: any, name: string): number {
+function workerOffsetOf(m: any, name: string, required = true): number {
   const fn = m[`_rac_wasm_offsetof_${name}`];
-  return typeof fn === 'function' ? fn() : 0;
+  if (typeof fn === 'function') return fn();
+  if (required) {
+    throw new Error(`Missing WASM offsetof export: _rac_wasm_offsetof_${name} — ABI mismatch between WASM binary and TS`);
+  }
+  return 0;
 }
 
-function workerSizeOf(m: any, name: string): number {
+function workerSizeOf(m: any, name: string, required = true): number {
   const fn = m[`_rac_wasm_sizeof_${name}`];
-  return typeof fn === 'function' ? fn() : 0;
+  if (typeof fn === 'function') return fn();
+  if (required) {
+    throw new Error(`Missing WASM sizeof export: _rac_wasm_sizeof_${name} — ABI mismatch between WASM binary and TS`);
+  }
+  return 0;
 }
 
 function loadOffsetsFromModule(m: any): AllOffsets {
@@ -246,10 +254,12 @@ async function initWASM(wasmJsUrl: string, useWebGPU = false): Promise<void> {
 
   // Dynamically import the Emscripten ES6 glue JS
   const { default: createModule } = await import(/* @vite-ignore */ wasmJsUrl);
+  const wasmBaseUrl = wasmJsUrl.substring(0, wasmJsUrl.lastIndexOf('/') + 1);
 
   wasmModule = await createModule({
     print: (text: string) => logInfo(text),
     printErr: (text: string) => logError(text),
+    locateFile: (path: string) => wasmBaseUrl + path,
   });
 
   const m = wasmModule;
@@ -562,6 +572,8 @@ async function processImage(
   width: number, height: number,
   prompt: string,
   maxTokens: number, temperature: number,
+  topP: number, systemPrompt?: string,
+  modelFamily?: number,
 ): Promise<VLMWorkerResult> {
   const m = wasmModule;
   const pixelArray = new Uint8Array(rgbPixels);
@@ -591,8 +603,16 @@ async function processImage(
   for (let i = 0; i < optSize; i++) m.setValue(optPtr + i, 0, 'i8');
   const vo = offsets!.vlmOptions;
   m.setValue(optPtr + vo.maxTokens, maxTokens, 'i32');
-  m.setValue(optPtr + vo.temperature, temperature, 'float');
-  m.setValue(optPtr + vo.topP, 0.9, 'float');
+  m.setValue(optPtr + vo.temperature, Number.isFinite(temperature) ? temperature : 0.7, 'float');
+  m.setValue(optPtr + vo.topP, Number.isFinite(topP) ? topP : 0.9, 'float');
+
+  let systemPromptPtr = 0;
+  if (systemPrompt) {
+    systemPromptPtr = allocString(systemPrompt);
+    m.setValue(optPtr + vo.systemPrompt, systemPromptPtr, '*');
+  }
+
+  m.setValue(optPtr + vo.modelFamily, modelFamily ?? 0, 'i32');
 
   const promptPtr = allocString(prompt);
 
@@ -629,6 +649,7 @@ async function processImage(
     m.ccall('rac_vlm_result_free', null, ['number'], [resPtr]);
     return result;
   } finally {
+    if (systemPromptPtr) m._free(systemPromptPtr);
     m._free(promptPtr);
     m._free(imagePtr);
     m._free(optPtr);
@@ -669,6 +690,7 @@ function handleMessage(e: MessageEvent<VLMWorkerCommand>): void {
         const result = await processImage(
           p.rgbPixels, p.width, p.height,
           p.prompt, p.maxTokens, p.temperature,
+          p.topP, p.systemPrompt, p.modelFamily,
         );
         self.postMessage({ id, type: 'result', payload: result } satisfies VLMWorkerResponse);
         break;

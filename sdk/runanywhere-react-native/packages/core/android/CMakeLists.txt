@@ -107,6 +107,7 @@ include_directories(
     "${RAC_INCLUDE_DIR}/rac/features/tts"
     "${RAC_INCLUDE_DIR}/rac/features/vad"
     "${RAC_INCLUDE_DIR}/rac/features/voice_agent"
+    "${RAC_INCLUDE_DIR}/rac/features/rag"
     "${RAC_INCLUDE_DIR}/rac/features/platform"
     "${RAC_INCLUDE_DIR}/rac/infrastructure"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/device"

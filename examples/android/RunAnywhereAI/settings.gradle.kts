@@ -53,10 +53,8 @@ include(":runanywhere-core-onnx")
 project(":runanywhere-core-onnx").projectDir =
     file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
 
-// RAG module - Retrieval-Augmented Generation adapter
-include(":runanywhere-core-rag")
-project(":runanywhere-core-rag").projectDir =
-    file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-rag")
+// RAG pipeline is now part of the core SDK (not a separate module).
+// Registration is handled by ragCreatePipeline(). See: RunAnywhere+RAG.jvmAndroid.kt
 
 // Genie module - Qualcomm NPU-accelerated LLM (Snapdragon 8 Gen 2+)
 // Now distributed as a closed-source AAR from a private repo.

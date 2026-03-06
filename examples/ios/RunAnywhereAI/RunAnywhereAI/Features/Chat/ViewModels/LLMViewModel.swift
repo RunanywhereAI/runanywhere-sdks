@@ -414,10 +414,14 @@ final class LLMViewModel {
         try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
         let destinationURL = loraDir.appendingPathComponent(adapter.filename)
 
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
+        if FileManager.default.fileExists(atPath: destinationURL.path),
+           Self.isValidGGUF(at: destinationURL) {
             downloadedAdapterPaths[adapter.id] = destinationURL.path
             return destinationURL.path
         }
+
+        // Remove any previously corrupted download
+        try? FileManager.default.removeItem(at: destinationURL)
 
         let delegate = DownloadProgressDelegate { [weak self] progress in
             Task { @MainActor in
@@ -426,6 +430,13 @@ final class LLMViewModel {
         }
 
         let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+
+        // Validate GGUF magic bytes before saving
+        guard Self.isValidGGUF(at: tempURL) else {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw LLMError.custom("Downloaded file is not a valid GGUF adapter (server may have returned an error page)")
+        }
+
         if FileManager.default.fileExists(atPath: destinationURL.path) {
             try FileManager.default.removeItem(at: destinationURL)
         }
@@ -434,6 +445,14 @@ final class LLMViewModel {
         downloadedAdapterPaths[adapter.id] = destinationURL.path
         logger.info("Adapter downloaded to \(destinationURL.path)")
         return destinationURL.path
+    }
+
+    /// Checks that a file starts with the GGUF magic bytes (0x47475546 = "GGUF").
+    private static func isValidGGUF(at url: URL) -> Bool {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 4), header.count == 4 else { return false }
+        return header == Data([0x47, 0x47, 0x55, 0x46])  // "GGUF"
     }
 
     private func syncDownloadedAdapterPaths() {

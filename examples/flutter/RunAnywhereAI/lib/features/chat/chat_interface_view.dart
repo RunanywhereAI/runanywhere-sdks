@@ -16,6 +16,7 @@ import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
+import 'package:runanywhere_ai/features/rag/rag_demo_view.dart';
 import 'package:runanywhere_ai/features/structured_output/structured_output_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -454,6 +455,17 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       appBar: AppBar(
         title: const Text('Chat'),
       actions: [
+          IconButton(
+            icon: const Icon(Icons.article_outlined),
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                MaterialPageRoute<void>(
+                  builder: (context) => const RagDemoView(),
+                ),
+              );
+            },
+            tooltip: 'Document Q&A',
+          ),
           IconButton(
             icon: const Icon(Icons.data_object),
             onPressed: () {

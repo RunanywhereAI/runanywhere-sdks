@@ -10,8 +10,8 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
+import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
-import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -140,11 +140,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   Future<void> _registerModulesAndModels() async {
     debugPrint('📦 Registering modules with their models...');
 
-    // LlamaCPP module with LLM models
-    // Using explicit IDs ensures models are recognized after download across app restarts
+    // --- LLAMACPP MODULE ---
     await LlamaCpp.register();
-
-    // Yield after heavy backend registration
     await Future<void>.delayed(Duration.zero);
 
     LlamaCpp.addModel(
@@ -190,8 +187,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 400000000,
     );
 
-    // Tool Calling Optimized Models
-    // LFM2-1.2B-Tool - Designed for concise and precise tool calling (Liquid AI)
     LlamaCpp.addModel(
       id: 'lfm2-1.2b-tool-q4_k_m',
       name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
@@ -206,16 +201,10 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
       memoryRequirement: 1400000000,
     );
-    debugPrint('✅ LlamaCPP module registered with LLM models (including tool-calling optimized models)');
-
-    // Yield between module registrations
+    debugPrint('✅ LlamaCPP module registered');
     await Future<void>.delayed(Duration.zero);
 
-    // Register VLM (Vision Language) models
-    // VLM models require 2 files: main model + mmproj (vision projector)
-    // Bundled as tar.gz archives for easy download/extraction
-
-    // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
+    // --- VLM MODULE ---
     RunAnywhere.registerModel(
       id: 'smolvlm-500m-instruct-q8_0',
       name: 'SmolVLM 500M Instruct',
@@ -229,57 +218,81 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 600000000,
     );
     debugPrint('✅ VLM models registered');
-
-    // Yield between module registrations
     await Future<void>.delayed(Duration.zero);
 
-    // Diffusion (image generation) is not registered here. CoreML diffusion is supported
-    // only in the Swift SDK and Swift example app; Flutter/RN do not register diffusion.
-
-    // ONNX module with STT and TTS models
-    // Using tar.gz format hosted on RunanywhereAI/sherpa-onnx for fast native extraction
-    // Using explicit IDs ensures models are recognized after download across app restarts
-    await Onnx.register();
-
-    // Yield after heavy backend registration
-    await Future<void>.delayed(Duration.zero);
-
+    // --- ONNX MODULE (STT/TTS via Core SDK) ---
     // STT Models (Sherpa-ONNX Whisper)
-    Onnx.addModel(
+    RunAnywhere.registerModel(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
-      url:
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
+      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+      framework: InferenceFramework.onnx,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 75000000,
     );
-    Onnx.addModel(
+
+    RunAnywhere.registerModel(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
-      url:
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz',
+      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
+      framework: InferenceFramework.onnx,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 250000000,
     );
 
     // TTS Models (Piper VITS)
-    Onnx.addModel(
+    RunAnywhere.registerModel(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
-      url:
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz',
+      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
+      framework: InferenceFramework.onnx,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
     );
-    Onnx.addModel(
+
+    RunAnywhere.registerModel(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
-      url:
-          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz',
+      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
+      framework: InferenceFramework.onnx,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
     );
-    debugPrint('✅ ONNX module registered with STT/TTS models');
+    debugPrint('✅ STT/TTS models registered via Core SDK');
+    await Future<void>.delayed(Duration.zero);
+
+    // --- RAG EMBEDDINGS ---
+    RunAnywhere.registerMultiFileModel(
+      id: 'all-minilm-l6-v2',
+      name: 'All MiniLM L6 v2 (Embedding)',
+      files: [
+        ModelFileDescriptor(
+          relativePath: 'model.onnx',
+          destinationPath: 'model.onnx',
+          url: Uri.parse(
+              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx'),
+        ),
+        ModelFileDescriptor(
+          relativePath: 'vocab.txt',
+          destinationPath: 'vocab.txt',
+          url: Uri.parse(
+              'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt'),
+        ),
+      ],
+      framework: InferenceFramework.onnx,
+      modality: ModelCategory.embedding,
+      memoryRequirement: 25500000,
+    );
+    debugPrint('✅ ONNX Embedding models registered');
+    await Future<void>.delayed(Duration.zero);
+
+    // --- RAG BACKEND ---
+    try {
+      await RAGModule.register();
+      debugPrint('✅ RAG backend registered');
+    } catch (e) {
+      debugPrint('⚠️ RAG backend not available (RAG features disabled): $e');
+    }
 
     debugPrint('🎉 All modules and models registered');
   }

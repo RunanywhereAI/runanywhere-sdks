@@ -123,12 +123,24 @@ export class SherpaONNXBridge {
    * In a Vite app, resolve it like:
    * ```typescript
    * SherpaONNXBridge.shared.wasmUrl = new URL(
-   *   '@runanywhere/web/wasm/sherpa/sherpa-onnx-glue.js',
+   *   '@runanywhere/web-onnx/wasm/sherpa/sherpa-onnx-glue.js',
    *   import.meta.url,
    * ).href;
    * ```
    */
   wasmUrl: string | null = null;
+
+  /**
+   * Override the base URL for sherpa-onnx helper files (sherpa-onnx-asr.js,
+   * sherpa-onnx-tts.js, sherpa-onnx-vad.js).
+   *
+   * When `null` (default), this is auto-derived from `wasmUrl` after the
+   * glue JS loads successfully. Set explicitly only if helper files are
+   * served from a different location than the glue JS.
+   *
+   * Must end with a trailing `/`.
+   */
+  helperBaseUrl: string | null = null;
 
   static get shared(): SherpaONNXBridge {
     if (!SherpaONNXBridge._instance) {
@@ -264,6 +276,12 @@ export class SherpaONNXBridge {
           .map(fn => `${fn}: ${typeof (mod as unknown as Record<string, unknown>)[fn]}`)
           .join(', ');
         throw new Error(`WASM exports not available after initialization. Available: ${available}`);
+      }
+
+      // Auto-derive helperBaseUrl so SherpaHelperLoader uses the same
+      // resolved base path (fixes fetch vs import asymmetry in Vite dev).
+      if (!this.helperBaseUrl) {
+        this.helperBaseUrl = baseUrl;
       }
 
       this._loaded = true;

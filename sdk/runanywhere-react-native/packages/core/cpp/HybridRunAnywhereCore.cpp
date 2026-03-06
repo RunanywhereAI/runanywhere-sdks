@@ -37,6 +37,7 @@
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
 #include "bridges/ToolCallingBridge.hpp"
+#include "bridges/RAGBridge.hpp"
 
 // RACommons C API headers for capability methods
 // These are backend-agnostic - they work with any registered backend
@@ -58,6 +59,8 @@
 #include <chrono>
 #include <vector>
 #include <mutex>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <cstdio>
 #include <cstring>
 
@@ -134,6 +137,69 @@ std::string base64Encode(const uint8_t* data, size_t len) {
         encoded.push_back('=');
     }
     return encoded;
+}
+
+// ============================================================================
+// ONNX Model Directory Resolution
+// ============================================================================
+
+// Mirrors TypeScript findModelPathAfterExtraction: given a directory path,
+// return the directory that actually contains model files (.onnx, tokens.txt, etc.).
+// Handles: file paths (returns parent dir), nested single-subdirectory archives,
+// and already-correct paths.
+std::string resolveOnnxModelDirectory(const std::string& path) {
+    struct stat st;
+    if (stat(path.c_str(), &st) != 0) return path;
+
+    std::string dir = path;
+    if (!S_ISDIR(st.st_mode)) {
+        size_t slash = path.rfind('/');
+        if (slash != std::string::npos) {
+            dir = path.substr(0, slash);
+            LOGI("resolveOnnxModelDirectory: file -> parent dir: %s", dir.c_str());
+        } else {
+            return path;
+        }
+    }
+
+    // Check if this directory directly contains model files
+    auto dirHasModelFiles = [](const std::string& d) -> bool {
+        DIR* dp = opendir(d.c_str());
+        if (!dp) return false;
+        bool found = false;
+        struct dirent* entry;
+        while ((entry = readdir(dp)) != nullptr) {
+            if (entry->d_type != DT_REG) continue;
+            std::string name(entry->d_name);
+            if (name.size() > 5 && name.substr(name.size() - 5) == ".onnx") { found = true; break; }
+            if (name == "tokens.txt" || name == "vocab.txt") { found = true; break; }
+        }
+        closedir(dp);
+        return found;
+    };
+
+    if (dirHasModelFiles(dir)) return dir;
+
+    // Not found at top level — check for single nested subdirectory
+    DIR* dp = opendir(dir.c_str());
+    if (!dp) return dir;
+    std::string singleSubdir;
+    int subdirCount = 0;
+    struct dirent* entry;
+    while ((entry = readdir(dp)) != nullptr) {
+        if (entry->d_type == DT_DIR && entry->d_name[0] != '.') {
+            singleSubdir = dir + "/" + entry->d_name;
+            subdirCount++;
+        }
+    }
+    closedir(dp);
+
+    if (subdirCount == 1 && dirHasModelFiles(singleSubdir)) {
+        LOGI("resolveOnnxModelDirectory: resolved nested dir: %s", singleSubdir.c_str());
+        return singleSubdir;
+    }
+
+    return dir;
 }
 
 // ============================================================================
@@ -801,67 +867,74 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDeviceId() {
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels() {
     return Promise<std::string>::async([]() -> std::string {
-        auto models = ModelRegistryBridge::shared().getAllModels();
+        try {
+            auto models = ModelRegistryBridge::shared().getAllModels();
 
-        LOGI("getAvailableModels: Building JSON for %zu models", models.size());
+            LOGI("getAvailableModels: Building JSON for %zu models", models.size());
 
-        std::string result = "[";
-        for (size_t i = 0; i < models.size(); i++) {
-            if (i > 0) result += ",";
-            const auto& m = models[i];
-            // Convert C++ enum values to TypeScript string values for compatibility
-            std::string categoryStr = "unknown";
-            switch (m.category) {
-                case RAC_MODEL_CATEGORY_LANGUAGE: categoryStr = "language"; break;
-                case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
-                case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
-                case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
-                case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
-                case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
-                case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
-                case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
-                default: categoryStr = "unknown"; break;
-            }
-            std::string formatStr = "unknown";
-            switch (m.format) {
-                case RAC_MODEL_FORMAT_GGUF: formatStr = "gguf"; break;
-                case RAC_MODEL_FORMAT_ONNX: formatStr = "onnx"; break;
-                case RAC_MODEL_FORMAT_ORT: formatStr = "ort"; break;
-                case RAC_MODEL_FORMAT_BIN: formatStr = "bin"; break;
-                default: formatStr = "unknown"; break;
-            }
-            std::string frameworkStr = "unknown";
-            switch (m.framework) {
-                case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
-                case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
+            std::string result = "[";
+            for (size_t i = 0; i < models.size(); i++) {
+                if (i > 0) result += ",";
+                const auto& m = models[i];
+                std::string categoryStr = "unknown";
+                switch (m.category) {
+                    case RAC_MODEL_CATEGORY_LANGUAGE: categoryStr = "language"; break;
+                    case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION: categoryStr = "speech-recognition"; break;
+                    case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS: categoryStr = "speech-synthesis"; break;
+                    case RAC_MODEL_CATEGORY_VISION: categoryStr = "vision"; break;
+                    case RAC_MODEL_CATEGORY_IMAGE_GENERATION: categoryStr = "image-generation"; break;
+                    case RAC_MODEL_CATEGORY_AUDIO: categoryStr = "audio"; break;
+                    case RAC_MODEL_CATEGORY_MULTIMODAL: categoryStr = "multimodal"; break;
+                    case RAC_MODEL_CATEGORY_EMBEDDING: categoryStr = "embedding"; break;
+                    default: categoryStr = "unknown"; break;
+                }
+                std::string formatStr = "unknown";
+                switch (m.format) {
+                    case RAC_MODEL_FORMAT_GGUF: formatStr = "gguf"; break;
+                    case RAC_MODEL_FORMAT_ONNX: formatStr = "onnx"; break;
+                    case RAC_MODEL_FORMAT_ORT: formatStr = "ort"; break;
+                    case RAC_MODEL_FORMAT_BIN: formatStr = "bin"; break;
+                    default: formatStr = "unknown"; break;
+                }
+                std::string frameworkStr = "unknown";
+                switch (m.framework) {
+                    case RAC_FRAMEWORK_LLAMACPP: frameworkStr = "LlamaCpp"; break;
+                    case RAC_FRAMEWORK_ONNX: frameworkStr = "ONNX"; break;
 #ifdef __APPLE__
-                case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
+                    case RAC_FRAMEWORK_COREML: frameworkStr = "CoreML"; break;
 #endif
-                case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
-                case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
-                default: frameworkStr = "unknown"; break;
+                    case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
+                    case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+                    default: frameworkStr = "unknown"; break;
+                }
+
+                result += buildJsonObject({
+                    {"id", jsonString(m.id)},
+                    {"name", jsonString(m.name)},
+                    {"localPath", jsonString(m.localPath)},
+                    {"downloadURL", jsonString(m.downloadUrl)},
+                    {"category", jsonString(categoryStr)},
+                    {"format", jsonString(formatStr)},
+                    {"preferredFramework", jsonString(frameworkStr)},
+                    {"compatibleFrameworks", "[" + jsonString(frameworkStr) + "]"},
+                    {"downloadSize", std::to_string(m.downloadSize)},
+                    {"memoryRequired", std::to_string(m.memoryRequired)},
+                    {"supportsThinking", m.supportsThinking ? "true" : "false"},
+                    {"isDownloaded", m.isDownloaded ? "true" : "false"},
+                    {"isAvailable", "true"}
+                });
             }
+            result += "]";
 
-            result += buildJsonObject({
-                {"id", jsonString(m.id)},
-                {"name", jsonString(m.name)},
-                {"localPath", jsonString(m.localPath)},
-                {"downloadURL", jsonString(m.downloadUrl)},  // TypeScript uses capital U
-                {"category", jsonString(categoryStr)},       // String for TypeScript
-                {"format", jsonString(formatStr)},           // String for TypeScript
-                {"preferredFramework", jsonString(frameworkStr)}, // String for TypeScript
-                {"downloadSize", std::to_string(m.downloadSize)},
-                {"memoryRequired", std::to_string(m.memoryRequired)},
-                {"supportsThinking", m.supportsThinking ? "true" : "false"},
-                {"isDownloaded", m.isDownloaded ? "true" : "false"},
-                {"isAvailable", "true"}  // Models in registry are available
-            });
+            LOGD("getAvailableModels: JSON length=%zu", result.length());
+            return result;
+        } catch (const std::exception& e) {
+            LOGE("getAvailableModels exception: %s", e.what());
+            return "[]";
+        } catch (...) {
+            LOGE("getAvailableModels unknown exception");
+            return "[]";
         }
-        result += "]";
-
-        LOGD("getAvailableModels: JSON length=%zu", result.length());
-
-        return result;
     });
 }
 
@@ -1713,6 +1786,8 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadSTTModel(
                 return false;
             }
 
+            std::string resolvedPath = resolveOnnxModelDirectory(modelPath);
+
             rac_handle_t handle = getGlobalSTTHandle();
             if (!handle) {
                 setLastError("Failed to create STT component. Is an STT backend registered?");
@@ -1720,7 +1795,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadSTTModel(
             }
 
             rac_result_t result = rac_stt_component_load_model(
-                handle, modelPath.c_str(), modelPath.c_str(), modelType.c_str());
+                handle, resolvedPath.c_str(), resolvedPath.c_str(), modelType.c_str());
             if (result != RAC_SUCCESS) {
                 setLastError("Failed to load STT model: " + std::to_string(result));
                 return false;
@@ -2001,7 +2076,10 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadTTSModel(
     const std::string& modelType,
     const std::optional<std::string>& configJson) {
     return Promise<bool>::async([this, modelPath, modelType]() -> bool {
-        LOGI("Loading TTS model: %s", modelPath.c_str());
+        LOGI("Loading TTS model: path=%s, type=%s", modelPath.c_str(), modelType.c_str());
+
+        std::string resolvedPath = resolveOnnxModelDirectory(modelPath);
+        LOGI("TTS resolved path: %s", resolvedPath.c_str());
 
         rac_handle_t handle = getGlobalTTSHandle();
         if (!handle) {
@@ -2009,30 +2087,32 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadTTSModel(
             throw std::runtime_error("TTS backend not registered. Install @runanywhere/onnx.");
         }
 
-        // Configure the TTS component first
         rac_tts_config_t config = RAC_TTS_CONFIG_DEFAULT;
-        config.model_id = modelPath.c_str();
+        config.model_id = resolvedPath.c_str();
         rac_result_t result = rac_tts_component_configure(handle, &config);
         if (result != RAC_SUCCESS) {
             LOGE("TTS configure failed: %d", result);
             throw std::runtime_error("Failed to configure TTS: " + std::to_string(result));
         }
 
-        // Extract model ID from path for telemetry
-        std::string voiceId = modelPath;
+        std::string voiceId = resolvedPath;
         size_t lastSlash = voiceId.find_last_of('/');
         if (lastSlash != std::string::npos) {
             voiceId = voiceId.substr(lastSlash + 1);
         }
 
-        // Load the voice - this is what actually loads the model files
-        result = rac_tts_component_load_voice(handle, modelPath.c_str(), voiceId.c_str(), modelType.c_str());
+        LOGI("TTS loading voice: id=%s, path=%s", voiceId.c_str(), resolvedPath.c_str());
+        result = rac_tts_component_load_voice(handle, resolvedPath.c_str(), voiceId.c_str(), modelType.c_str());
         if (result != RAC_SUCCESS) {
-            LOGE("TTS load_voice failed: %d", result);
-            throw std::runtime_error("Failed to load TTS voice: " + std::to_string(result));
+            const char* details = rac_error_get_details();
+            std::string errorMsg = "Failed to load TTS voice: " + std::to_string(result);
+            if (details && details[0] != '\0') {
+                errorMsg += " (" + std::string(details) + ")";
+            }
+            LOGE("TTS load_voice failed: %d, details: %s", result, details ? details : "none");
+            throw std::runtime_error(errorMsg);
         }
 
-        // Verify loading
         bool isLoaded = rac_tts_component_is_loaded(handle) == RAC_TRUE;
         LOGI("TTS model loaded successfully, isLoaded=%s", isLoaded ? "true" : "false");
 
@@ -2699,7 +2779,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOu
         // Use ToolCallingBridge for parsing - single source of truth
         // This ensures consistent <tool_call> tag parsing across all platforms
         // return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
-        
+
         // Temporary stub - return empty JSON for now
         LOGW("parseToolCallFromOutput: ToolCallingBridge disabled, returning empty JSON");
         return "{}";
@@ -2717,7 +2797,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPromp
         // Use C++ single source of truth for prompt formatting
         // This eliminates duplicate TypeScript implementation
         // return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
-        
+
         // Temporary stub - return empty string for now
         LOGW("formatToolsForPrompt: ToolCallingBridge disabled, returning empty string");
         return "";
@@ -2735,7 +2815,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
         // TODO: Re-enable when commons includes rac_tool_call_* functions
         // Use C++ single source of truth for initial prompt building
         // return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
-        
+
         // Temporary stub - return user prompt as-is
         LOGW("buildInitialPrompt: ToolCallingBridge disabled, returning user prompt");
         return userPrompt;
@@ -2756,10 +2836,62 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt
         // Use C++ single source of truth for follow-up prompt building
         // return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
         //     originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
-        
+
         // Temporary stub - return original prompt
         LOGW("buildFollowupPrompt: ToolCallingBridge disabled, returning original prompt");
         return originalPrompt;
+    });
+}
+
+// =============================================================================
+// RAG Pipeline
+// =============================================================================
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipeline(const std::string& configJson) {
+    return Promise<bool>::async([configJson]() {
+        return ::runanywhere::bridges::RAGBridge::shared().createPipeline(configJson);
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragDestroyPipeline() {
+    return Promise<bool>::async([]() {
+        return ::runanywhere::bridges::RAGBridge::shared().destroyPipeline();
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragAddDocument(const std::string& text, const std::string& metadataJson) {
+    return Promise<bool>::async([text, metadataJson]() {
+        return ::runanywhere::bridges::RAGBridge::shared().addDocument(text, metadataJson);
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragAddDocumentsBatch(const std::string& documentsJson) {
+    return Promise<bool>::async([documentsJson]() {
+        return ::runanywhere::bridges::RAGBridge::shared().addDocumentsBatch(documentsJson);
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::ragQuery(const std::string& queryJson) {
+    return Promise<std::string>::async([queryJson]() {
+        return ::runanywhere::bridges::RAGBridge::shared().query(queryJson);
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragClearDocuments() {
+    return Promise<bool>::async([]() {
+        return ::runanywhere::bridges::RAGBridge::shared().clearDocuments();
+    });
+}
+
+std::shared_ptr<Promise<double>> HybridRunAnywhereCore::ragGetDocumentCount() {
+    return Promise<double>::async([]() {
+        return ::runanywhere::bridges::RAGBridge::shared().getDocumentCount();
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::ragGetStatistics() {
+    return Promise<std::string>::async([]() {
+        return ::runanywhere::bridges::RAGBridge::shared().getStatistics();
     });
 }
 

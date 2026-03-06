@@ -17,16 +17,17 @@ ext {
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
     commonsVersion = "0.1.6"
+    coreVersion = "0.1.6"
 
     // =============================================================================
     // Remote binary URLs
-    // RACommons from runanywhere-sdks (NOT runanywhere-binaries)
+    // RACommons from runanywhere-sdks (includes RAG pipeline)
     // =============================================================================
     commonsGitHubOrg = "RunanywhereAI"
     commonsRepo = "runanywhere-sdks"
     commonsBaseUrl = "https://github.com/${commonsGitHubOrg}/${commonsRepo}/releases/download"
 
-    // Android native libraries package
+    // Android native libraries packages
     commonsAndroidUrl = "${commonsBaseUrl}/commons-v${commonsVersion}/RACommons-android-v${commonsVersion}.zip"
 
     // Helper method to check if we should download
@@ -34,7 +35,7 @@ ext {
         return !testLocal
     }
 
-    // Helper method to check if local libs exist
+    // Helper method to check if local RACommons libs exist
     checkLocalLibsExist = { ->
         def jniLibsDir = project.file('src/main/jniLibs')
         def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
@@ -47,4 +48,5 @@ ext {
         def commonsLib = new File(arm64Dir, 'librac_commons.so')
         return commonsLib.exists()
     }
+
 }

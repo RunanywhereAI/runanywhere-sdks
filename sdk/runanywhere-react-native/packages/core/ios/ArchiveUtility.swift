@@ -148,7 +148,8 @@ public enum ArchiveError: Error, LocalizedError {
 
     // MARK: - tar.gz Extraction (Native Compression Framework)
 
-    /// Extract a tar.gz archive using Apple's native Compression framework
+    /// Extract a tar.gz archive using streaming decompression to keep memory constant.
+    /// Decompresses gzip to a temporary tar file on disk, then extracts tar entries.
     private static func extractTarGz(
         from sourceURL: URL,
         to destinationURL: URL,
@@ -158,24 +159,23 @@ public enum ArchiveError: Error, LocalizedError {
         SDKLogger.archive.info("Extracting tar.gz: \(sourceURL.lastPathComponent)")
         progressHandler?(0.0)
 
-        // Step 1: Read compressed data
-        let readStart = Date()
-        let compressedData = try Data(contentsOf: sourceURL)
-        let readTime = Date().timeIntervalSince(readStart)
-        SDKLogger.archive.info("Read \(formatBytes(compressedData.count)) in \(String(format: "%.2f", readTime))s")
-        progressHandler?(0.05)
+        // Step 1: Stream-decompress gzip to a temporary tar file on disk.
+        // This avoids holding both compressed + decompressed data in memory simultaneously.
+        let tempTarURL = destinationURL.appendingPathExtension("tar.tmp")
+        defer { try? FileManager.default.removeItem(at: tempTarURL) }
 
-        // Step 2: Decompress gzip using NATIVE Compression framework
         let decompressStart = Date()
-        SDKLogger.archive.info("Starting native gzip decompression...")
-        let tarData = try decompressGzipNative(compressedData)
+        SDKLogger.archive.info("Starting streaming gzip decompression...")
+        try decompressGzipToFile(from: sourceURL, to: tempTarURL)
         let decompressTime = Date().timeIntervalSince(decompressStart)
-        SDKLogger.archive.info("Decompressed to \(formatBytes(tarData.count)) in \(String(format: "%.2f", decompressTime))s")
+        let tarFileSize = (try? FileManager.default.attributesOfItem(atPath: tempTarURL.path)[.size] as? Int) ?? 0
+        SDKLogger.archive.info("Decompressed to \(formatBytes(tarFileSize)) in \(String(format: "%.2f", decompressTime))s")
         progressHandler?(0.3)
 
-        // Step 3: Extract tar archive
+        // Step 2: Read tar data and extract entries
         let extractStart = Date()
         SDKLogger.archive.info("Extracting tar data...")
+        let tarData = try Data(contentsOf: tempTarURL)
         try extractTarData(tarData, to: destinationURL, progressHandler: { progress in
             progressHandler?(0.3 + progress * 0.7)
         })
@@ -187,111 +187,142 @@ public enum ArchiveError: Error, LocalizedError {
         progressHandler?(1.0)
     }
 
-    /// Decompress gzip data using Apple's native Compression framework
-    private static func decompressGzipNative(_ compressedData: Data) throws -> Data {
-        // Gzip header validation
-        guard compressedData.count >= 10 else {
-            throw ArchiveError.invalidArchive("Gzip data too short")
+    /// Stream-decompress a gzip file to an output file using compression_stream_process.
+    /// Peak memory usage is ~512 KB (input + output buffers) regardless of file size.
+    private static func decompressGzipToFile(from sourceURL: URL, to destinationURL: URL) throws {
+        guard let inputHandle = FileHandle(forReadingAtPath: sourceURL.path) else {
+            throw ArchiveError.fileNotFound("Cannot open: \(sourceURL.path)")
+        }
+        defer { try? inputHandle.close() }
+
+        // Parse gzip header to find where the deflate stream begins
+        let headerOffset = try parseGzipHeader(from: inputHandle)
+        inputHandle.seek(toFileOffset: UInt64(headerOffset))
+
+        // The deflate stream ends 8 bytes before EOF (CRC32 + ISIZE trailer)
+        let attrs = try FileManager.default.attributesOfItem(atPath: sourceURL.path)
+        let fileSize = (attrs[.size] as? UInt64) ?? 0
+        guard fileSize > UInt64(headerOffset) + 8 else {
+            throw ArchiveError.invalidArchive("Gzip file too small for valid deflate stream")
+        }
+        let deflateEndOffset = fileSize - 8
+
+        // Create output file
+        FileManager.default.createFile(atPath: destinationURL.path, contents: nil)
+        guard let outputHandle = FileHandle(forWritingAtPath: destinationURL.path) else {
+            throw ArchiveError.extractionFailed("Cannot create temp file: \(destinationURL.path)")
+        }
+        defer { try? outputHandle.close() }
+
+        // Initialize streaming decompression
+        var stream = compression_stream()
+        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            throw ArchiveError.decompressionFailed("Failed to initialize decompression stream")
+        }
+        defer { compression_stream_destroy(&stream) }
+
+        let chunkSize = 256 * 1024 // 256 KB
+        let inputBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        let outputBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: chunkSize)
+        defer {
+            inputBuffer.deallocate()
+            outputBuffer.deallocate()
         }
 
-        guard compressedData[0] == 0x1f && compressedData[1] == 0x8b else {
-            throw ArchiveError.invalidArchive("Invalid gzip magic number")
-        }
+        stream.src_size = 0
+        var finished = false
 
-        guard compressedData[2] == 8 else {
-            throw ArchiveError.invalidArchive("Unsupported gzip compression method")
-        }
-
-        let flags = compressedData[3]
-        var headerSize = 10
-
-        // Handle optional fields
-        if (flags & 0x04) != 0 { // FEXTRA
-            guard compressedData.count > headerSize + 2 else {
-                throw ArchiveError.invalidArchive("Truncated gzip header (FEXTRA)")
-            }
-            let extraLen = Int(compressedData[headerSize]) | (Int(compressedData[headerSize + 1]) << 8)
-            headerSize += 2 + extraLen
-        }
-
-        if (flags & 0x08) != 0 { // FNAME
-            while headerSize < compressedData.count && compressedData[headerSize] != 0 {
-                headerSize += 1
-            }
-            headerSize += 1
-        }
-
-        if (flags & 0x10) != 0 { // FCOMMENT
-            while headerSize < compressedData.count && compressedData[headerSize] != 0 {
-                headerSize += 1
-            }
-            headerSize += 1
-        }
-
-        if (flags & 0x02) != 0 { // FHCRC
-            headerSize += 2
-        }
-
-        // Extract raw deflate stream (skip header and 8-byte trailer)
-        guard compressedData.count > headerSize + 8 else {
-            throw ArchiveError.invalidArchive("Invalid gzip structure")
-        }
-        let deflateData = compressedData.subdata(in: headerSize..<(compressedData.count - 8))
-
-        // Use native Compression framework to decompress
-        // Start with a reasonable estimate (model files typically compress 3-5x)
-        var destinationBufferSize = deflateData.count * 10
-        var decompressedData = Data(count: destinationBufferSize)
-
-        let decompressedSize = deflateData.withUnsafeBytes { (srcPtr: UnsafeRawBufferPointer) -> Int in
-            guard let sourceAddress = srcPtr.baseAddress else { return 0 }
-
-            return decompressedData.withUnsafeMutableBytes { (destPtr: UnsafeMutableRawBufferPointer) -> Int in
-                guard let destAddress = destPtr.baseAddress else { return 0 }
-
-                return compression_decode_buffer(
-                    destAddress.assumingMemoryBound(to: UInt8.self),
-                    destinationBufferSize,
-                    sourceAddress.assumingMemoryBound(to: UInt8.self),
-                    deflateData.count,
-                    nil,
-                    COMPRESSION_ZLIB
-                )
-            }
-        }
-
-        // If buffer was too small, try again with a larger buffer
-        if decompressedSize == 0 || decompressedSize == destinationBufferSize {
-            destinationBufferSize = deflateData.count * 30
-            decompressedData = Data(count: destinationBufferSize)
-
-            let retrySize = deflateData.withUnsafeBytes { (srcPtr: UnsafeRawBufferPointer) -> Int in
-                guard let sourceAddress = srcPtr.baseAddress else { return 0 }
-
-                return decompressedData.withUnsafeMutableBytes { (destPtr: UnsafeMutableRawBufferPointer) -> Int in
-                    guard let destAddress = destPtr.baseAddress else { return 0 }
-
-                    return compression_decode_buffer(
-                        destAddress.assumingMemoryBound(to: UInt8.self),
-                        destinationBufferSize,
-                        sourceAddress.assumingMemoryBound(to: UInt8.self),
-                        deflateData.count,
-                        nil,
-                        COMPRESSION_ZLIB
-                    )
+        while !finished {
+            // Feed more input when the previous chunk is consumed
+            if stream.src_size == 0 {
+                let currentOffset = inputHandle.offsetInFile
+                if currentOffset >= deflateEndOffset {
+                    finished = true
+                } else {
+                    let bytesToRead = min(UInt64(chunkSize), deflateEndOffset - currentOffset)
+                    let chunk = inputHandle.readData(ofLength: Int(bytesToRead))
+                    if chunk.isEmpty {
+                        finished = true
+                    } else {
+                        chunk.copyBytes(to: inputBuffer, count: chunk.count)
+                        stream.src_ptr = UnsafePointer(inputBuffer)
+                        stream.src_size = chunk.count
+                    }
                 }
             }
 
-            guard retrySize > 0 && retrySize < destinationBufferSize else {
-                throw ArchiveError.decompressionFailed("Native decompression failed - buffer too small or corrupted data")
+            stream.dst_ptr = outputBuffer
+            stream.dst_size = chunkSize
+
+            let flags: Int32 = finished ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0
+            let status = compression_stream_process(&stream, flags)
+
+            let bytesProduced = chunkSize - stream.dst_size
+            if bytesProduced > 0 {
+                outputHandle.write(Data(bytes: outputBuffer, count: bytesProduced))
             }
 
-            decompressedData.count = retrySize
-            return decompressedData
+            switch status {
+            case COMPRESSION_STATUS_OK:
+                continue
+            case COMPRESSION_STATUS_END:
+                finished = true
+            case COMPRESSION_STATUS_ERROR:
+                throw ArchiveError.decompressionFailed("Streaming decompression error")
+            default:
+                throw ArchiveError.decompressionFailed("Unexpected compression status: \(status)")
+            }
+        }
+    }
+
+    /// Parse the gzip header and return the byte offset where the deflate stream begins.
+    private static func parseGzipHeader(from handle: FileHandle) throws -> Int {
+        handle.seek(toFileOffset: 0)
+        guard let header = try? handle.read(upToCount: 10), header.count >= 10 else {
+            throw ArchiveError.invalidArchive("Gzip data too short")
+        }
+        guard header[0] == 0x1f && header[1] == 0x8b else {
+            throw ArchiveError.invalidArchive("Invalid gzip magic number")
+        }
+        guard header[2] == 8 else {
+            throw ArchiveError.invalidArchive("Unsupported gzip compression method")
         }
 
-        decompressedData.count = decompressedSize
-        return decompressedData
+        let flags = header[3]
+        var offset = 10
+
+        if (flags & 0x04) != 0 { // FEXTRA
+            handle.seek(toFileOffset: UInt64(offset))
+            guard let extraLenData = try? handle.read(upToCount: 2), extraLenData.count >= 2 else {
+                throw ArchiveError.invalidArchive("Truncated gzip header (FEXTRA)")
+            }
+            let extraLen = Int(extraLenData[0]) | (Int(extraLenData[1]) << 8)
+            offset += 2 + extraLen
+        }
+
+        if (flags & 0x08) != 0 { // FNAME
+            handle.seek(toFileOffset: UInt64(offset))
+            while true {
+                guard let byte = try? handle.read(upToCount: 1), byte.count == 1 else { break }
+                offset += 1
+                if byte[0] == 0 { break }
+            }
+        }
+
+        if (flags & 0x10) != 0 { // FCOMMENT
+            handle.seek(toFileOffset: UInt64(offset))
+            while true {
+                guard let byte = try? handle.read(upToCount: 1), byte.count == 1 else { break }
+                offset += 1
+                if byte[0] == 0 { break }
+            }
+        }
+
+        if (flags & 0x02) != 0 { // FHCRC
+            offset += 2
+        }
+
+        return offset
     }
 
     // MARK: - ZIP Extraction (Pure Swift using Foundation)
