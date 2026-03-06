@@ -5,6 +5,7 @@ import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
+import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
@@ -155,6 +156,20 @@ object ModelList {
         ),
     )
 
+    // Genie NPU Models (Qualcomm Snapdragon 8 Gen 2+)
+    // Pre-compiled QNN context binaries for Qualcomm Genie SDK.
+    // Compiled via: python -m qai_hub_models.models.<model>.export --chipset qualcomm-snapdragon-8-elite
+    private val genieModels = listOf(
+        AppModel(id = "qwen2_5-7b-instruct-genie", name = "Qwen 2.5 7B (NPU)",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz",
+            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
+            memoryRequirement = 5_000_000_000),
+        AppModel(id = "llama-3.2-1b-instruct-genie", name = "Llama 3.2 1B (NPU)",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz",
+            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
+            memoryRequirement = 1_500_000_000),
+    )
+
     // VLM
     private val vlmModels = listOf(
         AppModel(id = "smolvlm-500m-instruct-q8_0", name = "SmolVLM 500M Instruct",
@@ -182,6 +197,7 @@ object ModelList {
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
+            Genie.register(priority = 200)
             Timber.i("Backends registered")
         } catch (e: Exception) {
             Timber.e(e, "Failed to register backends")
@@ -190,6 +206,7 @@ object ModelList {
 
         val allModels = listOf(
             "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
+            "Genie NPU" to genieModels,
             "Embedding" to embeddingModels,
             "VLM" to vlmModels,
         )

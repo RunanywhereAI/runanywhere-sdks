@@ -762,6 +762,9 @@ class SDKLogger(
         /** Logger for RAG (Retrieval-Augmented Generation) operations */
         val rag = SDKLogger("RAG")
 
+        /** Logger for Qualcomm Genie (NPU LLM) operations */
+        val genie = SDKLogger("Genie")
+
         /** Logger for VoiceAgent operations */
         val voiceAgent = SDKLogger("VoiceAgent")
 

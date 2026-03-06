@@ -804,6 +804,7 @@ object CppBridgeEvents {
         const val COREML = 4
         const val FOUNDATION = 5
         const val SYSTEM = 6
+        const val GENIE = 10
     }
 
     /**

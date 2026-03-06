@@ -94,6 +94,7 @@ object CppBridgeModelRegistry {
         const val FLUID_AUDIO = 4 // RAC_FRAMEWORK_FLUID_AUDIO
         const val BUILTIN = 5 // RAC_FRAMEWORK_BUILTIN
         const val NONE = 6 // RAC_FRAMEWORK_NONE
+        const val GENIE = 10 // RAC_FRAMEWORK_GENIE
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 
