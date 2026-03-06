@@ -48,6 +48,48 @@ export type {
   VADConfiguration,
 } from './types/models';
 
+// LLM Types (rich generation types, backend-agnostic)
+export type {
+  LLMGenerationOptions,
+  LLMGenerationResult,
+  LLMStreamingResult,
+  LLMStreamingMetrics,
+  LLMTokenCallback,
+  LLMStreamCompleteCallback,
+  LLMStreamErrorCallback,
+} from './types/LLMTypes';
+
+// VLM Types (backend-agnostic image/generation types)
+export { VLMImageFormat } from './types/VLMTypes';
+export type {
+  VLMImage,
+  VLMGenerationOptions,
+  VLMGenerationResult,
+  VLMStreamingResult,
+} from './types/VLMTypes';
+
+// STT Types (backend-agnostic result/streaming types)
+export type {
+  STTTranscriptionResult,
+  STTWord,
+  STTTranscribeOptions,
+  STTStreamCallback,
+  STTStreamingSession,
+} from './types/STTTypes';
+
+// TTS Types (backend-agnostic synthesis result/options)
+export type {
+  TTSSynthesisResult,
+  TTSSynthesizeOptions,
+} from './types/TTSTypes';
+
+// VAD Types (backend-agnostic activity/segment types)
+export { SpeechActivity } from './types/VADTypes';
+export type {
+  SpeechActivityCallback,
+  SpeechSegment,
+} from './types/VADTypes';
+
 // ---------------------------------------------------------------------------
 // Aliases for spec/README convenience (match React Native naming where used)
 // ---------------------------------------------------------------------------

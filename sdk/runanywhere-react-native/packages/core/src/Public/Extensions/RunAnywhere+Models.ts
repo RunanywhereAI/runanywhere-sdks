@@ -10,10 +10,11 @@ import {
   isNativeModuleAvailable,
 } from '../../native';
 import { ModelRegistry } from '../../services/ModelRegistry';
-import { FileSystem } from '../../services/FileSystem';
+import { FileSystem, MultiFileModelCache } from '../../services/FileSystem';
+import type { ModelFileDescriptor } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework, ModelCompatibilityResult } from '../../types';
-import { ModelCategory } from '../../types';
+import { ModelCategory, ModelArtifactType } from '../../types';
 
 const logger = new SDKLogger('RunAnywhere.Models');
 
@@ -212,31 +213,48 @@ export async function clearModelAssignmentsCache(
 }
 
 /**
- * Register a model from a download URL
+ * Register a model from a download URL.
+ *
+ * Matches iOS: RunAnywhere.registerModel(id:name:url:framework:modality:artifactType:memoryRequirement:supportsThinking:)
  */
 export async function registerModel(options: {
   id?: string;
   name: string;
   url: string;
   framework: LLMFramework;
-  category?: ModelCategory;
+  modality?: ModelCategory;
+  artifactType?: ModelArtifactType;
   memoryRequirement?: number;
   supportsThinking?: boolean;
 }): Promise<ModelInfo> {
   const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
   const now = new Date().toISOString();
+  const modelId = options.id ?? generateModelId(options.url);
+
+  let isDownloaded = false;
+  let localPath: string | undefined;
+
+  if (FileSystem.isAvailable()) {
+    try {
+      const frameworkDir = inferFrameworkDir(options.framework);
+      const exists = await FileSystem.modelExists(modelId, frameworkDir);
+      if (exists) {
+        localPath = await FileSystem.getModelPath(modelId, frameworkDir);
+        isDownloaded = true;
+        logger.info(`Model ${modelId} found on disk: ${localPath}`);
+      }
+    } catch (error) {
+      logger.debug(`Could not check for existing model ${modelId}: ${error}`);
+    }
+  }
 
   const modelInfo: ModelInfo = {
-    id: options.id ?? generateModelId(options.url),
+    id: modelId,
     name: options.name,
-    category: options.category ?? ModelCategory.Language,
-    format: options.url.includes('.zip')
-      ? ModelFormat.Zip
-      : options.url.includes('.gguf')
-        ? ModelFormat.GGUF
-        : ModelFormat.GGUF,
+    category: options.modality ?? ModelCategory.Language,
+    format: inferFormat(options.url, options.framework),
     downloadURL: options.url,
-    localPath: undefined,
+    localPath,
     downloadSize: undefined,
     memoryRequired: options.memoryRequirement,
     compatibleFrameworks: [options.framework],
@@ -248,12 +266,110 @@ export async function registerModel(options: {
     updatedAt: now,
     syncPending: false,
     usageCount: 0,
-    isDownloaded: false,
+    isDownloaded,
     isAvailable: true,
   };
 
   await ModelRegistry.registerModel(modelInfo);
+
+  logger.info(`Registered model: ${modelId} (${options.name})${isDownloaded ? ' [already downloaded]' : ''}`);
+
   return modelInfo;
+}
+
+/**
+ * Register a multi-file model (e.g., ONNX embedding model with vocab.txt, or VLM with mmproj).
+ * All files are downloaded into the same directory so companion files are co-located.
+ *
+ * Matches iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
+ */
+export async function registerMultiFileModel(options: {
+  id: string;
+  name: string;
+  files: ModelFileDescriptor[];
+  framework: LLMFramework;
+  modality?: ModelCategory;
+  memoryRequirement?: number;
+}): Promise<ModelInfo> {
+  const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
+  const now = new Date().toISOString();
+
+  MultiFileModelCache.set(options.id, options.files);
+
+  let isDownloaded = false;
+  let localPath: string | undefined;
+
+  if (FileSystem.isAvailable()) {
+    try {
+      const frameworkDir = inferFrameworkDir(options.framework);
+      const exists = await FileSystem.modelExists(options.id, frameworkDir);
+      if (exists) {
+        localPath = FileSystem.getModelFolder(options.id, frameworkDir);
+        isDownloaded = true;
+        logger.info(`Multi-file model ${options.id} found on disk: ${localPath}`);
+      }
+    } catch (error) {
+      logger.debug(`Could not check for existing model ${options.id}: ${error}`);
+    }
+  }
+
+  const modelInfo: ModelInfo = {
+    id: options.id,
+    name: options.name,
+    category: options.modality ?? ModelCategory.Language,
+    format: ModelFormat.ONNX,
+    downloadURL: options.files[0]?.url,
+    localPath,
+    downloadSize: undefined,
+    memoryRequired: options.memoryRequirement,
+    compatibleFrameworks: [options.framework],
+    preferredFramework: options.framework,
+    supportsThinking: false,
+    metadata: {
+      tags: [],
+      description: `Multi-file model (${options.files.length} files)`,
+    },
+    source: ConfigurationSource.Local,
+    createdAt: now,
+    updatedAt: now,
+    syncPending: false,
+    usageCount: 0,
+    isDownloaded,
+    isAvailable: true,
+  };
+
+  await ModelRegistry.registerModel(modelInfo);
+
+  logger.info(
+    `Registered multi-file model: ${options.id} (${options.name}, ${options.files.length} files)` +
+    `${isDownloaded ? ' [already downloaded]' : ''}`
+  );
+
+  return modelInfo;
+}
+
+function inferFrameworkDir(framework: LLMFramework): string {
+  switch (framework) {
+    case 'ONNX': return 'ONNX';
+    case 'LlamaCpp': return 'LlamaCpp';
+    default: return framework;
+  }
+}
+
+function inferFormat(url: string, framework?: LLMFramework): import('../../types/enums').ModelFormat {
+  const { ModelFormat } = require('../../types/enums');
+  const lower = url.toLowerCase();
+  if (lower.includes('.gguf')) return ModelFormat.GGUF;
+  if (lower.includes('.onnx')) return ModelFormat.ONNX;
+  if (lower.includes('.zip')) return ModelFormat.Zip;
+  // Archives (.tar.gz, .tar.bz2) are packaging, not format.
+  // Derive format from framework: ONNX archives contain ONNX models.
+  if (lower.includes('.tar.gz') || lower.includes('.tar.bz2')) {
+    if (framework === 'ONNX') return ModelFormat.ONNX;
+    return ModelFormat.GGUF;
+  }
+  if (framework === 'ONNX') return ModelFormat.ONNX;
+  return ModelFormat.GGUF;
 }
 
 function generateModelId(url: string): string {
@@ -298,53 +414,77 @@ export async function downloadModel(
     throw new Error('react-native-fs not installed - cannot download models');
   }
 
-  // Determine file name with extension
-  let extension = '';
-  if (modelInfo.downloadURL.includes('.gguf')) {
-    extension = '.gguf';
-  } else if (modelInfo.downloadURL.includes('.onnx')) {
-    extension = '.onnx';
-  } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
-    extension = '.tar.bz2';
-  } else if (modelInfo.downloadURL.includes('.tar.gz')) {
-    extension = '.tar.gz';
-  } else if (modelInfo.downloadURL.includes('.zip')) {
-    extension = '.zip';
-  }
-  const fileName = `${modelId}${extension}`;
-
-  logger.info('Starting download (react-native-fs):', {
-    modelId,
-    url: modelInfo.downloadURL,
-  });
+  // Use preferredFramework from modelInfo to ensure correct directory structure
+  const framework = modelInfo.preferredFramework;
 
   activeDownloads.set(modelId, 1);
   let lastLoggedProgress = -1;
 
-  // Use preferredFramework from modelInfo to ensure correct directory structure
-  // This prevents VLM models (tar.gz with GGUF) from being misclassified as ONNX
-  const framework = modelInfo.preferredFramework;
+  const progressHandler = (progress: { bytesWritten: number; contentLength: number; progress: number }) => {
+    const progressPct = Math.round(progress.progress * 100);
+    if (progressPct - lastLoggedProgress >= 10) {
+      logger.debug(`Download progress: ${progressPct}%`);
+      lastLoggedProgress = progressPct;
+    }
+    if (onProgress) {
+      onProgress({
+        modelId,
+        bytesDownloaded: progress.bytesWritten,
+        totalBytes: progress.contentLength || modelInfo.downloadSize || 0,
+        progress: progress.progress,
+      });
+    }
+  };
 
   try {
+    // Multi-file model: download all files into the same directory
+    const multiFileDescriptors = MultiFileModelCache.get(modelId);
+    if (multiFileDescriptors && multiFileDescriptors.length > 0) {
+      logger.info('Starting multi-file download:', { modelId, fileCount: multiFileDescriptors.length });
+
+      const destFolder = await FileSystem.downloadMultiFileModel(
+        modelId,
+        multiFileDescriptors,
+        progressHandler,
+        framework
+      );
+
+      logger.info('Multi-file download completed:', { modelId, destFolder });
+
+      const updatedModel: ModelInfo = {
+        ...modelInfo,
+        localPath: destFolder,
+        isDownloaded: true,
+      };
+      await ModelRegistry.registerModel(updatedModel);
+
+      return destFolder;
+    }
+
+    // Single-file model: existing download logic
+    let extension = '';
+    if (modelInfo.downloadURL.includes('.gguf')) {
+      extension = '.gguf';
+    } else if (modelInfo.downloadURL.includes('.onnx')) {
+      extension = '.onnx';
+    } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
+      extension = '.tar.bz2';
+    } else if (modelInfo.downloadURL.includes('.tar.gz')) {
+      extension = '.tar.gz';
+    } else if (modelInfo.downloadURL.includes('.zip')) {
+      extension = '.zip';
+    }
+    const fileName = `${modelId}${extension}`;
+
+    logger.info('Starting download (react-native-fs):', {
+      modelId,
+      url: modelInfo.downloadURL,
+    });
+
     const destPath = await FileSystem.downloadModel(
       fileName,
       modelInfo.downloadURL,
-      (progress) => {
-        const progressPct = Math.round(progress.progress * 100);
-        if (progressPct - lastLoggedProgress >= 10) {
-          logger.debug(`Download progress: ${progressPct}%`);
-          lastLoggedProgress = progressPct;
-        }
-
-        if (onProgress) {
-          onProgress({
-            modelId,
-            bytesDownloaded: progress.bytesWritten,
-            totalBytes: progress.contentLength || modelInfo.downloadSize || 0,
-            progress: progress.progress,
-          });
-        }
-      },
+      progressHandler,
       framework
     );
 
@@ -353,7 +493,6 @@ export async function downloadModel(
       destPath,
     });
 
-    // Update model in registry with local path
     const updatedModel: ModelInfo = {
       ...modelInfo,
       localPath: destPath,

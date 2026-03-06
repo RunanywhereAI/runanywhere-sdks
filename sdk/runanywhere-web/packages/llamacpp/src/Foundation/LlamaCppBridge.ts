@@ -258,10 +258,15 @@ export class LlamaCppBridge {
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
 
+      // Derive the base URL so the Emscripten glue resolves the companion
+      // .wasm binary from the same directory, regardless of bundler output.
+      const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
+
       // Instantiate the WASM module
       this._module = await createModule({
         print: (text: string) => logger.info(text),
         printErr: (text: string) => logger.error(text),
+        locateFile: (path: string) => baseUrl + path,
       }) as LlamaCppModule;
 
       // Verify module loaded

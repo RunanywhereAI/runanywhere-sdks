@@ -24,6 +24,7 @@ import 'package:runanywhere/native/dart_bridge_model_registry.dart'
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
+import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -2429,6 +2430,70 @@ class RunAnywhere {
     return model;
   }
 
+  /// Register a multi-file model with the SDK.
+  ///
+  /// Matches Swift `RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)`.
+  ///
+  /// Use this for models that consist of multiple files that must be downloaded
+  /// together into the same directory (e.g. embedding model.onnx + vocab.txt).
+  ///
+  /// Each [ModelFileDescriptor] must specify both its [url] and [destinationPath].
+  ///
+  /// ```dart
+  /// RunAnywhere.registerMultiFileModel(
+  ///   id: 'all-minilm-l6-v2',
+  ///   name: 'All MiniLM L6 v2 (Embedding)',
+  ///   files: [
+  ///     ModelFileDescriptor(
+  ///       relativePath: 'model.onnx',
+  ///       destinationPath: 'model.onnx',
+  ///       url: Uri.parse('https://.../model.onnx'),
+  ///     ),
+  ///     ModelFileDescriptor(
+  ///       relativePath: 'vocab.txt',
+  ///       destinationPath: 'vocab.txt',
+  ///       url: Uri.parse('https://.../vocab.txt'),
+  ///     ),
+  ///   ],
+  ///   framework: InferenceFramework.onnx,
+  ///   modality: ModelCategory.embedding,
+  ///   memoryRequirement: 25500000,
+  /// );
+  /// ```
+  static ModelInfo registerMultiFileModel({
+    String? id,
+    required String name,
+    required List<ModelFileDescriptor> files,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.embedding,
+    int? memoryRequirement,
+  }) {
+    final modelId =
+        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
+
+    // Primary download URL is the first file's URL (used for display/size queries)
+    final primaryUrl = files.isNotEmpty ? files.first.url : null;
+
+    final model = ModelInfo(
+      id: modelId,
+      name: name,
+      category: modality,
+      format: ModelFormat.onnx,
+      framework: framework,
+      downloadURL: primaryUrl,
+      artifactType: MultiFileArtifact(files: files),
+      downloadSize: memoryRequirement,
+      source: ModelSource.local,
+    );
+
+    _registeredModels.add(model);
+
+    // Save to C++ registry (fire-and-forget, matches Swift pattern)
+    _saveToCppRegistry(model);
+
+    return model;
+  }
+
   /// Save model to C++ registry (fire-and-forget).
   /// Matches Swift: `Task { try await CppBridge.ModelRegistry.shared.save(modelInfo) }`
   static void _saveToCppRegistry(ModelInfo model) {
@@ -2478,5 +2543,51 @@ class RunAnywhere {
       }
     }
     return null;
+  }
+
+  // ============================================================================
+  // MARK: - RAG (Retrieval-Augmented Generation)
+  // ============================================================================
+
+  /// Create a RAG pipeline with the given configuration.
+  ///
+  /// Must be called before ingesting documents or running queries.
+  static Future<void> ragCreatePipeline(RAGConfiguration config) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.createPipeline(config);
+  }
+
+  /// Destroy the RAG pipeline and release resources.
+  static Future<void> ragDestroyPipeline() async {
+    DartBridgeRAG.shared.destroyPipeline();
+  }
+
+  /// Ingest a document into the RAG pipeline.
+  ///
+  /// The document is split into chunks, embedded, and indexed.
+  static Future<void> ragIngest(String text, {String? metadataJson}) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
+  }
+
+  /// Clear all documents from the RAG pipeline.
+  static Future<void> ragClearDocuments() async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.clearDocuments();
+  }
+
+  /// Get the number of indexed document chunks.
+  static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
+
+  /// Query the RAG pipeline with a question.
+  ///
+  /// Returns a [RAGResult] with the generated answer and retrieved chunks.
+  static Future<RAGResult> ragQuery(
+    String question, {
+    RAGQueryOptions? options,
+  }) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    final queryOptions = options ?? RAGQueryOptions(question: question);
+    return DartBridgeRAG.shared.query(queryOptions);
   }
 }

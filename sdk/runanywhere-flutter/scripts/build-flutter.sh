@@ -16,6 +16,10 @@
 #   --rebuild-commons   Force rebuild of runanywhere-commons
 #   --ios               Build for iOS only
 #   --android           Build for Android only (default: both)
+#   --llamacpp          Include LlamaCPP backend
+#   --onnx              Include ONNX backend
+#   --rag               Include RAG backend
+#   --all-backends      Include all backends (default if none specified)
 #   --clean             Clean build directories before building
 #   --skip-build        Skip native build (only setup frameworks/libs)
 #   --help              Show this help message
@@ -32,6 +36,12 @@
 #
 #   # iOS only setup
 #   ./scripts/build-flutter.sh --setup --ios
+#
+#   # Build only llamacpp and onnx backends (skip RAG)
+#   ./scripts/build-flutter.sh --local --rebuild-commons --llamacpp --onnx
+#
+#   # Build only RAG backend
+#   ./scripts/build-flutter.sh --local --rebuild-commons --rag
 #
 # =============================================================================
 
@@ -72,6 +82,9 @@ SKIP_BUILD=false
 BUILD_IOS=true
 BUILD_ANDROID=true
 ABIS="arm64-v8a,x86_64"
+BACKEND_LLAMACPP=false
+BACKEND_ONNX=false
+BACKENDS_SPECIFIED=false
 
 # =============================================================================
 # Colors & Logging
@@ -139,6 +152,19 @@ for arg in "$@"; do
             BUILD_IOS=false
             BUILD_ANDROID=true
             ;;
+        --llamacpp)
+            BACKEND_LLAMACPP=true
+            BACKENDS_SPECIFIED=true
+            ;;
+        --onnx)
+            BACKEND_ONNX=true
+            BACKENDS_SPECIFIED=true
+            ;;
+        --all-backends)
+            BACKEND_LLAMACPP=true
+            BACKEND_ONNX=true
+            BACKENDS_SPECIFIED=true
+            ;;
         --clean)
             CLEAN_BUILD=true
             ;;
@@ -157,6 +183,19 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Default to all backends if none specified
+if [[ "$BACKENDS_SPECIFIED" == false ]]; then
+    BACKEND_LLAMACPP=true
+    BACKEND_ONNX=true
+fi
+
+# Build comma-separated BACKENDS string for build-android.sh
+# RAG pipeline is compiled into rac_commons, not a separate backend
+BACKENDS_LIST=()
+[[ "$BACKEND_LLAMACPP" == true ]] && BACKENDS_LIST+=("llamacpp")
+[[ "$BACKEND_ONNX" == true ]] && BACKENDS_LIST+=("onnx")
+BACKENDS=$(IFS=','; echo "${BACKENDS_LIST[*]}")
 
 # =============================================================================
 # Setup Environment
@@ -221,9 +260,6 @@ build_commons_android() {
     fi
 
     # build-android.sh takes positional args: BACKENDS ABIS
-    # Use "llamacpp,onnx" for backends to get both LlamaCPP and ONNX
-    local BACKENDS="llamacpp,onnx"
-
     log_step "Running: build-android.sh $BACKENDS $ABIS"
     "$COMMONS_ANDROID_SCRIPT" "$BACKENDS" "$ABIS"
 
@@ -270,6 +306,8 @@ copy_ios_frameworks() {
     else
         log_warn "RABackendONNX.xcframework not found at ${COMMONS_DIST}/"
     fi
+
+    # RAG pipeline is compiled into RACommons.xcframework — no separate framework needed
 
     # Copy onnxruntime.xcframework to onnx package (required dependency)
     # This matches the architecture of React Native and Swift SDKs
@@ -487,6 +525,8 @@ copy_android_jnilibs() {
                 log_info "ONNX: ${lib} (from Sherpa-ONNX)"
             fi
         done
+
+        # RAG pipeline is compiled into librac_commons.so — no separate .so needed
     done
 
     log_info "Android JNI libraries copied"
@@ -625,6 +665,7 @@ main() {
     echo "Rebuild Commons: $REBUILD_COMMONS"
     echo "iOS:            $BUILD_IOS"
     echo "Android:        $BUILD_ANDROID"
+    echo "Backends:       $BACKENDS"
     echo "ABIs:           $ABIS"
     echo ""
 

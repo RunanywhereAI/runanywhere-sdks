@@ -37,17 +37,11 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
 let sdkVersion = "0.19.6"
-
-// RAG binary is only available in local dev mode until the release artifact is published.
-// In remote mode, the RAG xcframework zip + checksum don't exist yet, so including the
-// binary target would block ALL SPM package resolution (not just RAG).
-// Set to true once RABackendRAG-v<version>.zip is published to GitHub releases.
-let ragRemoteBinaryAvailable = false
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -87,7 +81,7 @@ let package = Package(
             name: "RunAnywhereWhisperKit",
             targets: ["WhisperKitRuntime"]
         ),
-    ] + ragProducts(),
+    ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
@@ -152,7 +146,7 @@ let package = Package(
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",
                 "RACommonsBinary",
-            ] + ragCoreDependencies(),
+            ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
             swiftSettings: [
@@ -231,61 +225,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-    ] + ragTargets() + binaryTargets()
+    ] + binaryTargets()
 )
-
-// =============================================================================
-// RAG TARGET HELPERS
-// =============================================================================
-// RAG targets are gated because the remote binary artifact doesn't exist yet.
-// Including a binary target with a placeholder checksum blocks ALL SPM resolution.
-
-/// RAG product (library) — only included when the binary is available
-func ragProducts() -> [Product] {
-    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
-    return [
-        .library(
-            name: "RunAnywhereRAG",
-            targets: ["RAGRuntime"]
-        ),
-    ]
-}
-
-/// RAG dependency for the RunAnywhere core target
-/// NOTE: Core already accesses RAG C headers via CRACommons umbrella (rac_rag.h, rac_rag_pipeline.h).
-/// No additional dependency needed — RAGBackend is only used by RAGRuntime.
-func ragCoreDependencies() -> [Target.Dependency] {
-    return []
-}
-
-/// RAG-related targets (C bridge + Swift runtime)
-func ragTargets() -> [Target] {
-    guard useLocalBinaries || ragRemoteBinaryAvailable else { return [] }
-    return [
-        // C Bridge Module - RAG Backend Headers
-        .target(
-            name: "RAGBackend",
-            dependencies: ["RABackendRAGBinary"],
-            path: "sdk/runanywhere-swift/Sources/RAGRuntime/include",
-            publicHeadersPath: "."
-        ),
-        // RAG Runtime Backend
-        .target(
-            name: "RAGRuntime",
-            dependencies: [
-                "RunAnywhere",
-                "RAGBackend",
-                "ONNXRuntime",
-                "LlamaCPPRuntime",
-            ],
-            path: "sdk/runanywhere-swift/Sources/RAGRuntime",
-            exclude: ["include"],
-            linkerSettings: [
-                .linkedLibrary("c++"),
-            ]
-        ),
-    ]
-}
 
 // =============================================================================
 // BINARY TARGET SELECTION
@@ -313,10 +254,6 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
-            ),
-            .binaryTarget(
-                name: "RABackendRAGBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendRAG.xcframework"
             ),
         ]
 
@@ -368,17 +305,6 @@ func binaryTargets() -> [Target] {
                 checksum: "f73db9dc09012325b35fd3da74de794a75f4e9971d9b923af0805d6ab1dfc243"
             ),
         ]
-
-        // Only include RAG binary when the release artifact is available
-        if ragRemoteBinaryAvailable {
-            targets.append(
-                .binaryTarget(
-                    name: "RABackendRAGBinary",
-                    url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendRAG-v\(sdkVersion).zip",
-                    checksum: "0000000000000000000000000000000000000000000000000000000000000000" // Replace with actual checksum
-                )
-            )
-        }
 
         return targets
     }

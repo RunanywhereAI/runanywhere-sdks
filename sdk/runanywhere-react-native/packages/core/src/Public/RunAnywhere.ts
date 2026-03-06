@@ -48,6 +48,8 @@ import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
+import * as RAG from './Extensions/RunAnywhere+RAG';
+import * as VLM from './Extensions/RunAnywhere+VLM';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -615,6 +617,34 @@ export const RunAnywhere = {
   continueWithToolResult: ToolCalling.continueWithToolResult,
 
   // ============================================================================
+  // Vision Language Model (Delegated to Extension)
+  // ============================================================================
+
+  registerVLMBackend: VLM.registerVLMBackend,
+  loadVLMModel: VLM.loadVLMModel,
+  loadVLMModelById: VLM.loadVLMModelById,
+  isVLMModelLoaded: VLM.isVLMModelLoaded,
+  unloadVLMModel: VLM.unloadVLMModel,
+  describeImage: VLM.describeImage,
+  askAboutImage: VLM.askAboutImage,
+  processImage: VLM.processImage,
+  processImageStream: VLM.processImageStream,
+  cancelVLMGeneration: VLM.cancelVLMGeneration,
+
+  // ============================================================================
+  // RAG Pipeline (Delegated to Extension)
+  // ============================================================================
+
+  ragCreatePipeline: RAG.ragCreatePipeline,
+  ragDestroyPipeline: RAG.ragDestroyPipeline,
+  ragIngest: RAG.ragIngest,
+  ragAddDocumentsBatch: RAG.ragAddDocumentsBatch,
+  ragQuery: RAG.ragQuery,
+  ragClearDocuments: RAG.ragClearDocuments,
+  ragGetDocumentCount: RAG.ragGetDocumentCount,
+  ragGetStatistics: RAG.ragGetStatistics,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
@@ -635,6 +665,7 @@ export const RunAnywhere = {
   deleteModel: Models.deleteModel,
   checkCompatibility: Models.checkCompatibility,
   registerModel: Models.registerModel,
+  registerMultiFileModel: Models.registerMultiFileModel,
 
   // ============================================================================
   // Utilities

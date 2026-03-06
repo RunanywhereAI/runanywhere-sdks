@@ -4,7 +4,8 @@
  */
 
 import type { TabLifecycle } from '../app';
-import { AudioCapture, VAD, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
+import { AudioCapture, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
 import { ModelManager, ModelCategory, ensureVADLoaded, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 

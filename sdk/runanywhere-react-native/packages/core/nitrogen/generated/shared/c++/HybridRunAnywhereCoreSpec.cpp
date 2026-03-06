@@ -93,6 +93,14 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("formatToolsForPrompt", &HybridRunAnywhereCoreSpec::formatToolsForPrompt);
       prototype.registerHybridMethod("buildInitialPrompt", &HybridRunAnywhereCoreSpec::buildInitialPrompt);
       prototype.registerHybridMethod("buildFollowupPrompt", &HybridRunAnywhereCoreSpec::buildFollowupPrompt);
+      prototype.registerHybridMethod("ragCreatePipeline", &HybridRunAnywhereCoreSpec::ragCreatePipeline);
+      prototype.registerHybridMethod("ragDestroyPipeline", &HybridRunAnywhereCoreSpec::ragDestroyPipeline);
+      prototype.registerHybridMethod("ragAddDocument", &HybridRunAnywhereCoreSpec::ragAddDocument);
+      prototype.registerHybridMethod("ragAddDocumentsBatch", &HybridRunAnywhereCoreSpec::ragAddDocumentsBatch);
+      prototype.registerHybridMethod("ragQuery", &HybridRunAnywhereCoreSpec::ragQuery);
+      prototype.registerHybridMethod("ragClearDocuments", &HybridRunAnywhereCoreSpec::ragClearDocuments);
+      prototype.registerHybridMethod("ragGetDocumentCount", &HybridRunAnywhereCoreSpec::ragGetDocumentCount);
+      prototype.registerHybridMethod("ragGetStatistics", &HybridRunAnywhereCoreSpec::ragGetStatistics);
     });
   }
 

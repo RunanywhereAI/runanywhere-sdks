@@ -26,16 +26,16 @@ public struct RAGConfiguration: Sendable {
     /// Number of top chunks to retrieve per query (default: 3)
     public let topK: Int
 
-    /// Minimum cosine similarity threshold 0.0–1.0 (default: 0.7)
+    /// Minimum cosine similarity threshold 0.0–1.0 (default: 0.12)
     public let similarityThreshold: Float
 
     /// Maximum tokens to use for context sent to the LLM (default: 2048)
     public let maxContextTokens: Int
 
-    /// Tokens per chunk when splitting documents (default: 512)
+    /// Tokens per chunk when splitting documents (default: 180)
     public let chunkSize: Int
 
-    /// Overlap tokens between consecutive chunks (default: 50)
+    /// Overlap tokens between consecutive chunks (default: 30)
     public let chunkOverlap: Int
 
     /// Prompt template with `{context}` and `{query}` placeholders.
@@ -53,10 +53,10 @@ public struct RAGConfiguration: Sendable {
         llmModelPath: String,
         embeddingDimension: Int = 384,
         topK: Int = 3,
-        similarityThreshold: Float = 0.3,
+        similarityThreshold: Float = 0.12,
         maxContextTokens: Int = 2048,
-        chunkSize: Int = 512,
-        chunkOverlap: Int = 50,
+        chunkSize: Int = 180,
+        chunkOverlap: Int = 30,
         promptTemplate: String? = nil,
         embeddingConfigJSON: String? = nil,
         llmConfigJSON: String? = nil

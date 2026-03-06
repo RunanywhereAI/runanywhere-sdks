@@ -6,9 +6,13 @@
  * Core code (e.g. VoicePipeline) retrieves them at runtime via
  * `ExtensionPoint.getProvider()` with full compile-time type safety.
  *
- * Replaces the previous implicit `globalThis.__runanywhere_*` contract.
- * See: https://github.com/RunanywhereAI/runanywhere-sdks/issues/371
+ * All referenced types (LLMGenerationResult, STTTranscriptionResult, etc.)
+ * are defined in core so providers return properly typed results.
  */
+
+import type { LLMGenerationResult } from '../types/LLMTypes';
+import type { STTTranscriptionResult, STTTranscribeOptions } from '../types/STTTypes';
+import type { TTSSynthesisResult, TTSSynthesizeOptions } from '../types/TTSTypes';
 
 // ---------------------------------------------------------------------------
 // Provider Capability Keys
@@ -26,10 +30,6 @@ export type ProviderCapability = 'llm' | 'stt' | 'tts';
 
 /**
  * LLM (text generation) provider — implemented by @runanywhere/web-llamacpp.
- *
- * Only the subset of the TextGeneration API that cross-package consumers
- * (e.g. VoicePipeline) depend on. Backend packages may expose additional
- * methods beyond this interface.
  */
 export interface LLMProvider {
   generateStream(
@@ -41,47 +41,29 @@ export interface LLMProvider {
     },
   ): Promise<{
     stream: AsyncIterable<string>;
-    result: Promise<{
-      text: string;
-      tokensUsed: number;
-      tokensPerSecond: number;
-      [key: string]: unknown;
-    }>;
+    result: Promise<LLMGenerationResult>;
     cancel: () => void;
   }>;
 }
 
 /**
  * STT (speech-to-text) provider — implemented by @runanywhere/web-onnx.
- *
- * Only the subset of the STT API that cross-package consumers depend on.
  */
 export interface STTProvider {
   transcribe(
     audio: Float32Array,
-    options?: { sampleRate?: number },
-  ): Promise<{
-    text: string;
-    [key: string]: unknown;
-  }>;
+    options?: STTTranscribeOptions,
+  ): Promise<STTTranscriptionResult>;
 }
 
 /**
  * TTS (text-to-speech) provider — implemented by @runanywhere/web-onnx.
- *
- * Only the subset of the TTS API that cross-package consumers depend on.
  */
 export interface TTSProvider {
   synthesize(
     text: string,
-    options?: { speed?: number },
-  ): Promise<{
-    audioData: Float32Array;
-    sampleRate: number;
-    durationMs: number;
-    processingTimeMs: number;
-    [key: string]: unknown;
-  }>;
+    options?: TTSSynthesizeOptions,
+  ): Promise<TTSSynthesisResult>;
 }
 
 // ---------------------------------------------------------------------------

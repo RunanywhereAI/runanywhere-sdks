@@ -8,7 +8,7 @@
  * - Framework list with expansion
  * - Model list with download/select actions
  * - Loading overlay for model loading
- * - Context-based filtering (LLM, STT, TTS, Voice)
+ * - Context-based filtering (LLM, STT, TTS, Voice, VLM, RAG Embedding, RAG LLM)
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -52,6 +52,8 @@ export enum ModelSelectionContext {
   TTS = 'tts', // Text-to-Speech - show TTS frameworks
   Voice = 'voice', // Voice Assistant - show all voice-related
   VLM = 'vlm', // Vision - show VLM frameworks
+  RagEmbedding = 'ragEmbedding', // RAG embedding - ONNX embedding models only
+  RagLLM = 'ragLLM', // RAG generation - LlamaCpp language models only
 }
 
 /**
@@ -69,6 +71,10 @@ const getContextTitle = (context: ModelSelectionContext): string => {
       return 'Select Model';
     case ModelSelectionContext.VLM:
       return 'Select Vision Model';
+    case ModelSelectionContext.RagEmbedding:
+      return 'Select Embedding Model';
+    case ModelSelectionContext.RagLLM:
+      return 'Select LLM Model';
   }
 };
 
@@ -94,6 +100,10 @@ const _getRelevantCategories = (
       ]);
     case ModelSelectionContext.VLM:
       return new Set([ModelCategory.Multimodal, ModelCategory.Vision]);
+    case ModelSelectionContext.RagEmbedding:
+      return new Set([ModelCategory.Embedding]);
+    case ModelSelectionContext.RagLLM:
+      return new Set([ModelCategory.Language]);
   }
 };
 
@@ -114,8 +124,36 @@ const getCategoryForContext = (
       return null; // Show all
     case ModelSelectionContext.VLM:
       return SDKModelCategory.Multimodal; // 'multimodal'
+    case ModelSelectionContext.RagEmbedding:
+      return SDKModelCategory.Embedding; // 'embedding'
+    case ModelSelectionContext.RagLLM:
+      return SDKModelCategory.Language; // 'language'
   }
 };
+
+/**
+ * Get allowed frameworks for context.
+ * Returns null if all frameworks are acceptable.
+ */
+const getAllowedFrameworksForContext = (
+  context: ModelSelectionContext
+): Set<string> | null => {
+  switch (context) {
+    case ModelSelectionContext.RagEmbedding:
+      return new Set([LLMFramework.ONNX]);
+    case ModelSelectionContext.RagLLM:
+      return new Set([LLMFramework.LlamaCpp]);
+    default:
+      return null;
+  }
+};
+
+/**
+ * Whether this context is a RAG context (no model pre-loading needed)
+ */
+const isRAGContext = (context: ModelSelectionContext): boolean =>
+  context === ModelSelectionContext.RagEmbedding ||
+  context === ModelSelectionContext.RagLLM;
 
 /**
  * Framework info for display
@@ -238,15 +276,24 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       }
 
       // Filter models based on context (using category field)
-      // Check both enum string value and direct comparison
+      const allowedFrameworks = getAllowedFrameworksForContext(context);
+
       let filteredModels = categoryFilter
         ? allModels.filter((m: SDKModelInfo) => {
             const modelCategory = m.category;
-            const matches =
+            const categoryMatch =
               modelCategory === categoryFilter ||
               String(modelCategory).toLowerCase() ===
                 String(categoryFilter).toLowerCase();
-            return matches;
+            if (!categoryMatch) return false;
+
+            // Framework restriction (e.g., ONNX-only for embedding, LlamaCpp-only for RAG LLM)
+            if (allowedFrameworks) {
+              const fw = m.preferredFramework || m.compatibleFrameworks?.[0];
+              if (!fw || !allowedFrameworks.has(fw)) return false;
+            }
+
+            return true;
           })
         : allModels;
 
@@ -465,15 +512,18 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    */
   const handleSelectModel = async (model: SDKModelInfo) => {
     if (!model.isDownloaded && !model.localPath) {
-      // Model needs to be downloaded first
       return;
     }
 
-    // Don't show loading overlay - parent will close modal and show loading state
-    // Just call the callback and let parent handle the rest
     try {
-      await onModelSelected(model);
-      // Parent is responsible for closing the modal
+      if (isRAGContext(context)) {
+        // RAG models are referenced by file path at pipeline creation time,
+        // not pre-loaded into memory. Just pass the selection back and close.
+        await onModelSelected(model);
+        onClose();
+      } else {
+        await onModelSelected(model);
+      }
     } catch (error) {
       console.error('[ModelSelectionSheet] Error selecting model:', error);
     }

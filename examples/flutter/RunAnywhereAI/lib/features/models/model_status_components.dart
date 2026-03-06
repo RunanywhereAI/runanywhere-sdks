@@ -251,6 +251,10 @@ class ModelRequiredOverlay extends StatelessWidget {
         return Icons.mic;
       case ModelSelectionContext.vlm:
         return Icons.center_focus_strong;
+      case ModelSelectionContext.ragEmbedding:
+        return Icons.data_object;
+      case ModelSelectionContext.ragLLM:
+        return Icons.question_answer_outlined;
     }
   }
 
@@ -266,6 +270,10 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Voice Assistant';
       case ModelSelectionContext.vlm:
         return 'Vision Language Model';
+      case ModelSelectionContext.ragEmbedding:
+        return 'Document RAG';
+      case ModelSelectionContext.ragLLM:
+        return 'Document RAG';
     }
   }
 
@@ -281,6 +289,10 @@ class ModelRequiredOverlay extends StatelessWidget {
         return 'Voice assistant requires multiple models. Let\'s set them up together.';
       case ModelSelectionContext.vlm:
         return 'Select a vision-language model to analyze images. Point your camera or pick a photo to get AI descriptions.';
+      case ModelSelectionContext.ragEmbedding:
+        return 'Select an embedding model to encode document chunks for retrieval.';
+      case ModelSelectionContext.ragLLM:
+        return 'Select a language model to generate answers from retrieved document context.';
     }
   }
 }

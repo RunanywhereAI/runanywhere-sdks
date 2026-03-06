@@ -33,9 +33,9 @@ const logger = new SDKLogger('LlamaCppProvider');
 let _isRegistered = false;
 let _registeringPromise: Promise<void> | null = null;
 
-async function _doRegister(): Promise<void> {
+async function _doRegister(acceleration?: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
   const bridge = LlamaCppBridge.shared;
-  await bridge.ensureLoaded();
+  await bridge.ensureLoaded(acceleration);
 
   // Load llama.cpp struct offsets from the WASM module
   loadOffsets();
@@ -99,8 +99,10 @@ export const LlamaCppProvider = {
    * 3. Registers LLM model loader with ModelManager
    * 4. Registers all extension singletons with ExtensionRegistry
    * 5. Registers this backend with ExtensionPoint
+   *
+   * @param acceleration - Hardware acceleration strategy (default: 'auto').
    */
-  async register(): Promise<void> {
+  async register(acceleration?: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     if (_isRegistered) {
       logger.debug('LlamaCpp backend already registered, skipping');
       return;
@@ -111,7 +113,7 @@ export const LlamaCppProvider = {
       return _registeringPromise;
     }
 
-    _registeringPromise = _doRegister();
+    _registeringPromise = _doRegister(acceleration);
     try {
       await _registeringPromise;
     } finally {

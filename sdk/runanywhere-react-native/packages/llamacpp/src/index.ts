@@ -7,20 +7,21 @@
  * ## Usage
  *
  * ```typescript
- * import { RunAnywhere } from '@runanywhere/core';
- * import { LlamaCPP, LlamaCppProvider } from '@runanywhere/llamacpp';
+ * import { RunAnywhere, LLMFramework } from '@runanywhere/core';
+ * import { LlamaCPP } from '@runanywhere/llamacpp';
  *
  * // Initialize core SDK
  * await RunAnywhere.initialize({ apiKey: 'your-key' });
  *
- * // Register LlamaCPP backend (calls native rac_backend_llamacpp_register)
- * await LlamaCppProvider.register();
+ * // Register LlamaCPP backend
+ * LlamaCPP.register();
  *
- * // Add a model
- * LlamaCPP.addModel({
+ * // Register models via RunAnywhere (matching iOS pattern)
+ * await RunAnywhere.registerModel({
  *   id: 'smollm2-360m-q8_0',
  *   name: 'SmolLM2 360M Q8_0',
  *   url: 'https://huggingface.co/.../SmolLM2-360M.Q8_0.gguf',
+ *   framework: LLMFramework.LlamaCpp,
  *   memoryRequirement: 500_000_000
  * });
  *
@@ -37,7 +38,7 @@
 // Main API
 // =============================================================================
 
-export { LlamaCPP, type LlamaCPPModelOptions, type LlamaCPPVLMModelOptions } from './LlamaCPP';
+export { LlamaCPP } from './LlamaCPP';
 export { LlamaCppProvider, autoRegister } from './LlamaCppProvider';
 
 // =============================================================================

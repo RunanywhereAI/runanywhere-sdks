@@ -1,66 +1,24 @@
 /**
- * RunAnywhere Web SDK - VLM Types
+ * RunAnywhere Web SDK - VLM Types (LlamaCpp Backend)
  *
- * Type definitions for the Vision Language Model extension.
- * Extracted from RunAnywhere+VLM.ts for clean separation of concerns.
+ * Re-exports generic VLM types from core and adds backend-specific
+ * model family enum for llama.cpp architectures.
  */
 
-import { HardwareAcceleration } from '@runanywhere/web';
+// Re-export all generic VLM types from core
+export {
+  VLMImageFormat,
+  type VLMImage,
+  type VLMGenerationOptions,
+  type VLMGenerationResult,
+  type VLMStreamingResult,
+} from '@runanywhere/web';
 
-// ---------------------------------------------------------------------------
-// VLM Types
-// ---------------------------------------------------------------------------
-
-export enum VLMImageFormat {
-  FilePath = 0,
-  RGBPixels = 1,
-  Base64 = 2,
-}
-
+/** llama.cpp-specific VLM model architecture families. */
 export enum VLMModelFamily {
   Auto = 0,
   Qwen2VL = 1,
   SmolVLM = 2,
   LLaVA = 3,
   Custom = 99,
-}
-
-export interface VLMImage {
-  format: VLMImageFormat;
-  /** File path in WASM virtual FS (for FilePath format) */
-  filePath?: string;
-  /** Raw RGB pixel data (for RGBPixels format) */
-  pixelData?: Uint8Array;
-  /** Base64-encoded image (for Base64 format) */
-  base64Data?: string;
-  width?: number;
-  height?: number;
-}
-
-export interface VLMGenerationOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  systemPrompt?: string;
-  modelFamily?: VLMModelFamily;
-  streaming?: boolean;
-}
-
-export interface VLMGenerationResult {
-  text: string;
-  promptTokens: number;
-  imageTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  timeToFirstTokenMs: number;
-  imageEncodeTimeMs: number;
-  totalTimeMs: number;
-  tokensPerSecond: number;
-  hardwareUsed: HardwareAcceleration;
-}
-
-export interface VLMStreamingResult {
-  result: Promise<VLMGenerationResult>;
-  tokens: AsyncIterable<string>;
-  cancel: () => void;
 }
