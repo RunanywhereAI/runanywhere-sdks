@@ -92,6 +92,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
                         ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
                         ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
+                        ModelFormat.QNN_CONTEXT -> CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT
                         else -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
                     },
                 // CRITICAL: Map InferenceFramework to C++ framework constant
@@ -295,6 +296,7 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
                 CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
                 CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
                 CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+                CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
                 else -> ModelFormat.UNKNOWN
             },
         framework =
@@ -1346,6 +1348,7 @@ private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
                                 1 -> ModelFormat.GGUF
                                 2 -> ModelFormat.ONNX
                                 3 -> ModelFormat.ORT
+                                5 -> ModelFormat.QNN_CONTEXT
                                 else -> ModelFormat.UNKNOWN
                             },
                         framework =
