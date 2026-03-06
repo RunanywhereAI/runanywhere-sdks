@@ -24,11 +24,8 @@
 #include "rac/core/rac_logger.h"
 
 #if SHERPA_ONNX_AVAILABLE
-extern "C" {
-    int espeak_Initialize(int output, int buflength, const char *path, int options);
-    int espeak_SetVoiceByName(const char *name);
-}
-#define ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS 0x0003
+// espeak-ng reinitialization is handled by destroying and recreating
+// the SherpaOnnxOfflineTts instance via the sherpa-onnx C API.
 #endif
 
 namespace runanywhere {
@@ -966,26 +963,15 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         return false;
     }
 
-    sherpa_tts_ = new_tts;
-
-    // Force espeak-ng to use THIS model's data_dir.
-    // Sherpa-ONNX uses std::once_flag for espeak_Initialize, so only the first
-    // model loaded gets its data_dir registered. Re-calling espeak_Initialize
-    // directly resets the internal path_home to the current model's directory.
-    if (!espeak_data_dir_.empty()) {
-        int reinit = espeak_Initialize(ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS, 0, espeak_data_dir_.c_str(), 0);
-        RAC_LOG_INFO("ONNX.TTS", "espeak_Initialize override: result=%d (expected 22050), data_dir=%s",
-            reinit, espeak_data_dir_.c_str());
-
-        if (reinit == 22050) {
-            int voice_test = espeak_SetVoiceByName("en-us");
-            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-us') test: result=%d (0=success)", voice_test);
-            int voice_test_gb = espeak_SetVoiceByName("en-gb");
-            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-gb') test: result=%d (0=success)", voice_test_gb);
-        } else {
-            RAC_LOG_ERROR("ONNX.TTS", "espeak_Initialize override FAILED with code %d", reinit);
-        }
+    // Workaround for sherpa-onnx std::once_flag issue: espeak_Initialize is
+    // only called internally on the very first SherpaOnnxCreateOfflineTts call.
+    // When switching TTS models with different data_dir, destroy and recreate
+    // the instance so the config (including data_dir) is applied correctly.
+    if (sherpa_tts_ && sherpa_tts_ != new_tts) {
+        SherpaOnnxDestroyOfflineTts(sherpa_tts_);
+        sherpa_tts_ = nullptr;
     }
+    sherpa_tts_ = new_tts;
 
     sample_rate_ = SherpaOnnxOfflineTtsSampleRate(sherpa_tts_);
     int num_speakers = SherpaOnnxOfflineTtsNumSpeakers(sherpa_tts_);

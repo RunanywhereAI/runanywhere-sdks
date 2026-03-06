@@ -14,11 +14,13 @@
  *   4. Invoke user's complete_callback with final model path
  */
 
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <dirent.h>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <sys/stat.h>
 #include <vector>
@@ -572,8 +574,24 @@ rac_result_t rac_download_orchestrate_multi(
         return start_result;
     }
 
-    // Download each file sequentially
-    bool any_failed = false;
+    // Shared state for async completion barrier across all file downloads.
+    // Each launched download increments pending; its callback decrements and notifies.
+    // After the loop we wait until all in-flight downloads have reported back.
+    struct multi_download_barrier {
+        std::mutex mtx;
+        std::condition_variable cv;
+        int pending{0};
+        bool any_required_failed{false};
+    };
+    auto barrier = std::make_shared<multi_download_barrier>();
+
+    // Per-file context passed through the C callback void*.
+    struct multi_file_holder {
+        std::shared_ptr<multi_download_barrier> barrier;
+        bool is_required;
+    };
+
+    bool launch_failed = false;
     for (size_t i = 0; i < file_count; ++i) {
         const rac_model_file_descriptor_t& file = files[i];
 
@@ -596,49 +614,36 @@ rac_result_t rac_download_orchestrate_multi(
             mkdir_p(dest_path.substr(0, last_slash).c_str());
         }
 
-        // For multi-file, download synchronously via platform adapter
-        // Update progress proportionally
-        double file_progress_start = static_cast<double>(i) / static_cast<double>(file_count);
-        double file_progress_end =
-            static_cast<double>(i + 1) / static_cast<double>(file_count);
-
         // Update download manager with file-level progress
-        int64_t fake_downloaded = static_cast<int64_t>(file_progress_start * 100);
+        int64_t fake_downloaded = static_cast<int64_t>(
+            static_cast<double>(i) / static_cast<double>(file_count) * 100);
         rac_download_manager_update_progress(dm_handle, task_id, fake_downloaded, 100);
 
-        // Start HTTP download for this file
-        // Note: Multi-file downloads are sequential — each file completes before next starts.
-        // For now we use the platform adapter's synchronous path.
-        char* http_task_id = nullptr;
+        // Increment pending count *before* launching so the barrier is always ahead of callbacks
+        {
+            std::lock_guard<std::mutex> lk(barrier->mtx);
+            barrier->pending++;
+        }
 
-        // For multi-file we need a simpler blocking approach.
-        // Use shared_ptr to prevent double-free if callback fires unexpectedly.
-        struct multi_file_ctx {
-            bool completed;
-            rac_result_t result;
-            std::string downloaded_path;
-        };
+        auto* file_holder = new multi_file_holder{barrier, file.is_required == RAC_TRUE};
 
-        auto file_ctx = std::make_shared<multi_file_ctx>(multi_file_ctx{false, RAC_SUCCESS, ""});
-
-        // Wrap in a raw holder for C callback void* — callback takes ownership of the holder
-        struct multi_file_holder {
-            std::shared_ptr<multi_file_ctx> ctx;
-        };
-        auto* file_holder = new multi_file_holder{file_ctx};
-
-        auto file_complete = [](rac_result_t result, const char* path, void* ud) {
+        auto file_complete = [](rac_result_t result, const char* /*path*/, void* ud) {
             auto* holder = static_cast<multi_file_holder*>(ud);
-            if (!holder || !holder->ctx) {
-                delete holder;
-                return;
-            }
-            holder->ctx->completed = true;
-            holder->ctx->result = result;
-            if (path) holder->ctx->downloaded_path = path;
+            if (!holder) return;
+
+            auto b = holder->barrier;
+            bool required = holder->is_required;
             delete holder;
+
+            std::lock_guard<std::mutex> lk(b->mtx);
+            if (result != RAC_SUCCESS && required) {
+                b->any_required_failed = true;
+            }
+            b->pending--;
+            b->cv.notify_all();
         };
 
+        char* http_task_id = nullptr;
         rac_result_t http_result = rac_http_download(
             file_url.c_str(), dest_path.c_str(), nullptr /* no per-file progress */, file_complete,
             file_holder, &http_task_id);
@@ -646,27 +651,40 @@ rac_result_t rac_download_orchestrate_multi(
         if (http_task_id) rac_free(http_task_id);
 
         if (http_result != RAC_SUCCESS) {
+            // Download never started — callback won't fire, so clean up manually
+            delete file_holder;
+            {
+                std::lock_guard<std::mutex> lk(barrier->mtx);
+                barrier->pending--;  // undo the pre-increment
+            }
+
             if (file.is_required == RAC_TRUE) {
-                any_failed = true;
                 RAC_LOG_ERROR(LOG_TAG, "Required file download failed to start: %s",
                               file.relative_path);
-                // Download never started, so callback won't fire — delete holder safely
-                delete file_holder;
+                launch_failed = true;
                 break;
             }
             RAC_LOG_WARNING(LOG_TAG, "Optional file download failed to start: %s",
                             file.relative_path);
-            // Download never started, so callback won't fire — delete holder safely
-            delete file_holder;
             continue;
         }
 
-        // Download started — async callback will delete file_holder
+        // Download started — async callback owns file_holder
     }
+
+    // Wait for all in-flight downloads to complete before reporting final status
+    {
+        std::unique_lock<std::mutex> lk(barrier->mtx);
+        barrier->cv.wait(lk, [&barrier] { return barrier->pending == 0; });
+    }
+
+    bool any_failed = launch_failed || barrier->any_required_failed;
 
     if (any_failed) {
         rac_download_manager_mark_failed(dm_handle, task_id, RAC_ERROR_DOWNLOAD_FAILED,
                                          "One or more required files failed to download");
+        *out_task_id = task_id;
+        return RAC_ERROR_DOWNLOAD_FAILED;
     } else {
         // Update final progress
         rac_download_manager_update_progress(dm_handle, task_id, 100, 100);

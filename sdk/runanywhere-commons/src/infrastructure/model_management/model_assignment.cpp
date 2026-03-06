@@ -188,6 +188,7 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
         model->name = strdup(name.c_str());
         if (!model->id || !model->name) {
             rac_model_info_free(model);
+            pos = obj_end;
             continue;
         }
         model->download_url = download_url.empty() ? nullptr : strdup(download_url.c_str());

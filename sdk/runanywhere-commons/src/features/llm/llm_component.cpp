@@ -223,9 +223,14 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
 
-    // Destroy lifecycle manager (will cleanup service if loaded)
-    if (component->lifecycle) {
-        rac_lifecycle_destroy(component->lifecycle);
+    // Acquire component mutex to serialize against in-flight operations.
+    // lifecycle_destroy -> unload will block until any acquired services are released.
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
+        if (component->lifecycle) {
+            rac_lifecycle_destroy(component->lifecycle);
+            component->lifecycle = nullptr;
+        }
     }
 
     log_info("LLM.Component", "LLM component destroyed");
@@ -771,13 +776,14 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
 
-    // Do NOT acquire component->mtx here. generate_stream() holds the mutex
-    // for the entire streaming duration, so locking here would deadlock until
-    // generation finishes — defeating the purpose of cancel.
-    // rac_llm_cancel() ultimately sets an atomic bool, which is safe without the lock.
-    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
-    if (service) {
+    // Use acquire/release to pin the service for the duration of the cancel call,
+    // preventing use-after-free if destroy races with cancel.
+    // Do NOT acquire component->mtx — generate_stream() holds it during streaming.
+    rac_handle_t service = nullptr;
+    rac_result_t acq = rac_lifecycle_acquire_service(component->lifecycle, &service);
+    if (acq == RAC_SUCCESS && service) {
         rac_llm_cancel(service);
+        rac_lifecycle_release_service(component->lifecycle);
     }
 
     log_info("LLM.Component", "Generation cancellation requested");

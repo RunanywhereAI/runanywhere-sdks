@@ -13,6 +13,7 @@
 #include <cstring>
 #include <mutex>
 #include <new>
+#include <thread>
 
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
@@ -47,6 +48,10 @@ void emit_voice_agent_all_ready();
 struct rac_voice_agent {
     // State — atomic so is_ready() checks don't need the mutex
     std::atomic<bool> is_configured{false};
+
+    // Shutdown barrier — prevents use-after-free on destroy
+    std::atomic<bool> is_shutting_down{false};
+    std::atomic<int> in_flight{0};
 
     // Whether we own the component handles (and should destroy them)
     bool owns_components;
@@ -237,12 +242,17 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
         return;
     }
 
+    // Signal shutdown and wait for all in-flight operations (including lock-free ones)
+    handle->is_shutting_down.store(true, std::memory_order_release);
+    handle->is_configured.store(false, std::memory_order_release);
+
+    // Spin-wait until all in-flight operations complete
+    while (handle->in_flight.load(std::memory_order_acquire) > 0) {
+        std::this_thread::yield();
+    }
+
     {
-        // Acquire mutex so any in-flight process_voice_turn / process_stream
-        // finishes before we tear down components. Setting is_configured=false
-        // ensures new callers return immediately after we release.
         std::lock_guard<std::mutex> lock(handle->mutex);
-        handle->is_configured.store(false, std::memory_order_release);
 
         if (handle->owns_components) {
             RAC_LOG_DEBUG("VoiceAgent", "Destroying owned component handles");
@@ -909,10 +919,23 @@ rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle, cons
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // Check shutdown barrier (this is a lock-free path)
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        return RAC_ERROR_INVALID_STATE;
+    }
+    handle->in_flight.fetch_add(1, std::memory_order_acq_rel);
+
+    // Re-check after incrementing to avoid TOCTOU with destroy
+    if (handle->is_shutting_down.load(std::memory_order_acquire)) {
+        handle->in_flight.fetch_sub(1, std::memory_order_acq_rel);
+        return RAC_ERROR_INVALID_STATE;
+    }
+
     // VAD doesn't require is_configured (mirrors Swift)
     rac_result_t result =
         rac_vad_component_process(handle->vad_handle, samples, sample_count, out_speech_detected);
 
+    handle->in_flight.fetch_sub(1, std::memory_order_acq_rel);
     return result;
 }
 

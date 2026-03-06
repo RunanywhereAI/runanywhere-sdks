@@ -60,8 +60,13 @@ static rac_result_t posixDeletePath(const char* path, int recursive, void* /*use
     if (!path) return RAC_ERROR_NULL_POINTER;
 
     struct stat st;
-    if (stat(path, &st) != 0) {
+    if (lstat(path, &st) != 0) {
         return RAC_SUCCESS; // Already gone
+    }
+
+    // Handle symlinks: remove the link itself, don't follow it
+    if (S_ISLNK(st.st_mode)) {
+        return unlink(path) == 0 ? RAC_SUCCESS : RAC_ERROR_FILE_IO;
     }
 
     if (S_ISDIR(st.st_mode)) {

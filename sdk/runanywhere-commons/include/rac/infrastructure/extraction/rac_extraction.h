@@ -48,11 +48,19 @@ typedef struct rac_extraction_options {
 /**
  * @brief Default extraction options.
  */
+#ifdef __cplusplus
+inline constexpr rac_extraction_options_t RAC_EXTRACTION_OPTIONS_DEFAULT = {
+    RAC_TRUE,             /* skip_macos_resources */
+    RAC_FALSE,            /* skip_symlinks */
+    RAC_ARCHIVE_TYPE_NONE /* archive_type_hint */
+};
+#else
 static const rac_extraction_options_t RAC_EXTRACTION_OPTIONS_DEFAULT = {
     RAC_TRUE,             /* skip_macos_resources */
     RAC_FALSE,            /* skip_symlinks */
     RAC_ARCHIVE_TYPE_NONE /* archive_type_hint */
 };
+#endif
 
 // =============================================================================
 // EXTRACTION RESULT

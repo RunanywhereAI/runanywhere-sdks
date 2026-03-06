@@ -37,15 +37,26 @@ static const char* kLogTag = "Extraction";
 static bool is_path_safe(const char* pathname) {
     if (!pathname || pathname[0] == '\0') return false;
 
-    // Reject absolute paths
+    // Reject absolute paths (Unix)
     if (pathname[0] == '/') return false;
 
-    // Reject paths containing ".." components
+    // Reject Windows UNC paths (\\server\share)
+    if (pathname[0] == '\\' && pathname[1] == '\\') return false;
+
+    // Reject Windows drive letters (C:, D:, etc.)
+    if (((pathname[0] >= 'A' && pathname[0] <= 'Z') ||
+         (pathname[0] >= 'a' && pathname[0] <= 'z')) &&
+        pathname[1] == ':') {
+        return false;
+    }
+
+    // Normalize and check for ".." components (handle both / and \ separators)
     const char* p = pathname;
     while (*p) {
         if (p[0] == '.' && p[1] == '.') {
-            // ".." at start, after "/" , or at end
-            if ((p == pathname || *(p - 1) == '/') && (p[2] == '/' || p[2] == '\0')) {
+            bool at_start = (p == pathname || *(p - 1) == '/' || *(p - 1) == '\\');
+            bool at_end = (p[2] == '/' || p[2] == '\\' || p[2] == '\0');
+            if (at_start && at_end) {
                 return false;
             }
         }
@@ -237,9 +248,16 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
         std::string full_path = dest_dir + pathname;
         archive_entry_set_pathname(entry, full_path.c_str());
 
-        // Also rewrite hardlink paths if present
+        // Also rewrite hardlink paths if present (with safety check)
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink && hardlink[0] != '\0') {
+            if (!is_path_safe(hardlink)) {
+                RAC_LOG_WARNING(kLogTag, "Skipping unsafe hardlink target: %s -> %s", pathname,
+                                hardlink);
+                result.entries_skipped++;
+                archive_read_data_skip(a);
+                continue;
+            }
             std::string full_hardlink = dest_dir + hardlink;
             archive_entry_set_hardlink(entry, full_hardlink.c_str());
         }

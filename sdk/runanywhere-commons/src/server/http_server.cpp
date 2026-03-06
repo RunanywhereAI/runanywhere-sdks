@@ -71,8 +71,9 @@ rac_result_t HttpServer::start(const rac_server_config_t& config) {
             return RAC_ERROR_INVALID_ARGUMENT;
         }
 
-        // Check if model file exists
-        if (!std::filesystem::exists(config.model_path)) {
+        // Check if model file exists (use error_code overload to avoid exceptions)
+        std::error_code ec;
+        if (!std::filesystem::exists(config.model_path, ec) || ec) {
             RAC_LOG_ERROR("Server", "Model file not found: %s", config.model_path);
             return RAC_ERROR_SERVER_MODEL_NOT_FOUND;
         }
@@ -372,27 +373,56 @@ RAC_API rac_result_t rac_server_start(const rac_server_config_t* config) {
     if (!config) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    return rac::server::HttpServer::instance().start(*config);
+    try {
+        return rac::server::HttpServer::instance().start(*config);
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("Server", "Failed to start: %s", e.what());
+        return RAC_ERROR_INTERNAL;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
 }
 
 RAC_API rac_result_t rac_server_stop(void) {
-    return rac::server::HttpServer::instance().stop();
+    try {
+        return rac::server::HttpServer::instance().stop();
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("Server", "Failed to stop: %s", e.what());
+        return RAC_ERROR_INTERNAL;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
 }
 
 RAC_API rac_bool_t rac_server_is_running(void) {
-    return rac::server::HttpServer::instance().isRunning() ? RAC_TRUE : RAC_FALSE;
+    try {
+        return rac::server::HttpServer::instance().isRunning() ? RAC_TRUE : RAC_FALSE;
+    } catch (...) {
+        return RAC_FALSE;
+    }
 }
 
 RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status) {
     if (!status) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    rac::server::HttpServer::instance().getStatus(*status);
-    return RAC_SUCCESS;
+    try {
+        rac::server::HttpServer::instance().getStatus(*status);
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR("Server", "Failed to get status: %s", e.what());
+        return RAC_ERROR_INTERNAL;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
 }
 
 RAC_API int rac_server_wait(void) {
-    return rac::server::HttpServer::instance().wait();
+    try {
+        return rac::server::HttpServer::instance().wait();
+    } catch (...) {
+        return -1;
+    }
 }
 
 RAC_API void rac_server_set_request_callback(rac_server_request_callback_fn callback,

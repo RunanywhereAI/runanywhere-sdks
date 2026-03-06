@@ -9,6 +9,7 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -42,8 +43,8 @@ struct rac_vad_component {
     rac_vad_audio_callback_fn audio_callback;
     void* audio_user_data;
 
-    /** Initialization state */
-    bool is_initialized;
+    /** Initialization state (atomic for lock-free query from callbacks) */
+    std::atomic<bool> is_initialized;
 
     /** Mutex for thread safety */
     std::mutex mtx;
@@ -181,8 +182,7 @@ extern "C" rac_bool_t rac_vad_component_is_initialized(rac_handle_t handle) {
         return RAC_FALSE;
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
-    return component->is_initialized ? RAC_TRUE : RAC_FALSE;
+    return component->is_initialized.load(std::memory_order_acquire) ? RAC_TRUE : RAC_FALSE;
 }
 
 extern "C" rac_result_t rac_vad_component_initialize(rac_handle_t handle) {
@@ -479,13 +479,8 @@ extern "C" rac_lifecycle_state_t rac_vad_component_get_state(rac_handle_t handle
         return RAC_LIFECYCLE_STATE_IDLE;
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
-
-    if (component->is_initialized) {
-        return RAC_LIFECYCLE_STATE_LOADED;
-    }
-
-    return RAC_LIFECYCLE_STATE_IDLE;
+    return component->is_initialized.load(std::memory_order_acquire) ? RAC_LIFECYCLE_STATE_LOADED
+                                                                      : RAC_LIFECYCLE_STATE_IDLE;
 }
 
 extern "C" rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,

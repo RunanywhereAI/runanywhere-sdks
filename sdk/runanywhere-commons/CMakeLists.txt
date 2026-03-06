@@ -198,6 +198,11 @@ set(_SAVED_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(libarchive)
 set(BUILD_SHARED_LIBS ${_SAVED_BUILD_SHARED_LIBS})
+
+if(TARGET bz2_bundled AND TARGET archive_static)
+    target_link_libraries(archive_static bz2_bundled)
+endif()
+
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
 # =============================================================================

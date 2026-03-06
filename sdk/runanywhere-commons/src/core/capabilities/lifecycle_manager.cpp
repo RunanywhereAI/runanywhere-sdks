@@ -60,6 +60,10 @@ struct LifecycleManager {
     // Thread safety
     std::mutex mutex{};
 
+    // Service pinning (acquire/release) — prevents unload while service is in use
+    std::atomic<int> service_refcount{0};
+    std::condition_variable service_cv{};
+
     LifecycleManager() {
         // Set start time (mirrors Swift's startTime = Date())
         auto now = std::chrono::system_clock::now();
@@ -225,13 +229,45 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
     return result;
 }
 
+rac_result_t rac_lifecycle_acquire_service(rac_handle_t handle, rac_handle_t* out_service) {
+    if (handle == nullptr || out_service == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* mgr = static_cast<LifecycleManager*>(handle);
+    std::lock_guard<std::mutex> lock(mgr->mutex);
+
+    if (mgr->state.load() != RAC_LIFECYCLE_STATE_LOADED || mgr->current_service.load() == nullptr) {
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    mgr->service_refcount.fetch_add(1);
+    *out_service = mgr->current_service.load();
+    return RAC_SUCCESS;
+}
+
+void rac_lifecycle_release_service(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return;
+    }
+
+    auto* mgr = static_cast<LifecycleManager*>(handle);
+    int prev = mgr->service_refcount.fetch_sub(1);
+    if (prev <= 1) {
+        mgr->service_cv.notify_all();
+    }
+}
+
 rac_result_t rac_lifecycle_unload(rac_handle_t handle) {
     if (handle == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
-    std::lock_guard<std::mutex> lock(mgr->mutex);
+    std::unique_lock<std::mutex> lock(mgr->mutex);
+
+    // Wait for all acquired services to be released
+    mgr->service_cv.wait(lock, [mgr] { return mgr->service_refcount.load() == 0; });
 
     // Mirrors Swift: if let modelId = await lifecycle.currentResourceId
     if (!mgr->current_model_id.empty()) {
@@ -269,7 +305,10 @@ rac_result_t rac_lifecycle_reset(rac_handle_t handle) {
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
-    std::lock_guard<std::mutex> lock(mgr->mutex);
+    std::unique_lock<std::mutex> lock(mgr->mutex);
+
+    // Wait for all acquired services to be released
+    mgr->service_cv.wait(lock, [mgr] { return mgr->service_refcount.load() == 0; });
 
     // Track unload if currently loaded (mirrors Swift reset())
     if (!mgr->current_model_id.empty()) {

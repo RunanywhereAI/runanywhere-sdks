@@ -71,7 +71,11 @@ rac_result_t rac_vad_analytics_create(rac_vad_analytics_handle_t* out_handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
-    *out_handle = new (std::nothrow) rac_vad_analytics_s();
+    try {
+        *out_handle = new (std::nothrow) rac_vad_analytics_s();
+    } catch (...) {
+        *out_handle = nullptr;
+    }
     if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }

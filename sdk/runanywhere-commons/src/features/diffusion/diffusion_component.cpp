@@ -396,8 +396,8 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
         // Reset cancellation flag (also atomic, but set under lock for consistency)
         component->cancel_requested = false;
 
-        // Get service from lifecycle manager
-        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        // Pin service via acquire to prevent unload during generation
+        rac_result_t result = rac_lifecycle_acquire_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
             return result;
@@ -417,6 +417,9 @@ extern "C" rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
 
     // Perform generation outside lock
     rac_result_t result = rac_diffusion_generate(service, &effective_options, out_result);
+
+    // Release pinned service in all exit paths
+    rac_lifecycle_release_service(component->lifecycle);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Generation failed: %d", result);
@@ -491,8 +494,8 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
         // Reset cancellation flag
         component->cancel_requested = false;
 
-        // Get service from lifecycle manager
-        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        // Pin service via acquire to prevent unload during generation
+        rac_result_t result = rac_lifecycle_acquire_service(component->lifecycle, &service);
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("Diffusion.Component", "No model loaded - cannot generate");
             if (error_callback) {
@@ -525,6 +528,9 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
     rac_diffusion_result_t gen_result = {};
     rac_result_t result = rac_diffusion_generate_with_progress(service, &effective_options,
                                                                diffusion_progress_wrapper, &ctx, &gen_result);
+
+    // Release pinned service in all exit paths
+    rac_lifecycle_release_service(component->lifecycle);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Generation failed: %d", result);

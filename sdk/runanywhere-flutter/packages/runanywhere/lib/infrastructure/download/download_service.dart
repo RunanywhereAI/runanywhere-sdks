@@ -348,8 +348,8 @@ class ModelDownloadService {
       'rac_extract_archive_native',
     );
 
-    final archivePathPtr = archivePath.toNativeUtf8();
-    final destPathPtr = destDir.toNativeUtf8();
+    final archivePathPtr = archivePath.toNativeUtf8(allocator: calloc);
+    final destPathPtr = destDir.toNativeUtf8(allocator: calloc);
 
     try {
       final result = extractFn(
@@ -363,7 +363,7 @@ class ModelDownloadService {
 
       if (result != 0) {
         _logger.error('Native extraction failed with code: $result');
-        return archivePath;
+        throw DownloadException('Native extraction failed with code: $result');
       }
     } finally {
       calloc.free(archivePathPtr);

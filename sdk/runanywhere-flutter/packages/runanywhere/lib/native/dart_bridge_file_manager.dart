@@ -397,7 +397,7 @@ int _listDirectoryCallback(
 
     final entries = calloc<Pointer<Utf8>>(count);
     for (var i = 0; i < count; i++) {
-      final name = contents[i].uri.pathSegments.last;
+      final name = contents[i].uri.pathSegments.lastWhere((s) => s.isNotEmpty);
       entries[i] = name.toNativeUtf8();
     }
 
