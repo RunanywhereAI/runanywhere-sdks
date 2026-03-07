@@ -833,7 +833,6 @@ int _listDirectoryCallback(
 
     // Allocate array of string pointers
     final entriesPtr = calloc<Pointer<Utf8>>(entries.length);
-    final entriesPtr = malloc<Pointer<Utf8>>(entries.length);
     for (var i = 0; i < entries.length; i++) {
       entriesPtr[i] = entries[i].toNativeUtf8();
     }
