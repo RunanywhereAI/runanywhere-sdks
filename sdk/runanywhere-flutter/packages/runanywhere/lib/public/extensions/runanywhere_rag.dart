@@ -7,13 +7,9 @@
 /// with initialization guards, event publishing, and typed error conversion.
 library runanywhere_rag;
 
-import 'dart:ffi';
-
-import 'package:ffi/ffi.dart';
-
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
-import 'package:runanywhere/native/dart_bridge_rag.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/dart_bridge_rag.dart'
+    hide RAGConfiguration, RAGQueryOptions, RAGSearchResult, RAGResult;
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
@@ -41,8 +37,8 @@ extension RunAnywhereRAG on RunAnywhere {
 
   /// Create the RAG pipeline with the given configuration.
   ///
-  /// Marshals [config] to a native [RacRagConfigStruct] via FFI, calls
-  /// [DartBridgeRAG.createPipeline], then publishes [SDKRAGEvent.pipelineCreated].
+  /// Passes [config] to [DartBridgeRAG.createPipeline] which handles
+  /// all FFI marshaling internally, then publishes [SDKRAGEvent.pipelineCreated].
   ///
   /// Throws [SDKError.notInitialized] if SDK is not initialized.
   /// Throws [SDKError.invalidState] if pipeline creation fails.
@@ -57,39 +53,13 @@ extension RunAnywhereRAG on RunAnywhere {
       );
     }
 
-    final embeddingModelPathPtr = config.embeddingModelPath.toNativeUtf8();
-    final llmModelPathPtr = config.llmModelPath.toNativeUtf8();
-    final promptTemplatePtr = config.promptTemplate?.toNativeUtf8();
-    final embeddingConfigJsonPtr = config.embeddingConfigJSON?.toNativeUtf8();
-    final llmConfigJsonPtr = config.llmConfigJSON?.toNativeUtf8();
-    final configPtr = calloc<RacRagConfigStruct>();
-
     try {
-      configPtr.ref.embeddingModelPath = embeddingModelPathPtr;
-      configPtr.ref.llmModelPath = llmModelPathPtr;
-      configPtr.ref.embeddingDimension = config.embeddingDimension;
-      configPtr.ref.topK = config.topK;
-      configPtr.ref.similarityThreshold = config.similarityThreshold;
-      configPtr.ref.maxContextTokens = config.maxContextTokens;
-      configPtr.ref.chunkSize = config.chunkSize;
-      configPtr.ref.chunkOverlap = config.chunkOverlap;
-      configPtr.ref.promptTemplate = promptTemplatePtr ?? nullptr;
-      configPtr.ref.embeddingConfigJson = embeddingConfigJsonPtr ?? nullptr;
-      configPtr.ref.llmConfigJson = llmConfigJsonPtr ?? nullptr;
-
-      DartBridgeRAG.shared.createPipeline(config: configPtr);
+      DartBridgeRAG.shared.createPipeline(config);
 
       EventBus.shared.publish(SDKRAGEvent.pipelineCreated());
     } catch (e) {
       EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
       throw SDKError.invalidState('RAG pipeline creation failed: $e');
-    } finally {
-      calloc.free(embeddingModelPathPtr);
-      calloc.free(llmModelPathPtr);
-      if (promptTemplatePtr != null) calloc.free(promptTemplatePtr);
-      if (embeddingConfigJsonPtr != null) calloc.free(embeddingConfigJsonPtr);
-      if (llmConfigJsonPtr != null) calloc.free(llmConfigJsonPtr);
-      calloc.free(configPtr);
     }
   }
 
@@ -103,7 +73,7 @@ extension RunAnywhereRAG on RunAnywhere {
       throw SDKError.notInitialized();
     }
 
-    DartBridgeRAG.shared.destroy();
+    DartBridgeRAG.shared.destroyPipeline();
     EventBus.shared.publish(SDKRAGEvent.pipelineDestroyed());
   }
 
@@ -132,7 +102,7 @@ extension RunAnywhereRAG on RunAnywhere {
     final stopwatch = Stopwatch()..start();
 
     try {
-      DartBridgeRAG.shared.addDocument(text, metadataJSON: metadataJSON);
+      DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJSON);
 
       stopwatch.stop();
 
@@ -210,16 +180,23 @@ extension RunAnywhereRAG on RunAnywhere {
     );
 
     try {
-      final bridgeResult = DartBridgeRAG.shared.query(
-        question,
-        systemPrompt: options?.systemPrompt,
-        maxTokens: options?.maxTokens ?? 512,
-        temperature: options?.temperature ?? 0.7,
-        topP: options?.topP ?? 0.9,
-        topK: options?.topK ?? 40,
-      );
+      final queryOptions = options ??
+          RAGQueryOptions(question: question);
 
-      final result = RAGResult.fromBridge(bridgeResult);
+      // If caller provided options but with a different question field,
+      // create a new options with the positional question.
+      final effectiveOptions = queryOptions.question == question
+          ? queryOptions
+          : RAGQueryOptions(
+              question: question,
+              systemPrompt: queryOptions.systemPrompt,
+              maxTokens: queryOptions.maxTokens,
+              temperature: queryOptions.temperature,
+              topP: queryOptions.topP,
+              topK: queryOptions.topK,
+            );
+
+      final result = DartBridgeRAG.shared.query(effectiveOptions);
 
       EventBus.shared.publish(
         SDKRAGEvent.queryComplete(

@@ -4,8 +4,6 @@
 /// Mirrors iOS RAGTypes.swift adapted for Flutter/Dart.
 library rag_types;
 
-import 'package:runanywhere/native/dart_bridge_rag.dart';
-
 // MARK: - RAGConfiguration
 
 /// Configuration for the RAG pipeline.
@@ -135,18 +133,6 @@ class RAGSearchResult {
     this.metadataJSON,
   });
 
-  /// Create from a bridge search result.
-  ///
-  /// Converts empty metadataJson strings to null.
-  factory RAGSearchResult.fromBridge(RAGBridgeSearchResult bridge) {
-    return RAGSearchResult(
-      chunkId: bridge.chunkId,
-      text: bridge.text,
-      similarityScore: bridge.similarityScore,
-      metadataJSON: bridge.metadataJson.isEmpty ? null : bridge.metadataJson,
-    );
-  }
-
   @override
   String toString() {
     return 'RAGSearchResult(chunkId: $chunkId, score: $similarityScore)';
@@ -187,24 +173,6 @@ class RAGResult {
     required this.generationTimeMs,
     required this.totalTimeMs,
   });
-
-  /// Create from a bridge result.
-  ///
-  /// Converts the bridge's [RAGBridgeResult] to public [RAGResult],
-  /// mapping each chunk through [RAGSearchResult.fromBridge].
-  /// Empty contextUsed strings are converted to null.
-  factory RAGResult.fromBridge(RAGBridgeResult bridge) {
-    return RAGResult(
-      answer: bridge.answer,
-      retrievedChunks: bridge.retrievedChunks
-          .map(RAGSearchResult.fromBridge)
-          .toList(growable: false),
-      contextUsed: bridge.contextUsed.isEmpty ? null : bridge.contextUsed,
-      retrievalTimeMs: bridge.retrievalTimeMs,
-      generationTimeMs: bridge.generationTimeMs,
-      totalTimeMs: bridge.totalTimeMs,
-    );
-  }
 
   @override
   String toString() {

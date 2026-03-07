@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +9,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 /// Model path utilities bridge.
 /// Wraps C++ rac_model_paths.h functions.

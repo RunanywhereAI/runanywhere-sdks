@@ -363,7 +363,7 @@ class ModelDownloadService {
 
       if (result != 0) {
         _logger.error('Native extraction failed with code: $result');
-        throw DownloadException('Native extraction failed with code: $result');
+        throw Exception('Native extraction failed with code: $result');
       }
     } finally {
       calloc.free(archivePathPtr);

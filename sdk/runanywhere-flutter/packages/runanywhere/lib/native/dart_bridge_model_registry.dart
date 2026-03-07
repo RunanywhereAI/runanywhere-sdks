@@ -833,6 +833,7 @@ int _listDirectoryCallback(
 
     // Allocate array of string pointers
     final entriesPtr = calloc<Pointer<Utf8>>(entries.length);
+    final entriesPtr = malloc<Pointer<Utf8>>(entries.length);
     for (var i = 0; i < entries.length; i++) {
       entriesPtr[i] = entries[i].toNativeUtf8();
     }
@@ -847,9 +848,9 @@ int _listDirectoryCallback(
 void _freeEntriesCallback(
     Pointer<Pointer<Utf8>> entries, int count, Pointer<Void> userData) {
   for (var i = 0; i < count; i++) {
-    if (entries[i] != nullptr) calloc.free(entries[i]);
+    if (entries[i] != nullptr) malloc.free(entries[i]);
   }
-  calloc.free(entries);
+  malloc.free(entries);
 }
 
 int _isDirectoryCallback(Pointer<Utf8> path, Pointer<Void> userData) {

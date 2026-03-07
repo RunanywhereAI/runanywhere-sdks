@@ -81,21 +81,23 @@ class DartBridgeFileManager {
 
   /// Create directory structure (Models, Cache, Temp, Downloads).
   static bool createDirectoryStructure() {
-    final fn = _lookup<Int32 Function(Pointer<RacFileCallbacksStruct>),
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
         int Function(Pointer<RacFileCallbacksStruct>)>(
         'rac_file_manager_create_directory_structure');
-    if (fn == null || _callbacksPtr == null) return false;
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
 
   /// Calculate directory size recursively.
   static int calculateDirectorySize(String path) {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return 0;
+    final fn = lib.lookupFunction<
         Int32 Function(
             Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Pointer<Int64>),
         int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>,
             Pointer<Int64>)>('rac_file_manager_calculate_dir_size');
-    if (fn == null || _callbacksPtr == null) return 0;
 
     final pathPtr = path.toNativeUtf8();
     final sizePtr = calloc<Int64>();
@@ -110,12 +112,13 @@ class DartBridgeFileManager {
 
   /// Get total models storage used.
   static int modelsStorageUsed() {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return 0;
+    final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Int64>),
         int Function(
             Pointer<RacFileCallbacksStruct>, Pointer<Int64>)>(
         'rac_file_manager_models_storage_used');
-    if (fn == null || _callbacksPtr == null) return 0;
 
     final sizePtr = calloc<Int64>();
     try {
@@ -128,30 +131,33 @@ class DartBridgeFileManager {
 
   /// Clear cache directory.
   static bool clearCache() {
-    final fn = _lookup<Int32 Function(Pointer<RacFileCallbacksStruct>),
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
         int Function(Pointer<RacFileCallbacksStruct>)>(
         'rac_file_manager_clear_cache');
-    if (fn == null || _callbacksPtr == null) return false;
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
 
   /// Clear temp directory.
   static bool clearTemp() {
-    final fn = _lookup<Int32 Function(Pointer<RacFileCallbacksStruct>),
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<Int32 Function(Pointer<RacFileCallbacksStruct>),
         int Function(Pointer<RacFileCallbacksStruct>)>(
         'rac_file_manager_clear_temp');
-    if (fn == null || _callbacksPtr == null) return false;
     return fn(_callbacksPtr!) == RacResultCode.success;
   }
 
   /// Get cache size.
   static int cacheSize() {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return 0;
+    final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Int64>),
         int Function(
             Pointer<RacFileCallbacksStruct>, Pointer<Int64>)>(
         'rac_file_manager_cache_size');
-    if (fn == null || _callbacksPtr == null) return 0;
 
     final sizePtr = calloc<Int64>();
     try {
@@ -164,12 +170,13 @@ class DartBridgeFileManager {
 
   /// Create a model folder and return its path.
   static String? createModelFolder(String modelId, int framework) {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return null;
+    final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
             Pointer<Utf8>, Size),
         int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
             Pointer<Utf8>, int)>('rac_file_manager_create_model_folder');
-    if (fn == null || _callbacksPtr == null) return null;
 
     final modelIdPtr = modelId.toNativeUtf8();
     const bufSize = 1024;
@@ -186,13 +193,14 @@ class DartBridgeFileManager {
 
   /// Check if a model folder exists.
   static bool modelFolderExists(String modelId, int framework) {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
             Pointer<Int32>, Pointer<Int32>),
         int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
             Pointer<Int32>, Pointer<Int32>)>(
         'rac_file_manager_model_folder_exists');
-    if (fn == null || _callbacksPtr == null) return false;
 
     final modelIdPtr = modelId.toNativeUtf8();
     final existsPtr = calloc<Int32>();
@@ -206,20 +214,21 @@ class DartBridgeFileManager {
   }
 
   /// Get combined storage information.
-  static StorageInfo? getStorageInfo() {
-    final fn = _lookup<
+  static NativeStorageInfo? getStorageInfo() {
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return null;
+    final fn = lib.lookupFunction<
         Int32 Function(
             Pointer<RacFileCallbacksStruct>, Pointer<RacFileManagerStorageInfoStruct>),
         int Function(Pointer<RacFileCallbacksStruct>,
             Pointer<RacFileManagerStorageInfoStruct>)>(
         'rac_file_manager_get_storage_info');
-    if (fn == null || _callbacksPtr == null) return null;
 
     final infoPtr = calloc<RacFileManagerStorageInfoStruct>();
     try {
       final result = fn(_callbacksPtr!, infoPtr);
       if (result != RacResultCode.success) return null;
-      return StorageInfo(
+      return NativeStorageInfo(
         deviceTotal: infoPtr.ref.deviceTotal,
         deviceFree: infoPtr.ref.deviceFree,
         modelsSize: infoPtr.ref.modelsSize,
@@ -234,21 +243,22 @@ class DartBridgeFileManager {
 
   /// Check storage availability via C++ rac_file_manager_check_storage.
   /// Returns full availability result including warnings and recommendations.
-  static StorageAvailability? checkStorageAvailability(int requiredBytes) {
-    final fn = _lookup<
+  static NativeStorageAvailability? checkStorageAvailability(int requiredBytes) {
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return null;
+    final fn = lib.lookupFunction<
         Int32 Function(Pointer<RacFileCallbacksStruct>, Int64,
             Pointer<RacStorageAvailabilityStruct>),
         int Function(Pointer<RacFileCallbacksStruct>, int,
             Pointer<RacStorageAvailabilityStruct>)>(
         'rac_file_manager_check_storage');
-    if (fn == null || _callbacksPtr == null) return null;
 
     final availPtr = calloc<RacStorageAvailabilityStruct>();
     try {
       final result = fn(_callbacksPtr!, requiredBytes, availPtr);
       if (result != RacResultCode.success) return null;
       final rec = availPtr.ref.recommendation;
-      return StorageAvailability(
+      return NativeStorageAvailability(
         isAvailable: availPtr.ref.isAvailable == RAC_TRUE,
         requiredSpace: availPtr.ref.requiredSpace,
         availableSpace: availPtr.ref.availableSpace,
@@ -270,12 +280,13 @@ class DartBridgeFileManager {
 
   /// Delete a model folder.
   static bool deleteModel(String modelId, int framework) {
-    final fn = _lookup<
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<
         Int32 Function(
             Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32),
         int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>,
             int)>('rac_file_manager_delete_model');
-    if (fn == null || _callbacksPtr == null) return false;
 
     final modelIdPtr = modelId.toNativeUtf8();
     try {
@@ -290,12 +301,11 @@ class DartBridgeFileManager {
   // Private helpers
   // =========================================================================
 
-  static F? _lookup<T extends Function, F extends Function>(String name) {
+  static DynamicLibrary? _lib() {
     try {
-      final lib = PlatformLoader.loadCommons();
-      return lib.lookupFunction<T, F>(name);
+      return PlatformLoader.loadCommons();
     } catch (e) {
-      _logger.debug('$name not available: $e');
+      _logger.debug('Native library not available: $e');
       return null;
     }
   }
@@ -306,14 +316,14 @@ class DartBridgeFileManager {
 // =============================================================================
 
 /// Storage availability result from C++ rac_file_manager_check_storage.
-class StorageAvailability {
+class NativeStorageAvailability {
   final bool isAvailable;
   final int requiredSpace;
   final int availableSpace;
   final bool hasWarning;
   final String? recommendation;
 
-  const StorageAvailability({
+  const NativeStorageAvailability({
     required this.isAvailable,
     required this.requiredSpace,
     required this.availableSpace,
@@ -323,7 +333,7 @@ class StorageAvailability {
 }
 
 /// Combined storage information from C++ file manager.
-class StorageInfo {
+class NativeStorageInfo {
   final int deviceTotal;
   final int deviceFree;
   final int modelsSize;
@@ -331,7 +341,7 @@ class StorageInfo {
   final int tempSize;
   final int totalAppSize;
 
-  const StorageInfo({
+  const NativeStorageInfo({
     required this.deviceTotal,
     required this.deviceFree,
     required this.modelsSize,
