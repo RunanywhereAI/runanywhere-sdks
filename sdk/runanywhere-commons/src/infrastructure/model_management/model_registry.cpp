@@ -15,6 +15,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -128,7 +129,10 @@ rac_result_t rac_model_registry_create(rac_model_registry_handle_t* out_handle) 
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_model_registry* registry = new rac_model_registry();
+    rac_model_registry* registry = new (std::nothrow) rac_model_registry();
+    if (!registry) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     RAC_LOG_INFO("ModelRegistry", "Model registry created");
 

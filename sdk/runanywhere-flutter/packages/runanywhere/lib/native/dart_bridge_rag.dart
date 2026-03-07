@@ -14,113 +14,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-
-// =============================================================================
-// RAG Types (mirrors Swift RAGTypes.swift / Kotlin RAGTypes.kt)
-// =============================================================================
-
-/// Configuration for creating a RAG pipeline.
-class RAGConfiguration {
-  /// Path to the ONNX embedding model
-  final String embeddingModelPath;
-
-  /// Path to the GGUF LLM model
-  final String llmModelPath;
-
-  /// Embedding vector dimension (default: 384 for all-MiniLM-L6-v2)
-  final int embeddingDimension;
-
-  /// Number of top chunks to retrieve per query
-  final int topK;
-
-  /// Minimum cosine similarity threshold 0.0-1.0
-  final double similarityThreshold;
-
-  /// Maximum tokens for context sent to the LLM
-  final int maxContextTokens;
-
-  /// Tokens per chunk when splitting documents
-  final int chunkSize;
-
-  /// Overlap tokens between consecutive chunks
-  final int chunkOverlap;
-
-  /// Prompt template with {context} and {query} placeholders
-  final String? promptTemplate;
-
-  /// Optional configuration JSON for the embedding model
-  final String? embeddingConfigJson;
-
-  /// Optional configuration JSON for the LLM model
-  final String? llmConfigJson;
-
-  const RAGConfiguration({
-    required this.embeddingModelPath,
-    required this.llmModelPath,
-    this.embeddingDimension = 384,
-    this.topK = 10,
-    this.similarityThreshold = 0.15,
-    this.maxContextTokens = 2048,
-    this.chunkSize = 512,
-    this.chunkOverlap = 50,
-    this.promptTemplate,
-    this.embeddingConfigJson,
-    this.llmConfigJson,
-  });
-}
-
-/// Options for querying the RAG pipeline.
-class RAGQueryOptions {
-  final String question;
-  final String? systemPrompt;
-  final int maxTokens;
-  final double temperature;
-  final double topP;
-  final int topK;
-
-  const RAGQueryOptions({
-    required this.question,
-    this.systemPrompt,
-    this.maxTokens = 512,
-    this.temperature = 0.7,
-    this.topP = 0.9,
-    this.topK = 40,
-  });
-}
-
-/// A single retrieved document chunk.
-class RAGSearchResult {
-  final String chunkId;
-  final String text;
-  final double similarityScore;
-  final String? metadataJson;
-
-  const RAGSearchResult({
-    required this.chunkId,
-    required this.text,
-    required this.similarityScore,
-    this.metadataJson,
-  });
-}
-
-/// Result of a RAG query.
-class RAGResult {
-  final String answer;
-  final List<RAGSearchResult> retrievedChunks;
-  final String? contextUsed;
-  final double retrievalTimeMs;
-  final double generationTimeMs;
-  final double totalTimeMs;
-
-  const RAGResult({
-    required this.answer,
-    required this.retrievedChunks,
-    this.contextUsed,
-    required this.retrievalTimeMs,
-    required this.generationTimeMs,
-    required this.totalTimeMs,
-  });
-}
+import 'package:runanywhere/public/types/rag_types.dart';
 
 // =============================================================================
 // FFI Struct for rac_rag_config_t (legacy standalone config)
@@ -276,11 +170,11 @@ class DartBridgeRAG {
       cConfig.ref.promptTemplate = config.promptTemplate != null
           ? config.promptTemplate!.toNativeUtf8()
           : nullptr;
-      cConfig.ref.embeddingConfigJson = config.embeddingConfigJson != null
-          ? config.embeddingConfigJson!.toNativeUtf8()
+      cConfig.ref.embeddingConfigJson = config.embeddingConfigJSON != null
+          ? config.embeddingConfigJSON!.toNativeUtf8()
           : nullptr;
-      cConfig.ref.llmConfigJson = config.llmConfigJson != null
-          ? config.llmConfigJson!.toNativeUtf8()
+      cConfig.ref.llmConfigJson = config.llmConfigJSON != null
+          ? config.llmConfigJSON!.toNativeUtf8()
           : nullptr;
 
       final result = fn(cConfig, outPipeline);
@@ -410,7 +304,7 @@ class DartBridgeRAG {
           chunkId: c.chunkId != nullptr ? c.chunkId.toDartString() : '',
           text: c.text != nullptr ? c.text.toDartString() : '',
           similarityScore: c.similarityScore,
-          metadataJson:
+          metadataJSON:
               c.metadataJson != nullptr ? c.metadataJson.toDartString() : null,
         ));
       }

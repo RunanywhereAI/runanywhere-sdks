@@ -12,4 +12,5 @@ export 'structured_output_types.dart';
 export 'tool_calling_types.dart';
 export 'rag_types.dart';
 export 'vlm_types.dart';
+export 'lora_types.dart';
 export 'voice_agent_types.dart';

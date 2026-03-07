@@ -847,9 +847,9 @@ int _listDirectoryCallback(
 void _freeEntriesCallback(
     Pointer<Pointer<Utf8>> entries, int count, Pointer<Void> userData) {
   for (var i = 0; i < count; i++) {
-    if (entries[i] != nullptr) calloc.free(entries[i]);
+    if (entries[i] != nullptr) malloc.free(entries[i]);
   }
-  calloc.free(entries);
+  malloc.free(entries);
 }
 
 int _isDirectoryCallback(Pointer<Utf8> path, Pointer<Void> userData) {
@@ -972,6 +972,10 @@ base class RacModelInfoCStruct extends Struct {
   // rac_bool_t supports_thinking (int32_t)
   @Int32()
   external int supportsThinking;
+
+  // rac_bool_t supports_lora (int32_t)
+  @Int32()
+  external int supportsLora;
 
   // char** tags
   external Pointer<Pointer<Utf8>> tags;

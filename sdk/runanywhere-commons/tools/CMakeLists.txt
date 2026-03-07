@@ -38,7 +38,7 @@ find_package(Threads REQUIRED)
 target_link_libraries(runanywhere-server PRIVATE Threads::Threads)
 
 # Compiler features
-target_compile_features(runanywhere-server PRIVATE cxx_std_17)
+target_compile_features(runanywhere-server PRIVATE cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(runanywhere-server PRIVATE -Wall -Wextra)

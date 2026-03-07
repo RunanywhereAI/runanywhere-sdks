@@ -121,8 +121,9 @@ public:
 
     std::vector<int64_t> create_attention_mask(const std::vector<int64_t>& token_ids) {
         std::vector<int64_t> mask;
+        mask.reserve(token_ids.size());
         for (auto id : token_ids) {
-            mask.push_back(id != 0 ? 1 : 0); // 1 for real tokens, 0 for padding
+            mask.push_back(id != pad_id_ ? 1 : 0); 
         }
         return mask;
     }
@@ -479,13 +480,13 @@ public:
             try {
                 config_ = nlohmann::json::parse(config_json);
             } catch (const std::exception& e) {
-                LOGE("Failed to parse config JSON: %s", e.what());
+                RAC_LOG_ERROR(LOG_TAG,"Failed to parse config JSON: %s", e.what());
             }
         }
 
         // Initialize ONNX Runtime
         if (!initialize_onnx_runtime()) {
-            LOGE("Failed to initialize ONNX Runtime");
+            RAC_LOG_ERROR(LOG_TAG,"Failed to initialize ONNX Runtime");
             return;
         }
 
@@ -542,14 +543,15 @@ public:
                      vocab_path.c_str(), search_dir.string().c_str());
                 return;
             }
+
         }
 
         if (!tokenizer_.load_vocab(vocab_path)) {
-            LOGE("Failed to load tokenizer vocab: %s", vocab_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to load tokenizer vocab: %s", vocab_path.c_str());
             return;
         }
 
-        LOGI("Loaded tokenizer vocab: %s", vocab_path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"Loaded tokenizer vocab: %s", vocab_path.c_str());
 
         std::string resolved_model_path = model_path;
         if (std::filesystem::is_directory(resolved_model_path)) {
@@ -559,12 +561,13 @@ public:
         // Load model
         if (!load_model(resolved_model_path)) {
             LOGE("Failed to load model: %s", resolved_model_path.c_str());
+
             return;
         }
 
         ready_ = true;
-        LOGI("ONNX embedding provider initialized: %s", model_path.c_str());
-        LOGI("  Hidden dimension: %zu", embedding_dim_);
+        RAC_LOG_INFO(LOG_TAG,"ONNX embedding provider initialized: %s", model_path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"  Hidden dimension: %zu", embedding_dim_);
     }
 
     ~Impl() {
@@ -575,6 +578,7 @@ public:
         if (!ready_) {
             LOGE("Embedding provider not ready");
             return {};
+
         }
 
         std::lock_guard<std::mutex> lock(embed_mutex_);
@@ -612,8 +616,10 @@ public:
                 input_ids_guard.ptr()
             ));
             if (status_guard.is_error()) {
+
                 LOGE("CreateTensorWithDataAsOrtValue (input_ids) failed: %s", status_guard.error_message());
                 return {};
+
             }
 
             // Create attention_mask tensor
@@ -627,8 +633,10 @@ public:
                 attention_mask_guard.ptr()
             ));
             if (status_guard.is_error()) {
+
                 LOGE("CreateTensorWithDataAsOrtValue (attention_mask) failed: %s", status_guard.error_message());
                 return {};
+
             }
 
             // Create token_type_ids tensor
@@ -642,8 +650,10 @@ public:
                 token_type_ids_guard.ptr()
             ));
             if (status_guard.is_error()) {
+
                 LOGE("CreateTensorWithDataAsOrtValue (token_type_ids) failed: %s", status_guard.error_message());
                 return {};
+
             }
 
             // 3. Run inference
@@ -665,8 +675,10 @@ public:
             ));
 
             if (status_guard.is_error()) {
+
                 LOGE("ONNX inference failed: %s", status_guard.error_message());
                 return {};
+
             }
 
             // Transfer ownership to guard for automatic cleanup
@@ -678,13 +690,17 @@ public:
             output_status_guard.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
 
             if (output_status_guard.is_error()) {
+
                 LOGE("Failed to get output tensor data: %s", output_status_guard.error_message());
                 return {};
+
             }
 
             if (output_data == nullptr) {
+
                 LOGE("Output tensor data pointer is null");
                 return {};
+
             }
 
             OrtTensorTypeAndShapeInfo* shape_info = nullptr;
@@ -700,7 +716,7 @@ public:
                     ort_api_->GetDimensions(shape_info, dims.data(), dim_count);
                     actual_hidden_dim = static_cast<size_t>(dims[2]);
                     if (actual_hidden_dim != embedding_dim_) {
-                        LOGI("Model hidden dim %zu differs from configured %zu, using actual",
+                        RAC_LOG_INFO(LOG_TAG,"Model hidden dim %zu differs from configured %zu, using actual",
                              actual_hidden_dim, embedding_dim_);
                         embedding_dim_ = actual_hidden_dim;
                     }
@@ -719,12 +735,13 @@ public:
             normalize_vector(pooled);
 
             // All resources automatically cleaned up by RAII guards
-            LOGI("Generated embedding: dim=%zu, norm=1.0", pooled.size());
+            RAC_LOG_INFO(LOG_TAG,"Generated embedding: dim=%zu, norm=1.0", pooled.size());
             return pooled;
 
         } catch (const std::exception& e) {
             LOGE("Embedding generation failed: %s", e.what());
             return {};
+
         }
     }
 
@@ -944,7 +961,7 @@ private:
         const char* ort_version = ort_api_base ? ort_api_base->GetVersionString() : "unknown";
         ort_api_ = ort_api_base ? ort_api_base->GetApi(ORT_API_VERSION) : nullptr;
         if (!ort_api_) {
-            LOGE("Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
+            RAC_LOG_ERROR(LOG_TAG,"Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
             return false;
         }
 
@@ -952,7 +969,7 @@ private:
         OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAGEmbedding", &ort_env_);
         if (status != nullptr) {
             const char* error_msg = ort_api_->GetErrorMessage(status);
-            LOGE("Failed to create ORT environment: %s", error_msg);
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create ORT environment: %s", error_msg);
             ort_api_->ReleaseStatus(status);
             return false;
         }
@@ -967,25 +984,25 @@ private:
 
         status_guard.reset(ort_api_->CreateSessionOptions(options_guard.ptr()));
         if (status_guard.is_error()) {
-            LOGE("Failed to create session options: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create session options: %s", status_guard.error_message());
             return false;
         }
 
         if (options_guard.get() == nullptr) {
-            LOGE("Session options is null after creation");
+            RAC_LOG_ERROR(LOG_TAG,"Session options is null after creation");
             return false;
         }
 
         // Configure session options with error checking
         status_guard.reset(ort_api_->SetIntraOpNumThreads(options_guard.get(), 4));
         if (status_guard.is_error()) {
-            LOGE("Failed to set intra-op threads: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to set intra-op threads: %s", status_guard.error_message());
             return false;
         }
 
         status_guard.reset(ort_api_->SetSessionGraphOptimizationLevel(options_guard.get(), ORT_ENABLE_ALL));
         if (status_guard.is_error()) {
-            LOGE("Failed to set graph optimization level: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to set graph optimization level: %s", status_guard.error_message());
             return false;
         }
 
@@ -999,7 +1016,7 @@ private:
         // options_guard automatically releases session options on scope exit
 
         if (status_guard.is_error()) {
-            LOGE("Failed to load model: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to load model: %s", status_guard.error_message());
             return false;
         }
 

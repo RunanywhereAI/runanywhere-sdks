@@ -11,6 +11,7 @@
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <new>
 #include <random>
 #include <sstream>
 #include <string>
@@ -39,9 +40,8 @@ int64_t get_current_time_ms() {
 }
 
 std::string generate_uuid() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 15);
+    static thread_local std::mt19937 gen(std::random_device{}());
+    static thread_local std::uniform_int_distribution<> dis(0, 15);
 
     std::stringstream ss;
     ss << std::hex;
@@ -109,13 +109,12 @@ rac_result_t rac_tts_analytics_create(rac_tts_analytics_handle_t* out_handle) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
 
-    try {
-        *out_handle = new rac_tts_analytics_s();
-        log_info("TTS.Analytics", "TTS analytics service created");
-        return RAC_SUCCESS;
-    } catch (...) {
+    *out_handle = new (std::nothrow) rac_tts_analytics_s();
+    if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    log_info("TTS.Analytics", "TTS analytics service created");
+    return RAC_SUCCESS;
 }
 
 void rac_tts_analytics_destroy(rac_tts_analytics_handle_t handle) {
@@ -151,7 +150,7 @@ rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle
     if (!*out_synthesis_id) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    strcpy(*out_synthesis_id, id.c_str());
+    memcpy(*out_synthesis_id, id.c_str(), id.size() + 1);
 
     log_debug("TTS.Analytics", "Synthesis started: %s, voice: %s, %d characters", id.c_str(), voice,
               character_count);
