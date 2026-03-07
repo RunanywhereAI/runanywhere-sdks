@@ -26,6 +26,7 @@ export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
 export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
+export 'public/extensions/runanywhere_lora.dart';
 export 'public/extensions/runanywhere_storage.dart';
 export 'native/dart_bridge_rag.dart'
     show RAGConfiguration, RAGQueryOptions, RAGSearchResult, RAGResult;

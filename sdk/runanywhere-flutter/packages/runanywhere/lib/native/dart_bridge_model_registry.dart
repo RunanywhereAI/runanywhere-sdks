@@ -973,6 +973,10 @@ base class RacModelInfoCStruct extends Struct {
   @Int32()
   external int supportsThinking;
 
+  // rac_bool_t supports_lora (int32_t)
+  @Int32()
+  external int supportsLora;
+
   // char** tags
   external Pointer<Pointer<Utf8>> tags;
 
