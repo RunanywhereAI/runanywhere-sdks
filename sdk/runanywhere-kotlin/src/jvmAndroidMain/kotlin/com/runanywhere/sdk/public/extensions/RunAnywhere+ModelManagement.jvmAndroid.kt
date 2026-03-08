@@ -15,6 +15,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
@@ -508,6 +509,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 val updatedModelInfo = modelInfo.copy(localPath = finalPath)
                 addToModelCache(updatedModelInfo)
                 CppBridgeModelRegistry.updateDownloadStatus(modelId, finalPath)
+                CppBridgeStorage.storeString(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId, finalPath)
 
                 downloadLogger.info("Multi-file model ready at: $finalPath")
 
@@ -724,6 +726,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
             addToModelCache(updatedModelInfo)
             CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
+            CppBridgeStorage.storeString(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId, finalModelPath)
 
             downloadLogger.info("Model ready at: $finalModelPath")
 
@@ -813,6 +816,9 @@ private suspend fun extractArchive(
         // Use the URL to determine archive type (file may be saved without extension)
         val lowercaseUrl = originalUrl.lowercase()
 
+        // Snapshot existing items BEFORE extraction to detect newly extracted flat files
+        val itemsBeforeExtraction = parentDir.listFiles()?.map { it.name }?.toSet() ?: emptySet()
+
         // IMPORTANT: The archive file name might conflict with the folder inside the archive
         // (e.g., file "sherpa-onnx-whisper-tiny.en" and archive contains folder "sherpa-onnx-whisper-tiny.en/")
         // We need to rename/move the archive before extracting to avoid ENOTDIR errors
@@ -867,14 +873,27 @@ private suspend fun extractArchive(
         val expectedModelDir = File(parentDir, modelId)
         val finalPath =
             if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
+                // Standard case: archive had a named root folder (ONNX, LlamaCpp archives)
                 expectedModelDir.absolutePath
             } else {
-                // Fallback: look for any new directory created
-                parentDir
-                    .listFiles()
-                    ?.firstOrNull {
-                        it.isDirectory && it.name.contains(modelId.substringBefore("-"))
-                    }?.absolutePath ?: parentDir.absolutePath
+                // Fallback: look for any new named directory matching the model ID prefix
+                val matchingDir = parentDir.listFiles()
+                    ?.firstOrNull { it.isDirectory && it.name.contains(modelId.substringBefore("-")) }
+
+                if (matchingDir != null) {
+                    matchingDir.absolutePath
+                } else {
+                    // Flat archive (e.g. Genie): files extracted directly into parentDir.
+                    // Move them into a per-model subdirectory so the standard filesystem
+                    // scan can find and restore this model by its ID across app restarts.
+                    expectedModelDir.mkdirs()
+                    val newItems = parentDir.listFiles()
+                        ?.filter { it.name !in itemsBeforeExtraction && it != expectedModelDir }
+                        ?: emptyList()
+                    newItems.forEach { file -> file.renameTo(File(expectedModelDir, file.name)) }
+                    logger.info("Moved ${newItems.size} flat-extracted files into: ${expectedModelDir.absolutePath}")
+                    expectedModelDir.absolutePath
+                }
             }
 
         logger.info("Model extracted to: $finalPath")
@@ -1065,6 +1084,7 @@ private suspend fun downloadEmbeddingModelFiles(
         }
     }
     CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
+    CppBridgeStorage.storeString(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId, dirPath)
     CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
 
     logger.info("Embedding model ready at: $dirPath")
@@ -1143,6 +1163,7 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+    CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId)
     CppBridgeModelRegistry.remove(modelId)
 }
 
