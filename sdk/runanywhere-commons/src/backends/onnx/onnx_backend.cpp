@@ -14,15 +14,10 @@
 
 #include "onnx_backend.h"
 
-#if !defined(_WIN32)
-#include <dirent.h>
-#else
 #include <filesystem>
-#endif
-#include <sys/stat.h>
+#include <system_error>
 
 #include <cctype>
-#include <cstdio>
 #include <cstring>
 
 #include "rac/core/rac_logger.h"
@@ -157,8 +152,9 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
 
     RAC_LOG_INFO("ONNX.STT", "Loading model from: %s", model_path.c_str());
 
-    struct stat path_stat;
-    if (stat(model_path.c_str(), &path_stat) != 0) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::exists(model_path, ec)) {
         RAC_LOG_ERROR("ONNX.STT", "Model path does not exist: %s", model_path.c_str());
         return false;
     }
@@ -169,93 +165,58 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     std::string tokens_path;
     std::string nemo_ctc_model_path;  // Single-file CTC model (model.int8.onnx or model.onnx)
 
-    if (S_ISDIR(path_stat.st_mode)) {
-#if defined(_WIN32)
+    if (fs::is_directory(model_path, ec)) {
         try {
-            for (const auto& entry : std::filesystem::directory_iterator(model_path)) {
+            for (const auto& entry : fs::directory_iterator(model_path)) {
                 std::string filename = entry.path().filename().string();
                 std::string full_path = entry.path().string();
 
-                if (filename.find("encoder") != std::string::npos && filename.size() > 5 &&
-                    filename.substr(filename.size() - 5) == ".onnx") {
+                if (filename.find("encoder") != std::string::npos &&
+                    entry.path().extension() == ".onnx") {
                     encoder_path = full_path;
                     RAC_LOG_DEBUG("ONNX.STT", "Found encoder: %s", encoder_path.c_str());
-                } else if (filename.find("decoder") != std::string::npos && filename.size() > 5 &&
-                           filename.substr(filename.size() - 5) == ".onnx") {
+                } else if (filename.find("decoder") != std::string::npos &&
+                           entry.path().extension() == ".onnx") {
                     decoder_path = full_path;
                     RAC_LOG_DEBUG("ONNX.STT", "Found decoder: %s", decoder_path.c_str());
-                } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
-                                                        filename.find(".txt") != std::string::npos)) {
+                } else if (filename == "tokens.txt" ||
+                           (filename.find("tokens") != std::string::npos &&
+                            entry.path().extension() == ".txt")) {
                     tokens_path = full_path;
                     RAC_LOG_DEBUG("ONNX.STT", "Found tokens: %s", tokens_path.c_str());
+                } else if ((filename == "model.int8.onnx" || filename == "model.onnx") &&
+                           encoder_path.empty()) {
+                    // Single-file model (NeMo CTC, etc.) - prefer int8 if both exist
+                    if (filename == "model.int8.onnx" || nemo_ctc_model_path.empty()) {
+                        nemo_ctc_model_path = full_path;
+                        RAC_LOG_DEBUG("ONNX.STT", "Found single-file model: %s", nemo_ctc_model_path.c_str());
+                    }
                 }
             }
-        } catch (const std::filesystem::filesystem_error&) {
+        } catch (const fs::filesystem_error&) {
             RAC_LOG_ERROR("ONNX.STT", "Cannot open model directory: %s", model_path.c_str());
             return false;
         }
-#else
-        DIR* dir = opendir(model_path.c_str());
-        if (!dir) {
-            RAC_LOG_ERROR("ONNX.STT", "Cannot open model directory: %s", model_path.c_str());
-            return false;
-        }
-
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            std::string filename = entry->d_name;
-            std::string full_path = model_path + "/" + filename;
-
-            if (filename.find("encoder") != std::string::npos && filename.size() > 5 &&
-                filename.substr(filename.size() - 5) == ".onnx") {
-                encoder_path = full_path;
-                RAC_LOG_DEBUG("ONNX.STT", "Found encoder: %s", encoder_path.c_str());
-            } else if (filename.find("decoder") != std::string::npos && filename.size() > 5 &&
-                     filename.substr(filename.size() - 5) == ".onnx") {
-                decoder_path = full_path;
-                RAC_LOG_DEBUG("ONNX.STT", "Found decoder: %s", decoder_path.c_str());
-            } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
-                                                  filename.find(".txt") != std::string::npos)) {
-                tokens_path = full_path;
-                RAC_LOG_DEBUG("ONNX.STT", "Found tokens: %s", tokens_path.c_str());
-            } else if ((filename == "model.int8.onnx" || filename == "model.onnx") &&
-                       encoder_path.empty()) {
-                // Single-file model (NeMo CTC, etc.) - prefer int8 if both exist
-                if (filename == "model.int8.onnx" || nemo_ctc_model_path.empty()) {
-                    nemo_ctc_model_path = full_path;
-                    RAC_LOG_DEBUG("ONNX.STT", "Found single-file model: %s", nemo_ctc_model_path.c_str());
-                }
-            }
-        }
-        closedir(dir);
-#endif
 
         if (encoder_path.empty()) {
-            std::string test_path = model_path + "/encoder.onnx";
-            if (stat(test_path.c_str(), &path_stat) == 0) {
-                encoder_path = test_path;
-            }
+            fs::path test_path = fs::path(model_path) / "encoder.onnx";
+            if (fs::exists(test_path, ec)) encoder_path = test_path.string();
         }
         if (decoder_path.empty()) {
-            std::string test_path = model_path + "/decoder.onnx";
-            if (stat(test_path.c_str(), &path_stat) == 0) {
-                decoder_path = test_path;
-            }
+            fs::path test_path = fs::path(model_path) / "decoder.onnx";
+            if (fs::exists(test_path, ec)) decoder_path = test_path.string();
         }
         if (tokens_path.empty()) {
-            std::string test_path = model_path + "/tokens.txt";
-            if (stat(test_path.c_str(), &path_stat) == 0) {
-                tokens_path = test_path;
-            }
+            fs::path test_path = fs::path(model_path) / "tokens.txt";
+            if (fs::exists(test_path, ec)) tokens_path = test_path.string();
         }
     } else {
         encoder_path = model_path;
-        size_t last_slash = model_path.find_last_of('/');
-        if (last_slash != std::string::npos) {
-            std::string dir = model_path.substr(0, last_slash);
-            model_dir_ = dir;
-            decoder_path = dir + "/decoder.onnx";
-            tokens_path = dir + "/tokens.txt";
+        fs::path parent = fs::path(model_path).parent_path();
+        if (!parent.empty()) {
+            model_dir_ = parent.string();
+            decoder_path = (parent / "decoder.onnx").string();
+            tokens_path = (parent / "tokens.txt").string();
         }
     }
 
@@ -302,16 +263,16 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
 
     // Validate required files
     if (!is_nemo_ctc) {
-        if (stat(encoder_path.c_str(), &path_stat) != 0) {
+        if (!fs::exists(encoder_path, ec)) {
             RAC_LOG_ERROR("ONNX.STT", "Encoder file not found: %s", encoder_path.c_str());
             return false;
         }
-        if (stat(decoder_path.c_str(), &path_stat) != 0) {
+        if (!fs::exists(decoder_path, ec)) {
             RAC_LOG_ERROR("ONNX.STT", "Decoder file not found: %s", decoder_path.c_str());
             return false;
         }
     }
-    if (stat(tokens_path.c_str(), &path_stat) != 0) {
+    if (!fs::exists(tokens_path, ec)) {
         RAC_LOG_ERROR("ONNX.STT", "Tokens file not found: %s", tokens_path.c_str());
         return false;
     }
@@ -694,128 +655,111 @@ bool ONNXTTS::is_ready() const {
  * of lang voice files directly in voices/ to bypass the issue.
  */
 static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
-    std::string lang_dir = espeak_data_dir + "/lang";
-    std::string voices_dir = espeak_data_dir + "/voices";
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path lang_dir = fs::path(espeak_data_dir) / "lang";
+    fs::path voices_dir = fs::path(espeak_data_dir) / "voices";
 
-    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] lang_dir=%s, voices_dir=%s", lang_dir.c_str(), voices_dir.c_str());
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] lang_dir=%s, voices_dir=%s",
+        lang_dir.string().c_str(), voices_dir.string().c_str());
 
-    struct stat st;
-    if (stat(lang_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] lang/ directory NOT FOUND or not a dir: %s (errno=%d)", lang_dir.c_str(), errno);
+    if (!fs::is_directory(lang_dir, ec)) {
+        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] lang/ directory NOT FOUND or not a dir: %s",
+            lang_dir.string().c_str());
         return;
     }
 
-    if (stat(voices_dir.c_str(), &st) != 0) {
-        int mk = mkdir(voices_dir.c_str(), 0755);
-        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk, errno);
+    if (!fs::exists(voices_dir, ec)) {
+        bool created = fs::create_directory(voices_dir, ec);
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: %s (ec=%d)",
+            created ? "OK" : "FAILED", ec.value());
+        ec.clear();
     } else {
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] voices/ dir already exists");
-    }
-
-    DIR* lang_root = opendir(lang_dir.c_str());
-    if (!lang_root) {
-        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] Failed to open lang/ dir (errno=%d)", errno);
-        return;
     }
 
     int copied = 0;
     int skipped = 0;
     int errors = 0;
-    struct dirent* family_entry;
-    while ((family_entry = readdir(lang_root)) != nullptr) {
-        if (family_entry->d_name[0] == '.') continue;
 
-        std::string family_path = lang_dir + "/" + family_entry->d_name;
-        if (stat(family_path.c_str(), &st) != 0) continue;
+    for (const auto& family_entry : fs::directory_iterator(lang_dir, ec)) {
+        if (ec) { ec.clear(); continue; }
+        const fs::path& family_path = family_entry.path();
 
-        if (S_ISREG(st.st_mode)) {
-            std::string basename = family_entry->d_name;
+        if (fs::is_regular_file(family_path, ec)) {
+            std::string basename = family_path.filename().string();
             std::string lowercase_name;
             for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
 
-            std::string dest = voices_dir + "/" + lowercase_name;
-            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+            fs::path dest = voices_dir / lowercase_name;
+            if (fs::exists(dest, ec)) { skipped++; continue; }
 
-            FILE* src_f = fopen(family_path.c_str(), "rb");
-            FILE* dst_f = fopen(dest.c_str(), "wb");
-            if (src_f && dst_f) {
-                char buf[4096];
-                size_t n;
-                while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
-                    fwrite(buf, 1, n, dst_f);
-                }
+            ec.clear();
+            fs::copy_file(family_path, dest, ec);
+            if (!ec) {
                 copied++;
-                RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Copied: %s -> %s", family_path.c_str(), dest.c_str());
+                RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Copied: %s -> %s",
+                    family_path.string().c_str(), dest.string().c_str());
             } else {
                 errors++;
-                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED to copy %s -> %s (src=%p dst=%p errno=%d)",
-                    family_path.c_str(), dest.c_str(), (void*)src_f, (void*)dst_f, errno);
+                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED to copy %s -> %s (ec=%d)",
+                    family_path.string().c_str(), dest.string().c_str(), ec.value());
+                ec.clear();
             }
-            if (src_f) fclose(src_f);
-            if (dst_f) fclose(dst_f);
             continue;
         }
 
-        if (!S_ISDIR(st.st_mode)) continue;
+        if (!fs::is_directory(family_path, ec)) continue;
 
-        RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Scanning family dir: %s", family_entry->d_name);
-        DIR* family_dir = opendir(family_path.c_str());
-        if (!family_dir) continue;
+        RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Scanning family dir: %s",
+            family_path.filename().string().c_str());
 
-        struct dirent* voice_entry;
-        while ((voice_entry = readdir(family_dir)) != nullptr) {
-            if (voice_entry->d_name[0] == '.') continue;
+        for (const auto& voice_entry : fs::directory_iterator(family_path, ec)) {
+            if (ec) { ec.clear(); continue; }
+            const fs::path& voice_path = voice_entry.path();
+            if (!fs::is_regular_file(voice_path, ec)) continue;
 
-            std::string voice_path = family_path + "/" + voice_entry->d_name;
-            if (stat(voice_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
-
-            std::string basename = voice_entry->d_name;
+            std::string basename = voice_path.filename().string();
             std::string lowercase_name;
             for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
 
-            std::string dest = voices_dir + "/" + lowercase_name;
-            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+            fs::path dest = voices_dir / lowercase_name;
+            if (fs::exists(dest, ec)) { skipped++; continue; }
 
-            FILE* src_f = fopen(voice_path.c_str(), "rb");
-            FILE* dst_f = fopen(dest.c_str(), "wb");
-            if (src_f && dst_f) {
-                char buf[4096];
-                size_t n;
-                while ((n = fread(buf, 1, sizeof(buf), src_f)) > 0) {
-                    fwrite(buf, 1, n, dst_f);
-                }
+            ec.clear();
+            fs::copy_file(voice_path, dest, ec);
+            if (!ec) {
                 copied++;
-                RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Copied: %s -> voices/%s", voice_entry->d_name, lowercase_name.c_str());
+                RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Copied: %s -> voices/%s",
+                    basename.c_str(), lowercase_name.c_str());
             } else {
                 errors++;
-                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED: %s -> voices/%s (src=%p dst=%p errno=%d)",
-                    voice_entry->d_name, lowercase_name.c_str(), (void*)src_f, (void*)dst_f, errno);
+                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED: %s -> voices/%s (ec=%d)",
+                    basename.c_str(), lowercase_name.c_str(), ec.value());
+                ec.clear();
             }
-            if (src_f) fclose(src_f);
-            if (dst_f) fclose(dst_f);
         }
-        closedir(family_dir);
     }
-    closedir(lang_root);
 
-    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Done: copied=%d skipped=%d errors=%d", copied, skipped, errors);
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Done: copied=%d skipped=%d errors=%d",
+        copied, skipped, errors);
 
     // Dump voices/ directory contents for verification
-    DIR* vdir = opendir(voices_dir.c_str());
-    if (vdir) {
+    ec.clear();
+    if (fs::exists(voices_dir, ec)) {
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] === voices/ directory contents ===");
-        struct dirent* ve;
         int count = 0;
-        while ((ve = readdir(vdir)) != nullptr) {
-            if (ve->d_name[0] == '.') continue;
-            std::string vpath = voices_dir + "/" + ve->d_name;
-            struct stat vs;
-            stat(vpath.c_str(), &vs);
+        for (const auto& ve : fs::directory_iterator(voices_dir, ec)) {
+            if (ec) { ec.clear(); continue; }
+            bool is_dir = fs::is_directory(ve.path(), ec);
+            uintmax_t size = is_dir ? 0 : fs::file_size(ve.path(), ec);
+            if (ec) { size = 0; ec.clear(); }
             RAC_LOG_INFO("ONNX.TTS", "[ensure_voices]   [%s] %s (%lld bytes)",
-                S_ISDIR(vs.st_mode) ? "DIR" : "FILE", ve->d_name, (long long)vs.st_size);
+                is_dir ? "DIR" : "FILE",
+                ve.path().filename().string().c_str(),
+                (long long)size);
             count++;
         }
-        closedir(vdir);
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] === Total: %d entries ===", count);
     }
 }
@@ -843,80 +787,69 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     // Passing the espeak-ng-data dir directly works via the fallback branch.
     std::string espeak_data_dir;
 
-    struct stat path_stat;
-    if (stat(model_path.c_str(), &path_stat) != 0) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::exists(model_path, ec)) {
         RAC_LOG_ERROR("ONNX.TTS", "Model path does not exist: %s", model_path.c_str());
         return false;
     }
 
     // Diagnostic: list top-level directory contents
-    if (S_ISDIR(path_stat.st_mode)) {
-        DIR* diag_dir = opendir(model_path.c_str());
-        if (diag_dir) {
-            RAC_LOG_INFO("ONNX.TTS", "=== Model directory contents: %s ===", model_path.c_str());
-            struct dirent* diag_entry;
-            while ((diag_entry = readdir(diag_dir)) != nullptr) {
-                if (diag_entry->d_name[0] == '.') continue;
-                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s",
-                    diag_entry->d_type == DT_DIR ? "DIR" : "FILE",
-                    diag_entry->d_name);
-            }
-            closedir(diag_dir);
-            RAC_LOG_INFO("ONNX.TTS", "=== End directory listing ===");
+    if (fs::is_directory(model_path, ec)) {
+        RAC_LOG_INFO("ONNX.TTS", "=== Model directory contents: %s ===", model_path.c_str());
+        for (const auto& entry : fs::directory_iterator(model_path, ec)) {
+            if (ec) { ec.clear(); continue; }
+            RAC_LOG_INFO("ONNX.TTS", "  [%s] %s",
+                fs::is_directory(entry.path()) ? "DIR" : "FILE",
+                entry.path().filename().string().c_str());
         }
+        RAC_LOG_INFO("ONNX.TTS", "=== End directory listing ===");
     }
 
-    if (S_ISDIR(path_stat.st_mode)) {
-        model_onnx_path = model_path + "/model.onnx";
-        tokens_path = model_path + "/tokens.txt";
-        lexicon_path = model_path + "/lexicon.txt";
+    if (fs::is_directory(model_path, ec)) {
+        model_onnx_path = (fs::path(model_path) / "model.onnx").string();
+        tokens_path = (fs::path(model_path) / "tokens.txt").string();
+        lexicon_path = (fs::path(model_path) / "lexicon.txt").string();
 
-        if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
-            DIR* dir = opendir(model_path.c_str());
-            if (dir) {
-                struct dirent* entry;
-                while ((entry = readdir(dir)) != nullptr) {
-                    std::string filename = entry->d_name;
-                    if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
-                        model_onnx_path = model_path + "/" + filename;
-                        RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
-                        break;
-                    }
+        if (!fs::exists(model_onnx_path, ec)) {
+            for (const auto& entry : fs::directory_iterator(model_path, ec)) {
+                if (ec) { ec.clear(); continue; }
+                if (entry.path().extension() == ".onnx") {
+                    model_onnx_path = entry.path().string();
+                    RAC_LOG_DEBUG("ONNX.TTS", "Found model file: %s", model_onnx_path.c_str());
+                    break;
                 }
-                closedir(dir);
             }
         }
 
         // Look for espeak-ng-data directory
-        std::string candidate = model_path + "/espeak-ng-data";
-        if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-            espeak_data_dir = candidate;
+        fs::path candidate = fs::path(model_path) / "espeak-ng-data";
+        if (fs::is_directory(candidate, ec)) {
+            espeak_data_dir = candidate.string();
         } else {
-            candidate = model_path + "/data/espeak-ng-data";
-            if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-                espeak_data_dir = candidate;
+            candidate = fs::path(model_path) / "data" / "espeak-ng-data";
+            if (fs::is_directory(candidate, ec)) {
+                espeak_data_dir = candidate.string();
             }
         }
 
-        if (stat(lexicon_path.c_str(), &path_stat) != 0) {
-            std::string alt_lexicon = model_path + "/lexicon";
-            if (stat(alt_lexicon.c_str(), &path_stat) == 0) {
-                lexicon_path = alt_lexicon;
+        if (!fs::exists(lexicon_path, ec)) {
+            fs::path alt_lexicon = fs::path(model_path) / "lexicon";
+            if (fs::exists(alt_lexicon, ec)) {
+                lexicon_path = alt_lexicon.string();
             }
         }
     } else {
         model_onnx_path = model_path;
+        fs::path parent = fs::path(model_path).parent_path();
+        if (!parent.empty()) {
+            tokens_path = (parent / "tokens.txt").string();
+            lexicon_path = (parent / "lexicon.txt").string();
+            model_dir_ = parent.string();
 
-        size_t last_slash = model_path.find_last_of('/');
-        if (last_slash != std::string::npos) {
-            std::string dir = model_path.substr(0, last_slash);
-            tokens_path = dir + "/tokens.txt";
-            lexicon_path = dir + "/lexicon.txt";
-            model_dir_ = dir;
-
-            std::string candidate = dir + "/espeak-ng-data";
-            if (stat(candidate.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-                espeak_data_dir = candidate;
+            fs::path candidate = parent / "espeak-ng-data";
+            if (fs::is_directory(candidate, ec)) {
+                espeak_data_dir = candidate.string();
             }
         }
     }
@@ -925,30 +858,29 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     RAC_LOG_INFO("ONNX.TTS", "Tokens: %s", tokens_path.c_str());
     RAC_LOG_INFO("ONNX.TTS", "espeak_data_dir: %s", espeak_data_dir.c_str());
 
-    if (stat(model_onnx_path.c_str(), &path_stat) != 0) {
+    if (!fs::exists(model_onnx_path, ec)) {
         RAC_LOG_ERROR("ONNX.TTS", "Model ONNX file not found: %s", model_onnx_path.c_str());
         return false;
     }
 
-    if (stat(tokens_path.c_str(), &path_stat) != 0) {
+    if (!fs::exists(tokens_path, ec)) {
         RAC_LOG_ERROR("ONNX.TTS", "Tokens file not found: %s", tokens_path.c_str());
         return false;
     }
 
     if (!espeak_data_dir.empty()) {
         // Verify key files exist
-        std::string lang_gmw_dir = espeak_data_dir + "/lang/gmw";
-        std::string en_us_voice = lang_gmw_dir + "/en-US";
+        fs::path en_us_voice = fs::path(espeak_data_dir) / "lang" / "gmw" / "en-US";
         RAC_LOG_INFO("ONNX.TTS", "Checking lang/gmw/en-US: %s",
-            stat(en_us_voice.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
+            fs::exists(en_us_voice, ec) ? "EXISTS" : "MISSING");
 
         // Ensure voice files are accessible directly from voices/
         ensure_espeak_voice_files(espeak_data_dir);
 
         // Verify voices/en-us now exists
-        std::string voices_en_us = espeak_data_dir + "/voices/en-us";
+        fs::path voices_en_us = fs::path(espeak_data_dir) / "voices" / "en-us";
         RAC_LOG_INFO("ONNX.TTS", "voices/en-us after ensure: %s",
-            stat(voices_en_us.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
+            fs::exists(voices_en_us, ec) ? "EXISTS" : "MISSING");
     }
 
     SherpaOnnxOfflineTtsConfig tts_config;
@@ -957,7 +889,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     tts_config.model.vits.model = model_onnx_path.c_str();
     tts_config.model.vits.tokens = tokens_path.c_str();
 
-    if (stat(lexicon_path.c_str(), &path_stat) == 0 && S_ISREG(path_stat.st_mode)) {
+    if (fs::is_regular_file(lexicon_path, ec)) {
         tts_config.model.vits.lexicon = lexicon_path.c_str();
         RAC_LOG_DEBUG("ONNX.TTS", "Using lexicon file: %s", lexicon_path.c_str());
     }
