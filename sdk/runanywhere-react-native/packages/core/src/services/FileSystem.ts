@@ -503,6 +503,53 @@ export const FileSystem = {
   },
 
   /**
+   * Download a single file to a specific destination path.
+   * Used by multi-file download orchestration in RunAnywhere+Models.
+   *
+   * Reference: Swift SDK's AlamofireDownloadService.performDownload()
+   */
+  async downloadFile(
+    url: string,
+    destinationPath: string,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<number> {
+    if (!RNFS) {
+      throw new Error('react-native-fs not installed');
+    }
+
+    const downloadResult = RNFS.downloadFile({
+      fromUrl: url,
+      toFile: destinationPath,
+      background: true,
+      progressDivider: 1,
+      begin: (res) => {
+        logger.info(`Download started: ${res.contentLength} bytes`);
+      },
+      progress: (res) => {
+        const progress = res.contentLength > 0
+          ? res.bytesWritten / res.contentLength
+          : 0;
+
+        if (onProgress) {
+          onProgress({
+            bytesWritten: res.bytesWritten,
+            contentLength: res.contentLength,
+            progress,
+          });
+        }
+      },
+    });
+
+    const result = await downloadResult.promise;
+
+    if (result.statusCode !== 200) {
+      throw new Error(`Download failed with status: ${result.statusCode}`);
+    }
+
+    return result.bytesWritten;
+  },
+
+  /**
    * Delete a model
    */
   async deleteModel(modelId: string, framework?: string): Promise<boolean> {

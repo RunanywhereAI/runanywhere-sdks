@@ -8,6 +8,8 @@
 
 #include "FileManagerBridge.hpp"
 
+#include "rac_error.h"
+
 #include <cstring>
 #include <cstdlib>
 #include <sys/stat.h>
@@ -53,7 +55,7 @@ static rac_result_t posixCreateDirectory(const char* path, int recursive, void* 
     if (mkdir(path, 0755) == 0 || errno == EEXIST) {
         return RAC_SUCCESS;
     }
-    return RAC_ERROR_FILE_IO;
+    return RAC_ERROR_DIRECTORY_CREATION_FAILED;
 }
 
 static rac_result_t posixDeletePath(const char* path, int recursive, void* /*userData*/) {
@@ -66,14 +68,14 @@ static rac_result_t posixDeletePath(const char* path, int recursive, void* /*use
 
     // Handle symlinks: remove the link itself, don't follow it
     if (S_ISLNK(st.st_mode)) {
-        return unlink(path) == 0 ? RAC_SUCCESS : RAC_ERROR_FILE_IO;
+        return unlink(path) == 0 ? RAC_SUCCESS : RAC_ERROR_FILE_DELETE_FAILED;
     }
 
     if (S_ISDIR(st.st_mode)) {
         if (recursive) {
             // Recursively delete directory contents
             DIR* dir = opendir(path);
-            if (!dir) return RAC_ERROR_FILE_IO;
+            if (!dir) return RAC_ERROR_DIRECTORY_NOT_FOUND;
 
             struct dirent* entry;
             while ((entry = readdir(dir)) != nullptr) {
@@ -85,9 +87,9 @@ static rac_result_t posixDeletePath(const char* path, int recursive, void* /*use
             }
             closedir(dir);
         }
-        return (rmdir(path) == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_IO;
+        return (rmdir(path) == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_DELETE_FAILED;
     } else {
-        return (unlink(path) == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_IO;
+        return (unlink(path) == 0) ? RAC_SUCCESS : RAC_ERROR_FILE_DELETE_FAILED;
     }
 }
 
@@ -120,7 +122,7 @@ static rac_result_t posixListDirectory(const char* path, char*** outEntries,
     char** entries = static_cast<char**>(malloc(count * sizeof(char*)));
     if (!entries) {
         closedir(dir);
-        return RAC_ERROR_FILE_IO;
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
 
     // Second pass: fill entries
