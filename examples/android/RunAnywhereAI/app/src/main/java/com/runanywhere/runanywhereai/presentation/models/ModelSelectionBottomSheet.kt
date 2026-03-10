@@ -79,6 +79,7 @@ private data class AIModel(
     val size: String,
     val isDownloaded: Boolean,
     val supportsLora: Boolean = false,
+    val isNpu: Boolean = false,
 )
 
 /**
@@ -240,14 +241,20 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
     )
 
 private fun toAIModel(m: ModelInfo): AIModel {
+    val isGenie = m.framework == InferenceFramework.GENIE
     val formatStr = when (m.framework) {
         InferenceFramework.LLAMA_CPP -> "Fast"
         InferenceFramework.ONNX -> "ONNX"
         InferenceFramework.FOUNDATION_MODELS -> "Apple"
         InferenceFramework.SYSTEM_TTS -> "System"
+        InferenceFramework.GENIE -> "NPU"
         else -> m.framework.displayName
     }
-    val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
+    val formatColor = when (m.framework) {
+        InferenceFramework.ONNX -> AppColors.primaryPurple
+        InferenceFramework.GENIE -> AppColors.primaryBlue
+        else -> AppColors.primaryAccent
+    }
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
     return AIModel(
         name = m.name,
@@ -257,6 +264,7 @@ private fun toAIModel(m: ModelInfo): AIModel {
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
         supportsLora = m.supportsLora,
+        isNpu = isGenie,
     )
 }
 
@@ -513,6 +521,15 @@ private fun ModelCard(
                 textColor = model.formatColor,
                 backgroundColor = model.formatColor.copy(alpha = 0.10f),
             )
+
+            if (model.isNpu) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Badge(
+                    text = "SD 8 Gen 2+",
+                    textColor = AppColors.primaryBlue,
+                    backgroundColor = AppColors.primaryBlue.copy(alpha = 0.10f),
+                )
+            }
 
             if (model.supportsLora) {
                 Spacer(modifier = Modifier.width(4.dp))
