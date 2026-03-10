@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
@@ -323,7 +323,7 @@ class ModelDownloadService {
     return Directory(modelPath);
   }
 
-  /// Extract an archive to the destination
+  /// Extract an archive to the destination using streaming to avoid OOM on large files
   Future<String> _extractArchive(
     String archivePath,
     String destDir,
@@ -331,57 +331,29 @@ class ModelDownloadService {
   ) async {
     _logger.info('Extracting archive: $archivePath');
 
-    final archiveFile = File(archivePath);
-    final bytes = await archiveFile.readAsBytes();
+    final supported = archivePath.endsWith('.tar.gz') ||
+        archivePath.endsWith('.tgz') ||
+        archivePath.endsWith('.tar.bz2') ||
+        archivePath.endsWith('.tbz2') ||
+        archivePath.endsWith('.zip') ||
+        archivePath.endsWith('.tar');
 
-    Archive? archive;
-
-    // Determine archive type
-    if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-      final gzDecoded = GZipDecoder().decodeBytes(bytes);
-      archive = TarDecoder().decodeBytes(gzDecoded);
-    } else if (archivePath.endsWith('.tar.bz2') ||
-        archivePath.endsWith('.tbz2')) {
-      final bz2Decoded = BZip2Decoder().decodeBytes(bytes);
-      archive = TarDecoder().decodeBytes(bz2Decoded);
-    } else if (archivePath.endsWith('.zip')) {
-      archive = ZipDecoder().decodeBytes(bytes);
-    } else if (archivePath.endsWith('.tar')) {
-      archive = TarDecoder().decodeBytes(bytes);
-    } else {
+    if (!supported) {
       _logger.warning('Unknown archive format: $archivePath');
       return archivePath;
     }
 
-    // Extract files
-    String? rootDir;
-    for (final file in archive) {
-      final filePath = p.join(destDir, file.name);
-
-      if (file.isFile) {
-        final outFile = File(filePath);
-        await outFile.create(recursive: true);
-        await outFile.writeAsBytes(file.content as List<int>);
-        _logger.debug('Extracted: ${file.name}');
-
-        // Track root directory
-        final parts = file.name.split('/');
-        if (parts.isNotEmpty && rootDir == null) {
-          rootDir = parts.first;
-        }
-      } else {
-        await Directory(filePath).create(recursive: true);
-      }
-    }
+    // Use streaming extraction — reads file in chunks, never loads entire archive into RAM
+    await extractFileToDisk(archivePath, destDir);
 
     _logger.info('Extraction complete: $destDir');
 
-    // Return the model directory (could be a nested directory)
-    if (rootDir != null) {
-      final nestedPath = p.join(destDir, rootDir);
-      if (await Directory(nestedPath).exists()) {
-        return nestedPath;
-      }
+    // Return the nested root directory if one exists inside destDir
+    final destDirectory = Directory(destDir);
+    final entries = await destDirectory.list().toList();
+    final subdirs = entries.whereType<Directory>().toList();
+    if (subdirs.length == 1) {
+      return subdirs.first.path;
     }
 
     return destDir;

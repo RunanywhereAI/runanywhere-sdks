@@ -17,6 +17,9 @@ dependencies:
   # RunAnywhere SDK - LlamaCpp Backend (LLM)
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+
+  # RunAnywhere SDK - Genie NPU Backend (Android/Snapdragon only)
+  runanywhere_genie: ^0.1.2
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.0

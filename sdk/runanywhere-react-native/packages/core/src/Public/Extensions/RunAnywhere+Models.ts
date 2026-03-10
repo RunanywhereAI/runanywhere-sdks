@@ -14,7 +14,7 @@ import { FileSystem, MultiFileModelCache } from '../../services/FileSystem';
 import type { ModelFileDescriptor } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework, ModelCompatibilityResult } from '../../types';
-import { ModelCategory, ModelArtifactType } from '../../types';
+import { ModelCategory, ModelArtifactType, ModelFormat, ConfigurationSource } from '../../types';
 
 const logger = new SDKLogger('RunAnywhere.Models');
 
@@ -227,7 +227,6 @@ export async function registerModel(options: {
   memoryRequirement?: number;
   supportsThinking?: boolean;
 }): Promise<ModelInfo> {
-  const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
   const now = new Date().toISOString();
   const modelId = options.id ?? generateModelId(options.url);
 
@@ -291,7 +290,6 @@ export async function registerMultiFileModel(options: {
   modality?: ModelCategory;
   memoryRequirement?: number;
 }): Promise<ModelInfo> {
-  const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
   const now = new Date().toISOString();
 
   MultiFileModelCache.set(options.id, options.files);
@@ -356,8 +354,7 @@ function inferFrameworkDir(framework: LLMFramework): string {
   }
 }
 
-function inferFormat(url: string, framework?: LLMFramework): import('../../types/enums').ModelFormat {
-  const { ModelFormat } = require('../../types/enums');
+function inferFormat(url: string, framework?: LLMFramework): ModelFormat {
   const lower = url.toLowerCase();
   if (lower.includes('.gguf')) return ModelFormat.GGUF;
   if (lower.includes('.onnx')) return ModelFormat.ONNX;

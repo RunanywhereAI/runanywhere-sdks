@@ -19,6 +19,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -50,6 +51,15 @@ try {
 } catch (e) {
   console.warn('[App] LlamaCPP backend not available - some features disabled');
 }
+
+// Make Genie optional (Android/Snapdragon only)
+let Genie: any = null;
+try {
+  Genie = require('@runanywhere/genie').Genie;
+} catch (e) {
+  console.warn('[App] Genie NPU backend not available');
+}
+
 import { ONNX } from '@runanywhere/onnx';
 import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
 
@@ -224,6 +234,30 @@ async function registerModulesAndModels(): Promise<void> {
         framework: LLMFramework.LlamaCpp,
         modality: ModelCategory.Multimodal,
         memoryRequirement: 600_000_000,
+      }),
+    ]);
+  }
+
+  // =========================================================================
+  // Genie NPU backend + models (Android/Snapdragon only)
+  // =========================================================================
+  if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
+    Genie.register();
+
+    await Promise.all([
+      RunAnywhere.registerModel({
+        id: 'qwen2_5-7b-instruct-genie',
+        name: 'Qwen 2.5 7B (NPU)',
+        url: 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz',
+        framework: LLMFramework.Genie,
+        memoryRequirement: 5_000_000_000,
+      }),
+      RunAnywhere.registerModel({
+        id: 'llama-3.2-1b-instruct-genie',
+        name: 'Llama 3.2 1B (NPU)',
+        url: 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz',
+        framework: LLMFramework.Genie,
+        memoryRequirement: 1_500_000_000,
       }),
     ]);
   }

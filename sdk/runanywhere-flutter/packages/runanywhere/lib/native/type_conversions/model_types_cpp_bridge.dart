@@ -43,6 +43,7 @@ abstract class RacInferenceFramework {
   static const int fluidAudio = 4;
   static const int builtIn = 5;
   static const int none = 6;
+  static const int genie = 10; // RAC_FRAMEWORK_GENIE
   static const int unknown = 99;
 }
 
@@ -191,6 +192,8 @@ extension InferenceFrameworkCppBridge on InferenceFramework {
         return RacInferenceFramework.builtIn;
       case InferenceFramework.none:
         return RacInferenceFramework.none;
+      case InferenceFramework.genie:
+        return RacInferenceFramework.genie;
       case InferenceFramework.unknown:
         return RacInferenceFramework.unknown;
     }
@@ -213,6 +216,8 @@ extension InferenceFrameworkCppBridge on InferenceFramework {
         return InferenceFramework.builtIn;
       case RacInferenceFramework.none:
         return InferenceFramework.none;
+      case RacInferenceFramework.genie:
+        return InferenceFramework.genie;
       default:
         return InferenceFramework.unknown;
     }

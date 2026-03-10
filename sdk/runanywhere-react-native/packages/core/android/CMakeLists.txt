@@ -60,6 +60,10 @@ file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
 # TODO: Re-enable ToolCallingBridge when commons library includes rac_tool_call_* functions
 # Currently disabled because these functions aren't in commons v0.1.4
 list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*ToolCallingBridge\\.cpp$")
+# TODO: Re-enable RAGBridge when commons library includes rac_rag_* functions
+list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*RAGBridge\\.cpp$")
+# TODO: Re-enable CompatibilityBridge when commons library includes rac_model_check_compatibility
+list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*CompatibilityBridge\\.cpp$")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
@@ -109,6 +113,7 @@ include_directories(
     "${RAC_INCLUDE_DIR}/rac/features/voice_agent"
     "${RAC_INCLUDE_DIR}/rac/features/rag"
     "${RAC_INCLUDE_DIR}/rac/features/platform"
+    "${RAC_INCLUDE_DIR}/rac/backends"
     "${RAC_INCLUDE_DIR}/rac/infrastructure"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/device"
     "${RAC_INCLUDE_DIR}/rac/infrastructure/download"
