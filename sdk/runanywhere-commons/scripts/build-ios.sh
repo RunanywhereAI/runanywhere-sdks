@@ -330,6 +330,44 @@ create_macos_versioned_framework() {
 }
 
 # =============================================================================
+# Inject Info.plist into XCFramework slices for App Store validation
+# Library-format xcframeworks don't carry Info.plist automatically, so Xcode
+# generates a minimal one at embed time that may lack CFBundleShortVersionString.
+# =============================================================================
+
+inject_xcframework_info_plist() {
+    local XCFW_PATH=$1
+    local FRAMEWORK_NAME=$2
+
+    for slice_dir in "${XCFW_PATH}"/*/; do
+        [[ ! -d "$slice_dir" ]] && continue
+        local slice_name
+        slice_name=$(basename "$slice_dir")
+        local min_os_key="MinimumOSVersion"
+        local min_os_val="${IOS_DEPLOYMENT_TARGET}"
+        if [[ "$slice_name" == *"macos"* ]]; then
+            min_os_key="LSMinimumSystemVersion"
+            min_os_val="14.0"
+        fi
+        cat > "${slice_dir}Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>${FRAMEWORK_NAME}</string>
+    <key>CFBundleIdentifier</key><string>ai.runanywhere.${FRAMEWORK_NAME}</string>
+    <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${VERSION}</string>
+    <key>${min_os_key}</key><string>${min_os_val}</string>
+</dict>
+</plist>
+EOF
+    done
+    log_info "Injected Info.plist into ${FRAMEWORK_NAME}.xcframework slices"
+}
+
+# =============================================================================
 # Create XCFramework
 # =============================================================================
 
@@ -459,6 +497,7 @@ EOF
     fi
 
     xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_PATH}"
+    inject_xcframework_info_plist "${XCFW_PATH}" "${FRAMEWORK_NAME}"
 
     log_info "Created: ${XCFW_PATH}"
     echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
@@ -653,6 +692,7 @@ EOF
         fi
 
         xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_PATH}"
+        inject_xcframework_info_plist "${XCFW_PATH}" "${FRAMEWORK_NAME}"
 
         log_info "Created: ${XCFW_PATH}"
         echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
