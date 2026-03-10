@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:archive/archive_io.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
@@ -323,7 +322,10 @@ class ModelDownloadService {
     return Directory(modelPath);
   }
 
-  /// Extract an archive to the destination using streaming to avoid OOM on large files
+  /// Extract an archive using the system `tar`/`unzip` command.
+  /// This runs in a separate process (non-blocking) and is orders of magnitude
+  /// faster than the pure-Dart `archive` package for large model files (1GB+).
+  /// Android has `tar` via toybox since API 23 (min SDK 24).
   Future<String> _extractArchive(
     String archivePath,
     String destDir,
@@ -331,31 +333,46 @@ class ModelDownloadService {
   ) async {
     _logger.info('Extracting archive: $archivePath');
 
-    final supported = archivePath.endsWith('.tar.gz') ||
-        archivePath.endsWith('.tgz') ||
-        archivePath.endsWith('.tar.bz2') ||
-        archivePath.endsWith('.tbz2') ||
-        archivePath.endsWith('.zip') ||
-        archivePath.endsWith('.tar');
+    final List<String> args;
 
-    if (!supported) {
+    if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+      args = ['-xzf', archivePath, '-C', destDir];
+    } else if (archivePath.endsWith('.tar.bz2') ||
+        archivePath.endsWith('.tbz2')) {
+      args = ['-xjf', archivePath, '-C', destDir];
+    } else if (archivePath.endsWith('.tar')) {
+      args = ['-xf', archivePath, '-C', destDir];
+    } else if (archivePath.endsWith('.zip')) {
+      // Use unzip for .zip files
+      final result = await Process.run('unzip', ['-o', archivePath, '-d', destDir]);
+      if (result.exitCode != 0) {
+        throw Exception('unzip failed (exit ${result.exitCode}): ${result.stderr}');
+      }
+      _logger.info('Extraction complete: $destDir');
+      return _resolveExtractedDir(destDir);
+    } else {
       _logger.warning('Unknown archive format: $archivePath');
       return archivePath;
     }
 
-    // Use streaming extraction — reads file in chunks, never loads entire archive into RAM
-    await extractFileToDisk(archivePath, destDir);
+    // Run tar extraction — runs as a separate OS process, does not block the Dart event loop
+    final result = await Process.run('tar', args);
+    if (result.exitCode != 0) {
+      throw Exception('tar failed (exit ${result.exitCode}): ${result.stderr}');
+    }
 
     _logger.info('Extraction complete: $destDir');
+    return _resolveExtractedDir(destDir);
+  }
 
-    // Return the nested root directory if one exists inside destDir
+  /// If extraction produced a single subdirectory, return that path instead.
+  Future<String> _resolveExtractedDir(String destDir) async {
     final destDirectory = Directory(destDir);
     final entries = await destDirectory.list().toList();
     final subdirs = entries.whereType<Directory>().toList();
     if (subdirs.length == 1) {
       return subdirs.first.path;
     }
-
     return destDir;
   }
 
