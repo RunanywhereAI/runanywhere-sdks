@@ -78,7 +78,6 @@ class AudioPlaybackManager {
         channels: Int,
         bitsPerSample: Int,
     ) = suspendCancellableCoroutine { continuation ->
-        // resumed must be declared outside try so catch can share the same guard
         val resumed = AtomicBoolean(false)
 
         fun cleanup(track: AudioTrack?) {
@@ -154,10 +153,9 @@ class AudioPlaybackManager {
                     .setTransferMode(AudioTrack.MODE_STATIC)
                     .build()
 
+            interruptPlayback = { fail(track, AudioPlaybackException.PlaybackInterrupted) }
             audioTrack = track
             isPlaying = true
-
-            interruptPlayback = { fail(track, AudioPlaybackException.PlaybackInterrupted) }
 
             val bytesWritten = track.write(pcmData, 0, pcmData.size)
             if (bytesWritten < 0) {
@@ -214,12 +212,10 @@ class AudioPlaybackManager {
                 ((data[27].toInt() and 0xFF) shl 24)
         val bitsPerSample = (data[34].toInt() and 0xFF) or ((data[35].toInt() and 0xFF) shl 8)
 
-        // Validate parsed values before returning
         if (channels !in 1..2) throw AudioPlaybackException.InvalidAudioFormat
         if (sampleRate <= 0) throw AudioPlaybackException.InvalidAudioFormat
         if (bitsPerSample !in setOf(8, 16)) throw AudioPlaybackException.InvalidAudioFormat
 
-        // Find data chunk (usually at offset 44 but can vary)
         var dataOffset = 12
         while (dataOffset < data.size - 8) {
             val chunkId = String(data.copyOfRange(dataOffset, dataOffset + 4))
@@ -234,7 +230,13 @@ class AudioPlaybackManager {
                 break
             }
 
-            dataOffset += 8 + chunkSize
+            if (chunkSize < 0) throw AudioPlaybackException.InvalidAudioFormat
+            val paddedChunkSize = chunkSize + (chunkSize and 1)
+            val nextOffset = dataOffset.toLong() + 8L + paddedChunkSize.toLong()
+            if (nextOffset <= dataOffset.toLong() || nextOffset > data.size.toLong()) {
+                throw AudioPlaybackException.InvalidAudioFormat
+            }
+            dataOffset = nextOffset.toInt()
         }
 
         if (dataOffset >= data.size) throw AudioPlaybackException.InvalidAudioFormat
