@@ -108,6 +108,10 @@ public actor VoiceSessionHandle {
         eventContinuation?.finish()
     }
 
+    public func interruptPlayback() {
+        audioPlayback.stop()
+    }
+
     /// Force process current audio (push-to-talk)
     public func sendNow() async {
         guard isRunning else { return }
@@ -196,43 +200,68 @@ public actor VoiceSessionHandle {
 
         emit(.processing)
 
-        do {
-            let result = try await RunAnywhere.processVoiceTurn(audio)
+        var transcription = ""
+        var cleanedResponse = ""
+        var thinkingContent: String?
+        var synthesizedAudio: Data?
 
-            guard result.speechDetected else {
-                logger.info("No speech detected")
+        do {
+            // Step 1: Transcribe audio
+            transcription = try await RunAnywhere.voiceAgentTranscribe(audio)
+
+            guard !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                logger.info("No speech detected (empty transcription)")
+                emit(.turnCompleted(transcript: "", response: "", thinkingContent: nil, audio: nil))
                 if config.continuousMode && isRunning {
                     try? await startListening()
                 }
                 return
             }
 
-            // Emit intermediate results
-            if let transcript = result.transcription {
-                emit(.transcribed(text: transcript))
+            emit(.transcribed(text: transcription))
+
+            // Step 2: Generate LLM response (apply /no_think prefix if needed)
+            let effectivePrompt: String
+            if !config.thinkingModeEnabled {
+                effectivePrompt = "/no_think\n\(transcription)"
+            } else {
+                effectivePrompt = transcription
             }
 
-            if let response = result.response {
-                emit(.responded(text: response))
+            let rawResponse = try await RunAnywhere.voiceAgentGenerateResponse(effectivePrompt)
+
+            // Step 3: Parse out <think> tags from response before TTS
+            let parsed = ThinkingContentParser.extract(from: rawResponse)
+            cleanedResponse = parsed.text
+            thinkingContent = parsed.thinking
+
+            emit(.responded(text: cleanedResponse, thinkingContent: thinkingContent))
+
+            // Step 4: Synthesize speech from cleaned response (no think tags spoken)
+            if config.autoPlayTTS, !cleanedResponse.isEmpty {
+                let ttsAudio = try await RunAnywhere.voiceAgentSynthesizeSpeech(cleanedResponse)
+                synthesizedAudio = ttsAudio
+
+                if !ttsAudio.isEmpty {
+                    emit(.speaking)
+                    do {
+                        try await audioPlayback.play(ttsAudio)
+                    } catch is AudioPlaybackError {
+                        logger.info("TTS playback interrupted by user")
+                    }
+                }
             }
-
-            // Play TTS if enabled
-            if config.autoPlayTTS, let ttsAudio = result.synthesizedAudio, !ttsAudio.isEmpty {
-                emit(.speaking)
-                try await audioPlayback.play(ttsAudio)
-            }
-
-            // Emit complete result
-            emit(.turnCompleted(
-                transcript: result.transcription ?? "",
-                response: result.response ?? "",
-                audio: result.synthesizedAudio
-            ))
-
         } catch {
             logger.error("Processing failed: \(error)")
             emit(.error(error.localizedDescription))
         }
+
+        emit(.turnCompleted(
+            transcript: transcription,
+            response: cleanedResponse,
+            thinkingContent: thinkingContent,
+            audio: synthesizedAudio
+        ))
 
         // Resume listening if continuous mode
         if config.continuousMode && isRunning {

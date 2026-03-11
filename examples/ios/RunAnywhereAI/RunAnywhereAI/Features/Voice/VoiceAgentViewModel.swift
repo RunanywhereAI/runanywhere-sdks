@@ -387,7 +387,11 @@ final class VoiceAgentViewModel: ObservableObject {
         assistantResponse = ""
 
         do {
-            session = try await RunAnywhere.startVoiceSession()
+            let settings = SettingsViewModel.shared
+            let voiceConfig = VoiceSessionConfig(
+                thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled
+            )
+            session = try await RunAnywhere.startVoiceSession(config: voiceConfig)
             sessionState = .listening
             currentStatus = "Listening..."
             eventTask = Task { [weak self] in
@@ -419,6 +423,10 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Voice session stopped")
     }
 
+    func interruptSpeaking() async {
+        await session?.interruptPlayback()
+    }
+
     /// Force send current audio buffer (for push-to-talk mode)
     func sendAudioNow() async {
         await session?.sendNow()
@@ -434,9 +442,9 @@ final class VoiceAgentViewModel: ObservableObject {
         case .speechStarted: isSpeechDetected = true; currentStatus = "Listening..."
         case .processing: sessionState = .processing; currentStatus = "Processing..."; isSpeechDetected = false
         case .transcribed(let text): currentTranscript = text
-        case .responded(let text): assistantResponse = text
+        case .responded(let text, _): assistantResponse = text
         case .speaking: sessionState = .speaking; currentStatus = "Speaking..."
-        case let .turnCompleted(transcript, response, _):
+        case let .turnCompleted(transcript, response, _, _):
             currentTranscript = transcript; assistantResponse = response
             sessionState = .listening; currentStatus = "Listening..."
         case .stopped: sessionState = .disconnected; currentStatus = "Ready"

@@ -370,8 +370,8 @@ extension ChatInterfaceView {
             .onReceive(
                 NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))
             ) { _ in
-                if viewModel.isGenerating {
-                    proxy.scrollTo("typing", anchor: .bottom)
+                if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
                 }
             }
         }
@@ -413,7 +413,7 @@ extension ChatInterfaceView {
                     .animation(nil, value: message.content)
             }
 
-            if viewModel.isGenerating {
+            if viewModel.isGenerating, viewModel.messages.last?.content.isEmpty == true {
                 TypingIndicatorView()
                     .id("typing")
                     .transition(typingTransition)

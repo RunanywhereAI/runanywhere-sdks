@@ -87,7 +87,7 @@ public class AudioPlaybackManager: NSObject, ObservableObject, AVAudioPlayerDele
 
     /// Stop current playback
     public func stop() {
-        guard isPlaying else { return }
+        guard audioPlayer != nil else { return }
 
         audioPlayer?.stop()
         cleanupPlayback(success: false)

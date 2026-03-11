@@ -309,7 +309,7 @@ private final class LLMStreamCallbackContext: @unchecked Sendable {
 
 // MARK: - Thinking Content Parser
 
-private enum ThinkingContentParser {
+enum ThinkingContentParser {
     /// Extracts `<think>...</think>` content from generated text.
     /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
     static func extract(from text: String) -> (text: String, thinking: String?) {
@@ -320,10 +320,16 @@ private enum ThinkingContentParser {
         }
         let thinkingContent = String(text[startRange.upperBound..<endRange.lowerBound])
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let responseText = String(text[endRange.upperBound...])
+        // Include any text before <think> and after </think>
+        let textBefore = String(text[..<startRange.lowerBound])
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let textAfter = String(text[endRange.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let responseText = [textBefore, textAfter]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
         return (
-            text: responseText.isEmpty ? text : responseText,
+            text: responseText,
             thinking: thinkingContent.isEmpty ? nil : thinkingContent
         )
     }

@@ -194,6 +194,10 @@ class SettingsViewModel: ObservableObject {
 
         // Load system prompt — fall back to the default when the key has never been set
         systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? "You are a helpful, concise AI assistant."
+        // Persist the default so that other ViewModels reading UserDefaults directly always find a value
+        if UserDefaults.standard.string(forKey: systemPromptDefaultsKey) == nil {
+            UserDefaults.standard.set(systemPrompt, forKey: systemPromptDefaultsKey)
+        }
 
         // Load thinking mode
         thinkingModeEnabled = UserDefaults.standard.bool(forKey: thinkingModeKey)

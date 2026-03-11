@@ -107,8 +107,16 @@ final class RAGViewModel {
         }
 
         do {
+            let settings = SettingsViewModel.shared
+            let effectiveQuestion: String
+            if settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled {
+                effectiveQuestion = "/no_think\n\(question)"
+            } else {
+                effectiveQuestion = question
+            }
+
             logger.info("Querying RAG pipeline: \(question)")
-            let result = try await RunAnywhere.ragQuery(question: question)
+            let result = try await RunAnywhere.ragQuery(question: effectiveQuestion)
             messages.append((role: .assistant, text: result.answer))
             logger.info("Query complete (\(result.totalTimeMs, format: .fixed(precision: 0))ms)")
         } catch {

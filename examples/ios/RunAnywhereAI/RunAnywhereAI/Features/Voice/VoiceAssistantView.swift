@@ -421,7 +421,9 @@ extension VoiceAssistantView {
                 icon: viewModel.micButtonIcon
             ) {
                 Task {
-                    if viewModel.isActive {
+                    if viewModel.isSpeaking {
+                        await viewModel.interruptSpeaking()
+                    } else if viewModel.isActive {
                         await viewModel.stopConversation()
                     } else {
                         await viewModel.startConversation()
