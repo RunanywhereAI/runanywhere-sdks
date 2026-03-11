@@ -274,7 +274,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 0.6B Q4_K_M",
                 url: qwen3_06bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 500_000_000
+                memoryRequirement: 500_000_000,
+                supportsThinking: true
             )
         }
         if let qwen3_17bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf") {
@@ -283,7 +284,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 1.7B Q4_K_M",
                 url: qwen3_17bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 1_200_000_000
+                memoryRequirement: 1_200_000_000,
+                supportsThinking: true
             )
         }
         if let qwen3_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf") {
@@ -292,7 +294,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 4B Q4_K_M",
                 url: qwen3_4bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 2_800_000_000
+                memoryRequirement: 2_800_000_000,
+                supportsThinking: true
             )
         }
 
@@ -303,7 +306,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 0.8B Q4_K_M",
                 url: qwen35_08bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 600_000_000
+                memoryRequirement: 600_000_000,
+                supportsThinking: true
             )
         }
         if let qwen35_2bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf") {
@@ -312,7 +316,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 2B Q4_K_M",
                 url: qwen35_2bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 1_500_000_000
+                memoryRequirement: 1_500_000_000,
+                supportsThinking: true
             )
         }
         if let qwen35_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf") {
@@ -321,7 +326,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 4B Q4_K_M",
                 url: qwen35_4bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 2_800_000_000
+                memoryRequirement: 2_800_000_000,
+                supportsThinking: true
             )
         }
 

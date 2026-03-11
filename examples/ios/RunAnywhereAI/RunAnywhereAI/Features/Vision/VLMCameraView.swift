@@ -17,6 +17,7 @@ struct VLMCameraView: View {
     @State private var showingModelSelection = false
     @State private var showingPhotos = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -51,6 +52,14 @@ struct VLMCameraView: View {
         .onDisappear {
             viewModel.stopAutoStreaming()
             viewModel.stopCamera()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                viewModel.stopAutoStreaming()
+                viewModel.stopCamera()
+            } else if newPhase == .active {
+                setupCameraIfNeeded()
+            }
         }
     }
 
