@@ -18,7 +18,9 @@ class SettingsViewModel: ObservableObject {
     // Generation Settings
     @Published var temperature: Double = 0.7
     @Published var maxTokens: Int = 10000
-    @Published var systemPrompt: String = ""
+    @Published var systemPrompt: String = "You are a helpful, concise AI assistant."
+    @Published var thinkingModeEnabled: Bool = false
+    @Published private(set) var loadedModelSupportsThinking: Bool = false
 
     // API Configuration
     @Published var apiKey: String = ""
@@ -50,6 +52,7 @@ class SettingsViewModel: ObservableObject {
     private let temperatureDefaultsKey = "defaultTemperature"
     private let maxTokensDefaultsKey = "defaultMaxTokens"
     private let systemPromptDefaultsKey = "defaultSystemPrompt"
+    private let thinkingModeKey = "thinkingModeEnabled"
     private let analyticsLogKey = "analyticsLogToLocal"
     private let deviceRegisteredKey = "com.runanywhere.sdk.deviceRegistered"
 
@@ -92,6 +95,36 @@ class SettingsViewModel: ObservableObject {
     init() {
         loadSettings()
         setupObservers()
+        subscribeToModelNotifications()
+    }
+
+    private func subscribeToModelNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleModelLoaded(_:)),
+            name: Notification.Name("ModelLoaded"),
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleModelUnloaded),
+            name: Notification.Name("ModelUnloaded"),
+            object: nil
+        )
+    }
+
+    @objc private func handleModelLoaded(_ notification: Notification) {
+        if let model = notification.object as? ModelInfo {
+            loadedModelSupportsThinking = model.supportsThinking
+        }
+    }
+
+    @objc private func handleModelUnloaded() {
+        loadedModelSupportsThinking = false
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Setup
@@ -124,6 +157,14 @@ class SettingsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Auto-save thinking mode preference
+        $thinkingModeEnabled
+            .dropFirst()
+            .sink { [weak self] newValue in
+                self?.saveThinkingModePreference(newValue)
+            }
+            .store(in: &cancellables)
+
         // Auto-save analytics logging preference
         $analyticsLogToLocal
             .dropFirst() // Skip initial value to avoid saving on init
@@ -143,16 +184,19 @@ class SettingsViewModel: ObservableObject {
     }
 
     private func loadGenerationSettings() {
-        // Load temperature
-        let savedTemperature = UserDefaults.standard.double(forKey: temperatureDefaultsKey)
-        temperature = savedTemperature > 0 ? savedTemperature : 0.7
+        // Load temperature — use object(forKey:) to distinguish unset (nil) from explicit 0.0
+        let savedTemperature = UserDefaults.standard.object(forKey: temperatureDefaultsKey) as? Double
+        temperature = savedTemperature ?? 0.7
 
         // Load max tokens
         let savedMaxTokens = UserDefaults.standard.integer(forKey: maxTokensDefaultsKey)
         maxTokens = savedMaxTokens > 0 ? savedMaxTokens : 10000
 
-        // Load system prompt
-        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? ""
+        // Load system prompt — fall back to the default when the key has never been set
+        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? "You are a helpful, concise AI assistant."
+
+        // Load thinking mode
+        thinkingModeEnabled = UserDefaults.standard.bool(forKey: thinkingModeKey)
     }
 
     private func loadApiKeyConfiguration() {
@@ -200,12 +244,18 @@ class SettingsViewModel: ObservableObject {
         print("Settings: Saved system prompt (\(value.count) chars)")
     }
 
+    private func saveThinkingModePreference(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: thinkingModeKey)
+        print("Settings: Thinking mode set to: \(value)")
+    }
+
     /// Get current generation configuration for SDK usage
     func getGenerationConfiguration() -> GenerationConfiguration {
         GenerationConfiguration(
             temperature: temperature,
             maxTokens: maxTokens,
-            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
+            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt,
+            thinkingModeEnabled: thinkingModeEnabled
         )
     }
 
@@ -418,4 +468,5 @@ struct GenerationConfiguration {
     let temperature: Double
     let maxTokens: Int
     let systemPrompt: String?
+    let thinkingModeEnabled: Bool
 }
