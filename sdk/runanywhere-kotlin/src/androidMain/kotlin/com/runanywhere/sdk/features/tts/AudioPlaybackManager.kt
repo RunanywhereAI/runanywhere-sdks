@@ -7,6 +7,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -131,26 +132,44 @@ class AudioPlaybackManager {
             audioTrack = track
             isPlaying = true
 
+            val resumed = AtomicBoolean(false)
+
             // Write all data
             val bytesWritten = track.write(pcmData, 0, pcmData.size)
             if (bytesWritten < 0) {
                 track.release()
                 audioTrack = null
                 isPlaying = false
-                continuation.resumeWithException(AudioPlaybackException.PlaybackFailed("Write failed: $bytesWritten"))
+                if (resumed.compareAndSet(false, true)) {
+                    continuation.resumeWithException(AudioPlaybackException.PlaybackFailed("Write failed: $bytesWritten"))
+                }
+                return@suspendCancellableCoroutine
+            }
+
+            val bytesPerSample = bitsPerSample / 8
+            val frameSize = bytesPerSample * channels
+            if (frameSize <= 0 || bytesWritten % frameSize != 0) {
+                track.release()
+                audioTrack = null
+                isPlaying = false
+                if (resumed.compareAndSet(false, true)) {
+                    continuation.resumeWithException(AudioPlaybackException.InvalidAudioFormat)
+                }
                 return@suspendCancellableCoroutine
             }
 
             // Set notification marker at end
-            track.notificationMarkerPosition = pcmData.size / (bitsPerSample / 8 * channels)
+            track.notificationMarkerPosition = bytesWritten / frameSize
             track.setPlaybackPositionUpdateListener(
                 object : AudioTrack.OnPlaybackPositionUpdateListener {
                     override fun onMarkerReached(track: AudioTrack?) {
-                        isPlaying = false
-                        track?.stop()
-                        track?.release()
-                        audioTrack = null
-                        continuation.resume(Unit)
+                        if (resumed.compareAndSet(false, true)) {
+                            isPlaying = false
+                            track?.stop()
+                            track?.release()
+                            audioTrack = null
+                            continuation.resume(Unit)
+                        }
                     }
 
                     override fun onPeriodicNotification(track: AudioTrack?) {
@@ -161,7 +180,9 @@ class AudioPlaybackManager {
 
             // Handle cancellation
             continuation.invokeOnCancellation {
-                stop()
+                if (resumed.compareAndSet(false, true)) {
+                    stop()
+                }
             }
 
             // Start playback
@@ -170,7 +191,9 @@ class AudioPlaybackManager {
             isPlaying = false
             audioTrack?.release()
             audioTrack = null
-            continuation.resumeWithException(e)
+            if (continuation.isActive) {
+                continuation.resumeWithException(e)
+            }
         }
     }
 
