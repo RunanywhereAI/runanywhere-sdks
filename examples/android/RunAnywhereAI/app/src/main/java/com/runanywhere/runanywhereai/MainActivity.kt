@@ -1,97 +1,245 @@
 package com.runanywhere.runanywhereai
 
 import android.os.Bundle
-import timber.log.Timber
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.runanywhere.runanywhereai.presentation.common.InitializationErrorView
-import com.runanywhere.runanywhereai.presentation.common.InitializationLoadingView
-import com.runanywhere.runanywhereai.presentation.navigation.AppNavigation
-import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.runanywhere.runanywhereai.models.DialogState
+import com.runanywhere.runanywhereai.navigation.AppNavHost
+import com.runanywhere.runanywhereai.navigation.TopBarType
+import com.runanywhere.runanywhereai.navigation.TopLevelDestination
+import com.runanywhere.runanywhereai.navigation.resolveTopBar
+import com.runanywhere.runanywhereai.ui.components.ChatTopBar
+import com.runanywhere.runanywhereai.ui.components.ConversationHistorySheet
+import com.runanywhere.runanywhereai.ui.components.ModelSelectionSheet
+import com.runanywhere.runanywhereai.ui.icons.RAIcons
+import com.runanywhere.runanywhereai.ui.theme.AppMotion
+import com.runanywhere.runanywhereai.ui.theme.RunAnywhereTheme
+import com.runanywhere.runanywhereai.viewmodels.ChatViewModel
+import com.runanywhere.runanywhereai.viewmodels.ModelSelectionViewModel
 
-/**
- * Main Activity for RunAnywhere AI app.
- * Matches iOS RunAnywhereAIApp.swift pattern exactly:
- * - Shows InitializationLoadingView while SDK initializes
- * - Shows InitializationErrorView if initialization fails (with retry)
- * - Shows ContentView (AppNavigation) when SDK is ready
- */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // 1. Initialize PDFBox Resource Loader (REQUIRED for RAG/PDF extraction)
-        // This must be called before any PDFBox methods are used
-        PDFBoxResourceLoader.init(applicationContext)
-
-        // 2. Setup edge-to-edge display
         enableEdgeToEdge()
-
         setContent {
-            RunAnywhereAITheme {
-                MainAppContent()
+            RunAnywhereTheme {
+                MainApp()
             }
         }
     }
+}
 
-    /**
-     * Main content composable with initialization state handling.
-     * Matches iOS pattern:
-     * - if isSDKInitialized -> ContentView
-     * - else if initializationError -> InitializationErrorView
-     * - else -> InitializationLoadingView
-     */
-    @Composable
-    private fun MainAppContent() {
-        val app = application as RunAnywhereApplication
-        val initState by app.initializationState.collectAsState()
-        val scope = rememberCoroutineScope()
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainApp() {
+    val navController = rememberNavController()
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = currentEntry?.destination
+    val topBarType = remember(currentEntry) { resolveTopBar(currentEntry) }
 
-        when (initState) {
-            is SDKInitializationState.Loading -> {
-                InitializationLoadingView()
-            }
+    // Hoisted ViewModels for Chat — shared between top bar and screen
+    val chatViewModel: ChatViewModel = viewModel()
+    val modelSelectionViewModel: ModelSelectionViewModel = viewModel()
+    val chatUiState by chatViewModel.uiState.collectAsStateWithLifecycle()
+    val modelState by modelSelectionViewModel.uiState.collectAsStateWithLifecycle()
 
-            is SDKInitializationState.Error -> {
-                val error = (initState as SDKInitializationState.Error).error
-                InitializationErrorView(
-                    error = error,
-                    onRetry = {
-                        scope.launch {
-                            app.retryInitialization()
-                        }
-                    },
-                )
-            }
+    // Dialog state for model selection sheet (triggered from top bar)
+    var dialogState by remember { mutableStateOf<DialogState>(DialogState.None) }
 
-            is SDKInitializationState.Ready -> {
-                LaunchedEffect(Unit) { Timber.i("App is ready to use!") }
-                AppNavigation()
-            }
-        }
+    // Hide bottom bar on secondary screens
+    val showBottomBar = TopLevelDestination.entries.any { tab ->
+        currentDestination?.hasRoute(tab.route::class) == true
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Resume any active voice sessions if needed
-        // TODO: Implement when voice pipeline service is available
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            when (topBarType) {
+                is TopBarType.Chat -> {
+                    val readyState = chatUiState as? com.runanywhere.runanywhereai.models.ChatUiState.Ready
+                    ChatTopBar(
+                        modelName = readyState?.loadedModelName,
+                        isModelLoaded = readyState?.isModelLoaded == true,
+                        hasActiveLoraAdapter = readyState?.hasActiveLoraAdapter == true,
+                        onModelChipClick = {
+                            modelSelectionViewModel.loadModels()
+                            dialogState = DialogState.ModelSelection
+                        },
+                        onHistoryClick = {
+                            dialogState = DialogState.ConversationList
+                        },
+                        onNewChatClick = {
+                            chatViewModel.clearChat()
+                        },
+                    )
+                }
+                is TopBarType.Standard -> {
+                    TopAppBar(
+                        title = {
+                            AnimatedContent(
+                                targetState = topBarType.title,
+                                transitionSpec = {
+                                    (fadeIn(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseOut)) +
+                                        slideInVertically(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseOut)) { it / 2 })
+                                        .togetherWith(
+                                            fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn)) +
+                                                slideOutVertically(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn)) { -it / 2 }
+                                        )
+                                },
+                                label = "topBarTitle",
+                            ) { title ->
+                                Text(title)
+                            }
+                        },
+                        navigationIcon = {
+                            AnimatedVisibility(
+                                visible = topBarType.showBack,
+                                enter = fadeIn(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseOut)),
+                                exit = fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn)),
+                            ) {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(RAIcons.ChevronLeft, contentDescription = "Back")
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            AnimatedVisibility(
+                visible = showBottomBar,
+                enter = slideInVertically(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut)) { it } +
+                    fadeIn(tween(AppMotion.DURATION_MEDIUM, easing = AppMotion.EaseOut)),
+                exit = slideOutVertically(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn)) { it } +
+                    fadeOut(tween(AppMotion.DURATION_SHORT, easing = AppMotion.EaseIn)),
+            ) {
+                NavigationBar {
+                    TopLevelDestination.entries.forEach { destination ->
+                        val selected = currentDestination?.hasRoute(destination.route::class) == true
+
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (selected) destination.selectedIcon else destination.icon,
+                                    contentDescription = destination.label,
+                                )
+                            },
+                            label = { Text(destination.label) },
+                        )
+                    }
+                }
+            }
+        },
+    ) { innerPadding ->
+        AppNavHost(
+            navController = navController,
+            chatViewModel = chatViewModel,
+            modelSelectionViewModel = modelSelectionViewModel,
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
+        )
     }
 
-    override fun onPause() {
-        super.onPause()
-        // Pause voice sessions to save battery
-        // TODO: Implement when voice pipeline service is available
+    // Conversation History BottomSheet
+    if (dialogState == DialogState.ConversationList) {
+        val historyConversations by chatViewModel.conversations.collectAsStateWithLifecycle()
+        val currentConvId = (chatUiState as? com.runanywhere.runanywhereai.models.ChatUiState.Ready)?.currentConversation?.id
+
+        ConversationHistorySheet(
+            conversations = historyConversations,
+            currentConversationId = currentConvId,
+            onDismiss = { dialogState = DialogState.None },
+            onSelectConversation = { id ->
+                chatViewModel.loadConversation(id)
+            },
+            onDeleteConversation = { id ->
+                chatViewModel.deleteConversation(id)
+            },
+            onDeleteAllConversations = {
+                chatViewModel.deleteAllConversations()
+                dialogState = DialogState.None
+            },
+            onNewChat = {
+                chatViewModel.clearChat()
+            },
+        )
+    }
+
+    // Model Selection BottomSheet (hosted at activity level, triggered from top bar)
+    if (dialogState == DialogState.ModelSelection) {
+        ModelSelectionSheet(
+            state = modelState,
+            onDismiss = { dialogState = DialogState.None },
+            onSelectModel = { modelId ->
+                modelSelectionViewModel.selectModel(modelId) { name, supportsLora ->
+                    chatViewModel.onModelLoaded(name, supportsLora)
+                }
+                dialogState = DialogState.None
+            },
+            onDownloadModel = { modelId ->
+                modelSelectionViewModel.downloadModel(modelId)
+            },
+            onCancelModelDownload = {
+                modelSelectionViewModel.cancelModelDownload()
+            },
+            onLoadLora = { adapterId ->
+                modelSelectionViewModel.loadLoraAdapter(adapterId)
+            },
+            onUnloadLora = { adapterId ->
+                modelSelectionViewModel.unloadLoraAdapter(adapterId)
+            },
+            onDownloadLora = { entry ->
+                modelSelectionViewModel.downloadLoraAdapter(entry)
+            },
+            onCancelLoraDownload = {
+                modelSelectionViewModel.cancelLoraDownload()
+            },
+            isLoraDownloaded = { modelSelectionViewModel.isLoraDownloaded(it) },
+            isLoraLoaded = { modelSelectionViewModel.isLoraLoaded(it) },
+        )
     }
 }

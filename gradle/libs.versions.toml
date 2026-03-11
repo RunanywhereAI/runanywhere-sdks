@@ -4,6 +4,7 @@
 # ============================================================================
 agp = "8.11.2"
 kotlin = "2.1.21"
+material3 = "1.5.0-alpha15"
 pdfbox = "2.0.27.0"
 
 # ============================================================================
@@ -118,7 +119,7 @@ androidCore = "4.1.1.4"
 # ============================================================================
 # Database - Room
 # ============================================================================
-room = "2.6.1"
+room = "2.8.4"
 
 # ============================================================================
 # Database - SQLDelight (Cross-platform)
@@ -159,6 +160,7 @@ camerax = "1.4.2"
 # ----------------------------------------------------------------------------
 # AndroidX Core
 # ----------------------------------------------------------------------------
+androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
@@ -242,7 +244,7 @@ ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.r
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # ----------------------------------------------------------------------------
-# PDF 
+# PDF
 # ----------------------------------------------------------------------------
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
 
@@ -364,6 +366,11 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+# ----------------------------------------------------------------------------
+# Annotation Processing
+# ----------------------------------------------------------------------------
+ksp = { id = "com.google.devtools.ksp", version = "2.1.21-2.0.2" }
 
 # ----------------------------------------------------------------------------
 # Code Quality
