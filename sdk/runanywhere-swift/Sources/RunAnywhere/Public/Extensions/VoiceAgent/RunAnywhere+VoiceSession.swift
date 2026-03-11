@@ -228,12 +228,11 @@ public actor VoiceSessionHandle {
                 effectivePrompt = transcription
             }
 
-            let rawResponse = try await RunAnywhere.voiceAgentGenerateResponse(effectivePrompt)
-
-            // Step 3: Parse out <think> tags from response before TTS
-            let parsed = ThinkingContentParser.extract(from: rawResponse)
-            cleanedResponse = parsed.text
-            thinkingContent = parsed.thinking
+            let options = LLMGenerationOptions(maxTokens: config.maxTokens ?? 100)
+            let result = try await RunAnywhere.generate(effectivePrompt, options: options)
+            // generate() already runs ThinkingContentParser internally
+            cleanedResponse = result.text
+            thinkingContent = result.thinkingContent
 
             emit(.responded(text: cleanedResponse, thinkingContent: thinkingContent))
 

@@ -31,6 +31,7 @@ struct ChatInterfaceView: View {
     @State private var showingLoRAManagement = false
     @State private var pendingLoRAURL: URL?
     @State private var loraScale: Float = 1.0
+    @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
     @AppStorage("thinkingModeEnabled") private var thinkingModeEnabled = false
     @FocusState private var isTextFieldFocused: Bool
 
@@ -452,7 +453,7 @@ extension ChatInterfaceView {
                     thinkingModeBadge
                 }
 
-                if viewModel.useToolCalling {
+                if viewModel.useToolCalling && !toolSettingsViewModel.registeredTools.isEmpty {
                     toolCallingBadge
                 }
 
