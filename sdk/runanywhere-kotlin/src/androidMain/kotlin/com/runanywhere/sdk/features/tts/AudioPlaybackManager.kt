@@ -20,6 +20,7 @@ import kotlin.coroutines.resumeWithException
 class AudioPlaybackManager {
     private val logger = SDKLogger.tts
 
+    @Volatile
     private var audioTrack: AudioTrack? = null
 
     @Volatile
@@ -191,7 +192,7 @@ class AudioPlaybackManager {
             isPlaying = false
             audioTrack?.release()
             audioTrack = null
-            if (continuation.isActive) {
+            if (resumed.compareAndSet(false, true)) {
                 continuation.resumeWithException(e)
             }
         }
