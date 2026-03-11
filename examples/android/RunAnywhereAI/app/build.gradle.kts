@@ -107,10 +107,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Lifecycle (collectAsStateWithLifecycle)
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Immutable collections (stable lists for Compose)
-    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
+    implementation(libs.kotlinx.collections.immutable)
 
     // Room (local database for chat history)
     implementation(libs.androidx.room.runtime)

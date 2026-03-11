@@ -21,7 +21,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +59,7 @@ fun ChatScreen(
     val uiState by chatViewModel.uiState.collectAsStateWithLifecycle()
     var input by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val canSend by remember {
         derivedStateOf {
@@ -70,7 +74,7 @@ fun ChatScreen(
         chatViewModel.events.collect { event ->
             when (event) {
                 is ChatEvent.ShowSnackbar -> {
-                    // TODO: integrate with SnackbarHostState
+                    snackbarHostState.showSnackbar(event.message)
                 }
                 is ChatEvent.ScrollToBottom -> {
                     val readyState = uiState as? ChatUiState.Ready
@@ -82,6 +86,11 @@ fun ChatScreen(
             }
         }
     }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { _ ->
 
     when (val state = uiState) {
         is ChatUiState.Loading -> {
@@ -137,6 +146,8 @@ fun ChatScreen(
             }
         }
     }
+
+    } // Scaffold
 }
 
 @Composable

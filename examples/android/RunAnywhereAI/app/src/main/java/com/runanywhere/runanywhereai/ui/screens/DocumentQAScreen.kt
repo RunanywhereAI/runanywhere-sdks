@@ -41,7 +41,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -97,6 +100,7 @@ fun DocumentRagScreen(
     val context = LocalContext.current
     val listState = rememberLazyListState()
     var input by rememberSaveable { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     // Model picker state
     var showEmbeddingPicker by remember { mutableStateOf(false) }
@@ -125,10 +129,17 @@ fun DocumentRagScreen(
                         listState.animateScrollToItem(count - 1)
                     }
                 }
-                is RAGEvent.ShowSnackbar -> { /* TODO: snackbar */ }
+                is RAGEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
             }
         }
     }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { _ ->
 
     when (val state = uiState) {
         is RAGUiState.Ready -> {
@@ -195,6 +206,8 @@ fun DocumentRagScreen(
             )
         }
     }
+
+    } // Scaffold
 }
 
 @Composable

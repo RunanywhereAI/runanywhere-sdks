@@ -28,7 +28,6 @@ fun MoreHubScreen(
     onNavigateToStt: () -> Unit,
     onNavigateToTts: () -> Unit,
     onNavigateToRag: () -> Unit,
-    onNavigateToLoraManager: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
 ) {
     Column(
@@ -65,13 +64,6 @@ fun MoreHubScreen(
             title = "Document Q&A",
             subtitle = "Ask questions about your documents",
             onClick = onNavigateToRag,
-        )
-
-        HubCard(
-            icon = RAIcons.Puzzle,
-            title = "LoRA Adapters",
-            subtitle = "Manage fine-tuned model adapters",
-            onClick = onNavigateToLoraManager,
         )
 
         HubCard(

@@ -4,6 +4,8 @@
 # ============================================================================
 agp = "8.11.2"
 kotlin = "2.1.21"
+kotlinxCollectionsImmutable = "0.4.0"
+lifecycleRuntimeCompose = "2.10.0"
 material3 = "1.5.0-alpha15"
 pdfbox = "2.0.27.0"
 
@@ -163,6 +165,7 @@ camerax = "1.4.2"
 androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycleRuntimeCompose" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewModelCompose" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -170,6 +173,7 @@ androidx-activity-compose = { group = "androidx.activity", name = "activity-comp
 # ----------------------------------------------------------------------------
 # Material Design
 # ----------------------------------------------------------------------------
+kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 
 # ----------------------------------------------------------------------------

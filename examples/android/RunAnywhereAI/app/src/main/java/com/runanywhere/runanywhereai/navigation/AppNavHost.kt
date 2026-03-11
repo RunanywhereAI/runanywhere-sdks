@@ -64,7 +64,6 @@ fun AppNavHost(
                 onNavigateToStt = { navController.navigate(Route.Stt) },
                 onNavigateToTts = { navController.navigate(Route.Tts) },
                 onNavigateToRag = { navController.navigate(Route.Rag) },
-                onNavigateToLoraManager = { navController.navigate(Route.LoraManager) },
                 onNavigateToBenchmarks = { navController.navigate(Route.Benchmarks) },
             )
         }
