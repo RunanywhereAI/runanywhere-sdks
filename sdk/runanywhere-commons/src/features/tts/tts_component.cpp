@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <random>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -50,13 +51,15 @@ struct rac_tts_component {
 
 // Generate a simple UUID v4-like string for event tracking
 static std::string generate_uuid_v4() {
+    static thread_local std::mt19937 gen(std::random_device{}());
+    static thread_local std::uniform_int_distribution<> dis(0, 15);
     static const char* hex = "0123456789abcdef";
     std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
     for (size_t i = 0; i < uuid.size(); i++) {
         if (uuid[i] == 'x') {
-            uuid[i] = hex[std::rand() % 16];
+            uuid[i] = hex[dis(gen)];
         } else if (uuid[i] == 'y') {
-            uuid[i] = hex[(std::rand() % 4) + 8];
+            uuid[i] = hex[(dis(gen) % 4) + 8];
         }
     }
     return uuid;
@@ -318,20 +321,42 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_tts_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Generate synthesis ID for event tracking
+    // Acquire lock only for state reads, release before long-running synthesis
     std::string synthesis_id = generate_uuid_v4();
-    const char* voice_id = rac_lifecycle_get_model_id(component->lifecycle);
-    const char* voice_name = rac_lifecycle_get_model_name(component->lifecycle);
+    rac_handle_t service = nullptr;
+    rac_tts_options_t local_options;
+    rac_inference_framework_t framework;
+    const char* voice_id = nullptr;
+    const char* voice_name = nullptr;
 
-    // Debug: Log if voice_id is null
-    if (!voice_id) {
-        log_warning("TTS.Component",
-                    "rac_lifecycle_get_model_id returned null - voice may not be set in telemetry");
-    } else {
-        log_debug("TTS.Component", "TTS synthesis using voice_id: %s", voice_id);
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
+
+        voice_id = rac_lifecycle_get_model_id(component->lifecycle);
+        voice_name = rac_lifecycle_get_model_name(component->lifecycle);
+        framework = component->actual_framework;
+
+        // Copy effective options to local so we can release the lock
+        local_options = options ? *options : component->default_options;
+
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            log_error("TTS.Component", "No voice loaded - cannot synthesize");
+            // Emit SYNTHESIS_FAILED event
+            rac_analytics_event_data_t event_data;
+            event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
+            event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
+            event_data.data.tts_synthesis.model_id = voice_id;
+            event_data.data.tts_synthesis.model_name = voice_name;
+            event_data.data.tts_synthesis.framework = framework;
+            event_data.data.tts_synthesis.error_code = result;
+            event_data.data.tts_synthesis.error_message = "No voice loaded";
+            rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
+            return result;
+        }
     }
+    // Lock released — safe to do long-running synthesis
 
     // Emit SYNTHESIS_STARTED event
     {
@@ -341,34 +366,15 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = static_cast<int32_t>(std::strlen(text));
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
-    }
-
-    rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "No voice loaded - cannot synthesize");
-        // Emit SYNTHESIS_FAILED event
-        rac_analytics_event_data_t event_data;
-        event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
-        event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
-        event_data.data.tts_synthesis.model_id = voice_id;
-        event_data.data.tts_synthesis.model_name = voice_name;
-        event_data.data.tts_synthesis.framework = component->actual_framework;
-        event_data.data.tts_synthesis.error_code = result;
-        event_data.data.tts_synthesis.error_message = "No voice loaded";
-        rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
-        return result;
     }
 
     log_info("TTS.Component", "Synthesizing text");
 
-    const rac_tts_options_t* effective_options = options ? options : &component->default_options;
-
     auto start_time = std::chrono::steady_clock::now();
 
-    result = rac_tts_synthesize(service, text, effective_options, out_result);
+    rac_result_t result = rac_tts_synthesize(service, text, &local_options, out_result);
 
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -384,7 +390,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "Synthesis failed";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -414,7 +420,7 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         event_data.data.tts_synthesis.processing_duration_ms = processing_ms;
         event_data.data.tts_synthesis.characters_per_second = chars_per_sec;
         event_data.data.tts_synthesis.sample_rate = static_cast<int32_t>(out_result->sample_rate);
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event_data);
     }
 
@@ -433,13 +439,43 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_tts_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Generate synthesis ID for event tracking
+    // Acquire lock only for state reads, release before long-running synthesis
     std::string synthesis_id = generate_uuid_v4();
-    const char* voice_id = rac_lifecycle_get_model_id(component->lifecycle);
-    const char* voice_name = rac_lifecycle_get_model_name(component->lifecycle);
+    rac_handle_t service = nullptr;
+    rac_tts_options_t local_options;
+    rac_inference_framework_t framework;
+    const char* voice_id = nullptr;
+    const char* voice_name = nullptr;
     int32_t char_count = static_cast<int32_t>(std::strlen(text));
+
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
+
+        voice_id = rac_lifecycle_get_model_id(component->lifecycle);
+        voice_name = rac_lifecycle_get_model_name(component->lifecycle);
+        framework = component->actual_framework;
+
+        // Copy effective options to local so we can release the lock
+        local_options = options ? *options : component->default_options;
+
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            log_error("TTS.Component", "No voice loaded - cannot synthesize stream");
+            // Emit SYNTHESIS_FAILED event
+            rac_analytics_event_data_t event_data;
+            event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
+            event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
+            event_data.data.tts_synthesis.model_id = voice_id;
+            event_data.data.tts_synthesis.model_name = voice_name;
+            event_data.data.tts_synthesis.framework = framework;
+            event_data.data.tts_synthesis.error_code = result;
+            event_data.data.tts_synthesis.error_message = "No voice loaded";
+            rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
+            return result;
+        }
+    }
+    // Lock released — safe to do long-running synthesis
 
     // Emit SYNTHESIS_STARTED event
     {
@@ -449,34 +485,15 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.model_id = voice_id;
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.character_count = char_count;
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_STARTED, &event_data);
-    }
-
-    rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        log_error("TTS.Component", "No voice loaded - cannot synthesize stream");
-        // Emit SYNTHESIS_FAILED event
-        rac_analytics_event_data_t event_data;
-        event_data.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
-        event_data.data.tts_synthesis.synthesis_id = synthesis_id.c_str();
-        event_data.data.tts_synthesis.model_id = voice_id;
-        event_data.data.tts_synthesis.model_name = voice_name;
-        event_data.data.tts_synthesis.framework = component->actual_framework;
-        event_data.data.tts_synthesis.error_code = result;
-        event_data.data.tts_synthesis.error_message = "No voice loaded";
-        rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
-        return result;
     }
 
     log_info("TTS.Component", "Starting streaming synthesis");
 
-    const rac_tts_options_t* effective_options = options ? options : &component->default_options;
-
     auto start_time = std::chrono::steady_clock::now();
 
-    result = rac_tts_synthesize_stream(service, text, effective_options, callback, user_data);
+    rac_result_t result = rac_tts_synthesize_stream(service, text, &local_options, callback, user_data);
 
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -492,7 +509,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.model_name = voice_name;
         event_data.data.tts_synthesis.processing_duration_ms =
             static_cast<double>(duration.count());
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         event_data.data.tts_synthesis.error_code = result;
         event_data.data.tts_synthesis.error_message = "Streaming synthesis failed";
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_FAILED, &event_data);
@@ -509,7 +526,7 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
         event_data.data.tts_synthesis.character_count = char_count;
         event_data.data.tts_synthesis.processing_duration_ms = processing_ms;
         event_data.data.tts_synthesis.characters_per_second = chars_per_sec;
-        event_data.data.tts_synthesis.framework = component->actual_framework;
+        event_data.data.tts_synthesis.framework = framework;
         rac_analytics_event_emit(RAC_EVENT_TTS_SYNTHESIS_COMPLETED, &event_data);
     }
 

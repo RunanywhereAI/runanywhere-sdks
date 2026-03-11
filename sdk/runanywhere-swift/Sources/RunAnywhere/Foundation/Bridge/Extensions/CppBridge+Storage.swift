@@ -173,14 +173,14 @@ extension CppBridge {
 
 // MARK: - C Callbacks (Platform-Specific File Operations)
 
-/// Calculate directory size using FileManager
+/// Calculate directory size — delegates to C++ file manager (single source of truth)
 private func storageCalculateDirSizeCallback(
     path: UnsafePointer<CChar>?,
     userData _: UnsafeMutableRawPointer?
 ) -> Int64 {
     guard let path = path else { return 0 }
     let url = URL(fileURLWithPath: String(cString: path))
-    return calculateDirectorySize(at: url)
+    return CppBridge.FileManager.calculateDirectorySize(at: url)
 }
 
 /// Get file size
@@ -228,43 +228,6 @@ private func storageGetTotalSpaceCallback(userData _: UnsafeMutableRawPointer?) 
     } catch {
         return 0
     }
-}
-
-/// Calculate directory size (recursive)
-private func calculateDirectorySize(at url: URL) -> Int64 {
-    let fm = FileManager.default
-
-    // Check if it's a directory
-    var isDirectory: ObjCBool = false
-    if fm.fileExists(atPath: url.path, isDirectory: &isDirectory) {
-        if !isDirectory.boolValue {
-            // It's a file
-            if let attrs = try? fm.attributesOfItem(atPath: url.path),
-               let fileSize = attrs[.size] as? Int64 {
-                return fileSize
-            } else {
-                return 0
-            }
-        }
-    }
-
-    // It's a directory
-    guard let enumerator = fm.enumerator(
-        at: url,
-        includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey],
-        options: [.skipsHiddenFiles]
-    ) else {
-        return 0
-    }
-
-    var totalSize: Int64 = 0
-    for case let fileURL as URL in enumerator {
-        if let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
-           values.isRegularFile == true {
-            totalSize += Int64(values.fileSize ?? 0)
-        }
-    }
-    return totalSize
 }
 
 // MARK: - Swift Type Conversions

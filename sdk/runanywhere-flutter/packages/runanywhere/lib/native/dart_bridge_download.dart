@@ -114,6 +114,120 @@ class DartBridgeDownload {
 
   /// Get active download count
   int get activeDownloadCount => _activeTasks.length;
+
+  // ===========================================================================
+  // Download Orchestrator Utilities (from rac_download_orchestrator.h)
+  // ===========================================================================
+
+  /// Find the actual model path after extraction.
+  ///
+  /// Consolidates duplicated Dart logic for scanning extracted directories.
+  /// Uses C++ `rac_find_model_path_after_extraction()` which handles:
+  /// - Finding .gguf, .onnx, .ort, .bin files
+  /// - Nested directories (e.g., sherpa-onnx archives)
+  /// - Single-file-nested pattern
+  /// - Directory-based models (ONNX)
+  ///
+  /// [structure]: C++ archive structure constant (99 = unknown/auto-detect)
+  /// [framework]: C++ inference framework constant (from RacInferenceFramework)
+  /// [format]: C++ model format constant (from RacModelFormat)
+  static String? findModelPathAfterExtraction({
+    required String extractedDir,
+    required int structure,
+    required int framework,
+    required int format,
+  }) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<
+          Int32 Function(
+              Pointer<Utf8>, Int32, Int32, Int32, Pointer<Utf8>, IntPtr),
+          int Function(Pointer<Utf8>, int, int, int, Pointer<Utf8>,
+              int)>('rac_find_model_path_after_extraction');
+
+      final dirPtr = extractedDir.toNativeUtf8();
+      final outPath = calloc<Uint8>(4096);
+
+      try {
+        final result = fn(
+            dirPtr, structure, framework, format, outPath.cast<Utf8>(), 4096);
+        if (result != RacResultCode.success) return null;
+        return outPath.cast<Utf8>().toDartString();
+      } finally {
+        calloc.free(dirPtr);
+        calloc.free(outPath);
+      }
+    } catch (e) {
+      _logger.debug('rac_find_model_path_after_extraction not available: $e');
+      return null;
+    }
+  }
+
+  /// Check if a download URL requires extraction.
+  ///
+  /// Wraps C++ `rac_download_requires_extraction()` which checks URL suffix
+  /// for archive extensions (.tar.gz, .tar.bz2, .tar.xz, .zip).
+  static bool downloadRequiresExtraction(String url) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Int32 Function(Pointer<Utf8>),
+          int Function(Pointer<Utf8>)>('rac_download_requires_extraction');
+
+      final urlPtr = url.toNativeUtf8();
+      try {
+        return fn(urlPtr) == RAC_TRUE;
+      } finally {
+        calloc.free(urlPtr);
+      }
+    } catch (e) {
+      _logger.debug('rac_download_requires_extraction not available: $e');
+      return false;
+    }
+  }
+
+  /// Compute the download destination path for a model.
+  ///
+  /// Wraps C++ `rac_download_compute_destination()`.
+  /// Returns the destination path and whether extraction is needed,
+  /// or null if the computation fails.
+  static ({String path, bool needsExtraction})? computeDownloadDestination({
+    required String modelId,
+    required String downloadUrl,
+    required int framework,
+    required int format,
+  }) {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<
+          Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Int32, Int32,
+              Pointer<Utf8>, IntPtr, Pointer<Int32>),
+          int Function(Pointer<Utf8>, Pointer<Utf8>, int, int, Pointer<Utf8>,
+              int, Pointer<Int32>)>('rac_download_compute_destination');
+
+      final modelIdPtr = modelId.toNativeUtf8();
+      final urlPtr = downloadUrl.toNativeUtf8();
+      final outPath = calloc<Uint8>(4096);
+      final outNeedsExtraction = calloc<Int32>();
+
+      try {
+        final result = fn(modelIdPtr, urlPtr, framework, format,
+            outPath.cast<Utf8>(), 4096, outNeedsExtraction);
+        if (result != RacResultCode.success) return null;
+        return (
+          path: outPath.cast<Utf8>().toDartString(),
+          needsExtraction: outNeedsExtraction.value == RAC_TRUE,
+        );
+      } finally {
+        calloc.free(modelIdPtr);
+        calloc.free(urlPtr);
+        calloc.free(outPath);
+        calloc.free(outNeedsExtraction);
+      }
+    } catch (e) {
+      _logger.debug('rac_download_compute_destination not available: $e');
+      return null;
+    }
+  }
 }
 
 class _DownloadTask {

@@ -90,7 +90,7 @@ SpacesInSquareBrackets: false
 
 # C/C++ specific
 Language: Cpp
-Standard: c++17
+Standard: c++20
 
 # Penalties (for line breaking decisions)
 PenaltyBreakBeforeFirstCallParameter: 19
