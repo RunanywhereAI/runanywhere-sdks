@@ -296,8 +296,10 @@ struct VLMCameraView: View {
     private func setupCameraIfNeeded() {
         Task {
             await viewModel.checkCameraAuthorization()
-            if viewModel.isCameraAuthorized && viewModel.captureSession == nil {
-                viewModel.setupCamera()
+            if viewModel.isCameraAuthorized {
+                if viewModel.captureSession == nil {
+                    viewModel.setupCamera()
+                }
                 viewModel.startCamera()
             }
         }

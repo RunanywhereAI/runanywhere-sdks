@@ -574,4 +574,19 @@ final class LLMViewModel {
             loadConversation(conversation)
         }
     }
+
+    static func stripThinkTags(from text: String) -> String {
+        var result = text
+        // Remove complete <think>...</think> blocks 
+        while let startRange = result.range(of: "<think>"),
+              let endRange = result.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound {
+            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
+        }
+        if let trailingStart = result.range(of: "<think>", options: .backwards),
+           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
+            result = String(result[result.startIndex..<trailingStart.lowerBound])
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }

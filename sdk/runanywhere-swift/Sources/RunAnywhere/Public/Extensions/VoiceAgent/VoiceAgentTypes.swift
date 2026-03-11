@@ -23,6 +23,9 @@ public struct VoiceAgentResult: Sendable {
     /// Generated response text from LLM
     public var response: String?
 
+    /// Thinking content extracted from `<think>...</think>` tags (nil if none)
+    public var thinkingContent: String?
+
     /// Synthesized audio data from TTS
     public var synthesizedAudio: Data?
 
@@ -31,11 +34,13 @@ public struct VoiceAgentResult: Sendable {
         speechDetected: Bool = false,
         transcription: String? = nil,
         response: String? = nil,
+        thinkingContent: String? = nil,
         synthesizedAudio: Data? = nil
     ) {
         self.speechDetected = speechDetected
         self.transcription = transcription
         self.response = response
+        self.thinkingContent = thinkingContent
         self.synthesizedAudio = synthesizedAudio
     }
 
@@ -185,14 +190,14 @@ public enum VoiceSessionEvent: Sendable {
     /// Got transcription from STT
     case transcribed(text: String)
 
-    /// Got response from LLM
-    case responded(text: String)
+    /// Got response from LLM (with optional thinking content)
+    case responded(text: String, thinkingContent: String? = nil)
 
     /// Playing TTS audio
     case speaking
 
-    /// Complete turn result
-    case turnCompleted(transcript: String, response: String, audio: Data?)
+    /// Complete turn result (with optional thinking content)
+    case turnCompleted(transcript: String, response: String, thinkingContent: String? = nil, audio: Data?)
 
     /// Session stopped
     case stopped
@@ -217,16 +222,21 @@ public struct VoiceSessionConfig: Sendable {
     /// Whether to auto-resume listening after TTS playback
     public var continuousMode: Bool
 
+    /// Whether thinking mode is enabled for the LLM.
+    public var thinkingModeEnabled: Bool
+
     public init(
         silenceDuration: TimeInterval = 1.5,
         speechThreshold: Float = 0.1,
         autoPlayTTS: Bool = true,
-        continuousMode: Bool = true
+        continuousMode: Bool = true,
+        thinkingModeEnabled: Bool = false
     ) {
         self.silenceDuration = silenceDuration
         self.speechThreshold = speechThreshold
         self.autoPlayTTS = autoPlayTTS
         self.continuousMode = continuousMode
+        self.thinkingModeEnabled = thinkingModeEnabled
     }
 
     /// Default configuration

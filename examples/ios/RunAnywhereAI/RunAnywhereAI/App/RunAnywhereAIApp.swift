@@ -64,6 +64,7 @@ struct RunAnywhereAIApp: App {
                 }
             }
             .task {
+                _ = SettingsViewModel.shared
                 logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
             }

@@ -84,7 +84,12 @@ class ToolSettingsViewModel: ObservableObject {
                     category: "Utility"
                 ),
                 executor: { args in
-                    let expression = args["expression"]?.stringValue ?? args["input"]?.stringValue ?? "0"
+                    let expression = args["expression"]?.stringValue
+                        ?? args["input"]?.stringValue
+                        ?? args["expr"]?.stringValue
+                        ?? args.values.compactMap(\.stringValue).first
+                        ?? "0"
+                    print("Calculator received args: \(args), using expression: '\(expression)'")
                     // Clean the expression - remove any non-math characters
                     let cleanedExpression = expression
                         .replacingOccurrences(of: "=", with: "")
