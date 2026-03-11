@@ -389,7 +389,8 @@ final class VoiceAgentViewModel: ObservableObject {
         do {
             let settings = SettingsViewModel.shared
             let voiceConfig = VoiceSessionConfig(
-                thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled
+                thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled,
+                maxTokens: settings.maxTokens
             )
             session = try await RunAnywhere.startVoiceSession(config: voiceConfig)
             sessionState = .listening

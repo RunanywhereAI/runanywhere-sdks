@@ -225,18 +225,23 @@ public struct VoiceSessionConfig: Sendable {
     /// Whether thinking mode is enabled for the LLM.
     public var thinkingModeEnabled: Bool
 
+    /// Maximum tokens for LLM generation (nil uses SDK default of 100)
+    public var maxTokens: Int?
+
     public init(
         silenceDuration: TimeInterval = 1.5,
         speechThreshold: Float = 0.1,
         autoPlayTTS: Bool = true,
         continuousMode: Bool = true,
-        thinkingModeEnabled: Bool = false
+        thinkingModeEnabled: Bool = false,
+        maxTokens: Int? = nil
     ) {
         self.silenceDuration = silenceDuration
         self.speechThreshold = speechThreshold
         self.autoPlayTTS = autoPlayTTS
         self.continuousMode = continuousMode
         self.thinkingModeEnabled = thinkingModeEnabled
+        self.maxTokens = maxTokens
     }
 
     /// Default configuration
