@@ -170,6 +170,11 @@ struct FlatModelRow: View {
         }
     }
 
+    /// Check if any LoRA adapters are compatible with this model
+    private var hasLoRAAdapters: Bool {
+        LoRAAdapterCatalog.adapters.contains { $0.compatibleModelIds.contains(model.id) }
+    }
+
     /// Check if this is a built-in model that doesn't require download
     private var isBuiltIn: Bool {
         model.framework == .foundationModels ||
@@ -286,6 +291,20 @@ struct FlatModelRow: View {
                 .padding(.vertical, AppSpacing.xxSmall)
                 .background(AppColors.badgePurple)
                 .foregroundColor(AppColors.primaryPurple)
+                .cornerRadius(AppSpacing.cornerRadiusSmall)
+            }
+
+            // LoRA adapter support indicator
+            if hasLoRAAdapters {
+                HStack(spacing: AppSpacing.xxSmall) {
+                    Image(systemName: "sparkles")
+                    Text("LoRA")
+                }
+                .font(AppTypography.caption2)
+                .padding(.horizontal, AppSpacing.small)
+                .padding(.vertical, AppSpacing.xxSmall)
+                .background(AppColors.badgeBlue)
+                .foregroundColor(AppColors.primaryBlue)
                 .cornerRadius(AppSpacing.cornerRadiusSmall)
             }
         }
