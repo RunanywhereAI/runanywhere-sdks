@@ -384,9 +384,9 @@ extension DocumentRAGView {
             Spacer(minLength: AppSpacing.large)
                 .id("top-spacer")
 
-            ForEach(Array(viewModel.messages.enumerated()), id: \.offset) { index, message in
+            ForEach(viewModel.messages) { message in
                 RAGMessageBubble(message: message)
-                    .id(index)
+                    .id(message.id)
             }
 
             if viewModel.isQuerying {
@@ -412,8 +412,8 @@ extension DocumentRAGView {
         withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
             if viewModel.isQuerying {
                 proxy.scrollTo("querying", anchor: .bottom)
-            } else if !viewModel.messages.isEmpty {
-                proxy.scrollTo(viewModel.messages.count - 1, anchor: .bottom)
+            } else if let lastMessage = viewModel.messages.last {
+                proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
         }
     }
@@ -503,30 +503,142 @@ extension DocumentRAGView {
 // MARK: - RAG Message Bubble
 
 private struct RAGMessageBubble: View {
-    let message: (role: MessageRole, text: String)
+    let message: RAGMessage
+    @State private var isThinkingExpanded = false
 
     private var isUser: Bool {
         message.role == .user
+    }
+
+    private var hasThinking: Bool {
+        message.thinkingContent != nil && !(message.thinkingContent?.isEmpty ?? true)
     }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: AppSpacing.smallMedium) {
             if isUser { Spacer(minLength: AppSpacing.xxxLarge) }
 
-            Text(message.text)
-                .font(.body)
-                .foregroundColor(isUser ? .white : AppColors.textPrimary)
-                .padding(.horizontal, AppSpacing.mediumLarge)
-                .padding(.vertical, AppSpacing.smallMedium)
-                .background(
-                    isUser
-                        ? AppColors.messageBubbleUser
-                        : AppColors.messageBubbleAssistant
-                )
-                .cornerRadius(AppSpacing.cornerRadiusBubble)
+            VStack(alignment: .leading, spacing: 4) {
+                if !isUser && hasThinking {
+                    thinkingSection
+                }
+
+                Text(message.text)
+                    .font(.body)
+                    .foregroundColor(isUser ? .white : AppColors.textPrimary)
+                    .padding(.horizontal, AppSpacing.mediumLarge)
+                    .padding(.vertical, AppSpacing.smallMedium)
+                    .background(
+                        isUser
+                            ? AppColors.messageBubbleUser
+                            : AppColors.messageBubbleAssistant
+                    )
+                    .cornerRadius(AppSpacing.cornerRadiusBubble)
+            }
 
             if !isUser { Spacer(minLength: AppSpacing.xxxLarge) }
         }
+    }
+
+    // MARK: - Thinking Section
+
+    private var thinkingSection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.small) {
+            Button {
+                withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
+                    isThinkingExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.min")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryPurple)
+
+                    Text(isThinkingExpanded ? "Hide reasoning" : thinkingSummary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryPurple)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Image(systemName: isThinkingExpanded ? "chevron.up" : "chevron.right")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.primaryPurple.opacity(0.6))
+                }
+                .padding(.horizontal, AppSpacing.regular)
+                .padding(.vertical, AppSpacing.padding9)
+                .background(
+                    RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    AppColors.primaryPurple.opacity(0.1),
+                                    AppColors.primaryPurple.opacity(0.05)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
+                                .strokeBorder(
+                                    AppColors.primaryPurple.opacity(0.2),
+                                    lineWidth: AppSpacing.strokeThin
+                                )
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            if isThinkingExpanded {
+                ScrollView {
+                    Text(message.thinkingContent ?? "")
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+                }
+                .frame(maxHeight: AppSpacing.minFrameHeight)
+                .padding(AppSpacing.mediumLarge)
+                .background(
+                    RoundedRectangle(cornerRadius: AppSpacing.medium)
+                        .fill(AppColors.backgroundGray6)
+                )
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .slide),
+                    removal: .opacity.combined(with: .slide)
+                ))
+            }
+        }
+    }
+
+    private var thinkingSummary: String {
+        guard let thinking = message.thinkingContent?
+            .trimmingCharacters(in: .whitespacesAndNewlines) else {
+            return ""
+        }
+
+        let sentences = thinking.components(separatedBy: CharacterSet(charactersIn: ".!?"))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+        if sentences.count >= 2 {
+            let firstSentence = sentences[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            if firstSentence.count > 20 {
+                return firstSentence + "..."
+            }
+        }
+
+        if thinking.count > 80 {
+            let truncated = String(thinking.prefix(80))
+            if let lastSpace = truncated.lastIndex(of: " ") {
+                return String(truncated[..<lastSpace]) + "..."
+            }
+            return truncated + "..."
+        }
+
+        return thinking
     }
 }
 

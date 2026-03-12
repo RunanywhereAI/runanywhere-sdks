@@ -19,6 +19,50 @@ enum MessageRole {
     case system
 }
 
+// MARK: - RAG Message
+
+struct RAGMessage: Identifiable {
+    let id = UUID()
+    let role: MessageRole
+    let text: String
+    let thinkingContent: String?
+
+    init(role: MessageRole, text: String, thinkingContent: String? = nil) {
+        self.role = role
+        self.text = text
+        self.thinkingContent = thinkingContent
+    }
+
+    // MARK: - Think Tag Helpers
+
+    /// Extract the content inside `<think>...</think>` tags.
+    static func extractThinkingContent(from text: String) -> String? {
+        guard let startRange = text.range(of: "<think>"),
+              let endRange = text.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound else {
+            return nil
+        }
+        let content = String(text[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return content.isEmpty ? nil : content
+    }
+
+    /// Strip all `<think>...</think>` blocks and trailing incomplete `<think>` tags.
+    static func stripThinkTags(from text: String) -> String {
+        var result = text
+        while let startRange = result.range(of: "<think>"),
+              let endRange = result.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound {
+            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
+        }
+        if let trailingStart = result.range(of: "<think>", options: .backwards),
+           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
+            result = String(result[result.startIndex..<trailingStart.lowerBound])
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 // MARK: - RAG View Model
 
 @MainActor
@@ -33,7 +77,7 @@ final class RAGViewModel {
 
     // MARK: - Query State
 
-    private(set) var messages: [(role: MessageRole, text: String)] = []
+    private(set) var messages: [RAGMessage] = []
     private(set) var isQuerying = false
     /// Settable from the view layer to surface file-picker failures in the error banner.
     var error: Error?
@@ -97,7 +141,7 @@ final class RAGViewModel {
         guard !question.isEmpty else { return }
         guard isDocumentLoaded else { return }
 
-        messages.append((role: .user, text: question))
+        messages.append(RAGMessage(role: .user, text: question))
         currentQuestion = ""
         isQuerying = true
         error = nil
@@ -117,11 +161,13 @@ final class RAGViewModel {
 
             logger.info("Querying RAG pipeline: \(question)")
             let result = try await RunAnywhere.ragQuery(question: effectiveQuestion)
-            messages.append((role: .assistant, text: result.answer))
+            let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
+            let displayText = RAGMessage.stripThinkTags(from: result.answer)
+            messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
             logger.info("Query complete (\(result.totalTimeMs, format: .fixed(precision: 0))ms)")
         } catch {
             self.error = error
-            messages.append((role: .assistant, text: "Error: \(error.localizedDescription)"))
+            messages.append(RAGMessage(role: .assistant, text: "Error: \(error.localizedDescription)"))
             logger.error("Query failed: \(error.localizedDescription)")
         }
     }
