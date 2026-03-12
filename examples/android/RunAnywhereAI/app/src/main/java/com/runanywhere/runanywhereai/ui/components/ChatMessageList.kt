@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.models.ChatMessage
 import com.runanywhere.runanywhereai.models.MessageRole
@@ -40,7 +41,7 @@ fun ChatMessageList(
     listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    val maxBubbleWidth = (LocalConfiguration.current.screenWidthDp * 0.8f).dp
+    val maxBubbleWidth = (LocalWindowInfo.current.containerDpSize.width * 0.8f)
 
     LazyColumn(
         modifier = modifier,
@@ -61,7 +62,6 @@ fun ChatMessageList(
 
                 MessageRole.ASSISTANT -> AssistantMessageBubble(
                     message = message,
-                    maxWidth = maxBubbleWidth,
                 )
 
                 MessageRole.SYSTEM -> SystemMessageRow(message = message)
@@ -97,13 +97,12 @@ private fun UserMessageBubble(
 @Composable
 private fun AssistantMessageBubble(
     message: ChatMessage,
-    maxWidth: androidx.compose.ui.unit.Dp,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start,
     ) {
-        Column(modifier = Modifier.widthIn(max = maxWidth)) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             // Thinking content (expandable)
             if (!message.thinkingContent.isNullOrBlank()) {
                 ThinkingSection(thinkingContent = message.thinkingContent)
