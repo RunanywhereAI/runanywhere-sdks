@@ -10,6 +10,7 @@ import Foundation
 import SwiftUI
 import RunAnywhere
 import Combine
+import os
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -45,6 +46,7 @@ class SettingsViewModel: ObservableObject {
 
     // MARK: - Private Properties
 
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Settings")
     private var cancellables = Set<AnyCancellable>()
     private let keychainService = KeychainService.shared
     private let apiKeyStorageKey = "runanywhere_api_key"
@@ -99,32 +101,34 @@ class SettingsViewModel: ObservableObject {
     }
 
     private func subscribeToModelNotifications() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleModelLoaded(_:)),
-            name: Notification.Name("ModelLoaded"),
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleModelUnloaded),
-            name: Notification.Name("ModelUnloaded"),
-            object: nil
-        )
+        // Subscribe to SDK events directly so any LLM model load
+        // (from chat, voice agent, or RAG) updates the thinking mode flag.
+        RunAnywhere.events.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                Task { @MainActor in
+                    self?.handleSDKEvent(event)
+                }
+            }
+            .store(in: &cancellables)
     }
 
-    @objc private func handleModelLoaded(_ notification: Notification) {
-        if let model = notification.object as? ModelInfo {
-            loadedModelSupportsThinking = model.supportsThinking
+    private func handleSDKEvent(_ event: any SDKEvent) {
+        guard event.category == .llm else { return }
+
+        switch event.type {
+        case "llm_model_load_completed":
+            let modelId = event.properties["model_id"] ?? ""
+            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                loadedModelSupportsThinking = model.supportsThinking
+                logger.info("LLM loaded (\(modelId)), supportsThinking: \(model.supportsThinking)")
+            }
+        case "llm_model_unloaded":
+            loadedModelSupportsThinking = false
+            logger.info("LLM unloaded, thinking mode disabled")
+        default:
+            break
         }
-    }
-
-    @objc private func handleModelUnloaded() {
-        loadedModelSupportsThinking = false
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Setup

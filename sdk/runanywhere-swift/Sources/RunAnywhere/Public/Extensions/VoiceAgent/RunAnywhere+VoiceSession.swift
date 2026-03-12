@@ -119,6 +119,12 @@ public actor VoiceSessionHandle {
         await processCurrentAudio()
     }
 
+    /// Resume listening after a completed turn (for push-to-talk when continuousMode is false)
+    public func resumeListening() async {
+        guard isRunning else { return }
+        try? await startListening()
+    }
+
     // MARK: - Private
 
     private func emit(_ event: VoiceSessionEvent) {
