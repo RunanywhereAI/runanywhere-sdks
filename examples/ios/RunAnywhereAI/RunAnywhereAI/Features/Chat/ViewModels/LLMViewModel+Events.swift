@@ -37,6 +37,7 @@ extension LLMViewModel {
             if let id = modelId,
                let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
+                self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
             }
         }
     }
@@ -89,6 +90,7 @@ extension LLMViewModel {
 
         if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
             updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
+            setLoadedModelSupportsThinking(matchingModel.supportsThinking)
         }
 
         if !wasLoaded {

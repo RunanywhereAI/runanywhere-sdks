@@ -19,6 +19,7 @@ extension LLMViewModel {
             await MainActor.run {
                 self.updateModelLoadedState(isLoaded: true)
                 self.updateLoadedModelInfo(name: modelInfo.name, framework: modelInfo.framework)
+                self.setLoadedModelSupportsThinking(modelInfo.supportsThinking)
                 self.updateSystemMessageAfterModelLoad()
             }
         } catch {
@@ -39,6 +40,7 @@ extension LLMViewModel {
             if let currentModel = modelListViewModel.currentModel {
                 self.updateModelLoadedState(isLoaded: true)
                 self.updateLoadedModelInfo(name: currentModel.name, framework: currentModel.framework)
+                self.setLoadedModelSupportsThinking(currentModel.supportsThinking)
                 verifyModelLoaded(currentModel)
             } else {
                 self.updateModelLoadedState(isLoaded: false)

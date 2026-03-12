@@ -95,6 +95,7 @@ public extension RunAnywhere {
 
         // Synthesize (C++ emits events)
         var ttsResult = rac_tts_result_t()
+        defer { rac_tts_result_free(&ttsResult) }
         let synthesizeResult = text.withCString { textPtr in
             rac_tts_component_synthesize(handle, textPtr, &cOptions, &ttsResult)
         }
@@ -157,7 +158,6 @@ public extension RunAnywhere {
 
         let voiceId = await CppBridge.TTS.shared.currentVoiceId ?? "unknown"
         let startTime = Date()
-        var totalAudioData = Data()
 
         // Build C options
         var cOptions = rac_tts_options_t()
@@ -166,8 +166,8 @@ public extension RunAnywhere {
         cOptions.volume = options.volume
         cOptions.sample_rate = Int32(options.sampleRate)
 
-        // Create callback context
-        let context = TTSStreamContext(onChunk: onAudioChunk, totalData: &totalAudioData)
+        // Create callback context - owns its own Data
+        let context = TTSStreamContext(onChunk: onAudioChunk)
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
         let streamResult = text.withCString { textPtr in
@@ -180,13 +180,14 @@ public extension RunAnywhere {
                     let ctx = Unmanaged<TTSStreamContext>.fromOpaque(userData).takeUnretainedValue()
                     let chunk = Data(bytes: audioPtr, count: audioSize)
                     ctx.onChunk(chunk)
-                    ctx.totalData.pointee.append(chunk)
+                    ctx.totalData.append(chunk)
                 },
                 contextPtr
             )
         }
 
-        Unmanaged<TTSStreamContext>.fromOpaque(contextPtr).release()
+        let finalContext = Unmanaged<TTSStreamContext>.fromOpaque(contextPtr).takeRetainedValue()
+        let totalAudioData = finalContext.totalData
 
         guard streamResult == RAC_SUCCESS else {
             throw SDKError.tts(.processingFailed, "Streaming synthesis failed: \(streamResult)")
@@ -309,10 +310,9 @@ public extension RunAnywhere {
 
 private final class TTSStreamContext: @unchecked Sendable {
     let onChunk: (Data) -> Void
-    var totalData: UnsafeMutablePointer<Data>
+    var totalData: Data = Data()
 
-    init(onChunk: @escaping (Data) -> Void, totalData: UnsafeMutablePointer<Data>) {
+    init(onChunk: @escaping (Data) -> Void) {
         self.onChunk = onChunk
-        self.totalData = totalData
     }
 }

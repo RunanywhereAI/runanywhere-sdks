@@ -12,7 +12,7 @@ import Combine
 
 struct CombinedSettingsView: View {
     // ViewModel - all business logic is here
-    @StateObject private var viewModel = SettingsViewModel()
+    @ObservedObject private var viewModel = SettingsViewModel.shared
     @StateObject private var toolViewModel = ToolSettingsViewModel.shared
 
     var body: some View {
@@ -49,6 +49,18 @@ struct CombinedSettingsView: View {
     }
 }
 
+// MARK: - Helpers
+
+@MainActor
+private func thinkingModeDescription(for viewModel: SettingsViewModel) -> String {
+    guard viewModel.loadedModelSupportsThinking else {
+        return "Not available for the currently loaded model."
+    }
+    return viewModel.thinkingModeEnabled
+        ? "Model will use its default thinking/reasoning mode."
+        : "Thinking disabled. The model will skip its reasoning step."
+}
+
 // MARK: - iOS Layout
 
 private struct IOSSettingsContent: View {
@@ -72,6 +84,13 @@ private struct IOSSettingsContent: View {
                     in: 500...20000,
                     step: 500
                 )
+
+                Toggle("Thinking Mode", isOn: $viewModel.thinkingModeEnabled)
+                    .disabled(!viewModel.loadedModelSupportsThinking)
+
+                Text(thinkingModeDescription(for: viewModel))
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
 
             // System Prompt
@@ -179,6 +198,7 @@ private struct IOSSettingsContent: View {
             }
         }
         .navigationTitle("Settings")
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -261,6 +281,28 @@ private struct GenerationSettingsCard: View {
                             .frame(maxWidth: 400)
                     }
                 }
+
+                HStack {
+                    Text("Thinking Mode")
+                        .frame(width: 150, alignment: .leading)
+
+                    Toggle("", isOn: $viewModel.thinkingModeEnabled)
+                        .disabled(!viewModel.loadedModelSupportsThinking)
+
+                    Spacer()
+
+                    Text(viewModel.thinkingModeEnabled ? "Enabled" : "Disabled")
+                        .font(AppTypography.caption)
+                        .foregroundColor(
+                            viewModel.thinkingModeEnabled
+                                ? AppColors.primaryPurple
+                                : AppColors.textSecondary
+                        )
+                }
+
+                Text(thinkingModeDescription(for: viewModel))
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
         }
     }

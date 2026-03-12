@@ -31,6 +31,8 @@ struct ChatInterfaceView: View {
     @State private var showingLoRAManagement = false
     @State private var pendingLoRAURL: URL?
     @State private var loraScale: Float = 1.0
+    @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
+    @AppStorage("thinkingModeEnabled") private var thinkingModeEnabled = false
     @FocusState private var isTextFieldFocused: Bool
 
     private let logger = Logger(
@@ -369,8 +371,8 @@ extension ChatInterfaceView {
             .onReceive(
                 NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))
             ) { _ in
-                if viewModel.isGenerating {
-                    proxy.scrollTo("typing", anchor: .bottom)
+                if viewModel.isGenerating, let lastMessage = viewModel.messages.last {
+                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
                 }
             }
         }
@@ -412,7 +414,7 @@ extension ChatInterfaceView {
                     .animation(nil, value: message.content)
             }
 
-            if viewModel.isGenerating {
+            if viewModel.isGenerating, viewModel.messages.last?.content.isEmpty == true {
                 TypingIndicatorView()
                     .id("typing")
                     .transition(typingTransition)
@@ -445,9 +447,13 @@ extension ChatInterfaceView {
         VStack(spacing: 0) {
             Divider()
 
-            // Status badges (tool calling + LoRA)
+            // Status badges (thinking mode + tool calling + LoRA)
             HStack(spacing: 8) {
-                if viewModel.useToolCalling {
+                if thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
+                    thinkingModeBadge
+                }
+
+                if viewModel.useToolCalling && !toolSettingsViewModel.registeredTools.isEmpty {
                     toolCallingBadge
                 }
 
@@ -459,7 +465,7 @@ extension ChatInterfaceView {
                     loraAddButton
                 }
             }
-            .padding(.top, (viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
+            .padding(.top, ((thinkingModeEnabled && viewModel.loadedModelSupportsThinking) || viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
 
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
@@ -490,6 +496,24 @@ extension ChatInterfaceView {
             .padding(AppSpacing.large)
             .background(AppColors.backgroundPrimary)
             .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
+        }
+    }
+
+    var thinkingModeBadge: some View {
+        Button {
+            thinkingModeEnabled.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "lightbulb.min.fill")
+                    .font(.system(size: 10))
+                Text("Thinking")
+                    .font(AppTypography.caption2)
+            }
+            .foregroundColor(AppColors.primaryPurple)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(AppColors.primaryPurple.opacity(0.1))
+            .cornerRadius(6)
         }
     }
 

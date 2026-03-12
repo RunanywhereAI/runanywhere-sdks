@@ -24,7 +24,8 @@ extension LLMViewModel {
 
         for try await token in stream {
             fullResponse += token
-            await updateMessageContent(at: messageIndex, content: fullResponse)
+            let displayText = Self.stripThinkTags(from: fullResponse)
+            await updateMessageContent(at: messageIndex, content: displayText)
             NotificationCenter.default.post(
                 name: Notification.Name("MessageContentUpdated"),
                 object: nil

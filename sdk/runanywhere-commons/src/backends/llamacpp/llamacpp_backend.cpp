@@ -679,6 +679,8 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     std::string partial_utf8_buffer;
     partial_utf8_buffer.reserve(8);
 
+    Utf8State scanner_state;
+
     int n_cur = batch.n_tokens;
     int tokens_generated = 0;
     bool stop_sequence_hit = false;
@@ -696,11 +698,11 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
         const std::string new_token_chars =
             common_token_to_piece(context_, new_token_id);
 
+        const size_t old_partial_size = partial_utf8_buffer.size();
         partial_utf8_buffer.append(new_token_chars);
 
-        Utf8State scanner_state;
         size_t valid_upto = 0;
-        for (size_t i = 0; i < partial_utf8_buffer.size(); ++i) {
+        for (size_t i = old_partial_size; i < partial_utf8_buffer.size(); ++i) {
             scanner_state.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
             if (scanner_state.state == 0) {
                 valid_upto = i + 1;
@@ -735,12 +737,17 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
             if (stop_window.size() > MAX_STOP_LEN) {
                 size_t safe_len = stop_window.size() - MAX_STOP_LEN;
-                if (!callback(stop_window.substr(0, safe_len))) {
-                    LOGI("Generation cancelled by callback");
-                    cancel_requested_.store(true);
-                    break;
+                while (safe_len > 0 && (stop_window[safe_len] & 0xC0) == 0x80) {
+                    safe_len--;
                 }
-                stop_window.erase(0, safe_len);
+                if (safe_len > 0) {
+                    if (!callback(stop_window.substr(0, safe_len))) {
+                        LOGI("Generation cancelled by callback");
+                        cancel_requested_.store(true);
+                        break;
+                    }
+                    stop_window.erase(0, safe_len);
+                }
             }
         }
 
@@ -973,6 +980,8 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
     std::string partial_utf8_buffer;
     partial_utf8_buffer.reserve(8);
 
+    Utf8State scanner_state;
+
     std::string generated_text;
     int n_cur = static_cast<int>(current_pos) + n_prompt;
     int tokens_generated = 0;
@@ -987,38 +996,17 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
         }
 
         const std::string new_token_chars = common_token_to_piece(context_, new_token_id);
+        const size_t old_partial_size = partial_utf8_buffer.size();
         partial_utf8_buffer.append(new_token_chars);
 
-        struct Utf8Check {
-            static size_t valid_upto(const std::string& buf) {
-                static const uint8_t utf8d[] = {
-                    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
-                    7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
-                    8,8,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,
-                    0xa,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x3,0x4,0x3,0x3,
-                    0xb,0x6,0x6,0x6,0x5,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,0x8,
-                    0x0,0x1,0x2,0x3,0x5,0x8,0x7,0x1,0x1,0x1,0x4,0x6,0x1,0x1,0x1,0x1,
-                    1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,1,0,1,1,1,1,1,1,
-                    1,2,1,1,1,1,1,2,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,
-                    1,2,1,1,1,1,1,1,1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,3,1,3,1,1,1,1,1,1,
-                    1,3,1,1,1,1,1,3,1,3,1,1,1,1,1,1,1,3,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-                };
-                uint32_t state = 0;
-                size_t upto = 0;
-                for (size_t i = 0; i < buf.size(); ++i) {
-                    uint32_t type = utf8d[static_cast<uint8_t>(buf[i])];
-                    state = utf8d[256 + state * 16 + type];
-                    if (state == 0) upto = i + 1;
-                }
-                return upto;
+        size_t valid_upto = 0;
+        for (size_t i = old_partial_size; i < partial_utf8_buffer.size(); ++i) {
+            scanner_state.process(static_cast<uint8_t>(partial_utf8_buffer[i]));
+            if (scanner_state.state == 0) {
+                valid_upto = i + 1;
             }
-        };
+        }
 
-        const size_t valid_upto = Utf8Check::valid_upto(partial_utf8_buffer);
         if (valid_upto > 0) {
             std::string valid_chunk = partial_utf8_buffer.substr(0, valid_upto);
             stop_window.append(valid_chunk);
@@ -1042,9 +1030,14 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
             }
 
             if (stop_window.size() > MAX_STOP_LEN) {
-                const size_t safe_len = stop_window.size() - MAX_STOP_LEN;
-                generated_text += stop_window.substr(0, safe_len);
-                stop_window.erase(0, safe_len);
+                size_t safe_len = stop_window.size() - MAX_STOP_LEN;
+                while (safe_len > 0 && (stop_window[safe_len] & 0xC0) == 0x80) {
+                    safe_len--;
+                }
+                if (safe_len > 0) {
+                    generated_text += stop_window.substr(0, safe_len);
+                    stop_window.erase(0, safe_len);
+                }
             }
         }
 
