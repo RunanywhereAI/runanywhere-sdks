@@ -271,6 +271,7 @@ rac_inference_framework_t frameworkFromString(const std::string& framework) {
 #endif
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
+    if (framework == "Genie" || framework == "genie") return (rac_inference_framework_t)10; // RAC_FRAMEWORK_GENIE
     return RAC_FRAMEWORK_UNKNOWN;
 }
 
@@ -905,6 +906,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
 #endif
                     case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
                     case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+                    case 10: frameworkStr = "Genie"; break; // RAC_FRAMEWORK_GENIE
                     default: frameworkStr = "unknown"; break;
                 }
 
@@ -978,6 +980,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
 #endif
             case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
             case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+            case 10: frameworkStr = "Genie"; break; // RAC_FRAMEWORK_GENIE
             default: frameworkStr = "unknown"; break;
         }
 

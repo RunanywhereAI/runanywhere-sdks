@@ -12,6 +12,7 @@ import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
+import 'package:runanywhere_genie/runanywhere_genie.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -202,6 +203,27 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 1400000000,
     );
     debugPrint('✅ LlamaCPP module registered');
+    await Future<void>.delayed(Duration.zero);
+
+    // --- GENIE NPU MODULE (Android/Snapdragon only) ---
+    if (Genie.isAvailable) {
+      await Genie.register(priority: 200);
+      Genie.addModel(
+        id: 'qwen2_5-7b-instruct-genie',
+        name: 'Qwen 2.5 7B (NPU)',
+        url: 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz',
+        memoryRequirement: 5000000000,
+      );
+      Genie.addModel(
+        id: 'llama-3.2-1b-instruct-genie',
+        name: 'Llama 3.2 1B (NPU)',
+        url: 'https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz',
+        memoryRequirement: 1500000000,
+      );
+      debugPrint('✅ Genie NPU module registered');
+    } else {
+      debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
+    }
     await Future<void>.delayed(Duration.zero);
 
     // --- VLM MODULE ---

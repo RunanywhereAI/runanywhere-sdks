@@ -16,6 +16,7 @@ import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceConta
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
+import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
 import {
   HTTPService,
   SDKEnvironment as NetworkSDKEnvironment,
@@ -346,7 +347,6 @@ export const RunAnywhere = {
 
       // Store tokens in secure storage for persistence
       try {
-        const { SecureStorageService } = await import('../Foundation/Security/SecureStorageService');
         await SecureStorageService.storeAuthTokens(
           authResponse.access_token,
           authResponse.refresh_token,

@@ -1,9 +1,11 @@
 package com.runanywhere.runanywhereai.data
 
-import android.util.Log
+import timber.log.Timber
+import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
+import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
@@ -14,9 +16,6 @@ import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 
 object ModelList {
-
-    private const val TAG = "ModelList"
-
     // LLM Models
     private val llmModels = listOf(
         AppModel(id = "smollm2-360m-q8_0", name = "SmolLM2 360M Q8_0",
@@ -39,6 +38,7 @@ object ModelList {
             url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
             memoryRequirement = 2_500_000_000),
+        // Qwen3 models
         AppModel(id = "qwen3-0.6b-q4_k_m", name = "Qwen3 0.6B Q4_K_M",
             url = "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
@@ -51,6 +51,7 @@ object ModelList {
             url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
             memoryRequirement = 2_800_000_000),
+        // Qwen3.5 models
         AppModel(id = "qwen3.5-0.8b-q4_k_m", name = "Qwen3.5 0.8B Q4_K_M",
             url = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
@@ -81,15 +82,13 @@ object ModelList {
             memoryRequirement = 1_400_000_000),
     )
 
-    // STT Models
+    // STT / TTS
     private val sttModels = listOf(
         AppModel(id = "sherpa-onnx-whisper-tiny.en", name = "Sherpa Whisper Tiny (ONNX)",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
             framework = InferenceFramework.ONNX, category = ModelCategory.SPEECH_RECOGNITION,
             memoryRequirement = 75_000_000),
     )
-
-    // TTS Models
     private val ttsModels = listOf(
         AppModel(id = "vits-piper-en_US-lessac-medium", name = "Piper TTS (US English - Medium)",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
@@ -101,7 +100,7 @@ object ModelList {
             memoryRequirement = 65_000_000),
     )
 
-    // Embedding Models
+    // Embedding
     private val embeddingModels = listOf(
         AppModel(id = "all-minilm-l6-v2", name = "All MiniLM L6 v2 (Embedding)",
             url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
@@ -113,7 +112,35 @@ object ModelList {
             )),
     )
 
-    // VLM Models
+    // LoRA Adapters
+    private val loraAdapters = listOf(
+        LoraAdapterCatalogEntry(
+            id = "abliterated-lora",
+            name = "Abliterated LoRA (F16)",
+            description = "Removes refusal behavior — model answers all questions directly without disclaimers",
+            downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
+            filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
+            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
+            fileSize = 17_600_000,
+            defaultScale = 1.0f,
+        ),
+    )
+
+    // Genie NPU Models (Qualcomm Snapdragon 8 Gen 2+)
+    // Pre-compiled QNN context binaries for Qualcomm Genie SDK.
+    // Compiled via: python -m qai_hub_models.models.<model>.export --chipset qualcomm-snapdragon-8-elite
+    private val genieModels = listOf(
+        AppModel(id = "qwen2_5-7b-instruct-genie", name = "Qwen 2.5 7B (NPU)",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz",
+            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
+            memoryRequirement = 5_000_000_000),
+        AppModel(id = "llama-3.2-1b-instruct-genie", name = "Llama 3.2 1B (NPU)",
+            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz",
+            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
+            memoryRequirement = 1_500_000_000),
+    )
+
+    // VLM
     private val vlmModels = listOf(
         AppModel(id = "smolvlm-500m-instruct-q8_0", name = "SmolVLM 500M Instruct",
             url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
@@ -135,33 +162,21 @@ object ModelList {
             )),
     )
 
-    // LoRA Adapters
-    private val loraAdapters = listOf(
-        LoraAdapterCatalogEntry(
-            id = "abliterated-lora",
-            name = "Abliterated LoRA (F16)",
-            description = "Removes refusal behavior — model answers all questions directly without disclaimers",
-            downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
-            fileSize = 17_600_000,
-            defaultScale = 1.0f,
-        ),
-    )
-
     fun setupModels() {
-        Log.i(TAG, "Registering backends and models...")
+        Timber.i("Registering backends and models...")
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
-            Log.i(TAG, "Backends registered")
+            Genie.register(priority = 200)
+            Timber.i("Backends registered")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to register backends", e)
+            Timber.e(e, "Failed to register backends")
             return
         }
 
         val allModels = listOf(
             "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
+            "Genie NPU" to genieModels,
             "Embedding" to embeddingModels,
             "VLM" to vlmModels,
         )
@@ -190,20 +205,20 @@ object ModelList {
                         )
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Failed to register model: ${model.id}", e)
+                    Timber.e(e, "Failed to register model: ${model.id}")
                 }
             }
-            Log.i(TAG, "$label models registered (${models.size})")
+            Timber.i("$label models registered (${models.size})")
         }
 
         for (adapter in loraAdapters) {
             try {
                 RunAnywhere.registerLoraAdapter(adapter)
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to register LoRA adapter: ${adapter.id}", e)
+                Timber.e(e, "Failed to register LoRA adapter: ${adapter.id}")
             }
         }
-        Log.i(TAG, "LoRA adapters registered (${loraAdapters.size})")
-        Log.i(TAG, "All models registered")
+        Timber.i("LoRA adapters registered (${loraAdapters.size})")
+        Timber.i("All models registered")
     }
 }
