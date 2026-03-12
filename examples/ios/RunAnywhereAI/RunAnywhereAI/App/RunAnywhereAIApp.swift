@@ -208,7 +208,7 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 4_000_000_000
             )
         }
-        if let qwenURL = URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf") {
+        if let qwenURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen2.5-0.5b-instruct-q6_k",
                 name: "Qwen 2.5 0.5B Instruct Q6_K",
