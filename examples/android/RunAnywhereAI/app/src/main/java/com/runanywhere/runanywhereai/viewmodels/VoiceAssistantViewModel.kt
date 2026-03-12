@@ -31,8 +31,10 @@ import com.runanywhere.sdk.public.extensions.stopVoiceSession
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.voiceAgentComponentStates
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -837,8 +839,7 @@ class VoiceAssistantViewModel(application: Application) : AndroidViewModel(appli
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        @Suppress("OPT_IN_USAGE")
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 RunAnywhere.stopVoiceSession()
             } catch (_: Exception) { /* best-effort cleanup */ }

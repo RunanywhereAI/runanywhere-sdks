@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+
 /**
  * Renders a fenced code block with optional language label, horizontal scroll, and copy button.
  */

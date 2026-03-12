@@ -24,7 +24,9 @@ import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -347,21 +349,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         thinkingContent: String?,
     ) {
         updateReady {
-            copy(
-                messages = messages.map { msg ->
-                    if (msg.id == messageId) msg.copy(content = content, thinkingContent = thinkingContent) else msg
-                }.toImmutableList()
-            )
+            val index = messages.indexOfFirst { it.id == messageId }
+            if (index == -1) return@updateReady this
+            val persistent = messages as? PersistentList ?: messages.toPersistentList()
+            val updated = persistent[index].copy(content = content, thinkingContent = thinkingContent)
+            copy(messages = persistent.set(index, updated))
         }
     }
 
     private fun updateAssistantMessageAnalytics(messageId: String, analytics: MessageAnalytics) {
         updateReady {
-            copy(
-                messages = messages.map { msg ->
-                    if (msg.id == messageId) msg.copy(analytics = analytics) else msg
-                }.toImmutableList()
-            )
+            val index = messages.indexOfFirst { it.id == messageId }
+            if (index == -1) return@updateReady this
+            val persistent = messages as? PersistentList ?: messages.toPersistentList()
+            val updated = persistent[index].copy(analytics = analytics)
+            copy(messages = persistent.set(index, updated))
         }
     }
 

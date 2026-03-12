@@ -27,8 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.icons.RAIcons
 import com.runanywhere.runanywhereai.viewmodels.DownloadInfo
 import com.runanywhere.runanywhereai.viewmodels.ModelSelectionUiState
+import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
@@ -104,7 +105,7 @@ fun ModelSelectionSheet(
 
             // Tab layout (Models | LoRA) for LLM context, or just model list for others
             if (showTabs) {
-                TabRow(
+                PrimaryTabRow(
                     selectedTabIndex = selectedTab,
                     modifier = Modifier.fillMaxWidth(),
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -443,6 +444,12 @@ private fun ModelRow(
                             )
                         }
                     }
+                    if (model.framework == InferenceFramework.GENIE) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        TagBadge(text = "NPU", color = NpuBlue)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        TagBadge(text = "SD 8 Gen 2+", color = NpuBlue)
+                    }
                     if (model.supportsLora) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
@@ -640,6 +647,25 @@ private fun LoraRow(
                 }
             }
         }
+    }
+}
+
+// -- Tag Badge --
+
+private val NpuBlue = Color(0xFF2196F3)
+
+@Composable
+private fun TagBadge(text: String, color: Color) {
+    Surface(
+        shape = RoundedCornerShape(4.dp),
+        color = color.copy(alpha = 0.15f),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+        )
     }
 }
 

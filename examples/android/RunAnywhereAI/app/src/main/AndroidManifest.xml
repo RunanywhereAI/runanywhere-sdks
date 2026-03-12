@@ -9,12 +9,6 @@
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-    <!-- Use new storage permissions for Android 13+ -->
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
 
     <application
         android:name=".RunAnywhereApplication"
@@ -27,7 +21,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RunAnywhereAI"
         android:largeHeap="true"
-        android:extractNativeLibs="true"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
 
@@ -51,7 +44,6 @@
             android:theme="@style/Theme.RunAnywhereAI">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,12 +53,15 @@ fun ChatTopBar(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = if (isModelLoaded && modelName != null) {
+                    val displayName = remember(modelName, isModelLoaded) {
+                        if (isModelLoaded && modelName != null) {
                             modelName.take(18).let { if (modelName.length > 18) "$it…" else it }
                         } else {
                             "Select Model"
-                        },
+                        }
+                    }
+                    Text(
+                        text = displayName,
                         style = MaterialTheme.typography.labelLarge,
                         color = if (isModelLoaded) {
                             MaterialTheme.colorScheme.onSurface

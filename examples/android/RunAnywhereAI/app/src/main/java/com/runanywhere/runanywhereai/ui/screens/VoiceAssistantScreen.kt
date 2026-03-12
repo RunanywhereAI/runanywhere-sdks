@@ -200,13 +200,16 @@ fun VoiceAssistantScreen(
         )
     }
 
+    // Stable model lookup used across all voice model selection sheets
+    val currentModels by rememberUpdatedState(modelState.models)
+
     // Model selection sheets
     if (showSTTModelSelection) {
         ModelSelectionSheet(
             state = modelState,
             onDismiss = { showSTTModelSelection = false },
             onSelectModel = { modelId ->
-                val model = modelState.models.find { it.id == modelId }
+                val model = currentModels.find { it.id == modelId }
                 modelSelectionViewModel.selectModel(modelId) { _, _ ->
                     if (model != null) {
                         voiceViewModel.setSTTModel(model.framework.displayName, model.name, model.id)
@@ -230,7 +233,7 @@ fun VoiceAssistantScreen(
             state = modelState,
             onDismiss = { showLLMModelSelection = false },
             onSelectModel = { modelId ->
-                val model = modelState.models.find { it.id == modelId }
+                val model = currentModels.find { it.id == modelId }
                 modelSelectionViewModel.selectModel(modelId) { _, _ ->
                     if (model != null) {
                         voiceViewModel.setLLMModel(model.framework.displayName, model.name, model.id)
@@ -254,7 +257,7 @@ fun VoiceAssistantScreen(
             state = modelState,
             onDismiss = { showTTSModelSelection = false },
             onSelectModel = { modelId ->
-                val model = modelState.models.find { it.id == modelId }
+                val model = currentModels.find { it.id == modelId }
                 modelSelectionViewModel.selectModel(modelId) { _, _ ->
                     if (model != null) {
                         voiceViewModel.setTTSModel(model.framework.displayName, model.name, model.id)
@@ -415,8 +418,8 @@ private fun MainVoiceUI(
             if (displayText.isNotEmpty()) {
                 val scrollState = rememberScrollState()
 
-                LaunchedEffect(displayText) {
-                    scrollState.animateScrollTo(scrollState.maxValue)
+                LaunchedEffect(displayText.length) {
+                    scrollState.scrollTo(scrollState.maxValue)
                 }
 
                 Column(

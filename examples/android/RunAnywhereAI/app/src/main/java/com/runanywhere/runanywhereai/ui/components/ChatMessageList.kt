@@ -23,6 +23,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -119,9 +120,12 @@ private fun AssistantMessageBubble(
                 // Analytics badge
                 val tokensPerSecond = message.analytics?.averageTokensPerSecond
                 if (tokensPerSecond != null && tokensPerSecond > 0) {
+                    val formattedTps = remember(tokensPerSecond) {
+                        "%.1f tokens/s".format(tokensPerSecond)
+                    }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "%.1f tokens/s".format(tokensPerSecond),
+                        text = formattedTps,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     )
