@@ -14,7 +14,7 @@
     "format:fix": "prettier \"src/**/*.{ts,tsx}\" \"App.tsx\" --write",
     "unused": "knip",
     "pod-install": "cd ios && pod install",
-    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install && cd ios && pod install",
+    "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && npm install --ignore-scripts && patch-package && cd ios && pod install",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -26,6 +26,7 @@
     "@runanywhere/core": "file:../../../sdk/runanywhere-react-native/packages/core",
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
+    "@runanywhere/genie": "^0.1.1",
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-document-picker": "^9.3.1",

@@ -206,6 +206,7 @@ private fun convertToModelStorageMetrics(
             CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
             CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
             CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
+            CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
             else -> InferenceFramework.UNKNOWN
         }
 
