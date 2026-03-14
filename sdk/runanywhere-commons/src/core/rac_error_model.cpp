@@ -21,6 +21,7 @@ const char* rac_error_category(rac_result_t code) {
     if (code >= -349 && code <= -330) return "Security";
     if (code >= -369 && code <= -350) return "Extraction";
     if (code >= -379 && code <= -370) return "Calibration";
+    if (code >= -389 && code <= -380) return "Cancellation";
     if (code >= -499 && code <= -400) return "ModuleService";
     if (code >= -599 && code <= -500) return "PlatformAdapter";
     if (code >= -699 && code <= -600) return "Backend";
