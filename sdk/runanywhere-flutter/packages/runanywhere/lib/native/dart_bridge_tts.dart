@@ -9,7 +9,8 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/tts/system_tts_service.dart'
+    show TTSConfiguration;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -190,6 +191,12 @@ class DartBridgeTTS {
     double pitch = 1.0,
     double volume = 1.0,
   }) async {
+    TTSConfiguration(
+      speakingRate: rate,
+      pitch: pitch,
+      volume: volume,
+    ).validate();
+
     final handle = getHandle();
 
     if (!isLoaded) {
