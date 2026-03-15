@@ -18,7 +18,7 @@ import 'dart:ffi';
 import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/llm/llm_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -241,6 +241,12 @@ class DartBridgeLLM {
     double temperature = 0.7,
     String? systemPrompt,
   }) async {
+    _validateGenerationParameters(
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+    );
+
     final handle = getHandle();
 
     if (!isLoaded) {
@@ -284,6 +290,13 @@ class DartBridgeLLM {
     double temperature = 0.7,
     String? systemPrompt,
   }) {
+    _validateGenerationParameters(
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: true,
+    );
+
     final handle = getHandle();
 
     if (!isLoaded) {
@@ -365,6 +378,21 @@ class DartBridgeLLM {
       }
       receivePort.close();
     }
+  }
+
+  void _validateGenerationParameters({
+    required int maxTokens,
+    required double temperature,
+    String? systemPrompt,
+    bool streamingEnabled = false,
+  }) {
+    LLMConfiguration(
+      contextLength: 32768,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: streamingEnabled,
+    ).validate();
   }
 
   // MARK: - Cleanup

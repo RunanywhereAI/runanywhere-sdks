@@ -1844,6 +1844,8 @@ class RunAnywhere {
         tokensPerSecond: tokensPerSecond,
         structuredData: structuredData,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track generation failure
       TelemetryService.shared.trackError(
