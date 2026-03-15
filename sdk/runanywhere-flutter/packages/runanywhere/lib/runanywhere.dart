@@ -13,6 +13,7 @@ export 'core/types/storage_types.dart';
 // Network layer
 export 'data/network/network.dart';
 export 'features/llm/llm_configuration.dart';
+export 'features/stt/stt_configuration.dart';
 export 'features/vad/vad_configuration.dart';
 export 'foundation/configuration/sdk_constants.dart';
 export 'foundation/error_types/sdk_error.dart';
