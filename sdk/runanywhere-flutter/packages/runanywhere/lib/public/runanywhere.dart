@@ -468,7 +468,12 @@ class RunAnywhere {
       // Load model directly via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
       // The C++ layer handles finding the right backend via the service registry
       logger.debug('Loading model via C++ bridge: $resolvedPath');
-      await DartBridge.llm.loadModel(resolvedPath, modelId, model.name);
+      await DartBridge.llm.loadModel(
+        resolvedPath,
+        modelId,
+        model.name,
+        model.contextLength,
+      );
 
       // Verify the model loaded successfully
       if (!DartBridge.llm.isLoaded) {
@@ -1812,7 +1817,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         isStreaming: false,
       );
@@ -1993,7 +1998,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         timeToFirstTokenMs: timeToFirstTokenMs,
         isStreaming: true,
