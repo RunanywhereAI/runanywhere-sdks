@@ -48,6 +48,7 @@ class DartBridgeLLM {
 
   RacHandle? _handle;
   String? _loadedModelId;
+  int? _loadedContextLength;
   final _logger = SDKLogger('DartBridge.LLM');
 
   /// Active stream subscription for cancellation
@@ -153,6 +154,7 @@ class DartBridgeLLM {
     String modelPath,
     String modelId,
     String modelName,
+    int? contextLength,
   ) async {
     final handle = getHandle();
 
@@ -181,6 +183,7 @@ class DartBridgeLLM {
       }
 
       _loadedModelId = modelId;
+      _loadedContextLength = contextLength;
       _logger.info('LLM model loaded: $modelId');
     } finally {
       calloc.free(pathPtr);
@@ -200,6 +203,7 @@ class DartBridgeLLM {
 
       cleanupFn(_handle!);
       _loadedModelId = null;
+      _loadedContextLength = null;
       _logger.info('LLM model unloaded');
     } catch (e) {
       _logger.error('Failed to unload LLM model: $e');
@@ -386,8 +390,10 @@ class DartBridgeLLM {
     String? systemPrompt,
     bool streamingEnabled = false,
   }) {
+    final contextLength = _loadedContextLength;
+
     LLMConfiguration(
-      contextLength: 32768,
+      contextLength: contextLength ?? 32768,
       maxTokens: maxTokens,
       temperature: temperature,
       systemPrompt: systemPrompt,
@@ -408,6 +414,7 @@ class DartBridgeLLM {
         destroyFn(_handle!);
         _handle = null;
         _loadedModelId = null;
+        _loadedContextLength = null;
         _logger.debug('LLM component destroyed');
       } catch (e) {
         _logger.error('Failed to destroy LLM component: $e');

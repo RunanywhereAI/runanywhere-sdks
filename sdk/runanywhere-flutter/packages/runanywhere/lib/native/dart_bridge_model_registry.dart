@@ -151,6 +151,7 @@ class DartBridgeModelRegistry {
         modelPtr.ref.localPath =
             pathDart != null ? strdupFn(pathDart) : nullptr;
         modelPtr.ref.downloadSize = model.sizeBytes;
+        modelPtr.ref.contextLength = model.contextLength;
         modelPtr.ref.source = model.source;
 
         final result = saveFn(_registryHandle!, modelPtr);
@@ -196,6 +197,7 @@ class DartBridgeModelRegistry {
         framework: _frameworkToFfi(model.framework),
         source: _sourceToFfi(model.source),
         sizeBytes: model.downloadSize ?? 0,
+        contextLength: model.contextLength ?? 0,
         downloadURL: model.downloadURL?.toString(),
         localPath: model.localPath?.toFilePath(),
         version: null,
@@ -384,6 +386,7 @@ class DartBridgeModelRegistry {
           ? Uri.file(ffiModel.localPath!)
           : null,
       downloadSize: ffiModel.sizeBytes > 0 ? ffiModel.sizeBytes : null,
+      contextLength: ffiModel.contextLength > 0 ? ffiModel.contextLength : null,
       source: _sourceFromFfi(ffiModel.source),
     );
   }
@@ -804,6 +807,7 @@ class DartBridgeModelRegistry {
       framework: struct.ref.framework,
       source: struct.ref.source,
       sizeBytes: struct.ref.downloadSize,
+      contextLength: struct.ref.contextLength,
       downloadURL: downloadURL,
       localPath: localPath,
       version: null,
@@ -1092,6 +1096,7 @@ class ModelInfo {
   final int framework;
   final int source;
   final int sizeBytes;
+  final int contextLength;
   final String? downloadURL;
   final String? localPath;
   final String? version;
@@ -1104,6 +1109,7 @@ class ModelInfo {
     required this.framework,
     required this.source,
     required this.sizeBytes,
+    required this.contextLength,
     this.downloadURL,
     this.localPath,
     this.version,
@@ -1119,6 +1125,7 @@ class ModelInfo {
         'framework': framework,
         'source': source,
         'sizeBytes': sizeBytes,
+        'contextLength': contextLength,
         if (downloadURL != null) 'downloadURL': downloadURL,
         if (localPath != null) 'localPath': localPath,
         if (version != null) 'version': version,
