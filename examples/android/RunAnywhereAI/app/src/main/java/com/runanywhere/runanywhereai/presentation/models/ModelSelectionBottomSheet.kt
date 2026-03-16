@@ -522,15 +522,6 @@ private fun ModelCard(
                 backgroundColor = model.formatColor.copy(alpha = 0.10f),
             )
 
-            if (model.isNpu) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Badge(
-                    text = "SD 8 Gen 2+",
-                    textColor = AppColors.primaryBlue,
-                    backgroundColor = AppColors.primaryBlue.copy(alpha = 0.10f),
-                )
-            }
-
             if (model.supportsLora) {
                 Spacer(modifier = Modifier.width(4.dp))
                 Badge(
