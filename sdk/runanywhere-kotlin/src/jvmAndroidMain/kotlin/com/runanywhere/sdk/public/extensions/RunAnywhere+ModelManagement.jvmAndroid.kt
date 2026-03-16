@@ -552,10 +552,10 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
                 // All files downloaded — update registry with directory path
-                //     Guard: if model was deleted during download, don't resurrect it
-                val stillRegistered = synchronized(modelCacheLock) {
-                    registeredModels.any { it.id == modelId }
-                }
+                //     Guard: if model was deleted during download, don't resurrect it.
+                //     Check the C++ registry (cleared by deleteModel via remove()) rather than
+                //     registeredModels (which only clears localPath but keeps the entry).
+                val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
                 if (!stillRegistered) {
                     downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
                     modelDir.deleteRecursively()
@@ -791,10 +791,10 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
             // 13. Update model in C++ registry with local path
-            //     Guard: if model was deleted during download, don't resurrect it
-            val stillRegistered = synchronized(modelCacheLock) {
-                registeredModels.any { it.id == modelId }
-            }
+            //     Guard: if model was deleted during download, don't resurrect it.
+            //     Check the C++ registry (cleared by deleteModel via remove()) rather than
+            //     registeredModels (which only clears localPath but keeps the entry).
+            val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
             if (!stillRegistered) {
                 downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
                 File(finalModelPath).let { f -> if (f.exists()) f.deleteRecursively() }
@@ -1318,7 +1318,11 @@ actual suspend fun RunAnywhere.deleteAllModels() {
 
     val downloadedModels = CppBridgeModelRegistry.getDownloaded()
     for (model in downloadedModels) {
-        deleteModel(model.modelId)
+        try {
+            deleteModel(model.modelId)
+        } catch (e: Exception) {
+            downloadLogger.warn("deleteAllModels: failed to delete ${model.modelId}: ${e.message}")
+        }
     }
 }
 

@@ -271,7 +271,9 @@ private fun toAIModel(m: ModelInfo, deviceMemoryMB: Long? = null): AIModel {
     val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
 
-    // Compute memory compatibility from downloadSize (which stores memoryRequirement)
+    // Compute memory compatibility using downloadSize as an approximation of runtime memory.
+    // Note: downloadSize may not equal runtime memory for all models (e.g., GGUF quantized models
+    // may use less RAM than their file size), but it's the best heuristic available.
     val compatibility = computeMemoryCompatibility(m.downloadSize, deviceMemoryMB)
 
     return AIModel(

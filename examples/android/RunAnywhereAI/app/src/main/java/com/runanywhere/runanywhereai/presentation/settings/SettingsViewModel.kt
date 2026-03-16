@@ -615,4 +615,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val state = _uiState.value
         return state.isApiKeyConfigured && state.isBaseURLConfigured
     }
+
+    /**
+     * Clear the error message so the same error can trigger the dialog again.
+     */
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
 }

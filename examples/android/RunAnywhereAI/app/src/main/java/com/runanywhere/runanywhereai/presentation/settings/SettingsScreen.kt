@@ -448,11 +448,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     // Error Dialog
     showErrorMessage?.let { message ->
         AlertDialog(
-            onDismissRequest = { showErrorMessage = null },
+            onDismissRequest = {
+                showErrorMessage = null
+                viewModel.clearError()
+            },
             title = { Text("Error") },
             text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = { showErrorMessage = null }) {
+                TextButton(onClick = {
+                    showErrorMessage = null
+                    viewModel.clearError()
+                }) {
                     Text("OK")
                 }
             },
