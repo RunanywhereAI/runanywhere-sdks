@@ -418,16 +418,28 @@ extension VoiceAssistantView {
                 isLoading: isLoading,
                 activeColor: viewModel.micButtonColor.swiftUIColor,
                 inactiveColor: viewModel.micButtonColor.swiftUIColor,
-                icon: viewModel.micButtonIcon
-            ) {
-                Task {
-                    if viewModel.isActive {
-                        await viewModel.stopConversation()
-                    } else {
-                        await viewModel.startConversation()
+                icon: viewModel.micButtonIcon,
+                action: {
+                    Task {
+                        if viewModel.isSpeaking {
+                            await viewModel.interruptSpeaking()
+                        } else if viewModel.isListening {
+                            await viewModel.sendAudioNow()
+                        } else if viewModel.sessionState == .connected {
+                            await viewModel.resumeListening()
+                        } else if !viewModel.isActive {
+                            await viewModel.startConversation()
+                        }
+                    }
+                },
+                onLongPress: {
+                    Task {
+                        if viewModel.isActive || viewModel.sessionState == .connected {
+                            await viewModel.stopConversation()
+                        }
                     }
                 }
-            }
+            )
 
             Spacer()
         }

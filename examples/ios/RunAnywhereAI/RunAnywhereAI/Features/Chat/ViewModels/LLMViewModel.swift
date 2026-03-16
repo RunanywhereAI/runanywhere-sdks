@@ -29,6 +29,7 @@ final class LLMViewModel {
     private(set) var error: Error?
     private(set) var isModelLoaded = false
     private(set) var loadedModelName: String?
+    private(set) var loadedModelSupportsThinking = false
     private(set) var selectedFramework: InferenceFramework?
     private(set) var modelSupportsStreaming = true
     private(set) var currentConversation: Conversation?
@@ -80,8 +81,13 @@ final class LLMViewModel {
         selectedFramework = framework
     }
 
+    func setLoadedModelSupportsThinking(_ value: Bool) {
+        loadedModelSupportsThinking = value
+    }
+
     func clearLoadedModelInfo() {
         loadedModelName = nil
+        loadedModelSupportsThinking = false
         selectedFramework = nil
     }
 
@@ -244,12 +250,19 @@ final class LLMViewModel {
         do {
             try await ensureModelIsLoaded()
             let options = getGenerationOptions()
-            try await performGeneration(prompt: prompt, options: options, messageIndex: messageIndex)
+            let effectivePrompt = applyThinkingModePrefix(to: prompt)
+            try await performGeneration(prompt: effectivePrompt, options: options, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
         }
 
         await finalizeGeneration(at: messageIndex)
+    }
+
+    private func applyThinkingModePrefix(to prompt: String) -> String {
+        guard loadedModelSupportsThinking else { return prompt }
+        let thinkingModeEnabled = SettingsViewModel.shared.thinkingModeEnabled
+        return thinkingModeEnabled ? prompt : "/no_think\n\(prompt)"
     }
 
     private func performGeneration(
@@ -476,20 +489,17 @@ final class LLMViewModel {
         if !isModelLoaded {
             throw LLMError.noModelLoaded
         }
-
-        // Verify model is actually loaded in SDK
-        if let model = ModelListViewModel.shared.currentModel {
-            try await RunAnywhere.loadModel(model.id)
-        }
     }
 
     private func getGenerationOptions() -> LLMGenerationOptions {
-        let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+        // Use object(forKey:) to distinguish an unset key (nil) from a value explicitly set to 0.0
+        let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let savedSystemPrompt = UserDefaults.standard.string(forKey: "defaultSystemPrompt")
+        let thinkingModeEnabled = SettingsViewModel.shared.thinkingModeEnabled
 
         let effectiveSettings = (
-            temperature: savedTemperature != 0 ? savedTemperature : Self.defaultTemperatureValue,
+            temperature: savedTemperature ?? Self.defaultTemperatureValue,
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
@@ -501,7 +511,7 @@ final class LLMViewModel {
     }()
 
     logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), systemPrompt=\(systemPromptInfo)"
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
     )
 
     return LLMGenerationOptions(
@@ -519,8 +529,8 @@ final class LLMViewModel {
     }
 
     private func ensureSettingsAreApplied() async {
-        let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
-        let temperature = savedTemperature != 0 ? savedTemperature : Self.defaultTemperatureValue
+        let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
+        let temperature = savedTemperature ?? Self.defaultTemperatureValue
 
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
@@ -542,6 +552,7 @@ final class LLMViewModel {
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
+                    self.loadedModelSupportsThinking = model.supportsThinking
                     self.selectedFramework = model.framework
                     self.modelSupportsStreaming = supportsStreaming
 
@@ -562,5 +573,20 @@ final class LLMViewModel {
         if let conversation = notification.object as? Conversation {
             loadConversation(conversation)
         }
+    }
+
+    static func stripThinkTags(from text: String) -> String {
+        var result = text
+        // Remove complete <think>...</think> blocks 
+        while let startRange = result.range(of: "<think>"),
+              let endRange = result.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound {
+            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
+        }
+        if let trailingStart = result.range(of: "<think>", options: .backwards),
+           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
+            result = String(result[result.startIndex..<trailingStart.lowerBound])
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

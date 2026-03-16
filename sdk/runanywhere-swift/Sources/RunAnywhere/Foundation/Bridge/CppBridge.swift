@@ -179,6 +179,15 @@ public enum CppBridge {
 
         guard wasInitialized else { return }
 
+        Task {
+            await LLM.shared.destroy()
+            await STT.shared.destroy()
+            await TTS.shared.destroy()
+            await VAD.shared.destroy()
+            await VoiceAgent.shared.destroy()
+            await VLM.shared.destroy()
+        }
+
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)
 

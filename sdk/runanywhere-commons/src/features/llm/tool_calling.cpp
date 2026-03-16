@@ -398,13 +398,41 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                         *out_is_object = true;
                                         return true;
                                     }
+                                } else {
+                                    // Scalar value (number, boolean, null)
+                                    // Read until comma, closing brace, or whitespace
+                                    size_t val_start = pos;
+                                    size_t val_end = pos;
+                                    while (val_end < len && json_obj[val_end] != ',' &&
+                                           json_obj[val_end] != '}' && json_obj[val_end] != ']' &&
+                                           json_obj[val_end] != '\n') {
+                                        val_end++;
+                                    }
+                                    // Trim trailing whitespace
+                                    while (val_end > val_start &&
+                                           (json_obj[val_end - 1] == ' ' || json_obj[val_end - 1] == '\t')) {
+                                        val_end--;
+                                    }
+                                    if (val_end > val_start) {
+                                        size_t val_len = val_end - val_start;
+                                        *out_value = static_cast<char*>(malloc(val_len + 1));
+                                        if (*out_value) {
+                                            memcpy(*out_value, json_obj + val_start, val_len);
+                                            (*out_value)[val_len] = '\0';
+                                        }
+                                        *out_is_object = false;
+                                        return true;
+                                    }
                                 }
                             }
                         }
                     }
 
                     // Move to end of key for continued scanning
+                    // Skip the in_string toggle - extract_json_string already
+                    // consumed the closing quote so in_string must stay false.
                     i = key_end - 1;
+                    continue;
                 }
             }
             in_string = !in_string;
@@ -663,10 +691,46 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                     }
                 }
 
-                // No arguments found - use empty object
-                *out_args_json = static_cast<char*>(malloc(3));
-                if (*out_args_json) {
-                    std::memcpy(*out_args_json, "{}", 3);
+                // No standard argument wrapper key found.
+                // Fallback: collect all remaining keys (excluding the tool name key)
+                // as flat arguments. This handles LLM output like:
+                // {"tool": "calculate", "expression": "5 * 100"}
+                {
+                    std::vector<std::string> all_keys = get_json_keys(json_obj);
+                    std::string flat_args = "{";
+                    bool first = true;
+                    for (const auto& k : all_keys) {
+                        // Skip the key that matched the tool name
+                        bool is_tool_key = false;
+                        for (int t = 0; TOOL_NAME_KEYS[t] != nullptr; t++) {
+                            if (str_equals_ignore_case(k.c_str(), TOOL_NAME_KEYS[t])) {
+                                is_tool_key = true;
+                                break;
+                            }
+                        }
+                        if (is_tool_key) continue;
+
+                        char* kval = nullptr;
+                        bool kval_is_obj = false;
+                        if (extract_json_value(json_obj, k.c_str(), &kval, &kval_is_obj)) {
+                            if (!first) flat_args += ",";
+                            std::string escaped_key = escape_json_string(k.c_str());
+                            if (kval_is_obj) {
+                                flat_args += "\"" + escaped_key + "\":" + std::string(kval);
+                            } else if (kval) {
+                                std::string escaped_val = escape_json_string(kval);
+                                flat_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
+                            }
+                            free(kval);
+                            first = false;
+                        }
+                    }
+                    flat_args += "}";
+
+                    *out_args_json = static_cast<char*>(malloc(flat_args.size() + 1));
+                    if (*out_args_json) {
+                        std::memcpy(*out_args_json, flat_args.c_str(), flat_args.size() + 1);
+                    }
                 }
                 return true;
             }
