@@ -16,9 +16,7 @@ import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
 import com.runanywhere.sdk.public.extensions.LLM.LLMStreamingResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
@@ -192,12 +190,15 @@ actual suspend fun RunAnywhere.generateStreamWithMetrics(
             }
         }
 
-    return coroutineScope {
-        LLMStreamingResult(
-            stream = tokenStream,
-            result = async { resultDeferred.await() },
-        )
-    }
+    // Return immediately — the stream is cold (runs when collected),
+    // and resultDeferred completes after generation finishes.
+    // NOTE: Do NOT wrap in coroutineScope{} — it would deadlock because
+    // coroutineScope waits for all children, but the async result can only
+    // complete after the stream is collected (which hasn't started yet).
+    return LLMStreamingResult(
+        stream = tokenStream,
+        result = resultDeferred,
+    )
 }
 
 actual fun RunAnywhere.cancelGeneration() {
