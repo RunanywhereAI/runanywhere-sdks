@@ -229,6 +229,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 .collect { event ->
                     when (event.eventType) {
                         ModelEvent.ModelEventType.DOWNLOAD_COMPLETED -> {
+                            // Reconcile: if the model was previously deleted and re-downloaded
+                            // in the same session, remove it from the filter set so it reappears.
+                            event.modelId?.let { deletedModelIds.remove(it) }
                             Timber.d("📥 Model download completed: ${event.modelId}, refreshing storage...")
                             loadStorageData()
                         }

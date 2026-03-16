@@ -31,7 +31,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -269,16 +268,6 @@ class ModelSelectionViewModel(
 
                 // Call SDK download API - it returns a Flow<DownloadProgress>
                 RunAnywhere.downloadModel(modelId)
-                    .catch { e ->
-                        Timber.e("❌ Download stream error: ${e.message}")
-                        _uiState.update {
-                            it.copy(
-                                downloadingModelIds = it.downloadingModelIds - modelId,
-                                downloadProgressMap = it.downloadProgressMap - modelId,
-                                error = e.message ?: "Download failed",
-                            )
-                        }
-                    }
                     .collect { progress ->
                         val percent = (progress.progress * 100).toInt()
                         _uiState.update {
@@ -302,6 +291,8 @@ class ModelSelectionViewModel(
                         downloadProgressMap = it.downloadProgressMap - modelId,
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "❌ Download failed for $modelId: ${e.message}")
                 _uiState.update {

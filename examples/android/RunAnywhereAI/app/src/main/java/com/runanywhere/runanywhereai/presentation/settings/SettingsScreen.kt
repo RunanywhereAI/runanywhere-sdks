@@ -70,12 +70,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showDeleteConfirmDialog by remember { mutableStateOf<StoredModelInfo?>(null) }
-    var showErrorMessage by remember { mutableStateOf<String?>(null) }
-
-    // Show error messages from ViewModel
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { showErrorMessage = it }
-    }
 
     // Refresh storage data when the screen appears
     // This ensures downloaded models and storage metrics are up-to-date
@@ -445,20 +439,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         )
     }
 
-    // Error Dialog
-    showErrorMessage?.let { message ->
+    // Error Dialog — driven directly from ViewModel state (single source of truth)
+    uiState.errorMessage?.let { message ->
         AlertDialog(
-            onDismissRequest = {
-                showErrorMessage = null
-                viewModel.clearError()
-            },
+            onDismissRequest = { viewModel.clearError() },
             title = { Text("Error") },
             text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = {
-                    showErrorMessage = null
-                    viewModel.clearError()
-                }) {
+                TextButton(onClick = { viewModel.clearError() }) {
                     Text("OK")
                 }
             },

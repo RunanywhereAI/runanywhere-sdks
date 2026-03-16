@@ -1145,6 +1145,14 @@ private suspend fun downloadEmbeddingModelFiles(
 
     val dirPath = embeddingDir.absolutePath
 
+    // Guard: if model was deleted during download, don't resurrect it.
+    val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
+    if (!stillRegistered) {
+        logger.warn("Model '$modelId' was deleted during embedding download, discarding result")
+        withContext(Dispatchers.IO) { embeddingDir.deleteRecursively() }
+        return
+    }
+
     // Update in-memory cache with local path
     synchronized(modelCacheLock) {
         val idx = registeredModels.indexOfFirst { it.id == modelId }
@@ -1223,9 +1231,18 @@ actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Actually cancel the download thread via CppBridgeDownload
-    // This cancels the future, cleans up temp files, and notifies listeners
-    CppBridgeDownload.cancelDownload(modelId)
+    // CppBridgeDownload.cancelDownload() expects a downloadId (UUID), not a modelId.
+    // Reverse-lookup the downloadId from the modelId mapping.
+    val downloadId = downloadIdToModelId.entries.firstOrNull { it.value == modelId }?.key
+    if (downloadId != null) {
+        CppBridgeDownload.cancelDownload(downloadId)
+        // Clean up tracking maps
+        downloadIdToModelId.remove(downloadId)
+        activeDownloadHandlers.remove(modelId)
+    } else {
+        // Fallback: try modelId directly (some paths may use modelId as downloadId)
+        CppBridgeDownload.cancelDownload(modelId)
+    }
 }
 
 actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
