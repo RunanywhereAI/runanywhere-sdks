@@ -59,12 +59,22 @@ fun BenchmarkProgressDialog(
 
             Spacer(modifier = Modifier.height(AppSpacing.xxLarge))
 
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-                color = AppColors.primaryAccent,
-                trackColor = AppColors.primaryAccent.copy(alpha = 0.12f),
-            )
+            if (progress > 0f) {
+                // Determinate: show actual progress once first benchmark completes
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AppColors.primaryAccent,
+                    trackColor = AppColors.primaryAccent.copy(alpha = 0.12f),
+                )
+            } else {
+                // Indeterminate: animate while first benchmark is running
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AppColors.primaryAccent,
+                    trackColor = AppColors.primaryAccent.copy(alpha = 0.12f),
+                )
+            }
 
             Spacer(modifier = Modifier.height(AppSpacing.xxLarge))
 

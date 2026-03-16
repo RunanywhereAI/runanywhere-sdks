@@ -147,6 +147,7 @@ class BenchmarkRunner {
         for ((index, item) in workItems.withIndex()) {
             coroutineContext.ensureActive()
 
+            // Report which benchmark is about to run (progress reflects completed items)
             onProgress(
                 BenchmarkProgressUpdate(
                     completedCount = index,
@@ -185,16 +186,17 @@ class BenchmarkRunner {
                     metrics = metrics,
                 ),
             )
-        }
 
-        onProgress(
-            BenchmarkProgressUpdate(
-                completedCount = total,
-                totalCount = total,
-                currentScenario = "Done",
-                currentModel = "",
-            ),
-        )
+            // Report progress AFTER the benchmark completes so UI reflects actual progress
+            onProgress(
+                BenchmarkProgressUpdate(
+                    completedCount = index + 1,
+                    totalCount = total,
+                    currentScenario = if (index + 1 < total) workItems[index + 1].scenario.name else "Done",
+                    currentModel = if (index + 1 < total) workItems[index + 1].model.name else "",
+                ),
+            )
+        }
 
         return BenchmarkRunResult(
             results = results,
