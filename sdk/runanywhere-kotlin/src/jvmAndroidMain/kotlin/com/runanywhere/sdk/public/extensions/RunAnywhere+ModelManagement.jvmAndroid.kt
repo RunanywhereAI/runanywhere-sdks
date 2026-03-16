@@ -519,6 +519,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     totalBytesDownloaded,
                 )
 
+                // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+                EventBus.publish(
+                    ModelEvent(
+                        eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+                        modelId = modelId,
+                    )
+                )
+
                 trySend(
                     DownloadProgress(
                         modelId = modelId,
@@ -730,6 +738,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // 14. Emit completion events
             val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
             CppBridgeEvents.emitDownloadCompleted(modelId, downloadDurationMs.toDouble(), result.fileSize)
+
+            // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+            EventBus.publish(
+                ModelEvent(
+                    eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+                    modelId = modelId,
+                )
+            )
 
             trySend(
                 DownloadProgress(
@@ -1066,6 +1082,14 @@ private suspend fun downloadEmbeddingModelFiles(
     }
     CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
     CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
+
+    // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+    EventBus.publish(
+        ModelEvent(
+            eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+            modelId = modelId,
+        )
+    )
 
     logger.info("Embedding model ready at: $dirPath")
 }
