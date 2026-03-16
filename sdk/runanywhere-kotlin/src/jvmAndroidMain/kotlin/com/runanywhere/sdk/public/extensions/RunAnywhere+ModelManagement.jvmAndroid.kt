@@ -12,6 +12,8 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
@@ -1189,11 +1191,29 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    // 1. Get model info to find the local path for file deletion
+    // 1. Unload the model if it is currently loaded (LLM, TTS, STT, or VLM)
+    if (CppBridgeLLM.getLoadedModelId() == modelId) {
+        CppBridgeLLM.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeTTS.getLoadedModelId() == modelId) {
+        CppBridgeTTS.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeSTT.getLoadedModelId() == modelId) {
+        CppBridgeSTT.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeVLM.getLoadedModelId() == modelId) {
+        CppBridgeVLM.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+
+    // 2. Get model info to find the local path for file deletion
     val model = CppBridgeModelRegistry.get(modelId)
     val localPath = model?.localPath
 
-    // 2. Delete actual files from disk (matches iOS SimplifiedFileManager.deleteModel)
+    // 3. Delete actual files from disk (matches iOS SimplifiedFileManager.deleteModel)
     if (localPath != null) {
         val modelFile = File(localPath)
         if (modelFile.exists()) {

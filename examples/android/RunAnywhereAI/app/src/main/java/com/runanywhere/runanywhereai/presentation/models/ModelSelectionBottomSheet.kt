@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -199,12 +200,12 @@ fun ModelSelectionBottomSheet(
                         val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
                             model.framework == InferenceFramework.SYSTEM_TTS
                         val isReady = isBuiltIn || model.isDownloaded
-                        val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
+                        val isThisModelDownloading = model.id in uiState.downloadingModelIds
                         ModelCard(
                             model = toAIModel(model, deviceMemoryMB),
                             isReady = isReady,
                             isLoading = isThisModelDownloading,
-                            downloadProgress = if (isThisModelDownloading) uiState.loadingProgress else null,
+                            downloadProgress = uiState.downloadProgressMap[model.id],
                             onCardClick = {
                                 if (isReady) {
                                     scope.launch {
@@ -225,8 +226,11 @@ fun ModelSelectionBottomSheet(
                                 }
                             },
                             onDownloadClick = {
-                                if (!isReady) viewModel.startDownload(model.id)
+                                if (!isReady && !isThisModelDownloading) viewModel.startDownload(model.id)
                             },
+                            onCancelClick = if (isThisModelDownloading) {
+                                { viewModel.cancelDownload(model.id) }
+                            } else null,
                         )
                         if (index < sortedModels.lastIndex) Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -494,6 +498,7 @@ private fun ModelCard(
     downloadProgress: String? = null,
     onCardClick: () -> Unit,
     onDownloadClick: () -> Unit,
+    onCancelClick: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier
@@ -593,10 +598,12 @@ private fun ModelCard(
                 )
             } else {
                 if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = AppColors.primaryAccent,
-                        strokeWidth = 2.dp,
+                    Badge(
+                        text = "Cancel",
+                        textColor = AppColors.primaryRed,
+                        backgroundColor = AppColors.primaryRed.copy(alpha = 0.10f),
+                        icon = Icons.Outlined.Close,
+                        onClick = onCancelClick,
                     )
                 } else {
                     Badge(
