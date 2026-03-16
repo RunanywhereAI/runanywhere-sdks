@@ -12,6 +12,8 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.VLM.VLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.VLM.VLMImage
 import com.runanywhere.sdk.public.extensions.VLM.VLMImageFormat
@@ -232,6 +234,7 @@ actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
     }
 
     vlmLogger.info("VLM model loaded successfully by ID: $modelId")
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 actual suspend fun RunAnywhere.loadVLMModel(
@@ -254,11 +257,16 @@ actual suspend fun RunAnywhere.loadVLMModel(
     }
 
     vlmLogger.info("VLM model loaded successfully: $modelId")
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 actual suspend fun RunAnywhere.unloadVLMModel() {
+    val modelId = CppBridgeVLM.getLoadedModelId()
     CppBridgeVLM.unload()
     vlmLogger.info("VLM model unloaded")
+    if (modelId != null) {
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
 }
 
 actual val RunAnywhere.isVLMModelLoaded: Boolean

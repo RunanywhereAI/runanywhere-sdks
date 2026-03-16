@@ -13,6 +13,8 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.TTS.TTSOptions
 import com.runanywhere.sdk.public.extensions.TTS.TTSOutput
 import com.runanywhere.sdk.public.extensions.TTS.TTSSpeakResult
@@ -43,13 +45,18 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
         throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
     }
     ttsLogger.info("TTS voice loaded: $voiceId")
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = voiceId))
 }
 
 actual suspend fun RunAnywhere.unloadTTSVoice() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+    val voiceId = CppBridgeTTS.getLoadedModelId()
     CppBridgeTTS.unload()
+    if (voiceId != null) {
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = voiceId))
+    }
 }
 
 actual suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean {

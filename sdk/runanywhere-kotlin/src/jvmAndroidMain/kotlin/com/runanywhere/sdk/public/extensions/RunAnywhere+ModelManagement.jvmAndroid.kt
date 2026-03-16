@@ -504,6 +504,16 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
                 // All files downloaded — update registry with directory path
+                //     Guard: if model was deleted during download, don't resurrect it
+                val stillRegistered = synchronized(modelCacheLock) {
+                    registeredModels.any { it.id == modelId }
+                }
+                if (!stillRegistered) {
+                    downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
+                    modelDir.deleteRecursively()
+                    close()
+                    return@callbackFlow
+                }
                 val finalPath = modelDir.absolutePath
                 val updatedModelInfo = modelInfo.copy(localPath = finalPath)
                 addToModelCache(updatedModelInfo)
@@ -729,6 +739,16 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
             // 13. Update model in C++ registry with local path
+            //     Guard: if model was deleted during download, don't resurrect it
+            val stillRegistered = synchronized(modelCacheLock) {
+                registeredModels.any { it.id == modelId }
+            }
+            if (!stillRegistered) {
+                downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
+                File(finalModelPath).let { f -> if (f.exists()) f.deleteRecursively() }
+                close()
+                return@callbackFlow
+            }
             val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
             addToModelCache(updatedModelInfo)
             CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
@@ -1151,8 +1171,9 @@ actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Update C++ registry to mark download cancelled
-    CppBridgeModelRegistry.updateDownloadStatus(modelId, null)
+    // Actually cancel the download thread via CppBridgeDownload
+    // This cancels the future, cleans up temp files, and notifies listeners
+    CppBridgeDownload.cancelDownload(modelId)
 }
 
 actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
@@ -1198,10 +1219,20 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
         }
     }
 
-    // 5. Emit deletion event to C++ analytics
+    // 5. Clean up multi-file descriptor cache
+    synchronized(multiFileCacheLock) {
+        multiFileModelCache.remove(modelId)
+    }
+
+    // 6. Reset scan flag so deleted models aren't resurrected from stale scan state
+    synchronized(scanLock) {
+        hasScannedForDownloads = false
+    }
+
+    // 7. Emit deletion event to C++ analytics
     CppBridgeEvents.emitModelDeleted(modelId)
 
-    // 6. Publish to Kotlin EventBus so UI subscribers (e.g., SettingsViewModel) get notified
+    // 8. Publish to Kotlin EventBus so UI subscribers (e.g., SettingsViewModel) get notified
     EventBus.publish(
         ModelEvent(
             eventType = ModelEvent.ModelEventType.DELETED,
@@ -1247,13 +1278,19 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }
+
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 actual suspend fun RunAnywhere.unloadLLMModel() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+    val modelId = CppBridgeLLM.getLoadedModelId()
     CppBridgeLLM.unload()
+    if (modelId != null) {
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
 }
 
 actual suspend fun RunAnywhere.isLLMModelLoaded(): Boolean {
@@ -1316,6 +1353,8 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     if (result != 0) {
         throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
     }
+
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 // ============================================================================
