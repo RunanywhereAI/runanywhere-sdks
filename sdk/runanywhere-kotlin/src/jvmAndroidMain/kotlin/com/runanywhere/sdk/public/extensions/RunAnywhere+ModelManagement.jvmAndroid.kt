@@ -189,6 +189,52 @@ private fun getAllBridgeModels(): List<CppBridgeModelRegistry.ModelInfo> {
 private var hasScannedForDownloads = false
 private val scanLock = Any()
 
+// ============================================================================
+// MULTIPLEXING DOWNLOAD LISTENER
+// Routes CppBridgeDownload callbacks to per-model handlers for concurrent downloads.
+// ============================================================================
+
+private val activeDownloadHandlers = java.util.concurrent.ConcurrentHashMap<String, CppBridgeDownload.DownloadListener>()
+/** Maps downloadId → modelId for routing progress callbacks (which only have downloadId). */
+private val downloadIdToModelId = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+private val multiplexingListener = object : CppBridgeDownload.DownloadListener {
+    override fun onDownloadStarted(downloadId: String, modelId: String, url: String) {
+        downloadIdToModelId[downloadId] = modelId
+        activeDownloadHandlers[modelId]?.onDownloadStarted(downloadId, modelId, url)
+    }
+    override fun onDownloadProgress(downloadId: String, downloadedBytes: Long, totalBytes: Long, progress: Int) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) {
+            activeDownloadHandlers[modelId]?.onDownloadProgress(downloadId, downloadedBytes, totalBytes, progress)
+        }
+    }
+    override fun onDownloadCompleted(downloadId: String, modelId: String, filePath: String, fileSize: Long) {
+        activeDownloadHandlers[modelId]?.onDownloadCompleted(downloadId, modelId, filePath, fileSize)
+        downloadIdToModelId.remove(downloadId)
+    }
+    override fun onDownloadFailed(downloadId: String, modelId: String, error: Int, errorMessage: String) {
+        activeDownloadHandlers[modelId]?.onDownloadFailed(downloadId, modelId, error, errorMessage)
+        downloadIdToModelId.remove(downloadId)
+    }
+    override fun onDownloadPaused(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadPaused(downloadId)
+    }
+    override fun onDownloadResumed(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadResumed(downloadId)
+    }
+    override fun onDownloadCancelled(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadCancelled(downloadId)
+        downloadIdToModelId.remove(downloadId)
+    }
+}
+
+@Volatile
+private var isMultiplexingListenerInstalled = false
+
 actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
@@ -676,8 +722,12 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
             }
 
-        // Register listener BEFORE starting download
-        CppBridgeDownload.downloadListener = downloadListener
+        // Register per-model handler with the multiplexing listener
+        activeDownloadHandlers[modelId] = downloadListener
+        if (!isMultiplexingListenerInstalled) {
+            CppBridgeDownload.downloadListener = multiplexingListener
+            isMultiplexingListenerInstalled = true
+        }
 
         try {
             // 8. Start the actual download (runs asynchronously on thread pool)
@@ -787,8 +837,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // Close with exception so collectors receive the error
             close(e)
         } finally {
-            // Clean up listener
-            CppBridgeDownload.downloadListener = null
+            // Remove this model's handler (other downloads keep theirs)
+            activeDownloadHandlers.remove(modelId)
         }
 
         awaitClose {
