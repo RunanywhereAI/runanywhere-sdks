@@ -81,6 +81,14 @@ let package = Package(
             name: "RunAnywhereWhisperKit",
             targets: ["WhisperKitRuntime"]
         ),
+
+        // =================================================================
+        // MetalRT Backend - adds LLM/STT/TTS/VLM via custom Metal kernels
+        // =================================================================
+        .library(
+            name: "RunAnywhereMetalRT",
+            targets: ["MetalRTRuntime"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -197,6 +205,34 @@ let package = Package(
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
                 .linkedFramework("MetalKit"),
+            ]
+        ),
+
+        // =================================================================
+        // MetalRT C Bridge Module - exposes rac_backend_metalrt_register()
+        // =================================================================
+        .target(
+            name: "MetalRTBackend",
+            dependencies: [],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // MetalRT Runtime Backend (custom Metal GPU kernels)
+        // =================================================================
+        .target(
+            name: "MetalRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "MetalRTBackend",
+            ],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
+            exclude: ["include"],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
             ]
         ),
 

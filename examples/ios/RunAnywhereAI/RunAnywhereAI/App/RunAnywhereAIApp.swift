@@ -10,6 +10,9 @@ import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
 import WhisperKitRuntime
+#if canImport(MetalRTRuntime)
+import MetalRTRuntime
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -84,6 +87,9 @@ struct RunAnywhereAIApp: App {
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
             WhisperKitSTT.register(priority: 200)
+            #if canImport(MetalRTRuntime)
+            MetalRT.register(priority: 100)
+            #endif
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -326,6 +332,26 @@ struct RunAnywhereAIApp: App {
         }
 
         logger.info("✅ LLM models registered (including tool-calling optimized models)")
+
+        // ============================================================================
+        // Register MetalRT LLM models (custom Metal GPU kernels, framework-hint only)
+        // These models use MetalRT's safetensors format, NOT GGUF.
+        // ============================================================================
+        // TODO: Add MetalRT model download URLs once hosted
+        // For now, models are loaded from local paths during development.
+        // Example registration (uncomment when URLs are available):
+        //
+        // if let qwen3MetalRTURL = URL(string: "https://huggingface.co/.../Qwen3-0.6B-MLX-4bit.tar.gz") {
+        //     RunAnywhere.registerModel(
+        //         id: "qwen3-0.6b-metalrt",
+        //         name: "Qwen3 0.6B (MetalRT)",
+        //         url: qwen3MetalRTURL,
+        //         framework: .metalrt,
+        //         memoryRequirement: 400_000_000
+        //     )
+        // }
+
+        logger.info("✅ MetalRT models registered (framework-hint only)")
 
         // Register VLM (Vision Language) models
         // VLM models require 2 files: main model + mmproj (vision projector)
