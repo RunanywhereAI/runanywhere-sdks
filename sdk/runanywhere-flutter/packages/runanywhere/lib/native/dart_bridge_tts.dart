@@ -12,6 +12,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 /// TTS component bridge for C++ interop.
@@ -48,13 +49,9 @@ class DartBridgeTTS {
     }
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-          int Function(Pointer<RacHandle>)>('rac_tts_component_create');
-
       final handlePtr = calloc<RacHandle>();
       try {
-        final result = create(handlePtr);
+        final result = NativeFunctions.ttsCreate(handlePtr);
 
         if (result != RAC_SUCCESS) {
           throw StateError(
@@ -81,11 +78,7 @@ class DartBridgeTTS {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_tts_component_is_loaded');
-
-      return isLoadedFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.ttsIsLoaded(_handle!) == RAC_TRUE;
     } catch (e) {
       _logger.debug('isLoaded check failed: $e');
       return false;
@@ -116,14 +109,7 @@ class DartBridgeTTS {
     final namePtr = voiceName.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadVoiceFn = lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_tts_component_load_voice');
-
-      final result = loadVoiceFn(handle, pathPtr, idPtr, namePtr);
+      final result = NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -145,11 +131,7 @@ class DartBridgeTTS {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_tts_component_cleanup');
-
-      cleanupFn(_handle!);
+      NativeFunctions.ttsCleanup(_handle!);
       _loadedVoiceId = null;
       _logger.info('TTS voice unloaded');
     } catch (e) {
@@ -162,11 +144,7 @@ class DartBridgeTTS {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final stopFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_tts_component_stop');
-
-      stopFn(_handle!);
+      NativeFunctions.ttsStop(_handle!);
       _logger.debug('TTS synthesis stopped');
     } catch (e) {
       _logger.error('Failed to stop TTS: $e');
@@ -335,11 +313,7 @@ class DartBridgeTTS {
   void destroy() {
     if (_handle != null) {
       try {
-        final lib = PlatformLoader.loadCommons();
-        final destroyFn = lib.lookupFunction<Void Function(RacHandle),
-            void Function(RacHandle)>('rac_tts_component_destroy');
-
-        destroyFn(_handle!);
+        NativeFunctions.ttsDestroy(_handle!);
         _handle = null;
         _loadedVoiceId = null;
         _logger.debug('TTS component destroyed');
