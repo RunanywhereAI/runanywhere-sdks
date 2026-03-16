@@ -17,6 +17,8 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
@@ -1141,14 +1143,58 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+
+    // 1. Get model info to find the local path for file deletion
+    val model = CppBridgeModelRegistry.get(modelId)
+    val localPath = model?.localPath
+
+    // 2. Delete actual files from disk (matches iOS SimplifiedFileManager.deleteModel)
+    if (localPath != null) {
+        val modelFile = File(localPath)
+        if (modelFile.exists()) {
+            if (modelFile.isDirectory) {
+                modelFile.deleteRecursively()
+            } else {
+                modelFile.delete()
+            }
+        }
+    }
+
+    // 3. Remove from C++ registry entirely.
+    //    The model will be re-registered (without localPath) on next app start via ModelList.setupModels().
     CppBridgeModelRegistry.remove(modelId)
+
+    // 4. Clear localPath in the Kotlin in-memory cache so availableModels() reflects deletion.
+    //    Without this, the registeredModels cache still has localPath set, and since it takes
+    //    precedence over bridge models in the merge, the model would still appear as downloaded.
+    synchronized(modelCacheLock) {
+        val index = registeredModels.indexOfFirst { it.id == modelId }
+        if (index >= 0) {
+            registeredModels[index] = registeredModels[index].copy(localPath = null)
+        }
+    }
+
+    // 5. Emit deletion event to C++ analytics
+    CppBridgeEvents.emitModelDeleted(modelId)
+
+    // 6. Publish to Kotlin EventBus so UI subscribers (e.g., SettingsViewModel) get notified
+    EventBus.publish(
+        ModelEvent(
+            eventType = ModelEvent.ModelEventType.DELETED,
+            modelId = modelId,
+        )
+    )
 }
 
 actual suspend fun RunAnywhere.deleteAllModels() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Would need to parse and delete each - simplified
+
+    val downloadedModels = CppBridgeModelRegistry.getDownloaded()
+    for (model in downloadedModels) {
+        deleteModel(model.modelId)
+    }
 }
 
 actual suspend fun RunAnywhere.refreshModelRegistry() {

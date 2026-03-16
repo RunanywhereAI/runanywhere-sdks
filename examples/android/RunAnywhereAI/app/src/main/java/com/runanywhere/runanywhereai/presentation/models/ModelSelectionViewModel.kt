@@ -83,6 +83,10 @@ class ModelSelectionViewModel(
                                 )
                             }
                         }
+                        ModelEvent.ModelEventType.DELETED -> {
+                            Timber.d("🗑️ Model deleted: ${event.modelId}")
+                            loadModelsAndFrameworks() // Refresh models list
+                        }
                         else -> {}
                     }
                 }

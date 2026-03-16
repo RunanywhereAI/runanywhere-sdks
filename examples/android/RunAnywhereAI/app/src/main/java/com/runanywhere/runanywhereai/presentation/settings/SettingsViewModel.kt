@@ -70,6 +70,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    /**
+     * Track model IDs that have been deleted in this session.
+     * Used to filter out stale entries from the C++ registry that may lag behind.
+     */
+    private val deletedModelIds = mutableSetOf<String>()
+
     private val encryptedPrefs by lazy {
         val masterKey = MasterKey.Builder(application)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -251,15 +257,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 // Use SDK's storageInfo()
                 val storageInfo = RunAnywhere.storageInfo()
 
-                // Map stored models to UI model
+                // Map stored models to UI model, filtering out models deleted in this session
                 val storedModels =
-                    storageInfo.storedModels.map { model ->
-                        StoredModelInfo(
-                            id = model.id,
-                            name = model.name,
-                            size = model.size,
-                        )
-                    }
+                    storageInfo.storedModels
+                        .filter { it.id !in deletedModelIds }
+                        .map { model ->
+                            StoredModelInfo(
+                                id = model.id,
+                                name = model.name,
+                                size = model.size,
+                            )
+                        }
 
                 Timber.d("Storage info received:")
                 Timber.d("  - Total space: ${storageInfo.deviceStorage.totalSpace}")
@@ -304,14 +312,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 Timber.d("Deleting model: $modelId")
+
+                // Track this deletion so loadStorageData() filters it out even if C++ is stale
+                deletedModelIds.add(modelId)
+
+                // Optimistic UI update: remove model from list immediately
+                _uiState.update { state ->
+                    state.copy(
+                        downloadedModels = state.downloadedModels.filter { it.id != modelId },
+                    )
+                }
+
                 // Use SDK's deleteModel extension function
                 RunAnywhere.deleteModel(modelId)
                 Timber.d("Model deleted successfully: $modelId")
 
-                // Refresh storage data after deletion
+                // Refresh storage data to sync sizes
                 loadStorageData()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to delete model: $modelId")
+                // Rollback: remove from deleted set and reload
+                deletedModelIds.remove(modelId)
+                loadStorageData()
                 _uiState.update {
                     it.copy(errorMessage = "Failed to delete model: ${e.message}")
                 }

@@ -54,9 +54,10 @@ private fun collectAndroidDeviceInfo(): DeviceInfo {
                 "unknown"
             }
 
-        val runtime = Runtime.getRuntime()
-        val totalMemory = runtime.maxMemory()
-        val processorCount = runtime.availableProcessors()
+        val processorCount = Runtime.getRuntime().availableProcessors()
+
+        // Get actual physical RAM via ActivityManager (not Runtime.maxMemory() which is JVM heap limit)
+        val totalMemory = getAndroidPhysicalMemory() ?: Runtime.getRuntime().maxMemory()
 
         DeviceInfo(
             deviceId = generateDeviceId(),
@@ -108,6 +109,37 @@ private fun collectJvmDeviceInfo(): DeviceInfo {
         totalMemory = totalMemory,
         processorCount = processorCount,
     )
+}
+
+/**
+ * Get actual physical RAM on Android via ActivityManager reflection.
+ * Runtime.maxMemory() returns the JVM heap limit (~256-512MB), not physical RAM.
+ * ActivityManager.MemoryInfo.totalMem returns the real physical memory.
+ */
+private fun getAndroidPhysicalMemory(): Long? {
+    return try {
+        // Get the application context via ActivityThread reflection
+        val activityThreadClass = Class.forName("android.app.ActivityThread")
+        val currentAppMethod = activityThreadClass.getMethod("currentApplication")
+        val context = currentAppMethod.invoke(null) ?: return null
+
+        // Get ActivityManager service
+        val contextClass = Class.forName("android.content.Context")
+        val getSystemServiceMethod = contextClass.getMethod("getSystemService", String::class.java)
+        val activityManager = getSystemServiceMethod.invoke(context, "activity") ?: return null
+
+        // Create MemoryInfo and call getMemoryInfo
+        val memInfoClass = Class.forName("android.app.ActivityManager\$MemoryInfo")
+        val memInfo = memInfoClass.getDeclaredConstructor().newInstance()
+        val getMemInfoMethod = activityManager.javaClass.getMethod("getMemoryInfo", memInfoClass)
+        getMemInfoMethod.invoke(activityManager, memInfo)
+
+        // Read totalMem field
+        val totalMemField = memInfoClass.getField("totalMem")
+        totalMemField.getLong(memInfo)
+    } catch (e: Exception) {
+        null
+    }
 }
 
 /**

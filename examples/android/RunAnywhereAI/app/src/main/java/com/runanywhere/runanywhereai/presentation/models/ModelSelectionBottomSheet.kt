@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.SdStorage
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +71,20 @@ private data class DeviceStatus(
     val hasNeuralEngine: Boolean,
 )
 
+/**
+ * Memory compatibility level for a model relative to device RAM.
+ */
+private enum class MemoryCompatibility {
+    /** Model memory requirement is ≤50% of device RAM — runs comfortably */
+    RECOMMENDED,
+    /** Model memory requirement is ≤80% of device RAM — runs but may be tight */
+    COMPATIBLE,
+    /** Model memory requirement exceeds 80% of device RAM — likely too large */
+    TOO_LARGE,
+    /** Unknown — no memory info available */
+    UNKNOWN,
+}
+
 /** Display model for model list row. */
 private data class AIModel(
     val name: String,
@@ -79,6 +94,7 @@ private data class AIModel(
     val size: String,
     val isDownloaded: Boolean,
     val supportsLora: Boolean = false,
+    val memoryCompatibility: MemoryCompatibility = MemoryCompatibility.UNKNOWN,
 )
 
 /**
@@ -104,6 +120,7 @@ fun ModelSelectionBottomSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deviceStatus = uiState.deviceInfo?.let { toDeviceStatus(it) }
         ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
+    val deviceMemoryMB = uiState.deviceInfo?.totalMemoryMB
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -184,7 +201,7 @@ fun ModelSelectionBottomSheet(
                         val isReady = isBuiltIn || model.isDownloaded
                         val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
                         ModelCard(
-                            model = toAIModel(model),
+                            model = toAIModel(model, deviceMemoryMB),
                             isReady = isReady,
                             isLoading = isThisModelDownloading,
                             downloadProgress = if (isThisModelDownloading) uiState.loadingProgress else null,
@@ -239,7 +256,7 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
         hasNeuralEngine = false,
     )
 
-private fun toAIModel(m: ModelInfo): AIModel {
+private fun toAIModel(m: ModelInfo, deviceMemoryMB: Long? = null): AIModel {
     val formatStr = when (m.framework) {
         InferenceFramework.LLAMA_CPP -> "Fast"
         InferenceFramework.ONNX -> "ONNX"
@@ -249,6 +266,10 @@ private fun toAIModel(m: ModelInfo): AIModel {
     }
     val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
+
+    // Compute memory compatibility from downloadSize (which stores memoryRequirement)
+    val compatibility = computeMemoryCompatibility(m.downloadSize, deviceMemoryMB)
+
     return AIModel(
         name = m.name,
         logoResId = getModelLogoResId(m),
@@ -257,7 +278,24 @@ private fun toAIModel(m: ModelInfo): AIModel {
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
         supportsLora = m.supportsLora,
+        memoryCompatibility = compatibility,
     )
+}
+
+private fun computeMemoryCompatibility(
+    memoryRequirementBytes: Long?,
+    deviceMemoryMB: Long?,
+): MemoryCompatibility {
+    if (memoryRequirementBytes == null || memoryRequirementBytes <= 0 || deviceMemoryMB == null || deviceMemoryMB <= 0) {
+        return MemoryCompatibility.UNKNOWN
+    }
+    val deviceMemoryBytes = deviceMemoryMB * 1024 * 1024
+    val ratio = memoryRequirementBytes.toDouble() / deviceMemoryBytes
+    return when {
+        ratio <= 0.50 -> MemoryCompatibility.RECOMMENDED
+        ratio <= 0.80 -> MemoryCompatibility.COMPATIBLE
+        else -> MemoryCompatibility.TOO_LARGE
+    }
 }
 
 /** Drawable resource ID for model logo (matches iOS ModelInfo+Logo). */
@@ -521,6 +559,27 @@ private fun ModelCard(
                     textColor = AppColors.primaryPurple,
                     backgroundColor = AppColors.loraBadgeBg,
                 )
+            }
+
+            when (model.memoryCompatibility) {
+                MemoryCompatibility.RECOMMENDED -> {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Badge(
+                        text = "Fits",
+                        textColor = AppColors.primaryGreen,
+                        backgroundColor = AppColors.primaryGreen.copy(alpha = 0.10f),
+                    )
+                }
+                MemoryCompatibility.TOO_LARGE -> {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Badge(
+                        text = "Large",
+                        textColor = AppColors.primaryRed,
+                        backgroundColor = AppColors.primaryRed.copy(alpha = 0.10f),
+                        icon = Icons.Outlined.Warning,
+                    )
+                }
+                else -> { /* COMPATIBLE and UNKNOWN: no extra badge */ }
             }
 
             Spacer(modifier = Modifier.width(8.dp))
