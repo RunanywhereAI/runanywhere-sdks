@@ -66,8 +66,6 @@ class DartBridgeVoiceAgent {
     }
 
     try {
-      final lib = PlatformLoader.loadCommons();
-
       // Use shared component handles (matches Swift approach)
       // This allows the voice agent to use already-loaded models from the
       // individual component bridges (STT, LLM, TTS, VAD)
@@ -110,7 +108,6 @@ class DartBridgeVoiceAgent {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
       final readyPtr = calloc<Int32>();
       try {
         final result = NativeFunctions.voiceAgentIsReady(_handle!, readyPtr);
@@ -128,7 +125,6 @@ class DartBridgeVoiceAgent {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
       final loadedPtr = calloc<Int32>();
       try {
         final result = NativeFunctions.voiceAgentIsSTTLoaded(_handle!, loadedPtr);
@@ -146,7 +142,6 @@ class DartBridgeVoiceAgent {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
       final loadedPtr = calloc<Int32>();
       try {
         final result = NativeFunctions.voiceAgentIsLLMLoaded(_handle!, loadedPtr);
@@ -164,7 +159,6 @@ class DartBridgeVoiceAgent {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
       final loadedPtr = calloc<Int32>();
       try {
         final result = NativeFunctions.voiceAgentIsTTSLoaded(_handle!, loadedPtr);
@@ -466,7 +460,11 @@ class DartBridgeVoiceAgent {
       calloc.free(textPtr);
       // Free the audio data allocated by C++
       if (audioPtr.value != nullptr) {
-        NativeFunctions.racFree(audioPtr.value);
+        try {
+          NativeFunctions.racFree(audioPtr.value);
+        } catch (_) {
+          // `rac_free` may not exist in some native builds.
+        }
       }
       calloc.free(audioPtr);
       calloc.free(audioSizePtr);
