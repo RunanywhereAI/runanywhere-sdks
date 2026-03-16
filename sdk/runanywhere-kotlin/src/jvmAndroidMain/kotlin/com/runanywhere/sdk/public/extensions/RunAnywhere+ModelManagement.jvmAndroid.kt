@@ -1338,7 +1338,7 @@ actual suspend fun RunAnywhere.deleteAllModels() {
         try {
             deleteModel(model.modelId)
         } catch (e: Exception) {
-            downloadLogger.warn("deleteAllModels: failed to delete ${model.modelId}: ${e.message}")
+            modelsLogger.warn("deleteAllModels: failed to delete ${model.modelId}: ${e.message}")
         }
     }
 }
