@@ -65,17 +65,16 @@ class DartBridgeVoiceAgent {
       return _handle!;
     }
 
-    try {
-      // Use shared component handles (matches Swift approach)
-      // This allows the voice agent to use already-loaded models from the
-      // individual component bridges (STT, LLM, TTS, VAD)
-      final llmHandle = DartBridgeLLM.shared.getHandle();
-      final sttHandle = DartBridgeSTT.shared.getHandle();
-      final ttsHandle = DartBridgeTTS.shared.getHandle();
-      final vadHandle = DartBridgeVAD.shared.getHandle();
+    // Use shared component handles (matches Swift approach)
+    // This allows the voice agent to use already-loaded models from the
+    // individual component bridges (STT, LLM, TTS, VAD)
+    final llmHandle = DartBridgeLLM.shared.getHandle();
+    final sttHandle = DartBridgeSTT.shared.getHandle();
+    final ttsHandle = DartBridgeTTS.shared.getHandle();
+    final vadHandle = DartBridgeVAD.shared.getHandle();
 
-      _logger.debug(
-          'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
+    _logger.debug(
+        'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
 
     try {
       final handlePtr = calloc<RacVoiceAgentHandle>();
@@ -127,7 +126,8 @@ class DartBridgeVoiceAgent {
     try {
       final loadedPtr = calloc<Int32>();
       try {
-        final result = NativeFunctions.voiceAgentIsSTTLoaded(_handle!, loadedPtr);
+        final result =
+            NativeFunctions.voiceAgentIsSTTLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -144,7 +144,8 @@ class DartBridgeVoiceAgent {
     try {
       final loadedPtr = calloc<Int32>();
       try {
-        final result = NativeFunctions.voiceAgentIsLLMLoaded(_handle!, loadedPtr);
+        final result =
+            NativeFunctions.voiceAgentIsLLMLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -161,7 +162,8 @@ class DartBridgeVoiceAgent {
     try {
       final loadedPtr = calloc<Int32>();
       try {
-        final result = NativeFunctions.voiceAgentIsTTSLoaded(_handle!, loadedPtr);
+        final result =
+            NativeFunctions.voiceAgentIsTTSLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -181,7 +183,8 @@ class DartBridgeVoiceAgent {
     final idPtr = modelId.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.voiceAgentLoadSTTModel(handle, pathPtr, idPtr);
+      final result =
+          NativeFunctions.voiceAgentLoadSTTModel(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -205,7 +208,8 @@ class DartBridgeVoiceAgent {
     final idPtr = modelId.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.voiceAgentLoadLLMModel(handle, pathPtr, idPtr);
+      final result =
+          NativeFunctions.voiceAgentLoadLLMModel(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -229,7 +233,8 @@ class DartBridgeVoiceAgent {
     final idPtr = voiceId.toNativeUtf8();
 
     try {
-      final result = NativeFunctions.voiceAgentLoadTTSVoice(handle, pathPtr, idPtr);
+      final result =
+          NativeFunctions.voiceAgentLoadTTSVoice(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -254,7 +259,8 @@ class DartBridgeVoiceAgent {
     final handle = await getHandle();
 
     try {
-      final result = NativeFunctions.voiceAgentInitializeWithLoadedModels(handle);
+      final result =
+          NativeFunctions.voiceAgentInitializeWithLoadedModels(handle);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -288,8 +294,7 @@ class DartBridgeVoiceAgent {
     }
 
     // Run the heavy C++ processing in a background isolate
-    return Isolate.run(
-        () => _processVoiceTurnInIsolate(handle, audioData));
+    return Isolate.run(() => _processVoiceTurnInIsolate(handle, audioData));
   }
 
   /// Static helper for processing voice turn in an isolate.
@@ -363,7 +368,9 @@ class DartBridgeVoiceAgent {
     Uint8List audioWavData;
     if (result.synthesizedAudioSize > 0 && result.synthesizedAudio != nullptr) {
       audioWavData = Uint8List.fromList(
-        result.synthesizedAudio.cast<Uint8>().asTypedList(result.synthesizedAudioSize),
+        result.synthesizedAudio
+            .cast<Uint8>()
+            .asTypedList(result.synthesizedAudioSize),
       );
     } else {
       audioWavData = Uint8List(0);
@@ -416,7 +423,8 @@ class DartBridgeVoiceAgent {
     final resultPtr = calloc<Pointer<Utf8>>();
 
     try {
-      final status = NativeFunctions.voiceAgentGenerateResponse(handle, promptPtr, resultPtr);
+      final status = NativeFunctions.voiceAgentGenerateResponse(
+          handle, promptPtr, resultPtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -514,6 +522,7 @@ class DartBridgeVoiceAgent {
 class VoiceTurnResult {
   final String transcription;
   final String response;
+
   /// WAV-formatted audio data ready for playback
   final Uint8List audioWavData;
   final int sttDurationMs;
