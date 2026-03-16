@@ -17,6 +17,7 @@ import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 /// Voice agent handle type (opaque pointer to rac_voice_agent struct).
@@ -78,16 +79,11 @@ class DartBridgeVoiceAgent {
       _logger.debug(
           'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
 
-      final create = lib.lookupFunction<
-          Int32 Function(RacHandle, RacHandle, RacHandle, RacHandle,
-              Pointer<RacVoiceAgentHandle>),
-          int Function(RacHandle, RacHandle, RacHandle, RacHandle,
-              Pointer<RacVoiceAgentHandle>)>('rac_voice_agent_create');
-
+    try {
       final handlePtr = calloc<RacVoiceAgentHandle>();
       try {
-        final result =
-            create(llmHandle, sttHandle, ttsHandle, vadHandle, handlePtr);
+        final result = NativeFunctions.voiceAgentCreate(
+            llmHandle, sttHandle, ttsHandle, vadHandle, handlePtr);
 
         if (result != RAC_SUCCESS) {
           throw StateError(
@@ -115,14 +111,9 @@ class DartBridgeVoiceAgent {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final isReadyFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Int32>),
-          int Function(
-              RacVoiceAgentHandle, Pointer<Int32>)>('rac_voice_agent_is_ready');
-
       final readyPtr = calloc<Int32>();
       try {
-        final result = isReadyFn(_handle!, readyPtr);
+        final result = NativeFunctions.voiceAgentIsReady(_handle!, readyPtr);
         return result == RAC_SUCCESS && readyPtr.value == RAC_TRUE;
       } finally {
         calloc.free(readyPtr);
@@ -138,14 +129,9 @@ class DartBridgeVoiceAgent {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Int32>),
-          int Function(RacVoiceAgentHandle,
-              Pointer<Int32>)>('rac_voice_agent_is_stt_loaded');
-
       final loadedPtr = calloc<Int32>();
       try {
-        final result = isLoadedFn(_handle!, loadedPtr);
+        final result = NativeFunctions.voiceAgentIsSTTLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -161,14 +147,9 @@ class DartBridgeVoiceAgent {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Int32>),
-          int Function(RacVoiceAgentHandle,
-              Pointer<Int32>)>('rac_voice_agent_is_llm_loaded');
-
       final loadedPtr = calloc<Int32>();
       try {
-        final result = isLoadedFn(_handle!, loadedPtr);
+        final result = NativeFunctions.voiceAgentIsLLMLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -184,14 +165,9 @@ class DartBridgeVoiceAgent {
 
     try {
       final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Int32>),
-          int Function(RacVoiceAgentHandle,
-              Pointer<Int32>)>('rac_voice_agent_is_tts_loaded');
-
       final loadedPtr = calloc<Int32>();
       try {
-        final result = isLoadedFn(_handle!, loadedPtr);
+        final result = NativeFunctions.voiceAgentIsTTSLoaded(_handle!, loadedPtr);
         return result == RAC_SUCCESS && loadedPtr.value == RAC_TRUE;
       } finally {
         calloc.free(loadedPtr);
@@ -211,13 +187,7 @@ class DartBridgeVoiceAgent {
     final idPtr = modelId.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_stt_model');
-
-      final result = loadFn(handle, pathPtr, idPtr);
+      final result = NativeFunctions.voiceAgentLoadSTTModel(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -241,13 +211,7 @@ class DartBridgeVoiceAgent {
     final idPtr = modelId.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_llm_model');
-
-      final result = loadFn(handle, pathPtr, idPtr);
+      final result = NativeFunctions.voiceAgentLoadLLMModel(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -271,13 +235,7 @@ class DartBridgeVoiceAgent {
     final idPtr = voiceId.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_voice_agent_load_tts_voice');
-
-      final result = loadFn(handle, pathPtr, idPtr);
+      final result = NativeFunctions.voiceAgentLoadTTSVoice(handle, pathPtr, idPtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -302,12 +260,7 @@ class DartBridgeVoiceAgent {
     final handle = await getHandle();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final initFn = lib.lookupFunction<Int32 Function(RacVoiceAgentHandle),
-              int Function(RacVoiceAgentHandle)>(
-          'rac_voice_agent_initialize_with_loaded_models');
-
-      final result = initFn(handle);
+      final result = NativeFunctions.voiceAgentInitializeWithLoadedModels(handle);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -446,14 +399,7 @@ class DartBridgeVoiceAgent {
       // Efficient bulk copy of audio bytes
       audioPtr.asTypedList(audioData.length).setAll(0, audioData);
 
-      final lib = PlatformLoader.loadCommons();
-      final transcribeFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Void>, IntPtr,
-              Pointer<Pointer<Utf8>>),
-          int Function(RacVoiceAgentHandle, Pointer<Void>, int,
-              Pointer<Pointer<Utf8>>)>('rac_voice_agent_transcribe');
-
-      final status = transcribeFn(
+      final status = NativeFunctions.voiceAgentTranscribe(
           handle, audioPtr.cast<Void>(), audioData.length, resultPtr);
 
       if (status != RAC_SUCCESS) {
@@ -476,14 +422,7 @@ class DartBridgeVoiceAgent {
     final resultPtr = calloc<Pointer<Utf8>>();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final generateFn = lib.lookupFunction<
-          Int32 Function(
-              RacVoiceAgentHandle, Pointer<Utf8>, Pointer<Pointer<Utf8>>),
-          int Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Pointer<Utf8>>)>('rac_voice_agent_generate_response');
-
-      final status = generateFn(handle, promptPtr, resultPtr);
+      final status = NativeFunctions.voiceAgentGenerateResponse(handle, promptPtr, resultPtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -507,17 +446,8 @@ class DartBridgeVoiceAgent {
     final audioSizePtr = calloc<IntPtr>();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final synthesizeFn = lib.lookupFunction<
-          Int32 Function(RacVoiceAgentHandle, Pointer<Utf8>,
-              Pointer<Pointer<Void>>, Pointer<IntPtr>),
-          int Function(
-              RacVoiceAgentHandle,
-              Pointer<Utf8>,
-              Pointer<Pointer<Void>>,
-              Pointer<IntPtr>)>('rac_voice_agent_synthesize_speech');
-
-      final status = synthesizeFn(handle, textPtr, audioPtr, audioSizePtr);
+      final status = NativeFunctions.voiceAgentSynthesizeSpeech(
+          handle, textPtr, audioPtr, audioSizePtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -536,14 +466,7 @@ class DartBridgeVoiceAgent {
       calloc.free(textPtr);
       // Free the audio data allocated by C++
       if (audioPtr.value != nullptr) {
-        final lib = PlatformLoader.loadCommons();
-        try {
-          final freeFn = lib.lookupFunction<Void Function(Pointer<Void>),
-              void Function(Pointer<Void>)>('rac_free');
-          freeFn(audioPtr.value);
-        } catch (_) {
-          // rac_free may not exist
-        }
+        NativeFunctions.racFree(audioPtr.value);
       }
       calloc.free(audioPtr);
       calloc.free(audioSizePtr);
@@ -557,11 +480,7 @@ class DartBridgeVoiceAgent {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacVoiceAgentHandle),
-          int Function(RacVoiceAgentHandle)>('rac_voice_agent_cleanup');
-
-      cleanupFn(_handle!);
+      NativeFunctions.voiceAgentCleanup(_handle!);
       _logger.info('Voice agent cleaned up');
     } catch (e) {
       _logger.error('Failed to cleanup voice agent: $e');
@@ -572,11 +491,7 @@ class DartBridgeVoiceAgent {
   void destroy() {
     if (_handle != null) {
       try {
-        final lib = PlatformLoader.loadCommons();
-        final destroyFn = lib.lookupFunction<Void Function(RacVoiceAgentHandle),
-            void Function(RacVoiceAgentHandle)>('rac_voice_agent_destroy');
-
-        destroyFn(_handle!);
+        NativeFunctions.voiceAgentDestroy(_handle!);
         _handle = null;
         _logger.debug('Voice agent destroyed');
       } catch (e) {
