@@ -11,6 +11,7 @@ import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
+import com.runanywhere.sdk.public.extensions.getChip
 import com.runanywhere.sdk.public.extensions.registerLoraAdapter
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
@@ -126,19 +127,21 @@ object ModelList {
         ),
     )
 
-    // Genie NPU Models (Qualcomm Snapdragon 8 Gen 2+)
-    // Pre-compiled QNN context binaries for Qualcomm Genie SDK.
-    // Compiled via: python -m qai_hub_models.models.<model>.export --chipset qualcomm-snapdragon-8-elite
-    private val genieModels = listOf(
-        AppModel(id = "qwen2_5-7b-instruct-genie", name = "Qwen 2.5 7B (NPU)",
-            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen2.5-7b-instruct-genie-w8a16.tar.gz",
-            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 5_000_000_000),
-        AppModel(id = "llama-3.2-1b-instruct-genie", name = "Llama 3.2 1B (NPU)",
-            url = "https://huggingface.co/runanywhere/genie-npu-models/resolve/main/llama-3.2-1b-instruct-genie-w4.tar.gz",
-            framework = InferenceFramework.GENIE, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 1_500_000_000),
-    )
+    // Genie NPU Models — URLs are built dynamically based on detected chipset.
+    // getChip() returns the NPUChip for this device, or null if unsupported.
+    private fun genieModels(): List<AppModel> {
+        val chip = RunAnywhere.getChip() ?: return emptyList()
+        return listOf(
+            AppModel(
+                id = "qwen-npu-${chip.identifier}",
+                name = "Qwen3 4B (NPU - ${chip.displayName})",
+                url = chip.downloadUrl("qwen"),
+                framework = InferenceFramework.GENIE,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 2_800_000_000,
+            ),
+        )
+    }
 
     // VLM
     private val vlmModels = listOf(
@@ -176,7 +179,7 @@ object ModelList {
 
         val allModels = listOf(
             "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
-            "Genie NPU" to genieModels,
+            "Genie NPU" to genieModels(),
             "Embedding" to embeddingModels,
             "VLM" to vlmModels,
         )

@@ -160,6 +160,15 @@ export type {
   ToolCallingResult,
 } from './ToolCallingTypes';
 
+// NPU Chip Types
+export type { NPUChip } from './NPUChip';
+export {
+  NPU_CHIPS,
+  NPU_BASE_URL,
+  getNPUDownloadUrl,
+  npuChipFromSocModel,
+} from './NPUChip';
+
 // VLM Types
 export type {
   VLMResult,

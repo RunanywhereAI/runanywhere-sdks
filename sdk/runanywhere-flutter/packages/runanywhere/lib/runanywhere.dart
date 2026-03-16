@@ -24,6 +24,8 @@ export 'public/configuration/sdk_environment.dart';
 export 'public/errors/errors.dart';
 export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
+export 'core/types/npu_chip.dart';
+export 'public/extensions/runanywhere_device.dart';
 export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_storage.dart';

@@ -50,6 +50,7 @@ import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
+import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VLM';
 
 const logger = new SDKLogger('RunAnywhere');
@@ -500,6 +501,12 @@ export const RunAnywhere = {
       return '';
     }
   },
+
+  // ============================================================================
+  // Device / NPU Chip Detection (Delegated to Extension)
+  // ============================================================================
+
+  getChip: Device.getChip,
 
   // ============================================================================
   // Logging (Delegated to Extension)
