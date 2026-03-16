@@ -1343,8 +1343,10 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
+    // Run on IO to prevent ANR — JNI model loading can take hundreds of ms
+    val result = withContext(Dispatchers.IO) {
+        CppBridgeLLM.loadModel(localPath, modelId, model.name)
+    }
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }

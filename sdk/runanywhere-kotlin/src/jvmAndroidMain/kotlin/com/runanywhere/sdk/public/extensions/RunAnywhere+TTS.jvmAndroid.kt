@@ -38,8 +38,10 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
         modelInfo.localPath
             ?: throw SDKError.tts("Voice '$voiceId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
+    // Run on IO to prevent ANR — JNI model loading can take hundreds of ms
+    val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        CppBridgeTTS.loadModel(localPath, voiceId, modelInfo.name)
+    }
     if (result != 0) {
         ttsLogger.error("Failed to load TTS voice '$voiceId' (error code: $result)")
         throw SDKError.tts("Failed to load TTS voice '$voiceId' (error code: $result)")
