@@ -470,8 +470,20 @@ EOF
 EOF
     done
 
-    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
+    local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
+        # Only combine if the simulator binary doesn't already contain arm64
+        local SIM_ARCHS
+        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
+        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
+            log_step "Creating fat simulator binary (arm64 + x86_64)..."
+            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
+                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        fi
+    fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -664,8 +676,20 @@ EOF
         return 0
     fi
 
-    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
+    local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
+        # Only combine if the simulator binary doesn't already contain arm64
+        local SIM_ARCHS
+        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
+        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
+            log_step "Creating fat simulator binary (arm64 + x86_64)..."
+            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
+                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        fi
+    fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
