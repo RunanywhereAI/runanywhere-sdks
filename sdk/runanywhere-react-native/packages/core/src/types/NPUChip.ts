@@ -1,15 +1,15 @@
 /**
  * Supported NPU chipsets for on-device Genie model inference.
  *
- * Each chip has an `identifier` used to construct dynamic download URLs
- * for chipset-specific NPU model binaries.
+ * Each chip has an `identifier` used in model IDs and an `npuSuffix` used
+ * to construct download URLs from the HuggingFace model repository.
  *
  * @example
  * ```typescript
  * const chip = await RunAnywhere.getChip();
  * if (chip) {
- *   const url = getNPUDownloadUrl(chip, 'qwen');
- *   // → https://huggingface.co/Void2377/npu-models/resolve/main/qwen-gen1.zip?download=true
+ *   const url = getNPUDownloadUrl(chip, 'qwen3-4b');
+ *   // → https://huggingface.co/runanywhere/genie-npu-models/resolve/main/qwen3-4b-genie-w4a16-8elite-gen5.tar.gz
  * }
  * ```
  */
@@ -18,33 +18,37 @@ export interface NPUChip {
   identifier: string;
   displayName: string;
   socModel: string;
+  npuSuffix: string;
 }
 
 /** Base URL for NPU model downloads on HuggingFace. */
 export const NPU_BASE_URL =
-  'https://huggingface.co/Void2377/npu-models/resolve/main/';
+  'https://huggingface.co/runanywhere/genie-npu-models/resolve/main/';
 
 /** All supported NPU chipsets. */
 export const NPU_CHIPS: readonly NPUChip[] = [
   {
-    identifier: 'gen1',
+    identifier: '8elite',
     displayName: 'Snapdragon 8 Elite',
     socModel: 'SM8750',
+    npuSuffix: '8elite',
   },
   {
-    identifier: 'gen2',
+    identifier: '8elite-gen5',
     displayName: 'Snapdragon 8 Elite Gen 5',
     socModel: 'SM8850',
+    npuSuffix: '8elite-gen5',
   },
 ] as const;
 
 /**
  * Build a HuggingFace download URL for a chip.
  * @param chip - The detected NPU chip
- * @param modelName - Model prefix (e.g. "qwen") → produces "qwen-gen1.zip"
+ * @param modelSlug - Model slug (e.g. "qwen3-4b") → produces
+ *   "qwen3-4b-genie-w4a16-8elite-gen5.tar.gz"
  */
-export function getNPUDownloadUrl(chip: NPUChip, modelName: string): string {
-  return `${NPU_BASE_URL}${modelName}-${chip.identifier}.zip?download=true`;
+export function getNPUDownloadUrl(chip: NPUChip, modelSlug: string): string {
+  return `${NPU_BASE_URL}${modelSlug}-genie-w4a16-${chip.npuSuffix}.tar.gz`;
 }
 
 /**

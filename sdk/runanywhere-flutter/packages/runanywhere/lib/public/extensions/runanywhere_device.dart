@@ -25,10 +25,10 @@ extension RunAnywhereDevice on RunAnywhere {
   ///
   /// Example:
   /// ```dart
-  /// final chip = RunAnywhereDevice.getChip();
+  /// final chip = await RunAnywhereDevice.getChip();
   /// if (chip != null) {
-  ///   final url = chip.downloadUrl('qwen');
-  ///   RunAnywhere.registerModel(id: 'qwen-npu', name: 'Qwen NPU', url: url, ...);
+  ///   final url = chip.downloadUrl('qwen3-4b');
+  ///   RunAnywhere.registerModel(id: 'qwen3-4b-npu', name: 'Qwen3 4B NPU', url: url, ...);
   /// }
   /// ```
   static Future<NPUChip?> getChip() async {
