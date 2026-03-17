@@ -19,6 +19,7 @@ import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/features/llm/llm_configuration.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -245,17 +246,18 @@ class DartBridgeLLM {
     double temperature = 0.7,
     String? systemPrompt,
   }) async {
-    _validateGenerationParameters(
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-    );
-
     final handle = getHandle();
 
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
+
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+    );
 
     // Run FFI call in a separate isolate to avoid heap corruption
     // from C++ background threads (Metal GPU operations)
@@ -294,18 +296,19 @@ class DartBridgeLLM {
     double temperature = 0.7,
     String? systemPrompt,
   }) {
-    _validateGenerationParameters(
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-      streamingEnabled: true,
-    );
-
     final handle = getHandle();
 
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
+
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: true,
+    );
 
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
@@ -384,16 +387,26 @@ class DartBridgeLLM {
     }
   }
 
+  int _requireLoadedContextLength() {
+    final contextLength = _loadedContextLength;
+    if (contextLength != null && contextLength > 0) {
+      return contextLength;
+    }
+
+    throw SDKError.validationFailed(
+      'Loaded model is missing context length metadata for maxTokens validation',
+    );
+  }
+
   void _validateGenerationParameters({
+    required int contextLength,
     required int maxTokens,
     required double temperature,
     String? systemPrompt,
     bool streamingEnabled = false,
   }) {
-    final contextLength = _loadedContextLength;
-
     LLMConfiguration(
-      contextLength: contextLength ?? 32768,
+      contextLength: contextLength,
       maxTokens: maxTokens,
       temperature: temperature,
       systemPrompt: systemPrompt,
