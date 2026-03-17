@@ -5,8 +5,10 @@
 
 #include "rac_stt_metalrt.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "metalrt_c_api.h"
 
@@ -65,13 +67,21 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
     auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
     if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
 
-    // MetalRT expects float32 samples + sample count + sample rate
-    // RAC STT passes raw audio bytes — assume float32 PCM at 16kHz
-    const auto* samples = static_cast<const float*>(audio_data);
-    int n_samples = static_cast<int>(audio_size / sizeof(float));
+    // SDK audio capture sends Int16 PCM at 16 kHz.
+    // Convert to Float32 normalized [-1.0, 1.0] for metalrt_whisper_transcribe.
+    const auto* int16_samples = static_cast<const int16_t*>(audio_data);
+    int n_samples = static_cast<int>(audio_size / sizeof(int16_t));
     int sample_rate = 16000;
 
-    const char* text = metalrt_whisper_transcribe(impl->handle, samples, n_samples, sample_rate);
+    std::vector<float> float_samples(n_samples);
+    for (int i = 0; i < n_samples; i++) {
+        float_samples[i] = static_cast<float>(int16_samples[i]) / 32768.0f;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Transcribing %d samples (%.1fs) at %d Hz",
+                 n_samples, static_cast<float>(n_samples) / sample_rate, sample_rate);
+
+    const char* text = metalrt_whisper_transcribe(impl->handle, float_samples.data(), n_samples, sample_rate);
     if (!text) {
         rac_error_set_details("metalrt_whisper_transcribe returned null");
         return RAC_ERROR_INFERENCE_FAILED;
