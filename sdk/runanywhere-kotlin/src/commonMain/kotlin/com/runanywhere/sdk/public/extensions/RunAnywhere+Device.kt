@@ -9,12 +9,12 @@ import com.runanywhere.sdk.public.RunAnywhere
  * Returns the [NPUChip] if the device has a supported Qualcomm SoC,
  * or null if the device does not support NPU inference.
  *
- * Use [NPUChip.identifier] to construct chipset-specific download URLs:
+ * Use [NPUChip.downloadUrl] to construct chipset-specific download URLs:
  * ```kotlin
  * val chip = RunAnywhere.getChip()
  * if (chip != null) {
- *     val url = "https://example.com/models/qwen-${chip.identifier}.zip"
- *     RunAnywhere.registerModel(id = "qwen-npu", name = "Qwen NPU", url = url, ...)
+ *     val url = chip.downloadUrl("qwen3-4b")
+ *     RunAnywhere.registerModel(id = "qwen3-4b-npu", name = "Qwen3 4B NPU", url = url, ...)
  * }
  * ```
  */

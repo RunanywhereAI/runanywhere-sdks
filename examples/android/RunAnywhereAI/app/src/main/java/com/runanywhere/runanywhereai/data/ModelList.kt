@@ -4,6 +4,7 @@ import timber.log.Timber
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
+import com.runanywhere.sdk.core.types.NPUChip
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.public.RunAnywhere
@@ -129,18 +130,44 @@ object ModelList {
 
     // Genie NPU Models — URLs are built dynamically based on detected chipset.
     // getChip() returns the NPUChip for this device, or null if unsupported.
+    // Each entry specifies which chips it supports; only matching models are shown.
+
+    private data class GenieModelDef(
+        val slug: String,
+        val name: String,
+        val memoryRequirement: Long,
+        val supportedChips: Set<NPUChip>,
+    )
+
+    private val genieModelDefs = listOf(
+        GenieModelDef(
+            slug = "qwen3-4b",
+            name = "Qwen3 4B",
+            memoryRequirement = 2_800_000_000,
+            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+        ),
+        GenieModelDef(
+            slug = "llama-v3.2-1b-instruct",
+            name = "Llama 3.2 1B Instruct",
+            memoryRequirement = 1_200_000_000,
+            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+        ),
+    )
+
     private fun genieModels(): List<AppModel> {
         val chip = RunAnywhere.getChip() ?: return emptyList()
-        return listOf(
-            AppModel(
-                id = "qwen-npu-${chip.identifier}",
-                name = "Qwen3 4B (NPU - ${chip.displayName})",
-                url = chip.downloadUrl("qwen"),
-                framework = InferenceFramework.GENIE,
-                category = ModelCategory.LANGUAGE,
-                memoryRequirement = 2_800_000_000,
-            ),
-        )
+        return genieModelDefs
+            .filter { chip in it.supportedChips }
+            .map { def ->
+                AppModel(
+                    id = "${def.slug}-npu-${chip.identifier}",
+                    name = "${def.name} (NPU - ${chip.displayName})",
+                    url = chip.downloadUrl(def.slug),
+                    framework = InferenceFramework.GENIE,
+                    category = ModelCategory.LANGUAGE,
+                    memoryRequirement = def.memoryRequirement,
+                )
+            }
     }
 
     // VLM
