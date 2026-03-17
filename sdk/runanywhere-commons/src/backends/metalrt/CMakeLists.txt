@@ -35,10 +35,12 @@ target_include_directories(rac_backend_metalrt PRIVATE
 target_compile_definitions(rac_backend_metalrt PRIVATE RAC_METALRT_BUILDING)
 
 # Link MetalRT static library
+# NO_CMAKE_FIND_ROOT_PATH: the engine is built locally, not inside the iOS SDK sysroot
 find_library(METALRT_ENGINE_LIB
     NAMES metalrt_engine
     PATHS ${_metalrt_lib_dir}
     NO_DEFAULT_PATH
+    NO_CMAKE_FIND_ROOT_PATH
 )
 
 if(METALRT_ENGINE_LIB)

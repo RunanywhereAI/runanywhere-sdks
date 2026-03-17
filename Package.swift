@@ -213,7 +213,7 @@ let package = Package(
         // =================================================================
         .target(
             name: "MetalRTBackend",
-            dependencies: [],
+            dependencies: ["RABackendMetalRTBinary"],
             path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
             publicHeadersPath: "."
         ),
@@ -226,13 +226,19 @@ let package = Package(
             dependencies: [
                 "RunAnywhere",
                 "MetalRTBackend",
+                "RABackendMetalRTBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
             exclude: ["include"],
+            resources: [
+                .copy("Resources/default.metallib"),
+            ],
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
                 .linkedFramework("Metal"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("ImageIO"),
             ]
         ),
 
@@ -291,6 +297,10 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
+            .binaryTarget(
+                name: "RABackendMetalRTBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+            ),
         ]
 
         // ONNX Runtime xcframeworks - split by platform
@@ -329,6 +339,11 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
                 checksum: "809e2510da49f71f6d019e77bcc0a7e12e967f3b739ba0b9eea7adb77936edc0"
+            ),
+            .binaryTarget(
+                name: "RABackendMetalRTBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMetalRT-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeiOSBinary",

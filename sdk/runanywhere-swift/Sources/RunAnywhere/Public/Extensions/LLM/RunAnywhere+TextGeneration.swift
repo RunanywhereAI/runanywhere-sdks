@@ -264,9 +264,14 @@ private enum LLMStreamCallbacks {
             return RAC_TRUE
         }
 
-        let completeCallback: CompleteFn = { _, userData in
+        let completeCallback: CompleteFn = { resultPtr, userData in
             guard let userData = userData else { return }
             let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+            if let resultPtr = resultPtr {
+                let promptTokens = Int(resultPtr.pointee.prompt_tokens)
+                let completionTokens = Int(resultPtr.pointee.completion_tokens)
+                Task { await ctx.collector.recordFinalMetrics(promptTokens: promptTokens, completionTokens: completionTokens) }
+            }
             ctx.continuation.finish()
             Task { await ctx.collector.markComplete() }
         }
@@ -311,6 +316,8 @@ private actor LLMStreamingMetricsCollector {
     private var isComplete = false
     private var error: Error?
     private var resultContinuation: CheckedContinuation<LLMGenerationResult, Error>?
+    private var finalPromptTokens: Int = 0
+    private var finalCompletionTokens: Int?
 
     init(modelId: String, promptLength: Int) {
         self.modelId = modelId
@@ -329,6 +336,11 @@ private actor LLMStreamingMetricsCollector {
             firstTokenRecorded = true
             firstTokenTime = Date()
         }
+    }
+
+    func recordFinalMetrics(promptTokens: Int, completionTokens: Int) {
+        finalPromptTokens = promptTokens
+        finalCompletionTokens = completionTokens
     }
 
     func markComplete() {
@@ -373,18 +385,20 @@ private actor LLMStreamingMetricsCollector {
         let totalTimeSec = latencyMs / 1000.0
         let tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
 
+        let finalOutputTokens = finalCompletionTokens ?? outputTokens
+
         return LLMGenerationResult(
             text: fullText,
             thinkingContent: nil,
-            inputTokens: 0,
-            tokensUsed: outputTokens,
+            inputTokens: finalPromptTokens,
+            tokensUsed: finalOutputTokens,
             modelUsed: modelId,
             latencyMs: latencyMs,
             framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: timeToFirstTokenMs,
             thinkingTokens: 0,
-            responseTokens: outputTokens
+            responseTokens: finalOutputTokens
         )
     }
 }

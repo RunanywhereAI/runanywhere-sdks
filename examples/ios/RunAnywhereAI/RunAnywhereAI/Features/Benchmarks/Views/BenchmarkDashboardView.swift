@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhere
 
 struct BenchmarkDashboardView: View {
     @State private var viewModel = BenchmarkViewModel()
@@ -58,6 +59,47 @@ struct BenchmarkDashboardView: View {
                 // Scenario descriptions per selected category
                 ForEach(BenchmarkCategory.allCases.filter { viewModel.selectedCategories.contains($0) }) { category in
                     CategoryScenariosRow(category: category)
+                }
+            }
+
+            // Model Selection
+            if !viewModel.availableModels.isEmpty {
+                Section {
+                    ForEach(BenchmarkCategory.allCases.filter { viewModel.availableModels[$0] != nil && viewModel.selectedCategories.contains($0) }) { category in
+                        if let models = viewModel.availableModels[category] {
+                            DisclosureGroup {
+                                ForEach(models, id: \.id) { model in
+                                    ModelSelectionRow(
+                                        model: model,
+                                        isSelected: viewModel.selectedModelIds.contains(model.id)
+                                    ) {
+                                        viewModel.toggleModel(model.id)
+                                    }
+                                }
+                            } label: {
+                                HStack {
+                                    Label(category.displayName, systemImage: category.iconName)
+                                        .font(AppTypography.subheadlineMedium)
+                                    Spacer()
+                                    let total = models.count
+                                    let selected = models.filter { viewModel.selectedModelIds.contains($0.id) }.count
+                                    Text("\(selected)/\(total)")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text("Models")
+                        Spacer()
+                        Button("All") { viewModel.selectAllModels() }
+                            .font(AppTypography.caption)
+                        Text("·").foregroundColor(AppColors.textTertiary)
+                        Button("None") { viewModel.deselectAllModels() }
+                            .font(AppTypography.caption)
+                    }
                 }
             }
 
@@ -176,6 +218,7 @@ struct BenchmarkDashboardView: View {
         }
         .task {
             viewModel.loadPastRuns()
+            viewModel.refreshAvailableModels()
         }
     }
 }
@@ -232,6 +275,34 @@ private struct CategoryChip: View {
                     RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
                         .stroke(isSelected ? AppColors.primaryAccent.opacity(0.5) : Color.clear, lineWidth: AppSpacing.strokeRegular)
                 )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Model Selection Row
+
+private struct ModelSelectionRow: View {
+    let model: ModelInfo
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.name)
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.textPrimary)
+                    Text(model.framework.displayName)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textTertiary)
+                }
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? AppColors.primaryAccent : AppColors.textTertiary)
+                    .imageScale(.large)
+            }
         }
         .buttonStyle(.plain)
     }

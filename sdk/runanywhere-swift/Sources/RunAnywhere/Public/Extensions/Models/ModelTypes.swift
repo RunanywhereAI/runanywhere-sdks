@@ -158,6 +158,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_COREML: return .coreml
         case RAC_FRAMEWORK_MLX: return .mlx
         case RAC_FRAMEWORK_WHISPERKIT_COREML: return .whisperKitCoreML
+        case RAC_FRAMEWORK_METALRT: return .metalrt
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none
         default: return .unknown

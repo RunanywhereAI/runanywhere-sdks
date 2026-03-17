@@ -105,15 +105,22 @@ rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char* prompt,
     return RAC_SUCCESS;
 }
 
-// Adapter to bridge MetalRT's callback to RAC's callback
+// Adapter to bridge MetalRT's callback to RAC's callback,
+// with client-side max_tokens enforcement since the engine may overshoot.
 struct MetalRTStreamCtx {
     rac_llm_metalrt_stream_cb callback;
     void* user_data;
+    int32_t max_tokens;
+    int32_t emitted_tokens;
 };
 
 static bool metalrt_stream_bridge(const char* piece, void* ctx) {
     auto* adapter = static_cast<MetalRTStreamCtx*>(ctx);
     if (!adapter || !adapter->callback) return false;
+    if (adapter->max_tokens > 0 && adapter->emitted_tokens >= adapter->max_tokens) {
+        return false;
+    }
+    adapter->emitted_tokens++;
     return adapter->callback(piece, RAC_FALSE, adapter->user_data) == RAC_TRUE;
 }
 
@@ -125,15 +132,17 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
     if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
 
+    int32_t max_tok = options ? options->max_tokens : 100;
+
     struct MetalRTOptions opts = {};
-    opts.max_tokens = options ? options->max_tokens : 100;
+    opts.max_tokens = max_tok;
     opts.temperature = options ? options->temperature : 0.8f;
     opts.top_k = 40;
     opts.think = false;
     opts.reset_cache = true;
     opts.ignore_eos = false;
 
-    MetalRTStreamCtx ctx = {callback, user_data};
+    MetalRTStreamCtx ctx = {callback, user_data, max_tok, 0};
     struct MetalRTResult result = metalrt_generate_stream(
         impl->handle, prompt, metalrt_stream_bridge, &ctx, &opts);
 

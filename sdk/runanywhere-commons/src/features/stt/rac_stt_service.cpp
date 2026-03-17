@@ -30,17 +30,54 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
 
     *out_handle = nullptr;
 
-    RAC_LOG_INFO(LOG_CAT, "Creating STT service");
+    RAC_LOG_INFO(LOG_CAT, "Creating STT service for: %s", model_path ? model_path : "NULL");
+
+    // Query model registry to get framework
+    rac_model_info_t* model_info = nullptr;
+    rac_result_t reg_result = RAC_ERROR_NOT_FOUND;
+    if (model_path) {
+        reg_result = rac_get_model(model_path, &model_info);
+
+        if (reg_result != RAC_SUCCESS) {
+            RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_path);
+            reg_result = rac_get_model_by_path(model_path, &model_info);
+        }
+
+        if (reg_result != RAC_SUCCESS) {
+            const char* last_slash = strrchr(model_path, '/');
+            if (last_slash && last_slash[1] != '\0') {
+                const char* extracted_id = last_slash + 1;
+                RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
+                reg_result = rac_get_model(extracted_id, &model_info);
+            }
+        }
+    }
+
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    const char* resolved_path = model_path;
+
+    if (reg_result == RAC_SUCCESS && model_info) {
+        framework = model_info->framework;
+        if (model_info->local_path) {
+            resolved_path = model_info->local_path;
+        }
+        RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d",
+                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework));
+    }
 
     // Build service request
     rac_service_request_t request = {};
     request.identifier = model_path;
     request.capability = RAC_CAPABILITY_STT;
-    request.framework = RAC_FRAMEWORK_UNKNOWN;  // Let service registry dispatch via can_handle
-    request.model_path = model_path;
+    request.framework = framework;
+    request.model_path = resolved_path;
 
     // Service registry returns an rac_stt_service_t* with vtable already set
     rac_result_t result = rac_service_create(RAC_CAPABILITY_STT, &request, out_handle);
+
+    if (model_info) {
+        rac_model_info_free(model_info);
+    }
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");

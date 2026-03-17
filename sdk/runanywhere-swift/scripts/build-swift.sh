@@ -230,6 +230,16 @@ build_commons() {
     "$COMMONS_BUILD_SCRIPT" $FLAGS
 
     log_info "runanywhere-commons build complete"
+
+    # Build MetalRT backend if the MetalRT repo is available
+    local METALRT_ROOT="$REPO_ROOT/../MetalRT"
+    if [[ -d "$METALRT_ROOT" ]]; then
+        log_step "Building MetalRT backend (device-only)..."
+        "$COMMONS_BUILD_SCRIPT" --backend metalrt
+        log_info "MetalRT backend build complete"
+    else
+        log_warn "MetalRT repo not found at $METALRT_ROOT — skipping MetalRT backend"
+    fi
 }
 
 # =============================================================================
@@ -242,7 +252,7 @@ install_frameworks() {
     mkdir -p "$BINARIES_DIR"
 
     # All frameworks are now in dist/ (flat structure from build-ios.sh)
-    for framework in RACommons RABackendLLAMACPP RABackendONNX; do
+    for framework in RACommons RABackendLLAMACPP RABackendONNX RABackendMetalRT; do
         local src="$COMMONS_DIR/dist/${framework}.xcframework"
         if [[ -d "$src" ]]; then
             log_step "Copying ${framework}.xcframework"
@@ -406,6 +416,7 @@ main() {
         echo "  2. Build RACommons.xcframework"
         echo "  3. Build RABackendLLAMACPP.xcframework"
         echo "  4. Build RABackendONNX.xcframework (RAG pipeline merged into RACommons)"
+        echo "  4b. Build RABackendMetalRT.xcframework (if MetalRT repo is available)"
         if [[ "$INCLUDE_MACOS" == true ]]; then
             echo "     (all xcframeworks will include macOS arm64 slices)"
             echo "  5. Create combined ONNX Runtime xcframework (iOS + macOS)"

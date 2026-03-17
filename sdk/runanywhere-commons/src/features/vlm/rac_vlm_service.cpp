@@ -44,6 +44,16 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
         result = rac_get_model_by_path(model_id, &model_info);
     }
 
+    // If still not found, extract last path component and try as model ID
+    if (result != RAC_SUCCESS) {
+        const char* last_slash = strrchr(model_id, '/');
+        if (last_slash && last_slash[1] != '\0') {
+            const char* extracted_id = last_slash + 1;
+            RAC_LOG_DEBUG(LOG_CAT, "Trying extracted model ID from path: %s", extracted_id);
+            result = rac_get_model(extracted_id, &model_info);
+        }
+    }
+
     // Default to llama.cpp for VLM (has broad VLM support via mtmd)
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
     const char* model_path = model_id;

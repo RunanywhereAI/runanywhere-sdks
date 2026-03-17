@@ -544,6 +544,14 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         ctx->full_text += token;
         ctx->token_count++;
 
+        // Enforce max_tokens cap at the component level
+        if (ctx->max_tokens > 0 && ctx->token_count >= ctx->max_tokens) {
+            if (ctx->token_callback) {
+                ctx->token_callback(token, ctx->user_data);
+            }
+            return RAC_FALSE;
+        }
+
         // Emit streaming update event (every 10 tokens to avoid spam)
         if (ctx->token_count % 10 == 0) {
             rac_analytics_event_data_t event = {};
@@ -702,7 +710,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = ctx.token_count;
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 

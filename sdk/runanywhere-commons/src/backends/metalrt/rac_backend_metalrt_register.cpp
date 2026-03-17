@@ -16,7 +16,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <dirent.h>
 #include <mutex>
+#include <string>
+#include <sys/stat.h>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -27,6 +30,41 @@
 #include "rac/features/vlm/rac_vlm_service.h"
 
 static const char* LOG_CAT = "MetalRT";
+
+// =============================================================================
+// PATH RESOLUTION — handle nested directories from tar.gz extraction
+// =============================================================================
+
+static std::string resolve_metalrt_model_path(const char* base_path) {
+    if (!base_path || base_path[0] == '\0') return {};
+
+    struct stat st;
+    std::string config_at_root = std::string(base_path) + "/config.json";
+    if (stat(config_at_root.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+        return std::string(base_path);
+    }
+
+    DIR* dir = opendir(base_path);
+    if (!dir) return std::string(base_path);
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        if (entry->d_name[0] == '.') continue;
+#ifdef _DIRENT_HAVE_D_TYPE
+        if (entry->d_type != DT_DIR && entry->d_type != DT_UNKNOWN) continue;
+#endif
+        std::string nested_config = std::string(base_path) + "/" + entry->d_name + "/config.json";
+        if (stat(nested_config.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            std::string resolved = std::string(base_path) + "/" + entry->d_name;
+            closedir(dir);
+            RAC_LOG_INFO(LOG_CAT, "Resolved nested model dir: %s -> %s", base_path, resolved.c_str());
+            return resolved;
+        }
+    }
+    closedir(dir);
+
+    return std::string(base_path);
+}
 
 // =============================================================================
 // LLM VTABLE
@@ -316,12 +354,14 @@ rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user
 rac_handle_t metalrt_llm_create(const rac_service_request_t* request, void* /*user_data*/) {
     if (!request) return nullptr;
 
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (!model_path || model_path[0] == '\0') {
+    const char* raw_path = request->model_path ? request->model_path : request->identifier;
+    if (!raw_path || raw_path[0] == '\0') {
         RAC_LOG_ERROR(LOG_CAT, "LLM: no model path");
         return nullptr;
     }
 
+    std::string resolved = resolve_metalrt_model_path(raw_path);
+    const char* model_path = resolved.c_str();
     RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_path);
 
     rac_handle_t backend = nullptr;
@@ -345,12 +385,14 @@ rac_handle_t metalrt_llm_create(const rac_service_request_t* request, void* /*us
 rac_handle_t metalrt_stt_create(const rac_service_request_t* request, void* /*user_data*/) {
     if (!request) return nullptr;
 
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (!model_path || model_path[0] == '\0') {
+    const char* raw_path = request->model_path ? request->model_path : request->identifier;
+    if (!raw_path || raw_path[0] == '\0') {
         RAC_LOG_ERROR(LOG_CAT, "STT: no model path");
         return nullptr;
     }
 
+    std::string resolved = resolve_metalrt_model_path(raw_path);
+    const char* model_path = resolved.c_str();
     RAC_LOG_INFO(LOG_CAT, "Creating STT service for: %s", model_path);
 
     rac_handle_t backend = nullptr;
@@ -373,12 +415,14 @@ rac_handle_t metalrt_stt_create(const rac_service_request_t* request, void* /*us
 rac_handle_t metalrt_tts_create(const rac_service_request_t* request, void* /*user_data*/) {
     if (!request) return nullptr;
 
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (!model_path || model_path[0] == '\0') {
+    const char* raw_path = request->model_path ? request->model_path : request->identifier;
+    if (!raw_path || raw_path[0] == '\0') {
         RAC_LOG_ERROR(LOG_CAT, "TTS: no model path");
         return nullptr;
     }
 
+    std::string resolved = resolve_metalrt_model_path(raw_path);
+    const char* model_path = resolved.c_str();
     RAC_LOG_INFO(LOG_CAT, "Creating TTS service for: %s", model_path);
 
     rac_handle_t backend = nullptr;
@@ -401,12 +445,14 @@ rac_handle_t metalrt_tts_create(const rac_service_request_t* request, void* /*us
 rac_handle_t metalrt_vlm_create(const rac_service_request_t* request, void* /*user_data*/) {
     if (!request) return nullptr;
 
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (!model_path || model_path[0] == '\0') {
+    const char* raw_path = request->model_path ? request->model_path : request->identifier;
+    if (!raw_path || raw_path[0] == '\0') {
         RAC_LOG_ERROR(LOG_CAT, "VLM: no model path");
         return nullptr;
     }
 
+    std::string resolved = resolve_metalrt_model_path(raw_path);
+    const char* model_path = resolved.c_str();
     RAC_LOG_INFO(LOG_CAT, "Creating VLM service for: %s", model_path);
 
     rac_handle_t backend = nullptr;
@@ -453,9 +499,10 @@ rac_result_t rac_backend_metalrt_register(void) {
         RAC_CAPABILITY_TEXT_GENERATION,
         RAC_CAPABILITY_STT,
         RAC_CAPABILITY_TTS,
+        RAC_CAPABILITY_VISION_LANGUAGE,
     };
     module_info.capabilities = capabilities;
-    module_info.num_capabilities = 3;
+    module_info.num_capabilities = 4;
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
@@ -514,7 +561,7 @@ rac_result_t rac_backend_metalrt_register(void) {
     {
         rac_service_provider_t provider = {};
         provider.name = state.vlm_provider;
-        provider.capability = RAC_CAPABILITY_TEXT_GENERATION;  // VLM uses same capability
+        provider.capability = RAC_CAPABILITY_VISION_LANGUAGE;
         provider.priority = 100;
         provider.can_handle = metalrt_can_handle;
         provider.create = metalrt_vlm_create;
