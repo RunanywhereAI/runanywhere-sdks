@@ -132,7 +132,6 @@ class DartBridgeModelRegistry {
         _logger.debug('rac_model_info_alloc returned null');
         return false;
       }
-
       // Temporary Dart strings for conversion
       final idDart = model.id.toNativeUtf8();
       final nameDart = model.name.toNativeUtf8();
@@ -281,9 +280,9 @@ class DartBridgeModelRegistry {
   static int _sourceToFfi(public_types.ModelSource source) {
     switch (source) {
       case public_types.ModelSource.remote:
-        return 1; // RAC_MODEL_SOURCE_REMOTE
+        return 0; // RAC_MODEL_SOURCE_REMOTE
       case public_types.ModelSource.local:
-        return 2; // RAC_MODEL_SOURCE_LOCAL
+        return 1; // RAC_MODEL_SOURCE_LOCAL
     }
   }
 
@@ -361,9 +360,9 @@ class DartBridgeModelRegistry {
   /// Convert C++ RAC_MODEL_SOURCE int to public ModelSource
   static public_types.ModelSource _sourceFromFfi(int source) {
     switch (source) {
-      case 1:
+      case 0:
         return public_types.ModelSource.remote;
-      case 2:
+      case 1:
         return public_types.ModelSource.local;
       default:
         return public_types.ModelSource.remote;
@@ -789,20 +788,24 @@ class DartBridgeModelRegistry {
   /// Convert C struct to Dart ModelInfo using correct struct layout.
   /// Uses RacModelInfoCStruct which matches the actual C rac_model_info_t.
   ModelInfo _cStructToModelInfo(Pointer<RacModelInfoCStruct> struct) {
+    final id = struct.ref.id.toDartString();
+    final name = struct.ref.name.toDartString();
+    final downloadURL = struct.ref.downloadUrl != nullptr
+        ? struct.ref.downloadUrl.toDartString()
+        : null;
+    final localPath = struct.ref.localPath != nullptr
+        ? struct.ref.localPath.toDartString()
+        : null;
     return ModelInfo(
-      id: struct.ref.id.toDartString(),
-      name: struct.ref.name.toDartString(),
+      id: id,
+      name: name,
       category: struct.ref.category,
       format: struct.ref.format,
       framework: struct.ref.framework,
       source: struct.ref.source,
       sizeBytes: struct.ref.downloadSize,
-      downloadURL: struct.ref.downloadUrl != nullptr
-          ? struct.ref.downloadUrl.toDartString()
-          : null,
-      localPath: struct.ref.localPath != nullptr
-          ? struct.ref.localPath.toDartString()
-          : null,
+      downloadURL: downloadURL,
+      localPath: localPath,
       version: null,
     );
   }
