@@ -190,11 +190,9 @@ public final class ArchiveUtility {
     /// Decompress raw deflate data using streaming compression_stream_process.
     /// Uses a small 256 KB output buffer instead of pre-allocating compressedSize * N.
     private static func decompressDeflateStreaming(_ data: Data, range: Range<Int>) throws -> Data {
-        var stream = compression_stream(dst_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity: 0),
-                                        dst_size: 0,
-                                        src_ptr: UnsafeMutablePointer<UInt8>.allocate(capacity: 0),
-                                        src_size: 0,
-                                        state: nil)
+        let placeholder = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+        defer { placeholder.deallocate() }
+        var stream = compression_stream(dst_ptr: placeholder, dst_size: 0, src_ptr: placeholder, src_size: 0, state: nil)
         guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
             throw SDKError.download(.extractionFailed, "Failed to initialize decompression stream")
         }

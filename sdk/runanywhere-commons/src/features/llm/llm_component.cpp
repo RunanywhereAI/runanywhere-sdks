@@ -9,6 +9,7 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -44,6 +45,9 @@ struct rac_llm_component {
 
     /** Mutex for thread safety */
     std::mutex mtx;
+
+    /** Cancellation flag - set by cancel(), read by token callback without holding mtx */
+    std::atomic<bool> cancel_requested{false};
 
     /** Resolved inference framework (defaults to LlamaCPP, the primary LLM backend) */
     rac_inference_framework_t actual_framework;
@@ -509,6 +513,8 @@ struct llm_stream_context {
     float temperature;
     int32_t max_tokens;
     int32_t token_count;  // Track tokens for streaming updates
+
+    std::atomic<bool>* cancel_flag;
 };
 
 /**
@@ -516,6 +522,10 @@ struct llm_stream_context {
  */
 static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
+
+    if (ctx->cancel_flag && ctx->cancel_flag->load(std::memory_order_relaxed)) {
+        return RAC_FALSE;
+    }
 
     // Track first token time and emit first token event
     if (!ctx->first_token_recorded) {
@@ -543,14 +553,6 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
     if (token) {
         ctx->full_text += token;
         ctx->token_count++;
-
-        // Enforce max_tokens cap at the component level
-        if (ctx->max_tokens > 0 && ctx->token_count >= ctx->max_tokens) {
-            if (ctx->token_callback) {
-                ctx->token_callback(token, ctx->user_data);
-            }
-            return RAC_FALSE;
-        }
 
         // Emit streaming update event (every 10 tokens to avoid spam)
         if (ctx->token_count % 10 == 0) {
@@ -583,6 +585,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->cancel_requested.store(false, std::memory_order_relaxed);
 
     // Generate unique ID for this generation
     std::string generation_id = generate_unique_id();
@@ -675,6 +679,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
+    ctx.cancel_flag = &component->cancel_requested;
 
     // Perform streaming generation
     result = rac_llm_generate_stream(service, prompt, effective_options, llm_stream_token_callback,
@@ -710,7 +715,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = ctx.token_count;
+    final_result.completion_tokens = ctx.token_count > 0 ? ctx.token_count : estimate_tokens(ctx.full_text.c_str());
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -769,7 +774,8 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
         return RAC_ERROR_INVALID_HANDLE;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->cancel_requested.store(true, std::memory_order_relaxed);
 
     rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
     if (service) {
