@@ -18,7 +18,8 @@ import 'dart:ffi';
 import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/llm/llm_configuration.dart';
+import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -48,6 +49,7 @@ class DartBridgeLLM {
 
   RacHandle? _handle;
   String? _loadedModelId;
+  int? _loadedContextLength;
   final _logger = SDKLogger('DartBridge.LLM');
 
   /// Active stream subscription for cancellation
@@ -153,6 +155,7 @@ class DartBridgeLLM {
     String modelPath,
     String modelId,
     String modelName,
+    int? contextLength,
   ) async {
     final handle = getHandle();
 
@@ -181,6 +184,7 @@ class DartBridgeLLM {
       }
 
       _loadedModelId = modelId;
+      _loadedContextLength = contextLength;
       _logger.info('LLM model loaded: $modelId');
     } finally {
       calloc.free(pathPtr);
@@ -200,6 +204,7 @@ class DartBridgeLLM {
 
       cleanupFn(_handle!);
       _loadedModelId = null;
+      _loadedContextLength = null;
       _logger.info('LLM model unloaded');
     } catch (e) {
       _logger.error('Failed to unload LLM model: $e');
@@ -247,6 +252,13 @@ class DartBridgeLLM {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
 
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+    );
+
     // Run FFI call in a separate isolate to avoid heap corruption
     // from C++ background threads (Metal GPU operations)
     final handleAddress = handle.address;
@@ -289,6 +301,14 @@ class DartBridgeLLM {
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
+
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: true,
+    );
 
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
@@ -367,6 +387,33 @@ class DartBridgeLLM {
     }
   }
 
+  int _requireLoadedContextLength() {
+    final contextLength = _loadedContextLength;
+    if (contextLength != null && contextLength > 0) {
+      return contextLength;
+    }
+
+    throw SDKError.validationFailed(
+      'Loaded model is missing context length metadata for maxTokens validation',
+    );
+  }
+
+  void _validateGenerationParameters({
+    required int contextLength,
+    required int maxTokens,
+    required double temperature,
+    String? systemPrompt,
+    bool streamingEnabled = false,
+  }) {
+    LLMConfiguration(
+      contextLength: contextLength,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: streamingEnabled,
+    ).validate();
+  }
+
   // MARK: - Cleanup
 
   /// Destroy the component and release resources.
@@ -380,6 +427,7 @@ class DartBridgeLLM {
         destroyFn(_handle!);
         _handle = null;
         _loadedModelId = null;
+        _loadedContextLength = null;
         _logger.debug('LLM component destroyed');
       } catch (e) {
         _logger.error('Failed to destroy LLM component: $e');
