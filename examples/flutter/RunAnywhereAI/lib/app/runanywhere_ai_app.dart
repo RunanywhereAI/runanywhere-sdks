@@ -217,7 +217,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           // Qwen3 4B — Gen 5 only
           (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, chips: {NPUChip.snapdragon8EliteGen5}),
           // Llama 3.2 1B Instruct — both chips
-          (slug: 'llama-v3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          // TODO: Remove snapdragon7sGen3Test before merging
+          (slug: 'llama-v3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5, NPUChip.snapdragon7sGen3Test}),
         ];
         for (final m in genieModels) {
           if (m.chips.contains(chip)) {
