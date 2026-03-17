@@ -103,20 +103,6 @@ try {
   logger.warning('react-native-fs not installed, file operations will be limited');
 }
 
-// Try to import react-native-zip-archive
-let ZipArchive: {
-  unzip: (source: string, target: string) => Promise<string>;
-  unzipWithPassword: (source: string, target: string, password: string) => Promise<string>;
-  unzipAssets: (assetPath: string, target: string) => Promise<string>;
-  subscribe: (callback: (event: { progress: number; filePath: string }) => void) => { remove: () => void };
-} | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  ZipArchive = require('react-native-zip-archive');
-} catch {
-  logger.warning('react-native-zip-archive not installed, archive extraction will be limited');
-}
-
 // Constants matching Swift SDK path structure
 const RUN_ANYWHERE_DIR = 'RunAnywhere';
 const MODELS_DIR = 'Models';
@@ -161,65 +147,20 @@ export interface DownloadProgress {
 }
 
 /**
- * Archive types supported for extraction
- * Matches Swift SDK's ArchiveType enum
+ * Check if a URL points to an archive that needs extraction.
+ * C++ handles actual format detection via rac_detect_archive_type().
  */
-export enum ArchiveType {
-  Zip = 'zip',
-  TarBz2 = 'tar.bz2',
-  TarGz = 'tar.gz',
-  TarXz = 'tar.xz',
-}
-
-/**
- * Describes the internal structure of an archive after extraction
- * Matches Swift SDK's ArchiveStructure enum
- */
-export enum ArchiveStructure {
-  SingleFileNested = 'singleFileNested',
-  DirectoryBased = 'directoryBased',
-  NestedDirectory = 'nestedDirectory',
-  Unknown = 'unknown',
-}
-
-/**
- * Model artifact type - describes how a model is packaged
- * Matches Swift SDK's ModelArtifactType enum
- */
-export type ModelArtifactType =
-  | { type: 'singleFile' }
-  | { type: 'archive'; archiveType: ArchiveType; structure: ArchiveStructure }
-  | { type: 'multiFile'; files: string[] }
-  | { type: 'custom'; strategyId: string }
-  | { type: 'builtIn' };
-
-/**
- * Extraction result
- */
-export interface ExtractionResult {
-  modelPath: string;
-  extractedSize: number;
-  fileCount: number;
-}
-
-/**
- * Infer archive type from URL
- */
-function inferArchiveType(url: string): ArchiveType | null {
+function isArchiveUrl(url: string): boolean {
   const lowercased = url.toLowerCase();
-  if (lowercased.includes('.tar.bz2') || lowercased.includes('.tbz2')) {
-    return ArchiveType.TarBz2;
-  }
-  if (lowercased.includes('.tar.gz') || lowercased.includes('.tgz')) {
-    return ArchiveType.TarGz;
-  }
-  if (lowercased.includes('.tar.xz') || lowercased.includes('.txz')) {
-    return ArchiveType.TarXz;
-  }
-  if (lowercased.includes('.zip')) {
-    return ArchiveType.Zip;
-  }
-  return null;
+  return (
+    lowercased.includes('.tar.bz2') ||
+    lowercased.includes('.tbz2') ||
+    lowercased.includes('.tar.gz') ||
+    lowercased.includes('.tgz') ||
+    lowercased.includes('.tar.xz') ||
+    lowercased.includes('.txz') ||
+    lowercased.includes('.zip')
+  );
 }
 
 /**
@@ -326,21 +267,7 @@ export const FileSystem = {
       return `${folder}/${baseId}${ext}`;
     }
 
-    // For ONNX, check if the model is in a nested directory structure
-    if (RNFS) {
-      try {
-        const exists = await RNFS.exists(folder);
-        if (exists) {
-          // Find the actual model path (handles nested directory structures)
-          const modelPath = await this.findModelPathAfterExtraction(folder);
-          return modelPath;
-        }
-      } catch {
-        // Fall through to return the default folder
-      }
-    }
-
-    // Directory-based model (ONNX)
+    // Directory-based model (ONNX) — return the folder
     return folder;
   },
 
@@ -364,42 +291,11 @@ export const FileSystem = {
       if (files.length === 0) return false;
 
       if (fw === 'ONNX') {
-        // For ONNX, we need to check if there are actual model files (not just an archive)
-        // ONNX models should have .onnx files after extraction
-        const hasOnnxFiles = await this.hasModelFiles(folder);
-        return hasOnnxFiles;
+        // For ONNX, directory has contents — model is present
+        return true;
       }
 
       return true;
-    } catch {
-      return false;
-    }
-  },
-
-  /**
-   * Recursively check if a folder contains model files
-   */
-  async hasModelFiles(folder: string): Promise<boolean> {
-    if (!RNFS) return false;
-
-    try {
-      const contents = await RNFS.readDir(folder);
-
-      for (const item of contents) {
-        if (item.isFile()) {
-          const name = item.name.toLowerCase();
-          // Check for actual model files, not archive files
-          if (name.endsWith('.onnx') || name.endsWith('.bin') || name.endsWith('.txt')) {
-            return true;
-          }
-        } else if (item.isDirectory()) {
-          // Check nested directories
-          const hasFiles = await this.hasModelFiles(item.path);
-          if (hasFiles) return true;
-        }
-      }
-
-      return false;
     } catch {
       return false;
     }
@@ -446,8 +342,8 @@ export const FileSystem = {
 
     // Determine destination path
     let destPath: string;
-    const archiveType = inferArchiveType(url);
-if (fw === 'LlamaCpp' && archiveType === null) {
+    const needsExtraction = isArchiveUrl(url);
+    if (fw === 'LlamaCpp' && !needsExtraction) {
       // Single GGUF/BIN file (not an archive)
       const ext =
         modelId.includes('.gguf') || url.includes('.gguf')
@@ -456,7 +352,7 @@ if (fw === 'LlamaCpp' && archiveType === null) {
             ? '.bin'
             : '.gguf';
       destPath = `${folder}/${baseId}${ext}`;
-    } else if (fw === 'ONNX' && archiveType === null) {
+    } else if (fw === 'ONNX' && !needsExtraction) {
       // ONNX single-file model (.onnx)
       const ext = modelId.includes('.onnx') || url.includes('.onnx') ? '.onnx' : '';
       destPath = `${folder}/${baseId}${ext}`;
@@ -472,7 +368,7 @@ if (fw === 'LlamaCpp' && archiveType === null) {
 
     // Check if already exists
     const exists = await RNFS.exists(destPath);
-    if (exists && (fw === 'LlamaCpp' || (fw === 'ONNX' && archiveType === null))) {
+    if (exists && (fw === 'LlamaCpp' || (fw === 'ONNX' && !needsExtraction))) {
       logger.info(`Model already exists: ${destPath}`);
       return destPath;
     }
@@ -511,25 +407,18 @@ if (fw === 'LlamaCpp' && archiveType === null) {
 
     logger.info(`Download completed: ${result.bytesWritten} bytes`);
 
-// For archives (ONNX or LlamaCpp VLM), extract to final location
-    if (archiveType !== null) {
-      logger.info(`Extracting ${archiveType} archive for ${fw}...`);
+    // For archives (ONNX or LlamaCpp VLM), extract to final location
+    if (needsExtraction) {
+      logger.info(`Extracting archive for ${fw}...`);
 
       try {
-        const extractionResult = await this.extractArchive(destPath, folder, archiveType);
-        logger.info(`Extraction completed: ${extractionResult.fileCount} files, ${extractionResult.extractedSize} bytes`);
+        const modelPath = await this.extractArchive(destPath, folder);
+        logger.info(`Extraction completed, model at: ${modelPath}`);
 
         // Clean up the temporary archive file
         await RNFS.unlink(destPath);
 
-        // For LlamaCpp VLM, find the .gguf file in extracted folder
-        if (fw === 'LlamaCpp') {
-          destPath = await this.findGGUFInDirectory(extractionResult.modelPath);
-          logger.info(`Found GGUF model at: ${destPath}`);
-        } else {
-          // For ONNX, return the extracted folder path
-          destPath = extractionResult.modelPath;
-        }
+        destPath = modelPath;
       } catch (extractError) {
         logger.error(`Archive extraction failed: ${extractError}`);
         // Clean up temp file on failure
@@ -546,167 +435,41 @@ if (fw === 'LlamaCpp' && archiveType === null) {
   },
 
   /**
-   * Extract an archive to a destination folder
-   * Uses native extraction via the core module (iOS: ArchiveUtility, Android: native extraction)
+   * Extract an archive to a destination folder.
+   * Uses native C++ extraction via libarchive (auto-detects format).
+   * Returns the extracted model path.
    */
   async extractArchive(
     archivePath: string,
     destinationFolder: string,
-    archiveType: ArchiveType,
-    onProgress?: (progress: number) => void
-  ): Promise<ExtractionResult> {
+  ): Promise<string> {
     if (!RNFS) {
       throw new Error('react-native-fs not installed');
     }
 
     logger.info(`Extracting archive: ${archivePath}`);
-    logger.info(`Archive type: ${archiveType}`);
     logger.info(`Destination: ${destinationFolder}`);
 
     // Ensure destination exists
     await this.ensureDirectory(destinationFolder);
 
-    // Try native extraction first (supports tar.gz, tar.bz2, zip)
-    try {
-      const native = getNativeModule();
-      if (!native) {
-        throw new Error('Native module not available');
-      }
-
-      logger.info('Using native archive extraction...');
-      const success = await native.extractArchive(archivePath, destinationFolder);
-
-      if (!success) {
-        throw new Error('Native extraction returned false');
-      }
-
-      logger.info('Native extraction completed successfully');
-    } catch (nativeError) {
-      logger.warning(`Native extraction failed: ${nativeError}, trying fallback...`);
-
-      // Fallback to react-native-zip-archive for ZIP files only
-      if (archiveType === ArchiveType.Zip && ZipArchive) {
-        logger.info('Falling back to react-native-zip-archive for ZIP...');
-
-        let subscription: { remove: () => void } | null = null;
-        if (onProgress) {
-          subscription = ZipArchive.subscribe(({ progress }) => {
-            onProgress(progress);
-          });
-        }
-
-        try {
-          await ZipArchive.unzip(archivePath, destinationFolder);
-        } finally {
-          if (subscription) {
-            subscription.remove();
-          }
-        }
-      } else if (archiveType === ArchiveType.TarGz || archiveType === ArchiveType.TarBz2) {
-        // No fallback for tar archives - native is required
-        throw new Error(
-          `Archive extraction failed for ${archiveType}. Native extraction is required for tar archives. Error: ${nativeError}`
-        );
-      } else {
-        throw new Error(`Archive extraction failed: ${nativeError}`);
-      }
+    // Use native C++ extraction (libarchive) — auto-detects all formats
+    const native = getNativeModule();
+    if (!native) {
+      throw new Error('Native module not available');
     }
 
-    // After extraction, find the actual model path
-    // ONNX models are typically nested in a directory with the same name
-    const modelPath = await this.findModelPathAfterExtraction(destinationFolder);
+    const success = await native.extractArchive(archivePath, destinationFolder);
 
-    // Calculate extraction stats
-    const stats = await this.calculateExtractionStats(destinationFolder);
-
-    return {
-      modelPath,
-      extractedSize: stats.totalSize,
-      fileCount: stats.fileCount,
-    };
-  },
-
-  /**
-   * Find the actual model path after extraction
-   * Handles nested directory structures common in ONNX archives
-   */
-  async findModelPathAfterExtraction(extractedFolder: string): Promise<string> {
-    if (!RNFS) {
-      return extractedFolder;
+    if (!success) {
+      throw new Error('Native extraction failed');
     }
 
-    try {
-      const contents = await RNFS.readDir(extractedFolder);
+    logger.info('Native extraction completed successfully');
 
-      // If the directory contains .onnx files or other model files (tokens.txt, espeak-ng-data),
-      // return the DIRECTORY path — the C++ backend scans it internally for all needed files
-      // (encoder.onnx, decoder.onnx, tokens.txt, espeak-ng-data/, vocab.txt, etc.).
-      // This matches the iOS SDK which always passes directory paths for ONNX models.
-      const hasModelFiles = contents.some(
-        item => item.isFile() && (
-          item.name.toLowerCase().endsWith('.onnx') ||
-          item.name === 'tokens.txt' ||
-          item.name === 'vocab.txt'
-        )
-      );
-      if (hasModelFiles) {
-        logger.info(`Found model files in directory: ${extractedFolder}`);
-        return extractedFolder;
-      }
-
-      // If there's exactly one directory and no model files, it's a nested archive structure
-      const directories = contents.filter(item => item.isDirectory());
-      const files = contents.filter(item => item.isFile());
-
-      if (directories.length === 1 && files.length === 0) {
-        const nestedDir = directories[0];
-        logger.info(`Found nested directory structure: ${nestedDir.name}`);
-        return this.findModelPathAfterExtraction(nestedDir.path);
-      }
-
-      return extractedFolder;
-    } catch (error) {
-      logger.error(`Error finding model path: ${error}`);
-      return extractedFolder;
-    }
-  },
-
-  /**
-   * Find GGUF file in extracted directory (for VLM models)
-   * Recursively searches for the main model .gguf file
-   */
-  async findGGUFInDirectory(directory: string): Promise<string> {
-    if (!RNFS) {
-      throw new Error('react-native-fs not available');
-    }
-
-    try {
-      const contents = await RNFS.readDir(directory);
-
-      // Look for .gguf files (not mmproj)
-      for (const item of contents) {
-        if (item.isFile() && item.name.endsWith('.gguf') && !item.name.includes('mmproj')) {
-          logger.info(`Found main GGUF model: ${item.name}`);
-          return item.path;
-        }
-      }
-
-      // If not found, check nested directories
-      for (const item of contents) {
-        if (item.isDirectory()) {
-          try {
-            return await this.findGGUFInDirectory(item.path);
-          } catch {
-            // Continue searching other directories
-          }
-        }
-      }
-
-      throw new Error(`No GGUF model file found in ${directory}`);
-    } catch (error) {
-      logger.error(`Error finding GGUF file: ${error}`);
-      throw error;
-    }
+    // C++ extraction handles format detection and path finding.
+    // Return the destination folder as the model path.
+    return destinationFolder;
   },
 
   /**
@@ -740,109 +503,50 @@ if (fw === 'LlamaCpp' && archiveType === null) {
   },
 
   /**
-   * Calculate extraction statistics
+   * Download a single file to a specific destination path.
+   * Used by multi-file download orchestration in RunAnywhere+Models.
+   *
+   * Reference: Swift SDK's AlamofireDownloadService.performDownload()
    */
-  async calculateExtractionStats(folder: string): Promise<{ totalSize: number; fileCount: number }> {
-    if (!RNFS) {
-      return { totalSize: 0, fileCount: 0 };
-    }
-
-    let totalSize = 0;
-    let fileCount = 0;
-
-    const processDir = async (dir: string) => {
-      try {
-        const contents = await RNFS!.readDir(dir);
-        for (const item of contents) {
-          if (item.isFile()) {
-            totalSize += item.size;
-            fileCount++;
-          } else if (item.isDirectory()) {
-            await processDir(item.path);
-          }
-        }
-      } catch {
-        // Ignore errors
-      }
-    };
-
-    await processDir(folder);
-    return { totalSize, fileCount };
-  },
-
-  /**
-   * Download a multi-file model.
-   * All files are placed in the same directory: Models/{framework}/{modelId}/
-   * Returns the folder path (not a file path), matching the Swift SDK behavior.
-   */
-  async downloadMultiFileModel(
-    modelId: string,
-    files: ModelFileDescriptor[],
-    onProgress?: (progress: DownloadProgress) => void,
-    framework?: string
-  ): Promise<string> {
+  async downloadFile(
+    url: string,
+    destinationPath: string,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<number> {
     if (!RNFS) {
       throw new Error('react-native-fs not installed');
     }
 
-    const fw = framework || 'ONNX';
-    const baseId = getBaseModelId(modelId);
-    const folder = `${this.getFrameworkDirectory(fw)}/${baseId}`;
+    const downloadResult = RNFS.downloadFile({
+      fromUrl: url,
+      toFile: destinationPath,
+      background: true,
+      progressDivider: 1,
+      begin: (res) => {
+        logger.info(`Download started: ${res.contentLength} bytes`);
+      },
+      progress: (res) => {
+        const progress = res.contentLength > 0
+          ? res.bytesWritten / res.contentLength
+          : 0;
 
-    await this.ensureDirectory(this.getRunAnywhereDirectory());
-    await this.ensureDirectory(this.getModelsDirectory());
-    await this.ensureDirectory(this.getFrameworkDirectory(fw));
-    await this.ensureDirectory(folder);
+        if (onProgress) {
+          onProgress({
+            bytesWritten: res.bytesWritten,
+            contentLength: res.contentLength,
+            progress,
+          });
+        }
+      },
+    });
 
-    logger.info(`Downloading multi-file model: ${modelId} (${files.length} files)`);
+    const result = await downloadResult.promise;
 
-    let totalBytesWritten = 0;
-    let totalContentLength = 0;
-
-    for (let i = 0; i < files.length; i++) {
-      const fileDesc = files[i];
-      const destPath = `${folder}/${fileDesc.filename}`;
-
-      const exists = await RNFS.exists(destPath);
-      if (exists) {
-        logger.info(`File already exists, skipping: ${fileDesc.filename}`);
-        continue;
-      }
-
-      logger.info(`Downloading file ${i + 1}/${files.length}: ${fileDesc.filename}`);
-
-      const downloadResult = RNFS.downloadFile({
-        fromUrl: fileDesc.url,
-        toFile: destPath,
-        background: true,
-        progressDivider: 1,
-        begin: (res) => {
-          totalContentLength += res.contentLength;
-          logger.info(`File download started: ${fileDesc.filename} (${res.contentLength} bytes)`);
-        },
-        progress: (res) => {
-          if (onProgress && totalContentLength > 0) {
-            onProgress({
-              bytesWritten: totalBytesWritten + res.bytesWritten,
-              contentLength: totalContentLength,
-              progress: (totalBytesWritten + res.bytesWritten) / totalContentLength,
-            });
-          }
-        },
-      });
-
-      const result = await downloadResult.promise;
-
-      if (result.statusCode !== 200) {
-        throw new Error(`Download failed for ${fileDesc.filename}: status ${result.statusCode}`);
-      }
-
-      totalBytesWritten += result.bytesWritten;
-      logger.info(`File downloaded: ${fileDesc.filename} (${result.bytesWritten} bytes)`);
+    if (result.statusCode !== 200) {
+      throw new Error(`Download failed with status: ${result.statusCode}`);
     }
 
-    logger.info(`Multi-file model download complete: ${folder}`);
-    return folder;
+    return result.bytesWritten;
   },
 
   /**
@@ -935,33 +639,6 @@ if (fw === 'LlamaCpp' && archiveType === null) {
       return stat.isDirectory();
     } catch {
       return false;
-    }
-  },
-
-  /**
-   * Get the size of a directory in bytes (recursive)
-   */
-  async getDirectorySize(dirPath: string): Promise<number> {
-    if (!RNFS) return 0;
-
-    try {
-      const exists = await RNFS.exists(dirPath);
-      if (!exists) return 0;
-
-      let totalSize = 0;
-      const contents = await RNFS.readDir(dirPath);
-
-      for (const item of contents) {
-        if (item.isDirectory()) {
-          totalSize += await this.getDirectorySize(item.path);
-        } else {
-          totalSize += item.size || 0;
-        }
-      }
-
-      return totalSize;
-    } catch {
-      return 0;
     }
   },
 

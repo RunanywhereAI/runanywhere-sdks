@@ -50,6 +50,21 @@ android {
 
         // Consumer proguard rules
         consumerProguardFiles 'proguard-rules.pro'
+
+        // C++ RAG bridge compilation
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+                arguments '-DANDROID_STL=c++_shared'
+            }
+        }
+    }
+
+    // CMake build for the C++ RAG bridge
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+        }
     }
 
     compileOptions {

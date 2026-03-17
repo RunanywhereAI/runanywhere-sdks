@@ -11,6 +11,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 
 /// File manager for RunAnywhere SDK
 /// Matches iOS SimplifiedFileManager from Infrastructure/FileManagement/Services/SimplifiedFileManager.swift
@@ -161,19 +162,10 @@ class SimplifiedFileManager {
     }
   }
 
-  /// Calculate total size of all models
+  /// Calculate total size of all models (C++ recursive traversal)
   Future<int> calculateModelsSize() async {
     _ensureInitialized();
-    final modelsDir = Directory(path.join(_baseDirectory!.path, 'Models'));
-    if (!await modelsDir.exists()) return 0;
-
-    int totalSize = 0;
-    await for (final entity in modelsDir.list(recursive: true)) {
-      if (entity is File) {
-        totalSize += await entity.length();
-      }
-    }
-    return totalSize;
+    return DartBridgeFileManager.modelsStorageUsed();
   }
 
   /// Get device storage info
@@ -187,36 +179,18 @@ class SimplifiedFileManager {
     );
   }
 
-  /// Clear all cache
+  /// Clear all cache (C++ handles delete + recreate)
   Future<void> clearCache() async {
     _ensureInitialized();
-    final cacheDir = Directory(path.join(_baseDirectory!.path, 'Cache'));
-    if (await cacheDir.exists()) {
-      await for (final entity in cacheDir.list()) {
-        if (entity is File) {
-          await entity.delete();
-        } else if (entity is Directory) {
-          await entity.delete(recursive: true);
-        }
-      }
-      _logger.info('Cache cleared');
-    }
+    DartBridgeFileManager.clearCache();
+    _logger.info('Cache cleared');
   }
 
-  /// Clear all temporary files
+  /// Clear all temporary files (C++ handles delete + recreate)
   Future<void> clearTemp() async {
     _ensureInitialized();
-    final tempDir = Directory(path.join(_baseDirectory!.path, 'Temp'));
-    if (await tempDir.exists()) {
-      await for (final entity in tempDir.list()) {
-        if (entity is File) {
-          await entity.delete();
-        } else if (entity is Directory) {
-          await entity.delete(recursive: true);
-        }
-      }
-      _logger.info('Temp directory cleared');
-    }
+    DartBridgeFileManager.clearTemp();
+    _logger.info('Temp directory cleared');
   }
 
   void _ensureInitialized() {

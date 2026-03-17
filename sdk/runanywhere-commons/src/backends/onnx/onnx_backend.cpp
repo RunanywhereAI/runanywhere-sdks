@@ -24,11 +24,8 @@
 #include "rac/core/rac_logger.h"
 
 #if SHERPA_ONNX_AVAILABLE
-extern "C" {
-    int espeak_Initialize(int output, int buflength, const char *path, int options);
-    int espeak_SetVoiceByName(const char *name);
-}
-#define ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS 0x0003
+// espeak-ng reinitialization is handled by destroying and recreating
+// the SherpaOnnxOfflineTts instance via the sherpa-onnx C API.
 #endif
 
 namespace runanywhere {
@@ -966,26 +963,15 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         return false;
     }
 
-    sherpa_tts_ = new_tts;
-
-    // Force espeak-ng to use THIS model's data_dir.
-    // Sherpa-ONNX uses std::once_flag for espeak_Initialize, so only the first
-    // model loaded gets its data_dir registered. Re-calling espeak_Initialize
-    // directly resets the internal path_home to the current model's directory.
-    if (!espeak_data_dir_.empty()) {
-        int reinit = espeak_Initialize(ESPEAK_AUDIO_OUTPUT_SYNCHRONOUS, 0, espeak_data_dir_.c_str(), 0);
-        RAC_LOG_INFO("ONNX.TTS", "espeak_Initialize override: result=%d (expected 22050), data_dir=%s",
-            reinit, espeak_data_dir_.c_str());
-
-        if (reinit == 22050) {
-            int voice_test = espeak_SetVoiceByName("en-us");
-            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-us') test: result=%d (0=success)", voice_test);
-            int voice_test_gb = espeak_SetVoiceByName("en-gb");
-            RAC_LOG_INFO("ONNX.TTS", "espeak_SetVoiceByName('en-gb') test: result=%d (0=success)", voice_test_gb);
-        } else {
-            RAC_LOG_ERROR("ONNX.TTS", "espeak_Initialize override FAILED with code %d", reinit);
-        }
+    // Workaround for sherpa-onnx std::once_flag issue: espeak_Initialize is
+    // only called internally on the very first SherpaOnnxCreateOfflineTts call.
+    // When switching TTS models with different data_dir, destroy and recreate
+    // the instance so the config (including data_dir) is applied correctly.
+    if (sherpa_tts_ && sherpa_tts_ != new_tts) {
+        SherpaOnnxDestroyOfflineTts(sherpa_tts_);
+        sherpa_tts_ = nullptr;
     }
+    sherpa_tts_ = new_tts;
 
     sample_rate_ = SherpaOnnxOfflineTtsSampleRate(sherpa_tts_);
     int num_speakers = SherpaOnnxOfflineTtsNumSpeakers(sherpa_tts_);
@@ -1220,11 +1206,13 @@ bool ONNXVAD::unload_model() {
 }
 
 bool ONNXVAD::configure_vad(const VADConfig& config) {
+    std::lock_guard<std::mutex> lock(mutex_);
     config_ = config;
     return true;
 }
 
 VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_rate) {
+    std::lock_guard<std::mutex> lock(mutex_);
     VADResult result;
 
 #if SHERPA_ONNX_AVAILABLE
@@ -1232,18 +1220,24 @@ VADResult ONNXVAD::process(const std::vector<float>& audio_samples, int sample_r
         return result;
     }
 
-    const int32_t window_size = 512;  // Silero native window size
+    static constexpr int32_t SILERO_WINDOW_SIZE = 512;
 
     // Append incoming audio to the pending buffer.
-    // Audio capture may deliver chunks smaller than window_size (e.g. 256 samples),
+    // Audio capture may deliver chunks smaller than SILERO_WINDOW_SIZE (e.g. 256 samples),
     // but Silero VAD requires exactly 512 samples per call.
     pending_samples_.insert(pending_samples_.end(), audio_samples.begin(), audio_samples.end());
 
-    // Feed complete window_size chunks to Silero VAD
-    while (pending_samples_.size() >= static_cast<size_t>(window_size)) {
+    // Feed complete SILERO_WINDOW_SIZE chunks to Silero VAD.
+    // Use offset tracking instead of repeated front-erase (O(n) per erase).
+    size_t consumed = 0;
+    while (consumed + SILERO_WINDOW_SIZE <= pending_samples_.size()) {
         SherpaOnnxVoiceActivityDetectorAcceptWaveform(
-            sherpa_vad_, pending_samples_.data(), window_size);
-        pending_samples_.erase(pending_samples_.begin(), pending_samples_.begin() + window_size);
+            sherpa_vad_, pending_samples_.data() + consumed, SILERO_WINDOW_SIZE);
+        consumed += SILERO_WINDOW_SIZE;
+    }
+    if (consumed > 0) {
+        pending_samples_.erase(pending_samples_.begin(),
+                               pending_samples_.begin() + static_cast<ptrdiff_t>(consumed));
     }
 
     // Check if speech is currently detected in the latest frame
@@ -1280,6 +1274,7 @@ VADResult ONNXVAD::feed_audio(const std::string& stream_id, const std::vector<fl
 void ONNXVAD::destroy_stream(const std::string& stream_id) {}
 
 void ONNXVAD::reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
 #if SHERPA_ONNX_AVAILABLE
     if (sherpa_vad_) {
         SherpaOnnxVoiceActivityDetectorReset(sherpa_vad_);
@@ -1289,6 +1284,7 @@ void ONNXVAD::reset() {
 }
 
 VADConfig ONNXVAD::get_vad_config() const {
+    std::lock_guard<std::mutex> lock(mutex_);
     return config_;
 }
 

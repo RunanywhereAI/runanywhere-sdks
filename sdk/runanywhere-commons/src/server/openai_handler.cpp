@@ -151,6 +151,7 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_llamacpp_generate returned rc=%d", rc);
 
     if (RAC_FAILED(rc)) {
+        rac_llm_result_free(&result);
         sendError(res, 500, "Generation failed", "server_error");
         return;
     }

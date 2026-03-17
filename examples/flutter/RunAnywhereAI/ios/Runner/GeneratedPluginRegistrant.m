@@ -12,6 +12,12 @@
 @import audioplayers_darwin;
 #endif
 
+#if __has_include(<camera_avfoundation/CameraPlugin.h>)
+#import <camera_avfoundation/CameraPlugin.h>
+#else
+@import camera_avfoundation;
+#endif
+
 #if __has_include(<device_info_plus/FPPDeviceInfoPlusPlugin.h>)
 #import <device_info_plus/FPPDeviceInfoPlusPlugin.h>
 #else
@@ -28,6 +34,12 @@
 #import <flutter_tts/FlutterTtsPlugin.h>
 #else
 @import flutter_tts;
+#endif
+
+#if __has_include(<image_picker_ios/FLTImagePickerPlugin.h>)
+#import <image_picker_ios/FLTImagePickerPlugin.h>
+#else
+@import image_picker_ios;
 #endif
 
 #if __has_include(<package_info_plus/FPPPackageInfoPlusPlugin.h>)
@@ -94,9 +106,11 @@
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
   [AudioplayersDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioplayersDarwinPlugin"]];
+  [CameraPlugin registerWithRegistrar:[registry registrarForPlugin:@"CameraPlugin"]];
   [FPPDeviceInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPDeviceInfoPlusPlugin"]];
   [FlutterSecureStoragePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterSecureStoragePlugin"]];
   [FlutterTtsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterTtsPlugin"]];
+  [FLTImagePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTImagePickerPlugin"]];
   [FPPPackageInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPPackageInfoPlusPlugin"]];
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];

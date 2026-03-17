@@ -32,7 +32,7 @@ RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swi
 
 ### Design Principles
 
-- **C++ Core, C API Surface** - C++17 internally, pure C API for FFI compatibility
+- **C++ Core, C API Surface** - C++20 internally, pure C API for FFI compatibility
 - **Vtable-Based Polymorphism** - No C++ virtual inheritance at API boundaries
 - **Priority-Based Dispatch** - Service providers register with priority; first capable handler wins
 - **Lazy Initialization** - Services created on-demand, not at startup
@@ -173,7 +173,7 @@ printf("Transcription: %s\n", result.text);
 ### Prerequisites
 
 - **CMake** 3.22 or higher
-- **C++17** compatible compiler (Clang, GCC)
+- **C++20** compatible compiler (Clang, GCC, MSVC)
 - **Platform-specific**: Xcode 15+ (iOS/macOS), Android NDK r25+ (Android)
 
 ### Quick Start

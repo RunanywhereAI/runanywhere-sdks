@@ -243,7 +243,7 @@ extension CppBridge {
                 guard let path = path else { return RAC_ERROR_INVALID_ARGUMENT }
 
                 let url = URL(fileURLWithPath: String(cString: path))
-                let fm = FileManager.default
+                let fm = Foundation.FileManager.default
 
                 guard let contents = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
                     outEntries?.pointee = nil
@@ -286,7 +286,7 @@ extension CppBridge {
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
                 var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: pathStr, isDirectory: &isDir) {
+                if Foundation.FileManager.default.fileExists(atPath: pathStr, isDirectory: &isDir) {
                     return isDir.boolValue ? RAC_TRUE : RAC_FALSE
                 }
                 return RAC_FALSE
@@ -296,7 +296,7 @@ extension CppBridge {
             callbacks.path_exists = { path, _ -> rac_bool_t in
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
-                return FileManager.default.fileExists(atPath: pathStr) ? RAC_TRUE : RAC_FALSE
+                return Foundation.FileManager.default.fileExists(atPath: pathStr) ? RAC_TRUE : RAC_FALSE
             }
 
             // Is model file callback - checks for known model extensions
