@@ -2664,7 +2664,9 @@ class RunAnywhere {
 
   /// Create a RAG pipeline with the given configuration.
   ///
-  /// Must be called before ingesting documents or running queries.
+  /// Auto-registers the RAG module if needed — no explicit RAGModule.register()
+  /// required. The C++ bridge handles model path resolution (GGUF directory
+  /// scanning, vocab.txt discovery).
   static Future<void> ragCreatePipeline(RAGConfiguration config) async {
     if (!_isInitialized) throw SDKError.notInitialized();
     DartBridgeRAG.shared.createPipeline(config);
@@ -2683,6 +2685,16 @@ class RunAnywhere {
     DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
   }
 
+  /// Ingest multiple documents in batch.
+  ///
+  /// More efficient than calling [ragIngest] multiple times.
+  /// Each document map should have a 'text' key and optional 'metadataJson' key.
+  static Future<void> ragAddDocumentsBatch(
+      List<Map<String, String>> documents) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.addDocumentsBatch(documents);
+  }
+
   /// Clear all documents from the RAG pipeline.
   static Future<void> ragClearDocuments() async {
     if (!_isInitialized) throw SDKError.notInitialized();
@@ -2691,6 +2703,12 @@ class RunAnywhere {
 
   /// Get the number of indexed document chunks.
   static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
+
+  /// Get pipeline statistics as JSON.
+  static Future<RAGStatistics> ragGetStatistics() async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    return DartBridgeRAG.shared.getStatistics();
+  }
 
   /// Query the RAG pipeline with a question.
   ///

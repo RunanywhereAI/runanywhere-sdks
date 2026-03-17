@@ -8,11 +8,9 @@
 library runanywhere_rag;
 
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
-import 'package:runanywhere/native/dart_bridge_rag.dart'
-    hide RAGConfiguration, RAGQueryOptions, RAGSearchResult, RAGResult;
+import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/public/runanywhere.dart';
 import 'package:runanywhere/public/types/rag_types.dart';
 
@@ -37,20 +35,14 @@ extension RunAnywhereRAG on RunAnywhere {
 
   /// Create the RAG pipeline with the given configuration.
   ///
-  /// Passes [config] to [DartBridgeRAG.createPipeline] which handles
-  /// all FFI marshaling internally, then publishes [SDKRAGEvent.pipelineCreated].
+  /// Passes [config] to the C++ bridge which handles JSON parsing, model path
+  /// resolution, and pipeline creation. Publishes [SDKRAGEvent.pipelineCreated].
   ///
   /// Throws [SDKError.notInitialized] if SDK is not initialized.
   /// Throws [SDKError.invalidState] if pipeline creation fails.
   static Future<void> ragCreatePipeline(RAGConfiguration config) async {
     if (!RunAnywhere.isSDKInitialized) {
       throw SDKError.notInitialized();
-    }
-
-    if (!RAGModule.isRegistered) {
-      throw SDKError.invalidState(
-        'RAG backend not registered. Call RAGModule.register() first.',
-      );
     }
 
     try {
@@ -121,6 +113,51 @@ extension RunAnywhereRAG on RunAnywhere {
     }
   }
 
+  /// Ingest multiple documents in batch.
+  ///
+  /// More efficient than calling [ragIngest] multiple times.
+  /// Publishes [SDKRAGEvent.ingestionStarted] before and
+  /// [SDKRAGEvent.ingestionComplete] after the operation.
+  ///
+  /// [documents] - List of document maps with 'text' and optional 'metadataJson' keys.
+  ///
+  /// Throws [SDKError.notInitialized] if SDK is not initialized.
+  /// Throws [SDKError.invalidState] if batch ingestion fails.
+  static Future<void> ragAddDocumentsBatch(
+      List<Map<String, String>> documents) async {
+    if (!RunAnywhere.isSDKInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    final totalLength =
+        documents.fold<int>(0, (sum, d) => sum + (d['text']?.length ?? 0));
+
+    EventBus.shared.publish(
+      SDKRAGEvent.ingestionStarted(documentLength: totalLength),
+    );
+
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      DartBridgeRAG.shared.addDocumentsBatch(documents);
+
+      stopwatch.stop();
+
+      final chunkCount = DartBridgeRAG.shared.documentCount;
+
+      EventBus.shared.publish(
+        SDKRAGEvent.ingestionComplete(
+          chunkCount: chunkCount,
+          durationMs: stopwatch.elapsedMilliseconds.toDouble(),
+        ),
+      );
+    } catch (e) {
+      stopwatch.stop();
+      EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
+      throw SDKError.invalidState('RAG batch ingestion failed: $e');
+    }
+  }
+
   /// Clear all documents from the RAG pipeline.
   ///
   /// Throws [SDKError.notInitialized] if SDK is not initialized.
@@ -152,6 +189,24 @@ extension RunAnywhereRAG on RunAnywhere {
     return DartBridgeRAG.shared.documentCount;
   }
 
+  /// Get pipeline statistics.
+  ///
+  /// Returns a [RAGStatistics] with the raw JSON from the C pipeline.
+  ///
+  /// Throws [SDKError.notInitialized] if SDK is not initialized.
+  /// Throws [SDKError.invalidState] if statistics retrieval fails.
+  static Future<RAGStatistics> ragGetStatistics() async {
+    if (!RunAnywhere.isSDKInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    try {
+      return DartBridgeRAG.shared.getStatistics();
+    } catch (e) {
+      throw SDKError.invalidState('RAG get statistics failed: $e');
+    }
+  }
+
   // MARK: - Query
 
   /// Query the RAG pipeline with a natural language question.
@@ -180,8 +235,7 @@ extension RunAnywhereRAG on RunAnywhere {
     );
 
     try {
-      final queryOptions = options ??
-          RAGQueryOptions(question: question);
+      final queryOptions = options ?? RAGQueryOptions(question: question);
 
       // If caller provided options but with a different question field,
       // create a new options with the positional question.
