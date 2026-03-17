@@ -72,18 +72,18 @@ class DartBridgeVoiceAgent {
     final completer = Completer<RacHandle>();
     _initFuture = completer.future;
 
-    // Use shared component handles (matches Swift approach)
-    // This allows the voice agent to use already-loaded models from the
-    // individual component bridges (STT, LLM, TTS, VAD)
-    final llmHandle = DartBridgeLLM.shared.getHandle();
-    final sttHandle = DartBridgeSTT.shared.getHandle();
-    final ttsHandle = DartBridgeTTS.shared.getHandle();
-    final vadHandle = DartBridgeVAD.shared.getHandle();
-
-    _logger.debug(
-        'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
-
     try {
+      // Use shared component handles (matches Swift approach)
+      // This allows the voice agent to use already-loaded models from the
+      // individual component bridges (STT, LLM, TTS, VAD)
+      final llmHandle = await DartBridgeLLM.shared.getHandle();
+      final sttHandle = await DartBridgeSTT.shared.getHandle();
+      final ttsHandle = await DartBridgeTTS.shared.getHandle();
+      final vadHandle = await DartBridgeVAD.shared.getHandle();
+
+      _logger.debug(
+          'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
+
       final handlePtr = calloc<RacHandle>();
       try {
         final result = NativeFunctions.voiceAgentCreate(
@@ -334,7 +334,7 @@ class DartBridgeVoiceAgent {
       }
 
       // Parse result while still in isolate (before freeing memory)
-      return _parseVoiceTurnResultStatic(resultPtr.ref, _voiceAgentLib);
+      return _parseVoiceTurnResultStatic(resultPtr.ref);
     } finally {
       // Free audio data
       calloc.free(audioPtr);
@@ -354,7 +354,6 @@ class DartBridgeVoiceAgent {
   /// using rac_audio_float32_to_wav, so synthesized_audio is WAV data.
   static VoiceTurnResult _parseVoiceTurnResultStatic(
     RacVoiceAgentResultStruct result,
-    DynamicLibrary lib,
   ) {
     final transcription = result.transcription != nullptr
         ? result.transcription.toDartString()
@@ -410,6 +409,9 @@ class DartBridgeVoiceAgent {
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
       calloc.free(audioPtr);
+      if (resultPtr.value != nullptr) {
+        NativeFunctions.racFree(resultPtr.value.cast<Void>());
+      }
       calloc.free(resultPtr);
     }
   }
@@ -433,6 +435,9 @@ class DartBridgeVoiceAgent {
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
       calloc.free(promptPtr);
+      if (resultPtr.value != nullptr) {
+        NativeFunctions.racFree(resultPtr.value.cast<Void>());
+      }
       calloc.free(resultPtr);
     }
   }
