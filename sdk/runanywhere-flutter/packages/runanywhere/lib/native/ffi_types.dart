@@ -1098,6 +1098,13 @@ base class RacVlmOptionsStruct extends Struct {
 
   @Int32()
   external int useGpu; // rac_bool_t
+
+  @Int32()
+  external int modelFamily; // rac_vlm_model_family_t (0 = AUTO)
+
+  external Pointer<Void> customChatTemplate; // const rac_vlm_chat_template_t*
+
+  external Pointer<Utf8> imageMarkerOverride; // const char*
 }
 
 /// VLM generation result (matches rac_vlm_result_t)
