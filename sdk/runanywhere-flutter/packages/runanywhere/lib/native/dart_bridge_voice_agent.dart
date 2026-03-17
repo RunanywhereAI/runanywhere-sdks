@@ -20,6 +20,16 @@ import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
+void _safeRacFree(Pointer<Void> ptr) {
+  if (ptr == nullptr) return;
+
+  try {
+    NativeFunctions.racFree(ptr);
+  } catch (_) {
+    // rac_free may not exist in some native builds
+  }
+}
+
 /// VoiceAgent component bridge for C++ interop.
 ///
 /// Orchestrates LLM, STT, TTS, and VAD components for voice conversations.
@@ -76,10 +86,10 @@ class DartBridgeVoiceAgent {
       // Use shared component handles (matches Swift approach)
       // This allows the voice agent to use already-loaded models from the
       // individual component bridges (STT, LLM, TTS, VAD)
-      final llmHandle = await DartBridgeLLM.shared.getHandle();
-      final sttHandle = await DartBridgeSTT.shared.getHandle();
-      final ttsHandle = await DartBridgeTTS.shared.getHandle();
-      final vadHandle = await DartBridgeVAD.shared.getHandle();
+      final llmHandle = DartBridgeLLM.shared.getHandle();
+      final sttHandle = DartBridgeSTT.shared.getHandle();
+      final ttsHandle = DartBridgeTTS.shared.getHandle();
+      final vadHandle = DartBridgeVAD.shared.getHandle();
 
       _logger.debug(
           'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
@@ -409,9 +419,7 @@ class DartBridgeVoiceAgent {
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
       calloc.free(audioPtr);
-      if (resultPtr.value != nullptr) {
-        NativeFunctions.racFree(resultPtr.value.cast<Void>());
-      }
+      _safeRacFree(resultPtr.value.cast<Void>());
       calloc.free(resultPtr);
     }
   }
@@ -435,9 +443,7 @@ class DartBridgeVoiceAgent {
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';
     } finally {
       calloc.free(promptPtr);
-      if (resultPtr.value != nullptr) {
-        NativeFunctions.racFree(resultPtr.value.cast<Void>());
-      }
+      _safeRacFree(resultPtr.value.cast<Void>());
       calloc.free(resultPtr);
     }
   }
@@ -471,13 +477,7 @@ class DartBridgeVoiceAgent {
     } finally {
       calloc.free(textPtr);
       // Free the audio data allocated by C++
-      if (audioPtr.value != nullptr) {
-        try {
-          NativeFunctions.racFree(audioPtr.value);
-        } catch (_) {
-          // `rac_free` may not exist in some native builds.
-        }
-      }
+      _safeRacFree(audioPtr.value);
       calloc.free(audioPtr);
       calloc.free(audioSizePtr);
     }
