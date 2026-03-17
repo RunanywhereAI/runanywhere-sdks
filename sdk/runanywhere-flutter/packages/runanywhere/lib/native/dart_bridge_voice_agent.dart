@@ -20,9 +20,6 @@ import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
-/// Voice agent handle type (opaque pointer to rac_voice_agent struct).
-typedef RacVoiceAgentHandle = Pointer<Void>;
-
 /// VoiceAgent component bridge for C++ interop.
 ///
 /// Orchestrates LLM, STT, TTS, and VAD components for voice conversations.
@@ -45,7 +42,8 @@ class DartBridgeVoiceAgent {
 
   // MARK: - State
 
-  RacVoiceAgentHandle? _handle;
+  RacHandle? _handle;
+  Future<RacHandle>? _initFuture;
   final _logger = SDKLogger('DartBridge.VoiceAgent');
 
   /// Event stream controller
@@ -60,10 +58,19 @@ class DartBridgeVoiceAgent {
   ///
   /// Requires LLM, STT, TTS, and VAD components to be available.
   /// Uses shared component handles (matches Swift CppBridge+VoiceAgent.swift).
-  Future<RacVoiceAgentHandle> getHandle() async {
+  Future<RacHandle> getHandle() async {
     if (_handle != null) {
       return _handle!;
     }
+
+    final initFuture = _initFuture;
+    if (initFuture != null) {
+      await initFuture;
+      return _handle!;
+    }
+
+    final completer = Completer<RacHandle>();
+    _initFuture = completer.future;
 
     // Use shared component handles (matches Swift approach)
     // This allows the voice agent to use already-loaded models from the
@@ -77,7 +84,7 @@ class DartBridgeVoiceAgent {
         'Creating voice agent with shared handles: LLM=$llmHandle, STT=$sttHandle, TTS=$ttsHandle, VAD=$vadHandle');
 
     try {
-      final handlePtr = calloc<RacVoiceAgentHandle>();
+      final handlePtr = calloc<RacHandle>();
       try {
         final result = NativeFunctions.voiceAgentCreate(
             llmHandle, sttHandle, ttsHandle, vadHandle, handlePtr);
@@ -90,12 +97,18 @@ class DartBridgeVoiceAgent {
 
         _handle = handlePtr.value;
         _logger.info('Voice agent created with shared component handles');
+        completer.complete(_handle!);
+        _initFuture = null;
         return _handle!;
       } finally {
         calloc.free(handlePtr);
       }
-    } catch (e) {
+    } catch (e, st) {
       _logger.error('Failed to create voice agent handle: $e');
+      if (!completer.isCompleted) {
+        completer.completeError(e, st);
+      }
+      _initFuture = null;
       rethrow;
     }
   }
@@ -300,7 +313,7 @@ class DartBridgeVoiceAgent {
   /// Static helper for processing voice turn in an isolate.
   /// The C++ API expects raw audio bytes (PCM16), not float samples.
   static Future<VoiceTurnResult> _processVoiceTurnInIsolate(
-    RacVoiceAgentHandle handle,
+    RacHandle handle,
     Uint8List audioData,
   ) async {
     // Allocate native memory for audio data (raw PCM16 bytes)
@@ -311,16 +324,8 @@ class DartBridgeVoiceAgent {
       // Efficient bulk copy of audio bytes
       audioPtr.asTypedList(audioData.length).setAll(0, audioData);
 
-      final lib = PlatformLoader.loadCommons();
-      final processFn = lib.lookupFunction<
-              Int32 Function(RacVoiceAgentHandle, Pointer<Void>, IntPtr,
-                  Pointer<RacVoiceAgentResultStruct>),
-              int Function(RacVoiceAgentHandle, Pointer<Void>, int,
-                  Pointer<RacVoiceAgentResultStruct>)>(
-          'rac_voice_agent_process_voice_turn');
-
-      final status =
-          processFn(handle, audioPtr.cast<Void>(), audioData.length, resultPtr);
+      final status = _processVoiceTurnFn(
+          handle, audioPtr.cast<Void>(), audioData.length, resultPtr);
 
       if (status != RAC_SUCCESS) {
         throw StateError(
@@ -329,20 +334,14 @@ class DartBridgeVoiceAgent {
       }
 
       // Parse result while still in isolate (before freeing memory)
-      return _parseVoiceTurnResultStatic(resultPtr.ref, lib);
+      return _parseVoiceTurnResultStatic(resultPtr.ref, _voiceAgentLib);
     } finally {
       // Free audio data
       calloc.free(audioPtr);
 
       // Free result struct - the C++ side allocates strings/audio that need freeing
-      final lib = PlatformLoader.loadCommons();
       try {
-        final freeFn = lib.lookupFunction<
-            Void Function(Pointer<RacVoiceAgentResultStruct>),
-            void Function(Pointer<RacVoiceAgentResultStruct>)>(
-          'rac_voice_agent_result_free',
-        );
-        freeFn(resultPtr);
+        _voiceAgentResultFreeFn?.call(resultPtr);
       } catch (e) {
         // Function may not exist, just free the struct
       }
@@ -600,3 +599,34 @@ final class RacVoiceAgentResultStruct extends Struct {
   @IntPtr()
   external int synthesizedAudioSize; // size_t (size in bytes)
 }
+
+// MARK: - Isolate-scoped FFI caches
+
+// These are intentionally top-level statics so each isolate initializes them
+// once on first use. This keeps symbol lookups out of hot paths while preserving
+// the existing isolate execution model.
+final DynamicLibrary _voiceAgentLib = PlatformLoader.loadCommons();
+
+final int Function(
+  RacHandle,
+  Pointer<Void>,
+  int,
+  Pointer<RacVoiceAgentResultStruct>,
+) _processVoiceTurnFn = _voiceAgentLib.lookupFunction<
+    Int32 Function(RacHandle, Pointer<Void>, IntPtr,
+        Pointer<RacVoiceAgentResultStruct>),
+    int Function(RacHandle, Pointer<Void>, int,
+        Pointer<RacVoiceAgentResultStruct>)>('rac_voice_agent_process_voice_turn');
+
+final void Function(Pointer<RacVoiceAgentResultStruct>)?
+    _voiceAgentResultFreeFn = (() {
+  try {
+    return _voiceAgentLib.lookupFunction<
+        Void Function(Pointer<RacVoiceAgentResultStruct>),
+        void Function(Pointer<RacVoiceAgentResultStruct>)>(
+      'rac_voice_agent_result_free',
+    );
+  } catch (_) {
+    return null;
+  }
+})();
