@@ -686,6 +686,8 @@ class RunAnywhere {
       logger.info(
           'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
       return result.text;
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
@@ -949,6 +951,8 @@ class RunAnywhere {
         sampleRate: result.sampleRate,
         durationMs: result.durationMs,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track synthesis failure
       TelemetryService.shared.trackError(
@@ -1932,12 +1936,17 @@ class RunAnywhere {
     final allTokens = <String>[];
 
     // Start streaming generation via DartBridgeLLM
-    final tokenStream = DartBridge.llm.generateStream(
-      prompt,
-      maxTokens: opts.maxTokens,
-      temperature: opts.temperature,
-      systemPrompt: effectiveSystemPrompt,
-    );
+    late final Stream<String> tokenStream;
+    try {
+      tokenStream = DartBridge.llm.generateStream(
+        prompt,
+        maxTokens: opts.maxTokens,
+        temperature: opts.temperature,
+        systemPrompt: effectiveSystemPrompt,
+      );
+    } on SDKError {
+      rethrow;
+    }
 
     // Forward tokens and collect them, track subscription in bridge for cancellation
     DartBridge.llm.setActiveStreamSubscription(
