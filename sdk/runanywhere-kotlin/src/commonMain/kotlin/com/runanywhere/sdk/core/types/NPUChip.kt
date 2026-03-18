@@ -27,9 +27,10 @@ enum class NPUChip(
      * Build a HuggingFace download URL for this chip.
      * @param modelSlug Model slug (e.g. "qwen3-4b") → produces
      *   "qwen3-4b-genie-w4a16-8elite-gen5.tar.gz"
+     * @param quant Quantization format (e.g. "w4a16", "w8a16"). Defaults to "w4a16".
      */
-    fun downloadUrl(modelSlug: String): String =
-        "${BASE_URL}${modelSlug}-genie-w4a16-${npuSuffix}.tar.gz"
+    fun downloadUrl(modelSlug: String, quant: String = "w4a16"): String =
+        "${BASE_URL}${modelSlug}-genie-${quant}-${npuSuffix}.tar.gz"
 
     companion object {
         /** Base URL for NPU model downloads on HuggingFace. */

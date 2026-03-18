@@ -256,11 +256,16 @@ async function registerModulesAndModels(): Promise<void> {
         name: string;
         mem: number;
         chips: string[];
+        quant?: string;
       }> = [
         // Qwen3 4B — Gen 5 only
         { slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2_800_000_000, chips: ['8elite-gen5'] },
         // Llama 3.2 1B Instruct — both chips
-        { slug: 'llama-v3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1_200_000_000, chips: ['8elite', '8elite-gen5'] },
+        { slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1_200_000_000, chips: ['8elite', '8elite-gen5'] },
+        // SEA-LION v3.5 8B Instruct — both chips
+        { slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4_800_000_000, chips: ['8elite', '8elite-gen5'] },
+        // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
+        { slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4_200_000_000, chips: ['8elite'], quant: 'w8a16' },
       ];
 
       const registrations = genieModels
@@ -269,7 +274,7 @@ async function registerModulesAndModels(): Promise<void> {
           RunAnywhere.registerModel({
             id: `${m.slug}-npu-${chip.identifier}`,
             name: `${m.name} (NPU - ${chip.displayName})`,
-            url: getNPUDownloadUrl(chip, m.slug),
+            url: getNPUDownloadUrl(chip, m.slug, m.quant),
             framework: LLMFramework.Genie,
             memoryRequirement: m.mem,
           }),

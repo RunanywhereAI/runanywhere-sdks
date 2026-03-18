@@ -215,17 +215,20 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         // Models with per-chip availability
         const genieModels = [
           // Qwen3 4B — Gen 5 only
-          (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, chips: {NPUChip.snapdragon8EliteGen5}),
+          (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8EliteGen5}),
           // Llama 3.2 1B Instruct — both chips
-          // TODO: Remove snapdragon7sGen3Test before merging
-          (slug: 'llama-v3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5, NPUChip.snapdragon7sGen3Test}),
+          (slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          // SEA-LION v3.5 8B Instruct — both chips
+          (slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
+          (slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4200000000, quant: 'w8a16', chips: {NPUChip.snapdragon8Elite}),
         ];
         for (final m in genieModels) {
           if (m.chips.contains(chip)) {
             Genie.addModel(
               id: '${m.slug}-npu-${chip.identifier}',
               name: '${m.name} (NPU - ${chip.displayName})',
-              url: chip.downloadUrl(m.slug),
+              url: chip.downloadUrl(m.slug, quant: m.quant),
               memoryRequirement: m.mem,
             );
           }

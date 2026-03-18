@@ -137,6 +137,7 @@ object ModelList {
         val name: String,
         val memoryRequirement: Long,
         val supportedChips: Set<NPUChip>,
+        val quant: String = "w4a16",
     )
 
     private val genieModelDefs = listOf(
@@ -147,10 +148,23 @@ object ModelList {
             supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE_GEN5),
         ),
         GenieModelDef(
-            slug = "llama-v3.2-1b-instruct",
+            slug = "llama3.2-1b-instruct",
             name = "Llama 3.2 1B Instruct",
             memoryRequirement = 1_200_000_000,
             supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+        ),
+        GenieModelDef(
+            slug = "sea-lion3.5-8b-instruct",
+            name = "SEA-LION v3.5 8B Instruct",
+            memoryRequirement = 4_800_000_000,
+            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+        ),
+        GenieModelDef(
+            slug = "qwen2.5-7b-instruct",
+            name = "Qwen 2.5 7B Instruct",
+            memoryRequirement = 4_200_000_000,
+            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE),
+            quant = "w8a16",
         ),
     )
 
@@ -162,7 +176,7 @@ object ModelList {
                 AppModel(
                     id = "${def.slug}-npu-${chip.identifier}",
                     name = "${def.name} (NPU - ${chip.displayName})",
-                    url = chip.downloadUrl(def.slug),
+                    url = chip.downloadUrl(def.slug, def.quant),
                     framework = InferenceFramework.GENIE,
                     category = ModelCategory.LANGUAGE,
                     memoryRequirement = def.memoryRequirement,

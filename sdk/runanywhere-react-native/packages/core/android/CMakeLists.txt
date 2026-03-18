@@ -27,8 +27,8 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size
 # Path to pre-built native libraries (downloaded from runanywhere-sdks)
 set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 
-# Path to RAC headers (downloaded with native libraries)
-set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/include)
+# Path to RAC headers (downloaded with native libraries into jniLibs)
+set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/include)
 
 # =============================================================================
 # RACommons - Core SDK functionality (rac_* API)

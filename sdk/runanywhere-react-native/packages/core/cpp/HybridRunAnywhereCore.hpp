@@ -292,6 +292,7 @@ public:
 private:
   // Thread safety
   std::mutex initMutex_;
+  std::mutex errorMutex_;
 
   // State tracking
   std::string lastError_;

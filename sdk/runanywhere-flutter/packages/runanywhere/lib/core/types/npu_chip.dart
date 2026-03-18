@@ -29,8 +29,9 @@ enum NPUChip {
   /// Build a HuggingFace download URL for this chip.
   /// [modelSlug] is the model slug (e.g. "qwen3-4b") → produces
   ///   "qwen3-4b-genie-w4a16-8elite-gen5.tar.gz"
-  String downloadUrl(String modelSlug) =>
-      '$baseUrl$modelSlug-genie-w4a16-$npuSuffix.tar.gz';
+  /// [quant] is the quantization format (e.g. "w4a16", "w8a16"). Defaults to "w4a16".
+  String downloadUrl(String modelSlug, {String quant = 'w4a16'}) =>
+      '$baseUrl$modelSlug-genie-$quant-$npuSuffix.tar.gz';
 
   /// Match an NPU chip from a SoC model string (e.g. "SM8750").
   /// Returns null if the SoC is not a supported NPU chipset.

@@ -46,9 +46,10 @@ export const NPU_CHIPS: readonly NPUChip[] = [
  * @param chip - The detected NPU chip
  * @param modelSlug - Model slug (e.g. "qwen3-4b") → produces
  *   "qwen3-4b-genie-w4a16-8elite-gen5.tar.gz"
+ * @param quant - Quantization format (e.g. "w4a16", "w8a16"). Defaults to "w4a16".
  */
-export function getNPUDownloadUrl(chip: NPUChip, modelSlug: string): string {
-  return `${NPU_BASE_URL}${modelSlug}-genie-w4a16-${chip.npuSuffix}.tar.gz`;
+export function getNPUDownloadUrl(chip: NPUChip, modelSlug: string, quant = 'w4a16'): string {
+  return `${NPU_BASE_URL}${modelSlug}-genie-${quant}-${chip.npuSuffix}.tar.gz`;
 }
 
 /**
