@@ -5,15 +5,31 @@
 
 #include "rac_vlm_metalrt.h"
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "metalrt_c_api.h"
 
 #include "rac/core/rac_logger.h"
 
 static const char* LOG_CAT = "VLM.MetalRT";
+
+// Expand 3-byte RGB to 4-byte RGBA (alpha=0xFF) for MetalRT's pixel API.
+static std::vector<uint8_t> rgb_to_rgba(const uint8_t* rgb, uint32_t w, uint32_t h) {
+    size_t n_pixels = (size_t)w * h;
+    std::vector<uint8_t> rgba(n_pixels * 4);
+    for (size_t i = 0; i < n_pixels; i++) {
+        rgba[i * 4 + 0] = rgb[i * 3 + 0];
+        rgba[i * 4 + 1] = rgb[i * 3 + 1];
+        rgba[i * 4 + 2] = rgb[i * 3 + 2];
+        rgba[i * 4 + 3] = 0xFF;
+    }
+    return rgba;
+}
 
 struct rac_vlm_metalrt_impl {
     void* handle;  // metalrt_vision_create() handle
@@ -65,34 +81,29 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
     if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
 
-    // MetalRT needs a file path — handle different image formats
-    const char* image_path = nullptr;
-    char tmp_path[256] = {};
-
-    if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH) {
-        image_path = image->file_path;
-    } else {
-        // For non-file formats, write to a temp file
-        // This is a simplification — production code would handle RGB/base64 properly
-        RAC_LOG_ERROR(LOG_CAT, "MetalRT VLM only supports FILE_PATH image format");
-        return RAC_ERROR_VALIDATION_FAILED;
-    }
-
-    if (!image_path || image_path[0] == '\0') {
-        return RAC_ERROR_NULL_POINTER;
-    }
-
     struct MetalRTVisionOptions vopts = {};
     vopts.max_tokens = options ? options->max_tokens : 256;
     vopts.temperature = options ? options->temperature : 0.0f;
     vopts.top_k = 40;
     vopts.think = false;
 
-    struct MetalRTVisionResult result = metalrt_vision_analyze(impl->handle, image_path, prompt, &vopts);
+    struct MetalRTVisionResult result = {};
+
+    if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
+        result = metalrt_vision_analyze(impl->handle, image->file_path, prompt, &vopts);
+    } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
+        auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
+        result = metalrt_vision_analyze_pixels(impl->handle, rgba.data(),
+                                                (int)image->width, (int)image->height,
+                                                prompt, &vopts);
+    } else {
+        RAC_LOG_ERROR(LOG_CAT, "Unsupported image format: %d", image->format);
+        return RAC_ERROR_VALIDATION_FAILED;
+    }
 
     out_result->text = result.text ? strdup(result.text) : nullptr;
     out_result->prompt_tokens = result.prompt_tokens;
-    out_result->image_tokens = 0;  // MetalRT doesn't separate image token count
+    out_result->image_tokens = 0;
     out_result->completion_tokens = result.generated_tokens;
     out_result->total_tokens = result.prompt_tokens + result.generated_tokens;
     out_result->time_to_first_token_ms = static_cast<int64_t>(result.prefill_ms);
@@ -125,11 +136,6 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
     if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
 
-    if (image->format != RAC_VLM_IMAGE_FORMAT_FILE_PATH || !image->file_path) {
-        RAC_LOG_ERROR(LOG_CAT, "MetalRT VLM only supports FILE_PATH image format");
-        return RAC_ERROR_VALIDATION_FAILED;
-    }
-
     struct MetalRTVisionOptions vopts = {};
     vopts.max_tokens = options ? options->max_tokens : 256;
     vopts.temperature = options ? options->temperature : 0.0f;
@@ -137,8 +143,20 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
     vopts.think = false;
 
     VLMStreamCtx ctx = {callback, user_data};
-    struct MetalRTVisionResult result = metalrt_vision_analyze_stream(
-        impl->handle, image->file_path, prompt, vlm_stream_bridge, &ctx, &vopts);
+    struct MetalRTVisionResult result = {};
+
+    if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
+        result = metalrt_vision_analyze_stream(
+            impl->handle, image->file_path, prompt, vlm_stream_bridge, &ctx, &vopts);
+    } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
+        auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
+        result = metalrt_vision_analyze_pixels_stream(
+            impl->handle, rgba.data(), (int)image->width, (int)image->height,
+            prompt, vlm_stream_bridge, &ctx, &vopts);
+    } else {
+        RAC_LOG_ERROR(LOG_CAT, "Unsupported image format for streaming: %d", image->format);
+        return RAC_ERROR_VALIDATION_FAILED;
+    }
 
     metalrt_vision_free_result(result);
     return RAC_SUCCESS;

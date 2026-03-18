@@ -465,7 +465,7 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        // --- MetalRT VLM model (Qwen3-VL) ---
+        // --- MetalRT VLM models ---
 
         if let url = URL(string: "\(metalrtBase)/qwen3-vl-2b-metalrt.tar.gz") {
             RunAnywhere.registerModel(
@@ -476,6 +476,18 @@ struct RunAnywhereAIApp: App {
                 modality: .multimodal,
                 artifactType: .archive(.tarGz, structure: .nestedDirectory),
                 memoryRequirement: 1_800_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/lfm25-vl-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "lfm25-vl-metalrt",
+                name: "LFM2.5-VL 1.6B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000
             )
         }
 

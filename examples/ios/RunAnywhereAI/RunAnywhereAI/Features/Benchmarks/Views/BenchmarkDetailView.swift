@@ -213,7 +213,9 @@ private struct MetricsGrid: View {
             if let chars = metrics.charactersProcessed { items.append(("Chars", "\(chars)")) }
         case .vlm:
             if let tps = metrics.tokensPerSecond { items.append(("tok/s", String(format: "%.1f", tps))) }
-            if let ct = metrics.completionTokens { items.append(("Tokens", "\(ct)")) }
+            if let pt = metrics.promptTokens, pt > 0 { items.append(("Prompt Tok", "\(pt)")) }
+            if let ct = metrics.completionTokens { items.append(("Comp Tok", "\(ct)")) }
+            if metrics.warmupTimeMs > 0 { items.append(("Warmup", String(format: "%.0fms", metrics.warmupTimeMs))) }
         case .diffusion:
             if let gen = metrics.generationTimeMs { items.append(("Gen", String(format: "%.0fms", gen))) }
         }

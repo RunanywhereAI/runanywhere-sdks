@@ -87,6 +87,19 @@ public final class ArchiveUtility {
         logger.info("🗜️ [EXTRACTION START] tar.gz archive: \(sourceURL.lastPathComponent)")
         progressHandler?(0.0)
 
+        let attrs = try FileManager.default.attributesOfItem(atPath: sourceURL.path)
+        let compressedSize = (attrs[.size] as? Int64) ?? 0
+
+        // Large archives (>256MB) use streaming to avoid OOM on iOS devices
+        if compressedSize > 256 * 1024 * 1024 {
+            logger.info("📏 Large archive (\(formatBytes(Int(compressedSize)))), using streaming extraction")
+            try extractTarGzArchiveStreaming(from: sourceURL, to: destinationURL, progressHandler: progressHandler)
+            let totalTime = Date().timeIntervalSince(overallStart)
+            logger.info("🎉 [EXTRACTION COMPLETE] Total: \(String(format: "%.2f", totalTime))s (streaming)")
+            progressHandler?(1.0)
+            return
+        }
+
         // Step 1: Read compressed data
         let readStart = Date()
         let compressedData = try Data(contentsOf: sourceURL)
@@ -234,6 +247,264 @@ public final class ArchiveUtility {
         }
 
         return result
+    }
+
+    // MARK: - Streaming Extraction (large archives)
+
+    /// Stream-extract a tar.gz archive without holding the full decompressed data in memory.
+    /// Decompresses to a temp .tar file on disk, then extracts entries one-at-a-time.
+    /// Peak memory: ~1MB (buffers only). Safe for multi-GB archives on iOS devices.
+    private static func extractTarGzArchiveStreaming(
+        from sourceURL: URL,
+        to destinationURL: URL,
+        progressHandler: ((Double) -> Void)? = nil
+    ) throws {
+        let tempTarURL = sourceURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(UUID().uuidString + ".tar")
+        defer { try? FileManager.default.removeItem(at: tempTarURL) }
+
+        // Phase 1: Decompress .gz -> temp .tar file on disk (~40% of progress)
+        let decompressStart = Date()
+        logger.info("⚡ [STREAM] Phase 1: Decompressing gzip to temp tar file...")
+        try streamDecompressGzipToFile(from: sourceURL, to: tempTarURL) { p in
+            progressHandler?(p * 0.4)
+        }
+        let tarSize = (try? FileManager.default.attributesOfItem(atPath: tempTarURL.path)[.size] as? Int64) ?? 0
+        let dt = Date().timeIntervalSince(decompressStart)
+        logger.info("✅ [STREAM] Phase 1 done: \(formatBytes(Int(tarSize))) tar in \(String(format: "%.2f", dt))s")
+        progressHandler?(0.4)
+
+        // Phase 2: Stream-parse tar and write files to disk (~60% of progress)
+        let extractStart = Date()
+        logger.info("📦 [STREAM] Phase 2: Extracting tar entries to disk...")
+        try streamExtractTarFile(from: tempTarURL, to: destinationURL, totalSize: tarSize) { p in
+            progressHandler?(0.4 + p * 0.6)
+        }
+        let et = Date().timeIntervalSince(extractStart)
+        logger.info("✅ [STREAM] Phase 2 done in \(String(format: "%.2f", et))s")
+    }
+
+    /// Decompress a gzip file to a tar file on disk using streaming I/O.
+    /// Memory-maps the input, streams decompressed output via 256KB buffer.
+    private static func streamDecompressGzipToFile(
+        from sourceURL: URL,
+        to destURL: URL,
+        progressHandler: ((Double) -> Void)? = nil
+    ) throws {
+        let compressedData = try Data(contentsOf: sourceURL, options: .mappedIfSafe)
+        guard compressedData.count >= 10 else {
+            throw SDKError.download(.extractionFailed, "Invalid gzip data: too short")
+        }
+        guard compressedData[0] == 0x1f && compressedData[1] == 0x8b && compressedData[2] == 8 else {
+            throw SDKError.download(.extractionFailed, "Invalid gzip header")
+        }
+
+        let flags = compressedData[3]
+        var headerSize = 10
+
+        if flags & 0x04 != 0 {
+            guard compressedData.count >= headerSize + 2 else {
+                throw SDKError.download(.extractionFailed, "Invalid gzip extra field")
+            }
+            let extraLen = Int(compressedData[headerSize]) | (Int(compressedData[headerSize + 1]) << 8)
+            headerSize += 2 + extraLen
+        }
+        if flags & 0x08 != 0 {
+            while headerSize < compressedData.count && compressedData[headerSize] != 0 { headerSize += 1 }
+            headerSize += 1
+        }
+        if flags & 0x10 != 0 {
+            while headerSize < compressedData.count && compressedData[headerSize] != 0 { headerSize += 1 }
+            headerSize += 1
+        }
+        if flags & 0x02 != 0 { headerSize += 2 }
+
+        guard compressedData.count > headerSize + 8 else {
+            throw SDKError.download(.extractionFailed, "Invalid gzip structure")
+        }
+
+        let deflateRange = headerSize..<(compressedData.count - 8)
+        try decompressDeflateToFile(compressedData, range: deflateRange, outputURL: destURL, progressHandler: progressHandler)
+    }
+
+    /// Stream-decompress raw deflate data from a memory-mapped Data to an output file.
+    /// Only uses ~512KB of heap (256KB output buffer + overhead).
+    private static func decompressDeflateToFile(
+        _ data: Data,
+        range: Range<Int>,
+        outputURL: URL,
+        progressHandler: ((Double) -> Void)? = nil
+    ) throws {
+        let placeholder = UnsafeMutablePointer<UInt8>.allocate(capacity: 1)
+        defer { placeholder.deallocate() }
+        var stream = compression_stream(dst_ptr: placeholder, dst_size: 0, src_ptr: placeholder, src_size: 0, state: nil)
+        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) == COMPRESSION_STATUS_OK else {
+            throw SDKError.download(.extractionFailed, "Failed to initialize decompression stream")
+        }
+        defer { compression_stream_destroy(&stream) }
+
+        let outputChunkSize = 256 * 1024
+        let outputBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: outputChunkSize)
+        defer { outputBuffer.deallocate() }
+
+        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+        let outHandle = try FileHandle(forWritingTo: outputURL)
+        defer { try? outHandle.close() }
+
+        try data.withUnsafeBytes { rawBuffer in
+            guard let base = rawBuffer.baseAddress else {
+                throw SDKError.download(.extractionFailed, "Cannot access compressed data buffer")
+            }
+            let srcBase = base.advanced(by: range.lowerBound).assumingMemoryBound(to: UInt8.self)
+
+            stream.src_ptr = srcBase
+            stream.src_size = range.count
+
+            let totalInput = range.count
+            var status: compression_status
+            repeat {
+                stream.dst_ptr = outputBuffer
+                stream.dst_size = outputChunkSize
+
+                status = compression_stream_process(&stream, Int32(COMPRESSION_STREAM_FINALIZE.rawValue))
+
+                let bytesProduced = outputChunkSize - stream.dst_size
+                if bytesProduced > 0 {
+                    outHandle.write(Data(bytesNoCopy: outputBuffer, count: bytesProduced, deallocator: .none))
+                }
+
+                let consumed = totalInput - stream.src_size
+                progressHandler?(Double(consumed) / Double(max(totalInput, 1)))
+            } while status == COMPRESSION_STATUS_OK
+
+            guard status == COMPRESSION_STATUS_END else {
+                throw SDKError.download(.extractionFailed, "Streaming decompression failed (status \(status.rawValue))")
+            }
+        }
+    }
+
+    /// Stream-extract a tar archive from disk: reads 512-byte headers and copies file
+    /// data directly to disk. Never holds more than one file's block in memory at once.
+    private static func streamExtractTarFile(
+        from tarURL: URL,
+        to destinationURL: URL,
+        totalSize: Int64,
+        progressHandler: ((Double) -> Void)? = nil
+    ) throws {
+        let handle = try FileHandle(forReadingFrom: tarURL)
+        defer { try? handle.close() }
+
+        try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+
+        var extractedFiles = 0
+        var extractedDirs = 0
+        var totalBytesWritten: Int64 = 0
+        var longName: String?
+
+        while true {
+            guard let headerData = try? handle.read(upToCount: 512), headerData.count == 512 else { break }
+            if headerData.allSatisfy({ $0 == 0 }) { break }
+
+            let typeFlag = headerData[156]
+
+            let sizeStr = String(
+                bytes: headerData[124..<136].prefix(while: { $0 != 0 && $0 != 0x20 }),
+                encoding: .ascii
+            ) ?? "0"
+            let fileSize = Int64(sizeStr.trimmingCharacters(in: .whitespaces), radix: 8) ?? 0
+            let paddedSize = (fileSize + 511) & ~511
+
+            // Handle GNU long name extension (type 'L')
+            if typeFlag == UInt8(ascii: "L") {
+                if fileSize > 0, let nameData = try? handle.read(upToCount: Int(paddedSize)), !nameData.isEmpty {
+                    longName = String(bytes: nameData.prefix(Int(fileSize)).prefix(while: { $0 != 0 }), encoding: .utf8)
+                }
+                continue
+            }
+
+            // Parse filename
+            let fullName: String
+            if let ln = longName {
+                fullName = ln
+                longName = nil
+            } else {
+                let nameBytes = headerData[0..<100]
+                let name = String(bytes: nameBytes.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
+                let prefixBytes = headerData[345..<500]
+                let prefix = String(bytes: prefixBytes.prefix(while: { $0 != 0 }), encoding: .utf8) ?? ""
+                fullName = prefix.isEmpty ? name : (prefix + "/" + name)
+            }
+
+            guard !fullName.isEmpty else {
+                if fileSize > 0 { handle.seek(toFileOffset: handle.offsetInFile + UInt64(paddedSize)) }
+                continue
+            }
+
+            // Skip macOS resource fork entries
+            if fullName.contains("/._") || fullName.hasPrefix("._") {
+                if fileSize > 0 { handle.seek(toFileOffset: handle.offsetInFile + UInt64(paddedSize)) }
+                continue
+            }
+
+            // Skip PAX extended headers
+            if typeFlag == UInt8(ascii: "x") || typeFlag == UInt8(ascii: "g") {
+                if fileSize > 0 { handle.seek(toFileOffset: handle.offsetInFile + UInt64(paddedSize)) }
+                continue
+            }
+
+            let fullPath = destinationURL.appendingPathComponent(fullName)
+
+            switch typeFlag {
+            case 0x35, UInt8(ascii: "5"):
+                try FileManager.default.createDirectory(at: fullPath, withIntermediateDirectories: true)
+                extractedDirs += 1
+
+            case 0, 0x30, UInt8(ascii: "0"):
+                try FileManager.default.createDirectory(
+                    at: fullPath.deletingLastPathComponent(), withIntermediateDirectories: true
+                )
+                FileManager.default.createFile(atPath: fullPath.path, contents: nil)
+                let outHandle = try FileHandle(forWritingTo: fullPath)
+
+                var remaining = fileSize
+                let copyChunk = 1024 * 1024 // 1MB
+                while remaining > 0 {
+                    let toRead = min(Int(remaining), copyChunk)
+                    guard let data = try? handle.read(upToCount: toRead), !data.isEmpty else { break }
+                    outHandle.write(data)
+                    remaining -= Int64(data.count)
+                }
+                try? outHandle.close()
+
+                let padding = Int(paddedSize - fileSize)
+                if padding > 0 { handle.seek(toFileOffset: handle.offsetInFile + UInt64(padding)) }
+
+                extractedFiles += 1
+                totalBytesWritten += fileSize
+
+            case 0x32, UInt8(ascii: "2"):
+                let linkName = String(
+                    bytes: headerData[157..<257].prefix(while: { $0 != 0 }),
+                    encoding: .utf8
+                ) ?? ""
+                if !linkName.isEmpty {
+                    try FileManager.default.createDirectory(
+                        at: fullPath.deletingLastPathComponent(), withIntermediateDirectories: true
+                    )
+                    try? FileManager.default.createSymbolicLink(atPath: fullPath.path, withDestinationPath: linkName)
+                }
+
+            default:
+                if fileSize > 0 { handle.seek(toFileOffset: handle.offsetInFile + UInt64(paddedSize)) }
+            }
+
+            if totalSize > 0 {
+                progressHandler?(min(Double(handle.offsetInFile) / Double(totalSize), 1.0))
+            }
+        }
+
+        logger.info("   ✅ [STREAM EXTRACT] Wrote \(extractedFiles) files (\(formatBytes(Int(totalBytesWritten)))) and \(extractedDirs) dirs")
     }
 
     /// Extract a tar.xz archive to a destination directory

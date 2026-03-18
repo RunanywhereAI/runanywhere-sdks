@@ -248,7 +248,7 @@ private struct CategoryScenariosRow: View {
         case .tts:
             return "Short text, Medium text — measures audio duration, char throughput"
         case .vlm:
-            return "Solid color, Gradient image (224×224) — measures tok/s, completion tokens"
+            return "Gradient image (224×224) — measures tok/s, completion tokens"
         case .diffusion:
             return "Simple prompt, 10 steps, seed 42 — measures generation time"
         }
