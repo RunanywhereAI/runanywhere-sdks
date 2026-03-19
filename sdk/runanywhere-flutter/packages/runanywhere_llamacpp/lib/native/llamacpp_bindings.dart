@@ -95,9 +95,12 @@ class LlamaCppBindings {
       } catch (_) {
         // Ignore - continue trying to load backend
       }
-      // NOTE: rac_backend_llamacpp.dll has a known crash on Windows.
-      // Return commons for now so checkAvailability() returns false gracefully.
-      throw ArgumentError('LlamaCpp backend not available on Windows');
+      // Load rac_backend_llamacpp.dll (bundled alongside the app executable)
+      try {
+        return DynamicLibrary.open('rac_backend_llamacpp.dll');
+      } catch (e) {
+        throw ArgumentError('Could not load rac_backend_llamacpp.dll on Windows: $e');
+      }
     }
 
     // On iOS/macOS/Linux, everything is statically linked or in rac_commons.
