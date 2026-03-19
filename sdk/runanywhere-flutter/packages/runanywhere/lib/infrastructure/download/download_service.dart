@@ -101,6 +101,17 @@ class ModelDownloadService {
   final _logger = SDKLogger('ModelDownloadService');
   final Map<String, http.Client> _activeDownloads = {};
 
+  /// Optional factory for creating HTTP clients.
+  /// Set this to inject a proxy-aware client.
+  http.Client Function()? clientFactory;
+
+  http.Client _createClient() {
+    if (clientFactory != null) {
+      return clientFactory!.call();
+    }
+    return http.Client();
+  }
+
   /// Download a model by ID
   ///
   /// Returns a stream of download progress updates.
@@ -136,7 +147,7 @@ class ModelDownloadService {
       // Handle multi-file models (e.g. embedding model + vocab.txt)
       if (model.artifactType is MultiFileArtifact) {
         final multiFile = model.artifactType as MultiFileArtifact;
-        final client = http.Client();
+        final client = _createClient();
         _activeDownloads[modelId] = client;
 
         try {
@@ -211,7 +222,7 @@ class ModelDownloadService {
       final downloadPath = p.join(destDir.path, fileName);
 
       // Create HTTP client
-      final client = http.Client();
+      final client = _createClient();
       _activeDownloads[modelId] = client;
 
       try {

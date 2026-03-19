@@ -28,7 +28,7 @@ export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_storage.dart';
 export 'native/dart_bridge_rag.dart'
-    show RAGConfiguration, RAGQueryOptions, RAGSearchResult, RAGResult;
+    show RAGBridgeSearchResult, RAGBridgeResult;
 export 'public/runanywhere.dart';
 export 'public/runanywhere_tool_calling.dart';
 export 'public/types/tool_calling_types.dart';

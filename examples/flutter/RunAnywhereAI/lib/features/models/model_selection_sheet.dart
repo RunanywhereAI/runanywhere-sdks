@@ -304,7 +304,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.textPrimary(context)
-                            .withValues(alpha: 0.1),
+                            .withOpacity(0.1),
                         borderRadius:
                             BorderRadius.circular(AppSpacing.cornerRadiusSmall),
                       ),
@@ -673,7 +673,7 @@ class _FlatModelRowState extends State<_FlatModelRow> {
                           vertical: AppSpacing.xxSmall,
                         ),
                         decoration: BoxDecoration(
-                          color: _frameworkColor.withValues(alpha: 0.15),
+                          color: _frameworkColor.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(
                               AppSpacing.cornerRadiusSmall),
                         ),

@@ -465,7 +465,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
               borderRadius:
                   BorderRadius.circular(AppSpacing.cornerRadiusRegular),
               border: Border.all(
-                color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                color: AppColors.primaryBlue.withOpacity(0.3),
               ),
             ),
             child: SelectableText(
@@ -619,11 +619,11 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
             width: double.infinity,
             padding: const EdgeInsets.all(AppSpacing.mediumLarge),
             decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withValues(alpha: 0.1),
+              color: AppColors.primaryBlue.withOpacity(0.1),
               borderRadius:
                   BorderRadius.circular(AppSpacing.cornerRadiusRegular),
               border: Border.all(
-                color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                color: AppColors.primaryBlue.withOpacity(0.3),
               ),
             ),
             child: SelectableText(

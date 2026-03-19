@@ -7,6 +7,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/services/proxy_config_service.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +41,13 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _isApiKeyConfigured = false;
   bool _isBaseURLConfigured = false;
 
+  // Proxy Configuration
+  bool _proxyEnabled = false;
+  String _proxyHost = '';
+  int _proxyPort = 8080;
+  late final TextEditingController _proxyHostController;
+  late final TextEditingController _proxyPortController;
+
   // Generation Settings
   double _temperature = 0.7;
   int _maxTokens = 1000;
@@ -53,15 +61,26 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   void initState() {
     super.initState();
     _systemPromptController = TextEditingController();
+    _proxyHostController = TextEditingController();
+    _proxyPortController = TextEditingController();
+    // ProxyConfigService is already loaded at app startup — init controllers now
+    _proxyEnabled = ProxyConfigService.shared.enabled;
+    _proxyHost = ProxyConfigService.shared.host;
+    _proxyPort = ProxyConfigService.shared.port;
+    _proxyHostController.text = _proxyHost;
+    _proxyPortController.text = _proxyPort.toString();
     unawaited(_loadSettings());
     unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
     unawaited(_loadStorageData());
+    // Proxy state is already initialized synchronously above from ProxyConfigService.shared
   }
 
   @override
   void dispose() {
     _systemPromptController.dispose();
+    _proxyHostController.dispose();
+    _proxyPortController.dispose();
     super.dispose();
   }
 
@@ -256,11 +275,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.mediumLarge),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                    color: AppColors.primaryOrange.withOpacity(0.1),
                     borderRadius:
                         BorderRadius.circular(AppSpacing.cornerRadiusRegular),
                     border: Border.all(
-                        color: AppColors.primaryOrange.withValues(alpha: 0.3)),
+                        color: AppColors.primaryOrange.withOpacity(0.3)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,6 +321,40 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         ),
       ),
     ));
+  }
+
+  /// Save proxy settings and apply immediately
+  Future<void> _saveProxySettings() async {
+    // _proxyHost/_proxyPort are kept in sync by onChanged callbacks
+    // Also sync from controllers as fallback
+    final ctrlHost = _proxyHostController.text.trim();
+    final ctrlPort = int.tryParse(_proxyPortController.text.trim());
+
+    if (ctrlHost.isNotEmpty) {
+      _proxyHost = ctrlHost;
+    }
+    if (ctrlPort != null) {
+      _proxyPort = ctrlPort;
+    }
+
+    await ProxyConfigService.shared.save(
+      enabled: _proxyEnabled,
+      host: _proxyHost,
+      port: _proxyPort,
+    );
+
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _proxyEnabled && _proxyHost.isNotEmpty
+                ? 'Proxy enabled: $_proxyHost:$_proxyPort'
+                : 'Proxy settings saved (disabled)',
+          ),
+        ),
+      );
+    }
   }
 
   /// Load storage data using RunAnywhere SDK
@@ -433,6 +486,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           // API Configuration Section
           _buildSectionHeader('API Configuration (Testing)'),
           _buildApiConfigurationCard(),
+          const SizedBox(height: AppSpacing.large),
+
+          // Proxy Configuration Section
+          _buildSectionHeader('Proxy Configuration'),
+          _buildProxyConfigCard(),
           const SizedBox(height: AppSpacing.large),
 
           // Generation Settings Section
@@ -783,6 +841,81 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     );
   }
 
+  Widget _buildProxyConfigCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Enable Proxy'),
+              subtitle: Text(
+                _proxyEnabled && _proxyHost.isNotEmpty
+                    ? '$_proxyHost:$_proxyPort'
+                    : 'Not configured',
+                style: AppTypography.caption(context).copyWith(
+                  color: _proxyEnabled && _proxyHost.isNotEmpty
+                      ? AppColors.statusGreen
+                      : AppColors.textSecondary(context),
+                ),
+              ),
+              value: _proxyEnabled,
+              onChanged: (value) {
+                setState(() => _proxyEnabled = value);
+              },
+            ),
+            if (_proxyEnabled) ...[
+              const Divider(),
+              const SizedBox(height: AppSpacing.smallMedium),
+            ],
+            const SizedBox(height: AppSpacing.smallMedium),
+            Text('Proxy Host', style: AppTypography.caption(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            TextField(
+              controller: _proxyHostController,
+              keyboardType: TextInputType.url,
+              enabled: _proxyEnabled,
+              decoration: const InputDecoration(
+                hintText: '127.0.0.1',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) {
+                _proxyHost = v.trim();
+              },
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+            Text('Proxy Port', style: AppTypography.caption(context)),
+            const SizedBox(height: AppSpacing.xSmall),
+            TextField(
+              controller: _proxyPortController,
+              keyboardType: TextInputType.number,
+              enabled: _proxyEnabled,
+              decoration: const InputDecoration(
+                hintText: '8080',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (v) => _proxyPort = int.tryParse(v) ?? _proxyPort,
+            ),
+            const SizedBox(height: AppSpacing.mediumLarge),
+            ElevatedButton(
+              onPressed: _saveProxySettings,
+              child: const Text('Save Proxy Settings'),
+            ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            Text(
+              'Routes all network traffic (downloads and API calls) through the specified proxy.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStorageOverviewCard() {
     return Card(
       child: Padding(
@@ -858,7 +991,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                       Icons.view_in_ar_outlined,
                       size: 48,
                       color: AppColors.textSecondary(context)
-                          .withValues(alpha: 0.5),
+                          .withOpacity(0.5),
                     ),
                     const SizedBox(height: AppSpacing.mediumLarge),
                     Text(
@@ -916,9 +1049,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.mediumLarge),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
+          color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Row(
           children: [

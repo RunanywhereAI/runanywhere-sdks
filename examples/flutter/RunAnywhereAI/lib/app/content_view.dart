@@ -42,7 +42,7 @@ class _ContentViewState extends State<ContentView> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedTab,
-        indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+        indicatorColor: AppColors.primaryBlue.withOpacity(0.2),
         onDestinationSelected: (index) {
           setState(() {
             _selectedTab = index;

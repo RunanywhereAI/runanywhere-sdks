@@ -450,11 +450,11 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         padding: const EdgeInsets.all(AppSpacing.large),
         decoration: BoxDecoration(
           color: isLoaded
-              ? color.withValues(alpha: 0.1)
+              ? color.withOpacity(0.1)
               : AppColors.backgroundGray5(context),
           borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
           border: Border.all(
-            color: isLoaded ? color.withValues(alpha: 0.3) : Colors.transparent,
+            color: isLoaded ? color.withOpacity(0.3) : Colors.transparent,
           ),
         ),
         child: Row(
@@ -463,7 +463,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
+                color: color.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 20),
@@ -658,7 +658,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             Icon(
               Icons.mic_none,
               size: 48,
-              color: AppColors.textSecondary(context).withValues(alpha: 0.3),
+              color: AppColors.textSecondary(context).withOpacity(0.3),
             ),
             const SizedBox(height: AppSpacing.mediumLarge),
             Text(
@@ -717,7 +717,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
             decoration: BoxDecoration(
               color: isUser
                   ? AppColors.backgroundGray5(context)
-                  : AppColors.primaryBlue.withValues(alpha: 0.08),
+                  : AppColors.primaryBlue.withOpacity(0.08),
               borderRadius:
                   BorderRadius.circular(AppSpacing.cornerRadiusBubble),
             ),
@@ -746,7 +746,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               vertical: 4,
             ),
             decoration: BoxDecoration(
-              color: AppColors.statusRed.withValues(alpha: 0.1),
+              color: AppColors.statusRed.withOpacity(0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Row(
@@ -788,7 +788,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
                   decoration: BoxDecoration(
                     color: isActive
                         ? AppColors.statusGreen
-                        : AppColors.statusGray.withValues(alpha: 0.3),
+                        : AppColors.statusGray.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 );
@@ -849,7 +849,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
                         color: _getMicButtonColor(),
                         boxShadow: [
                           BoxShadow(
-                            color: _getMicButtonColor().withValues(alpha: 0.3),
+                            color: _getMicButtonColor().withOpacity(0.3),
                             blurRadius: _isListening ? 20 : 10,
                             spreadRadius: _isListening ? 5 : 0,
                           ),
@@ -878,7 +878,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
           Text(
             _getInstructionText(),
             style: AppTypography.caption2(context).copyWith(
-              color: AppColors.textSecondary(context).withValues(alpha: 0.7),
+              color: AppColors.textSecondary(context).withOpacity(0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -969,7 +969,7 @@ class _ModelBadge extends StatelessWidget {
         vertical: AppSpacing.xSmall,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(

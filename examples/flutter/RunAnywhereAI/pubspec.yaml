@@ -57,6 +57,8 @@ dev_dependencies:
 dependency_overrides:
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  # Downgrade record to be compatible with Dart 3.3.4 (Flutter 3.19.6)
+  record: ^5.1.2
 
 flutter:
   uses-material-design: true

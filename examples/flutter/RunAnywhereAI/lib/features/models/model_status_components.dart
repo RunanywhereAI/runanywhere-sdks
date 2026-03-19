@@ -195,7 +195,7 @@ class ModelRequiredOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.backgroundPrimary(context).withValues(alpha: 0.95),
+      color: AppColors.backgroundPrimary(context).withOpacity(0.95),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -203,7 +203,7 @@ class ModelRequiredOverlay extends StatelessWidget {
             Icon(
               _modalityIcon,
               size: 64,
-              color: AppColors.textSecondary(context).withValues(alpha: 0.5),
+              color: AppColors.textSecondary(context).withOpacity(0.5),
             ),
             const SizedBox(height: AppSpacing.xLarge),
             Text(
@@ -323,7 +323,7 @@ class AudioLevelIndicator extends StatelessWidget {
           decoration: BoxDecoration(
             color: isActive
                 ? AppColors.statusGreen
-                : AppColors.statusGray.withValues(alpha: 0.3),
+                : AppColors.statusGray.withOpacity(0.3),
             borderRadius: BorderRadius.circular(2),
           ),
         );
@@ -357,7 +357,7 @@ class RecordingStatusBadge extends StatelessWidget {
     final Widget leading;
 
     if (isRecording) {
-      bgColor = AppColors.primaryRed.withValues(alpha: 0.1);
+      bgColor = AppColors.primaryRed.withOpacity(0.1);
       textColor = AppColors.primaryRed;
       text = 'RECORDING';
       leading = Container(
@@ -369,7 +369,7 @@ class RecordingStatusBadge extends StatelessWidget {
         ),
       );
     } else {
-      bgColor = AppColors.primaryOrange.withValues(alpha: 0.1);
+      bgColor = AppColors.primaryOrange.withOpacity(0.1);
       textColor = AppColors.primaryOrange;
       text = 'TRANSCRIBING';
       leading = SizedBox(
@@ -488,7 +488,7 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: AppColors.primaryBlue.withValues(alpha: 0.7),
+                          color: AppColors.primaryBlue.withOpacity(0.7),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -540,8 +540,8 @@ class CompactModelIndicator extends StatelessWidget {
         ),
         decoration: BoxDecoration(
           color: framework != null
-              ? AppColors.primaryBlue.withValues(alpha: 0.1)
-              : AppColors.statusOrange.withValues(alpha: 0.1),
+              ? AppColors.primaryBlue.withOpacity(0.1)
+              : AppColors.statusOrange.withOpacity(0.1),
           borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
         ),
         child: Row(
@@ -969,13 +969,13 @@ class ModelSetupCard extends StatelessWidget {
     if (isLoading) return AppColors.statusOrange;
     if (isLoaded) return AppColors.statusGreen;
     if (isConfigured) return color;
-    return AppColors.statusGray.withValues(alpha: 0.2);
+    return AppColors.statusGray.withOpacity(0.2);
   }
 
   Color get _borderColor {
-    if (isLoaded) return AppColors.statusGreen.withValues(alpha: 0.5);
-    if (isLoading) return AppColors.statusOrange.withValues(alpha: 0.5);
-    if (isConfigured) return color.withValues(alpha: 0.5);
+    if (isLoaded) return AppColors.statusGreen.withOpacity(0.5);
+    if (isLoading) return AppColors.statusOrange.withOpacity(0.5);
+    if (isConfigured) return color.withOpacity(0.5);
     return Colors.transparent;
   }
 }

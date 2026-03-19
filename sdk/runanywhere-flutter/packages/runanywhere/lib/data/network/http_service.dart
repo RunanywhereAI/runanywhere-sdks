@@ -60,7 +60,7 @@ class HTTPService {
   String _supabaseURL = '';
   String _supabaseKey = '';
 
-  final http.Client _httpClient;
+  http.Client _httpClient;
   final SDKLogger _logger;
 
   // ============================================================================
@@ -70,6 +70,12 @@ class HTTPService {
   HTTPService._()
       : _httpClient = http.Client(),
         _logger = SDKLogger('HTTPService');
+
+  /// Replace the underlying HTTP client (e.g. to inject a proxy-aware client).
+  void setHttpClient(http.Client client) {
+    _httpClient.close();
+    _httpClient = client;
+  }
 
   Map<String, String> get _defaultHeaders => {
         'Content-Type': 'application/json',

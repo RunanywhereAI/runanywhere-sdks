@@ -8,6 +8,7 @@ import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
+import 'package:runanywhere_ai/core/services/proxy_config_service.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
@@ -61,6 +62,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Yield to allow UI to render before heavy work
       await Future<void>.delayed(Duration.zero);
+
+      // Load and apply proxy configuration
+      await ProxyConfigService.shared.load();
+      ProxyConfigService.shared.applyToServices();
+      if (ProxyConfigService.shared.enabled) {
+        debugPrint('🌐 Proxy enabled: ${ProxyConfigService.shared.host}:${ProxyConfigService.shared.port}');
+      }
 
       // Check for custom API configuration (stored via Settings screen)
       final customApiKey = await KeychainHelper.loadString(KeychainKeys.apiKey);
@@ -317,7 +325,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
             elevation: 0,
           ),
           navigationBarTheme: NavigationBarThemeData(
-            indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+            indicatorColor: AppColors.primaryBlue.withOpacity(0.2),
           ),
         ),
         darkTheme: ThemeData(

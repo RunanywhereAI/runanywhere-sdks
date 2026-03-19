@@ -73,24 +73,24 @@ class VisionHubView extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: Colors.indigo.withValues(alpha: 0.5),
+                color: Colors.indigo.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 Icons.auto_awesome,
-                color: Colors.white.withValues(alpha: 0.5),
+                color: Colors.white.withOpacity(0.5),
               ),
             ),
             title: Text(
               'Image Generation',
               style: TextStyle(
-                color: AppColors.textSecondary(context).withValues(alpha: 0.5),
+                color: AppColors.textSecondary(context).withOpacity(0.5),
               ),
             ),
             subtitle: Text(
               'Create images with Stable Diffusion',
               style: TextStyle(
-                color: AppColors.textSecondary(context).withValues(alpha: 0.5),
+                color: AppColors.textSecondary(context).withOpacity(0.5),
               ),
             ),
           ),

@@ -87,7 +87,20 @@ class LlamaCppBindings {
       );
     }
 
-    // On iOS/macOS, everything is statically linked
+    // On Windows, the LlamaCpp backend is in a separate DLL.
+    if (Platform.isWindows) {
+      // Ensure rac_commons.dll is loaded first (dependency).
+      try {
+        PlatformLoader.loadCommons();
+      } catch (_) {
+        // Ignore - continue trying to load backend
+      }
+      // NOTE: rac_backend_llamacpp.dll has a known crash on Windows.
+      // Return commons for now so checkAvailability() returns false gracefully.
+      throw ArgumentError('LlamaCpp backend not available on Windows');
+    }
+
+    // On iOS/macOS/Linux, everything is statically linked or in rac_commons.
     return PlatformLoader.loadCommons();
   }
 

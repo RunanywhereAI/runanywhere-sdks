@@ -441,7 +441,7 @@ class _RagDemoViewState extends State<RagDemoView> {
         vertical: AppSpacing.smallMedium,
       ),
       decoration: BoxDecoration(
-        color: AppColors.primaryRed.withValues(alpha: 0.1),
+        color: AppColors.primaryRed.withOpacity(0.1),
         borderRadius:
             BorderRadius.circular(AppSpacing.cornerRadiusRegular),
       ),

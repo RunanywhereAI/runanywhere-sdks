@@ -281,9 +281,9 @@ class DartBridgeModelRegistry {
   static int _sourceToFfi(public_types.ModelSource source) {
     switch (source) {
       case public_types.ModelSource.remote:
-        return 1; // RAC_MODEL_SOURCE_REMOTE
+        return 0; // RAC_MODEL_SOURCE_REMOTE
       case public_types.ModelSource.local:
-        return 2; // RAC_MODEL_SOURCE_LOCAL
+        return 1; // RAC_MODEL_SOURCE_LOCAL
     }
   }
 
@@ -361,9 +361,9 @@ class DartBridgeModelRegistry {
   /// Convert C++ RAC_MODEL_SOURCE int to public ModelSource
   static public_types.ModelSource _sourceFromFfi(int source) {
     switch (source) {
-      case 1:
+      case 0:
         return public_types.ModelSource.remote;
-      case 2:
+      case 1:
         return public_types.ModelSource.local;
       default:
         return public_types.ModelSource.remote;
@@ -972,6 +972,10 @@ base class RacModelInfoCStruct extends Struct {
   // rac_bool_t supports_thinking (int32_t)
   @Int32()
   external int supportsThinking;
+
+  // rac_bool_t supports_lora (int32_t)
+  @Int32()
+  external int supportsLora;
 
   // char** tags
   external Pointer<Pointer<Utf8>> tags;

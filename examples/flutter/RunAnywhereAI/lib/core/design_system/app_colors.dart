@@ -15,7 +15,7 @@ class AppColors {
       Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
   static Color textSecondary(BuildContext context) =>
       (Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey)
-          .withValues(alpha: 0.6);
+          .withOpacity(0.6);
   static const Color textWhite = Colors.white;
 
   // MARK: - Background Colors
@@ -26,7 +26,7 @@ class AppColors {
   static Color backgroundTertiary(BuildContext context) =>
       Theme.of(context).colorScheme.surface;
   static Color backgroundGrouped(BuildContext context) =>
-      Theme.of(context).colorScheme.surfaceContainerHighest;
+      Theme.of(context).colorScheme.surface;
   static Color backgroundGray5(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
           ? Colors.grey.shade800
@@ -41,20 +41,20 @@ class AppColors {
       Theme.of(context).dividerColor;
 
   // MARK: - Badge/Tag colors
-  static Color get badgeBlue => Colors.blue.withValues(alpha: 0.2);
-  static Color get badgeGreen => Colors.green.withValues(alpha: 0.2);
-  static Color get badgePurple => Colors.purple.withValues(alpha: 0.2);
-  static Color get badgeOrange => Colors.orange.withValues(alpha: 0.2);
-  static Color get badgeRed => Colors.red.withValues(alpha: 0.2);
-  static Color get badgeGray => Colors.grey.withValues(alpha: 0.2);
+  static Color get badgeBlue => Colors.blue.withOpacity(0.2);
+  static Color get badgeGreen => Colors.green.withOpacity(0.2);
+  static Color get badgePurple => Colors.purple.withOpacity(0.2);
+  static Color get badgeOrange => Colors.orange.withOpacity(0.2);
+  static Color get badgeRed => Colors.red.withOpacity(0.2);
+  static Color get badgeGray => Colors.grey.withOpacity(0.2);
 
   // MARK: - Model info colors
-  static Color get modelFrameworkBg => Colors.blue.withValues(alpha: 0.1);
-  static Color get modelThinkingBg => Colors.purple.withValues(alpha: 0.1);
+  static Color get modelFrameworkBg => Colors.blue.withOpacity(0.1);
+  static Color get modelThinkingBg => Colors.purple.withOpacity(0.1);
 
   // MARK: - Chat bubble colors
   static Color get userBubbleGradientStart => Colors.blue;
-  static Color get userBubbleGradientEnd => Colors.blue.withValues(alpha: 0.9);
+  static Color get userBubbleGradientEnd => Colors.blue.withOpacity(0.9);
   static Color assistantBubbleBg(BuildContext context) =>
       backgroundGray5(context);
 
@@ -67,16 +67,16 @@ class AppColors {
   static const Color statusPurple = Colors.purple;
 
   // MARK: - Shadow colors
-  static Color get shadowDefault => Colors.black.withValues(alpha: 0.1);
-  static Color get shadowLight => Colors.black.withValues(alpha: 0.1);
-  static Color get shadowMedium => Colors.black.withValues(alpha: 0.12);
-  static Color get shadowDark => Colors.black.withValues(alpha: 0.3);
+  static Color get shadowDefault => Colors.black.withOpacity(0.1);
+  static Color get shadowLight => Colors.black.withOpacity(0.1);
+  static Color get shadowMedium => Colors.black.withOpacity(0.12);
+  static Color get shadowDark => Colors.black.withOpacity(0.3);
 
   // MARK: - Overlay colors
-  static Color get overlayLight => Colors.black.withValues(alpha: 0.3);
-  static Color get overlayMedium => Colors.black.withValues(alpha: 0.4);
+  static Color get overlayLight => Colors.black.withOpacity(0.3);
+  static Color get overlayMedium => Colors.black.withOpacity(0.4);
 
   // MARK: - Border colors
-  static Color get borderLight => Colors.white.withValues(alpha: 0.3);
-  static Color get borderMedium => Colors.black.withValues(alpha: 0.05);
+  static Color get borderLight => Colors.white.withOpacity(0.3);
+  static Color get borderMedium => Colors.black.withOpacity(0.05);
 }

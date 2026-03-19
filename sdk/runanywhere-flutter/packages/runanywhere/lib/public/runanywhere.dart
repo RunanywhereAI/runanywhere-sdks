@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
@@ -22,7 +24,8 @@ import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
-import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
+import 'package:runanywhere/native/ffi_types.dart'
+    show RacVlmImageFormat, RacRagConfigStruct;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -2554,12 +2557,38 @@ class RunAnywhere {
   /// Must be called before ingesting documents or running queries.
   static Future<void> ragCreatePipeline(RAGConfiguration config) async {
     if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.createPipeline(config);
+    final embeddingModelPathPtr = config.embeddingModelPath.toNativeUtf8();
+    final llmModelPathPtr = config.llmModelPath.toNativeUtf8();
+    final promptTemplatePtr = config.promptTemplate?.toNativeUtf8();
+    final embeddingConfigJsonPtr = config.embeddingConfigJSON?.toNativeUtf8();
+    final llmConfigJsonPtr = config.llmConfigJSON?.toNativeUtf8();
+    final configPtr = calloc<RacRagConfigStruct>();
+    try {
+      configPtr.ref.embeddingModelPath = embeddingModelPathPtr;
+      configPtr.ref.llmModelPath = llmModelPathPtr;
+      configPtr.ref.embeddingDimension = config.embeddingDimension;
+      configPtr.ref.topK = config.topK;
+      configPtr.ref.similarityThreshold = config.similarityThreshold;
+      configPtr.ref.maxContextTokens = config.maxContextTokens;
+      configPtr.ref.chunkSize = config.chunkSize;
+      configPtr.ref.chunkOverlap = config.chunkOverlap;
+      configPtr.ref.promptTemplate = promptTemplatePtr ?? nullptr;
+      configPtr.ref.embeddingConfigJson = embeddingConfigJsonPtr ?? nullptr;
+      configPtr.ref.llmConfigJson = llmConfigJsonPtr ?? nullptr;
+      DartBridgeRAG.shared.createPipeline(config: configPtr);
+    } finally {
+      calloc.free(embeddingModelPathPtr);
+      calloc.free(llmModelPathPtr);
+      if (promptTemplatePtr != null) calloc.free(promptTemplatePtr);
+      if (embeddingConfigJsonPtr != null) calloc.free(embeddingConfigJsonPtr);
+      if (llmConfigJsonPtr != null) calloc.free(llmConfigJsonPtr);
+      calloc.free(configPtr);
+    }
   }
 
   /// Destroy the RAG pipeline and release resources.
   static Future<void> ragDestroyPipeline() async {
-    DartBridgeRAG.shared.destroyPipeline();
+    DartBridgeRAG.shared.destroy();
   }
 
   /// Ingest a document into the RAG pipeline.
@@ -2567,7 +2596,7 @@ class RunAnywhere {
   /// The document is split into chunks, embedded, and indexed.
   static Future<void> ragIngest(String text, {String? metadataJson}) async {
     if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
+    DartBridgeRAG.shared.addDocument(text, metadataJSON: metadataJson);
   }
 
   /// Clear all documents from the RAG pipeline.
@@ -2587,7 +2616,14 @@ class RunAnywhere {
     RAGQueryOptions? options,
   }) async {
     if (!_isInitialized) throw SDKError.notInitialized();
-    final queryOptions = options ?? RAGQueryOptions(question: question);
-    return DartBridgeRAG.shared.query(queryOptions);
+    final bridgeResult = DartBridgeRAG.shared.query(
+      question,
+      systemPrompt: options?.systemPrompt,
+      maxTokens: options?.maxTokens ?? 512,
+      temperature: options?.temperature ?? 0.7,
+      topP: options?.topP ?? 0.9,
+      topK: options?.topK ?? 40,
+    );
+    return RAGResult.fromBridge(bridgeResult);
   }
 }
