@@ -65,7 +65,7 @@ export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.OpenAIWhisper]: 'OpenAI Whisper',
   [LLMFramework.SystemTTS]: 'System TTS',
   [LLMFramework.PiperTTS]: 'Piper TTS',
-  [LLMFramework.Genie]: 'Genie NPU',
+  [LLMFramework.Genie]: 'Qualcomm Genie',
 };
 
 /**
