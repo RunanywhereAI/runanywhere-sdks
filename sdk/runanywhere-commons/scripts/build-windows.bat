@@ -333,6 +333,10 @@ if exist "%BUILD_OUT%\rac_backend_rag.dll" copy /y "%BUILD_OUT%\rac_backend_rag.
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.dll" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.dll" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.dll" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.dll" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.dll" "%DIST_BIN%\" >nul
+:: Visual Studio multi-config: backends output to src\backends\<name>\<Config>\
+if exist "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.dll" copy /y "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.dll" "%DIST_BIN%\" >nul
+if exist "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.dll" copy /y "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.dll" "%DIST_BIN%\" >nul
+if exist "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.dll" copy /y "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.dll" "%DIST_BIN%\" >nul
 
 :: Copy import libs / static libs to lib
 if exist "%BUILD_OUT%\rac_commons.lib" copy /y "%BUILD_OUT%\rac_commons.lib" "%DIST_LIB%\" >nul
@@ -342,6 +346,10 @@ if exist "%BUILD_OUT%\rac_backend_rag.lib" copy /y "%BUILD_OUT%\rac_backend_rag.
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.lib" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.lib" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.lib" "%DIST_LIB%\" >nul
 if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.lib" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.lib" "%DIST_LIB%\" >nul
+:: Visual Studio multi-config: backends output to src\backends\<name>\<Config>\
+if exist "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.lib" copy /y "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.lib" "%DIST_LIB%\" >nul
+if exist "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.lib" copy /y "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.lib" "%DIST_LIB%\" >nul
+if exist "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.lib" copy /y "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.lib" "%DIST_LIB%\" >nul
 
 :: PDB files (optional, for debugging)
 if exist "%BUILD_OUT%\rac_commons.pdb" copy /y "%BUILD_OUT%\rac_commons.pdb" "%DIST_BIN%\" >nul
@@ -351,6 +359,10 @@ if exist "%BUILD_OUT%\rac_backend_rag.pdb" copy /y "%BUILD_OUT%\rac_backend_rag.
 if exist "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.pdb" copy /y "%BUILD_OUT%\src\backends\llamacpp\rac_backend_llamacpp.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.pdb" copy /y "%BUILD_OUT%\src\backends\onnx\rac_backend_onnx.pdb" "%DIST_BIN%\" >nul
 if exist "%BUILD_OUT%\src\backends\rag\rac_backend_rag.pdb" copy /y "%BUILD_OUT%\src\backends\rag\rac_backend_rag.pdb" "%DIST_BIN%\" >nul
+:: Visual Studio multi-config: backends output to src\backends\<name>\<Config>\
+if exist "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.pdb" copy /y "%BUILD_DIR%\src\backends\llamacpp\%BUILD_TYPE%\rac_backend_llamacpp.pdb" "%DIST_BIN%\" >nul
+if exist "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.pdb" copy /y "%BUILD_DIR%\src\backends\onnx\%BUILD_TYPE%\rac_backend_onnx.pdb" "%DIST_BIN%\" >nul
+if exist "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.pdb" copy /y "%BUILD_DIR%\src\backends\rag\%BUILD_TYPE%\rac_backend_rag.pdb" "%DIST_BIN%\" >nul
 
 :: Headers: rac and backends
 if exist "%PROJECT_ROOT%\include\rac" (

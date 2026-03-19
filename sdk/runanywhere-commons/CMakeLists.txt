@@ -201,9 +201,7 @@ elseif(MSVC)
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} \
-        /Zi \
-        /arch:SSE2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi /arch:SSE2")
 endif()
 
 # =============================================================================
