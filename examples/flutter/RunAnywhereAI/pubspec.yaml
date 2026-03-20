@@ -17,6 +17,10 @@ dependencies:
   # RunAnywhere SDK - LlamaCpp Backend (LLM)
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
+
+  # RunAnywhere SDK - Genie NPU Backend (Android/Snapdragon only)
+  runanywhere_genie:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.0
@@ -57,6 +61,8 @@ dev_dependencies:
 dependency_overrides:
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  runanywhere_genie:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
 
 flutter:
   uses-material-design: true

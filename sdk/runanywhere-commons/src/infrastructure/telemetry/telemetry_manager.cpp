@@ -318,6 +318,8 @@ const char* framework_to_string(rac_inference_framework_t framework) {
             return "mlx";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return "whisperkit_coreml";
+        case RAC_FRAMEWORK_GENIE:
+            return "genie";
         case RAC_FRAMEWORK_UNKNOWN:
         default:
             return "unknown";

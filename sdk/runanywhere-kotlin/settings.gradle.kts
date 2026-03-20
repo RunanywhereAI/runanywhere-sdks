@@ -49,3 +49,7 @@ include(":modules:runanywhere-core-onnx")
 // RAG pipeline — NOT a separate module. RAG is an orchestration pipeline (like Voice Agent)
 // that uses existing LLM + Embeddings services. Registration is handled by the core SDK
 // when ragCreatePipeline() is called. See: RunAnywhere+RAG.jvmAndroid.kt
+
+// Genie module - now distributed as a closed-source AAR from private repo:
+//   com.runanywhere.sdk:runanywhere-genie-android:<version>
+// See: https://github.com/RunanywhereAI/runanywhere-genie

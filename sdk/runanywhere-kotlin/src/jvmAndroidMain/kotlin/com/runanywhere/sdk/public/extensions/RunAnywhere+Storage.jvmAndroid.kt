@@ -206,6 +206,7 @@ private fun convertToModelStorageMetrics(
             CppBridgeModelRegistry.Framework.FLUID_AUDIO -> InferenceFramework.FLUID_AUDIO
             CppBridgeModelRegistry.Framework.BUILTIN -> InferenceFramework.BUILT_IN
             CppBridgeModelRegistry.Framework.NONE -> InferenceFramework.NONE
+            CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
             else -> InferenceFramework.UNKNOWN
         }
 
@@ -230,6 +231,7 @@ private fun convertToModelStorageMetrics(
             CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
             CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
             CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
+            CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
             else -> ModelFormat.UNKNOWN
         }
 
