@@ -171,11 +171,14 @@ android {
             "**/libfbjni.so",
             "**/libfolly_runtime.so",
             "**/libreactnative.so",
-            "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
-            "**/librac_backend_onnx.so", // ONNX backend duplicated via rag + onnx modules
+            "**/libNitroModules.so",
+            "**/librac_backend_onnx.so",
             "**/librac_commons.so",
             "**/libomp.so",
-            "**/libcdsprpc.so"  // Qualcomm FastRPC (shared by Genie and device)
+            "**/libcdsprpc.so",
+            "**/libGenie.so",
+            "**/libQnnHtpV81Skel.so",
+            "**/libQnnHtpV81Stub.so"
         ]
     }
 
