@@ -20,10 +20,11 @@ ext {
 
     // =============================================================================
     // Remote binary URLs
-    // RABackendGenie from runanywhere-genie
+    // RABackendGenie hosted on the public runanywhere-sdks repo
+    // (runanywhere-genie is private, so binaries are published here)
     // =============================================================================
     binariesGitHubOrg = "RunanywhereAI"
-    binariesRepo = "runanywhere-genie"
+    binariesRepo = "runanywhere-sdks"
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
