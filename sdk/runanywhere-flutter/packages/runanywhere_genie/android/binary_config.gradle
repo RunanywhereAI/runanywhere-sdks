@@ -16,18 +16,18 @@ ext {
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)
     // =============================================================================
-    coreVersion = "0.1.6"
+    genieVersion = "0.3.0"
 
     // =============================================================================
     // Remote binary URLs
-    // RABackendGenie from runanywhere-sdks
+    // RABackendGenie from runanywhere-genie
     // =============================================================================
     binariesGitHubOrg = "RunanywhereAI"
-    binariesRepo = "runanywhere-sdks"
+    binariesRepo = "runanywhere-genie"
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
     // Android native libraries package
-    genieAndroidUrl = "${binariesBaseUrl}/commons-v${coreVersion}/RABackendGenie-android-v${coreVersion}.zip"
+    genieAndroidUrl = "${binariesBaseUrl}/genie-v${genieVersion}/RABackendGENIE-android-arm64-v8a-v${genieVersion}.zip"
 
     // Helper method to check if we should download
     shouldDownloadAndroidLibs = { ->
