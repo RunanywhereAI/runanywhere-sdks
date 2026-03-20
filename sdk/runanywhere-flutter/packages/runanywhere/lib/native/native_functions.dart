@@ -196,12 +196,25 @@ abstract class NativeFunctions {
           Int32 Function(RacHandle),
           int Function(RacHandle)>('rac_vad_component_cleanup');
 
-  static final int Function(RacHandle, Pointer<Float>, int, Pointer<Void>)
-      vadProcess =
-      _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Float>, IntPtr, Pointer<Void>),
-          int Function(
-              RacHandle, Pointer<Float>, int, Pointer<Void>)>('rac_vad_component_process');
+  static final int Function(
+  RacHandle,
+  Pointer<Float>,
+  int,
+  Pointer<RacVadResultStruct>,
+) vadProcess =
+    _lib.lookupFunction<
+        Int32 Function(
+          RacHandle,
+          Pointer<Float>,
+          IntPtr,
+          Pointer<RacVadResultStruct>,
+        ),
+        int Function(
+          RacHandle,
+          Pointer<Float>,
+          int,
+          Pointer<RacVadResultStruct>,
+        )>('rac_vad_component_process');
 
   static final void Function(RacHandle) vadDestroy =
       _lib.lookupFunction<
@@ -309,7 +322,11 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle),
           void Function(RacHandle)>('rac_voice_agent_destroy');
 
-  static final void Function(Pointer<Void>) racFree =
-      _lib.lookupFunction<Void Function(Pointer<Void>),
-          void Function(Pointer<Void>)>('rac_free');
-}
+  static final void Function(Pointer<Void>)? racFree = (() {
+  try {
+    return _lib.lookupFunction<Void Function(Pointer<Void>),
+        void Function(Pointer<Void>)>('rac_free');
+  } catch (_) {
+    return null;
+  }
+})();
