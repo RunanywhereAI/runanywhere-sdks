@@ -10,7 +10,6 @@ enum LLMFramework {
   onnxRuntime,
   systemTTS,
   whisperKit,
-  genie,
   unknown;
 
   String get displayName {
@@ -27,8 +26,6 @@ enum LLMFramework {
         return 'System TTS';
       case LLMFramework.whisperKit:
         return 'WhisperKit';
-      case LLMFramework.genie:
-        return 'Genie NPU';
       case LLMFramework.unknown:
         return 'Unknown';
     }
@@ -48,8 +45,6 @@ enum LLMFramework {
         return 'system_tts';
       case LLMFramework.whisperKit:
         return 'whisperkit';
-      case LLMFramework.genie:
-        return 'genie';
       case LLMFramework.unknown:
         return 'unknown';
     }

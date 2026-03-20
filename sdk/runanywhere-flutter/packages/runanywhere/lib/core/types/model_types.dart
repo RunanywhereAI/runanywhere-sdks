@@ -111,7 +111,6 @@ enum InferenceFramework {
       'FoundationModels', 'Foundation Models', 'foundation_models'),
   systemTTS('SystemTTS', 'System TTS', 'system_tts'),
   fluidAudio('FluidAudio', 'FluidAudio', 'fluid_audio'),
-  genie('Genie', 'Qualcomm Genie', 'genie'),
 
   // Special cases
   builtIn('BuiltIn', 'Built-in', 'built_in'),

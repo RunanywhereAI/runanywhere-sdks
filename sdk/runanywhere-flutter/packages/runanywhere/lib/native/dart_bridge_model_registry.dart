@@ -272,8 +272,6 @@ class DartBridgeModelRegistry {
         return 5; // RAC_FRAMEWORK_BUILTIN
       case public_types.InferenceFramework.none:
         return 6; // RAC_FRAMEWORK_NONE
-      case public_types.InferenceFramework.genie:
-        return 10; // RAC_FRAMEWORK_GENIE
       case public_types.InferenceFramework.unknown:
         return 99; // RAC_FRAMEWORK_UNKNOWN
     }
@@ -974,10 +972,6 @@ base class RacModelInfoCStruct extends Struct {
   // rac_bool_t supports_thinking (int32_t)
   @Int32()
   external int supportsThinking;
-
-  // rac_bool_t supports_lora (int32_t)
-  @Int32()
-  external int supportsLora;
 
   // char** tags
   external Pointer<Pointer<Utf8>> tags;

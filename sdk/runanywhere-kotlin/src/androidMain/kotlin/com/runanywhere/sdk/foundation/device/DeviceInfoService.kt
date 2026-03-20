@@ -33,26 +33,18 @@ actual class DeviceInfoService {
         }
     }
 
-    actual fun getChipName(): String? {
-        return try {
-            // Try Build.SOC_MODEL first (API 31+) — returns actual SoC like "SM8750"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val socModel = Build.SOC_MODEL
-                if (!socModel.isNullOrEmpty() && socModel != "unknown") {
-                    return socModel
-                }
-            }
-            // Fallback to Build.HARDWARE
-            val hardware = Build.HARDWARE
-            if (!hardware.isNullOrEmpty() && hardware != "unknown") {
-                hardware
+    actual fun getChipName(): String? =
+        try {
+            // Get primary ABI (architecture)
+            val abis = Build.SUPPORTED_ABIS
+            if (abis.isNotEmpty()) {
+                abis[0]
             } else {
                 null
             }
         } catch (e: Exception) {
             null
         }
-    }
 
     actual fun getTotalMemoryGB(): Double? {
         return try {

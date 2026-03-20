@@ -755,13 +755,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // Use SDK's model listing API to find chat models
-                // Prefer Genie (NPU) models over CPU models for testing
                 val allModels = RunAnywhere.availableModels()
                 val chatModel =
                     allModels.firstOrNull { model ->
-                        model.category == ModelCategory.LANGUAGE && model.isDownloaded
-                                && model.framework == com.runanywhere.sdk.core.types.InferenceFramework.GENIE
-                    } ?: allModels.firstOrNull { model ->
                         model.category == ModelCategory.LANGUAGE && model.isDownloaded
                     }
 

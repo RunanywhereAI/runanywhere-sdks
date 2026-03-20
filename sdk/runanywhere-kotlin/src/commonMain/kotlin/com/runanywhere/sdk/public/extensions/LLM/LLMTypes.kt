@@ -206,7 +206,6 @@ data class LoRAAdapterConfig(
 ) {
     init {
         require(path.isNotBlank()) { "LoRA adapter path cannot be blank" }
-        require(scale.isFinite() && scale > 0f) { "LoRA adapter scale must be positive and finite (got $scale)" }
     }
 }
 

@@ -189,7 +189,6 @@ const getFrameworkInfo = (
     [LLMFramework.MLC]: Colors.primaryBlue,
     [LLMFramework.MediaPipe]: Colors.primaryOrange,
     [LLMFramework.OpenAIWhisper]: Colors.primaryGreen,
-    [LLMFramework.Genie]: Colors.primaryPurple,
   };
 
   const iconMap: Record<LLMFramework, string> = {
@@ -208,7 +207,6 @@ const getFrameworkInfo = (
     [LLMFramework.MLC]: 'git-branch-outline',
     [LLMFramework.MediaPipe]: 'videocam-outline',
     [LLMFramework.OpenAIWhisper]: 'ear-outline',
-    [LLMFramework.Genie]: 'hardware-chip-outline',
   };
 
   return {
@@ -268,6 +266,15 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       const allModels = await RunAnywhere.getAvailableModels();
       const categoryFilter = getCategoryForContext(context);
 
+      console.warn('[ModelSelectionSheet] All models count:', allModels.length);
+      console.warn('[ModelSelectionSheet] Category filter:', categoryFilter);
+      if (allModels.length > 0) {
+        console.warn(
+          '[ModelSelectionSheet] First model:',
+          JSON.stringify(allModels[0], null, 2)
+        );
+      }
+
       // Filter models based on context (using category field)
       const allowedFrameworks = getAllowedFrameworksForContext(context);
 
@@ -289,6 +296,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             return true;
           })
         : allModels;
+
+      console.warn(
+        '[ModelSelectionSheet] Filtered models count:',
+        filteredModels.length
+      );
 
       // Fallback: if no models found after filtering for LLM, show models with LlamaCpp framework
       if (
@@ -419,10 +431,21 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
     const frameworkCounts = new Map<LLMFramework, number>();
 
+    console.warn(
+      '[ModelSelectionSheet] getFrameworks called, availableModels count:',
+      availableModels.length
+    );
+
     availableModels.forEach((model: SDKModelInfo, index: number) => {
       // Determine framework from model - use preferredFramework or first compatibleFramework
       const frameworkValue =
         model.preferredFramework || model.compatibleFrameworks?.[0];
+
+      if (index < 3) {
+        console.warn(
+          `[ModelSelectionSheet] Model ${index}: preferredFramework=${model.preferredFramework}, compatibleFrameworks=${JSON.stringify(model.compatibleFrameworks)}`
+        );
+      }
 
       // Map string to enum if needed
       let framework: LLMFramework;
@@ -445,6 +468,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     if (context === ModelSelectionContext.TTS) {
       frameworkCounts.set(LLMFramework.SystemTTS, 1);
     }
+
+    console.warn(
+      '[ModelSelectionSheet] Framework counts:',
+      Array.from(frameworkCounts.entries())
+    );
 
     return Array.from(frameworkCounts.entries())
       .map(([framework, count]) => getFrameworkInfo(framework, count))

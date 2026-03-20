@@ -110,7 +110,7 @@ include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/runanywhereonnx+autoli
 # =============================================================================
 # Get core package include dir (for rac/*.h headers)
 get_filename_component(RN_NODE_MODULES "${CMAKE_SOURCE_DIR}/../../.." ABSOLUTE)
-set(CORE_INCLUDE_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/include")
+set(CORE_INCLUDE_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/include")
 set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLibs/${ANDROID_ABI}")
 
 include_directories(

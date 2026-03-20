@@ -178,7 +178,6 @@ target_include_directories(rac_backend_llamacpp PUBLIC
     ${RAC_COMMONS_ROOT_DIR}/include
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
     ${llamacpp_SOURCE_DIR}/include
-    ${llamacpp_SOURCE_DIR}/src                  # Internal headers (llama-adapter.h for LoRA introspection)
     ${llamacpp_SOURCE_DIR}/common
     ${llamacpp_SOURCE_DIR}/ggml/include
     ${llamacpp_SOURCE_DIR}/vendor               # nlohmann/json.hpp

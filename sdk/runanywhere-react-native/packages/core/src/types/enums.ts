@@ -43,7 +43,6 @@ export enum LLMFramework {
   OpenAIWhisper = 'OpenAIWhisper',
   SystemTTS = 'SystemTTS',
   PiperTTS = 'PiperTTS',
-  Genie = 'Genie',
 }
 
 /**
@@ -65,7 +64,6 @@ export const LLMFrameworkDisplayNames: Record<LLMFramework, string> = {
   [LLMFramework.OpenAIWhisper]: 'OpenAI Whisper',
   [LLMFramework.SystemTTS]: 'System TTS',
   [LLMFramework.PiperTTS]: 'Piper TTS',
-  [LLMFramework.Genie]: 'Qualcomm Genie',
 };
 
 /**

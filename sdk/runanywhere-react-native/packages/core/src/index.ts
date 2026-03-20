@@ -257,19 +257,6 @@ export {
 } from './Public/Extensions/RunAnywhere+Models';
 
 // =============================================================================
-// Device / NPU Chip Detection
-// =============================================================================
-
-export { getChip } from './Public/Extensions/RunAnywhere+Device';
-export type { NPUChip } from './types/NPUChip';
-export {
-  NPU_CHIPS,
-  NPU_BASE_URL,
-  getNPUDownloadUrl,
-  npuChipFromSocModel,
-} from './types/NPUChip';
-
-// =============================================================================
 // RAG Pipeline
 // =============================================================================
 

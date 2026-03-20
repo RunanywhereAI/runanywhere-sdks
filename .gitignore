@@ -388,12 +388,6 @@ tools/
 sdk/runanywhere-react-native/packages/rag/ios/.testlocal
 
 
-# Python virtual environments
-.venv*/
-venv*/
-__pycache__/
-*.pyc
-
 # Node
 node_modules/
 /tools/

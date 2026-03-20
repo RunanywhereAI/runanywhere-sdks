@@ -2,6 +2,9 @@
 ///
 /// RAG pipeline bridge - manages C++ RAG pipeline lifecycle.
 /// Mirrors Swift's CppBridge+RAG.swift pattern.
+///
+/// The RAG pipeline is a feature (like Voice Agent) that orchestrates
+/// LLM and Embeddings services for Retrieval-Augmented Generation.
 library dart_bridge_rag;
 
 import 'dart:ffi';
@@ -13,24 +16,86 @@ import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 // =============================================================================
-// Bridge-Level Result Types
-//
-// These are the low-level types returned from C++ via FFI.
-// Public-facing types with richer semantics live in rag_types.dart.
-// They are intentionally named differently to avoid import conflicts.
+// RAG Types (mirrors Swift RAGTypes.swift / Kotlin RAGTypes.kt)
 // =============================================================================
 
-/// A single retrieved document chunk from C++ (bridge-level).
-/// Field names match C struct field names exactly.
-class _RAGBridgeSearchResult {
+/// Configuration for creating a RAG pipeline.
+class RAGConfiguration {
+  /// Path to the ONNX embedding model
+  final String embeddingModelPath;
+
+  /// Path to the GGUF LLM model
+  final String llmModelPath;
+
+  /// Embedding vector dimension (default: 384 for all-MiniLM-L6-v2)
+  final int embeddingDimension;
+
+  /// Number of top chunks to retrieve per query
+  final int topK;
+
+  /// Minimum cosine similarity threshold 0.0-1.0
+  final double similarityThreshold;
+
+  /// Maximum tokens for context sent to the LLM
+  final int maxContextTokens;
+
+  /// Tokens per chunk when splitting documents
+  final int chunkSize;
+
+  /// Overlap tokens between consecutive chunks
+  final int chunkOverlap;
+
+  /// Prompt template with {context} and {query} placeholders
+  final String? promptTemplate;
+
+  /// Optional configuration JSON for the embedding model
+  final String? embeddingConfigJson;
+
+  /// Optional configuration JSON for the LLM model
+  final String? llmConfigJson;
+
+  const RAGConfiguration({
+    required this.embeddingModelPath,
+    required this.llmModelPath,
+    this.embeddingDimension = 384,
+    this.topK = 10,
+    this.similarityThreshold = 0.15,
+    this.maxContextTokens = 2048,
+    this.chunkSize = 512,
+    this.chunkOverlap = 50,
+    this.promptTemplate,
+    this.embeddingConfigJson,
+    this.llmConfigJson,
+  });
+}
+
+/// Options for querying the RAG pipeline.
+class RAGQueryOptions {
+  final String question;
+  final String? systemPrompt;
+  final int maxTokens;
+  final double temperature;
+  final double topP;
+  final int topK;
+
+  const RAGQueryOptions({
+    required this.question,
+    this.systemPrompt,
+    this.maxTokens = 512,
+    this.temperature = 0.7,
+    this.topP = 0.9,
+    this.topK = 40,
+  });
+}
+
+/// A single retrieved document chunk.
+class RAGSearchResult {
   final String chunkId;
   final String text;
   final double similarityScore;
-
-  /// Null if the C string was null or empty.
   final String? metadataJson;
 
-  const _RAGBridgeSearchResult({
+  const RAGSearchResult({
     required this.chunkId,
     required this.text,
     required this.similarityScore,
@@ -38,29 +103,117 @@ class _RAGBridgeSearchResult {
   });
 }
 
-/// RAG query result from C++ (bridge-level).
-/// [contextUsed] is an empty string if no context was sent to the LLM.
-class _RAGBridgeResult {
+/// Result of a RAG query.
+class RAGResult {
   final String answer;
-  final List<_RAGBridgeSearchResult> retrievedChunks;
-  final String contextUsed;
+  final List<RAGSearchResult> retrievedChunks;
+  final String? contextUsed;
   final double retrievalTimeMs;
   final double generationTimeMs;
   final double totalTimeMs;
 
-  const _RAGBridgeResult({
+  const RAGResult({
     required this.answer,
     required this.retrievedChunks,
-    required this.contextUsed,
+    this.contextUsed,
     required this.retrievalTimeMs,
     required this.generationTimeMs,
     required this.totalTimeMs,
   });
 }
 
-/// Public type aliases — used by [rag_types.dart] factory constructors.
-typedef RAGBridgeSearchResult = _RAGBridgeSearchResult;
-typedef RAGBridgeResult = _RAGBridgeResult;
+// =============================================================================
+// FFI Struct for rac_rag_config_t (legacy standalone config)
+// =============================================================================
+
+final class _RacRagConfig extends Struct {
+  external Pointer<Utf8> embeddingModelPath;
+  external Pointer<Utf8> llmModelPath;
+  @Size()
+  external int embeddingDimension;
+  @Size()
+  external int topK;
+  @Float()
+  external double similarityThreshold;
+  @Size()
+  external int maxContextTokens;
+  @Size()
+  external int chunkSize;
+  @Size()
+  external int chunkOverlap;
+  external Pointer<Utf8> promptTemplate;
+  external Pointer<Utf8> embeddingConfigJson;
+  external Pointer<Utf8> llmConfigJson;
+}
+
+final class _RacRagQuery extends Struct {
+  external Pointer<Utf8> question;
+  external Pointer<Utf8> systemPrompt;
+  @Int32()
+  external int maxTokens;
+  @Float()
+  external double temperature;
+  @Float()
+  external double topP;
+  @Int32()
+  external int topK;
+}
+
+final class _RacSearchResult extends Struct {
+  external Pointer<Utf8> chunkId;
+  external Pointer<Utf8> text;
+  @Float()
+  external double similarityScore;
+  external Pointer<Utf8> metadataJson;
+}
+
+final class _RacRagResult extends Struct {
+  external Pointer<Utf8> answer;
+  external Pointer<_RacSearchResult> retrievedChunks;
+  @Size()
+  external int numChunks;
+  external Pointer<Utf8> contextUsed;
+  @Double()
+  external double retrievalTimeMs;
+  @Double()
+  external double generationTimeMs;
+  @Double()
+  external double totalTimeMs;
+}
+
+// =============================================================================
+// FFI Function Typedefs
+// =============================================================================
+
+typedef _RagRegisterNative = Int32 Function();
+typedef _RagRegisterDart = int Function();
+
+typedef _RagCreateStandaloneNative = Int32 Function(
+    Pointer<_RacRagConfig> config, Pointer<Pointer<Void>> outPipeline);
+typedef _RagCreateStandaloneDart = int Function(
+    Pointer<_RacRagConfig> config, Pointer<Pointer<Void>> outPipeline);
+
+typedef _RagDestroyNative = Void Function(Pointer<Void> pipeline);
+typedef _RagDestroyDart = void Function(Pointer<Void> pipeline);
+
+typedef _RagAddDocumentNative = Int32 Function(
+    Pointer<Void> pipeline, Pointer<Utf8> text, Pointer<Utf8> metadata);
+typedef _RagAddDocumentDart = int Function(
+    Pointer<Void> pipeline, Pointer<Utf8> text, Pointer<Utf8> metadata);
+
+typedef _RagQueryNative = Int32 Function(
+    Pointer<Void> pipeline, Pointer<_RacRagQuery> query, Pointer<_RacRagResult> result);
+typedef _RagQueryDart = int Function(
+    Pointer<Void> pipeline, Pointer<_RacRagQuery> query, Pointer<_RacRagResult> result);
+
+typedef _RagClearNative = Int32 Function(Pointer<Void> pipeline);
+typedef _RagClearDart = int Function(Pointer<Void> pipeline);
+
+typedef _RagCountNative = Size Function(Pointer<Void> pipeline);
+typedef _RagCountDart = int Function(Pointer<Void> pipeline);
+
+typedef _RagResultFreeNative = Void Function(Pointer<_RacRagResult> result);
+typedef _RagResultFreeDart = void Function(Pointer<_RacRagResult> result);
 
 // =============================================================================
 // DartBridgeRAG — FFI bridge to rac_rag_pipeline_* C API
@@ -76,94 +229,111 @@ class DartBridgeRAG {
 
   final _logger = SDKLogger('DartBridge.RAG');
   Pointer<Void>? _pipeline;
+  bool _registered = false;
 
   bool get isCreated => _pipeline != null;
 
-  // MARK: - Static Registration
+  /// Register the RAG module (call once before using RAG).
+  void register() {
+    if (_registered) return;
 
-  /// Register the RAG backend with the C++ service registry.
-  ///
-  /// Returns the C++ result code (0 = success, -401 = already registered).
-  static int registerBackend() {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<RacBackendRagRegisterNative,
-          RacBackendRagRegisterDart>('rac_backend_rag_register');
-      return fn();
-    } catch (e) {
-      return -1;
-    }
-  }
-
-  /// Unregister the RAG backend from the C++ service registry.
-  static void unregisterBackend() {
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final fn = lib.lookupFunction<RacBackendRagUnregisterNative,
-          RacBackendRagUnregisterDart>('rac_backend_rag_unregister');
-      fn();
-    } catch (_) {
-      // Silently ignore — unregister is best-effort
-    }
-  }
-
-  // MARK: - Pipeline Lifecycle
-
-  /// Create a RAG pipeline from a pre-populated [RacRagConfigStruct] pointer.
-  ///
-  /// [config] must be valid for the duration of this call.
-  /// The caller is responsible for freeing [config] after this returns.
-  void createPipeline({required Pointer<RacRagConfigStruct> config}) {
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<RacRagPipelineCreateNative,
-        RacRagPipelineCreateDart>('rac_rag_pipeline_create');
+    final fn = lib.lookupFunction<_RagRegisterNative, _RagRegisterDart>(
+        'rac_backend_rag_register');
 
+    final result = fn();
+    if (result != RAC_SUCCESS && result != -401) {
+      _logger.error('Failed to register RAG module: $result');
+      return;
+    }
+
+    _registered = true;
+    _logger.debug('RAG module registered');
+  }
+
+  /// Create a RAG pipeline with the given configuration.
+  void createPipeline(RAGConfiguration config) {
+    if (!_registered) register();
+
+    final lib = PlatformLoader.loadCommons();
+    final fn =
+        lib.lookupFunction<_RagCreateStandaloneNative, _RagCreateStandaloneDart>(
+            'rac_rag_pipeline_create_standalone');
+
+    final cConfig = calloc<_RacRagConfig>();
     final outPipeline = calloc<Pointer<Void>>();
+
     try {
-      final result = fn(config, outPipeline);
+      cConfig.ref.embeddingModelPath =
+          config.embeddingModelPath.toNativeUtf8();
+      cConfig.ref.llmModelPath = config.llmModelPath.toNativeUtf8();
+      cConfig.ref.embeddingDimension = config.embeddingDimension;
+      cConfig.ref.topK = config.topK;
+      cConfig.ref.similarityThreshold = config.similarityThreshold;
+      cConfig.ref.maxContextTokens = config.maxContextTokens;
+      cConfig.ref.chunkSize = config.chunkSize;
+      cConfig.ref.chunkOverlap = config.chunkOverlap;
+      cConfig.ref.promptTemplate = config.promptTemplate != null
+          ? config.promptTemplate!.toNativeUtf8()
+          : nullptr;
+      cConfig.ref.embeddingConfigJson = config.embeddingConfigJson != null
+          ? config.embeddingConfigJson!.toNativeUtf8()
+          : nullptr;
+      cConfig.ref.llmConfigJson = config.llmConfigJson != null
+          ? config.llmConfigJson!.toNativeUtf8()
+          : nullptr;
+
+      final result = fn(cConfig, outPipeline);
       if (result != RAC_SUCCESS || outPipeline.value == nullptr) {
         throw Exception('Failed to create RAG pipeline: error $result');
       }
 
       if (_pipeline != null) {
-        destroy();
+        destroyPipeline();
       }
 
       _pipeline = outPipeline.value;
       _logger.debug('RAG pipeline created');
     } finally {
+      calloc.free(cConfig.ref.embeddingModelPath);
+      calloc.free(cConfig.ref.llmModelPath);
+      if (cConfig.ref.promptTemplate != nullptr) {
+        calloc.free(cConfig.ref.promptTemplate);
+      }
+      if (cConfig.ref.embeddingConfigJson != nullptr) {
+        calloc.free(cConfig.ref.embeddingConfigJson);
+      }
+      if (cConfig.ref.llmConfigJson != nullptr) {
+        calloc.free(cConfig.ref.llmConfigJson);
+      }
+      calloc.free(cConfig);
       calloc.free(outPipeline);
     }
   }
 
-  /// Destroy the RAG pipeline and release native resources.
-  void destroy() {
+  /// Destroy the RAG pipeline.
+  void destroyPipeline() {
     if (_pipeline == null) return;
 
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<RacRagPipelineDestroyNative,
-        RacRagPipelineDestroyDart>('rac_rag_pipeline_destroy');
+    final fn = lib.lookupFunction<_RagDestroyNative, _RagDestroyDart>(
+        'rac_rag_pipeline_destroy');
 
     fn(_pipeline!);
     _pipeline = null;
     _logger.debug('RAG pipeline destroyed');
   }
 
-  // MARK: - Document Management
-
   /// Add a document to the pipeline.
-  ///
-  /// [metadataJSON] is optional JSON metadata to associate with the document.
-  void addDocument(String text, {String? metadataJSON}) {
+  void addDocument(String text, {String? metadataJson}) {
     _ensurePipeline();
 
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<RacRagAddDocumentNative,
-        RacRagAddDocumentDart>('rac_rag_add_document');
+    final fn = lib.lookupFunction<_RagAddDocumentNative, _RagAddDocumentDart>(
+        'rac_rag_add_document');
 
     final cText = text.toNativeUtf8();
-    final cMeta =
-        metadataJSON != null ? metadataJSON.toNativeUtf8() : nullptr;
+    final cMeta = metadataJson != null ? metadataJson.toNativeUtf8() : nullptr;
 
     try {
       final result = fn(_pipeline!, cText, cMeta);
@@ -181,8 +351,8 @@ class DartBridgeRAG {
     _ensurePipeline();
 
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<RacRagClearDocumentsNative,
-        RacRagClearDocumentsDart>('rac_rag_clear_documents');
+    final fn = lib.lookupFunction<_RagClearNative, _RagClearDart>(
+        'rac_rag_clear_documents');
 
     fn(_pipeline!);
   }
@@ -192,45 +362,34 @@ class DartBridgeRAG {
     if (_pipeline == null) return 0;
 
     final lib = PlatformLoader.loadCommons();
-    final fn = lib.lookupFunction<RacRagGetDocumentCountNative,
-        RacRagGetDocumentCountDart>('rac_rag_get_document_count');
+    final fn = lib.lookupFunction<_RagCountNative, _RagCountDart>(
+        'rac_rag_get_document_count');
 
     return fn(_pipeline!);
   }
 
-  // MARK: - Query
-
-  /// Query the RAG pipeline with named parameters.
-  ///
-  /// Returns a [RAGBridgeResult]. Use [RAGResult.fromBridge] in [rag_types.dart]
-  /// to convert to the public [RAGResult] type.
-  RAGBridgeResult query(
-    String question, {
-    String? systemPrompt,
-    int maxTokens = 512,
-    double temperature = 0.7,
-    double topP = 0.9,
-    int topK = 40,
-  }) {
+  /// Query the RAG pipeline.
+  RAGResult query(RAGQueryOptions options) {
     _ensurePipeline();
 
     final lib = PlatformLoader.loadCommons();
-    final queryFn = lib.lookupFunction<RacRagQueryNative, RacRagQueryDart>(
+    final queryFn = lib.lookupFunction<_RagQueryNative, _RagQueryDart>(
         'rac_rag_query');
-    final freeFn = lib.lookupFunction<RacRagResultFreeNative,
-        RacRagResultFreeDart>('rac_rag_result_free');
+    final freeFn = lib.lookupFunction<_RagResultFreeNative, _RagResultFreeDart>(
+        'rac_rag_result_free');
 
-    final cQuery = calloc<RacRagQueryStruct>();
-    final cResult = calloc<RacRagResultStruct>();
+    final cQuery = calloc<_RacRagQuery>();
+    final cResult = calloc<_RacRagResult>();
 
     try {
-      cQuery.ref.question = question.toNativeUtf8();
-      cQuery.ref.systemPrompt =
-          systemPrompt != null ? systemPrompt.toNativeUtf8() : nullptr;
-      cQuery.ref.maxTokens = maxTokens;
-      cQuery.ref.temperature = temperature;
-      cQuery.ref.topP = topP;
-      cQuery.ref.topK = topK;
+      cQuery.ref.question = options.question.toNativeUtf8();
+      cQuery.ref.systemPrompt = options.systemPrompt != null
+          ? options.systemPrompt!.toNativeUtf8()
+          : nullptr;
+      cQuery.ref.maxTokens = options.maxTokens;
+      cQuery.ref.temperature = options.temperature;
+      cQuery.ref.topP = options.topP;
+      cQuery.ref.topK = options.topK;
 
       final status = queryFn(_pipeline!, cQuery, cResult);
       if (status != RAC_SUCCESS) {
@@ -242,22 +401,21 @@ class DartBridgeRAG {
           : '';
       final contextUsed = cResult.ref.contextUsed != nullptr
           ? cResult.ref.contextUsed.toDartString()
-          : '';
+          : null;
 
-      final chunks = <RAGBridgeSearchResult>[];
+      final chunks = <RAGSearchResult>[];
       for (int i = 0; i < cResult.ref.numChunks; i++) {
         final c = cResult.ref.retrievedChunks[i];
-        final meta =
-            c.metadataJson != nullptr ? c.metadataJson.toDartString() : null;
-        chunks.add(RAGBridgeSearchResult(
+        chunks.add(RAGSearchResult(
           chunkId: c.chunkId != nullptr ? c.chunkId.toDartString() : '',
           text: c.text != nullptr ? c.text.toDartString() : '',
           similarityScore: c.similarityScore,
-          metadataJson: meta?.isEmpty == true ? null : meta,
+          metadataJson:
+              c.metadataJson != nullptr ? c.metadataJson.toDartString() : null,
         ));
       }
 
-      final result = RAGBridgeResult(
+      final result = RAGResult(
         answer: answer,
         retrievedChunks: chunks,
         contextUsed: contextUsed,
@@ -280,8 +438,7 @@ class DartBridgeRAG {
 
   void _ensurePipeline() {
     if (_pipeline == null) {
-      throw StateError(
-          'RAG pipeline not created. Call createPipeline() first.');
+      throw StateError('RAG pipeline not created. Call createPipeline() first.');
     }
   }
 }

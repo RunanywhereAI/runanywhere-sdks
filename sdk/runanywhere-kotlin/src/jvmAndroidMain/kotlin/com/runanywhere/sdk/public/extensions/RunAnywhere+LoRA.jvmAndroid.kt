@@ -47,7 +47,7 @@ actual suspend fun RunAnywhere.loadLoraAdapter(config: LoRAAdapterConfig) {
 
     val result = CppBridgeLLM.loadLoraAdapter(config.path, config.scale)
     if (result != 0) {
-        throw SDKError.llm("Failed to load LoRA adapter '${config.path}': error code $result")
+        throw SDKError.llm("Failed to load LoRA adapter: error $result")
     }
 }
 
@@ -248,21 +248,6 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
         throw e
     } finally {
         connection.disconnect()
-    }
-
-    // Validate GGUF magic bytes (matches iOS validation)
-    val isValidGguf = destFile.inputStream().use { stream ->
-        val bytes = ByteArray(4)
-        if (stream.read(bytes) != 4) return@use false
-        val magic = (bytes[0].toUInt() and 0xFFu) or
-            ((bytes[1].toUInt() and 0xFFu) shl 8) or
-            ((bytes[2].toUInt() and 0xFFu) shl 16) or
-            ((bytes[3].toUInt() and 0xFFu) shl 24)
-        magic == 0x46554747u  // "GGUF" in little-endian
-    }
-    if (!isValidGguf) {
-        destFile.delete()
-        throw SDKError.download("Downloaded LoRA adapter is not a valid GGUF file: ${entry.filename}")
     }
 
     loraLogger.info("LoRA download completed: ${destFile.absolutePath}")

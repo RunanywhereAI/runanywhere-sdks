@@ -27,15 +27,8 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.RunAnywhereAI"
         android:largeHeap="true"
-        android:extractNativeLibs="true"
         android:usesCleartextTraffic="false"
         tools:targetApi="35">
-
-        <!-- Qualcomm FastRPC transport library for QNN HTP (NPU) inference.
-             Required on API 31+ to make vendor public libraries accessible. -->
-        <uses-native-library
-            android:name="libcdsprpc.so"
-            android:required="false" />
 
         <!-- 16KB page size support for Android 15+
              Our native libraries are built with 16KB ELF alignment, so we properly

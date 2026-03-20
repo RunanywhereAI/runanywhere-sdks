@@ -10,11 +10,8 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
-import 'package:runanywhere/core/types/npu_chip.dart';
-import 'package:runanywhere/public/extensions/runanywhere_device.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
-import 'package:runanywhere_genie/runanywhere_genie.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -205,41 +202,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 1400000000,
     );
     debugPrint('✅ LlamaCPP module registered');
-    await Future<void>.delayed(Duration.zero);
-
-    // --- GENIE NPU MODULE (Android/Snapdragon only) ---
-    if (Genie.isAvailable) {
-      await Genie.register(priority: 200);
-      final chip = await RunAnywhereDevice.getChip();
-      if (chip != null) {
-        // Models with per-chip availability
-        const genieModels = [
-          // Qwen3 4B — Gen 5 only
-          (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8EliteGen5}),
-          // Llama 3.2 1B Instruct — both chips
-          (slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
-          // SEA-LION v3.5 8B Instruct — both chips
-          (slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
-          // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
-          (slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4200000000, quant: 'w8a16', chips: {NPUChip.snapdragon8Elite}),
-        ];
-        for (final m in genieModels) {
-          if (m.chips.contains(chip)) {
-            Genie.addModel(
-              id: '${m.slug}-npu-${chip.identifier}',
-              name: '${m.name} (NPU - ${chip.displayName})',
-              url: chip.downloadUrl(m.slug, quant: m.quant),
-              memoryRequirement: m.mem,
-            );
-          }
-        }
-        debugPrint('✅ Genie NPU module registered (chip: ${chip.displayName})');
-      } else {
-        debugPrint('ℹ️ Genie available but no supported NPU chip detected');
-      }
-    } else {
-      debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
-    }
     await Future<void>.delayed(Duration.zero);
 
     // --- VLM MODULE ---

@@ -530,7 +530,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   /// Map SDK InferenceFramework enum to app framework enum
   LLMFramework _mapInferenceFramework(sdk.InferenceFramework? framework) {
-    if (framework == null) return LLMFramework.unknown;
+    if (framework == null) return LLMFramework.llamaCpp;
     switch (framework) {
       case sdk.InferenceFramework.llamaCpp:
         return LLMFramework.llamaCpp;
@@ -540,10 +540,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         return LLMFramework.onnxRuntime;
       case sdk.InferenceFramework.systemTTS:
         return LLMFramework.systemTTS;
-      case sdk.InferenceFramework.genie:
-        return LLMFramework.genie;
       default:
-        return LLMFramework.unknown;
+        return LLMFramework.llamaCpp;
     }
   }
 
@@ -771,6 +769,7 @@ class _MessageBubble extends StatefulWidget {
 
 class _MessageBubbleState extends State<_MessageBubble> {
   bool _showThinking = false;
+  bool _showToolCallSheet = false;
 
   @override
   Widget build(BuildContext context) {

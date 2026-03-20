@@ -23,7 +23,7 @@ expect class DeviceInfoService() {
     fun getDeviceModel(): String
 
     /**
-     * Get SoC model name for NPU chip detection (e.g., "SM8750", "kalama")
+     * Get chip/CPU name (e.g., "ARM64", "x86_64")
      * Returns null if unable to determine
      */
     fun getChipName(): String?

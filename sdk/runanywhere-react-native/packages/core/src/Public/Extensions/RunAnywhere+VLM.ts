@@ -20,10 +20,11 @@ import type {
 
 const logger = new SDKLogger('RunAnywhere.VLM');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _vlmModule: any = null;
+type VLMModule = typeof import('../../../llamacpp/src/RunAnywhere+VLM');
 
-async function getVLMModule(): Promise<any> {
+let _vlmModule: VLMModule | null = null;
+
+async function getVLMModule(): Promise<VLMModule> {
   if (_vlmModule) return _vlmModule;
   try {
     _vlmModule = require('@runanywhere/llamacpp');

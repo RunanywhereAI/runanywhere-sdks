@@ -143,7 +143,7 @@ class RAGSearchResult {
       chunkId: bridge.chunkId,
       text: bridge.text,
       similarityScore: bridge.similarityScore,
-      metadataJSON: bridge.metadataJson?.isEmpty == false ? bridge.metadataJson : null,
+      metadataJSON: bridge.metadataJson.isEmpty ? null : bridge.metadataJson,
     );
   }
 

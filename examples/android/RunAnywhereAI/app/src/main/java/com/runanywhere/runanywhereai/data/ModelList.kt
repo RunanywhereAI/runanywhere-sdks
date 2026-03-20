@@ -4,15 +4,12 @@ import timber.log.Timber
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.core.types.NPUChip
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
-import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelFileDescriptor
-import com.runanywhere.sdk.public.extensions.getChip
 import com.runanywhere.sdk.public.extensions.registerLoraAdapter
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
@@ -32,8 +29,8 @@ object ModelList {
             url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
             memoryRequirement = 4_000_000_000),
-        AppModel(id = "qwen2.5-0.5b-instruct-q8_0", name = "Qwen 2.5 0.5B Instruct Q8_0",
-            url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/base-model-q8_0.gguf",
+        AppModel(id = "qwen2.5-0.5b-instruct-q6_k", name = "Qwen 2.5 0.5B Instruct Q6_K",
+            url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
             framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
             memoryRequirement = 600_000_000, supportsLoraAdapters = true),
         AppModel(id = "qwen2.5-1.5b-instruct-q4_k_m", name = "Qwen 2.5 1.5B Instruct Q4_K_M",
@@ -117,72 +114,46 @@ object ModelList {
     // LoRA Adapters
     private val loraAdapters = listOf(
         LoraAdapterCatalogEntry(
-            id = "abliterated-lora",
-            name = "Abliterated LoRA (F16)",
-            description = "Removes refusal behavior — model answers all questions directly without disclaimers",
-            downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
-            fileSize = 17_600_000,
+            id = "code-assistant-lora",
+            name = "Code Assistant",
+            description = "Enhances code generation and programming assistance",
+            downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/code-assistant-Q8_0.gguf",
+            filename = "code-assistant-Q8_0.gguf",
+            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q6_k"),
+            fileSize = 765_952,
+            defaultScale = 1.0f,
+        ),
+        LoraAdapterCatalogEntry(
+            id = "reasoning-logic-lora",
+            name = "Reasoning Logic",
+            description = "Improves logical reasoning and step-by-step problem solving",
+            downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/reasoning-logic-Q8_0.gguf",
+            filename = "reasoning-logic-Q8_0.gguf",
+            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q6_k"),
+            fileSize = 765_952,
+            defaultScale = 1.0f,
+        ),
+        LoraAdapterCatalogEntry(
+            id = "medical-qa-lora",
+            name = "Medical QA",
+            description = "Enhances medical question answering and health-related responses",
+            downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/medical-qa-Q8_0.gguf",
+            filename = "medical-qa-Q8_0.gguf",
+            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q6_k"),
+            fileSize = 765_952,
+            defaultScale = 1.0f,
+        ),
+        LoraAdapterCatalogEntry(
+            id = "creative-writing-lora",
+            name = "Creative Writing",
+            description = "Improves creative writing, storytelling, and literary style",
+            downloadUrl = "https://huggingface.co/Void2377/Qwen/resolve/main/lora/creative-writing-Q8_0.gguf",
+            filename = "creative-writing-Q8_0.gguf",
+            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q6_k"),
+            fileSize = 765_952,
             defaultScale = 1.0f,
         ),
     )
-
-    // Genie NPU Models — URLs are built dynamically based on detected chipset.
-    // getChip() returns the NPUChip for this device, or null if unsupported.
-    // Each entry specifies which chips it supports; only matching models are shown.
-
-    private data class GenieModelDef(
-        val slug: String,
-        val name: String,
-        val memoryRequirement: Long,
-        val supportedChips: Set<NPUChip>,
-        val quant: String = "w4a16",
-    )
-
-    private val genieModelDefs = listOf(
-        GenieModelDef(
-            slug = "qwen3-4b",
-            name = "Qwen3 4B",
-            memoryRequirement = 2_800_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "llama3.2-1b-instruct",
-            name = "Llama 3.2 1B Instruct",
-            memoryRequirement = 1_200_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "sea-lion3.5-8b-instruct",
-            name = "SEA-LION v3.5 8B Instruct",
-            memoryRequirement = 4_800_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "qwen2.5-7b-instruct",
-            name = "Qwen 2.5 7B Instruct",
-            memoryRequirement = 4_200_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE),
-            quant = "w8a16",
-        ),
-    )
-
-    private fun genieModels(): List<AppModel> {
-        val chip = RunAnywhere.getChip() ?: return emptyList()
-        return genieModelDefs
-            .filter { chip in it.supportedChips }
-            .map { def ->
-                AppModel(
-                    id = "${def.slug}-npu-${chip.identifier}",
-                    name = "${def.name} (NPU - ${chip.displayName})",
-                    url = chip.downloadUrl(def.slug, def.quant),
-                    framework = InferenceFramework.GENIE,
-                    category = ModelCategory.LANGUAGE,
-                    memoryRequirement = def.memoryRequirement,
-                )
-            }
-    }
 
     // VLM
     private val vlmModels = listOf(
@@ -211,27 +182,17 @@ object ModelList {
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
-            Timber.i("Core backends registered")
+            Timber.i("Backends registered")
         } catch (e: Exception) {
-            Timber.e(e, "Failed to register core backends")
+            Timber.e(e, "Failed to register backends")
             return
         }
 
-        var genieRegistered = false
-        try {
-            Genie.register(priority = 200)
-            genieRegistered = true
-            Timber.i("Genie NPU backend registered")
-        } catch (e: Exception) {
-            Timber.w(e, "Genie backend unavailable — continuing without NPU models")
-        }
-
-        val allModels = buildList {
-            add("LLM/STT/TTS" to (llmModels + sttModels + ttsModels))
-            if (genieRegistered) add("Genie NPU" to genieModels())
-            add("Embedding" to embeddingModels)
-            add("VLM" to vlmModels)
-        }
+        val allModels = listOf(
+            "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
+            "Embedding" to embeddingModels,
+            "VLM" to vlmModels,
+        )
         for ((label, models) in allModels) {
             for (model in models) {
                 try {

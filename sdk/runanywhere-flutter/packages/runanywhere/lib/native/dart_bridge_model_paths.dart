@@ -322,8 +322,6 @@ int _frameworkToCValue(InferenceFramework framework) {
       return 5; // RAC_FRAMEWORK_BUILTIN
     case InferenceFramework.none:
       return 6; // RAC_FRAMEWORK_NONE
-    case InferenceFramework.genie:
-      return 10; // RAC_FRAMEWORK_GENIE
     case InferenceFramework.unknown:
       return 99;
   }

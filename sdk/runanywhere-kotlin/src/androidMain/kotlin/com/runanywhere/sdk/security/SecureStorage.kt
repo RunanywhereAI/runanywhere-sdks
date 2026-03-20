@@ -39,7 +39,6 @@ class AndroidSecureStorage private constructor(
         /**
          * Create secure storage instance for Android
          */
-        @Synchronized
         fun create(identifier: String): AndroidSecureStorage {
             val appContext =
                 context

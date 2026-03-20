@@ -10,10 +10,8 @@
  */
 
 #include <chrono>
-#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <mutex>
 #include <string>
 
@@ -890,28 +888,14 @@ extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Verify file exists and is a valid GGUF
-    {
-        std::ifstream file(adapter_path, std::ios::binary);
-        if (!file.is_open()) {
-            *out_error = rac_strdup("Adapter file not found");
-            return RAC_ERROR_INVALID_ARGUMENT;
-        }
-        uint32_t magic = 0;
-        file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
-        if (!file || magic != 0x46554747u) {  // "GGUF" in little-endian
-            *out_error = rac_strdup("Adapter file is not a valid GGUF file");
-            return RAC_ERROR_INVALID_ARGUMENT;
-        }
-    }
-
-    // Verify the backend supports LoRA
+    // Basic pre-check: verify the backend supports LoRA at all
     auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
     if (!llm_service->ops || !llm_service->ops->load_lora) {
         *out_error = rac_strdup("Backend does not support LoRA adapters");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
+    // Adapter path and backend both valid - considered compatible
     return RAC_SUCCESS;
 }
 

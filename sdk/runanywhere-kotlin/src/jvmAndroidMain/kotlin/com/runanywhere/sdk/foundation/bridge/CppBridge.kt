@@ -558,12 +558,8 @@ object CppBridge {
      * @return true if rac_is_initialized() returns true
      */
     fun isNativeInitialized(): Boolean {
-        if (!_isInitialized || !isNativeLibraryLoaded) return false
-        return try {
-            RunAnywhereBridge.racIsInitialized()
-        } catch (_: Exception) {
-            _isInitialized
-        }
+        // TODO: Call rac_is_initialized()
+        return _isInitialized
     }
 
     // =============================================================================

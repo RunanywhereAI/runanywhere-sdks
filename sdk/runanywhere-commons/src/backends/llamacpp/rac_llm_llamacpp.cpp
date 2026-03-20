@@ -346,8 +346,7 @@ rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
     }
 
     if (!h->text_gen->load_lora_adapter(adapter_path, scale)) {
-        std::string detail = std::string("Failed to load LoRA adapter: ") + adapter_path;
-        rac_error_set_details(detail.c_str());
+        rac_error_set_details("Failed to load LoRA adapter");
         return RAC_ERROR_MODEL_LOAD_FAILED;
     }
 

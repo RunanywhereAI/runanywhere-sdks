@@ -512,26 +512,20 @@ This keeps `librac_commons.so` decoupled from `librac_backend_llamacpp.so`.
 
 ---
 
-## llama.cpp LoRA API (b8201)
+## llama.cpp LoRA API (b8011)
 
 The implementation uses these llama.cpp functions:
 
 | Function | Purpose |
 |----------|---------|
 | `llama_adapter_lora_init(model, path)` | Load adapter tensors from GGUF file |
-| `llama_set_adapters_lora(ctx, adapters[], n, scales[])` | Apply adapter(s) to context with scale(s) |
+| `llama_set_adapter_lora(ctx, adapter, scale)` | Apply adapter to context with scale |
+| `llama_rm_adapter_lora(ctx, adapter)` | Remove specific adapter from context |
+| `llama_clear_adapter_lora(ctx)` | Remove all adapters from context |
 | `llama_memory_clear(memory, true)` | Clear KV cache after adapter changes |
-| `llama_adapter_meta_val_str(adapter, key, buf, size)` | Read adapter GGUF metadata by key |
-| `llama_adapter_meta_count(adapter)` | Get number of metadata entries |
-| `llama_adapter_meta_key_by_index(adapter, i, buf, size)` | Read metadata key by index |
-| `llama_adapter_meta_val_str_by_index(adapter, i, buf, size)` | Read metadata value by index |
 
-Note: `llama_adapter_lora_free()` is deprecated in b8201 — "adapters are now freed
-together with the associated model". Do NOT call it manually.
-
-**Internal header dependency:** The implementation includes `llama-adapter.h` (internal
-llama.cpp header) to access `adapter->ab_map.size()` for tensor match validation.
-This is pinned to llama.cpp b8201 via `VERSIONS` file. Must be verified on version bumps.
+Note: `llama_adapter_lora_free()` is deprecated. Adapters are freed automatically
+when the model is freed.
 
 ---
 
@@ -539,28 +533,20 @@ This is pinned to llama.cpp b8201 via `VERSIONS` file. Must be verified on versi
 
 ### Context Recreation
 
-Per llama.cpp docs: "All adapters must be loaded before context creation."
-When a new adapter is loaded after the model is already running, the
-implementation recreates the context so the compute graph properly accounts
-for LoRA operations:
+llama.cpp requires all adapters to be loaded before context creation. When a new
+adapter is loaded after the model is already running (context exists), the
+implementation recreates the context:
 
-1. Free old sampler and context
-2. Create new context with same parameters (context_size, batch_size, num_threads)
-3. Rebuild greedy sampler chain (real sampler rebuilt on next `generate_stream()`)
-4. Invalidate cached sampler params (temperature, top_p, top_k, repetition_penalty)
-5. Re-apply ALL loaded adapters via `llama_set_adapters_lora()`
-6. KV cache is already empty from fresh context — no explicit clear needed
+1. Free old context and sampler
+2. Create new context with same parameters (context_size, num_threads)
+3. Rebuild sampler chain (temperature, top_p, top_k, repetition penalty)
+4. Re-apply ALL loaded adapters to the new context
+5. Clear KV cache
 
 This is handled by `recreate_context()` + `apply_lora_adapters()` in
-`llamacpp_backend.cpp`.
-
-### Pre-Generation Adapter Verification
-
-Before each `generate_stream()` call, the implementation checks that all loaded
-adapters have `applied == true`. If any adapter is not applied (e.g., due to a
-prior failure), it attempts to re-apply via `apply_lora_adapters()`. If re-apply
-fails, generation is aborted with an error rather than silently ignoring the
-adapter.
+`llamacpp_backend.cpp`. The approach keeps things simple while ensuring
+correctness -- adapter memory overhead is typically 1-5% of the base model,
+so the cost of re-applying all adapters is negligible.
 
 ### KV Cache Invalidation
 
@@ -579,16 +565,10 @@ is in progress. The lock hierarchy is:
 - Component layer: `std::lock_guard<std::mutex>` on `component->mtx`
 - Kotlin bridge layer: `synchronized(lock)` on the CppBridgeLLM lock object
 
-### Input Validation
+### Duplicate Detection
 
-`load_lora_adapter()` performs multi-stage validation before touching llama.cpp:
-
-1. **Scale validation** — must be positive and finite (`scale > 0.0f && isfinite(scale)`)
-2. **Duplicate detection** — rejects if same path already loaded
-3. **File existence** — opens file with `std::ifstream` to verify it exists
-4. **GGUF magic check** — reads first 4 bytes and verifies `0x46554747` ("GGUF" LE)
-5. **Tensor match validation** — after `llama_adapter_lora_init()`, checks `adapter->ab_map.size() > 0` to ensure the adapter actually matched model tensors (catches wrong-base-model errors)
-6. **Metadata logging** — dumps adapter GGUF metadata (alpha, rank, etc.) for diagnostics
+`load_lora_adapter()` checks for duplicate adapter paths before loading. If the
+same path is already loaded, it returns an error instead of loading twice.
 
 ### Rollback on Failure
 
@@ -651,14 +631,6 @@ the context and model are freed. This ordering prevents use-after-free.
 | `sdk/runanywhere-kotlin/src/commonMain/.../LLMTypes.kt` | Added `LoRAAdapterConfig` and `LoRAAdapterInfo` data classes |
 | `sdk/runanywhere-kotlin/src/commonMain/.../RunAnywhere+LoRA.kt` | NEW file. `expect` declarations for 4 public API functions |
 | `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../RunAnywhere+LoRA.jvmAndroid.kt` | NEW file. `actual` implementations with init checks, CppBridgeLLM delegation, JSON parsing for adapter info |
-
-### Android Example App
-
-| File | Changes |
-|------|---------|
-| `examples/android/RunAnywhereAI/.../data/ModelList.kt` | Switched LoRA adapter from `lora-adapter.gguf` (4.3MB, ineffective) to `qwen2.5-0.5b-abliterated-lora-f16.gguf` (17.6MB F16, abliterated). Updated catalog entry ID, name, filename, fileSize. |
-| `examples/android/RunAnywhereAI/.../data/LoraExamplePrompts.kt` | Updated prompt filename key to match new adapter filename |
-| `examples/android/RunAnywhereAI/.../presentation/chat/ChatScreen.kt` | Updated starter prompt suggestions for LoRA demo comparison |
 
 ---
 
@@ -726,4 +698,3 @@ cd sdk/runanywhere-kotlin
 | 2026-02-19 | Claude | Initial implementation of LoRA adapter support across all 6 layers (C++ through Kotlin public API). C++ desktop build verified. |
 | 2026-02-19 | Claude | Fixed architecture: Component layer now dispatches LoRA ops through vtable (`rac_llm_service_ops_t`) instead of calling backend directly. This decouples `librac_commons.so` from `librac_backend_llamacpp.so`. Added 4 vtable entries and wrapper functions. Fixed `AttachCurrentThread` cast for Android NDK C++ build. Android native build verified. |
 | 2026-02-19 | Claude | Added detailed Kotlin SDK usage guide with data types, code examples, error handling, Android ViewModel pattern, and table of contents with section links. Updated "How to Extend" to include vtable step. |
-| 2026-03-09 | Claude | **LoRA fix & hardening.** Fixed LoRA adapter having no effect — root cause: wrong adapter file (4.3MB generic vs 17.6MB abliterated F16). Updated Android app to use `qwen2.5-0.5b-abliterated-lora-f16.gguf`. Added C++ validation: scale check, GGUF magic verification, tensor match count via `ab_map` (internal header `llama-adapter.h`), adapter metadata logging, pre-generation adapter state verification. Updated API from deprecated `llama_set_adapter_lora` to `llama_set_adapters_lora` (batch API, b8201). Updated docs to reflect llama.cpp b8201 API changes. |

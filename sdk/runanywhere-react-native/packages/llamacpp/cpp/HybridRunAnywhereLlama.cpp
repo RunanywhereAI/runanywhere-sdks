@@ -50,11 +50,7 @@ int extractIntValue(const std::string& json, const std::string& key, int default
   pos += searchKey.length();
   while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
   if (pos >= json.size()) return defaultValue;
-  try {
-    return std::stoi(json.substr(pos));
-  } catch (...) {
-    return defaultValue;
-  }
+  return std::stoi(json.substr(pos));
 }
 
 float extractFloatValue(const std::string& json, const std::string& key, float defaultValue) {
@@ -64,11 +60,7 @@ float extractFloatValue(const std::string& json, const std::string& key, float d
   pos += searchKey.length();
   while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
   if (pos >= json.size()) return defaultValue;
-  try {
-    return std::stof(json.substr(pos));
-  } catch (...) {
-    return defaultValue;
-  }
+  return std::stof(json.substr(pos));
 }
 
 std::string extractStringValue(const std::string& json, const std::string& key, const std::string& defaultValue = "") {

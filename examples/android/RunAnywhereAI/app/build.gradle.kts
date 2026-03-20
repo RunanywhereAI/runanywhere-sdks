@@ -220,8 +220,6 @@ dependencies {
     implementation(project(":runanywhere-core-llamacpp")) // ~45MB - LLM text generation
     implementation(project(":runanywhere-core-onnx")) // ~30MB - STT, TTS, VAD
     // RAG pipeline is now part of the core SDK (not a separate module)
-    // Genie: closed-source AAR from Maven Central (Qualcomm NPU backend)
-    implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1")
 
     // AndroidX Core & Lifecycle
     implementation(libs.androidx.core.ktx)

@@ -1215,11 +1215,6 @@
     prompts "^2.4.2"
     semver "^7.5.2"
 
-"@react-native-documents/picker@^12.0.1":
-  version "12.0.1"
-  resolved "https://registry.npmjs.org/@react-native-documents/picker/-/picker-12.0.1.tgz"
-  integrity sha512-vpJKb4t/5bnxe9+gQl+plJfKrrIsmYwANGhNH2B9E1dS1+6FDBzg4Dwmcq4ueaGfkRKEPJ606mJttVEH1ZKZaA==
-
 "@react-native/assets-registry@0.83.1":
   version "0.83.1"
   resolved "https://registry.npmjs.org/@react-native/assets-registry/-/assets-registry-0.83.1.tgz"
@@ -1472,14 +1467,9 @@
   dependencies:
     nanoid "^3.3.11"
 
-"@runanywhere/core@>=0.16.0", "@runanywhere/core@file:../../../sdk/runanywhere-react-native/packages/core":
+"@runanywhere/core@file:../../../sdk/runanywhere-react-native/packages/core":
   version "0.18.1"
   resolved "file:../../../sdk/runanywhere-react-native/packages/core"
-
-"@runanywhere/genie@^0.1.1":
-  version "0.1.1"
-  resolved "https://registry.npmjs.org/@runanywhere/genie/-/genie-0.1.1.tgz"
-  integrity sha512-rbIoJW4d52QA4+AwgIO9gclVeKXbERFUxDQ1LFeibCCl4KiPe/Eu5XxZtIe12pUBR8cDSps1ZJKQuZ1BfMrdOg==
 
 "@runanywhere/llamacpp@file:../../../sdk/runanywhere-react-native/packages/llamacpp":
   version "0.18.1"
@@ -5130,6 +5120,13 @@ react-is@^19.1.0:
   resolved "https://registry.npmjs.org/react-is/-/react-is-19.2.4.tgz"
   integrity sha512-W+EWGn2v0ApPKgKKCy/7s7WHXkboGcsrXE+2joLyVxkbyVQfO3MUEaUQDHoSmb8TFFrSKYa9mw64WZHNHSDzYA==
 
+react-native-document-picker@^9.3.1:
+  version "9.3.1"
+  resolved "https://registry.npmjs.org/react-native-document-picker/-/react-native-document-picker-9.3.1.tgz"
+  integrity sha512-Vcofv9wfB0j67zawFjfq9WQPMMzXxOZL9kBmvWDpjVuEcVK73ndRmlXHlkeFl5ZHVsv4Zb6oZYhqm9u5omJOPA==
+  dependencies:
+    invariant "^2.2.4"
+
 react-native-fs@^2.20.0:
   version "2.20.0"
   resolved "https://registry.npmjs.org/react-native-fs/-/react-native-fs-2.20.0.tgz"
@@ -5156,7 +5153,7 @@ react-native-monorepo-config@^0.3.0:
     escape-string-regexp "^5.0.0"
     fast-glob "^3.3.3"
 
-react-native-nitro-modules@^0.33.7, react-native-nitro-modules@>=0.31.3:
+react-native-nitro-modules@^0.33.7:
   version "0.33.7"
   resolved "https://registry.npmjs.org/react-native-nitro-modules/-/react-native-nitro-modules-0.33.7.tgz"
   integrity sha512-WepMobWe4j1Ae5GQ5RxYGBdBpJBwzP6zaOxJ7r6nhbY5iyl01DL3Gsh4gk8edzNFRuAh1rvXDAHIipq8SahxeQ==
@@ -5192,7 +5189,7 @@ react-native-vision-camera@^4.7.3:
   resolved "https://registry.npmjs.org/react-native-vision-camera/-/react-native-vision-camera-4.7.3.tgz"
   integrity sha512-g1/neOyjSqn1kaAa2FxI/qp5KzNvPcF0bnQw6NntfbxH6tm0+8WFZszlgb5OV+iYlB6lFUztCbDtyz5IpL47OA==
 
-react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.61.5", react-native@>=0.70.0, react-native@>=0.74.0, react-native@>=0.79.0, react-native@0.83.1:
+react-native@*, "react-native@^0.0.0-0 || >=0.65 <1.0", "react-native@>= 0.61.5", react-native@>=0.70.0, react-native@0.83.1:
   version "0.83.1"
   resolved "https://registry.npmjs.org/react-native/-/react-native-0.83.1.tgz"
   integrity sha512-mL1q5HPq5cWseVhWRLl+Fwvi5z1UO+3vGOpjr+sHFwcUletPRZ5Kv+d0tUfqHmvi73/53NjlQqX1Pyn4GguUfA==

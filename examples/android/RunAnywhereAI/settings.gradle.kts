@@ -55,8 +55,3 @@ project(":runanywhere-core-onnx").projectDir =
 
 // RAG pipeline is now part of the core SDK (not a separate module).
 // Registration is handled by ragCreatePipeline(). See: RunAnywhere+RAG.jvmAndroid.kt
-
-// Genie module - Qualcomm NPU-accelerated LLM (Snapdragon 8 Gen 2+)
-// Now distributed as a closed-source AAR from a private repo.
-// Add the dependency in app/build.gradle.kts:
-//   implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1")

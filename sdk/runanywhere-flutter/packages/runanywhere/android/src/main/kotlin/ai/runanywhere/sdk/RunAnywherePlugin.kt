@@ -48,9 +48,6 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
             "getCommonsVersion" -> {
                 result.success(COMMONS_VERSION)
             }
-            "getSocModel" -> {
-                result.success(getSocModel())
-            }
             else -> {
                 result.notImplemented()
             }
@@ -59,19 +56,5 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel.setMethodCallHandler(null)
-    }
-
-    /**
-     * Get the SoC model string for NPU chip detection.
-     * Uses Build.SOC_MODEL (API 31+) with Build.HARDWARE fallback.
-     */
-    private fun getSocModel(): String {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val socModel = Build.SOC_MODEL
-            if (!socModel.isNullOrEmpty() && socModel != "unknown") {
-                return socModel
-            }
-        }
-        return Build.HARDWARE ?: ""
     }
 }

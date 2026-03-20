@@ -9,9 +9,6 @@ const sdkRagPath = path.join(sdkPackagesPath, 'rag');
 const sdkLlamaPath = path.join(sdkPackagesPath, 'llamacpp');
 const sdkOnnxPath = path.join(sdkPackagesPath, 'onnx');
 
-// Genie package — consumed from npm (@runanywhere/genie)
-const geniePkgPath = path.resolve(__dirname, 'node_modules/@runanywhere/genie');
-
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
@@ -19,7 +16,7 @@ const geniePkgPath = path.resolve(__dirname, 'node_modules/@runanywhere/genie');
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  watchFolders: [sdkPackagesPath, geniePkgPath],
+  watchFolders: [sdkPackagesPath],
   resolver: {
     // Ensure Metro resolves SDK packages from the workspace (symlinks can be flaky)
     extraNodeModules: {
@@ -27,13 +24,8 @@ const config = {
       '@runanywhere/rag': sdkRagPath,
       '@runanywhere/llamacpp': sdkLlamaPath,
       '@runanywhere/onnx': sdkOnnxPath,
-      '@runanywhere/genie': geniePkgPath,
-      // Force single instances of shared peer dependencies (avoid version conflicts)
-      'react-native': path.resolve(__dirname, 'node_modules/react-native'),
-      'react-native-nitro-modules': path.resolve(__dirname, 'node_modules/react-native-nitro-modules'),
-      'react': path.resolve(__dirname, 'node_modules/react'),
     },
-    // Allow Metro to resolve modules from the SDK and genie package
+    // Allow Metro to resolve modules from the SDK
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
       path.resolve(sdkPath, 'node_modules'),

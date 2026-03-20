@@ -98,7 +98,6 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
     // Mirrors Swift's ModelCategory.from(framework:)
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
-        case RAC_FRAMEWORK_GENIE:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_MODEL_CATEGORY_LANGUAGE;
         case RAC_FRAMEWORK_ONNX:
@@ -150,14 +149,6 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
             (*out_formats)[0] = RAC_MODEL_FORMAT_BIN;
             return RAC_SUCCESS;
         }
-        case RAC_FRAMEWORK_GENIE: {
-            *out_count = 1;
-            *out_formats = (rac_model_format_t*)malloc(sizeof(rac_model_format_t));
-            if (!*out_formats)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            (*out_formats)[0] = RAC_MODEL_FORMAT_QNN_CONTEXT;
-            return RAC_SUCCESS;
-        }
         default:
             *out_count = 0;
             *out_formats = nullptr;
@@ -174,8 +165,6 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
                                                                                        : RAC_FALSE;
         case RAC_FRAMEWORK_LLAMACPP:
             return (format == RAC_MODEL_FORMAT_GGUF) ? RAC_TRUE : RAC_FALSE;
-        case RAC_FRAMEWORK_GENIE:
-            return (format == RAC_MODEL_FORMAT_QNN_CONTEXT) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_COREML:
             return (format == RAC_MODEL_FORMAT_COREML) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_FLUID_AUDIO:
@@ -189,9 +178,8 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
     // Mirrors Swift's InferenceFramework.usesDirectoryBasedModels
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
-        case RAC_FRAMEWORK_COREML:
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:
-        case RAC_FRAMEWORK_GENIE:
+        case RAC_FRAMEWORK_COREML:      // CoreML compiled models (.mlmodelc) are directories
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:   // WhisperKit models are directories of .mlmodelc files
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -202,7 +190,6 @@ rac_bool_t rac_framework_supports_llm(rac_inference_framework_t framework) {
     // Mirrors Swift's InferenceFramework.supportsLLM
     switch (framework) {
         case RAC_FRAMEWORK_LLAMACPP:
-        case RAC_FRAMEWORK_GENIE:
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
             return RAC_TRUE;
@@ -250,8 +237,6 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return "WhisperKit CoreML";
-        case RAC_FRAMEWORK_GENIE:
-            return "Qualcomm Genie";
         case RAC_FRAMEWORK_BUILTIN:
             return "Built-in";
         case RAC_FRAMEWORK_NONE:
@@ -280,8 +265,6 @@ const char* rac_framework_analytics_key(rac_inference_framework_t framework) {
             return "fluid_audio";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return "whisperkit_coreml";
-        case RAC_FRAMEWORK_GENIE:
-            return "genie";
         case RAC_FRAMEWORK_BUILTIN:
             return "built_in";
         case RAC_FRAMEWORK_NONE:
@@ -420,9 +403,7 @@ const char* rac_model_format_extension(rac_model_format_t format) {
         case RAC_MODEL_FORMAT_BIN:
             return "bin";
         case RAC_MODEL_FORMAT_COREML:
-            return "mlmodelc";
-        case RAC_MODEL_FORMAT_QNN_CONTEXT:
-            return "bin";
+            return "mlmodelc";  // CoreML compiled model directory
         default:
             return nullptr;
     }

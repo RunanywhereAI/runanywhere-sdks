@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { NativeModules } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { pick as documentPick } from '@react-native-documents/picker';
+import DocumentPicker from 'react-native-document-picker';
 import { Colors } from '../theme/colors';
 import { Typography, FontWeight } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -167,11 +167,12 @@ export const RAGScreen: React.FC = () => {
     if (!areModelsReady || !isNitroReady) return;
 
     try {
-      const [result] = await documentPick({
-        type: ['application/pdf', 'text/plain', 'application/json'],
+      const result = await DocumentPicker.pickSingle({
+        type: [DocumentPicker.types.pdf, DocumentPicker.types.plainText, DocumentPicker.types.json],
+        copyTo: 'cachesDirectory',
       });
 
-      const fileUri = result.uri;
+      const fileUri = result.fileCopyUri || result.uri;
       if (!fileUri) return;
 
       setIsLoadingDocument(true);
@@ -204,8 +205,8 @@ export const RAGScreen: React.FC = () => {
 
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
-    } catch (err: any) {
-      if (err?.code === 'OPERATION_CANCELED') {
+    } catch (err) {
+      if (DocumentPicker.isCancel(err)) {
         return; // User cancelled
       }
       const msg = err instanceof Error ? err.message : 'Failed to load document';
