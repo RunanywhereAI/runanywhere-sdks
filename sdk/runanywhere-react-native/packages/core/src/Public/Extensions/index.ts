@@ -109,6 +109,9 @@ export type {
   StructuredOutputStreamResult
 } from './RunAnywhere+StructuredOutput';
 
+// Device (NPU Chip Detection)
+export { getChip } from './RunAnywhere+Device';
+
 // Logging
 export { setLogLevel } from './RunAnywhere+Logging';
 

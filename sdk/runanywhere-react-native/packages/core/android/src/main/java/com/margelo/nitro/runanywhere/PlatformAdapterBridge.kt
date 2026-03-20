@@ -379,10 +379,16 @@ object PlatformAdapterBridge {
     }
 
     /**
-     * Get chip name (e.g., "Tensor G3")
+     * Get chip name (e.g., "SM8750")
      */
     @JvmStatic
     fun getChipName(): String {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val socModel = android.os.Build.SOC_MODEL
+            if (!socModel.isNullOrEmpty() && socModel != "unknown") {
+                return socModel
+            }
+        }
         return android.os.Build.HARDWARE
     }
 
