@@ -93,6 +93,21 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORC
 
 FetchContent_MakeAvailable(llamacpp)
 
+# MSVC C++20 fix for llama-chat.cpp:
+# u8"..." literals return const char8_t* in C++20; MSVC rejects any cast to const char*.
+# Force-include msvc_lu8_fix.h which redefines LU8(x) to plain x (no u8 prefix).
+# /utf-8 is still required: it tells MSVC to read source files as UTF-8, so the
+# multi-byte characters inside the plain string literals are preserved byte-for-byte.
+if(RAC_PLATFORM_WINDOWS AND MSVC)
+    set(_lu8_fix_header "${CMAKE_CURRENT_SOURCE_DIR}/msvc_lu8_fix.h")
+    if(TARGET llama)
+        target_compile_options(llama PRIVATE /utf-8 "/FI${_lu8_fix_header}")
+    endif()
+    if(TARGET common)
+        target_compile_options(common PRIVATE /utf-8 "/FI${_lu8_fix_header}")
+    endif()
+endif()
+
 # Android: map POSIX_MADV_* to MADV_* to avoid missing constants
 if(RAC_PLATFORM_ANDROID)
     if(TARGET llama)
@@ -205,7 +220,6 @@ target_link_libraries(rac_backend_llamacpp PUBLIC
 )
 
 set_target_properties(rac_backend_llamacpp PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

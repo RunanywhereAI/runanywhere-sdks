@@ -88,4 +88,9 @@ class PreferenceKeys {
   static const String defaultMaxTokens = 'defaultMaxTokens';
   static const String defaultSystemPrompt = 'defaultSystemPrompt';
   static const String useStreaming = 'useStreaming';
+
+  // Proxy settings
+  static const String proxyEnabled = 'proxyEnabled';
+  static const String proxyHost = 'proxyHost';
+  static const String proxyPort = 'proxyPort';
 }

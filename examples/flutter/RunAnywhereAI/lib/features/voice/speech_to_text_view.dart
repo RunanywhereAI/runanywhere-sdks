@@ -428,7 +428,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           Icon(
             Icons.mic,
             size: 64,
-            color: AppColors.statusGreen.withValues(alpha: 0.5),
+            color: AppColors.statusGreen.withOpacity(0.5),
           ),
           const SizedBox(height: AppSpacing.large),
           Text(
@@ -602,7 +602,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           color: _hasModelSelected ? buttonColor : AppColors.statusGray,
           boxShadow: [
             BoxShadow(
-              color: buttonColor.withValues(alpha: 0.3),
+              color: buttonColor.withOpacity(0.3),
               blurRadius: AppSpacing.shadowXLarge,
               offset: const Offset(0, 4),
             ),

@@ -166,6 +166,20 @@ elseif(RAC_PLATFORM_LINUX)
     else()
         message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
     endif()
+
+elseif(RAC_PLATFORM_WINDOWS)
+    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-windows")
+    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
+        set(SHERPA_ONNX_AVAILABLE ON)
+
+        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
+        set_target_properties(sherpa_onnx PROPERTIES
+            IMPORTED_IMPLIB "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib"
+            IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.dll"
+            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_ONNX_ROOT}/include"
+        )
+        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
+    endif()
 endif()
 
 # =============================================================================
@@ -182,13 +196,19 @@ set(ONNX_BACKEND_SOURCES
 
 # ONNX embedding provider lives in src/features/rag/ but is compiled here
 # to avoid a shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+# NOTE: These two files are compiled unconditionally (even when RAC_BACKEND_RAG=OFF, e.g. on Windows)
+# because rac_backend_onnx_register.cpp always calls rac_backend_onnx_embeddings_register/unregister.
+# The embedding provider itself does not depend on USearch (the RAG-only library), so it is safe
+# to build on all platforms including Windows.
 set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../features/rag")
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
+if(EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp" AND EXISTS "${RAG_DIR}/rac_onnx_embeddings_register.cpp")
     list(APPEND ONNX_BACKEND_SOURCES
         ${RAG_DIR}/onnx_embedding_provider.cpp
         ${RAG_DIR}/rac_onnx_embeddings_register.cpp
     )
     message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
+else()
+    message(WARNING "  ONNX embedding provider sources not found in ${RAG_DIR} - LNK2019 may occur")
 endif()
 
 set(ONNX_BACKEND_HEADERS
@@ -211,7 +231,8 @@ target_include_directories(rac_backend_onnx PUBLIC
 )
 
 # RAG embedding provider headers (onnx_embedding_provider.h lives in features/rag/)
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
+# Always include regardless of RAC_BACKEND_RAG since the files are always compiled
+if(EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
     target_include_directories(rac_backend_onnx PRIVATE ${RAG_DIR})
 endif()
 
@@ -234,7 +255,6 @@ else()
 endif()
 
 set_target_properties(rac_backend_onnx PROPERTIES
-    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

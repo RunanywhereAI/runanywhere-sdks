@@ -124,7 +124,11 @@ class JsonBuilder {
         time_t secs = ms / 1000;
         int millis = ms % 1000;
         struct tm tm_info;
+#if defined(_WIN32) && defined(_MSC_VER)
+        gmtime_s(&tm_info, &secs);
+#else
         gmtime_r(&secs, &tm_info);
+#endif
 
         char buf[32];
         strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_info);

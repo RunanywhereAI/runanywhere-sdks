@@ -392,3 +392,7 @@ sdk/runanywhere-react-native/packages/rag/ios/.testlocal
 node_modules/
 /tools/
 *.trace
+
+# FVM 
+.fvm
+.fvmrc

@@ -32,6 +32,7 @@
 library runanywhere_llamacpp;
 
 import 'dart:async' show unawaited;
+import 'dart:io' show Platform;
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/types/model_types.dart';
@@ -147,7 +148,12 @@ class LlamaCpp implements RunAnywhereModule {
       _logger.info('LlamaCpp LLM backend registered successfully');
 
       // Register VLM backend (Vision Language Model)
-      _registerVlm();
+      // Skip on Windows - VLM registration causes a native crash on Windows builds
+      if (!Platform.isWindows) {
+        _registerVlm();
+      } else {
+        _logger.info('LlamaCpp VLM registration skipped on Windows');
+      }
     } catch (e) {
       _logger.error('LlamaCppBindings not available: $e');
     }
