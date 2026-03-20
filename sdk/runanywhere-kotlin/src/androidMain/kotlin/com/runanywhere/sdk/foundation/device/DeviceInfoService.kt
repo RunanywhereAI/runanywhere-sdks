@@ -33,8 +33,8 @@ actual class DeviceInfoService {
         }
     }
 
-    actual fun getChipName(): String? =
-        try {
+    actual fun getChipName(): String? {
+        return try {
             // Try Build.SOC_MODEL first (API 31+) — returns actual SoC like "SM8750"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val socModel = Build.SOC_MODEL
@@ -52,6 +52,7 @@ actual class DeviceInfoService {
         } catch (e: Exception) {
             null
         }
+    }
 
     actual fun getTotalMemoryGB(): Double? {
         return try {

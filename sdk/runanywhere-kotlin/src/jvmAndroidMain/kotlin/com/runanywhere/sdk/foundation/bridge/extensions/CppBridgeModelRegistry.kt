@@ -74,13 +74,13 @@ object CppBridgeModelRegistry {
      * Model format constants matching C++ RAC_MODEL_FORMAT_* values.
      */
     object ModelFormat {
-        const val UNKNOWN = 0 // RAC_MODEL_FORMAT_UNKNOWN
-        const val GGUF = 1 // RAC_MODEL_FORMAT_GGUF
-        const val ONNX = 2 // RAC_MODEL_FORMAT_ONNX
-        const val ORT = 3 // RAC_MODEL_FORMAT_ORT
-        const val BIN = 4 // RAC_MODEL_FORMAT_BIN
-        const val COREML = 5 // RAC_MODEL_FORMAT_COREML
-        const val TFLITE = 6 // RAC_MODEL_FORMAT_TFLITE
+        const val ONNX = 0 // RAC_MODEL_FORMAT_ONNX
+        const val ORT = 1 // RAC_MODEL_FORMAT_ORT
+        const val GGUF = 2 // RAC_MODEL_FORMAT_GGUF
+        const val BIN = 3 // RAC_MODEL_FORMAT_BIN
+        const val COREML = 4 // RAC_MODEL_FORMAT_COREML
+        const val QNN_CONTEXT = 5 // RAC_MODEL_FORMAT_QNN_CONTEXT
+        const val UNKNOWN = 99 // RAC_MODEL_FORMAT_UNKNOWN
     }
 
     /**

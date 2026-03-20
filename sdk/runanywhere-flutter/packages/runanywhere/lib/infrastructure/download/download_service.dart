@@ -259,12 +259,14 @@ class ModelDownloadService {
         if (requiresExtraction) {
           yield ModelDownloadProgress.extracting(modelId);
 
+          // Snapshot items before extraction to detect new entries
+          final itemsBefore = await destDir.list().map((e) => e.path).toSet();
+
           final extractedPath = await _extractArchive(
             downloadPath,
             destDir.path,
             model.artifactType,
           );
-          finalModelPath = extractedPath;
 
           // Clean up archive file after extraction
           try {
@@ -272,6 +274,14 @@ class ModelDownloadService {
           } catch (e) {
             _logger.warning('Failed to delete archive: $e');
           }
+
+          // Resolve the extracted model path using the snapshot
+          finalModelPath = await _resolveExtractedModelPath(
+            destDir.path,
+            modelId,
+            itemsBefore,
+            extractedPath,
+          );
         }
 
         // Update model's local path
@@ -349,7 +359,7 @@ class ModelDownloadService {
         throw Exception('unzip failed (exit ${result.exitCode}): ${result.stderr}');
       }
       _logger.info('Extraction complete: $destDir');
-      return _resolveExtractedDir(destDir);
+      return destDir;
     } else {
       _logger.warning('Unknown archive format: $archivePath');
       return archivePath;
@@ -362,18 +372,79 @@ class ModelDownloadService {
     }
 
     _logger.info('Extraction complete: $destDir');
-    return _resolveExtractedDir(destDir);
+    return destDir;
   }
 
-  /// If extraction produced a single subdirectory, return that path instead.
-  Future<String> _resolveExtractedDir(String destDir) async {
+  /// Resolve the final model directory after archive extraction.
+  ///
+  /// The download service already creates a per-model directory (destDir) named
+  /// after the modelId.  Archives may contain a single root folder whose name
+  /// differs from modelId (e.g. Genie NPU tar.gz).  We flatten that away so
+  /// model files always live directly inside destDir.
+  ///
+  /// Cases handled:
+  /// 1. Model files extracted directly into destDir → nothing to do.
+  /// 2. Single new subdirectory created by extraction → move its contents up
+  ///    into destDir and delete the now-empty subdirectory.
+  /// 3. Multiple new items → already flat, nothing to do.
+  Future<String> _resolveExtractedModelPath(
+    String destDir,
+    String modelId,
+    Set<String> itemsBefore,
+    String fallbackPath,
+  ) async {
     final destDirectory = Directory(destDir);
-    final entries = await destDirectory.list().toList();
-    final subdirs = entries.whereType<Directory>().toList();
-    if (subdirs.length == 1) {
-      return subdirs.first.path;
+
+    // Find new items created by extraction
+    final currentItems = await destDirectory.list().toList();
+    final newItems = currentItems
+        .where((e) => !itemsBefore.contains(e.path))
+        .toList();
+    final newDirs = newItems.whereType<Directory>().toList();
+    final newFiles = newItems.whereType<File>().toList();
+
+    // Case: single new directory (e.g. Genie NPU archive root like
+    // "llama_v3_2_1b_instruct-genie-w4-qualcomm_snapdragon_8_elite/").
+    // Move its contents up into destDir so files are discoverable directly.
+    if (newDirs.length == 1 && newFiles.isEmpty) {
+      final extractedDir = newDirs.first;
+      _logger.info(
+        'Flattening extracted dir '
+        "'${p.basename(extractedDir.path)}' into destDir",
+      );
+      try {
+        final innerItems = await extractedDir.list().toList();
+        for (final item in innerItems) {
+          final target = p.join(destDir, p.basename(item.path));
+          try {
+            await (item as FileSystemEntity).rename(target);
+          } catch (e) {
+            if (item is File) {
+              await item.copy(target);
+              await item.delete();
+            } else {
+              _logger.warning('Failed to move ${item.path}: $e');
+            }
+          }
+        }
+        await extractedDir.delete(recursive: true);
+        _logger.info(
+          'Flattened ${innerItems.length} items from '
+          "'${p.basename(extractedDir.path)}' into: $destDir",
+        );
+      } catch (e) {
+        _logger.warning('Error flattening extracted dir: $e');
+      }
+      return destDir;
     }
-    return destDir;
+
+    // Files already at destDir root (flat archive or direct match) — use as-is
+    if (newItems.isNotEmpty) {
+      _logger.info('Extracted ${newItems.length} items directly into: $destDir');
+      return destDir;
+    }
+
+    return fallbackPath;
   }
 
   /// Update model's local path after download

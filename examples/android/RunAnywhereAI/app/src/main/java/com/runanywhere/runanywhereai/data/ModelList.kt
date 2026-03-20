@@ -211,19 +211,27 @@ object ModelList {
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
-            Genie.register(priority = 200)
-            Timber.i("Backends registered")
+            Timber.i("Core backends registered")
         } catch (e: Exception) {
-            Timber.e(e, "Failed to register backends")
+            Timber.e(e, "Failed to register core backends")
             return
         }
 
-        val allModels = listOf(
-            "LLM/STT/TTS" to (llmModels + sttModels + ttsModels),
-            "Genie NPU" to genieModels(),
-            "Embedding" to embeddingModels,
-            "VLM" to vlmModels,
-        )
+        var genieRegistered = false
+        try {
+            Genie.register(priority = 200)
+            genieRegistered = true
+            Timber.i("Genie NPU backend registered")
+        } catch (e: Exception) {
+            Timber.w(e, "Genie backend unavailable — continuing without NPU models")
+        }
+
+        val allModels = buildList {
+            add("LLM/STT/TTS" to (llmModels + sttModels + ttsModels))
+            if (genieRegistered) add("Genie NPU" to genieModels())
+            add("Embedding" to embeddingModels)
+            add("VLM" to vlmModels)
+        }
         for ((label, models) in allModels) {
             for (model in models) {
                 try {

@@ -93,6 +93,8 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
                         ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
                         ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
+                        ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
+                        ModelFormat.QNN_CONTEXT -> CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT
                         else -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
                     },
                 // CRITICAL: Map InferenceFramework to C++ framework constant
@@ -296,6 +298,8 @@ private fun bridgeModelToPublic(bridge: CppBridgeModelRegistry.ModelInfo): Model
                 CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
                 CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
                 CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+                CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
+                CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
                 else -> ModelFormat.UNKNOWN
             },
         framework =
@@ -868,32 +872,52 @@ private suspend fun extractArchive(
             }
         }
 
-        // Find the extracted model directory
-        // The archive should have created a folder with the model ID name
+        // Find the extracted model directory.
+        // Compute new items by comparing current contents against the pre-extraction snapshot.
+        // Explicitly exclude the temp archive name in case cleanup failed (delete() returns false
+        // without throwing), to avoid moving a multi-GB archive file into the model directory.
+        val tempArchiveName = tempArchiveFile.name
         val expectedModelDir = File(parentDir, modelId)
+        val newItems = parentDir.listFiles()
+            ?.filter { it.name !in itemsBeforeExtraction && it.name != tempArchiveName }
+            ?: emptyList()
+        val newDirs = newItems.filter { it.isDirectory }
+        val newFiles = newItems.filter { it.isFile }
+
         val finalPath =
             if (expectedModelDir.exists() && expectedModelDir.isDirectory) {
-                // Standard case: archive had a named root folder (ONNX, LlamaCpp archives)
+                // Standard case: archive root folder name matches modelId
                 expectedModelDir.absolutePath
-            } else {
-                // Fallback: look for any new named directory matching the model ID prefix
-                val matchingDir = parentDir.listFiles()
-                    ?.firstOrNull { it.isDirectory && it.name.contains(modelId.substringBefore("-")) }
-
-                if (matchingDir != null) {
-                    matchingDir.absolutePath
-                } else {
-                    // Flat archive (e.g. Genie): files extracted directly into parentDir.
-                    // Move them into a per-model subdirectory so the standard filesystem
-                    // scan can find and restore this model by its ID across app restarts.
-                    expectedModelDir.mkdirs()
-                    val newItems = parentDir.listFiles()
-                        ?.filter { it.name !in itemsBeforeExtraction && it != expectedModelDir }
-                        ?: emptyList()
-                    newItems.forEach { file -> file.renameTo(File(expectedModelDir, file.name)) }
-                    logger.info("Moved ${newItems.size} flat-extracted files into: ${expectedModelDir.absolutePath}")
+            } else if (newDirs.size == 1 && newFiles.isEmpty()) {
+                // Archive had a single root directory with a different name (e.g. Genie NPU
+                // tar.gz containing "llama_v3_2_1b_instruct-genie-w4-qualcomm_snapdragon_8_elite/").
+                // Rename it to the expected modelId so the SDK can discover it consistently.
+                val extractedDir = newDirs.first()
+                if (extractedDir.renameTo(expectedModelDir)) {
+                    logger.info("Renamed extracted dir '${extractedDir.name}' -> '$modelId'")
                     expectedModelDir.absolutePath
+                } else {
+                    logger.warn("Could not rename '${extractedDir.name}' -> '$modelId', using as-is")
+                    extractedDir.absolutePath
                 }
+            } else {
+                // Flat archive: files extracted directly into parentDir.
+                // Move them into a per-model subdirectory so the SDK filesystem
+                // scan can discover this model by its ID across app restarts.
+                expectedModelDir.mkdirs()
+                val itemsToMove = newItems.filter { it != expectedModelDir }
+                var movedCount = 0
+                itemsToMove.forEach { file ->
+                    val dest = File(expectedModelDir, file.name)
+                    if (!file.renameTo(dest)) {
+                        logger.warn("Failed to move '${file.name}' into model dir, trying copy")
+                        file.copyTo(dest, overwrite = true)
+                        file.delete()
+                    }
+                    movedCount++
+                }
+                logger.info("Moved $movedCount flat-extracted files into: ${expectedModelDir.absolutePath}")
+                expectedModelDir.absolutePath
             }
 
         logger.info("Model extracted to: $finalPath")
@@ -1364,18 +1388,20 @@ private fun parseModelAssignmentsJson(json: String): List<ModelInfo> {
                             },
                         format =
                             when (formatInt) {
-                                1 -> ModelFormat.GGUF
-                                2 -> ModelFormat.ONNX
-                                3 -> ModelFormat.ORT
+                                CppBridgeModelRegistry.ModelFormat.ONNX -> ModelFormat.ONNX
+                                CppBridgeModelRegistry.ModelFormat.ORT -> ModelFormat.ORT
+                                CppBridgeModelRegistry.ModelFormat.GGUF -> ModelFormat.GGUF
+                                CppBridgeModelRegistry.ModelFormat.BIN -> ModelFormat.BIN
+                                CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT -> ModelFormat.QNN_CONTEXT
                                 else -> ModelFormat.UNKNOWN
                             },
                         framework =
                             when (frameworkInt) {
-                                1 -> InferenceFramework.LLAMA_CPP
-                                2 -> InferenceFramework.ONNX
-                                3 -> InferenceFramework.FOUNDATION_MODELS
-                                4 -> InferenceFramework.SYSTEM_TTS
-                                10 -> InferenceFramework.GENIE
+                                CppBridgeModelRegistry.Framework.LLAMACPP -> InferenceFramework.LLAMA_CPP
+                                CppBridgeModelRegistry.Framework.ONNX -> InferenceFramework.ONNX
+                                CppBridgeModelRegistry.Framework.FOUNDATION_MODELS -> InferenceFramework.FOUNDATION_MODELS
+                                CppBridgeModelRegistry.Framework.SYSTEM_TTS -> InferenceFramework.SYSTEM_TTS
+                                CppBridgeModelRegistry.Framework.GENIE -> InferenceFramework.GENIE
                                 else -> InferenceFramework.UNKNOWN
                             },
                         downloadURL = downloadUrl,
