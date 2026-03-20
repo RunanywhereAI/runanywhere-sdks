@@ -24,7 +24,7 @@ void _safeRacFree(Pointer<Void> ptr) {
   if (ptr == nullptr) return;
 
   try {
-    NativeFunctions.racFree(ptr);
+    NativeFunctions.racFree?.call(ptr);
   } catch (_) {
     // rac_free may not exist in some native builds
   }
@@ -73,10 +73,8 @@ class DartBridgeVoiceAgent {
       return _handle!;
     }
 
-    final initFuture = _initFuture;
-    if (initFuture != null) {
-      await initFuture;
-      return _handle!;
+    if (_initFuture != null) {
+      return _initFuture!;
     }
 
     final completer = Completer<RacHandle>();
@@ -618,10 +616,11 @@ final int Function(
   int,
   Pointer<RacVoiceAgentResultStruct>,
 ) _processVoiceTurnFn = _voiceAgentLib.lookupFunction<
-    Int32 Function(RacHandle, Pointer<Void>, IntPtr,
-        Pointer<RacVoiceAgentResultStruct>),
-    int Function(RacHandle, Pointer<Void>, int,
-        Pointer<RacVoiceAgentResultStruct>)>('rac_voice_agent_process_voice_turn');
+        Int32 Function(RacHandle, Pointer<Void>, IntPtr,
+            Pointer<RacVoiceAgentResultStruct>),
+        int Function(
+            RacHandle, Pointer<Void>, int, Pointer<RacVoiceAgentResultStruct>)>(
+    'rac_voice_agent_process_voice_turn');
 
 final void Function(Pointer<RacVoiceAgentResultStruct>)?
     _voiceAgentResultFreeFn = (() {

@@ -13,7 +13,6 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
-import 'package:runanywhere/native/platform_loader.dart';
 
 /// VAD component bridge for C++ interop.
 ///
@@ -226,7 +225,12 @@ class DartBridgeVAD {
         samplesPtr[i] = samples[i];
       }
 
-      final status = NativeFunctions.vadProcess(handle, samplesPtr, samples.length, resultPtr);
+      final status = NativeFunctions.vadProcess(
+        handle,
+        samplesPtr,
+        samples.length,
+        resultPtr.cast<Void>(),
+      );
 
       if (status != RAC_SUCCESS) {
         throw StateError(
