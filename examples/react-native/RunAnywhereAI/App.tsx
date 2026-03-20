@@ -19,6 +19,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -41,7 +42,11 @@ import {
   LLMFramework,
   ModelArtifactType,
   initializeNitroModulesGlobally,
+  getChip,
+  getNPUDownloadUrl,
+  NPU_CHIPS,
 } from '@runanywhere/core';
+import type { NPUChip } from '@runanywhere/core';
 
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: any = null;
@@ -50,6 +55,15 @@ try {
 } catch (e) {
   console.warn('[App] LlamaCPP backend not available - some features disabled');
 }
+
+// Make Genie optional (Android/Snapdragon only)
+let Genie: any = null;
+try {
+  Genie = require('@runanywhere/genie').Genie;
+} catch (e) {
+  console.warn('[App] Genie NPU backend not available');
+}
+
 import { ONNX } from '@runanywhere/onnx';
 import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
 
@@ -226,6 +240,50 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 600_000_000,
       }),
     ]);
+  }
+
+  // =========================================================================
+  // Genie NPU backend + models (Android/Snapdragon only)
+  // =========================================================================
+  if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
+    Genie.register();
+
+    const chip = await getChip();
+    if (chip) {
+      // Models with per-chip availability
+      const genieModels: Array<{
+        slug: string;
+        name: string;
+        mem: number;
+        chips: string[];
+        quant?: string;
+      }> = [
+        // Qwen3 4B — Gen 5 only
+        { slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2_800_000_000, chips: ['8elite-gen5'] },
+        // Llama 3.2 1B Instruct — both chips
+        { slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1_200_000_000, chips: ['8elite', '8elite-gen5'] },
+        // SEA-LION v3.5 8B Instruct — both chips
+        { slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4_800_000_000, chips: ['8elite', '8elite-gen5'] },
+        // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
+        { slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4_200_000_000, chips: ['8elite'], quant: 'w8a16' },
+      ];
+
+      const registrations = genieModels
+        .filter((m) => m.chips.includes(chip.identifier))
+        .map((m) =>
+          RunAnywhere.registerModel({
+            id: `${m.slug}-npu-${chip.identifier}`,
+            name: `${m.name} (NPU - ${chip.displayName})`,
+            url: getNPUDownloadUrl(chip, m.slug, m.quant),
+            framework: LLMFramework.Genie,
+            memoryRequirement: m.mem,
+          }),
+        );
+      await Promise.all(registrations);
+      console.log(`✅ Genie NPU models registered (chip: ${chip.displayName})`);
+    } else {
+      console.log('ℹ️ Genie available but no supported NPU chip detected');
+    }
   }
 
   // =========================================================================

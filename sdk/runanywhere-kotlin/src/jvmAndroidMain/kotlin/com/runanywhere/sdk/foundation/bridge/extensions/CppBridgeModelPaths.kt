@@ -908,9 +908,21 @@ object CppBridgeModelPaths {
             val finalPath = getModelPathByTypeCallback(modelId, modelType)
             val finalFile = File(finalPath)
 
-            // Delete existing file if present
+            // Delete existing file/directory if present
             if (finalFile.exists()) {
-                finalFile.delete()
+                val deleted = if (finalFile.isDirectory) {
+                    finalFile.deleteRecursively()
+                } else {
+                    finalFile.delete()
+                }
+                if (!deleted) {
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.ERROR,
+                        TAG,
+                        "Failed to delete existing destination: ${finalFile.absolutePath} (isDir=${finalFile.isDirectory})",
+                    )
+                    return false
+                }
             }
 
             // Move file

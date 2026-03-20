@@ -11,7 +11,6 @@ package com.runanywhere.sdk.public
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
-import kotlinx.coroutines.runBlocking
 
 private const val TAG = "PlatformBridge"
 private val logger = SDKLogger(TAG)
@@ -49,15 +48,9 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey
  * Initialize CppBridge services (Phase 2).
  * This includes model assignment, platform services, and device registration.
  */
-internal actual fun initializePlatformBridgeServices() {
+internal actual suspend fun initializePlatformBridgeServices() {
     logger.info("Initializing CppBridge services...")
-
-    // Use runBlocking to call the suspend function
-    // This is safe because services initialization is typically called once
-    runBlocking {
-        CppBridge.initializeServices()
-    }
-
+    CppBridge.initializeServices()
     logger.info("CppBridge services initialization complete")
 }
 

@@ -36,9 +36,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,6 +83,7 @@ private data class AIModel(
     val size: String,
     val isDownloaded: Boolean,
     val supportsLora: Boolean = false,
+    val isNpu: Boolean = false,
 )
 
 /**
@@ -104,6 +109,25 @@ fun ModelSelectionBottomSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deviceStatus = uiState.deviceInfo?.let { toDeviceStatus(it) }
         ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
+    var errorDialogText by remember { mutableStateOf<String?>(null) }
+
+    if (errorDialogText != null) {
+        AlertDialog(
+            onDismissRequest = { errorDialogText = null },
+            title = { Text("Model Load Error") },
+            text = {
+                Text(
+                    text = errorDialogText ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { errorDialogText = null }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -198,12 +222,15 @@ fun ModelSelectionBottomSheet(
                                             delay(500)
                                             attempts++
                                         }
-                                        // Only notify success if loading completed WITHOUT errors
                                         val state = viewModel.uiState.value
                                         if (!state.isLoadingModel && state.error == null) {
                                             onModelSelected(model)
+                                            onDismiss()
+                                        } else if (state.error != null) {
+                                            errorDialogText = "Model: ${model.id}\n\nError: ${state.error}"
+                                        } else {
+                                            errorDialogText = "Model: ${model.id}\n\nTimed out waiting for model to load (${maxAttempts * 500}ms)"
                                         }
-                                        onDismiss()
                                     }
                                 }
                             },
@@ -240,14 +267,20 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
     )
 
 private fun toAIModel(m: ModelInfo): AIModel {
+    val isGenie = m.framework == InferenceFramework.GENIE
     val formatStr = when (m.framework) {
         InferenceFramework.LLAMA_CPP -> "Fast"
         InferenceFramework.ONNX -> "ONNX"
         InferenceFramework.FOUNDATION_MODELS -> "Apple"
         InferenceFramework.SYSTEM_TTS -> "System"
+        InferenceFramework.GENIE -> "NPU"
         else -> m.framework.displayName
     }
-    val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
+    val formatColor = when (m.framework) {
+        InferenceFramework.ONNX -> AppColors.primaryPurple
+        InferenceFramework.GENIE -> AppColors.primaryBlue
+        else -> AppColors.primaryAccent
+    }
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
     return AIModel(
         name = m.name,
@@ -257,6 +290,7 @@ private fun toAIModel(m: ModelInfo): AIModel {
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
         supportsLora = m.supportsLora,
+        isNpu = isGenie,
     )
 }
 
