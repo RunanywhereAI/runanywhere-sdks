@@ -229,7 +229,7 @@ class DartBridgeVAD {
         handle,
         samplesPtr,
         samples.length,
-        resultPtr.cast<Void>(),
+        resultPtr,
       );
 
       if (status != RAC_SUCCESS) {
