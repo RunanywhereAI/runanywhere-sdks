@@ -180,6 +180,7 @@ rac_bool_t rac_framework_uses_directory_based_models(rac_inference_framework_t f
         case RAC_FRAMEWORK_ONNX:
         case RAC_FRAMEWORK_COREML:      // CoreML compiled models (.mlmodelc) are directories
         case RAC_FRAMEWORK_WHISPERKIT_COREML:   // WhisperKit models are directories of .mlmodelc files
+        case RAC_FRAMEWORK_METALRT:     // MetalRT models are directories (config.json + .safetensors)
             return RAC_TRUE;
         default:
             return RAC_FALSE;

@@ -1,0 +1,9 @@
+module MetalRTBackend {
+    umbrella header "MetalRTBackend.h"
+
+    export *
+    module * { export * }
+
+    link framework "Accelerate"
+    link framework "Metal"
+}

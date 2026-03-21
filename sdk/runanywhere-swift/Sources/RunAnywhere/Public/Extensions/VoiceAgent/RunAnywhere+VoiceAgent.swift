@@ -257,8 +257,12 @@ public extension RunAnywhere {
             rac_voice_agent_synthesize_speech(handle, textPtr, &audioPtr, &audioSize)
         }
 
-        guard result == RAC_SUCCESS, let ptr = audioPtr, audioSize > 0 else {
+        guard result == RAC_SUCCESS else {
             throw SDKError.voiceAgent(.processingFailed, "Speech synthesis failed: \(result)")
+        }
+
+        guard let ptr = audioPtr, audioSize > 0 else {
+            return Data()
         }
 
         let audioData = Data(bytes: ptr, count: audioSize)

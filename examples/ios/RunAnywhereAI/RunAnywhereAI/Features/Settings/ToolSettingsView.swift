@@ -84,7 +84,23 @@ class ToolSettingsViewModel: ObservableObject {
                     category: "Utility"
                 ),
                 executor: { args in
-                    let expression = args["expression"]?.stringValue ?? args["input"]?.stringValue ?? "0"
+                    // Extract expression from args, handling both string and number ToolValue types
+                    let expression: String = {
+                        let keys = ["expression", "input", "expr"]
+                        for key in keys {
+                            if let val = args[key] {
+                                if let s = val.stringValue { return s }
+                                if let n = val.numberValue { return "\(n)" }
+                            }
+                        }
+                        // Fallback: try any value in the dict
+                        for val in args.values {
+                            if let s = val.stringValue { return s }
+                            if let n = val.numberValue { return "\(n)" }
+                        }
+                        return "0"
+                    }()
+                    print("Calculator received args: \(args), using expression: '\(expression)'")
                     // Clean the expression - remove any non-math characters
                     let cleanedExpression = expression
                         .replacingOccurrences(of: "=", with: "")
@@ -93,16 +109,22 @@ class ToolSettingsViewModel: ObservableObject {
                         .replacingOccurrences(of: "÷", with: "/")
                         .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                    do {
-                        let exp = NSExpression(format: cleanedExpression)
-                        if let result = exp.expressionValue(with: nil, context: nil) as? NSNumber {
-                            return [
-                                "result": .number(result.doubleValue),
-                                "expression": .string(expression)
-                            ]
-                        }
-                    } catch {
-                        // Fall through to error
+                    // Validate expression contains only safe math characters
+                    let allowedChars = CharacterSet(charactersIn: "0123456789.+-*/() ")
+                    guard cleanedExpression.unicodeScalars.allSatisfy({ allowedChars.contains($0) }),
+                          !cleanedExpression.isEmpty else {
+                        return [
+                            "error": .string("Could not evaluate expression: \(expression)"),
+                            "expression": .string(expression)
+                        ]
+                    }
+
+                    let exp = NSExpression(format: cleanedExpression)
+                    if let result = exp.expressionValue(with: nil, context: nil) as? NSNumber {
+                        return [
+                            "result": .number(result.doubleValue),
+                            "expression": .string(expression)
+                        ]
                     }
                     return [
                         "error": .string("Could not evaluate expression: \(expression)"),

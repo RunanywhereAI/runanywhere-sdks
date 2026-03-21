@@ -112,6 +112,8 @@ const char* rac_framework_raw_value(rac_inference_framework_t framework) {
             return "FluidAudio";
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             return "WhisperKitCoreML";
+        case RAC_FRAMEWORK_METALRT:
+            return "MetalRT";
         case RAC_FRAMEWORK_BUILTIN:
             return "BuiltIn";
         case RAC_FRAMEWORK_NONE:
@@ -343,6 +345,7 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
     bool isFramework = false;
     const char* frameworks[] = {"ONNX",      "LlamaCpp",   "FoundationModels",
                                 "SystemTTS", "FluidAudio", "BuiltIn",
+                                "MetalRT",   "WhisperKitCoreML",
                                 "None",      "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
@@ -410,6 +413,9 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
         return RAC_SUCCESS;
     } else if (nextComponent == "WhisperKitCoreML") {
         *out_framework = RAC_FRAMEWORK_WHISPERKIT_COREML;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "MetalRT") {
+        *out_framework = RAC_FRAMEWORK_METALRT;
         return RAC_SUCCESS;
     } else if (nextComponent == "BuiltIn") {
         *out_framework = RAC_FRAMEWORK_BUILTIN;

@@ -69,10 +69,13 @@ extension LLMViewModel {
             toolCallInfo = nil
         }
 
+        // Strip any residual <think> tags before displaying
+        let displayText = Self.stripThinkTags(from: result.text)
+
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: result.text,
+            text: displayText,
             toolCallInfo: toolCallInfo
         )
     }

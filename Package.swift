@@ -81,6 +81,14 @@ let package = Package(
             name: "RunAnywhereWhisperKit",
             targets: ["WhisperKitRuntime"]
         ),
+
+        // =================================================================
+        // MetalRT Backend - adds LLM/STT/TTS/VLM via custom Metal kernels
+        // =================================================================
+        .library(
+            name: "RunAnywhereMetalRT",
+            targets: ["MetalRTRuntime"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -201,6 +209,40 @@ let package = Package(
         ),
 
         // =================================================================
+        // MetalRT C Bridge Module - exposes rac_backend_metalrt_register()
+        // =================================================================
+        .target(
+            name: "MetalRTBackend",
+            dependencies: ["RABackendMetalRTBinary"],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
+            publicHeadersPath: "."
+        ),
+
+        // =================================================================
+        // MetalRT Runtime Backend (custom Metal GPU kernels)
+        // =================================================================
+        .target(
+            name: "MetalRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "MetalRTBackend",
+                "RABackendMetalRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
+            exclude: ["include"],
+            resources: [
+                .copy("Resources/default.metallib"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("ImageIO"),
+            ]
+        ),
+
+        // =================================================================
         // WhisperKit Runtime Backend (Apple Neural Engine STT)
         // =================================================================
         .target(
@@ -255,6 +297,10 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
+            .binaryTarget(
+                name: "RABackendMetalRTBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+            ),
         ]
 
         // ONNX Runtime xcframeworks - split by platform
@@ -293,6 +339,11 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-v\(sdkVersion).zip",
                 checksum: "809e2510da49f71f6d019e77bcc0a7e12e967f3b739ba0b9eea7adb77936edc0"
+            ),
+            .binaryTarget(
+                name: "RABackendMetalRTBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMetalRT-v\(sdkVersion).zip",
+                checksum: "0000000000000000000000000000000000000000000000000000000000000000"
             ),
             .binaryTarget(
                 name: "ONNXRuntimeiOSBinary",

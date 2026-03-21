@@ -173,6 +173,26 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         return RAC_SUCCESS;
     }
 
+    // Auto-unload previous model if a different one is loaded.
+    // Without this, the old service leaks resources (GPU memory, file handles)
+    // and the new service creation may fail due to resource contention.
+    if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_service != nullptr) {
+        RAC_LOG_INFO(mgr->logger_category.c_str(),
+                     "Auto-unloading previous model '%s' before loading '%s'",
+                     mgr->current_model_id.c_str(), model_id);
+
+        if (mgr->destroy_fn != nullptr) {
+            mgr->destroy_fn(mgr->current_service, mgr->user_data);
+        }
+        track_lifecycle_event(mgr, "unloaded", mgr->current_model_id.c_str(), 0.0, RAC_SUCCESS);
+
+        mgr->current_service = nullptr;
+        mgr->current_model_path.clear();
+        mgr->current_model_id.clear();
+        mgr->current_model_name.clear();
+        mgr->total_unloads++;
+    }
+
     // Track load started (mirrors Swift: trackEvent(type: .loadStarted))
     int64_t start_time = current_time_ms();
     mgr->state.store(RAC_LIFECYCLE_STATE_LOADING);
