@@ -18,6 +18,7 @@ import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.currentVLMModelId
+import com.runanywhere.sdk.public.extensions.cancelDownload
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
@@ -25,11 +26,11 @@ import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.loadVLMModel
 import com.runanywhere.sdk.public.extensions.unloadVLMModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -45,6 +46,9 @@ class ModelSelectionViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ModelSelectionUiState(context = context))
     val uiState: StateFlow<ModelSelectionUiState> = _uiState.asStateFlow()
+
+    /** Active download jobs keyed by model ID, for cancellation support. */
+    private val downloadJobs = mutableMapOf<String, Job>()
 
     init {
         loadDeviceInfo()
@@ -82,6 +86,10 @@ class ModelSelectionViewModel(
                                     error = event.error ?: "Download failed",
                                 )
                             }
+                        }
+                        ModelEvent.ModelEventType.DELETED -> {
+                            Timber.d("🗑️ Model deleted: ${event.modelId}")
+                            loadModelsAndFrameworks() // Refresh models list
                         }
                         else -> {}
                     }
@@ -240,39 +248,32 @@ class ModelSelectionViewModel(
     }
 
     /**
-     * Download model with progress
+     * Download model with progress.
+     * Supports concurrent downloads — each model is tracked independently.
      */
     fun startDownload(modelId: String) {
-        viewModelScope.launch {
+        // Don't start a duplicate download
+        if (downloadJobs[modelId]?.isActive == true) return
+
+        val job = viewModelScope.launch {
             try {
                 Timber.d("⬇️ Starting download for model: $modelId")
 
                 _uiState.update {
                     it.copy(
-                        selectedModelId = modelId,
-                        isLoadingModel = true,
-                        loadingProgress = "Starting download...",
+                        downloadingModelIds = it.downloadingModelIds + modelId,
+                        downloadProgressMap = it.downloadProgressMap + (modelId to "Starting download..."),
                     )
                 }
 
                 // Call SDK download API - it returns a Flow<DownloadProgress>
                 RunAnywhere.downloadModel(modelId)
-                    .catch { e ->
-                        Timber.e("❌ Download stream error: ${e.message}")
-                        _uiState.update {
-                            it.copy(
-                                isLoadingModel = false,
-                                selectedModelId = null,
-                                loadingProgress = "",
-                                error = e.message ?: "Download failed",
-                            )
-                        }
-                    }
                     .collect { progress ->
                         val percent = (progress.progress * 100).toInt()
-                        Timber.d("📥 Download progress: $percent%")
                         _uiState.update {
-                            it.copy(loadingProgress = "Downloading... $percent%")
+                            it.copy(
+                                downloadProgressMap = it.downloadProgressMap + (modelId to "Downloading... $percent%"),
+                            )
                         }
                     }
 
@@ -286,21 +287,50 @@ class ModelSelectionViewModel(
 
                 _uiState.update {
                     it.copy(
-                        isLoadingModel = false,
-                        selectedModelId = null,
-                        loadingProgress = "",
+                        downloadingModelIds = it.downloadingModelIds - modelId,
+                        downloadProgressMap = it.downloadProgressMap - modelId,
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "❌ Download failed for $modelId: ${e.message}")
                 _uiState.update {
                     it.copy(
-                        isLoadingModel = false,
-                        selectedModelId = null,
-                        loadingProgress = "",
+                        downloadingModelIds = it.downloadingModelIds - modelId,
+                        downloadProgressMap = it.downloadProgressMap - modelId,
                         error = e.message ?: "Download failed",
                     )
                 }
+            } finally {
+                downloadJobs.remove(modelId)
+            }
+        }
+        downloadJobs[modelId] = job
+    }
+
+    /**
+     * Cancel an ongoing download.
+     */
+    fun cancelDownload(modelId: String) {
+        viewModelScope.launch {
+            Timber.d("🚫 Cancelling download for model: $modelId")
+            // Cancel the coroutine job (stops Flow collection)
+            downloadJobs[modelId]?.cancel()
+            downloadJobs.remove(modelId)
+
+            // Tell SDK to cancel the actual download thread
+            try {
+                RunAnywhere.cancelDownload(modelId)
+            } catch (e: Exception) {
+                Timber.w("Cancel download SDK call failed (may already be done): ${e.message}")
+            }
+
+            _uiState.update {
+                it.copy(
+                    downloadingModelIds = it.downloadingModelIds - modelId,
+                    downloadProgressMap = it.downloadProgressMap - modelId,
+                )
             }
         }
     }
@@ -427,5 +457,9 @@ data class ModelSelectionUiState(
     val isLoading: Boolean = true,
     val isLoadingModel: Boolean = false,
     val loadingProgress: String = "",
+    /** Set of model IDs currently being downloaded. */
+    val downloadingModelIds: Set<String> = emptySet(),
+    /** Per-model download progress strings (e.g., "Downloading... 45%"). */
+    val downloadProgressMap: Map<String, String> = emptyMap(),
     val error: String? = null,
 )

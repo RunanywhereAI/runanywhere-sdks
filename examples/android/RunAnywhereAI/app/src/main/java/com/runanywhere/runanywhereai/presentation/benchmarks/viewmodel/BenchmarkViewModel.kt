@@ -19,6 +19,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.Benchmark
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.BenchmarkReportFormatter
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.models.DeviceInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 // -- UI State --
@@ -105,17 +107,22 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             var run = BenchmarkRun(deviceInfo = deviceInfo)
 
             try {
-                val runResult = runner.runBenchmarks(
-                    categories = _uiState.value.selectedCategories,
-                ) { update ->
-                    _uiState.update { state ->
-                        state.copy(
-                            progress = update.progress,
-                            completedCount = update.completedCount,
-                            totalCount = update.totalCount,
-                            currentScenario = update.currentScenario,
-                            currentModel = update.currentModel,
-                        )
+                // Run benchmarks off the main thread to prevent ANR.
+                // MutableStateFlow.update is thread-safe so progress callbacks are fine from Default.
+                val selectedCats = _uiState.value.selectedCategories
+                val runResult = withContext(Dispatchers.Default) {
+                    runner.runBenchmarks(
+                        categories = selectedCats,
+                    ) { update ->
+                        _uiState.update { state ->
+                            state.copy(
+                                progress = update.progress,
+                                completedCount = update.completedCount,
+                                totalCount = update.totalCount,
+                                currentScenario = update.currentScenario,
+                                currentModel = update.currentModel,
+                            )
+                        }
                     }
                 }
 

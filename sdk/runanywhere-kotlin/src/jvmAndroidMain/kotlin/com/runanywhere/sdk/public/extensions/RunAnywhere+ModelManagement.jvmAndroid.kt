@@ -12,11 +12,15 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
@@ -184,6 +188,52 @@ private fun getAllBridgeModels(): List<CppBridgeModelRegistry.ModelInfo> {
 @Volatile
 private var hasScannedForDownloads = false
 private val scanLock = Any()
+
+// ============================================================================
+// MULTIPLEXING DOWNLOAD LISTENER
+// Routes CppBridgeDownload callbacks to per-model handlers for concurrent downloads.
+// ============================================================================
+
+private val activeDownloadHandlers = java.util.concurrent.ConcurrentHashMap<String, CppBridgeDownload.DownloadListener>()
+/** Maps downloadId → modelId for routing progress callbacks (which only have downloadId). */
+private val downloadIdToModelId = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+private val multiplexingListener = object : CppBridgeDownload.DownloadListener {
+    override fun onDownloadStarted(downloadId: String, modelId: String, url: String) {
+        downloadIdToModelId[downloadId] = modelId
+        activeDownloadHandlers[modelId]?.onDownloadStarted(downloadId, modelId, url)
+    }
+    override fun onDownloadProgress(downloadId: String, downloadedBytes: Long, totalBytes: Long, progress: Int) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) {
+            activeDownloadHandlers[modelId]?.onDownloadProgress(downloadId, downloadedBytes, totalBytes, progress)
+        }
+    }
+    override fun onDownloadCompleted(downloadId: String, modelId: String, filePath: String, fileSize: Long) {
+        activeDownloadHandlers[modelId]?.onDownloadCompleted(downloadId, modelId, filePath, fileSize)
+        downloadIdToModelId.remove(downloadId)
+    }
+    override fun onDownloadFailed(downloadId: String, modelId: String, error: Int, errorMessage: String) {
+        activeDownloadHandlers[modelId]?.onDownloadFailed(downloadId, modelId, error, errorMessage)
+        downloadIdToModelId.remove(downloadId)
+    }
+    override fun onDownloadPaused(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadPaused(downloadId)
+    }
+    override fun onDownloadResumed(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadResumed(downloadId)
+    }
+    override fun onDownloadCancelled(downloadId: String) {
+        val modelId = downloadIdToModelId[downloadId]
+        if (modelId != null) activeDownloadHandlers[modelId]?.onDownloadCancelled(downloadId)
+        downloadIdToModelId.remove(downloadId)
+    }
+}
+
+@Volatile
+private var isMultiplexingListenerInstalled = false
 
 actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
     if (!isInitialized) {
@@ -502,6 +552,16 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
                 // All files downloaded — update registry with directory path
+                //     Guard: if model was deleted during download, don't resurrect it.
+                //     Check the C++ registry (cleared by deleteModel via remove()) rather than
+                //     registeredModels (which only clears localPath but keeps the entry).
+                val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
+                if (!stillRegistered) {
+                    downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
+                    modelDir.deleteRecursively()
+                    close()
+                    return@callbackFlow
+                }
                 val finalPath = modelDir.absolutePath
                 val updatedModelInfo = modelInfo.copy(localPath = finalPath)
                 addToModelCache(updatedModelInfo)
@@ -515,6 +575,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     modelId,
                     downloadDurationMs.toDouble(),
                     totalBytesDownloaded,
+                )
+
+                // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+                EventBus.publish(
+                    ModelEvent(
+                        eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+                        modelId = modelId,
+                    )
                 )
 
                 trySend(
@@ -654,8 +722,12 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
             }
 
-        // Register listener BEFORE starting download
-        CppBridgeDownload.downloadListener = downloadListener
+        // Register per-model handler with the multiplexing listener
+        activeDownloadHandlers[modelId] = downloadListener
+        if (!isMultiplexingListenerInstalled) {
+            CppBridgeDownload.downloadListener = multiplexingListener
+            isMultiplexingListenerInstalled = true
+        }
 
         try {
             // 8. Start the actual download (runs asynchronously on thread pool)
@@ -719,6 +791,16 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                 }
 
             // 13. Update model in C++ registry with local path
+            //     Guard: if model was deleted during download, don't resurrect it.
+            //     Check the C++ registry (cleared by deleteModel via remove()) rather than
+            //     registeredModels (which only clears localPath but keeps the entry).
+            val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
+            if (!stillRegistered) {
+                downloadLogger.warn("Model '$modelId' was deleted during download, discarding result")
+                File(finalModelPath).let { f -> if (f.exists()) f.deleteRecursively() }
+                close()
+                return@callbackFlow
+            }
             val updatedModelInfo = modelInfo.copy(localPath = finalModelPath)
             addToModelCache(updatedModelInfo)
             CppBridgeModelRegistry.updateDownloadStatus(modelId, finalModelPath)
@@ -728,6 +810,14 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // 14. Emit completion events
             val downloadDurationMs = System.currentTimeMillis() - downloadStartTime
             CppBridgeEvents.emitDownloadCompleted(modelId, downloadDurationMs.toDouble(), result.fileSize)
+
+            // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+            EventBus.publish(
+                ModelEvent(
+                    eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+                    modelId = modelId,
+                )
+            )
 
             trySend(
                 DownloadProgress(
@@ -747,8 +837,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // Close with exception so collectors receive the error
             close(e)
         } finally {
-            // Clean up listener
-            CppBridgeDownload.downloadListener = null
+            // Remove this model's handler (other downloads keep theirs)
+            activeDownloadHandlers.remove(modelId)
         }
 
         awaitClose {
@@ -1055,6 +1145,14 @@ private suspend fun downloadEmbeddingModelFiles(
 
     val dirPath = embeddingDir.absolutePath
 
+    // Guard: if model was deleted during download, don't resurrect it.
+    val stillRegistered = CppBridgeModelRegistry.get(modelId) != null
+    if (!stillRegistered) {
+        logger.warn("Model '$modelId' was deleted during embedding download, discarding result")
+        withContext(Dispatchers.IO) { embeddingDir.deleteRecursively() }
+        return
+    }
+
     // Update in-memory cache with local path
     synchronized(modelCacheLock) {
         val idx = registeredModels.indexOfFirst { it.id == modelId }
@@ -1064,6 +1162,14 @@ private suspend fun downloadEmbeddingModelFiles(
     }
     CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
     CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
+
+    // Publish to Kotlin EventBus so other ViewModels refresh their model lists
+    EventBus.publish(
+        ModelEvent(
+            eventType = ModelEvent.ModelEventType.DOWNLOAD_COMPLETED,
+            modelId = modelId,
+        )
+    )
 
     logger.info("Embedding model ready at: $dirPath")
 }
@@ -1125,8 +1231,18 @@ actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Update C++ registry to mark download cancelled
-    CppBridgeModelRegistry.updateDownloadStatus(modelId, null)
+    // CppBridgeDownload.cancelDownload() expects a downloadId (UUID), not a modelId.
+    // Reverse-lookup the downloadId from the modelId mapping.
+    val downloadId = downloadIdToModelId.entries.firstOrNull { it.value == modelId }?.key
+    if (downloadId != null) {
+        CppBridgeDownload.cancelDownload(downloadId)
+        // Clean up tracking maps
+        downloadIdToModelId.remove(downloadId)
+        activeDownloadHandlers.remove(modelId)
+    } else {
+        // Fallback: try modelId directly (some paths may use modelId as downloadId)
+        CppBridgeDownload.cancelDownload(modelId)
+    }
 }
 
 actual suspend fun RunAnywhere.isModelDownloaded(modelId: String): Boolean {
@@ -1141,14 +1257,90 @@ actual suspend fun RunAnywhere.deleteModel(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+
+    // 1. Unload the model if it is currently loaded (LLM, TTS, STT, or VLM)
+    if (CppBridgeLLM.getLoadedModelId() == modelId) {
+        CppBridgeLLM.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeTTS.getLoadedModelId() == modelId) {
+        CppBridgeTTS.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeSTT.getLoadedModelId() == modelId) {
+        CppBridgeSTT.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+    if (CppBridgeVLM.getLoadedModelId() == modelId) {
+        CppBridgeVLM.unload()
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
+
+    // 2. Get model info to find the local path for file deletion
+    val model = CppBridgeModelRegistry.get(modelId)
+    val localPath = model?.localPath
+
+    // 3. Delete actual files from disk (matches iOS SimplifiedFileManager.deleteModel)
+    if (localPath != null) {
+        val modelFile = File(localPath)
+        if (modelFile.exists()) {
+            if (modelFile.isDirectory) {
+                modelFile.deleteRecursively()
+            } else {
+                modelFile.delete()
+            }
+        }
+    }
+
+    // 3. Remove from C++ registry entirely.
+    //    The model will be re-registered (without localPath) on next app start via ModelList.setupModels().
     CppBridgeModelRegistry.remove(modelId)
+
+    // 4. Clear localPath in the Kotlin in-memory cache so availableModels() reflects deletion.
+    //    Without this, the registeredModels cache still has localPath set, and since it takes
+    //    precedence over bridge models in the merge, the model would still appear as downloaded.
+    synchronized(modelCacheLock) {
+        val index = registeredModels.indexOfFirst { it.id == modelId }
+        if (index >= 0) {
+            registeredModels[index] = registeredModels[index].copy(localPath = null)
+        }
+    }
+
+    // 5. Clean up multi-file descriptor cache
+    synchronized(multiFileCacheLock) {
+        multiFileModelCache.remove(modelId)
+    }
+
+    // 6. Reset scan flag so deleted models aren't resurrected from stale scan state
+    synchronized(scanLock) {
+        hasScannedForDownloads = false
+    }
+
+    // 7. Emit deletion event to C++ analytics
+    CppBridgeEvents.emitModelDeleted(modelId)
+
+    // 8. Publish to Kotlin EventBus so UI subscribers (e.g., SettingsViewModel) get notified
+    EventBus.publish(
+        ModelEvent(
+            eventType = ModelEvent.ModelEventType.DELETED,
+            modelId = modelId,
+        )
+    )
 }
 
 actual suspend fun RunAnywhere.deleteAllModels() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Would need to parse and delete each - simplified
+
+    val downloadedModels = CppBridgeModelRegistry.getDownloaded()
+    for (model in downloadedModels) {
+        try {
+            deleteModel(model.modelId)
+        } catch (e: Exception) {
+            modelsLogger.warn("deleteAllModels: failed to delete ${model.modelId}: ${e.message}")
+        }
+    }
 }
 
 actual suspend fun RunAnywhere.refreshModelRegistry() {
@@ -1172,18 +1364,26 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
         model.localPath
             ?: throw SDKError.model("Model '$modelId' is not downloaded")
 
-    // Pass modelPath, modelId, and modelName separately for correct telemetry
-    val result = CppBridgeLLM.loadModel(localPath, modelId, model.name)
+    // Run on IO to prevent ANR — JNI model loading can take hundreds of ms
+    val result = withContext(Dispatchers.IO) {
+        CppBridgeLLM.loadModel(localPath, modelId, model.name)
+    }
     if (result != 0) {
         throw SDKError.llm("Failed to load LLM model '$modelId' (error code: $result)")
     }
+
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 actual suspend fun RunAnywhere.unloadLLMModel() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
+    val modelId = CppBridgeLLM.getLoadedModelId()
     CppBridgeLLM.unload()
+    if (modelId != null) {
+        EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.UNLOADED, modelId = modelId))
+    }
 }
 
 actual suspend fun RunAnywhere.isLLMModelLoaded(): Boolean {
@@ -1246,6 +1446,8 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
     if (result != 0) {
         throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
     }
+
+    EventBus.publish(ModelEvent(eventType = ModelEvent.ModelEventType.LOADED, modelId = modelId))
 }
 
 // ============================================================================

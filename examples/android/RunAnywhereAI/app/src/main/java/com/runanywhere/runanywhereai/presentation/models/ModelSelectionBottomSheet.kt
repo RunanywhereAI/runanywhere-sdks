@@ -21,11 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.SdStorage
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -70,6 +72,20 @@ private data class DeviceStatus(
     val hasNeuralEngine: Boolean,
 )
 
+/**
+ * Memory compatibility level for a model relative to device RAM.
+ */
+private enum class MemoryCompatibility {
+    /** Model memory requirement is ≤50% of device RAM — runs comfortably */
+    RECOMMENDED,
+    /** Model memory requirement is ≤80% of device RAM — runs but may be tight */
+    COMPATIBLE,
+    /** Model memory requirement exceeds 80% of device RAM — likely too large */
+    TOO_LARGE,
+    /** Unknown — no memory info available */
+    UNKNOWN,
+}
+
 /** Display model for model list row. */
 private data class AIModel(
     val name: String,
@@ -79,6 +95,7 @@ private data class AIModel(
     val size: String,
     val isDownloaded: Boolean,
     val supportsLora: Boolean = false,
+    val memoryCompatibility: MemoryCompatibility = MemoryCompatibility.UNKNOWN,
 )
 
 /**
@@ -104,6 +121,7 @@ fun ModelSelectionBottomSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val deviceStatus = uiState.deviceInfo?.let { toDeviceStatus(it) }
         ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
+    val deviceMemoryMB = uiState.deviceInfo?.totalMemoryMB
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -182,12 +200,12 @@ fun ModelSelectionBottomSheet(
                         val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
                             model.framework == InferenceFramework.SYSTEM_TTS
                         val isReady = isBuiltIn || model.isDownloaded
-                        val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
+                        val isThisModelDownloading = model.id in uiState.downloadingModelIds
                         ModelCard(
-                            model = toAIModel(model),
+                            model = toAIModel(model, deviceMemoryMB),
                             isReady = isReady,
                             isLoading = isThisModelDownloading,
-                            downloadProgress = if (isThisModelDownloading) uiState.loadingProgress else null,
+                            downloadProgress = uiState.downloadProgressMap[model.id],
                             onCardClick = {
                                 if (isReady) {
                                     scope.launch {
@@ -208,8 +226,11 @@ fun ModelSelectionBottomSheet(
                                 }
                             },
                             onDownloadClick = {
-                                if (!isReady) viewModel.startDownload(model.id)
+                                if (!isReady && !isThisModelDownloading) viewModel.startDownload(model.id)
                             },
+                            onCancelClick = if (isThisModelDownloading) {
+                                { viewModel.cancelDownload(model.id) }
+                            } else null,
                         )
                         if (index < sortedModels.lastIndex) Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -239,7 +260,7 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
         hasNeuralEngine = false,
     )
 
-private fun toAIModel(m: ModelInfo): AIModel {
+private fun toAIModel(m: ModelInfo, deviceMemoryMB: Long? = null): AIModel {
     val formatStr = when (m.framework) {
         InferenceFramework.LLAMA_CPP -> "Fast"
         InferenceFramework.ONNX -> "ONNX"
@@ -249,6 +270,12 @@ private fun toAIModel(m: ModelInfo): AIModel {
     }
     val formatColor = if (m.framework == InferenceFramework.ONNX) AppColors.primaryPurple else AppColors.primaryAccent
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
+
+    // Compute memory compatibility using downloadSize as an approximation of runtime memory.
+    // Note: downloadSize may not equal runtime memory for all models (e.g., GGUF quantized models
+    // may use less RAM than their file size), but it's the best heuristic available.
+    val compatibility = computeMemoryCompatibility(m.downloadSize, deviceMemoryMB)
+
     return AIModel(
         name = m.name,
         logoResId = getModelLogoResId(m),
@@ -257,7 +284,24 @@ private fun toAIModel(m: ModelInfo): AIModel {
         size = sizeStr,
         isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
         supportsLora = m.supportsLora,
+        memoryCompatibility = compatibility,
     )
+}
+
+private fun computeMemoryCompatibility(
+    memoryRequirementBytes: Long?,
+    deviceMemoryMB: Long?,
+): MemoryCompatibility {
+    if (memoryRequirementBytes == null || memoryRequirementBytes <= 0 || deviceMemoryMB == null || deviceMemoryMB <= 0) {
+        return MemoryCompatibility.UNKNOWN
+    }
+    val deviceMemoryBytes = deviceMemoryMB * 1024 * 1024
+    val ratio = memoryRequirementBytes.toDouble() / deviceMemoryBytes
+    return when {
+        ratio <= 0.50 -> MemoryCompatibility.RECOMMENDED
+        ratio <= 0.80 -> MemoryCompatibility.COMPATIBLE
+        else -> MemoryCompatibility.TOO_LARGE
+    }
 }
 
 /** Drawable resource ID for model logo (matches iOS ModelInfo+Logo). */
@@ -456,6 +500,7 @@ private fun ModelCard(
     downloadProgress: String? = null,
     onCardClick: () -> Unit,
     onDownloadClick: () -> Unit,
+    onCancelClick: (() -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier
@@ -523,6 +568,27 @@ private fun ModelCard(
                 )
             }
 
+            when (model.memoryCompatibility) {
+                MemoryCompatibility.RECOMMENDED -> {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Badge(
+                        text = "Fits",
+                        textColor = AppColors.primaryGreen,
+                        backgroundColor = AppColors.primaryGreen.copy(alpha = 0.10f),
+                    )
+                }
+                MemoryCompatibility.TOO_LARGE -> {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Badge(
+                        text = "Large",
+                        textColor = AppColors.primaryRed,
+                        backgroundColor = AppColors.primaryRed.copy(alpha = 0.10f),
+                        icon = Icons.Outlined.Warning,
+                    )
+                }
+                else -> { /* COMPATIBLE and UNKNOWN: no extra badge */ }
+            }
+
             Spacer(modifier = Modifier.width(8.dp))
 
             if (model.isDownloaded) {
@@ -534,10 +600,12 @@ private fun ModelCard(
                 )
             } else {
                 if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = AppColors.primaryAccent,
-                        strokeWidth = 2.dp,
+                    Badge(
+                        text = "Cancel",
+                        textColor = AppColors.primaryRed,
+                        backgroundColor = AppColors.primaryRed.copy(alpha = 0.10f),
+                        icon = Icons.Outlined.Close,
+                        onClick = onCancelClick,
                     )
                 } else {
                     Badge(

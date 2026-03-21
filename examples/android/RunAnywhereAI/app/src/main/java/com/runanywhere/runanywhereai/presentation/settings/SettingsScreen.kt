@@ -439,6 +439,20 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         )
     }
 
+    // Error Dialog — driven directly from ViewModel state (single source of truth)
+    uiState.errorMessage?.let { message ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("Error") },
+            text = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("OK")
+                }
+            },
+        )
+    }
+
     // API Configuration Dialog
     if (uiState.showApiConfigSheet) {
         ApiConfigurationDialog(
