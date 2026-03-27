@@ -46,7 +46,7 @@ extension RunAnywhereRAG on RunAnywhere {
     }
 
     try {
-      DartBridgeRAG.shared.createPipeline(config);
+      await DartBridgeRAG.shared.createPipelineAsync(config);
 
       EventBus.shared.publish(SDKRAGEvent.pipelineCreated());
     } catch (e) {
@@ -94,7 +94,7 @@ extension RunAnywhereRAG on RunAnywhere {
     final stopwatch = Stopwatch()..start();
 
     try {
-      DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJSON);
+      await DartBridgeRAG.shared.addDocumentAsync(text, metadataJson: metadataJSON);
 
       stopwatch.stop();
 
@@ -139,7 +139,7 @@ extension RunAnywhereRAG on RunAnywhere {
     final stopwatch = Stopwatch()..start();
 
     try {
-      DartBridgeRAG.shared.addDocumentsBatch(documents);
+      await DartBridgeRAG.shared.addDocumentsBatchAsync(documents);
 
       stopwatch.stop();
 
@@ -250,7 +250,7 @@ extension RunAnywhereRAG on RunAnywhere {
               topK: queryOptions.topK,
             );
 
-      final result = DartBridgeRAG.shared.query(effectiveOptions);
+      final result = await DartBridgeRAG.shared.queryAsync(effectiveOptions);
 
       EventBus.shared.publish(
         SDKRAGEvent.queryComplete(

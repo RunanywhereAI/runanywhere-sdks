@@ -13,6 +13,7 @@ library dart_bridge_rag;
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 
@@ -332,5 +333,153 @@ class DartBridgeRAG {
     if (!_isCreated) {
       throw StateError('RAG pipeline not created. Call createPipeline() first.');
     }
+  }
+
+  /// Create pipeline on a background isolate.
+  Future<void> createPipelineAsync(RAGConfiguration config) async {
+    final jsonStr = jsonEncode(config.toJson());
+    _logger.debug('createPipelineAsync config: $jsonStr');
+
+    final result = await Isolate.run(() => _isolateCreatePipeline(jsonStr));
+    if (result != 0) {
+      final detail = _getLastError();
+      final msg = detail != null
+          ? 'RAG pipeline creation failed (code $result): $detail'
+          : 'RAG pipeline creation failed (code $result)';
+      _logger.error(msg);
+      throw Exception(msg);
+    }
+
+    _isCreated = true;
+    _registered = true;
+    _logger.debug('RAG pipeline created (async)');
+  }
+
+  Future<void> addDocumentAsync(String text, {String? metadataJson}) async {
+    _ensurePipeline();
+    _logger.debug('addDocumentAsync: ${text.length} chars');
+
+    final result = await Isolate.run(
+      () => _isolateAddDocument(text, metadataJson),
+    );
+    if (result != 0) {
+      throw Exception('Failed to add document: error $result');
+    }
+  }
+
+  Future<void> addDocumentsBatchAsync(
+    List<Map<String, String>> documents,
+  ) async {
+    _ensurePipeline();
+
+    final jsonStr = jsonEncode(documents);
+    final result = await Isolate.run(
+      () => _isolateAddDocumentsBatch(jsonStr),
+    );
+    if (result != 0) {
+      throw Exception('Failed to add documents batch: error $result');
+    }
+  }
+
+  Future<RAGResult> queryAsync(RAGQueryOptions options) async {
+    _ensurePipeline();
+
+    final jsonStr = jsonEncode(options.toJson());
+    final resultJson = await Isolate.run(
+      () => _isolateQuery(jsonStr),
+    );
+
+    final decoded = jsonDecode(resultJson) as Map<String, dynamic>;
+    return RAGResult.fromJson(decoded);
+  }
+}
+
+DynamicLibrary _openBridgeLib() {
+  if (Platform.isIOS) {
+    return DynamicLibrary.executable();
+  } else if (Platform.isAndroid) {
+    try {
+      return DynamicLibrary.open('libflutter_rag_bridge.so');
+    } catch (_) {
+      return DynamicLibrary.open('librac_commons.so');
+    }
+  } else {
+    return DynamicLibrary.process();
+  }
+}
+
+DynamicLibrary _openCommonsLib() {
+  if (Platform.isIOS) {
+    return DynamicLibrary.executable();
+  } else if (Platform.isAndroid) {
+    return DynamicLibrary.open('librac_commons.so');
+  } else {
+    return DynamicLibrary.process();
+  }
+}
+
+int _isolateCreatePipeline(String configJson) {
+  final commons = _openCommonsLib();
+  final registerFn =
+      commons.lookupFunction<_RagRegisterNative, _RagRegisterDart>(
+          'rac_backend_rag_register');
+  registerFn(); 
+
+  final lib = _openBridgeLib();
+  final fn = lib.lookupFunction<_CreatePipelineJsonNative,
+      _CreatePipelineJsonDart>('flutter_rag_create_pipeline_json');
+
+  final cStr = configJson.toNativeUtf8();
+  try {
+    return fn(cStr);
+  } finally {
+    calloc.free(cStr);
+  }
+}
+
+int _isolateAddDocument(String text, String? metadataJson) {
+  final lib = _openBridgeLib();
+  final fn = lib.lookupFunction<_AddDocumentNative, _AddDocumentDart>(
+      'flutter_rag_add_document');
+
+  final cText = text.toNativeUtf8();
+  final cMeta = metadataJson != null ? metadataJson.toNativeUtf8() : nullptr;
+
+  try {
+    return fn(cText, cMeta);
+  } finally {
+    calloc.free(cText);
+    if (cMeta != nullptr) calloc.free(cMeta);
+  }
+}
+
+int _isolateAddDocumentsBatch(String documentsJson) {
+  final lib = _openBridgeLib();
+  final fn = lib.lookupFunction<_AddDocumentsBatchJsonNative,
+      _AddDocumentsBatchJsonDart>('flutter_rag_add_documents_batch_json');
+
+  final cStr = documentsJson.toNativeUtf8();
+  try {
+    return fn(cStr);
+  } finally {
+    calloc.free(cStr);
+  }
+}
+
+String _isolateQuery(String queryJson) {
+  final lib = _openBridgeLib();
+  final queryFn = lib.lookupFunction<_QueryJsonNative, _QueryJsonDart>(
+      'flutter_rag_query_json');
+  final freeFn = lib.lookupFunction<_FreeStringNative, _FreeStringDart>(
+      'flutter_rag_free_string');
+
+  final cStr = queryJson.toNativeUtf8();
+  try {
+    final resultPtr = queryFn(cStr);
+    final resultJson = resultPtr.toDartString();
+    freeFn(resultPtr);
+    return resultJson;
+  } finally {
+    calloc.free(cStr);
   }
 }
