@@ -25,7 +25,6 @@
     "@babel/runtime",
     "react-native-nitro-modules",
     "runanywhere-react-native",
-    "rn-fetch-blob",
     "@react-navigation/native-stack",
     "react-native-audio-recorder-player"
   ],

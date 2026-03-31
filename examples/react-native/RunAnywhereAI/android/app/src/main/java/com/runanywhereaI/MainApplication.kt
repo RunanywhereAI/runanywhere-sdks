@@ -23,6 +23,7 @@ class MainApplication : Application(), ReactApplication {
           add(RunAnywhereCorePackage())
           add(RunAnywhereLlamaPackage())
           add(RunAnywhereONNXPackage())
+          add(DocumentServicePackage())
         },
     )
   }
