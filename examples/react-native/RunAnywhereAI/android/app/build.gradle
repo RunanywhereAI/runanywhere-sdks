@@ -172,7 +172,7 @@ android {
             "**/libfolly_runtime.so",
             "**/libreactnative.so",
             "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
-            "**/librac_backend_onnx.so", // ONNX backend duplicated via rag + onnx modules
+            "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
             "**/librac_commons.so",
             "**/libomp.so"
         ]
@@ -199,7 +199,6 @@ dependencies {
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')
     implementation project(':runanywhere_onnx')
-    implementation project(':runanywhere_rag')
 
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
     // Expose hermesEnabled for other modules (like react-native-worklets)
