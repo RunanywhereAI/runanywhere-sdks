@@ -4205,7 +4205,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetMetri
 // =============================================================================
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeExtractArchive(JNIEnv* env,
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeExtractArchive(JNIEnv* env,
                                                                                jobject /* thiz */,
                                                                                jstring jArchivePath,
                                                                                jstring jDestDir) {
@@ -4230,7 +4230,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeExtractArchive(J
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDetectArchiveType(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeDetectArchiveType(
     JNIEnv* env, jobject /* thiz */, jstring jFilePath) {
     std::string filePath = getCString(env, jFilePath);
     rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
@@ -4243,7 +4243,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDetectArchiveTyp
 // =============================================================================
 
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFindModelPathAfterExtraction(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFindModelPathAfterExtraction(
     JNIEnv* env, jobject /* thiz */, jstring jExtractedDir, jint jStructure, jint jFramework,
     jint jFormat) {
     std::string extractedDir = getCString(env, jExtractedDir);
@@ -4261,14 +4261,14 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFindModelPathAft
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeDownloadRequiresExtraction(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeDownloadRequiresExtraction(
     JNIEnv* env, jobject /* thiz */, jstring jUrl) {
     std::string url = getCString(env, jUrl);
     return static_cast<jboolean>(rac_download_requires_extraction(url.c_str()) == RAC_TRUE);
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeComputeDownloadDestination(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeComputeDownloadDestination(
     JNIEnv* env, jobject /* thiz */, jstring jModelId, jstring jDownloadUrl, jint jFramework,
     jint jFormat) {
     std::string modelId = getCString(env, jModelId);
@@ -4426,7 +4426,7 @@ static rac_file_callbacks_t build_jni_file_callbacks() {
 
 // Register file callbacks object from Kotlin
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerRegisterCallbacks(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerRegisterCallbacks(
     JNIEnv* env, jobject /* thiz */, jobject callbacksObj) {
     if (callbacksObj == nullptr) return RAC_ERROR_NULL_POINTER;
 
@@ -4455,7 +4455,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerRegis
 
 // Create directory structure
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreateDirectoryStructure(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCreateDirectoryStructure(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     return static_cast<jint>(rac_file_manager_create_directory_structure(&cb));
@@ -4463,7 +4463,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreat
 
 // Calculate directory size
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCalculateDirSize(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCalculateDirSize(
     JNIEnv* env, jobject /* thiz */, jstring jPath) {
     std::string path = getCString(env, jPath);
     rac_file_callbacks_t cb = build_jni_file_callbacks();
@@ -4474,7 +4474,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCalcu
 
 // Models storage used
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModelsStorageUsed(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerModelsStorageUsed(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     int64_t size = 0;
@@ -4484,7 +4484,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModel
 
 // Clear cache
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClearCache(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerClearCache(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     return static_cast<jint>(rac_file_manager_clear_cache(&cb));
@@ -4492,7 +4492,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClear
 
 // Clear temp
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClearTemp(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerClearTemp(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     return static_cast<jint>(rac_file_manager_clear_temp(&cb));
@@ -4500,7 +4500,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerClear
 
 // Cache size
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCacheSize(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCacheSize(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     int64_t size = 0;
@@ -4510,7 +4510,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCache
 
 // Delete model
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerDeleteModel(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerDeleteModel(
     JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
     std::string modelId = getCString(env, jModelId);
     rac_file_callbacks_t cb = build_jni_file_callbacks();
@@ -4520,7 +4520,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerDelet
 
 // Create model folder
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreateModelFolder(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCreateModelFolder(
     JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
     std::string modelId = getCString(env, jModelId);
     rac_file_callbacks_t cb = build_jni_file_callbacks();
@@ -4536,7 +4536,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCreat
 
 // Model folder exists
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModelFolderExists(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerModelFolderExists(
     JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
     std::string modelId = getCString(env, jModelId);
     rac_file_callbacks_t cb = build_jni_file_callbacks();
@@ -4549,7 +4549,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerModel
 
 // Check storage availability - returns JSON string with result
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCheckStorage(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCheckStorage(
     JNIEnv* env, jobject /* thiz */, jlong requiredBytes) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     rac_storage_availability_t availability = {};
@@ -4573,7 +4573,7 @@ Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerCheck
 
 // Get storage info - returns JSON string with result
 JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_1bridge_RunAnywhereBridge_nativeFileManagerGetStorageInfo(
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetStorageInfo(
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     rac_file_manager_storage_info_t info = {};

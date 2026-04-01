@@ -88,6 +88,12 @@ android {
             minifyEnabled false
         }
     }
+
+    packaging {
+        jniLibs {
+            pickFirsts += ['**/libc++_shared.so']
+        }
+    }
 }
 
 dependencies {
