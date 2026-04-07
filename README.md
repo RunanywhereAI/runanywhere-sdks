@@ -140,8 +140,8 @@ println(response) // "Paris is the capital of France."
 
 ```kotlin
 dependencies {
-    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.1.4")
-    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.1.4")
+    implementation("com.runanywhere.sdk:runanywhere-kotlin:0.16.1")
+    implementation("com.runanywhere.sdk:runanywhere-core-llamacpp:0.16.1")
 }
 ```
 
@@ -161,7 +161,7 @@ LlamaCPP.register();
 
 // 2. Load a model
 await RunAnywhere.downloadModel('smollm2-360m');
-await RunAnywhere.loadModel(modelPath);
+await RunAnywhere.loadModel('smollm2-360m');
 
 // 3. Generate
 const response = await RunAnywhere.chat('What is the capital of France?');
@@ -201,8 +201,9 @@ print(response); // "Paris is the capital of France."
 
 ```yaml
 dependencies:
-  runanywhere: ^0.15.11
-  runanywhere_llamacpp: ^0.15.11
+  runanywhere: ^0.16.0
+  runanywhere_llamacpp: ^0.16.0  # LLM text generation
+  # runanywhere_onnx: ^0.16.0   # Add this if you need STT, TTS, or Voice features
 ```
 
 [Full documentation →](https://docs.runanywhere.ai/flutter/introduction) · [Source code](sdk/runanywhere-flutter/)
