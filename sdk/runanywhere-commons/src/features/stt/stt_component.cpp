@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <random>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
@@ -63,11 +64,10 @@ struct rac_stt_component {
  * Generate a unique ID for transcription tracking.
  */
 static std::string generate_unique_id() {
-    auto now = std::chrono::high_resolution_clock::now();
-    auto epoch = now.time_since_epoch();
-    auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(epoch).count();
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "trans_%lld", static_cast<long long>(ns));
+    static thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_int_distribution<uint32_t> dis;
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "trans_%08x%08x", dis(gen), dis(gen));
     return std::string(buffer);
 }
 
@@ -323,47 +323,51 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         return RAC_ERROR_INVALID_ARGUMENT;
 
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
 
-    // Generate unique ID for this transcription
+    // Acquire lock only for state reads, release before long-running transcription
     std::string transcription_id = generate_unique_id();
-    const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
-    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
+    rac_handle_t service = nullptr;
+    rac_stt_options_t local_options;
+    rac_inference_framework_t framework;
+    int32_t sample_rate = 0;
+    const char* model_id = nullptr;
+    const char* model_name = nullptr;
 
-    // Debug: Log if model_id is null
-    if (!model_id) {
-        log_warning(
-            "STT.Component",
-            "rac_lifecycle_get_model_id returned null - model_id may not be set in telemetry");
-    } else {
-        log_debug("STT.Component", "STT transcription using model_id: %s", model_id);
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
+
+        model_id = rac_lifecycle_get_model_id(component->lifecycle);
+        model_name = rac_lifecycle_get_model_name(component->lifecycle);
+        framework = component->actual_framework;
+        sample_rate = component->config.sample_rate;
+
+        // Copy effective options to local so we can release the lock
+        local_options = options ? *options : component->default_options;
+
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            log_error("STT.Component", "No model loaded - cannot transcribe");
+
+            // Emit transcription failed event
+            rac_analytics_event_data_t event = {};
+            event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
+            event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
+            event.data.stt_transcription.transcription_id = transcription_id.c_str();
+            event.data.stt_transcription.model_id = model_id;
+            event.data.stt_transcription.model_name = model_name;
+            event.data.stt_transcription.error_code = result;
+            event.data.stt_transcription.error_message = "No model loaded";
+            rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
+
+            return result;
+        }
     }
+    // Lock released — safe to do long-running transcription
 
     // Estimate audio length (assuming 16kHz mono 16-bit audio)
     double audio_length_ms = (audio_size / 2.0 / 16000.0) * 1000.0;
 
-    rac_handle_t service = nullptr;
-    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
-    if (result != RAC_SUCCESS) {
-        log_error("STT.Component", "No model loaded - cannot transcribe");
-
-        // Emit transcription failed event
-        rac_analytics_event_data_t event = {};
-        event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
-        event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
-        event.data.stt_transcription.transcription_id = transcription_id.c_str();
-        event.data.stt_transcription.model_id = model_id;
-        event.data.stt_transcription.model_name = model_name;
-        event.data.stt_transcription.error_code = result;
-        event.data.stt_transcription.error_message = "No model loaded";
-        rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_FAILED, &event);
-
-        return result;
-    }
-
     log_info("STT.Component", "Transcribing audio");
-
-    const rac_stt_options_t* effective_options = options ? options : &component->default_options;
 
     // Emit transcription started event
     {
@@ -375,16 +379,16 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription.model_name = model_name;
         event.data.stt_transcription.audio_length_ms = audio_length_ms;
         event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
-        event.data.stt_transcription.language = effective_options->language;
+        event.data.stt_transcription.language = local_options.language;
         event.data.stt_transcription.is_streaming = RAC_FALSE;
-        event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework = component->actual_framework;
+        event.data.stt_transcription.sample_rate = sample_rate;
+        event.data.stt_transcription.framework = framework;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_STARTED, &event);
     }
 
     auto start_time = std::chrono::steady_clock::now();
 
-    result = rac_stt_transcribe(service, audio_data, audio_size, effective_options, out_result);
+    rac_result_t result = rac_stt_transcribe(service, audio_data, audio_size, &local_options, out_result);
 
     if (result != RAC_SUCCESS) {
         log_error("STT.Component", "Transcription failed");
@@ -434,9 +438,9 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         event.data.stt_transcription.audio_size_bytes = static_cast<int32_t>(audio_size);
         event.data.stt_transcription.word_count = word_count;
         event.data.stt_transcription.real_time_factor = real_time_factor;
-        event.data.stt_transcription.language = effective_options->language;
-        event.data.stt_transcription.sample_rate = component->config.sample_rate;
-        event.data.stt_transcription.framework = component->actual_framework;
+        event.data.stt_transcription.language = local_options.language;
+        event.data.stt_transcription.sample_rate = sample_rate;
+        event.data.stt_transcription.framework = framework;
         event.data.stt_transcription.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
     }

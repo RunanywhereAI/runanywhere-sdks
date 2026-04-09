@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
+#include <new>
 
 #include "rac/core/rac_logger.h"
 #include "rac/features/vad/rac_vad_analytics.h"
@@ -71,12 +72,15 @@ rac_result_t rac_vad_analytics_create(rac_vad_analytics_handle_t* out_handle) {
     }
 
     try {
-        *out_handle = new rac_vad_analytics_s();
-        log_info("VAD.Analytics", "VAD analytics service created");
-        return RAC_SUCCESS;
+        *out_handle = new (std::nothrow) rac_vad_analytics_s();
     } catch (...) {
+        *out_handle = nullptr;
+    }
+    if (!*out_handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
+    log_info("VAD.Analytics", "VAD analytics service created");
+    return RAC_SUCCESS;
 }
 
 void rac_vad_analytics_destroy(rac_vad_analytics_handle_t handle) {

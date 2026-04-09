@@ -153,14 +153,25 @@ static int update_auth_state_from_response(const rac_auth_response_t* response) 
         return -1;
     }
 
+    // Pre-allocate required strings before modifying state
+    char* new_access = str_dup(response->access_token);
+    char* new_refresh = str_dup(response->refresh_token);
+    if (!new_access || !new_refresh) {
+        free(new_access);
+        free(new_refresh);
+        return -1;
+    }
+
     // Free old strings
     free_auth_state_strings();
 
-    // Copy new values
-    g_auth_state.access_token = str_dup(response->access_token);
-    g_auth_state.refresh_token = str_dup(response->refresh_token);
+    // Assign pre-allocated required values
+    g_auth_state.access_token = new_access;
+    g_auth_state.refresh_token = new_refresh;
+
+    // Copy optional values (NULL is acceptable)
     g_auth_state.device_id = str_dup(response->device_id);
-    g_auth_state.user_id = str_dup(response->user_id);  // Can be NULL
+    g_auth_state.user_id = str_dup(response->user_id);
     g_auth_state.organization_id = str_dup(response->organization_id);
 
     // Calculate expiry timestamp
@@ -286,6 +297,9 @@ int rac_auth_load_stored_tokens(void) {
         // Token expiry is unknown when loading, so it will trigger refresh on first use
         g_auth_state.token_expires_at = 0;
     }
+
+    // Clear sensitive data from stack buffer
+    memset(buffer, 0, sizeof(buffer));
 
     return 0;
 }

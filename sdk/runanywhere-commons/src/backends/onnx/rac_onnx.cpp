@@ -137,8 +137,16 @@ rac_result_t rac_stt_onnx_transcribe(rac_handle_t handle, const float* audio_sam
     auto result = h->stt->transcribe(request);
 
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
+    if (!result.text.empty() && !out_result->text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->detected_language =
         result.detected_language.empty() ? nullptr : strdup(result.detected_language.c_str());
+    if (!result.detected_language.empty() && !out_result->detected_language) {
+        free(out_result->text);
+        out_result->text = nullptr;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->words = nullptr;
     out_result->num_words = 0;
     out_result->confidence = 1.0f;
@@ -173,7 +181,11 @@ rac_result_t rac_stt_onnx_create_stream(rac_handle_t handle, rac_handle_t* out_s
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
 
-    *out_stream = static_cast<rac_handle_t>(strdup(stream_id.c_str()));
+    char* stream_copy = strdup(stream_id.c_str());
+    if (!stream_copy) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    *out_stream = static_cast<rac_handle_t>(stream_copy);
     return RAC_SUCCESS;
 }
 
@@ -213,6 +225,9 @@ rac_result_t rac_stt_onnx_decode_stream(rac_handle_t handle, rac_handle_t stream
 
     auto result = h->stt->decode(stream_id);
     *out_text = strdup(result.text.c_str());
+    if (!*out_text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     return RAC_SUCCESS;
 }
@@ -377,16 +392,31 @@ rac_result_t rac_tts_onnx_get_voices(rac_handle_t handle, char*** out_voices, si
     }
 
     auto voices = h->tts->get_voices();
-    *out_count = voices.size();
 
     if (voices.empty()) {
         *out_voices = nullptr;
+        *out_count = 0;
         return RAC_SUCCESS;
     }
 
     *out_voices = static_cast<char**>(malloc(voices.size() * sizeof(char*)));
+    if (!*out_voices) {
+        *out_count = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    *out_count = voices.size();
     for (size_t i = 0; i < voices.size(); i++) {
         (*out_voices)[i] = strdup(voices[i].id.c_str());
+        if (!(*out_voices)[i]) {
+            for (size_t j = 0; j < i; j++) {
+                free((*out_voices)[j]);
+            }
+            free(*out_voices);
+            *out_voices = nullptr;
+            *out_count = 0;
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
     }
 
     return RAC_SUCCESS;

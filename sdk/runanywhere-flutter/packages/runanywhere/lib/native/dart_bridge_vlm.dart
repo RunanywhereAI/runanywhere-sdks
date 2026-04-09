@@ -198,6 +198,44 @@ class DartBridgeVLM {
     }
   }
 
+  /// Load a VLM model by ID.
+  ///
+  /// The C++ layer resolves the model path from the global registry.
+  /// Matches Swift: `CppBridge.VLM.loadModelById(_:)`
+  ///
+  /// [modelId] - Unique identifier for the model (must be registered).
+  ///
+  /// Throws on failure.
+  Future<void> loadModelById(String modelId) async {
+    final handle = getHandle();
+
+    final idPtr = modelId.toNativeUtf8();
+
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final loadByIdFn = lib.lookupFunction<
+          Int32 Function(RacHandle, Pointer<Utf8>),
+          int Function(
+              RacHandle, Pointer<Utf8>)>('rac_vlm_component_load_model_by_id');
+
+      _logger.debug('Calling rac_vlm_component_load_model_by_id: $modelId');
+      final result = loadByIdFn(handle, idPtr);
+      _logger.debug(
+          'rac_vlm_component_load_model_by_id returned: $result (${RacResultCode.getMessage(result)})');
+
+      if (result != RAC_SUCCESS) {
+        throw StateError(
+          'Failed to load VLM model by ID: Error (code: $result)',
+        );
+      }
+
+      _loadedModelId = modelId;
+      _logger.info('VLM model loaded by ID: $modelId');
+    } finally {
+      calloc.free(idPtr);
+    }
+  }
+
   /// Unload the current model.
   void unload() {
     if (_handle == null) return;
@@ -266,6 +304,9 @@ class DartBridgeVLM {
     double temperature = 0.7,
     double topP = 0.9,
     bool useGpu = true,
+    String? systemPrompt,
+    int maxImageSize = 0,
+    int nThreads = 0,
   }) async {
     final handle = getHandle();
 
@@ -293,6 +334,9 @@ class DartBridgeVLM {
         temperature,
         topP,
         useGpu,
+        systemPrompt,
+        maxImageSize,
+        nThreads,
       );
     });
 
@@ -323,6 +367,9 @@ class DartBridgeVLM {
     double temperature = 0.7,
     double topP = 0.9,
     bool useGpu = true,
+    String? systemPrompt,
+    int maxImageSize = 0,
+    int nThreads = 0,
   }) {
     final handle = getHandle();
 
@@ -351,6 +398,9 @@ class DartBridgeVLM {
       topP,
       useGpu,
       controller,
+      systemPrompt,
+      maxImageSize,
+      nThreads,
     ).catchError((Object e) {
       if (!controller.isClosed) {
         controller.addError(e);
@@ -376,6 +426,9 @@ class DartBridgeVLM {
     double topP,
     bool useGpu,
     StreamController<String> controller,
+    String? systemPrompt,
+    int maxImageSize,
+    int nThreads,
   ) async {
     // Create a ReceivePort to receive tokens from the background isolate
     final receivePort = ReceivePort();
@@ -417,6 +470,9 @@ class DartBridgeVLM {
           temperature: temperature,
           topP: topP,
           useGpu: useGpu,
+          systemPrompt: systemPrompt,
+          maxImageSize: maxImageSize,
+          nThreads: nThreads,
         ),
       );
     } catch (e) {
@@ -500,6 +556,9 @@ VlmBridgeResult _processInIsolate(
   double temperature,
   double topP,
   bool useGpu,
+  String? systemPrompt,
+  int maxImageSize,
+  int nThreads,
 ) {
   final handle = Pointer<Void>.fromAddress(handleAddress);
   final promptPtr = prompt.toNativeUtf8();
@@ -510,6 +569,7 @@ VlmBridgeResult _processInIsolate(
   Pointer<Utf8>? filePathPtr;
   Pointer<Uint8>? pixelDataPtr;
   Pointer<Utf8>? base64DataPtr;
+  Pointer<Utf8>? systemPromptPtr;
 
   try {
     // Set up image struct based on format
@@ -554,9 +614,14 @@ VlmBridgeResult _processInIsolate(
     optionsPtr.ref.stopSequences = nullptr;
     optionsPtr.ref.numStopSequences = 0;
     optionsPtr.ref.streamingEnabled = RAC_FALSE;
-    optionsPtr.ref.systemPrompt = nullptr;
-    optionsPtr.ref.maxImageSize = 0;
-    optionsPtr.ref.nThreads = 0;
+    if (systemPrompt != null) {
+      systemPromptPtr = systemPrompt.toNativeUtf8();
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
+    } else {
+      optionsPtr.ref.systemPrompt = nullptr;
+    }
+    optionsPtr.ref.maxImageSize = maxImageSize;
+    optionsPtr.ref.nThreads = nThreads;
     optionsPtr.ref.useGpu = useGpu ? RAC_TRUE : RAC_FALSE;
 
     final lib = PlatformLoader.loadCommons();
@@ -603,6 +668,7 @@ VlmBridgeResult _processInIsolate(
     if (filePathPtr != null) calloc.free(filePathPtr);
     if (pixelDataPtr != null) calloc.free(pixelDataPtr);
     if (base64DataPtr != null) calloc.free(base64DataPtr);
+    if (systemPromptPtr != null) calloc.free(systemPromptPtr);
   }
 }
 
@@ -625,6 +691,9 @@ class _VlmStreamingIsolateParams {
   final double temperature;
   final double topP;
   final bool useGpu;
+  final String? systemPrompt;
+  final int maxImageSize;
+  final int nThreads;
 
   _VlmStreamingIsolateParams({
     required this.sendPort,
@@ -640,6 +709,9 @@ class _VlmStreamingIsolateParams {
     required this.temperature,
     required this.topP,
     required this.useGpu,
+    this.systemPrompt,
+    this.maxImageSize = 0,
+    this.nThreads = 0,
   });
 }
 
@@ -668,6 +740,7 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
   Pointer<Utf8>? filePathPtr;
   Pointer<Uint8>? pixelDataPtr;
   Pointer<Utf8>? base64DataPtr;
+  Pointer<Utf8>? systemPromptPtr;
 
   try {
     // Set up image struct based on format
@@ -714,9 +787,14 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
     optionsPtr.ref.stopSequences = nullptr;
     optionsPtr.ref.numStopSequences = 0;
     optionsPtr.ref.streamingEnabled = RAC_TRUE;
-    optionsPtr.ref.systemPrompt = nullptr;
-    optionsPtr.ref.maxImageSize = 0;
-    optionsPtr.ref.nThreads = 0;
+    if (params.systemPrompt != null) {
+      systemPromptPtr = params.systemPrompt!.toNativeUtf8();
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
+    } else {
+      optionsPtr.ref.systemPrompt = nullptr;
+    }
+    optionsPtr.ref.maxImageSize = params.maxImageSize;
+    optionsPtr.ref.nThreads = params.nThreads;
     optionsPtr.ref.useGpu = params.useGpu ? RAC_TRUE : RAC_FALSE;
 
     final lib = PlatformLoader.loadCommons();
@@ -789,6 +867,7 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
     if (filePathPtr != null) calloc.free(filePathPtr);
     if (pixelDataPtr != null) calloc.free(pixelDataPtr);
     if (base64DataPtr != null) calloc.free(base64DataPtr);
+    if (systemPromptPtr != null) calloc.free(systemPromptPtr);
     _vlmIsolateSendPort = null;
   }
 }
