@@ -12,6 +12,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart' as vad;
 
 /// Cached native function pointers for the RACommons library.

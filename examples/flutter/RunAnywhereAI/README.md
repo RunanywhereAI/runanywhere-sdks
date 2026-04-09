@@ -39,7 +39,7 @@ flutter pub get
 cd ios && pod install && cd ..
 
 # 6. Run the app
-flutter run
+`flutter run`
 
 # Or open in Android Studio / VS Code and run from there
 ```
