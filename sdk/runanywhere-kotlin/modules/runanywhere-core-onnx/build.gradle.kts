@@ -103,9 +103,6 @@ kotlin {
 
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
-            dependencies {
-                implementation("org.apache.commons:commons-compress:1.26.0")
-            }
         }
 
         val jvmMain by getting {

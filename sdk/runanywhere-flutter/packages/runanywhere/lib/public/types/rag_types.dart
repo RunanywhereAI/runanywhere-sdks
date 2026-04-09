@@ -4,8 +4,6 @@
 /// Mirrors iOS RAGTypes.swift adapted for Flutter/Dart.
 library rag_types;
 
-import 'package:runanywhere/native/dart_bridge_rag.dart';
-
 // MARK: - RAGConfiguration
 
 /// Configuration for the RAG pipeline.
@@ -17,24 +15,25 @@ class RAGConfiguration {
   final String embeddingModelPath;
 
   /// Path to the GGUF LLM model file (required).
+  /// Can be a directory — the C++ bridge will auto-resolve to the first .gguf file.
   final String llmModelPath;
 
   /// Embedding vector dimension (default: 384).
   final int embeddingDimension;
 
-  /// Number of top chunks to retrieve (default: 3).
+  /// Number of top chunks to retrieve (default: 10).
   final int topK;
 
-  /// Minimum cosine similarity threshold for retrieval (default: 0.3).
+  /// Minimum cosine similarity threshold for retrieval (default: 0.15).
   final double similarityThreshold;
 
   /// Maximum context tokens to send to the LLM (default: 2048).
   final int maxContextTokens;
 
-  /// Document chunk size in tokens (default: 512).
+  /// Tokens per chunk when splitting documents (default: 180, matches iOS).
   final int chunkSize;
 
-  /// Overlap between consecutive chunks in tokens (default: 50).
+  /// Overlap tokens between chunks (default: 30, matches iOS).
   final int chunkOverlap;
 
   /// Optional custom prompt template for the LLM.
@@ -50,15 +49,31 @@ class RAGConfiguration {
     required this.embeddingModelPath,
     required this.llmModelPath,
     this.embeddingDimension = 384,
-    this.topK = 3,
-    this.similarityThreshold = 0.3,
+    this.topK = 10,
+    this.similarityThreshold = 0.15,
     this.maxContextTokens = 2048,
-    this.chunkSize = 512,
-    this.chunkOverlap = 50,
+    this.chunkSize = 180,
+    this.chunkOverlap = 30,
     this.promptTemplate,
     this.embeddingConfigJSON,
     this.llmConfigJSON,
   });
+
+  /// Serialize to JSON for C++ bridge.
+  Map<String, dynamic> toJson() => {
+        'embeddingModelPath': embeddingModelPath,
+        'llmModelPath': llmModelPath,
+        'embeddingDimension': embeddingDimension,
+        'topK': topK,
+        'similarityThreshold': similarityThreshold,
+        'maxContextTokens': maxContextTokens,
+        'chunkSize': chunkSize,
+        'chunkOverlap': chunkOverlap,
+        if (promptTemplate != null) 'promptTemplate': promptTemplate,
+        if (embeddingConfigJSON != null)
+          'embeddingConfigJSON': embeddingConfigJSON,
+        if (llmConfigJSON != null) 'llmConfigJSON': llmConfigJSON,
+      };
 
   @override
   String toString() {
@@ -101,6 +116,16 @@ class RAGQueryOptions {
     this.topK = 40,
   });
 
+  /// Serialize to JSON for C++ bridge.
+  Map<String, dynamic> toJson() => {
+        'question': question,
+        if (systemPrompt != null) 'systemPrompt': systemPrompt,
+        'maxTokens': maxTokens,
+        'temperature': temperature,
+        'topP': topP,
+        'topK': topK,
+      };
+
   @override
   String toString() {
     return 'RAGQueryOptions(question: "${question.length > 50 ? question.substring(0, 50) : question}...", '
@@ -135,17 +160,14 @@ class RAGSearchResult {
     this.metadataJSON,
   });
 
-  /// Create from a bridge search result.
-  ///
-  /// Converts empty metadataJson strings to null.
-  factory RAGSearchResult.fromBridge(RAGBridgeSearchResult bridge) {
-    return RAGSearchResult(
-      chunkId: bridge.chunkId,
-      text: bridge.text,
-      similarityScore: bridge.similarityScore,
-      metadataJSON: bridge.metadataJson.isEmpty ? null : bridge.metadataJson,
-    );
-  }
+  /// Deserialize from JSON returned by C++ bridge.
+  factory RAGSearchResult.fromJson(Map<String, dynamic> json) =>
+      RAGSearchResult(
+        chunkId: json['chunkId'] as String? ?? '',
+        text: json['text'] as String? ?? '',
+        similarityScore: (json['similarityScore'] as num?)?.toDouble() ?? 0.0,
+        metadataJSON: _nonEmpty(json['metadataJson'] as String?),
+      );
 
   @override
   String toString() {
@@ -188,23 +210,20 @@ class RAGResult {
     required this.totalTimeMs,
   });
 
-  /// Create from a bridge result.
-  ///
-  /// Converts the bridge's [RAGBridgeResult] to public [RAGResult],
-  /// mapping each chunk through [RAGSearchResult.fromBridge].
-  /// Empty contextUsed strings are converted to null.
-  factory RAGResult.fromBridge(RAGBridgeResult bridge) {
-    return RAGResult(
-      answer: bridge.answer,
-      retrievedChunks: bridge.retrievedChunks
-          .map(RAGSearchResult.fromBridge)
-          .toList(growable: false),
-      contextUsed: bridge.contextUsed.isEmpty ? null : bridge.contextUsed,
-      retrievalTimeMs: bridge.retrievalTimeMs,
-      generationTimeMs: bridge.generationTimeMs,
-      totalTimeMs: bridge.totalTimeMs,
-    );
-  }
+  /// Deserialize from JSON returned by C++ bridge.
+  factory RAGResult.fromJson(Map<String, dynamic> json) => RAGResult(
+        answer: json['answer'] as String? ?? '',
+        retrievedChunks: (json['retrievedChunks'] as List<dynamic>?)
+                ?.map((c) =>
+                    RAGSearchResult.fromJson(c as Map<String, dynamic>))
+                .toList() ??
+            [],
+        contextUsed: _nonEmpty(json['contextUsed'] as String?),
+        retrievalTimeMs: (json['retrievalTimeMs'] as num?)?.toDouble() ?? 0.0,
+        generationTimeMs:
+            (json['generationTimeMs'] as num?)?.toDouble() ?? 0.0,
+        totalTimeMs: (json['totalTimeMs'] as num?)?.toDouble() ?? 0.0,
+      );
 
   @override
   String toString() {
@@ -213,3 +232,27 @@ class RAGResult {
         'totalTimeMs: $totalTimeMs)';
   }
 }
+
+// MARK: - RAGStatistics
+
+/// Pipeline statistics returned by ragGetStatistics().
+///
+/// Matches React Native's RAG statistics output.
+class RAGStatistics {
+  /// Raw JSON string from the C pipeline.
+  final String statsJson;
+
+  const RAGStatistics({required this.statsJson});
+
+  /// Deserialize from a JSON string.
+  factory RAGStatistics.fromJsonString(String json) =>
+      RAGStatistics(statsJson: json);
+
+  @override
+  String toString() => 'RAGStatistics($statsJson)';
+}
+
+// MARK: - Helpers
+
+/// Returns null for null or empty strings.
+String? _nonEmpty(String? s) => (s == null || s.isEmpty) ? null : s;

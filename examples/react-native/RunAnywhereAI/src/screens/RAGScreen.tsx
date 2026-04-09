@@ -10,7 +10,7 @@
  * Architecture:
  * - Uses @runanywhere/core RAG pipeline (compiled into RACommons)
  * - Reuses the shared ModelSelectionSheet with RagEmbedding/RagLLM contexts
- * - Document picker via react-native-document-picker
+ * - Document picker via @react-native-documents/picker
  */
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { NativeModules } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import DocumentPicker from 'react-native-document-picker';
+import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
 import { Colors } from '../theme/colors';
 import { Typography, FontWeight } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -167,12 +167,11 @@ export const RAGScreen: React.FC = () => {
     if (!areModelsReady || !isNitroReady) return;
 
     try {
-      const result = await DocumentPicker.pickSingle({
-        type: [DocumentPicker.types.pdf, DocumentPicker.types.plainText, DocumentPicker.types.json],
-        copyTo: 'cachesDirectory',
+      const [result] = await pick({
+        type: [types.pdf, types.plainText, types.json],
       });
 
-      const fileUri = result.fileCopyUri || result.uri;
+      const fileUri = result.uri;
       if (!fileUri) return;
 
       setIsLoadingDocument(true);
@@ -192,11 +191,11 @@ export const RAGScreen: React.FC = () => {
       const config = {
         embeddingModelPath: embeddingPath,
         llmModelPath: llmPath,
-        topK: 5,
-        similarityThreshold: 0.25,
+        topK: 3,
+        similarityThreshold: 0.12,
         maxContextTokens: 2048,
-        chunkSize: 512,
-        chunkOverlap: 50,
+        chunkSize: 180,
+        chunkOverlap: 30,
       };
 
       // Create pipeline and ingest document (same as iOS loadDocument)
@@ -206,7 +205,7 @@ export const RAGScreen: React.FC = () => {
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
     } catch (err) {
-      if (DocumentPicker.isCancel(err)) {
+      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
         return; // User cancelled
       }
       const msg = err instanceof Error ? err.message : 'Failed to load document';

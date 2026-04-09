@@ -1,16 +1,37 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
-import 'package:archive/archive.dart';
+import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_download.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
+
+/// FFI typedef for rac_extract_archive_native
+typedef _RacExtractNative = Int32 Function(
+  Pointer<Utf8> archivePath,
+  Pointer<Utf8> destinationDir,
+  Pointer<Void> options,
+  Pointer<Void> progressCallback,
+  Pointer<Void> userData,
+  Pointer<Void> outResult,
+);
+typedef _RacExtractDart = int Function(
+  Pointer<Utf8> archivePath,
+  Pointer<Utf8> destinationDir,
+  Pointer<Void> options,
+  Pointer<Void> progressCallback,
+  Pointer<Void> userData,
+  Pointer<Void> outResult,
+);
 
 /// ONNX download strategy for handling .onnx files and .tar.bz2 archives
 /// Matches iOS ONNXDownloadStrategy pattern
 ///
-/// Uses pure Dart archive extraction (via `archive` package) for cross-platform support.
-/// This works on both iOS and Android without requiring native libarchive.
+/// Uses native C++ extraction via libarchive for all archive formats.
 class OnnxDownloadStrategy {
   final SDKLogger logger = SDKLogger('OnnxDownloadStrategy');
 
@@ -146,17 +167,15 @@ class OnnxDownloadStrategy {
 
     logger.info('Archive downloaded, extracting to: ${modelFolder.path}');
 
-    // Extract the archive using pure Dart
+    // Extract the archive using native C++ (libarchive)
     try {
-      await _extractTarBz2(
+      await _extractNative(
         archivePath: archivePath.path,
         destinationPath: modelFolder.path,
-        onProgress: (extractProgress) {
-          // Map extraction progress to 50% - 95% of overall progress
-          final overallProgress = 0.5 + (extractProgress * 0.45);
-          progressHandler?.call(overallProgress);
-        },
       );
+
+      // Report extraction progress complete
+      progressHandler?.call(0.95);
 
       logger.info('Archive extracted successfully to: ${modelFolder.path}');
     } catch (e) {
@@ -175,23 +194,18 @@ class OnnxDownloadStrategy {
       logger.warning('Failed to delete archive file: $e');
     }
 
-    // Find the extracted model directory
-    // Sherpa-ONNX archives typically extract to a subdirectory with the model name
-    final contents = await modelFolder.list().toList();
-    logger.debug(
-        'Extracted contents: ${contents.map((e) => e.path.split('/').last).join(", ")}');
-
-    // If there's a single subdirectory, the actual model files are in there
-    var modelDir = modelFolder;
-    if (contents.length == 1 && contents.first is Directory) {
-      final subdir = contents.first as Directory;
-      final subdirStat = await subdir.stat();
-      if (subdirStat.type == FileSystemEntityType.directory) {
-        // Model files are in the subdirectory
-        modelDir = subdir;
-        logger.info(
-            'Model files are in subdirectory: ${subdir.path.split('/').last}');
-      }
+    // Use C++ to find the actual model path after extraction
+    // (handles nested directories, model file scanning for sherpa-onnx archives)
+    final foundPath = DartBridgeDownload.findModelPathAfterExtraction(
+      extractedDir: modelFolder.path,
+      structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect
+      framework: RacInferenceFramework.onnx,
+      format: RacModelFormat.onnx,
+    );
+    final modelDir = foundPath != null ? Directory(foundPath) : modelFolder;
+    if (foundPath != null && foundPath != modelFolder.path) {
+      logger.info(
+          'Model files found at: ${foundPath.split('/').last}');
     }
 
     // Report completion (100%)
@@ -201,33 +215,39 @@ class OnnxDownloadStrategy {
     return modelDir.uri;
   }
 
-  /// Extract tar.bz2 archive using pure Dart
-  Future<void> _extractTarBz2({
+  /// Extract archive using native C++ (libarchive) via FFI.
+  /// Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection.
+  Future<void> _extractNative({
     required String archivePath,
     required String destinationPath,
-    void Function(double progress)? onProgress,
   }) async {
-    final archiveFile = File(archivePath);
-    final bytes = await archiveFile.readAsBytes();
+    final lib = PlatformLoader.loadCommons();
+    final extractFn = lib.lookupFunction<_RacExtractNative, _RacExtractDart>(
+      'rac_extract_archive_native',
+    );
 
-    // Decompress bz2
-    final decompressed = BZip2Decoder().decodeBytes(bytes);
+    final archivePathPtr = archivePath.toNativeUtf8();
+    final destPathPtr = destinationPath.toNativeUtf8();
 
-    // Extract tar
-    final archive = TarDecoder().decodeBytes(decompressed);
-    final totalFiles = archive.files.length;
+    try {
+      final result = extractFn(
+        archivePathPtr,
+        destPathPtr,
+        nullptr, // default options
+        nullptr, // no progress callback
+        nullptr, // no user data
+        nullptr, // no result output
+      );
 
-    for (var i = 0; i < archive.files.length; i++) {
-      final file = archive.files[i];
-      final filename = file.name;
-
-      if (file.isFile) {
-        final outputFile = File('$destinationPath/$filename');
-        await outputFile.parent.create(recursive: true);
-        await outputFile.writeAsBytes(file.content as List<int>);
+      if (result != 0) {
+        throw SDKError.downloadFailed(
+          archivePath,
+          'Native extraction failed with code: $result',
+        );
       }
-
-      onProgress?.call((i + 1) / totalFiles);
+    } finally {
+      calloc.free(archivePathPtr);
+      calloc.free(destPathPtr);
     }
   }
 

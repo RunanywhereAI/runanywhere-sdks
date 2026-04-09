@@ -13,6 +13,7 @@ import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_environment.dart'
     show RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_events.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
 import 'package:runanywhere/native/dart_bridge_llm.dart';
 import 'package:runanywhere/native/dart_bridge_model_assignment.dart';
@@ -28,6 +29,7 @@ import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/dart_bridge_voice_agent.dart';
+import 'package:runanywhere/native/dart_bridge_lora.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -142,6 +144,10 @@ class DartBridge {
     // Matches Swift: Device.register()
     DartBridgeDevice.registerCallbacks();
     _logger.debug('Device callbacks registered');
+
+    // Step 8: Register file manager I/O callbacks
+    DartBridgeFileManager.register();
+    _logger.debug('File manager callbacks registered');
 
     _isInitialized = true;
     _logger.info('Phase 1 initialization complete');
@@ -311,6 +317,13 @@ class DartBridge {
 
   /// RAG pipeline bridge
   static DartBridgeRAG get rag => DartBridgeRAG.shared;
+
+  /// LoRA adapter bridge
+  static DartBridgeLora get lora => DartBridgeLora.shared;
+
+  /// LoRA registry bridge
+  static DartBridgeLoraRegistry get loraRegistry =>
+      DartBridgeLoraRegistry.shared;
 
   // -------------------------------------------------------------------------
   // Private Helpers

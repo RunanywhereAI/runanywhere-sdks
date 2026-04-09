@@ -18,7 +18,7 @@
 
 import type { RunAnywhereCore } from '../../specs/RunAnywhereCore.nitro';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKEnvironment } from '../../types/enums';
+import { SDKEnvironment } from '../../types';
 import { getNitroModulesProxySync } from '../../native/NitroModulesGlobalInit';
 
 // Use the global NitroModules initialization

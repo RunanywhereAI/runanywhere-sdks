@@ -78,7 +78,7 @@ typedef struct {
  *
  * @return Handle to the SDK state (never NULL after first call)
  */
-rac_sdk_state_handle_t rac_state_get_instance(void);
+RAC_API rac_sdk_state_handle_t rac_state_get_instance(void);
 
 // =============================================================================
 // Initialization & Lifecycle
@@ -95,14 +95,14 @@ rac_sdk_state_handle_t rac_state_get_instance(void);
  * @param device_id The persistent device ID (copied internally)
  * @return RAC_SUCCESS on success
  */
-rac_result_t rac_state_initialize(rac_environment_t env, const char* api_key, const char* base_url,
-                                  const char* device_id);
+RAC_API rac_result_t rac_state_initialize(rac_environment_t env, const char* api_key,
+                                          const char* base_url, const char* device_id);
 
 /**
  * @brief Check if SDK state is initialized
  * @return true if initialized
  */
-bool rac_state_is_initialized(void);
+RAC_API bool rac_state_is_initialized(void);
 
 /**
  * @brief Reset all state (for testing or re-initialization)
@@ -110,14 +110,14 @@ bool rac_state_is_initialized(void);
  * Clears all state including auth tokens, handles, etc.
  * Does NOT free the singleton - just resets to initial state.
  */
-void rac_state_reset(void);
+RAC_API void rac_state_reset(void);
 
 /**
  * @brief Shutdown and free all resources
  *
  * Called during SDK shutdown. Frees all memory and destroys handles.
  */
-void rac_state_shutdown(void);
+RAC_API void rac_state_shutdown(void);
 
 // =============================================================================
 // Environment Queries
@@ -127,25 +127,25 @@ void rac_state_shutdown(void);
  * @brief Get current environment
  * @return The SDK environment
  */
-rac_environment_t rac_state_get_environment(void);
+RAC_API rac_environment_t rac_state_get_environment(void);
 
 /**
  * @brief Get base URL
  * @return The base URL string (do not free)
  */
-const char* rac_state_get_base_url(void);
+RAC_API const char* rac_state_get_base_url(void);
 
 /**
  * @brief Get API key
  * @return The API key string (do not free)
  */
-const char* rac_state_get_api_key(void);
+RAC_API const char* rac_state_get_api_key(void);
 
 /**
  * @brief Get device ID
  * @return The device ID string (do not free)
  */
-const char* rac_state_get_device_id(void);
+RAC_API const char* rac_state_get_device_id(void);
 
 // =============================================================================
 // Auth State Management
@@ -160,25 +160,25 @@ const char* rac_state_get_device_id(void);
  * @param auth The auth data to set
  * @return RAC_SUCCESS on success
  */
-rac_result_t rac_state_set_auth(const rac_auth_data_t* auth);
+RAC_API rac_result_t rac_state_set_auth(const rac_auth_data_t* auth);
 
 /**
  * @brief Get current access token
  * @return Access token string or NULL if not authenticated (do not free)
  */
-const char* rac_state_get_access_token(void);
+RAC_API const char* rac_state_get_access_token(void);
 
 /**
  * @brief Get current refresh token
  * @return Refresh token string or NULL (do not free)
  */
-const char* rac_state_get_refresh_token(void);
+RAC_API const char* rac_state_get_refresh_token(void);
 
 /**
  * @brief Check if currently authenticated
  * @return true if authenticated with valid (non-expired) token
  */
-bool rac_state_is_authenticated(void);
+RAC_API bool rac_state_is_authenticated(void);
 
 /**
  * @brief Check if token needs refresh
@@ -187,32 +187,32 @@ bool rac_state_is_authenticated(void);
  *
  * @return true if refresh is needed
  */
-bool rac_state_token_needs_refresh(void);
+RAC_API bool rac_state_token_needs_refresh(void);
 
 /**
  * @brief Get token expiry timestamp
  * @return Unix timestamp (seconds) when token expires, or 0 if not set
  */
-int64_t rac_state_get_token_expires_at(void);
+RAC_API int64_t rac_state_get_token_expires_at(void);
 
 /**
  * @brief Get user ID
  * @return User ID string or NULL (do not free)
  */
-const char* rac_state_get_user_id(void);
+RAC_API const char* rac_state_get_user_id(void);
 
 /**
  * @brief Get organization ID
  * @return Organization ID string or NULL (do not free)
  */
-const char* rac_state_get_organization_id(void);
+RAC_API const char* rac_state_get_organization_id(void);
 
 /**
  * @brief Clear authentication state
  *
  * Called on logout or auth failure. Clears tokens but not device/env config.
  */
-void rac_state_clear_auth(void);
+RAC_API void rac_state_clear_auth(void);
 
 // =============================================================================
 // Device State Management
@@ -222,13 +222,13 @@ void rac_state_clear_auth(void);
  * @brief Set device registration status
  * @param registered Whether device is registered with backend
  */
-void rac_state_set_device_registered(bool registered);
+RAC_API void rac_state_set_device_registered(bool registered);
 
 /**
  * @brief Check if device is registered
  * @return true if device has been registered
  */
-bool rac_state_is_device_registered(void);
+RAC_API bool rac_state_is_device_registered(void);
 
 // =============================================================================
 // State Change Callbacks (for platform observers)
@@ -249,7 +249,7 @@ typedef void (*rac_auth_changed_callback_t)(bool is_authenticated, void* user_da
  * @param callback The callback function (NULL to unregister)
  * @param user_data Context passed to callback
  */
-void rac_state_on_auth_changed(rac_auth_changed_callback_t callback, void* user_data);
+RAC_API void rac_state_on_auth_changed(rac_auth_changed_callback_t callback, void* user_data);
 
 // =============================================================================
 // Persistence Bridge (Platform implements secure storage)
@@ -282,8 +282,8 @@ typedef const char* (*rac_load_callback_t)(const char* key, void* user_data);
  * @param load Callback to load a value
  * @param user_data Context passed to callbacks
  */
-void rac_state_set_persistence_callbacks(rac_persist_callback_t persist, rac_load_callback_t load,
-                                         void* user_data);
+RAC_API void rac_state_set_persistence_callbacks(rac_persist_callback_t persist,
+                                                  rac_load_callback_t load, void* user_data);
 
 #ifdef __cplusplus
 }

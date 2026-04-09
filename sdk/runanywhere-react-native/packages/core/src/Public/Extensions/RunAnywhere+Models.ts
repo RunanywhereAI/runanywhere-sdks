@@ -14,7 +14,7 @@ import { FileSystem, MultiFileModelCache } from '../../services/FileSystem';
 import type { ModelFileDescriptor } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type { ModelInfo, LLMFramework, ModelCompatibilityResult } from '../../types';
-import { ModelCategory, ModelArtifactType } from '../../types';
+import { ModelCategory, ModelArtifactType, ModelFormat, ConfigurationSource } from '../../types';
 
 const logger = new SDKLogger('RunAnywhere.Models');
 
@@ -227,7 +227,7 @@ export async function registerModel(options: {
   memoryRequirement?: number;
   supportsThinking?: boolean;
 }): Promise<ModelInfo> {
-  const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
+
   const now = new Date().toISOString();
   const modelId = options.id ?? generateModelId(options.url);
 
@@ -291,7 +291,7 @@ export async function registerMultiFileModel(options: {
   modality?: ModelCategory;
   memoryRequirement?: number;
 }): Promise<ModelInfo> {
-  const { ModelFormat, ConfigurationSource } = await import('../../types/enums');
+
   const now = new Date().toISOString();
 
   MultiFileModelCache.set(options.id, options.files);
@@ -356,8 +356,7 @@ function inferFrameworkDir(framework: LLMFramework): string {
   }
 }
 
-function inferFormat(url: string, framework?: LLMFramework): import('../../types/enums').ModelFormat {
-  const { ModelFormat } = require('../../types/enums');
+function inferFormat(url: string, framework?: LLMFramework): ModelFormat {
   const lower = url.toLowerCase();
   if (lower.includes('.gguf')) return ModelFormat.GGUF;
   if (lower.includes('.onnx')) return ModelFormat.ONNX;
@@ -438,16 +437,59 @@ export async function downloadModel(
 
   try {
     // Multi-file model: download all files into the same directory
+    // Follows Swift SDK's AlamofireDownloadService.downloadMultiFileModel() pattern:
+    // - Sequential download of each file
+    // - Proportional progress distribution (offset/scale per file)
+    // - C++ path resolution via FileSystem.getModelFolder()
     const multiFileDescriptors = MultiFileModelCache.get(modelId);
     if (multiFileDescriptors && multiFileDescriptors.length > 0) {
       logger.info('Starting multi-file download:', { modelId, fileCount: multiFileDescriptors.length });
 
-      const destFolder = await FileSystem.downloadMultiFileModel(
-        modelId,
-        multiFileDescriptors,
-        progressHandler,
-        framework
-      );
+      const frameworkDir = framework || 'ONNX';
+      const destFolder = FileSystem.getModelFolder(modelId, frameworkDir);
+
+      // Ensure directory structure exists
+      await FileSystem.ensureDirectory(FileSystem.getRunAnywhereDirectory());
+      await FileSystem.ensureDirectory(FileSystem.getModelsDirectory());
+      await FileSystem.ensureDirectory(FileSystem.getFrameworkDirectory(frameworkDir));
+      await FileSystem.ensureDirectory(destFolder);
+
+      const fileCount = multiFileDescriptors.length;
+
+      for (let index = 0; index < fileCount; index++) {
+        const fileDescriptor = multiFileDescriptors[index];
+        const fileDestination = `${destFolder}/${fileDescriptor.filename}`;
+
+        // Skip if file already exists
+        if (await FileSystem.fileExists(fileDestination)) {
+          logger.info(`File already exists, skipping: ${fileDescriptor.filename}`);
+          continue;
+        }
+
+        logger.info(`Downloading file ${index + 1}/${fileCount}: ${fileDescriptor.filename}`);
+
+        // Progress distribution: offset/scale pattern (mirrors Swift performDownload)
+        const progressOffset = index / fileCount;
+        const progressScale = 1.0 / fileCount;
+
+        await FileSystem.downloadFile(
+          fileDescriptor.url,
+          fileDestination,
+          (fileProgress) => {
+            const scaledProgress = progressOffset + (fileProgress.progress * progressScale);
+            if (onProgress) {
+              onProgress({
+                modelId,
+                bytesDownloaded: fileProgress.bytesWritten,
+                totalBytes: fileProgress.contentLength || modelInfo.downloadSize || 0,
+                progress: scaledProgress,
+              });
+            }
+          }
+        );
+
+        logger.info(`Completed file ${index + 1}/${fileCount}: ${fileDescriptor.filename}`);
+      }
 
       logger.info('Multi-file download completed:', { modelId, destFolder });
 
