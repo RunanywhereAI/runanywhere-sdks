@@ -57,7 +57,7 @@ static rac_result_t sarvam_stt_vtable_get_info(void* impl, rac_stt_info_t* out_i
 
     out_info->is_ready = RAC_TRUE;
     out_info->supports_streaming = RAC_FALSE;
-    out_info->current_model = "saarika:v2";
+    out_info->current_model = "saarika:v2.5";
     return RAC_SUCCESS;
 }
 
@@ -124,7 +124,7 @@ rac_handle_t sarvam_stt_create(const rac_service_request_t* request, void* user_
 
     service->ops = &g_sarvam_stt_ops;
     service->impl = backend_handle;
-    service->model_id = request && request->identifier ? strdup(request->identifier) : strdup("sarvam:saarika:v2");
+    service->model_id = request && request->identifier ? strdup(request->identifier) : strdup("sarvam:saarika:v2.5");
 
     RAC_LOG_INFO(LOG_CAT, "STT service created successfully");
     return service;

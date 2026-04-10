@@ -33,8 +33,9 @@ extern "C" {
  * Sarvam STT model variants.
  */
 typedef enum rac_stt_sarvam_model {
-    RAC_STT_SARVAM_MODEL_SAARIKA_V2 = 0,
-    RAC_STT_SARVAM_MODEL_SAARIKA_V1 = 1,
+    RAC_STT_SARVAM_MODEL_SAARIKA_V2_5 = 0,
+    RAC_STT_SARVAM_MODEL_SAARIKA_V2 = 1,
+    RAC_STT_SARVAM_MODEL_SAARIKA_V1 = 2,
 } rac_stt_sarvam_model_t;
 
 /**
@@ -49,7 +50,7 @@ typedef struct rac_stt_sarvam_config {
 } rac_stt_sarvam_config_t;
 
 static const rac_stt_sarvam_config_t RAC_STT_SARVAM_CONFIG_DEFAULT = {
-    .model = RAC_STT_SARVAM_MODEL_SAARIKA_V2,
+    .model = RAC_STT_SARVAM_MODEL_SAARIKA_V2_5,
     .language_code = "en-IN",
     .with_timestamps = RAC_FALSE,
     .with_diarization = RAC_FALSE,

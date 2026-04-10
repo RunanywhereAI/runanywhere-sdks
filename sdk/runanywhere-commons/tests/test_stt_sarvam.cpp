@@ -44,6 +44,19 @@ static rac_result_t test_secure_get(const char*, char**, void*) { return RAC_ERR
 static rac_result_t test_secure_set(const char*, const char*, void*) { return RAC_ERROR_NOT_SUPPORTED; }
 static rac_result_t test_secure_delete(const char*, void*) { return RAC_ERROR_NOT_SUPPORTED; }
 
+static int64_t test_now_ms(void*) {
+    return static_cast<int64_t>(std::time(nullptr)) * 1000;
+}
+
+static rac_result_t test_get_memory_info(rac_memory_info_t* out_info, void*) {
+    if (out_info) {
+        out_info->total_bytes = 8ULL * 1024 * 1024 * 1024;
+        out_info->available_bytes = 4ULL * 1024 * 1024 * 1024;
+        out_info->used_bytes = 4ULL * 1024 * 1024 * 1024;
+    }
+    return RAC_SUCCESS;
+}
+
 static void init_platform() {
     if (rac_is_initialized()) return;
 
@@ -55,7 +68,9 @@ static void init_platform() {
     adapter.secure_get = test_secure_get;
     adapter.secure_set = test_secure_set;
     adapter.secure_delete = test_secure_delete;
-    adapter.log_message = test_log;
+    adapter.log = test_log;
+    adapter.now_ms = test_now_ms;
+    adapter.get_memory_info = test_get_memory_info;
 
     rac_config_t config = {};
     config.platform_adapter = &adapter;
@@ -189,6 +204,8 @@ TestResult test_model_string() {
                 "V1 model string mismatch");
     ASSERT_TRUE(std::strcmp(rac::sarvam::model_string(RAC_STT_SARVAM_MODEL_SAARIKA_V2), "saarika:v2") == 0,
                 "V2 model string mismatch");
+    ASSERT_TRUE(std::strcmp(rac::sarvam::model_string(RAC_STT_SARVAM_MODEL_SAARIKA_V2_5), "saarika:v2.5") == 0,
+                "V2.5 model string mismatch");
 
     return TEST_PASS();
 }
@@ -456,7 +473,7 @@ TestResult test_transcribe_with_mock_http() {
     // Verify body contains WAV data (starts with RIFF after multipart headers)
     std::string body_str(g_mock_http.last_body.begin(), g_mock_http.last_body.end());
     ASSERT_TRUE(body_str.find("RIFF") != std::string::npos, "Body should contain WAV data");
-    ASSERT_TRUE(body_str.find("saarika:v2") != std::string::npos, "Body should contain model");
+    ASSERT_TRUE(body_str.find("saarika:v2.5") != std::string::npos, "Body should contain model");
     ASSERT_TRUE(body_str.find("en-IN") != std::string::npos, "Body should contain language");
 
     rac_stt_result_free(&result);
@@ -517,6 +534,143 @@ TestResult test_transcribe_audio_too_long() {
 }
 
 // =============================================================================
+// Real API integration test (requires SARVAM_API_KEY env + libcurl)
+// =============================================================================
+
+#ifdef RAC_TEST_HAS_CURL
+#include <curl/curl.h>
+
+// Simple curl-based HTTP executor for real API testing
+static size_t curl_write_cb(void* data, size_t size, size_t nmemb, void* userp) {
+    auto* buf = static_cast<std::string*>(userp);
+    buf->append(static_cast<char*>(data), size * nmemb);
+    return size * nmemb;
+}
+
+static void curl_http_executor(const rac_http_request_t* request, rac_http_callback_t callback,
+                                void* user_data) {
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        rac_http_response_t resp = {};
+        resp.status_code = 0;
+        resp.error_message = strdup("Failed to init curl");
+        callback(&resp, user_data);
+        free(resp.error_message);
+        return;
+    }
+
+    std::string response_body;
+    curl_easy_setopt(curl, CURLOPT_URL, request->url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_body);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (long)request->timeout_ms);
+
+    // Set headers
+    struct curl_slist* headers = nullptr;
+    for (size_t i = 0; i < request->header_count; ++i) {
+        std::string h = std::string(request->headers[i].key) + ": " + request->headers[i].value;
+        headers = curl_slist_append(headers, h.c_str());
+    }
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    // POST with binary body
+    if (request->method == RAC_HTTP_POST && request->body && request->body_length > 0) {
+        curl_easy_setopt(curl, CURLOPT_POST, 1L);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request->body);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)request->body_length);
+    }
+
+    CURLcode res = curl_easy_perform(curl);
+
+    rac_http_response_t resp = {};
+    if (res == CURLE_OK) {
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+        resp.status_code = (int32_t)http_code;
+        resp.body = strdup(response_body.c_str());
+        resp.body_length = response_body.size();
+    } else {
+        resp.status_code = 0;
+        resp.error_message = strdup(curl_easy_strerror(res));
+    }
+
+    callback(&resp, user_data);
+
+    free(resp.body);
+    free(resp.error_message);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+}
+
+TestResult test_real_api_transcribe() {
+    TestResult r;
+    r.test_name = "real_api_transcribe";
+
+    const char* api_key = std::getenv("SARVAM_API_KEY");
+    const char* audio_path = std::getenv("SARVAM_TEST_AUDIO");
+
+    if (!api_key || !audio_path) {
+        r.passed = true;
+        r.details = "Skipped (set SARVAM_API_KEY and SARVAM_TEST_AUDIO env vars)";
+        return r;
+    }
+
+    init_platform();
+
+    // Register real curl executor
+    curl_global_init(CURL_GLOBAL_DEFAULT);
+    rac_http_set_executor(curl_http_executor);
+
+    rac_stt_sarvam_set_api_key(api_key);
+
+    // Read raw PCM file
+    std::ifstream file(audio_path, std::ios::binary | std::ios::ate);
+    ASSERT_TRUE(file.is_open(), "Failed to open audio file");
+
+    size_t file_size = file.tellg();
+    file.seekg(0);
+    std::vector<uint8_t> pcm_data(file_size);
+    file.read(reinterpret_cast<char*>(pcm_data.data()), file_size);
+    file.close();
+
+    ASSERT_TRUE(file_size > 0, "Audio file is empty");
+
+    printf("Audio file: %s (%zu bytes, ~%.1fs)\n", audio_path, file_size,
+           (float)file_size / (16000.0f * 2));
+
+    // Create service with Hindi-IN language (adjust as needed)
+    rac_stt_sarvam_config_t config = RAC_STT_SARVAM_CONFIG_DEFAULT;
+    config.language_code = "hi-IN";
+    config.timeout_ms = 30000;
+
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = rac_stt_sarvam_create(&config, &handle);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Create should succeed");
+
+    // Transcribe
+    rac_stt_result_t result = {};
+    rc = rac_stt_sarvam_transcribe(handle, pcm_data.data(), pcm_data.size(), nullptr, &result);
+
+    printf("Result code: %d\n", rc);
+    if (rc == RAC_SUCCESS && result.text) {
+        printf("Transcript: %s\n", result.text);
+        printf("Language: %s\n", result.detected_language ? result.detected_language : "N/A");
+        printf("Processing time: %lld ms\n", (long long)result.processing_time_ms);
+    }
+
+    ASSERT_EQ(rc, RAC_SUCCESS, "Transcribe should succeed");
+    ASSERT_TRUE(result.text != nullptr, "Result text should not be null");
+    ASSERT_TRUE(strlen(result.text) > 0, "Transcript should not be empty");
+
+    rac_stt_result_free(&result);
+    rac_stt_sarvam_destroy(handle);
+    curl_global_cleanup();
+
+    return TEST_PASS();
+}
+#endif // RAC_TEST_HAS_CURL
+
+// =============================================================================
 // Main
 // =============================================================================
 
@@ -540,6 +694,11 @@ int main(int argc, char** argv) {
     suite.add("transcribe_with_mock_http", test_transcribe_with_mock_http);
     suite.add("transcribe_api_error", test_transcribe_api_error);
     suite.add("transcribe_audio_too_long", test_transcribe_audio_too_long);
+
+#ifdef RAC_TEST_HAS_CURL
+    // Real API test (requires env vars)
+    suite.add("real_api_transcribe", test_real_api_transcribe);
+#endif
 
     return suite.run(argc, argv);
 }

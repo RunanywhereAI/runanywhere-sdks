@@ -33,7 +33,8 @@ const char* model_string(rac_stt_sarvam_model_t model) {
     switch (model) {
         case RAC_STT_SARVAM_MODEL_SAARIKA_V1: return "saarika:v1";
         case RAC_STT_SARVAM_MODEL_SAARIKA_V2: return "saarika:v2";
-        default: return "saarika:v2";
+        case RAC_STT_SARVAM_MODEL_SAARIKA_V2_5: return "saarika:v2.5";
+        default: return "saarika:v2.5";
     }
 }
 

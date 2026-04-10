@@ -90,6 +90,14 @@ if(RAC_BACKEND_SARVAM AND TARGET rac_backend_sarvam)
     )
     target_link_libraries(test_stt_sarvam PRIVATE rac_commons rac_backend_sarvam)
     target_compile_features(test_stt_sarvam PRIVATE cxx_std_20)
+
+    # Enable real API tests if libcurl is available
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        target_compile_definitions(test_stt_sarvam PRIVATE RAC_TEST_HAS_CURL)
+        target_link_libraries(test_stt_sarvam PRIVATE CURL::libcurl)
+    endif()
+
     add_test(NAME stt_sarvam_tests COMMAND test_stt_sarvam --run-all)
 endif()
 
