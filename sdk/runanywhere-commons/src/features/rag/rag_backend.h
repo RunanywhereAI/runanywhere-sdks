@@ -44,7 +44,11 @@ struct RAGBackendConfig {
  * Coordinates vector store, embeddings service, and LLM service for
  * retrieval-augmented generation. Thread-safe for all operations.
  */
+#if defined(_MSC_VER)
+class RAGBackend {
+#else
 class __attribute__((visibility("default"))) RAGBackend {
+#endif
 public:
     /**
      * @brief Construct RAG pipeline with service handles

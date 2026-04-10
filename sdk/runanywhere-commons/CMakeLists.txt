@@ -90,6 +90,9 @@ elseif(APPLE)
 elseif(UNIX)
     set(RAC_PLATFORM_LINUX TRUE)
     set(RAC_PLATFORM_NAME "Linux")
+elseif(WIN32)
+    set(RAC_PLATFORM_WINDOWS TRUE)
+    set(RAC_PLATFORM_NAME "Windows")
 else()
     set(RAC_PLATFORM_NAME "Unknown")
 endif()
@@ -126,6 +129,57 @@ if(NOT DEFINED LIBARCHIVE_VERSION)
 endif()
 
 # -----------------------------------------------------------------------------
+# Zlib: Bundle from source when system zlib is not available.
+# Windows (MSVC) and some cross-compilation targets don't ship zlib.
+# We try system first; if not found, build from source so libarchive gets it.
+# -----------------------------------------------------------------------------
+find_package(ZLIB QUIET)
+if(NOT ZLIB_FOUND)
+    message(STATUS "System zlib not found — bundling from source...")
+    FetchContent_Declare(
+        zlib_src
+        GIT_REPOSITORY https://github.com/madler/zlib.git
+        GIT_TAG        v1.3.1
+        GIT_SHALLOW    TRUE
+    )
+    # Prevent zlib from installing or building examples
+    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_LIBRARIES ON CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_HEADERS ON CACHE BOOL "" FORCE)
+    set(SKIP_INSTALL_FILES ON CACHE BOOL "" FORCE)
+    # Save and restore BUILD_SHARED_LIBS
+    set(_SAVED_BSL_ZLIB ${BUILD_SHARED_LIBS})
+    set(BUILD_SHARED_LIBS OFF)
+    FetchContent_MakeAvailable(zlib_src)
+    set(BUILD_SHARED_LIBS ${_SAVED_BSL_ZLIB})
+
+    # Set cache variables so libarchive's find_package(ZLIB) picks up our build.
+    # For multi-config generators (Visual Studio), we point to the static lib
+    # output. The actual path is resolved at build time via target_link_libraries.
+    set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
+    set(ZLIB_INCLUDE_DIRS "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
+    # Use the CMake target name directly - this works because we link manually below
+    set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
+    set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
+    # Create an imported ZLIB::ZLIB target that points to our zlibstatic
+    if(NOT TARGET ZLIB::ZLIB)
+        add_library(ZLIB::ZLIB ALIAS zlibstatic)
+    endif()
+    # On MSVC, set zlibstatic output to a known location so the linker can find it
+    if(MSVC AND TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/lib"
+            ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
+        )
+    endif()
+    message(STATUS "Bundled zlib ready (v1.3.1)")
+else()
+    message(STATUS "Using system zlib: ${ZLIB_LIBRARIES}")
+endif()
+
+# -----------------------------------------------------------------------------
 # BZip2: Bundle from source for cross-compilation targets
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
@@ -156,6 +210,13 @@ if(NOT BZIP2_FOUND)
     set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
     set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
     set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
+    # On MSVC, set output to a known location so the linker can find it
+    if(MSVC AND TARGET bz2_bundled)
+        set_target_properties(bz2_bundled PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/lib"
+            ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/lib"
+        )
+    endif()
     message(STATUS "Bundled BZip2 ready (v1.0.8)")
 else()
     message(STATUS "Using system BZip2: ${BZIP2_LIBRARIES}")
@@ -182,7 +243,7 @@ set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
-set(ENABLE_LIBGCC OFF CACHE BOOL "" FORCE)
+set(ENABLE_LIBGCC ON CACHE BOOL "" FORCE)
 set(ENABLE_CNG OFF CACHE BOOL "" FORCE)
 set(ENABLE_TAR OFF CACHE BOOL "" FORCE)      # Don't build bsdtar binary
 set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)     # Don't build bsdcpio binary
@@ -201,6 +262,32 @@ set(BUILD_SHARED_LIBS ${_SAVED_BUILD_SHARED_LIBS})
 
 if(TARGET bz2_bundled AND TARGET archive_static)
     target_link_libraries(archive_static bz2_bundled)
+endif()
+
+# Link bundled zlib to libarchive if we built it from source
+if(TARGET zlibstatic AND TARGET archive_static)
+    target_link_libraries(archive_static zlibstatic)
+    target_include_directories(archive_static PRIVATE ${zlib_src_SOURCE_DIR} ${zlib_src_BINARY_DIR})
+endif()
+
+# On MSVC multi-config generators, libarchive references "zlibstatic.lib" and
+# "bz2_bundled.lib" by bare filename. The linker can't find them because they
+# are built into <config>/ subdirectories. Fix: redirect their output to a
+# single known directory and add it to the global linker search path.
+if(MSVC)
+    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
+    foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
+        string(TOUPPER "${_cfg}" _CFG)
+        if(TARGET zlibstatic)
+            set_target_properties(zlibstatic PROPERTIES
+                ARCHIVE_OUTPUT_DIRECTORY_${_CFG} "${RAC_BUNDLED_LIB_DIR}")
+        endif()
+        if(TARGET bz2_bundled)
+            set_target_properties(bz2_bundled PROPERTIES
+                ARCHIVE_OUTPUT_DIRECTORY_${_CFG} "${RAC_BUNDLED_LIB_DIR}")
+        endif()
+    endforeach()
+    link_directories("${RAC_BUNDLED_LIB_DIR}")
 endif()
 
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
@@ -233,6 +320,17 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_options(-O3 -DNDEBUG)
         add_compile_options(-fvisibility=hidden)
         add_compile_options(-ffunction-sections -fdata-sections)
+    endif()
+elseif(MSVC)
+    # /W3 = reasonable warning level, /utf-8 = source/execution charset
+    # /Zc:__cplusplus = report correct __cplusplus value
+    # /EHsc = standard C++ exception handling
+    add_compile_options(/W3 /utf-8 /Zc:__cplusplus /EHsc)
+    # Suppress common harmless warnings in third-party code
+    add_compile_options(/wd4244 /wd4267 /wd4996)
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(/O2 /DNDEBUG)
     endif()
 endif()
 
@@ -351,8 +449,11 @@ set(RAC_FEATURES_SOURCES
     src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
-    # Result memory management
-    src/features/result_free.cpp
+    # Result memory management (weak symbol fallbacks)
+    # On MSVC, each service .cpp already provides strong definitions,
+    # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
+    # must be excluded to avoid LNK2005 duplicate symbol errors.
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:src/features/result_free.cpp>
 )
 
 # Platform services (Apple Foundation Models + System TTS + CoreML Diffusion)
@@ -420,7 +521,20 @@ if(RAC_BUILD_SHARED)
 endif()
 
 # libarchive - native archive extraction
-target_link_libraries(rac_commons PRIVATE archive_static)
+# PUBLIC on Windows because MSVC static libs don't propagate transitive deps
+if(WIN32)
+    target_link_libraries(rac_commons PUBLIC archive_static)
+    # Tell libarchive headers we're using the static library (not DLL)
+    target_compile_definitions(rac_commons PRIVATE LIBARCHIVE_STATIC)
+    if(TARGET zlibstatic)
+        target_link_libraries(rac_commons PUBLIC zlibstatic)
+    endif()
+    if(TARGET bz2_bundled)
+        target_link_libraries(rac_commons PUBLIC bz2_bundled)
+    endif()
+else()
+    target_link_libraries(rac_commons PRIVATE archive_static)
+endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
 # Platform-specific linking
@@ -438,6 +552,12 @@ endif()
 if(RAC_PLATFORM_ANDROID)
     target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_ANDROID=1)
     target_link_libraries(rac_commons PUBLIC log)
+endif()
+
+if(RAC_PLATFORM_WINDOWS)
+    target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_WINDOWS=1)
+    # ws2_32 = Winsock, shlwapi = path utilities
+    target_link_libraries(rac_commons PUBLIC ws2_32 shlwapi)
 endif()
 
 set_target_properties(rac_commons PROPERTIES
@@ -586,6 +706,9 @@ message(STATUS "  Models:       Download strategies, storage")
 message(STATUS "  Services:     LLM, STT, TTS, VAD interfaces")
 if(APPLE AND RAC_BUILD_PLATFORM)
     message(STATUS "  Platform:     Apple Foundation Models, System TTS")
+endif()
+if(RAC_PLATFORM_WINDOWS)
+    message(STATUS "  Platform:     Windows (MSVC)")
 endif()
 if(RAC_BUILD_BACKENDS)
     message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}")

@@ -19,11 +19,29 @@
 #include <cstring>
 #include <fstream>
 #include <string>
-#include <sys/stat.h>
-#include <unistd.h>
+#include "rac/core/rac_platform_compat.h"
 #include <vector>
 
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+#include <windows.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
+
 // No platform adapter or rac_init() needed — extraction APIs are standalone.
+
+// Portable mkdir wrapper
+static inline int compat_mkdir(const char* path) {
+#ifdef _WIN32
+    return _mkdir(path);
+#else
+    return compat_mkdir(path);
+#endif
+}
 
 // =============================================================================
 // Test helpers
@@ -33,6 +51,14 @@ static std::string g_test_dir;
 
 /** Create a unique temporary directory for test artifacts. */
 static std::string create_temp_dir(const std::string& suffix) {
+#ifdef _WIN32
+    char tmp_path[MAX_PATH];
+    GetTempPathA(MAX_PATH, tmp_path);
+    char tmp_dir[MAX_PATH];
+    snprintf(tmp_dir, sizeof(tmp_dir), "%srac_test_%s_%d", tmp_path, suffix.c_str(), _getpid());
+    _mkdir(tmp_dir);
+    return std::string(tmp_dir);
+#else
     char tmpl[256];
     snprintf(tmpl, sizeof(tmpl), "/tmp/rac_test_%s_XXXXXX", suffix.c_str());
     char* result = mkdtemp(tmpl);
@@ -41,6 +67,7 @@ static std::string create_temp_dir(const std::string& suffix) {
         return "";
     }
     return std::string(result);
+#endif
 }
 
 /** Recursively remove a directory. */
@@ -93,8 +120,8 @@ static bool has_zip() {
 static std::string create_test_tar_gz(const std::string& base_dir) {
     std::string content_dir = base_dir + "/content";
     std::string sub_dir = content_dir + "/subdir";
-    mkdir(content_dir.c_str(), 0755);
-    mkdir(sub_dir.c_str(), 0755);
+    compat_mkdir(content_dir.c_str());
+    compat_mkdir(sub_dir.c_str());
 
     write_file(content_dir + "/hello.txt", "Hello, World!\n");
     write_file(content_dir + "/data.bin", std::string(256, '\x42'));
@@ -113,8 +140,8 @@ static std::string create_test_tar_gz(const std::string& base_dir) {
 static std::string create_test_zip(const std::string& base_dir) {
     std::string content_dir = base_dir + "/zipcontent";
     std::string sub_dir = content_dir + "/subdir";
-    mkdir(content_dir.c_str(), 0755);
-    mkdir(sub_dir.c_str(), 0755);
+    compat_mkdir(content_dir.c_str());
+    compat_mkdir(sub_dir.c_str());
 
     write_file(content_dir + "/readme.txt", "ZIP test file\n");
     write_file(content_dir + "/binary.dat", std::string(128, '\xAB'));
@@ -565,8 +592,8 @@ static TestResult test_default_options_skip_macos() {
     std::string archive_dir = create_temp_dir("macos_src");
     std::string content_dir = archive_dir + "/macos_content";
     std::string macosx_dir = content_dir + "/__MACOSX";
-    mkdir(content_dir.c_str(), 0755);
-    mkdir(macosx_dir.c_str(), 0755);
+    compat_mkdir(content_dir.c_str());
+    compat_mkdir(macosx_dir.c_str());
 
     write_file(content_dir + "/real_file.txt", "real content\n");
     write_file(content_dir + "/._resource_fork", "resource fork\n");
@@ -618,8 +645,8 @@ static TestResult test_custom_options_keep_macos() {
     std::string archive_dir = create_temp_dir("keepmac_src");
     std::string content_dir = archive_dir + "/keep_content";
     std::string macosx_dir = content_dir + "/__MACOSX";
-    mkdir(content_dir.c_str(), 0755);
-    mkdir(macosx_dir.c_str(), 0755);
+    compat_mkdir(content_dir.c_str());
+    compat_mkdir(macosx_dir.c_str());
 
     write_file(content_dir + "/file.txt", "content\n");
     write_file(macosx_dir + "/meta.plist", "metadata\n");

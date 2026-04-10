@@ -14,8 +14,11 @@
 
 #include "onnx_backend.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
+
+#ifdef _WIN32
+#include <direct.h>  // for _mkdir
+#endif
 
 #include <cctype>
 #include <cstdio>
@@ -673,7 +676,11 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
     }
 
     if (stat(voices_dir.c_str(), &st) != 0) {
+#ifdef _WIN32
+        int mk = _mkdir(voices_dir.c_str());
+#else
         int mk = mkdir(voices_dir.c_str(), 0755);
+#endif
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk, errno);
     } else {
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] voices/ dir already exists");

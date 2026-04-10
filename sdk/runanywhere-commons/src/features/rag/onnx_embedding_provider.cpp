@@ -1007,12 +1007,23 @@ private:
         }
 
         // Load model with session options
+#ifdef _WIN32
+        // ONNX Runtime on Windows requires wchar_t* paths
+        std::wstring wpath(model_path.begin(), model_path.end());
+        status_guard.reset(ort_api_->CreateSession(
+            ort_env_,
+            wpath.c_str(),
+            options_guard.get(),
+            &session_
+        ));
+#else
         status_guard.reset(ort_api_->CreateSession(
             ort_env_,
             model_path.c_str(),
             options_guard.get(),
             &session_
         ));
+#endif
         // options_guard automatically releases session options on scope exit
 
         if (status_guard.is_error()) {

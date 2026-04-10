@@ -13,9 +13,17 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 
+// MSVC does not support __attribute__((weak)).
+// Use /alternatename linker directive for weak symbol emulation on MSVC.
+#ifdef _MSC_VER
+#define RAC_WEAK_SYMBOL
+#else
+#define RAC_WEAK_SYMBOL __attribute__((weak))
+#endif
+
 extern "C" {
 
-__attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
+RAC_WEAK_SYMBOL void rac_llm_result_free(rac_llm_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -24,7 +32,7 @@ __attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
+RAC_WEAK_SYMBOL void rac_stt_result_free(rac_stt_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -48,7 +56,7 @@ __attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
+RAC_WEAK_SYMBOL void rac_tts_result_free(rac_tts_result_t* result) {
     if (result) {
         if (result->audio_data) {
             free(result->audio_data);
@@ -58,7 +66,7 @@ __attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_embeddings_result_free(rac_embeddings_result_t* result) {
+RAC_WEAK_SYMBOL void rac_embeddings_result_free(rac_embeddings_result_t* result) {
     if (result) {
         if (result->embeddings) {
             for (size_t i = 0; i < result->num_embeddings; i++) {

@@ -18,12 +18,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <sys/stat.h>
 #include <vector>
+#include "rac/core/rac_platform_compat.h"
+
+#ifdef _WIN32
+#include <direct.h>  // for _mkdir
+#endif
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
@@ -147,10 +150,18 @@ static bool mkdir_p(const char* path) {
     while ((pos = s.find('/', pos + 1)) != std::string::npos) {
         std::string sub = s.substr(0, pos);
         if (!sub.empty()) {
+#ifdef _WIN32
+            _mkdir(sub.c_str());
+#else
             mkdir(sub.c_str(), 0755);
+#endif
         }
     }
+#ifdef _WIN32
+    return _mkdir(s.c_str()) == 0 || dir_exists(path);
+#else
     return mkdir(s.c_str(), 0755) == 0 || dir_exists(path);
+#endif
 }
 
 /**

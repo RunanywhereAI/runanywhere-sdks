@@ -70,6 +70,14 @@ elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
     set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)
+elseif(RAC_PLATFORM_WINDOWS)
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    message(STATUS "Configuring whisper.cpp for Windows (CPU-only)")
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for whisper.cpp" FORCE)
@@ -154,6 +162,10 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework Metal"
         "-framework MetalKit"
     )
+
+elseif(RAC_PLATFORM_WINDOWS)
+    message(STATUS "Configuring WhisperCPP backend for Windows")
+    # No extra link libraries needed on Windows
 endif()
 
 # =============================================================================

@@ -19,6 +19,7 @@
 #include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
@@ -567,7 +568,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
         // Load melspectrogram model (required for proper pipeline)
         if (melspec_model_path) {
             backend->melspec_session = std::make_unique<Ort::Session>(
-                *backend->env, melspec_model_path, *backend->session_options);
+                *backend->env, RAC_ORT_PATH(melspec_model_path), *backend->session_options);
 
             // Get input/output names
             auto input_name = backend->melspec_session->GetInputNameAllocated(0, backend->allocator);
@@ -584,7 +585,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
         // Load embedding model (required)
         if (embedding_model_path) {
             backend->embedding_session = std::make_unique<Ort::Session>(
-                *backend->env, embedding_model_path, *backend->session_options);
+                *backend->env, RAC_ORT_PATH(embedding_model_path), *backend->session_options);
 
             // Get input/output names
             auto input_name = backend->embedding_session->GetInputNameAllocated(0, backend->allocator);
@@ -651,7 +652,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
         model.threshold = backend->global_threshold;
 
         model.session = std::make_unique<Ort::Session>(
-            *backend->env, model_path, *backend->session_options);
+            *backend->env, RAC_ORT_PATH(model_path), *backend->session_options);
 
         // Get input/output names
         auto input_name = model.session->GetInputNameAllocated(0, backend->allocator);
