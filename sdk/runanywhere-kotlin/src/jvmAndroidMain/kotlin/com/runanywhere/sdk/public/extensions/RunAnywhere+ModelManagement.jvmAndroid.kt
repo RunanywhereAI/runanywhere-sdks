@@ -99,6 +99,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
                         InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
                         InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.SARVAM -> CppBridgeModelRegistry.Framework.SARVAM
                         InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
                     },
                 downloadUrl = modelInfo.downloadURL,
@@ -714,6 +715,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
                         InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
                         InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.SARVAM -> CppBridgeModelRegistry.Framework.SARVAM
                         InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
                     }
                     val racFormat = when (modelInfo.format) {
