@@ -16,11 +16,13 @@
 
 #include <jni.h>
 
+#include <atomic>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
 #include <new>
 #include <string>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
 
 #ifdef __ANDROID__
@@ -46,6 +48,7 @@
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/network/rac_http_client.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -1453,6 +1456,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
                         options.sample_rate = sample_rate;
                         LOGd("Using sample_rate from config: %d", sample_rate);
                     }
+                }
+                if (json.contains("language") && json["language"].is_string()) {
+                    static thread_local std::string lang_buf;
+                    lang_buf = json["language"].get<std::string>();
+                    options.language = lang_buf.c_str();
+                    LOGd("Using language from config: %s", options.language);
                 }
             } catch (const nlohmann::json::exception& e) {
                 LOGe("Failed to parse STT config JSON: %s", e.what());
@@ -4591,6 +4600,190 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetSto
 
     std::string jsonStr = j.dump();
     return env->NewStringUTF(jsonStr.c_str());
+}
+
+// =============================================================================
+// HTTP Executor Bridge
+// =============================================================================
+
+static jobject g_http_executor_obj = nullptr;
+static jmethodID g_http_executor_method = nullptr;
+static std::mutex g_http_executor_mutex;
+
+// Pending HTTP callbacks: request_id → {callback, user_data}
+struct PendingHttpCallback {
+    rac_http_callback_t callback;
+    void* user_data;
+};
+static std::unordered_map<int64_t, PendingHttpCallback> g_pending_http;
+static std::mutex g_pending_http_mutex;
+static std::atomic<int64_t> g_http_request_counter{1};
+
+// The C-level executor function registered with rac_http_set_executor
+static void jni_http_executor(const rac_http_request_t* request,
+                              rac_http_callback_t callback, void* user_data) {
+    JNIEnv* env = getJNIEnv();
+    if (!env || !g_http_executor_obj || !g_http_executor_method) {
+        LOGe("jni_http_executor: JNI not ready");
+        if (callback) {
+            rac_http_response_t err_resp = {};
+            err_resp.status_code = -1;
+            err_resp.error_message = strdup("HTTP executor JNI not initialized");
+            callback(&err_resp, user_data);
+            free(err_resp.error_message);
+        }
+        return;
+    }
+
+    // Store callback for later completion
+    int64_t req_id = g_http_request_counter.fetch_add(1);
+    {
+        std::lock_guard<std::mutex> lock(g_pending_http_mutex);
+        g_pending_http[req_id] = {callback, user_data};
+    }
+
+    // Convert request to JNI args
+    jstring jUrl = env->NewStringUTF(request->url ? request->url : "");
+    jint jMethod = static_cast<jint>(request->method);
+    jint jTimeout = request->timeout_ms;
+
+    // Serialize headers to JSON
+    nlohmann::json headersJson = nlohmann::json::object();
+    for (size_t i = 0; i < request->header_count; i++) {
+        if (request->headers[i].key && request->headers[i].value) {
+            headersJson[request->headers[i].key] = request->headers[i].value;
+        }
+    }
+    std::string headersStr = headersJson.dump();
+    jstring jHeaders = env->NewStringUTF(headersStr.c_str());
+
+    // Body as byte array (supports binary data like multipart)
+    jbyteArray jBody = nullptr;
+    if (request->body && request->body_length > 0) {
+        jBody = env->NewByteArray(static_cast<jint>(request->body_length));
+        if (jBody) {
+            env->SetByteArrayRegion(jBody, 0, static_cast<jint>(request->body_length),
+                                    reinterpret_cast<const jbyte*>(request->body));
+        }
+    }
+
+    // Call Kotlin: httpExecutorCallback(requestId, url, method, headers, body, timeoutMs)
+    env->CallVoidMethod(g_http_executor_obj, g_http_executor_method,
+                        static_cast<jlong>(req_id), jUrl, jMethod, jHeaders, jBody, jTimeout);
+
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        LOGe("jni_http_executor: Java exception during callback");
+        // Remove pending callback and report error
+        std::lock_guard<std::mutex> lock(g_pending_http_mutex);
+        auto it = g_pending_http.find(req_id);
+        if (it != g_pending_http.end()) {
+            if (it->second.callback) {
+                rac_http_response_t err_resp = {};
+                err_resp.status_code = -1;
+                err_resp.error_message = strdup("Java exception in HTTP executor");
+                it->second.callback(&err_resp, it->second.user_data);
+                free(err_resp.error_message);
+            }
+            g_pending_http.erase(it);
+        }
+    }
+
+    // Cleanup local refs
+    env->DeleteLocalRef(jUrl);
+    env->DeleteLocalRef(jHeaders);
+    if (jBody) env->DeleteLocalRef(jBody);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpSetExecutor(
+    JNIEnv* env, jclass clazz, jobject callback) {
+
+    std::lock_guard<std::mutex> lock(g_http_executor_mutex);
+
+    // Clean up previous
+    if (g_http_executor_obj) {
+        env->DeleteGlobalRef(g_http_executor_obj);
+        g_http_executor_obj = nullptr;
+    }
+
+    if (!callback) {
+        rac_http_set_executor(nullptr);
+        LOGi("HTTP executor unregistered");
+        return RAC_SUCCESS;
+    }
+
+    g_http_executor_obj = env->NewGlobalRef(callback);
+
+    // Cache method ID: httpExecutorCallback(long, String, int, String, byte[], int)
+    jclass cls = env->GetObjectClass(callback);
+    g_http_executor_method = env->GetMethodID(
+        cls, "httpExecutorCallback", "(JLjava/lang/String;ILjava/lang/String;[BI)V");
+
+    if (!g_http_executor_method) {
+        LOGe("Failed to find httpExecutorCallback method");
+        env->DeleteGlobalRef(g_http_executor_obj);
+        g_http_executor_obj = nullptr;
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac_http_set_executor(jni_http_executor);
+    LOGi("HTTP executor registered via JNI");
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpExecutorComplete(
+    JNIEnv* env, jclass clazz, jlong requestId, jint statusCode,
+    jbyteArray responseBody, jstring responseHeaders,
+    jint errorCode, jstring errorMessage) {
+
+    PendingHttpCallback pending;
+    {
+        std::lock_guard<std::mutex> lock(g_pending_http_mutex);
+        auto it = g_pending_http.find(static_cast<int64_t>(requestId));
+        if (it == g_pending_http.end()) {
+            LOGw("racHttpExecutorComplete: unknown request %lld", (long long)requestId);
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        pending = it->second;
+        g_pending_http.erase(it);
+    }
+
+    if (!pending.callback) {
+        return RAC_SUCCESS;
+    }
+
+    rac_http_response_t response = {};
+    response.status_code = statusCode;
+
+    // Response body
+    if (responseBody) {
+        jsize len = env->GetArrayLength(responseBody);
+        response.body = static_cast<char*>(malloc(len + 1));
+        if (response.body) {
+            env->GetByteArrayRegion(responseBody, 0, len,
+                                    reinterpret_cast<jbyte*>(response.body));
+            response.body[len] = '\0';
+            response.body_length = static_cast<size_t>(len);
+        }
+    }
+
+    // Error message
+    std::string errStr;
+    if (errorMessage) {
+        errStr = getCString(env, errorMessage);
+        response.error_message = strdup(errStr.c_str());
+    }
+
+    pending.callback(&response, pending.user_data);
+
+    // Cleanup
+    free(response.body);
+    free(response.error_message);
+
+    return RAC_SUCCESS;
 }
 
 }  // extern "C"

@@ -190,8 +190,17 @@ rac_result_t rac_stt_sarvam_transcribe(rac_handle_t handle, const void* audio_da
     auto start_time = std::chrono::steady_clock::now();
 
     // Determine language from options or config
-    const char* language = (options && options->language) ? options->language
-                                                          : ctx->config.language_code;
+    // "auto" is used by the SDK for auto-detection — map to config default
+    const char* language = ctx->config.language_code;
+    if (options && options->language && options->language[0] != '\0' &&
+        strcmp(options->language, "auto") != 0) {
+        language = options->language;
+    }
+
+    RAC_LOG_INFO(LOG_CAT, "Language resolved: '%s' (options->language='%s', config='%s')",
+                 language,
+                 (options && options->language) ? options->language : "(null)",
+                 ctx->config.language_code);
 
     // Encode PCM to WAV
     auto wav = rac::sarvam::encode_wav(audio_data, audio_size, RAC_STT_DEFAULT_SAMPLE_RATE, 1, 16);

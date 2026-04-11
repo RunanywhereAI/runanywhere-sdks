@@ -27,6 +27,10 @@ set(SARVAM_BACKEND_SOURCES
     rac_backend_sarvam_register.cpp
 )
 
+if(RAC_BUILD_JNI)
+    list(APPEND SARVAM_BACKEND_SOURCES jni/rac_backend_sarvam_jni.cpp)
+endif()
+
 if(RAC_BUILD_SHARED)
     add_library(rac_backend_sarvam SHARED ${SARVAM_BACKEND_SOURCES})
 else()

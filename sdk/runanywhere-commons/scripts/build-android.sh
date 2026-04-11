@@ -356,6 +356,7 @@ for ABI in "${ABI_ARRAY[@]}"; do
         -DRAC_BACKEND_LLAMACPP=${BUILD_LLAMACPP} \
         -DRAC_BACKEND_WHISPERCPP=${BUILD_WHISPERCPP} \
         -DRAC_BACKEND_RAG=ON \
+        -DRAC_BACKEND_SARVAM=ON \
         -DRAC_BUILD_TESTS=OFF \
         -DRAC_BUILD_SHARED=ON \
         -DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON \
@@ -583,6 +584,12 @@ for ABI in "${ABI_ARRAY[@]}"; do
                 echo "  Copied: libc++_shared.so -> whispercpp/${ABI}/"
             fi
         fi
+    fi
+
+    # Sarvam backend (cloud STT — compiled into rac_commons, JNI is separate .so)
+    if [ -f "${ABI_BUILD_DIR}/src/backends/sarvam/librac_backend_sarvam.so" ]; then
+        cp "${ABI_BUILD_DIR}/src/backends/sarvam/librac_backend_sarvam.so" "${JNI_DIST_DIR}/${ABI}/"
+        echo "  Copied: librac_backend_sarvam.so -> jni/${ABI}/"
     fi
 
     # RAG JNI bridge (RAG pipeline is compiled into librac_commons.so;
