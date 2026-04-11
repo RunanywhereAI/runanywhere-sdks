@@ -317,12 +317,17 @@ The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native 
    - `ModelManager` - Model downloading and lifecycle
    - `ConfigurationService` - Environment-specific configuration
 
+### Hybrid Routing System
+
+The SDK routes AI requests between local and cloud backends automatically. See [docs/impl/hybrid-routing.md](docs/impl/hybrid-routing.md) for full architecture, confidence cascade logic, API key setup, and how to add new providers.
+
 ### Design Patterns
 
 1. **Repository Pattern**: Data access abstraction with platform-specific implementations
 2. **Service Container**: Centralized dependency injection
 3. **Event Bus**: Reactive communication between components
 4. **Provider Pattern**: Platform-specific service providers (STT, VAD)
+5. **Hybrid Router**: Condition-based backend selection with confidence cascade (see `sdk/runanywhere-kotlin/src/commonMain/.../routing/`)
 
 ### Platform Requirements
 
