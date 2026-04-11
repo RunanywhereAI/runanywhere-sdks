@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
+import com.runanywhere.sdk.public.extensions.transcribeWithOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -86,6 +87,14 @@ data class STTUiState(
     val isProcessing: Boolean = false,
     /** Whether selected model supports live streaming */
     val supportsLiveMode: Boolean = true,
+    /** Which backend handled the request (e.g. "whisper-local", "sarvam-cloud") */
+    val routingBackendId: String? = null,
+    /** Human-readable backend name */
+    val routingBackendName: String? = null,
+    /** True if the result came from a cloud fallback due to low confidence */
+    val wasFallback: Boolean = false,
+    /** Confidence score from the primary (local) backend before fallback */
+    val primaryConfidence: Float? = null,
 )
 
 /**
@@ -577,31 +586,43 @@ class SpeechToTextViewModel : ViewModel() {
                 // Calculate audio duration: bytes / (sample_rate * 2 bytes per sample) * 1000 ms
                 val audioDurationMs = (audioBytes.size.toDouble() / (SAMPLE_RATE * 2)) * 1000
 
-                // Use SDK's transcribe extension function
-                val result = RunAnywhere.transcribe(audioBytes)
+                // Use transcribeWithOptions to get routing metadata
+                val sttResult = RunAnywhere.transcribeWithOptions(
+                    audioBytes,
+                    STTOptions(language = _uiState.value.language),
+                )
 
                 val inferenceTimeMs = System.currentTimeMillis() - startTime
-                val wordCount = result.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+                val text = sttResult.text
+                val wordCount = text.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
 
                 withContext(Dispatchers.Main) {
                     _uiState.update {
                         it.copy(
-                            transcription = result,
+                            transcription = text,
                             recordingState = RecordingState.IDLE,
                             isTranscribing = false,
                             metrics =
                                 TranscriptionMetrics(
-                                    confidence = 0f,
+                                    confidence = sttResult.confidence,
                                     audioDurationMs = audioDurationMs,
                                     inferenceTimeMs = inferenceTimeMs.toDouble(),
                                     detectedLanguage = _uiState.value.language,
                                     wordCount = wordCount,
                                 ),
+                            routingBackendId = sttResult.routingBackendId,
+                            routingBackendName = sttResult.routingBackendName,
+                            wasFallback = sttResult.wasFallback,
+                            primaryConfidence = sttResult.primaryConfidence,
                         )
                     }
                 }
 
-                Timber.i("✅ Batch transcription complete: $result (${inferenceTimeMs}ms, $wordCount words)")
+                Timber.i(
+                    "Batch transcription complete via ${sttResult.routingBackendId}: " +
+                        "$text (${inferenceTimeMs}ms, confidence=${sttResult.confidence}, " +
+                        "fallback=${sttResult.wasFallback})"
+                )
             }
         } catch (e: Exception) {
             Timber.e(e, "Batch transcription failed: ${e.message}")

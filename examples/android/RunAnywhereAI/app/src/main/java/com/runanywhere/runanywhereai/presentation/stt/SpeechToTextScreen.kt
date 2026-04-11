@@ -142,6 +142,16 @@ fun SpeechToTextScreen(
                     modifier = Modifier.weight(1f),
                 )
 
+                // Routing info
+                if (uiState.routingBackendId != null) {
+                    RoutingInfoRow(
+                        backendName = uiState.routingBackendName ?: uiState.routingBackendId!!,
+                        wasFallback = uiState.wasFallback,
+                        confidence = uiState.metrics?.confidence ?: 0f,
+                        primaryConfidence = uiState.primaryConfidence,
+                    )
+                }
+
                 uiState.errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -1066,6 +1076,78 @@ private fun RecordingButton(
                             },
                         tint = Color.White,
                         modifier = Modifier.size(32.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RoutingInfoRow(
+    backendName: String,
+    wasFallback: Boolean,
+    confidence: Float,
+    primaryConfidence: Float?,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = if (wasFallback) {
+            AppColors.primaryOrange.copy(alpha = 0.1f)
+        } else {
+            AppColors.primaryGreen.copy(alpha = 0.1f)
+        },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (wasFallback) "Cloud Fallback" else "Local",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (wasFallback) AppColors.primaryOrange else AppColors.primaryGreen,
+                )
+                Text(
+                    text = backendName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.textSecondary,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "${(confidence * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        confidence >= 0.5f -> AppColors.primaryGreen
+                        else -> AppColors.primaryOrange
+                    },
+                )
+                Text(
+                    text = "confidence",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AppColors.textSecondary,
+                )
+            }
+            if (wasFallback && primaryConfidence != null) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "${(primaryConfidence * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Red.copy(alpha = 0.7f),
+                    )
+                    Text(
+                        text = "local score",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppColors.textSecondary,
                     )
                 }
             }

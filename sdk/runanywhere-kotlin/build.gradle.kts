@@ -200,6 +200,15 @@ kotlin {
                 implementation(libs.mockk)
             }
         }
+
+        androidInstrumentedTest {
+            dependencies {
+                implementation(libs.junit)
+                implementation(libs.androidx.junit)
+                implementation(libs.androidx.espresso.core)
+                implementation("androidx.test:runner:1.6.2")
+            }
+        }
     }
 }
 
