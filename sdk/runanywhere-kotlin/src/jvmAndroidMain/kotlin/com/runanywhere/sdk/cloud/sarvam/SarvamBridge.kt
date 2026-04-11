@@ -27,6 +27,26 @@ internal object SarvamBridge {
         }
     }
 
+    fun register(): Int {
+        ensureLoaded()
+        return nativeRegister()
+    }
+
+    fun unregister(): Int {
+        ensureLoaded()
+        return nativeUnregister()
+    }
+
+    fun setApiKey(apiKey: String): Int {
+        ensureLoaded()
+        return nativeSetApiKey(apiKey)
+    }
+
+    fun hasApiKey(): Boolean {
+        if (!isLoaded) return false
+        return nativeHasApiKey()
+    }
+
     @JvmStatic
     external fun nativeRegister(): Int
 

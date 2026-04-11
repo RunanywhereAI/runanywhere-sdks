@@ -58,6 +58,7 @@ class WhisperSTTBackend : STTBackend {
         return STTOutput(
             text = result.text,
             confidence = result.confidence,
+            detectedLanguage = result.language,
             metadata = TranscriptionMetadata(
                 modelId = CppBridgeSTT.getLoadedModelId() ?: "whisper",
                 processingTime = result.processingTimeMs / 1000.0,

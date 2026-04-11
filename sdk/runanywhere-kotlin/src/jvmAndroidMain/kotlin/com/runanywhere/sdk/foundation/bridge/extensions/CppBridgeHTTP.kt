@@ -302,10 +302,13 @@ object CppBridgeHTTP {
                 connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/Kotlin")
             }
 
+            val safeHeaders = headers.mapValues { (key, value) ->
+                if (key.contains("key", ignoreCase = true) || key.contains("auth", ignoreCase = true)) "***" else value
+            }
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "HTTP executor headers: $headers",
+                "HTTP executor headers: $safeHeaders",
             )
 
             // Write binary body

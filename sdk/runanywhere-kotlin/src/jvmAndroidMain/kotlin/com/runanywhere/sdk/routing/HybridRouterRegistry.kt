@@ -38,22 +38,24 @@ object HybridRouterRegistry {
      * To add a new backend, add it to the list below and register it.
      */
     fun initialize() {
-        if (isInitialized) return
-        isInitialized = true
+        synchronized(this) {
+            if (isInitialized) return
 
-        val backends: List<STTBackend> = listOf(
-            WhisperSTTBackend(),
-            SarvamSTTBackend(),
-        )
+            val backends: List<STTBackend> = listOf(
+                WhisperSTTBackend(),
+                SarvamSTTBackend(),
+            )
 
-        backends.forEach { backend ->
-            router.register(backend)
-            backend.descriptors().forEach { descriptor ->
-                sttBackends[descriptor.moduleId] = backend
+            backends.forEach { backend ->
+                router.register(backend)
+                backend.descriptors().forEach { descriptor ->
+                    sttBackends[descriptor.moduleId] = backend
+                }
             }
-        }
 
-        logger.info("HybridRouterRegistry initialized with ${backends.size} STT backends")
+            isInitialized = true
+            logger.info("HybridRouterRegistry initialized with ${backends.size} STT backends")
+        }
     }
 
     /**
@@ -68,4 +70,12 @@ object HybridRouterRegistry {
      * Return the executable STTBackend for a given moduleId.
      */
     fun sttBackendFor(moduleId: String): STTBackend? = sttBackends[moduleId]
+
+    fun shutdown() {
+        synchronized(this) {
+            sttBackends.clear()
+            isInitialized = false
+            logger.info("HybridRouterRegistry shut down")
+        }
+    }
 }

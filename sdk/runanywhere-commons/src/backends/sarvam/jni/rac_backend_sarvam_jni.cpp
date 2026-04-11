@@ -62,6 +62,12 @@ Java_com_runanywhere_sdk_cloud_sarvam_SarvamBridge_nativeSetApiKey(JNIEnv* env, 
     const char* key = env->GetStringUTFChars(apiKey, nullptr);
     if (!key) return RAC_ERROR_OUT_OF_MEMORY;
 
+    if (key[0] == '\0') {
+        env->ReleaseStringUTFChars(apiKey, key);
+        LOGe("nativeSetApiKey: empty API key");
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
     rac_result_t result = rac_stt_sarvam_set_api_key(key);
     env->ReleaseStringUTFChars(apiKey, key);
 

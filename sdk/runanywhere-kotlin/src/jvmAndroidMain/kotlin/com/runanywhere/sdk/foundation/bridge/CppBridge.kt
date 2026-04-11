@@ -542,6 +542,7 @@ object CppBridge {
             }
 
             // Unregister Phase 1 core extensions (reverse order)
+            CppBridgeHTTP.unregister()
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
             CppBridgeEvents.unregister()

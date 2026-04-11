@@ -620,7 +620,7 @@ class SpeechToTextViewModel : ViewModel() {
 
                 Timber.i(
                     "Batch transcription complete via ${sttResult.routingBackendId}: " +
-                        "$text (${inferenceTimeMs}ms, confidence=${sttResult.confidence}, " +
+                        "${text.take(20)}... (${inferenceTimeMs}ms, confidence=${sttResult.confidence}, " +
                         "fallback=${sttResult.wasFallback})"
                 )
             }

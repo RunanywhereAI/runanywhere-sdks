@@ -4623,7 +4623,14 @@ static std::atomic<int64_t> g_http_request_counter{1};
 static void jni_http_executor(const rac_http_request_t* request,
                               rac_http_callback_t callback, void* user_data) {
     JNIEnv* env = getJNIEnv();
-    if (!env || !g_http_executor_obj || !g_http_executor_method) {
+    jobject executor_obj;
+    jmethodID executor_method;
+    {
+        std::lock_guard<std::mutex> lock(g_http_executor_mutex);
+        executor_obj = g_http_executor_obj;
+        executor_method = g_http_executor_method;
+    }
+    if (!env || !executor_obj || !executor_method) {
         LOGe("jni_http_executor: JNI not ready");
         if (callback) {
             rac_http_response_t err_resp = {};
@@ -4668,7 +4675,7 @@ static void jni_http_executor(const rac_http_request_t* request,
     }
 
     // Call Kotlin: httpExecutorCallback(requestId, url, method, headers, body, timeoutMs)
-    env->CallVoidMethod(g_http_executor_obj, g_http_executor_method,
+    env->CallVoidMethod(executor_obj, executor_method,
                         static_cast<jlong>(req_id), jUrl, jMethod, jHeaders, jBody, jTimeout);
 
     if (env->ExceptionCheck()) {

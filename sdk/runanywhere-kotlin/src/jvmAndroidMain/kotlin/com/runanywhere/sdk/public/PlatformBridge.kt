@@ -69,6 +69,7 @@ internal actual fun initializePlatformBridgeServices() {
  */
 internal actual fun shutdownPlatformBridge() {
     logger.info("Shutting down CppBridge...")
+    HybridRouterRegistry.shutdown()
     CppBridge.shutdown()
     logger.info("CppBridge shutdown complete")
 }

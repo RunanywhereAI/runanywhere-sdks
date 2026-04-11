@@ -42,7 +42,7 @@ class SarvamSTTBackend : STTBackend {
                 RoutingCondition.NetworkRequired,
                 RoutingCondition.Custom(
                     description = "Sarvam API key configured",
-                    check = { SarvamBridge.nativeHasApiKey() },
+                    check = { SarvamBridge.hasApiKey() },
                 ),
                 RoutingCondition.QualityTier(BackendQuality.HIGH),
                 RoutingCondition.CostModel(costPerMinuteCents = 2.5f),
@@ -53,7 +53,7 @@ class SarvamSTTBackend : STTBackend {
     override suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTOutput {
         // Ensure Sarvam model is loaded — it may not be if we're coming from a cascade
         val loadedId = CppBridgeSTT.getLoadedModelId()
-        if (loadedId == null || !loadedId.contains("sarvam", ignoreCase = true)) {
+        if (loadedId == null || !loadedId.startsWith("sarvam:", ignoreCase = true)) {
             val loadResult = CppBridgeSTT.loadModel(
                 modelPath = "sarvam:saarika:v2.5",
                 modelId = "sarvam:saarika:v2.5",

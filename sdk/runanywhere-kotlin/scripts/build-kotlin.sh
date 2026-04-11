@@ -433,6 +433,8 @@ copy_jni_libs() {
         elif [ -f "${COMMONS_BUILD}/${ABI}/src/backends/sarvam/librac_backend_sarvam.so" ]; then
             cp "${COMMONS_BUILD}/${ABI}/src/backends/sarvam/librac_backend_sarvam.so" "${MAIN_JNILIBS_DIR}/${ABI}/"
             log_info "Sarvam: librac_backend_sarvam.so (from build)"
+        else
+            log_warn "Sarvam backend .so not found for ${ABI}, skipping"
         fi
 
     done

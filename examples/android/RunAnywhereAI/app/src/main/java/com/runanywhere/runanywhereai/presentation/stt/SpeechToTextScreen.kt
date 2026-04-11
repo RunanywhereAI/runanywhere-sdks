@@ -1108,10 +1108,12 @@ private fun RoutingInfoRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (wasFallback) "Cloud Fallback" else "Local",
+                    text = if (wasFallback) "Cloud Fallback"
+                        else if (backendName.contains("Cloud", ignoreCase = true) || backendName.contains("Sarvam", ignoreCase = true)) "Cloud"
+                        else "Local",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (wasFallback) AppColors.primaryOrange else AppColors.primaryGreen,
+                    color = if (wasFallback || backendName.contains("Cloud", ignoreCase = true) || backendName.contains("Sarvam", ignoreCase = true)) AppColors.primaryOrange else AppColors.primaryGreen,
                 )
                 Text(
                     text = backendName,
