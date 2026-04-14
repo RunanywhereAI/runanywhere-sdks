@@ -17,9 +17,11 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "rac/core/rac_logger.h"
 
@@ -1153,7 +1155,10 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
     model_path_ = model_path;
     struct stat path_stat;
     if (stat(model_path.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
-        std::string resolved;
+        // Collect every `.onnx` filename and sort lexicographically so the
+        // choice is deterministic across runs (readdir() order is
+        // filesystem-dependent and not stable).
+        std::vector<std::string> candidates;
         DIR* dir = opendir(model_path.c_str());
         if (dir) {
             struct dirent* entry;
@@ -1161,15 +1166,17 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
                 std::string filename = entry->d_name;
                 if (filename.size() > 5 &&
                     filename.substr(filename.size() - 5) == ".onnx") {
-                    resolved = model_path + "/" + filename;
-                    RAC_LOG_DEBUG("ONNX.VAD", "Found VAD model file: %s", resolved.c_str());
-                    break;
+                    candidates.push_back(std::move(filename));
                 }
             }
             closedir(dir);
         }
-        if (!resolved.empty()) {
-            model_path_ = resolved;
+        if (!candidates.empty()) {
+            std::sort(candidates.begin(), candidates.end());
+            model_path_ = model_path + "/" + candidates.front();
+            RAC_LOG_DEBUG("ONNX.VAD", "Found VAD model file: %s (%zu candidate%s)",
+                          model_path_.c_str(), candidates.size(),
+                          candidates.size() == 1 ? "" : "s");
         } else {
             RAC_LOG_ERROR("ONNX.VAD", "No .onnx file found in directory: %s", model_path.c_str());
             return false;

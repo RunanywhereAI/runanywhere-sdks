@@ -447,11 +447,22 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle,
     component->is_model_loaded = true;
     component->loaded_model_id = model_id ? strdup(model_id) : nullptr;
 
-    // Start the model-based VAD
+    // Start the model-based VAD. If start fails, roll back so `is_model_loaded`
+    // does not lie about a non-running service.
     if (component->model_service->ops && component->model_service->ops->start) {
         result = component->model_service->ops->start(component->model_service->impl);
         if (result != RAC_SUCCESS) {
-            RAC_LOG_WARNING("VAD.Component", "Model VAD start returned non-success, continuing");
+            log_error("VAD.Component", "Model VAD start failed: %d — rolling back load", result);
+            if (component->model_service->ops->destroy) {
+                component->model_service->ops->destroy(component->model_service->impl);
+            }
+            free(const_cast<char*>(component->model_service->model_id));
+            free(component->model_service);
+            component->model_service = nullptr;
+            component->is_model_loaded = false;
+            free(component->loaded_model_id);
+            component->loaded_model_id = nullptr;
+            return result;
         }
     }
 

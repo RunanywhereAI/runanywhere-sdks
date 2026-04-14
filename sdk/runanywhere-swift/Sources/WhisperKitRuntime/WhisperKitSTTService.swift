@@ -191,9 +191,7 @@ public actor WhisperKitSTTService {
     /// Root-mean-square energy using Accelerate (O(n) vectorized).
     private func rmsEnergy(_ samples: [Float]) -> Float {
         guard !samples.isEmpty else { return 0 }
-        var meanSquare: Float = 0
-        vDSP_measqv(samples, 1, &meanSquare, vDSP_Length(samples.count))
-        return sqrt(meanSquare)
+        return vDSP.rootMeanSquare(samples)
     }
 
     /// In-place gain using Accelerate (O(n) vectorized).

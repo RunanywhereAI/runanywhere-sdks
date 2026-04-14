@@ -68,11 +68,14 @@ final class PlaygroundViewModel {
             return
         }
 
-        // Prevent conflict with active voice keyboard session
+        // Prevent conflict with active voice keyboard session (iOS-only).
+        // FlowSessionManager is compiled `#if os(iOS)` so this check is skipped on macOS.
+        #if os(iOS)
         guard !FlowSessionManager.shared.isActive else {
             errorMessage = "Voice keyboard session is active. End it first."
             return
         }
+        #endif
 
         let permitted = await audioCapture.requestPermission()
         guard permitted else {

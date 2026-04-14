@@ -71,6 +71,9 @@ public enum RunAnywhere {
     /// Concurrent callers of completeServicesInitialization() await this shared task
     /// instead of racing through the init logic with an unprotected boolean guard.
     private static var _servicesInitTask: Task<Void, Error>?
+    /// Serializes the check-and-set on `_servicesInitTask` so two concurrent callers
+    /// can't both observe `nil` and spawn duplicate init tasks.
+    private static let _servicesInitLock = DispatchQueue(label: "com.runanywhere.sdk.servicesInit")
 
     // MARK: - SDK State
 
@@ -316,24 +319,28 @@ public enum RunAnywhere {
             return
         }
 
-        // If another task is already running Phase 2, join it instead of
-        // starting a duplicate. This prevents the race between the background
-        // Task.detached spawned by initialize() and any caller that reaches
-        // completeServicesInitialization() via ensureServicesReady().
-        if let existingTask = _servicesInitTask {
-            try await existingTask.value
-            return
+        // Atomically check-or-create the shared init task. Without the lock, two
+        // concurrent callers could both see `_servicesInitTask == nil` and spawn
+        // duplicate init tasks (e.g., the background Task.detached from initialize()
+        // racing a caller via ensureServicesReady()).
+        let task: Task<Void, Error> = _servicesInitLock.sync {
+            if let existingTask = _servicesInitTask {
+                return existingTask
+            }
+            let newTask = Task<Void, Error> {
+                try await _performServicesInitialization()
+            }
+            _servicesInitTask = newTask
+            return newTask
         }
-
-        let task = Task<Void, Error> {
-            try await _performServicesInitialization()
-        }
-        _servicesInitTask = task
 
         do {
             try await task.value
+            // Clear on success so the completed Task is released; subsequent calls
+            // hit the fast path via `hasCompletedServicesInit`.
+            _servicesInitLock.sync { _servicesInitTask = nil }
         } catch {
-            _servicesInitTask = nil
+            _servicesInitLock.sync { _servicesInitTask = nil }
             throw error
         }
     }

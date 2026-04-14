@@ -257,6 +257,16 @@ final class FlowSessionManager: ObservableObject {
                 try await RunAnywhere.transcribe(audio)
             }.value
             logger.info("Transcription complete: \"\(text)\"")
+
+            // Task.detached drops structured cancellation, so endSession()/killSession()
+            // cannot cancel the transcription in flight. If the session was torn down
+            // while transcription was running, discard the result rather than writing
+            // it to SharedDataBridge after the session is idle.
+            guard case .transcribing = sessionPhase else {
+                logger.info("Session no longer transcribing — discarding result")
+                return
+            }
+
             wordCount += text.split(separator: " ").count
 
             if #available(iOS 16.1, *) {

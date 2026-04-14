@@ -73,13 +73,11 @@ final class SharedDataBridge {
     // Caches are invalidated via Darwin notifications from the main app.
     private var _cachedSessionState: String
     private var _cachedAudioLevel: Float
-    private var _cachedHeartbeat: Double
 
     private init() {
         defaults = UserDefaults(suiteName: SharedConstants.appGroupID)
         _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
         _cachedAudioLevel = defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0
-        _cachedHeartbeat = defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0
         registerCacheObservers()
     }
 
@@ -102,13 +100,11 @@ final class SharedDataBridge {
     func refreshAllFromDefaults() {
         _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
         _cachedAudioLevel = defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0
-        _cachedHeartbeat = defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0
     }
 
     /// Refresh only session state from UserDefaults.
     private func refreshStateFromDefaults() {
         _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
-        _cachedHeartbeat = defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0
     }
 
     /// Refresh only audio level from UserDefaults.
@@ -165,17 +161,23 @@ final class SharedDataBridge {
         set {
             _cachedAudioLevel = newValue
             defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel)
+            // Post so the peer process (keyboard extension ↔ main app) refreshes
+            // its own _cachedAudioLevel — otherwise readers see stale values.
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.audioLevelChanged
+            )
         }
     }
 
     // MARK: - Heartbeat
 
+    /// Heartbeat is written ~every second by FlowSessionManager without a state
+    /// transition, so caching + Darwin-notification invalidation would require
+    /// a notification per second. Instead, read through to UserDefaults every
+    /// time so remote readers always see a fresh value.
     var lastHeartbeatTimestamp: Double {
-        get { _cachedHeartbeat }
-        set {
-            _cachedHeartbeat = newValue
-            defaults?.set(newValue, forKey: SharedConstants.Keys.lastHeartbeat)
-        }
+        get { defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0 }
+        set { defaults?.set(newValue, forKey: SharedConstants.Keys.lastHeartbeat) }
     }
 
     // MARK: - Last Inserted Text
@@ -220,7 +222,6 @@ final class SharedDataBridge {
         defaults?.set(Float(0), forKey: SharedConstants.Keys.audioLevel)
         defaults?.set(Double(0), forKey: SharedConstants.Keys.lastHeartbeat)
         _cachedAudioLevel = 0
-        _cachedHeartbeat = 0
         sessionState = "idle"
     }
 }

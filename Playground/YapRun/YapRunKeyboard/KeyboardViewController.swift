@@ -151,10 +151,10 @@ final class KeyboardViewController: UIInputViewController {
         SharedDataBridge.shared.lastInsertedText = text
         SharedDataBridge.shared.transcribedText = nil
 
-        // Copy to clipboard if we have full access
-        if hasFullAccess {
-            UIPasteboard.general.string = text
-        }
+        // Intentionally NOT copying to UIPasteboard: duplicating every dictated
+        // utterance to the global pasteboard is a privacy leak (other apps with
+        // pasteboard access would see it). A future opt-in setting or an
+        // explicit "Copy" action can gate a pasteboard write if users want one.
     }
 
     // MARK: - URL Opening

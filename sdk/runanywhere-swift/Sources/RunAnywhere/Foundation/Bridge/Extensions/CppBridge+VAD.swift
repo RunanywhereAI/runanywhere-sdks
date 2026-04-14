@@ -77,6 +77,12 @@ extension CppBridge {
 
             let handle = try getHandle()
 
+            // `rac_vad_component_load_model` unloads any previously loaded model
+            // first. If the subsequent load fails, the C++ side is already
+            // unloaded, so clear our mirror before the call so a retry isn't
+            // skipped by the `loadedModelId != modelId` fast path above.
+            loadedModelId = nil
+
             let result = modelPath.withCString { pathPtr in
                 modelId.withCString { idPtr in
                     modelName.withCString { namePtr in
