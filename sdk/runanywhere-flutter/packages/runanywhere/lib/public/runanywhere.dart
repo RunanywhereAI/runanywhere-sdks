@@ -748,6 +748,10 @@ class RunAnywhere {
         durationMs: audioDurationMs,
         language: result.language,
       );
+    } on SDKError {
+      // Re-throw validation / SDK errors so callers see the structured error
+      // instead of it being logged as a generic transcription failure.
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
