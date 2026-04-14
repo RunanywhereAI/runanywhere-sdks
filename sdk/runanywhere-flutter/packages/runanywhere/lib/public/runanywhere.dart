@@ -17,6 +17,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
@@ -131,11 +132,9 @@ class RunAnywhere {
 
       // =========================================================================
       // PHASE 2: Services Init (async, ~100-500ms, may need network)
-      // Matches Swift: RunAnywhere.completeServicesInitialization()
       // =========================================================================
 
       // Step 2.1: Initialize service bridges with credentials
-      // Matches Swift: CppBridge.State.initialize() + CppBridge.initializeServices()
       await DartBridge.initializeServices(
         apiKey: params.apiKey,
         baseURL: params.baseURL.toString(),
@@ -144,9 +143,7 @@ class RunAnywhere {
       logger.debug('Service bridges initialized');
 
       // Step 2.2: Set base directory for model paths
-      // Matches Swift: CppBridge.ModelPaths.setBaseDirectory(documentsURL)
       await DartBridge.modelPaths.setBaseDirectory();
-      logger.debug('Model paths base directory configured');
 
       // Step 2.3: Setup local services (HTTP, etc.)
       await serviceContainer.setupLocalServices(
@@ -155,23 +152,10 @@ class RunAnywhere {
         environment: params.environment,
       );
 
-      // Step 2.4: Register device with backend (REQUIRED before authentication)
-      // Matches Swift: CppBridge.Device.registerIfNeeded(environment:)
-      // The device must be registered in the backend database before auth can work
-      logger.debug('Registering device with backend...');
+      // Step 2.4: Register device with backend
       await _registerDeviceIfNeeded(params, logger);
 
-      // Step 2.5: Authenticate with backend (production/staging only)
-      // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-      // This gets access_token and refresh_token from backend for subsequent API calls
-      if (params.environment != SDKEnvironment.development) {
-        logger.debug('Authenticating with backend...');
-        await _authenticateWithBackend(params, logger);
-      }
-
       // Step 2.6: Initialize model registry
-      // CRITICAL: Uses the GLOBAL C++ registry via rac_get_model_registry()
-      // Models must be in the global registry for rac_llm_component_load_model to find them
       logger.debug('Initializing model registry...');
       await DartBridgeModelRegistry.instance.initialize();
 
@@ -229,7 +213,6 @@ class RunAnywhere {
       logger.debug('Device registration check completed');
     } catch (e) {
       // Device registration failures are non-critical
-      // App can still work offline with local models
       logger.warning('Device registration failed (non-critical): $e');
     }
   }
@@ -1161,8 +1144,9 @@ class RunAnywhere {
   static Future<String> describeImage(
     VLMImage image, {
     String prompt = "What's in this image?",
+    VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
-    final result = await processImage(image, prompt: prompt);
+    final result = await processImage(image, prompt: prompt, options: options);
     return result.text;
   }
 
@@ -1180,8 +1164,9 @@ class RunAnywhere {
   static Future<String> askAboutImage(
     String question, {
     required VLMImage image,
+    VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
-    final result = await processImage(image, prompt: question);
+    final result = await processImage(image, prompt: question, options: options);
     return result.text;
   }
 
@@ -1205,9 +1190,7 @@ class RunAnywhere {
   static Future<VLMResult> processImage(
     VLMImage image, {
     required String prompt,
-    int maxTokens = 2048,
-    double temperature = 0.7,
-    double topP = 0.9,
+    VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
     if (!_isInitialized) throw SDKError.notInitialized();
     if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
@@ -1220,10 +1203,7 @@ class RunAnywhere {
       final bridgeResult = await _processImageViaBridge(
         image,
         prompt,
-        maxTokens,
-        temperature,
-        topP,
-        useGpu: true,
+        options,
       );
 
       logger.info(
@@ -1238,8 +1218,8 @@ class RunAnywhere {
         promptTokens: bridgeResult.promptTokens,
         completionTokens: bridgeResult.completionTokens,
         latencyMs: bridgeResult.totalTimeMs.round(),
-        temperature: temperature,
-        maxTokens: maxTokens,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
         tokensPerSecond: bridgeResult.tokensPerSecond,
         isStreaming: false,
       );
@@ -1284,9 +1264,7 @@ class RunAnywhere {
   static Future<VLMStreamingResult> processImageStream(
     VLMImage image, {
     required String prompt,
-    int maxTokens = 2048,
-    double temperature = 0.7,
-    double topP = 0.9,
+    VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
     if (!_isInitialized) throw SDKError.notInitialized();
     if (!DartBridge.vlm.isLoaded) throw SDKError.vlmNotInitialized();
@@ -1305,10 +1283,7 @@ class RunAnywhere {
       final tokenStream = _processImageStreamViaBridge(
         image,
         prompt,
-        maxTokens,
-        temperature,
-        topP,
-        useGpu: true,
+        options,
       );
 
       // Forward tokens and collect them
@@ -1367,8 +1342,8 @@ class RunAnywhere {
           promptTokens: 0, // Image tokens not exposed yet
           completionTokens: allTokens.length,
           latencyMs: totalTimeMs.round(),
-          temperature: temperature,
-          maxTokens: maxTokens,
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
           tokensPerSecond: tokensPerSecond,
           timeToFirstTokenMs: timeToFirstTokenMs,
           isStreaming: true,
@@ -1539,6 +1514,147 @@ class RunAnywhere {
     }
   }
 
+  /// Load a VLM model by ID using C++ path resolution
+  ///
+  /// Matches Swift: `RunAnywhere.loadVLMModelById(_:)`
+  ///
+  /// The C++ layer resolves the model path from the global registry.
+  /// The model must have been registered via `registerModel()` first.
+  ///
+  /// ```dart
+  /// await RunAnywhere.loadVLMModelById('llava-1.5-7b');
+  /// ```
+  static Future<void> loadVLMModelById(String modelId) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+
+    final logger = SDKLogger('RunAnywhere.LoadVLMModelById');
+    logger.info('Loading VLM model by ID: $modelId');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+
+    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+
+    try {
+      if (DartBridge.vlm.isLoaded) {
+        logger.debug('Unloading previous VLM model');
+        DartBridge.vlm.unload();
+      }
+
+      await DartBridge.vlm.loadModelById(modelId);
+
+      if (!DartBridge.vlm.isLoaded) {
+        throw SDKError.vlmModelLoadFailed(
+          'VLM model failed to load - model may not be compatible',
+        );
+      }
+
+      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      logger.info('VLM model loaded by ID: $modelId');
+
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'vlm',
+        success: true,
+        loadTimeMs: loadTimeMs,
+      );
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+    } catch (e) {
+      logger.error('Failed to load VLM model by ID: $e');
+
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'vlm',
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'vlm_model_load_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId},
+      );
+
+      EventBus.shared.publish(SDKModelEvent.loadFailed(
+        modelId: modelId,
+        error: e.toString(),
+      ));
+
+      rethrow;
+    }
+  }
+
+  /// Load a VLM model from explicit file paths
+  ///
+  /// Matches Swift: `RunAnywhere.loadVLMModel(_:mmprojPath:modelId:modelName:)`
+  ///
+  /// ```dart
+  /// await RunAnywhere.loadVLMModelWithPath(
+  ///   '/path/to/model.gguf',
+  ///   mmprojPath: '/path/to/mmproj.gguf',
+  ///   modelId: 'llava-custom',
+  ///   modelName: 'LLaVA Custom',
+  /// );
+  /// ```
+  static Future<void> loadVLMModelWithPath(
+    String modelPath, {
+    String? mmprojPath,
+    required String modelId,
+    required String modelName,
+  }) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+
+    final logger = SDKLogger('RunAnywhere.LoadVLMModelWithPath');
+    logger.info('Loading VLM model from path: $modelPath');
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+
+    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+
+    try {
+      if (DartBridge.vlm.isLoaded) {
+        logger.debug('Unloading previous VLM model');
+        DartBridge.vlm.unload();
+      }
+
+      await DartBridge.vlm.loadModel(modelPath, mmprojPath, modelId, modelName);
+
+      if (!DartBridge.vlm.isLoaded) {
+        throw SDKError.vlmModelLoadFailed(
+          'VLM model failed to load - model may not be compatible',
+        );
+      }
+
+      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      logger.info('VLM model loaded from path: $modelPath');
+
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'vlm',
+        success: true,
+        loadTimeMs: loadTimeMs,
+      );
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+    } catch (e) {
+      logger.error('Failed to load VLM model from path: $e');
+
+      TelemetryService.shared.trackModelLoad(
+        modelId: modelId,
+        modelType: 'vlm',
+        success: false,
+      );
+      TelemetryService.shared.trackError(
+        errorCode: 'vlm_model_load_failed',
+        errorMessage: e.toString(),
+        context: {'model_id': modelId, 'model_path': modelPath},
+      );
+
+      EventBus.shared.publish(SDKModelEvent.loadFailed(
+        modelId: modelId,
+        error: e.toString(),
+      ));
+
+      rethrow;
+    }
+  }
+
   /// Unload the currently loaded VLM model
   ///
   /// Matches Swift: `RunAnywhere.unloadVLMModel()`
@@ -1566,11 +1682,8 @@ class RunAnywhere {
   static Future<VLMResult> _processImageViaBridge(
     VLMImage image,
     String prompt,
-    int maxTokens,
-    double temperature,
-    double topP, {
-    required bool useGpu,
-  }) async {
+    VLMGenerationOptions options,
+  ) async {
     // Extract format-specific data from sealed class
     final format = image.format;
     final VlmBridgeResult bridgeResult;
@@ -1580,10 +1693,13 @@ class RunAnywhere {
         imageFormat: RacVlmImageFormat.filePath,
         filePath: format.path,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else if (format is VLMImageFormatRgbPixels) {
       bridgeResult = await DartBridge.vlm.processImage(
@@ -1592,20 +1708,26 @@ class RunAnywhere {
         width: format.width,
         height: format.height,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else if (format is VLMImageFormatBase64) {
       bridgeResult = await DartBridge.vlm.processImage(
         imageFormat: RacVlmImageFormat.base64,
         base64Data: format.encoded,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else {
       throw SDKError.vlmInvalidImage('Unsupported image format');
@@ -1625,11 +1747,8 @@ class RunAnywhere {
   static Stream<String> _processImageStreamViaBridge(
     VLMImage image,
     String prompt,
-    int maxTokens,
-    double temperature,
-    double topP, {
-    required bool useGpu,
-  }) {
+    VLMGenerationOptions options,
+  ) {
     // Extract format-specific data from sealed class
     final format = image.format;
 
@@ -1638,10 +1757,13 @@ class RunAnywhere {
         imageFormat: RacVlmImageFormat.filePath,
         filePath: format.path,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else if (format is VLMImageFormatRgbPixels) {
       return DartBridge.vlm.processImageStream(
@@ -1650,20 +1772,26 @@ class RunAnywhere {
         width: format.width,
         height: format.height,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else if (format is VLMImageFormatBase64) {
       return DartBridge.vlm.processImageStream(
         imageFormat: RacVlmImageFormat.base64,
         base64Data: format.encoded,
         prompt: prompt,
-        maxTokens: maxTokens,
-        temperature: temperature,
-        topP: topP,
-        useGpu: useGpu,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
+        topP: options.topP,
+        useGpu: options.useGpu,
+        systemPrompt: options.systemPrompt,
+        maxImageSize: options.maxImageSize,
+        nThreads: options.nThreads,
       );
     } else {
       throw SDKError.vlmInvalidImage('Unsupported image format');
@@ -1675,8 +1803,11 @@ class RunAnywhere {
     String modelFolder,
     ModelInfo model,
   ) async {
-    final dir = Directory(modelFolder);
+    // If modelFolder points to a file (e.g. .gguf), use its parent directory
+    final file = File(modelFolder);
+    final dir = await file.exists() ? file.parent : Directory(modelFolder);
     if (!await dir.exists()) return null;
+    final dirPath = dir.path;
 
     try {
       // List folder contents
@@ -1690,7 +1821,7 @@ class RunAnywhere {
           ggufFiles.where((f) => !f.toLowerCase().contains('mmproj')).toList();
 
       if (mainModelFiles.isNotEmpty) {
-        return '$modelFolder/${mainModelFiles.first}';
+        return '$dirPath/${mainModelFiles.first}';
       }
 
       return null;
@@ -2218,27 +2349,9 @@ class RunAnywhere {
     }
   }
 
-  /// Calculate directory size recursively.
+  /// Calculate directory size — delegates to C++ file manager.
   static Future<int> _getDirectorySize(String path) async {
-    try {
-      final dir = Directory(path);
-      if (!await dir.exists()) return 0;
-
-      int totalSize = 0;
-      await for (final entity
-          in dir.list(recursive: true, followLinks: false)) {
-        if (entity is File) {
-          try {
-            totalSize += await entity.length();
-          } catch (_) {
-            // Skip files we can't read
-          }
-        }
-      }
-      return totalSize;
-    } catch (e) {
-      return 0;
-    }
+    return DartBridgeFileManager.calculateDirectorySize(path);
   }
 
   /// Get downloaded models with their file sizes.
@@ -2551,7 +2664,9 @@ class RunAnywhere {
 
   /// Create a RAG pipeline with the given configuration.
   ///
-  /// Must be called before ingesting documents or running queries.
+  /// Auto-registers the RAG module if needed — no explicit RAGModule.register()
+  /// required. The C++ bridge handles model path resolution (GGUF directory
+  /// scanning, vocab.txt discovery).
   static Future<void> ragCreatePipeline(RAGConfiguration config) async {
     if (!_isInitialized) throw SDKError.notInitialized();
     DartBridgeRAG.shared.createPipeline(config);
@@ -2570,6 +2685,16 @@ class RunAnywhere {
     DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
   }
 
+  /// Ingest multiple documents in batch.
+  ///
+  /// More efficient than calling [ragIngest] multiple times.
+  /// Each document map should have a 'text' key and optional 'metadataJson' key.
+  static Future<void> ragAddDocumentsBatch(
+      List<Map<String, String>> documents) async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    DartBridgeRAG.shared.addDocumentsBatch(documents);
+  }
+
   /// Clear all documents from the RAG pipeline.
   static Future<void> ragClearDocuments() async {
     if (!_isInitialized) throw SDKError.notInitialized();
@@ -2578,6 +2703,12 @@ class RunAnywhere {
 
   /// Get the number of indexed document chunks.
   static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
+
+  /// Get pipeline statistics as JSON.
+  static Future<RAGStatistics> ragGetStatistics() async {
+    if (!_isInitialized) throw SDKError.notInitialized();
+    return DartBridgeRAG.shared.getStatistics();
+  }
 
   /// Query the RAG pipeline with a question.
   ///

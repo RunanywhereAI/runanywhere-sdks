@@ -161,7 +161,7 @@ class VLMViewModel extends ChangeNotifier {
       final result = await sdk.RunAnywhere.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
-        maxTokens: 200,
+        options: const sdk.VLMGenerationOptions(maxTokens: 200),
       );
 
       // Listen to stream and append tokens
@@ -201,7 +201,7 @@ class VLMViewModel extends ChangeNotifier {
       final result = await sdk.RunAnywhere.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
-        maxTokens: 300,
+        options: const sdk.VLMGenerationOptions(maxTokens: 300),
       );
 
       // Listen to stream and append tokens
@@ -285,7 +285,7 @@ class VLMViewModel extends ChangeNotifier {
       final result = await sdk.RunAnywhere.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
-        maxTokens: 100,
+        options: const sdk.VLMGenerationOptions(maxTokens: 100),
       );
 
       // Listen to stream and build description

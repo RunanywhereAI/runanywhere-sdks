@@ -194,6 +194,10 @@ rac_result_t rac_http_download(const char* url, const char* destination_path,
                                rac_http_progress_callback_fn progress_callback,
                                rac_http_complete_callback_fn complete_callback,
                                void* callback_user_data, char** out_task_id) {
+    if (url == nullptr || destination_path == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
     if (s_platform_adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -208,6 +212,10 @@ rac_result_t rac_http_download(const char* url, const char* destination_path,
 }
 
 rac_result_t rac_http_download_cancel(const char* task_id) {
+    if (task_id == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
     if (s_platform_adapter == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
@@ -223,19 +231,39 @@ rac_result_t rac_http_download_cancel(const char* task_id) {
 // ARCHIVE EXTRACTION CONVENIENCE FUNCTION
 // =============================================================================
 
+#include "rac/infrastructure/extraction/rac_extraction.h"
+
 rac_result_t rac_extract_archive(const char* archive_path, const char* destination_dir,
                                  rac_extract_progress_callback_fn progress_callback,
                                  void* callback_user_data) {
-    if (s_platform_adapter == nullptr) {
-        return RAC_ERROR_ADAPTER_NOT_SET;
+    if (archive_path == nullptr || destination_dir == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
     }
 
-    if (s_platform_adapter->extract_archive == nullptr) {
-        return RAC_ERROR_NOT_SUPPORTED;
+    // Bridge the old callback signature to the new one
+    struct bridge_ctx {
+        rac_extract_progress_callback_fn callback;
+        void* user_data;
+    };
+    bridge_ctx ctx = {progress_callback, callback_user_data};
+
+    rac_extraction_progress_fn bridged_callback = nullptr;
+    void* bridged_user_data = nullptr;
+    if (progress_callback) {
+        bridged_callback = [](int32_t files_extracted, int32_t total_files,
+                              int64_t /* bytes_extracted */, void* ud) {
+            auto* c = static_cast<bridge_ctx*>(ud);
+            if (c->callback) {
+                c->callback(files_extracted, total_files, c->user_data);
+            }
+        };
+        bridged_user_data = &ctx;
     }
 
-    return s_platform_adapter->extract_archive(archive_path, destination_dir, progress_callback,
-                                               callback_user_data, s_platform_adapter->user_data);
+    // Use native libarchive extraction
+    return rac_extract_archive_native(archive_path, destination_dir, nullptr /* default options */,
+                                      bridged_callback, bridged_user_data,
+                                      nullptr /* no result output */);
 }
 
 // =============================================================================

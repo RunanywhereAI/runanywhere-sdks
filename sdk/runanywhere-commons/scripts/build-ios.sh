@@ -652,11 +652,12 @@ create_backend_xcframework() {
             local LLAMA_BUILD="${PLATFORM_DIR}/src/backends/llamacpp/_deps/llamacpp-build"
             [[ ! -d "$LLAMA_BUILD" ]] && LLAMA_BUILD="${PLATFORM_DIR}/_deps/llamacpp-build"
 
-            for lib in llama common ggml ggml-base ggml-cpu ggml-metal ggml-blas; do
+            for lib in llama common cpp-httplib ggml ggml-base ggml-cpu ggml-metal ggml-blas; do
                 local lib_path=""
                 for possible in \
                     "${LLAMA_BUILD}/src/lib${lib}.a" \
                     "${LLAMA_BUILD}/common/lib${lib}.a" \
+                    "${LLAMA_BUILD}/vendor/cpp-httplib/lib${lib}.a" \
                     "${LLAMA_BUILD}/ggml/src/lib${lib}.a" \
                     "${LLAMA_BUILD}/ggml/src/ggml-metal/lib${lib}.a" \
                     "${LLAMA_BUILD}/ggml/src/ggml-blas/lib${lib}.a" \

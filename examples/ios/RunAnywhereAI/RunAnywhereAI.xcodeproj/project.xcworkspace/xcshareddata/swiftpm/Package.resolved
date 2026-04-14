@@ -1,5 +1,5 @@
 {
-  "originHash" : "3460a3a28d41ad2e683d917ec52c81d360e2e01615debdddb4f13b7b027f04df",
+  "originHash" : "070e7557fa52110bb9abeaaa337e8dc0e5977347ec91cbfb35b730d5956bf217",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -8,15 +8,6 @@
       "state" : {
         "revision" : "3f99050e75bbc6fe71fc323adabb039756680016",
         "version" : "5.11.1"
-      }
-    },
-    {
-      "identity" : "bitbytedata",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tsolomko/BitByteData",
-      "state" : {
-        "revision" : "cdcdc5177ad536cfb11b95c620f926a81014b7fe",
-        "version" : "2.0.4"
       }
     },
     {
@@ -53,15 +44,6 @@
       "state" : {
         "revision" : "16cd512711375fa73f25ae5e373f596bdf4251ae",
         "version" : "8.58.0"
-      }
-    },
-    {
-      "identity" : "swcompression",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tsolomko/SWCompression.git",
-      "state" : {
-        "revision" : "390e0b0af8dd19a600005a242a89e570ff482e09",
-        "version" : "4.8.6"
       }
     },
     {
@@ -125,15 +107,6 @@
       "state" : {
         "revision" : "664e1b5a65296cd957dfdf262cd120ca88f3b24b",
         "version" : "0.15.0"
-      }
-    },
-    {
-      "identity" : "zipfoundation",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/weichsel/ZIPFoundation.git",
-      "state" : {
-        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
-        "version" : "0.9.20"
       }
     }
   ],

@@ -103,6 +103,7 @@
 
 // Download management
 #include "rac_download.h"
+#include "rac_download_orchestrator.h"
 
 // Model management
 #include "rac_model_types.h"
@@ -114,6 +115,9 @@
 
 // Storage
 #include "rac_storage_analyzer.h"
+
+// File Management
+#include "rac_file_manager.h"
 
 // Device
 #include "rac_device_manager.h"

@@ -117,6 +117,46 @@ class VLMStreamingResult {
   });
 }
 
+// MARK: - VLM Generation Options
+
+/// Options for VLM image processing
+///
+/// Provides structured configuration for VLM generation.
+/// Exposes C++ options fields (systemPrompt, maxImageSize, nThreads)
+/// that FFI already supports.
+class VLMGenerationOptions {
+  /// Maximum tokens to generate
+  final int maxTokens;
+
+  /// Sampling temperature (higher = more creative)
+  final double temperature;
+
+  /// Top-p sampling parameter (nucleus sampling)
+  final double topP;
+
+  /// Optional system prompt to guide generation
+  final String? systemPrompt;
+
+  /// Maximum image size in pixels (0 = model default)
+  final int maxImageSize;
+
+  /// Number of threads for processing (0 = auto)
+  final int nThreads;
+
+  /// Use GPU for vision encoding
+  final bool useGpu;
+
+  const VLMGenerationOptions({
+    this.maxTokens = 2048,
+    this.temperature = 0.7,
+    this.topP = 0.9,
+    this.systemPrompt,
+    this.maxImageSize = 0,
+    this.nThreads = 0,
+    this.useGpu = true,
+  });
+}
+
 // MARK: - VLM Error Codes
 
 /// VLM-specific error codes

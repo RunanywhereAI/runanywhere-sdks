@@ -10,15 +10,6 @@
       }
     },
     {
-      "identity" : "bitbytedata",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tsolomko/BitByteData",
-      "state" : {
-        "revision" : "cdcdc5177ad536cfb11b95c620f926a81014b7fe",
-        "version" : "2.0.4"
-      }
-    },
-    {
       "identity" : "devicekit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/devicekit/DeviceKit.git",
@@ -52,15 +43,6 @@
       "state" : {
         "revision" : "16cd512711375fa73f25ae5e373f596bdf4251ae",
         "version" : "8.58.0"
-      }
-    },
-    {
-      "identity" : "swcompression",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tsolomko/SWCompression.git",
-      "state" : {
-        "revision" : "390e0b0af8dd19a600005a242a89e570ff482e09",
-        "version" : "4.8.6"
       }
     },
     {
@@ -124,15 +106,6 @@
       "state" : {
         "revision" : "664e1b5a65296cd957dfdf262cd120ca88f3b24b",
         "version" : "0.15.0"
-      }
-    },
-    {
-      "identity" : "zipfoundation",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/weichsel/ZIPFoundation.git",
-      "state" : {
-        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
-        "version" : "0.9.20"
       }
     }
   ],

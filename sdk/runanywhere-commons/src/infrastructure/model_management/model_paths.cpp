@@ -47,8 +47,15 @@ rac_result_t rac_model_paths_set_base_dir(const char* base_dir) {
 }
 
 const char* rac_model_paths_get_base_dir(void) {
+    // Use thread_local copy to avoid returning c_str() that dangles after mutex release.
+    // Valid until the next call from the same thread.
+    static thread_local std::string tl_base_dir;
     std::lock_guard<std::mutex> lock(g_paths_mutex);
-    return g_base_dir.empty() ? nullptr : g_base_dir.c_str();
+    if (g_base_dir.empty()) {
+        return nullptr;
+    }
+    tl_base_dir = g_base_dir;
+    return tl_base_dir.c_str();
 }
 
 // =============================================================================

@@ -149,23 +149,6 @@ public struct FileOperationsUtilities {
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: withIntermediateDirectories, attributes: nil)
     }
 
-    /// Calculate the total size of a directory including all subdirectories
-    /// - Parameter url: The directory URL
-    /// - Returns: Total size in bytes
-    public static func calculateDirectorySize(at url: URL) -> Int64 {
-        var totalSize: Int64 = 0
-
-        if let enumerator = enumerateDirectory(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
-            for case let fileURL as URL in enumerator {
-                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                    totalSize += Int64(fileSize)
-                }
-            }
-        }
-
-        return totalSize
-    }
-
     // MARK: - File/Directory Removal
 
     /// Remove a file or directory at the specified URL

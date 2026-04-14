@@ -2,7 +2,7 @@
  * RunAnywhere+Storage.ts
  *
  * Storage management extension.
- * Uses react-native-fs via FileSystem service.
+ * Delegates to C++ via native module for storage info (C++ handles recursive traversal).
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift
  */
@@ -10,6 +10,7 @@
 import { ModelRegistry } from '../../services/ModelRegistry';
 import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 
 const logger = new SDKLogger('RunAnywhere.Storage');
 
@@ -67,7 +68,8 @@ export async function getModelsDirectory(): Promise<string> {
 
 /**
  * Get storage information
- * Returns structure matching Swift's StorageInfo
+ * Delegates to C++ FileManagerBridge for recursive directory traversal.
+ * Returns structure matching Swift's StorageInfo.
  */
 export async function getStorageInfo(): Promise<StorageInfo> {
   const emptyResult: StorageInfo = {
@@ -78,75 +80,46 @@ export async function getStorageInfo(): Promise<StorageInfo> {
     totalModelsSize: 0,
   };
 
-  if (!FileSystem.isAvailable()) {
-    return emptyResult;
-  }
-
   try {
-    const freeSpace = await FileSystem.getAvailableDiskSpace();
-    const totalSpace = await FileSystem.getTotalDiskSpace();
-    const usedSpace = totalSpace - freeSpace;
+    // Use native module (C++ FileManagerBridge handles recursive traversal)
+    if (isNativeModuleAvailable()) {
+      const native = requireNativeModule();
+      const json = await native.getStorageInfo();
+      const info = JSON.parse(json);
 
-    // Get models directory size
-    let modelsSize = 0;
-    let modelCount = 0;
-    try {
-      const modelsDir = FileSystem.getModelsDirectory();
-      const exists = await FileSystem.directoryExists(modelsDir);
-      if (exists) {
-        modelsSize = await FileSystem.getDirectorySize(modelsDir);
-        const files = await FileSystem.listDirectory(modelsDir);
-        modelCount = files.length;
-      }
-    } catch {
-      // Models directory may not exist yet
+      const totalDeviceSpace = parseInt(info.totalDeviceSpace || '0', 10);
+      const freeDeviceSpace = parseInt(info.freeDeviceSpace || '0', 10);
+      const usedDeviceSpace = parseInt(info.usedDeviceSpace || '0', 10);
+      const documentsSize = parseInt(info.documentsSize || '0', 10);
+      const cacheSz = parseInt(info.cacheSize || '0', 10);
+      const appSupportSize = parseInt(info.appSupportSize || '0', 10);
+      const totalAppSize = parseInt(info.totalAppSize || '0', 10);
+      const totalModelsSize = parseInt(info.totalModelsSize || '0', 10);
+      const modelCount = parseInt(info.modelCount || '0', 10);
+
+      return {
+        deviceStorage: {
+          totalSpace: totalDeviceSpace,
+          freeSpace: freeDeviceSpace,
+          usedSpace: usedDeviceSpace,
+        },
+        appStorage: {
+          documentsSize,
+          cacheSize: cacheSz,
+          appSupportSize,
+          totalSize: totalAppSize,
+        },
+        modelStorage: {
+          totalSize: totalModelsSize,
+          modelCount,
+        },
+        cacheSize: cacheSz,
+        totalModelsSize,
+      };
     }
 
-    // Get cache size
-    let cacheSize = 0;
-    try {
-      const cacheDir = FileSystem.getCacheDirectory();
-      const exists = await FileSystem.directoryExists(cacheDir);
-      if (exists) {
-        cacheSize = await FileSystem.getDirectorySize(cacheDir);
-      }
-    } catch {
-      // Cache directory may not exist
-    }
-
-    // Get app documents size (RunAnywhere directory)
-    let documentsSize = 0;
-    try {
-      const docsDir = FileSystem.getRunAnywhereDirectory();
-      const exists = await FileSystem.directoryExists(docsDir);
-      if (exists) {
-        documentsSize = await FileSystem.getDirectorySize(docsDir);
-      }
-    } catch {
-      // Documents directory may not exist
-    }
-
-    const totalAppSize = documentsSize + cacheSize;
-
-    return {
-      deviceStorage: {
-        totalSpace,
-        freeSpace,
-        usedSpace,
-      },
-      appStorage: {
-        documentsSize,
-        cacheSize,
-        appSupportSize: 0,
-        totalSize: totalAppSize,
-      },
-      modelStorage: {
-        totalSize: modelsSize,
-        modelCount,
-      },
-      cacheSize,
-      totalModelsSize: modelsSize,
-    };
+    // Native module is required for storage info (C++ handles recursive traversal)
+    return emptyResult;
   } catch (error) {
     logger.warning('Failed to get storage info:', { error });
     return emptyResult;
@@ -155,8 +128,21 @@ export async function getStorageInfo(): Promise<StorageInfo> {
 
 /**
  * Clear cache
+ * Delegates to C++ FileManagerBridge for file cache/temp clearing.
  */
 export async function clearCache(): Promise<void> {
+  // Clear in-memory model registry cache
   ModelRegistry.reset();
+
+  // Clear file caches via native module (C++ handles directory clearing)
+  if (isNativeModuleAvailable()) {
+    try {
+      const native = requireNativeModule();
+      await native.clearCache();
+    } catch (error) {
+      logger.warning('Failed to clear native cache:', { error });
+    }
+  }
+
   logger.info('Cache cleared');
 }
