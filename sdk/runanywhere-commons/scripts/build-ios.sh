@@ -734,18 +734,10 @@ create_backend_xcframework() {
             continue
         fi
 
-        # For MetalRT: strip sentencepiece's flag.cc.o to avoid duplicate _FLAGS_help with sherpa-onnx
+        # For MetalRT: strip sentencepiece's flag.cc.o/init.cc.o to avoid duplicate _FLAGS_help with sherpa-onnx
         if [[ "$BACKEND_NAME" == "metalrt" ]]; then
-            local TMPSTRIP
-            TMPSTRIP=$(mktemp -d) || { log_error "Failed to create temp directory"; exit 1; }
-            cd "$TMPSTRIP"
-            ar x "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
-            rm -f flag.cc.o init.cc.o
-            rm -f "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
-            ar rcs "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}" *.o
-            cd -
-            rm -rf "$TMPSTRIP"
-            log_info "  ${PLATFORM}: Stripped duplicate flag.cc.o from bundle"
+            ar -d "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}" flag.cc.o init.cc.o 2>/dev/null || true
+            log_info "  ${PLATFORM}: Stripped duplicate flag.cc.o/init.cc.o from bundle"
         fi
 
         # For MetalRT: copy default.metallib into the framework as a resource

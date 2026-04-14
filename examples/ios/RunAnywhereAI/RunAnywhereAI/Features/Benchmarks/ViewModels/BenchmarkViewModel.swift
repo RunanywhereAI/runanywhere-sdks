@@ -111,10 +111,9 @@ final class BenchmarkViewModel {
             var run = BenchmarkRun(deviceInfo: deviceInfo)
 
             do {
-                let modelFilter = selectedModelIds.isEmpty ? nil : selectedModelIds
                 let output = try await runner.runBenchmarks(
                     categories: selectedCategories,
-                    modelIds: modelFilter
+                    modelIds: selectedModelIds
                 ) { [weak self] update in
                     Task { @MainActor in
                         self?.progress = update.progress

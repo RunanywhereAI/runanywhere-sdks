@@ -231,10 +231,7 @@ public extension RunAnywhere {
                 }
 
                 if streamResult != RAC_SUCCESS {
-                    Unmanaged<LLMStreamCallbackContext>.fromOpaque(contextPtr).release()
-                    let error = SDKError.llm(.generationFailed, "Stream generation failed: \(streamResult)")
-                    continuation.finish(throwing: error)
-                    await collector.markFailed(error)
+                    return
                 }
             }
         }
@@ -258,7 +255,6 @@ private enum LLMStreamCallbacks {
     static func create() -> Callbacks {
         let tokenCallback: TokenFn = { tokenPtr, userData -> rac_bool_t in
             guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
-            if Task.isCancelled { return RAC_FALSE }
             let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
             let token = String(cString: tokenPtr)
             Task {
@@ -316,6 +312,7 @@ private final class LLMStreamCallbackContext: @unchecked Sendable {
 
 enum ThinkingContentParser {
     /// Extracts `<think>...</think>` content from generated text.
+    /// - NOTE: Only the first `<think>` block is extracted; additional blocks are left inline in the response text.
     /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
     static func extract(from text: String) -> (text: String, thinking: String?) {
         guard let startRange = text.range(of: "<think>"),

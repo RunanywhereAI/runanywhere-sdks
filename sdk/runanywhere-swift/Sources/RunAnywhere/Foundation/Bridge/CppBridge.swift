@@ -185,19 +185,26 @@ public enum CppBridge {
         // causing use-after-free inside the C++ layer and allowing reinit
         // while destruction is still in flight.
         //
-        // The destroy() methods are actor-isolated but not @MainActor, so
-        // blocking a background/non-MainActor caller on a semaphore is safe.
+        // We hop to a GCD global queue (not the Swift cooperative thread pool)
+        // and block that GCD worker on a semaphore. Blocking a cooperative
+        // thread-pool thread via `Task.detached { ... }` + `semaphore.wait()`
+        // on the caller risks priority inversion / pool starvation, since the
+        // detached task and the caller may share the same limited pool. The
+        // GCD global pool is separate and safe to block briefly.
+        //
         // reset() is not annotated @MainActor, so callers are expected to
         // invoke it off the main thread.
         let semaphore = DispatchSemaphore(value: 0)
-        Task.detached {
-            await LLM.shared.destroy()
-            await STT.shared.destroy()
-            await TTS.shared.destroy()
-            await VAD.shared.destroy()
-            await VoiceAgent.shared.destroy()
-            await VLM.shared.destroy()
-            semaphore.signal()
+        DispatchQueue.global(qos: .userInitiated).async {
+            Task {
+                await LLM.shared.destroy()
+                await STT.shared.destroy()
+                await TTS.shared.destroy()
+                await VAD.shared.destroy()
+                await VoiceAgent.shared.destroy()
+                await VLM.shared.destroy()
+                semaphore.signal()
+            }
         }
         semaphore.wait()
 

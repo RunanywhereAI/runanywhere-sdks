@@ -435,8 +435,10 @@ enum SafeMathEvaluator {
         }
 
         var isAtEnd: Bool {
-            skipWhitespace()
-            return index >= scalars.count
+            mutating get {
+                skipWhitespace()
+                return index >= scalars.count
+            }
         }
 
         mutating func skipWhitespace() {

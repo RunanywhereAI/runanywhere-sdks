@@ -31,7 +31,7 @@ struct BenchmarkDashboardView: View {
             // Benchmark Suite Info
             Section {
                 VStack(alignment: .leading, spacing: AppSpacing.small) {
-                    Text("Each category runs deterministic scenarios against every downloaded model of that type. Synthetic inputs (silent audio, sine waves, solid-color images) ensure reproducible results.")
+                    Text("Each category runs deterministic scenarios against every downloaded model of that type. Synthetic inputs (silent audio, sine waves, gradient images) ensure reproducible results.")
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                 }

@@ -564,6 +564,42 @@ static std::string escape_json_string(const char* str) {
     return result;
 }
 
+/**
+ * @brief Classify a raw scalar token as a JSON literal (number, boolean, or null).
+ *
+ * Used to decide whether an extracted value should be emitted verbatim into
+ * reconstructed JSON (true) or wrapped in quotes as a string (false). Accepts
+ * standard JSON number syntax plus the literals `true`, `false`, `null`.
+ */
+static bool is_json_scalar_literal(const char* s) {
+    if (!s || !*s) {
+        return false;
+    }
+
+    // Boolean and null literals
+    if (strcmp(s, "true") == 0 || strcmp(s, "false") == 0 || strcmp(s, "null") == 0) {
+        return true;
+    }
+
+    // JSON number: optional '-', digits, optional fraction, optional exponent
+    size_t i = 0;
+    if (s[i] == '-') i++;
+    if (!isdigit(static_cast<unsigned char>(s[i]))) return false;
+    while (isdigit(static_cast<unsigned char>(s[i]))) i++;
+    if (s[i] == '.') {
+        i++;
+        if (!isdigit(static_cast<unsigned char>(s[i]))) return false;
+        while (isdigit(static_cast<unsigned char>(s[i]))) i++;
+    }
+    if (s[i] == 'e' || s[i] == 'E') {
+        i++;
+        if (s[i] == '+' || s[i] == '-') i++;
+        if (!isdigit(static_cast<unsigned char>(s[i]))) return false;
+        while (isdigit(static_cast<unsigned char>(s[i]))) i++;
+    }
+    return s[i] == '\0';
+}
+
 // =============================================================================
 // JSON NORMALIZATION
 // =============================================================================
@@ -719,8 +755,16 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                             if (kval_is_obj) {
                                 flat_args += "\"" + escaped_key + "\":" + std::string(kval);
                             } else if (kval) {
-                                std::string escaped_val = escape_json_string(kval);
-                                flat_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
+                                // Emit JSON numbers/booleans/null verbatim; quote strings.
+                                // extract_json_value strips quotes from string values but
+                                // preserves raw scalars, so we classify the stripped value
+                                // using JSON scalar syntax rules.
+                                if (is_json_scalar_literal(kval)) {
+                                    flat_args += "\"" + escaped_key + "\":" + std::string(kval);
+                                } else {
+                                    std::string escaped_val = escape_json_string(kval);
+                                    flat_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
+                                }
                             }
                             free(kval);
                             first = false;
