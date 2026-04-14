@@ -450,7 +450,12 @@ class RunAnywhere {
       // Load model directly via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
       // The C++ layer handles finding the right backend via the service registry
       logger.debug('Loading model via C++ bridge: $resolvedPath');
-      await DartBridge.llm.loadModel(resolvedPath, modelId, model.name);
+      await DartBridge.llm.loadModel(
+        resolvedPath,
+        modelId,
+        model.name,
+        model.contextLength,
+      );
 
       // Verify the model loaded successfully
       if (!DartBridge.llm.isLoaded) {
@@ -663,6 +668,8 @@ class RunAnywhere {
       logger.info(
           'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
       return result.text;
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
@@ -740,6 +747,10 @@ class RunAnywhere {
         durationMs: audioDurationMs,
         language: result.language,
       );
+    } on SDKError {
+      // Re-throw validation / SDK errors so callers see the structured error
+      // instead of it being logged as a generic transcription failure.
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
@@ -926,6 +937,8 @@ class RunAnywhere {
         sampleRate: result.sampleRate,
         durationMs: result.durationMs,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track synthesis failure
       TelemetryService.shared.trackError(
@@ -1942,7 +1955,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         isStreaming: false,
       );
@@ -1974,6 +1987,8 @@ class RunAnywhere {
         tokensPerSecond: tokensPerSecond,
         structuredData: structuredData,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track generation failure
       TelemetryService.shared.trackError(
@@ -2055,12 +2070,17 @@ class RunAnywhere {
     final allTokens = <String>[];
 
     // Start streaming generation via DartBridgeLLM
-    final tokenStream = DartBridge.llm.generateStream(
-      prompt,
-      maxTokens: opts.maxTokens,
-      temperature: opts.temperature,
-      systemPrompt: effectiveSystemPrompt,
-    );
+    late final Stream<String> tokenStream;
+    try {
+      tokenStream = DartBridge.llm.generateStream(
+        prompt,
+        maxTokens: opts.maxTokens,
+        temperature: opts.temperature,
+        systemPrompt: effectiveSystemPrompt,
+      );
+    } on SDKError {
+      rethrow;
+    }
 
     // Forward tokens and collect them, track subscription in bridge for cancellation
     DartBridge.llm.setActiveStreamSubscription(
@@ -2121,7 +2141,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         timeToFirstTokenMs: timeToFirstTokenMs,
         isStreaming: true,

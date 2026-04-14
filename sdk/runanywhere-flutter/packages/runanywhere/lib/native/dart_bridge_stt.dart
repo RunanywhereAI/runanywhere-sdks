@@ -9,7 +9,7 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/stt/stt_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -163,6 +163,8 @@ class DartBridgeSTT {
     Uint8List audioData, {
     int sampleRate = 16000,
   }) async {
+    STTConfiguration(sampleRate: sampleRate).validate();
+
     final handle = getHandle();
 
     if (!isLoaded) {

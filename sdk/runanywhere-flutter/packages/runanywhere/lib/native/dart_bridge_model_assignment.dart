@@ -253,6 +253,7 @@ class DartBridgeModelAssignment {
       framework: struct.ref.framework,
       source: struct.ref.source,
       sizeBytes: struct.ref.sizeBytes,
+      contextLength: struct.ref.contextLength,
       downloadURL: struct.ref.downloadURL != nullptr
           ? struct.ref.downloadURL.toDartString()
           : null,
