@@ -12,7 +12,6 @@ import com.margelo.nitro.NitroModulesPackage
 import com.margelo.nitro.runanywhere.RunAnywhereCorePackage
 import com.margelo.nitro.runanywhere.llama.RunAnywhereLlamaPackage
 import com.margelo.nitro.runanywhere.onnx.RunAnywhereONNXPackage
-import com.margelo.nitro.runanywhere.rag.RunAnywhereRAGPackage
 
 class MainApplication : Application(), ReactApplication {
   override val reactHost: ReactHost by lazy {
@@ -24,7 +23,7 @@ class MainApplication : Application(), ReactApplication {
           add(RunAnywhereCorePackage())
           add(RunAnywhereLlamaPackage())
           add(RunAnywhereONNXPackage())
-          add(RunAnywhereRAGPackage())
+          add(DocumentServicePackage())
         },
     )
   }

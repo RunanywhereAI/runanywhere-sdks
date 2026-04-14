@@ -121,8 +121,16 @@ rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle, const float* aud
 
     // Fill output
     out_result->text = result.text.empty() ? nullptr : strdup(result.text.c_str());
+    if (!result.text.empty() && !out_result->text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->detected_language =
         result.detected_language.empty() ? nullptr : strdup(result.detected_language.c_str());
+    if (!result.detected_language.empty() && !out_result->detected_language) {
+        free(out_result->text);
+        out_result->text = nullptr;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->confidence = result.confidence;
     out_result->processing_time_ms = result.inference_time_ms;
 
@@ -130,12 +138,23 @@ rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle, const float* aud
     out_result->words = nullptr;
     out_result->num_words = 0;
     if (!result.word_timings.empty()) {
-        out_result->num_words = result.word_timings.size();
         out_result->words =
             static_cast<rac_stt_word_t*>(malloc(result.word_timings.size() * sizeof(rac_stt_word_t)));
         if (out_result->words) {
+            out_result->num_words = result.word_timings.size();
             for (size_t i = 0; i < result.word_timings.size(); i++) {
                 out_result->words[i].text = strdup(result.word_timings[i].word.c_str());
+                if (!out_result->words[i].text) {
+                    // Clean up already-allocated word texts
+                    for (size_t j = 0; j < i; j++) {
+                        free(out_result->words[j].text);
+                    }
+                    free(out_result->words);
+                    out_result->words = nullptr;
+                    out_result->num_words = 0;
+                    // Continue without word timings rather than failing entirely
+                    break;
+                }
                 out_result->words[i].start_ms =
                     static_cast<int64_t>(result.word_timings[i].start_time_ms);
                 out_result->words[i].end_ms =
@@ -163,6 +182,9 @@ rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle, char** out_lan
     }
 
     *out_language = strdup(h->detected_language.c_str());
+    if (!*out_language) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     return RAC_SUCCESS;
 }
 

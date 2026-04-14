@@ -22,6 +22,3 @@ project(':runanywhere_llamacpp').projectDir = new File(rootProject.projectDir, '
 
 include ':runanywhere_onnx'
 project(':runanywhere_onnx').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/onnx/android')
-
-include ':runanywhere_rag'
-project(':runanywhere_rag').projectDir = new File(rootProject.projectDir, '../node_modules/@runanywhere/rag/android')

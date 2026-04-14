@@ -37,11 +37,11 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = true //  Toggle: true for local dev, false for release
+let useLocalBinaries = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.6"
+let sdkVersion = "0.19.7"
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -86,9 +86,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
-        .package(url: "https://github.com/tsolomko/SWCompression.git", from: "4.8.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
         // ml-stable-diffusion for CoreML-based image generation
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
@@ -139,9 +137,7 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
-                .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "SWCompression", package: "SWCompression"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 "CRACommons",

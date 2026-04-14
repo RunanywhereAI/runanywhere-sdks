@@ -140,7 +140,7 @@ android {
                           "-DCMAKE_MODULE_PATH=${projectDir}"
             }
         }
-        ndkVersion "26.3.11579264"
+        ndkVersion "27.0.12077973"
     }
     signingConfigs {
         debug {
@@ -172,7 +172,7 @@ android {
             "**/libfolly_runtime.so",
             "**/libreactnative.so",
             "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
-            "**/librac_backend_onnx.so", // ONNX backend duplicated via rag + onnx modules
+            "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
             "**/librac_commons.so",
             "**/libomp.so"
         ]
@@ -192,6 +192,9 @@ dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
+    // PDF text extraction for DocumentService (RAG)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
     // Manually link Nitro modules (excluded from autolinking)
     implementation project(':react-native-nitro-modules')
     
@@ -199,7 +202,6 @@ dependencies {
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')
     implementation project(':runanywhere_onnx')
-    implementation project(':runanywhere_rag')
 
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
     // Expose hermesEnabled for other modules (like react-native-worklets)

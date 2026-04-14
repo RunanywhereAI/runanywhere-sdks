@@ -58,6 +58,22 @@ if [[ ! -d "${IOS_ONNX}" ]]; then
     log_error "iOS ONNX Runtime not found at: ${IOS_ONNX}"
 fi
 
+# Read ONNX Runtime version dynamically from the source xcframework's slice Info.plist.
+# The xcframework root Info.plist is metadata only; version lives inside each slice's framework.
+ONNX_VERSION_IOS=""
+for slice_plist in "${IOS_ONNX}"/*/onnxruntime.framework/Info.plist "${IOS_ONNX}"/*/Info.plist; do
+    [[ -f "$slice_plist" ]] || continue
+    ver=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$slice_plist" 2>/dev/null || true)
+    if [[ -n "$ver" ]]; then
+        ONNX_VERSION_IOS="$ver"
+        break
+    fi
+done
+if [[ -z "$ONNX_VERSION_IOS" ]]; then
+    log_error "Could not determine ONNX Runtime version from ${IOS_ONNX}"
+fi
+log_info "ONNX Runtime version: ${ONNX_VERSION_IOS}"
+
 # Verify macOS ONNX Runtime exists
 if [[ ! -d "${MACOS_ONNX}/lib" ]]; then
     log_error "macOS ONNX Runtime not found at: ${MACOS_ONNX}/lib\nRun: cd sdk/runanywhere-commons && ./scripts/macos/download-onnx.sh"
@@ -116,6 +132,27 @@ done
 IOS_XCFW="${OUTPUT_DIR}/onnxruntime-ios.xcframework"
 rm -rf "${IOS_XCFW}"
 xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${IOS_XCFW}"
+
+# Inject Info.plist into each slice so Xcode uses it when embedding the framework.
+# Library-format xcframeworks don't carry Info.plist automatically, causing
+# App Store validation to fail with "missing CFBundleShortVersionString".
+for slice_dir in "${IOS_XCFW}"/*/; do
+    [[ ! -d "$slice_dir" ]] && continue
+    cat > "${slice_dir}Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key><string>onnxruntime</string>
+    <key>CFBundleIdentifier</key><string>com.microsoft.onnxruntime</string>
+    <key>CFBundlePackageType</key><string>FMWK</string>
+    <key>CFBundleShortVersionString</key><string>${ONNX_VERSION_IOS}</string>
+    <key>CFBundleVersion</key><string>${ONNX_VERSION_IOS}</string>
+    <key>MinimumOSVersion</key><string>17.0</string>
+</dict>
+</plist>
+EOF
+done
 log_info "Created onnxruntime-ios.xcframework"
 
 # ============================================================================
@@ -164,16 +201,16 @@ framework module onnxruntime {
 EOF
 
 # Info.plist in Resources
-cat > "${MACOS_FW}/Versions/A/Resources/Info.plist" << 'EOF'
+cat > "${MACOS_FW}/Versions/A/Resources/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key><string>onnxruntime</string>
-    <key>CFBundleIdentifier</key><string>ai.onnxruntime</string>
+    <key>CFBundleIdentifier</key><string>com.microsoft.onnxruntime</string>
     <key>CFBundlePackageType</key><string>FMWK</string>
-    <key>CFBundleShortVersionString</key><string>1.17.1</string>
-    <key>CFBundleVersion</key><string>1.17.1</string>
+    <key>CFBundleShortVersionString</key><string>${ONNX_VERSION_IOS}</string>
+    <key>CFBundleVersion</key><string>${ONNX_VERSION_IOS}</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
 </dict>
 </plist>

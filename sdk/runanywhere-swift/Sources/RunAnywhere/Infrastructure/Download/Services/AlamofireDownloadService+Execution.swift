@@ -74,7 +74,7 @@ extension AlamofireDownloadService {
             }
             .validate()
 
-        activeDownloadRequests[taskId] = downloadRequest
+        storeDownloadRequest(downloadRequest, forKey: taskId)
 
         return try await withCheckedThrowingContinuation { continuation in
             downloadRequest.response { response in
@@ -103,46 +103,43 @@ extension AlamofireDownloadService {
         }
     }
 
-    /// Perform extraction for archive models (platform-specific - uses SWCompression)
+    /// Perform extraction for archive models (uses native C++ libarchive via rac_extract_archive)
+    /// Archive type auto-detection and post-extraction model path finding are handled by C++.
     func performExtraction(
         archiveURL: URL,
         destinationFolder: URL,
         model: ModelInfo,
         progressContinuation: AsyncStream<DownloadProgress>.Continuation
     ) async throws -> URL {
-        // Determine archive type from model artifact type or infer from archive URL/download URL
-        let archiveType: ArchiveType
+        // Use artifact type directly — C++ extraction auto-detects archive format from file contents.
+        // If model doesn't have an explicit archive artifact type, construct one with .unknown structure.
         let artifactTypeForExtraction: ModelArtifactType
-
-        if case .archive(let type, let structure, let expectedFiles) = model.artifactType {
-            archiveType = type
+        if case .archive = model.artifactType {
             artifactTypeForExtraction = model.artifactType
-        } else if let inferredType = ArchiveType.from(url: archiveURL) {
-            // Infer from downloaded archive file path
-            archiveType = inferredType
-            artifactTypeForExtraction = .archive(inferredType, structure: .unknown, expectedFiles: .none)
-            logger.info("Inferred archive type from file path: \(inferredType.rawValue)")
-        } else if let originalDownloadURL = model.downloadURL,
-                  let inferredType = ArchiveType.from(url: originalDownloadURL) {
-            // Infer from original download URL
-            archiveType = inferredType
-            artifactTypeForExtraction = .archive(inferredType, structure: .unknown, expectedFiles: .none)
-            logger.info("Inferred archive type from download URL: \(inferredType.rawValue)")
         } else {
-            throw SDKError.download(.extractionFailed, "Could not determine archive type for model: \(model.id)")
+            // C++ rac_extract_archive_native() auto-detects archive format, so archive type here
+            // is only used for the structure hint passed to post-extraction path finding.
+            artifactTypeForExtraction = .archive(.zip, structure: .unknown, expectedFiles: .none)
         }
 
         let extractionStartTime = Date()
 
         // Track extraction started via C++ event system
+        // Archive type detection is now in C++ — use artifact type if known, otherwise "unknown"
+        let archiveTypeString: String
+        if case .archive(let type, _, _) = model.artifactType {
+            archiveTypeString = type.rawValue
+        } else {
+            archiveTypeString = "unknown"
+        }
         CppBridge.Events.emitExtractionStarted(
             modelId: model.id,
-            archiveType: archiveType.rawValue
+            archiveType: archiveTypeString
         )
 
         logger.info("Starting extraction", metadata: [
             "modelId": model.id,
-            "archiveType": archiveType.rawValue,
+            "archiveType": archiveTypeString,
             "archiveURL": archiveURL.path,
             "destination": destinationFolder.path
         ])
@@ -156,6 +153,8 @@ extension AlamofireDownloadService {
                 archiveURL: archiveURL,
                 to: destinationFolder,
                 artifactType: artifactTypeForExtraction,
+                framework: model.framework,
+                format: model.format,
                 progressHandler: { progress in
                     // Track extraction progress (via C++ for routing to EventBus/telemetry)
                     if progress - lastReportedExtractionProgress >= 0.1 {

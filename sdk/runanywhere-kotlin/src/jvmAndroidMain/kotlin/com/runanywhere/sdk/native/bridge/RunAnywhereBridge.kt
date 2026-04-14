@@ -466,6 +466,55 @@ object RunAnywhereBridge {
     external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
+    // ARCHIVE EXTRACTION (rac_extraction.h)
+    // ========================================================================
+
+    /** Extract an archive (ZIP, TAR.GZ, TAR.BZ2, TAR.XZ) to destination directory.
+     *  Returns RAC_SUCCESS (0) on success, negative error code on failure. */
+    @JvmStatic
+    external fun nativeExtractArchive(archivePath: String, destinationDir: String): Int
+
+    /** Detect archive type from magic bytes. Returns rac_archive_type_t enum value, or -1 on failure. */
+    @JvmStatic
+    external fun nativeDetectArchiveType(filePath: String): Int
+
+    // ========================================================================
+    // DOWNLOAD ORCHESTRATOR (rac_download_orchestrator.h)
+    // ========================================================================
+
+    /** Find model path after extraction. Returns the actual model file/directory path.
+     *  Uses C++ rac_find_model_path_after_extraction() — consolidated from platform-specific logic.
+     *  @param extractedDir Directory where archive was extracted
+     *  @param structure Archive structure hint (rac_archive_structure_t enum ordinal)
+     *  @param framework Inference framework (rac_inference_framework_t enum ordinal)
+     *  @param format Model format (rac_model_format_t enum ordinal)
+     *  @return The found model path, or extractedDir as fallback */
+    @JvmStatic
+    external fun nativeFindModelPathAfterExtraction(
+        extractedDir: String,
+        structure: Int,
+        framework: Int,
+        format: Int,
+    ): String
+
+    /** Check if a download URL requires extraction.
+     *  Uses C++ rac_download_requires_extraction() — handles .tar.gz, .tar.bz2, .zip, etc.
+     *  @return true if URL points to an archive */
+    @JvmStatic
+    external fun nativeDownloadRequiresExtraction(url: String): Boolean
+
+    /** Compute download destination path.
+     *  Uses C++ rac_download_compute_destination().
+     *  @return Destination path, or null on failure */
+    @JvmStatic
+    external fun nativeComputeDownloadDestination(
+        modelId: String,
+        downloadUrl: String,
+        framework: Int,
+        format: Int,
+    ): String?
+
+    // ========================================================================
     // BACKEND REGISTRATION
     // ========================================================================
     // NOTE: Backend registration has been MOVED to their respective module JNI bridges:
@@ -1097,6 +1146,60 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racToolCallNormalizeJson(jsonStr: String): String?
+
+    // ========================================================================
+    // FILE MANAGER (rac_file_manager.h)
+    // ========================================================================
+
+    /**
+     * Register file manager callbacks object.
+     * The callback object must implement:
+     * - createDirectory(path: String, recursive: Boolean): Int
+     * - deletePath(path: String, recursive: Boolean): Int
+     * - listDirectory(path: String): Array<String>?
+     * - pathExists(path: String): Boolean
+     * - isDirectory(path: String): Boolean
+     * - getFileSize(path: String): Long
+     * - getAvailableSpace(): Long
+     * - getTotalSpace(): Long
+     */
+    @JvmStatic
+    external fun nativeFileManagerRegisterCallbacks(callbacksObj: Any): Int
+
+    @JvmStatic
+    external fun nativeFileManagerCreateDirectoryStructure(): Int
+
+    @JvmStatic
+    external fun nativeFileManagerCalculateDirSize(path: String): Long
+
+    @JvmStatic
+    external fun nativeFileManagerModelsStorageUsed(): Long
+
+    @JvmStatic
+    external fun nativeFileManagerClearCache(): Int
+
+    @JvmStatic
+    external fun nativeFileManagerClearTemp(): Int
+
+    @JvmStatic
+    external fun nativeFileManagerCacheSize(): Long
+
+    @JvmStatic
+    external fun nativeFileManagerDeleteModel(modelId: String, framework: Int): Int
+
+    @JvmStatic
+    external fun nativeFileManagerCreateModelFolder(modelId: String, framework: Int): String?
+
+    @JvmStatic
+    external fun nativeFileManagerModelFolderExists(modelId: String, framework: Int): Boolean
+
+    /** Returns JSON: {isAvailable, requiredSpace, availableSpace, hasWarning, recommendation} */
+    @JvmStatic
+    external fun nativeFileManagerCheckStorage(requiredBytes: Long): String?
+
+    /** Returns JSON: {deviceTotal, deviceFree, modelsSize, cacheSize, tempSize, totalAppSize} */
+    @JvmStatic
+    external fun nativeFileManagerGetStorageInfo(): String?
 
     // ========================================================================
     // CONSTANTS

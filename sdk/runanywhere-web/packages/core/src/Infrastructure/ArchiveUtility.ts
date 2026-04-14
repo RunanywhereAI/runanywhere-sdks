@@ -1,9 +1,21 @@
 /**
- * Archive Utility - Tar.gz extraction for model archives
+ * Archive Utility - Tar.gz extraction for model archives (Web-specific)
  *
- * Provides browser-native tar.gz extraction using DecompressionStream (gzip)
- * and a minimal tar parser. This matches the Swift SDK approach where Piper TTS
- * models are distributed as .tar.gz archives bundling model files + espeak-ng-data.
+ * Web-platform equivalent of `rac_extract_archive_native()` (libarchive) used
+ * by all native SDKs (Swift, Kotlin, React Native, Flutter).
+ *
+ * On native platforms, extraction goes through the shared C++ libarchive
+ * implementation which operates on filesystem paths. The Web SDK cannot use
+ * that path because:
+ *   1. The ONNX provider (sherpa-onnx.wasm) and RACommons (racommons-llamacpp.wasm)
+ *      are separate WASM modules with isolated virtual filesystems and memory spaces.
+ *   2. `rac_extract_archive_native` operates on file paths — using it would require
+ *      writing the archive to the llamacpp WASM FS, extracting, reading files back
+ *      to JS, then writing them to the sherpa WASM FS (double copy, extra WASM load).
+ *   3. The browser already provides native gzip decompression via DecompressionStream.
+ *
+ * This implementation uses browser-native DecompressionStream (gzip) and a minimal
+ * tar parser to extract archives in-memory (Uint8Array → TarEntry[]).
  */
 
 // ---------------------------------------------------------------------------

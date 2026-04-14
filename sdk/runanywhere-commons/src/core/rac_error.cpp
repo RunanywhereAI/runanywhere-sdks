@@ -41,6 +41,8 @@ const char* rac_error_message(rac_result_t error_code) {
             return "API key is invalid or missing";
         case RAC_ERROR_ENVIRONMENT_MISMATCH:
             return "Environment mismatch";
+        case RAC_ERROR_INVALID_PARAMETER:
+            return "Invalid parameter value";
 
         // =================================================================
         // MODEL ERRORS (-110 to -129)
