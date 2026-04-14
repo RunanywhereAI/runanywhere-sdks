@@ -15,8 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include "rac/core/rac_platform_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir

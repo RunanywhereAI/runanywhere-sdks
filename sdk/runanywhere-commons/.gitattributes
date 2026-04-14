@@ -1,0 +1,9 @@
+# Windows batch files MUST use CRLF line endings. cmd.exe's parser can
+# misbehave at 512-byte boundaries with LF-only line endings (label parsing
+# breaks, labels with delayed expansion fail intermittently). Keep these
+# files as CRLF even on non-Windows checkouts.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell scripts must stay LF.
+*.sh text eol=lf

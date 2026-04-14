@@ -87,6 +87,19 @@ elseif(RAC_PLATFORM_LINUX)
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
+elseif(RAC_PLATFORM_WINDOWS)
+    # Windows: CPU-only by default, no Metal/CUDA/Vulkan
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+    set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+    set(GGML_RPC OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    message(STATUS "Configuring llama.cpp for Windows (CPU-only)")
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
@@ -245,6 +258,10 @@ elseif(RAC_PLATFORM_LINUX)
     message(STATUS "Configuring LlamaCPP backend for Linux")
     # Linux-specific link libraries
     target_link_libraries(rac_backend_llamacpp PUBLIC pthread dl)
+
+elseif(RAC_PLATFORM_WINDOWS)
+    message(STATUS "Configuring LlamaCPP backend for Windows")
+    # No extra link libraries needed on Windows (threading is built-in)
 endif()
 
 # =============================================================================

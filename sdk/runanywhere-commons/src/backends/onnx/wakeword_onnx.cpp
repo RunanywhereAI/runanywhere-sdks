@@ -19,6 +19,7 @@
 #include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
@@ -564,10 +565,18 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     try {
-        // Load melspectrogram model (required for proper pipeline)
+        // Load melspectrogram model (required for proper pipeline).
+        // Store the wstring in a named local so the wchar_t* outlives the ctor call
+        // (passing `rac_to_wstring(p).c_str()` directly would dangle).
         if (melspec_model_path) {
+#ifdef _WIN32
+            std::wstring melspec_wpath = rac_to_wstring(melspec_model_path);
+            backend->melspec_session = std::make_unique<Ort::Session>(
+                *backend->env, melspec_wpath.c_str(), *backend->session_options);
+#else
             backend->melspec_session = std::make_unique<Ort::Session>(
                 *backend->env, melspec_model_path, *backend->session_options);
+#endif
 
             // Get input/output names
             auto input_name = backend->melspec_session->GetInputNameAllocated(0, backend->allocator);
@@ -583,8 +592,14 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 
         // Load embedding model (required)
         if (embedding_model_path) {
+#ifdef _WIN32
+            std::wstring embedding_wpath = rac_to_wstring(embedding_model_path);
+            backend->embedding_session = std::make_unique<Ort::Session>(
+                *backend->env, embedding_wpath.c_str(), *backend->session_options);
+#else
             backend->embedding_session = std::make_unique<Ort::Session>(
                 *backend->env, embedding_model_path, *backend->session_options);
+#endif
 
             // Get input/output names
             auto input_name = backend->embedding_session->GetInputNameAllocated(0, backend->allocator);
@@ -650,8 +665,14 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
         model.model_path = model_path;
         model.threshold = backend->global_threshold;
 
+#ifdef _WIN32
+        std::wstring model_wpath = rac_to_wstring(model_path);
+        model.session = std::make_unique<Ort::Session>(
+            *backend->env, model_wpath.c_str(), *backend->session_options);
+#else
         model.session = std::make_unique<Ort::Session>(
             *backend->env, model_path, *backend->session_options);
+#endif
 
         // Get input/output names
         auto input_name = model.session->GetInputNameAllocated(0, backend->allocator);

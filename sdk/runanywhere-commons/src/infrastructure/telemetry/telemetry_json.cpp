@@ -123,13 +123,26 @@ class JsonBuilder {
         // Format as ISO8601 string
         time_t secs = ms / 1000;
         int millis = ms % 1000;
-        struct tm tm_info;
-        gmtime_r(&secs, &tm_info);
+        struct tm tm_info{};
+        bool gmtime_ok = false;
+#ifdef _WIN32
+        // gmtime_s returns errno_t (0 == success).
+        gmtime_ok = (gmtime_s(&tm_info, &secs) == 0);
+#else
+        // gmtime_r returns a pointer to the result, or NULL on error.
+        gmtime_ok = (gmtime_r(&secs, &tm_info) != nullptr);
+#endif
+        comma();
+        if (!gmtime_ok) {
+            // Emit the raw millisecond epoch if the conversion failed — don't
+            // fabricate a timestamp string from uninitialized struct tm data.
+            ss_ << "\"" << key << "\":" << ms;
+            return;
+        }
 
         char buf[32];
         strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_info);
 
-        comma();
         ss_ << "\"" << key << "\":\"" << buf << "." << std::setfill('0') << std::setw(3) << millis
             << "Z\"";
     }

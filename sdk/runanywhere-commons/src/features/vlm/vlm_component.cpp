@@ -9,11 +9,10 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
 #include <mutex>
 #include <random>
 #include <string>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
