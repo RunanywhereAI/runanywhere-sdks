@@ -13,6 +13,10 @@ struct BenchmarkDashboardView: View {
     @StateObject private var deviceService = DeviceInfoService.shared
 
     var body: some View {
+        let visibleModelCategories = BenchmarkCategory.allCases.filter {
+            viewModel.selectedCategories.contains($0) && !(viewModel.availableModels[$0]?.isEmpty ?? true)
+        }
+
         List {
             // Device Info Header
             if let info = deviceService.deviceInfo {
@@ -63,9 +67,9 @@ struct BenchmarkDashboardView: View {
             }
 
             // Model Selection
-            if !viewModel.availableModels.isEmpty {
+            if !visibleModelCategories.isEmpty {
                 Section {
-                    ForEach(BenchmarkCategory.allCases.filter { viewModel.availableModels[$0] != nil && viewModel.selectedCategories.contains($0) }) { category in
+                    ForEach(visibleModelCategories) { category in
                         if let models = viewModel.availableModels[category] {
                             DisclosureGroup {
                                 ForEach(models, id: \.id) { model in
@@ -94,10 +98,20 @@ struct BenchmarkDashboardView: View {
                     HStack {
                         Text("Models")
                         Spacer()
-                        Button("All") { viewModel.selectAllModels() }
+                        Button("All") {
+                            let ids = visibleModelCategories
+                                .flatMap { viewModel.availableModels[$0] ?? [] }
+                                .map(\.id)
+                            viewModel.selectedModelIds.formUnion(ids)
+                        }
                             .font(AppTypography.caption)
                         Text("·").foregroundColor(AppColors.textTertiary)
-                        Button("None") { viewModel.deselectAllModels() }
+                        Button("None") {
+                            let ids = visibleModelCategories
+                                .flatMap { viewModel.availableModels[$0] ?? [] }
+                                .map(\.id)
+                            viewModel.selectedModelIds.subtract(ids)
+                        }
                             .font(AppTypography.caption)
                     }
                 }
