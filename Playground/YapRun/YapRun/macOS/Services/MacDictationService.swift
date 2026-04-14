@@ -166,7 +166,7 @@ final class MacDictationService {
 
         do {
             // AudioCaptureManager dispatches this callback on DispatchQueue.main
-            try audioCapture.startRecording { [weak self] data in
+            try await audioCapture.startRecording { [weak self] data in
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     self.audioBuffer.append(data)

@@ -6,6 +6,7 @@
 //  Provides:
 //  - App Group UserDefaults for state sharing
 //  - Darwin CFNotificationCenter helpers for instant IPC signalling
+//  - In-memory caching to eliminate redundant UserDefaults IPC reads
 //
 
 import Foundation
@@ -66,20 +67,61 @@ final class SharedDataBridge {
 
     let defaults: UserDefaults?
 
+    // MARK: - Cached Values
+    // These eliminate redundant UserDefaults IPC reads. The keyboard extension
+    // reads these values frequently (audioLevel every 150ms, sessionState every 5s).
+    // Caches are invalidated via Darwin notifications from the main app.
+    private var _cachedSessionState: String
+    private var _cachedAudioLevel: Float
+
     private init() {
         defaults = UserDefaults(suiteName: SharedConstants.appGroupID)
+        _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
+        _cachedAudioLevel = defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0
+        registerCacheObservers()
+    }
+
+    /// Register Darwin notification observers to invalidate caches when the main app writes.
+    private func registerCacheObservers() {
+        DarwinNotificationCenter.shared.addObserver(
+            name: SharedConstants.DarwinNotifications.stateChanged
+        ) { [weak self] in
+            self?.refreshStateFromDefaults()
+        }
+
+        DarwinNotificationCenter.shared.addObserver(
+            name: SharedConstants.DarwinNotifications.audioLevelChanged
+        ) { [weak self] in
+            self?.refreshAudioLevelFromDefaults()
+        }
+    }
+
+    /// Refresh all cached values from UserDefaults.
+    func refreshAllFromDefaults() {
+        _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
+        _cachedAudioLevel = defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0
+    }
+
+    /// Refresh only session state from UserDefaults.
+    private func refreshStateFromDefaults() {
+        _cachedSessionState = defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
+    }
+
+    /// Refresh only audio level from UserDefaults.
+    private func refreshAudioLevelFromDefaults() {
+        _cachedAudioLevel = defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0
     }
 
     // MARK: - Session State
 
     var sessionState: String {
-        get {
-            defaults?.synchronize()
-            return defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
-        }
+        get { _cachedSessionState }
         set {
+            _cachedSessionState = newValue
             defaults?.set(newValue, forKey: SharedConstants.Keys.sessionState)
-            defaults?.synchronize()
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.stateChanged
+            )
         }
     }
 
@@ -87,7 +129,6 @@ final class SharedDataBridge {
 
     var transcribedText: String? {
         get {
-            defaults?.synchronize()
             return defaults?.string(forKey: SharedConstants.Keys.transcribedText)
         }
         set {
@@ -96,7 +137,6 @@ final class SharedDataBridge {
             } else {
                 defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
             }
-            defaults?.synchronize()
         }
     }
 
@@ -117,12 +157,24 @@ final class SharedDataBridge {
     // MARK: - Audio Level
 
     var audioLevel: Float {
-        get { defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0 }
-        set { defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel) }
+        get { _cachedAudioLevel }
+        set {
+            _cachedAudioLevel = newValue
+            defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel)
+            // Post so the peer process (keyboard extension ↔ main app) refreshes
+            // its own _cachedAudioLevel — otherwise readers see stale values.
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.audioLevelChanged
+            )
+        }
     }
 
     // MARK: - Heartbeat
 
+    /// Heartbeat is written ~every second by FlowSessionManager without a state
+    /// transition, so caching + Darwin-notification invalidation would require
+    /// a notification per second. Instead, read through to UserDefaults every
+    /// time so remote readers always see a fresh value.
     var lastHeartbeatTimestamp: Double {
         get { defaults?.double(forKey: SharedConstants.Keys.lastHeartbeat) ?? 0 }
         set { defaults?.set(newValue, forKey: SharedConstants.Keys.lastHeartbeat) }
@@ -169,6 +221,7 @@ final class SharedDataBridge {
         defaults?.removeObject(forKey: SharedConstants.Keys.undoText)
         defaults?.set(Float(0), forKey: SharedConstants.Keys.audioLevel)
         defaults?.set(Double(0), forKey: SharedConstants.Keys.lastHeartbeat)
+        _cachedAudioLevel = 0
         sessionState = "idle"
     }
 }

@@ -15,6 +15,7 @@ enum ModelSelectionContext {
     case llm           // Chat experience - show LLM frameworks (llama.cpp, Foundation Models)
     case stt           // Speech-to-Text - show STT frameworks (ONNX STT)
     case tts           // Text-to-Speech - show TTS frameworks (ONNX TTS/Piper, System TTS)
+    case vad           // Voice Activity Detection - show VAD frameworks (ONNX VAD/Silero)
     case voice         // Voice Assistant - show all voice-related (LLM + STT + TTS)
     case vlm           // Vision Language Model - show VLM frameworks
     case ragEmbedding  // RAG embedding model - ONNX language/embedding models
@@ -25,6 +26,7 @@ enum ModelSelectionContext {
         case .llm: return "Select LLM Model"
         case .stt: return "Select STT Model"
         case .tts: return "Select TTS Model"
+        case .vad: return "Select VAD Model"
         case .voice: return "Select Model"
         case .vlm: return "Select Vision Model"
         case .ragEmbedding: return "Select Embedding Model"
@@ -40,6 +42,8 @@ enum ModelSelectionContext {
             return [.speechRecognition]
         case .tts:
             return [.speechSynthesis]
+        case .vad:
+            return [.voiceActivityDetection]
         case .voice:
             return [.language, .speechRecognition, .speechSynthesis]
         case .vlm:
@@ -291,6 +295,7 @@ extension ModelSelectionSheet {
         case .llm: try await RunAnywhere.loadModel(model.id)
         case .stt: try await RunAnywhere.loadSTTModel(model.id)
         case .tts: try await RunAnywhere.loadTTSModel(model.id)
+        case .vad: try await RunAnywhere.loadVADModel(model.id)
         case .voice: try await loadModelForVoiceContext(model)
         case .vlm: try await RunAnywhere.loadVLMModel(model)
         case .ragEmbedding, .ragLLM:

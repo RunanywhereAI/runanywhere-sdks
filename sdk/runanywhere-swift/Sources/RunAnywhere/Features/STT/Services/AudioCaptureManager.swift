@@ -29,7 +29,7 @@ import CoreAudio
 /// let capture = AudioCaptureManager()
 /// let granted = await capture.requestPermission()
 /// if granted {
-///     try capture.startRecording { audioData in
+///     try await capture.startRecording { audioData in
 ///         // Feed audioData to your STT service
 ///     }
 /// }
@@ -82,16 +82,27 @@ public class AudioCaptureManager: ObservableObject {
 
     /// Start recording audio from microphone
     /// - Note: Not supported on watchOS due to AVAudioEngine limitations
-    public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
+    public func startRecording(onAudioData: @escaping @Sendable (Data) -> Void) async throws {
         guard !isRecording else {
             logger.warning("Already recording")
             return
         }
 
         #if os(iOS) || os(tvOS)
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement)
-        try audioSession.setActive(true)
+        // Configure audio session on a background thread to avoid blocking the main thread.
+        // AVAudioSession.setActive() performs IPC to mediaserverd which can block for 100-300ms.
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.record, mode: .measurement)
+                    try audioSession.setActive(true)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
         #endif
 
         let engine = AVAudioEngine()
@@ -143,11 +154,20 @@ public class AudioCaptureManager: ObservableObject {
             }
         }
 
+        // Start the engine on a background thread to avoid blocking the main thread.
+        // AVAudioEngine.start() performs synchronous IPC to mediaserverd.
         do {
-            try engine.start()
-        } catch {
-            inputNode.removeTap(onBus: 0)
-            throw error
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        try engine.start()
+                        continuation.resume()
+                    } catch {
+                        inputNode.removeTap(onBus: 0)
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
         }
 
         self.audioEngine = engine
@@ -163,11 +183,20 @@ public class AudioCaptureManager: ObservableObject {
     /// Activates the AVAudioSession without starting the audio engine.
     /// Call this to keep the app alive in the background (with UIBackgroundModes: audio)
     /// before the user is ready to record. Follow with `startRecording` when recording begins.
-    public func activateAudioSession() throws {
+    public func activateAudioSession() async throws {
         #if os(iOS) || os(tvOS)
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement)
-        try audioSession.setActive(true)
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let audioSession = AVAudioSession.sharedInstance()
+                    try audioSession.setCategory(.record, mode: .measurement)
+                    try audioSession.setActive(true)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
         logger.info("Audio session activated (keepalive)")
         #endif
     }
@@ -175,7 +204,9 @@ public class AudioCaptureManager: ObservableObject {
     /// Deactivates the AVAudioSession. Call this when the session is fully ended.
     public func deactivateAudioSession() {
         #if os(iOS) || os(tvOS)
-        try? AVAudioSession.sharedInstance().setActive(false)
+        Task.detached(priority: .utility) {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
         logger.info("Audio session deactivated")
         #endif
     }
@@ -187,15 +218,28 @@ public class AudioCaptureManager: ObservableObject {
     public func stopRecording(deactivateSession: Bool = true) {
         guard isRecording else { return }
 
-        inputNode?.removeTap(onBus: 0)
-        audioEngine?.stop()
-
+        // Capture references and nil out immediately so the logical state is "stopped"
+        // and re-entrant calls hit the guard above.
+        let engine = audioEngine
+        let node = inputNode
         audioEngine = nil
         inputNode = nil
 
+        // Tear down audio hardware on a background thread.
+        // removeTap() and engine.stop() perform synchronous Mach IPC to mediaserverd
+        // that can block the calling thread for 400-500ms, causing UI hangs.
+        DispatchQueue.global(qos: .userInitiated).async {
+            node?.removeTap(onBus: 0)
+            engine?.stop()
+        }
+
         #if os(iOS) || os(tvOS)
         if deactivateSession {
-            try? AVAudioSession.sharedInstance().setActive(false)
+            // Deactivate audio session on a background thread to avoid blocking the main thread.
+            // AVAudioSession.setActive(false) performs IPC to mediaserverd.
+            Task.detached(priority: .utility) {
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
         }
         #endif
 

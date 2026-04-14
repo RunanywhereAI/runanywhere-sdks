@@ -27,6 +27,7 @@ namespace fs = std::filesystem;
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
+#include "rac/features/vad/rac_vad_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
@@ -332,6 +333,52 @@ rac_handle_t onnx_tts_create(const rac_service_request_t* request, void* user_da
     return service;
 }
 
+// =============================================================================
+// VAD VTABLE OPERATIONS
+// =============================================================================
+
+static rac_result_t onnx_vad_vtable_process(void* impl, const float* samples,
+                                             size_t num_samples, rac_bool_t* out_is_speech) {
+    return rac_vad_onnx_process(static_cast<rac_handle_t>(impl), samples, num_samples,
+                                out_is_speech);
+}
+
+static rac_result_t onnx_vad_vtable_start(void* impl) {
+    return rac_vad_onnx_start(static_cast<rac_handle_t>(impl));
+}
+
+static rac_result_t onnx_vad_vtable_stop(void* impl) {
+    return rac_vad_onnx_stop(static_cast<rac_handle_t>(impl));
+}
+
+static rac_result_t onnx_vad_vtable_reset(void* impl) {
+    return rac_vad_onnx_reset(static_cast<rac_handle_t>(impl));
+}
+
+static rac_result_t onnx_vad_vtable_set_threshold(void* impl, float threshold) {
+    return rac_vad_onnx_set_threshold(static_cast<rac_handle_t>(impl), threshold);
+}
+
+static rac_bool_t onnx_vad_vtable_is_speech_active(void* impl) {
+    return rac_vad_onnx_is_speech_active(static_cast<rac_handle_t>(impl));
+}
+
+static void onnx_vad_vtable_destroy(void* impl) {
+    if (impl) {
+        rac_vad_onnx_destroy(static_cast<rac_handle_t>(impl));
+    }
+}
+
+static const rac_vad_service_ops_t g_onnx_vad_ops = {
+    .process = onnx_vad_vtable_process,
+    .start = onnx_vad_vtable_start,
+    .stop = onnx_vad_vtable_stop,
+    .reset = onnx_vad_vtable_reset,
+    .set_threshold = onnx_vad_vtable_set_threshold,
+    .is_speech_active = onnx_vad_vtable_is_speech_active,
+    .destroy = onnx_vad_vtable_destroy,
+};
+
 // VAD can_handle
 rac_bool_t onnx_vad_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
@@ -339,7 +386,7 @@ rac_bool_t onnx_vad_can_handle(const rac_service_request_t* request, void* user_
     return RAC_TRUE;
 }
 
-// VAD create
+// VAD create — wraps ONNX VAD handle in rac_vad_service_t vtable (matching STT pattern)
 rac_handle_t onnx_vad_create(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
@@ -348,9 +395,26 @@ rac_handle_t onnx_vad_create(const rac_service_request_t* request, void* user_da
         model_path = request->identifier;
     }
 
-    rac_handle_t handle = nullptr;
-    rac_result_t result = rac_vad_onnx_create(model_path, nullptr, &handle);
-    return (result == RAC_SUCCESS) ? handle : nullptr;
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t result = rac_vad_onnx_create(model_path, nullptr, &backend_handle);
+    if (result != RAC_SUCCESS || !backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX VAD backend");
+        return nullptr;
+    }
+
+    // Wrap in rac_vad_service_t (matching STT service wrapping pattern)
+    auto* service = static_cast<rac_vad_service_t*>(malloc(sizeof(rac_vad_service_t)));
+    if (!service) {
+        rac_vad_onnx_destroy(backend_handle);
+        return nullptr;
+    }
+
+    service->ops = &g_onnx_vad_ops;
+    service->impl = backend_handle;
+    service->model_id = model_path ? strdup(model_path) : nullptr;
+
+    RAC_LOG_INFO(LOG_CAT, "ONNX VAD service created successfully");
+    return service;
 }
 
 // =============================================================================

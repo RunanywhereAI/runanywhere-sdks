@@ -31,6 +31,8 @@ extension ModelCategory {
             return RAC_MODEL_CATEGORY_AUDIO
         case .embedding:
             return RAC_MODEL_CATEGORY_EMBEDDING
+        case .voiceActivityDetection:
+            return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         }
     }
 
@@ -53,6 +55,8 @@ extension ModelCategory {
             self = .audio
         case RAC_MODEL_CATEGORY_EMBEDDING:
             self = .embedding
+        case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+            self = .voiceActivityDetection
         default:
             self = .language  // Default fallback
         }

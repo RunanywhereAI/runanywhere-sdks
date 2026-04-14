@@ -34,6 +34,11 @@ public actor WhisperKitSTTService {
     /// AGC, so normal-volume speech often arrives at ~0.03-0.05 peak.
     private let normalizationThreshold: Float = 0.1
 
+    /// Minimum RMS energy required before normalization is applied.
+    /// Prevents amplifying background noise (RMS ~0.001) that happens
+    /// to have low peak. Speech typically has RMS >= 0.003.
+    private let minimumRMSForNormalization: Float = 0.003
+
     private var whisperKit: WhisperKit?
     public private(set) var currentModelId: String?
 
@@ -89,14 +94,19 @@ public actor WhisperKitSTTService {
         // Normalize quiet audio so Whisper's mel spectrogram has enough energy.
         // The AudioCaptureManager uses .measurement mode which disables AGC,
         // causing normal-volume speech to arrive at ~0.03-0.05 peak amplitude.
+        // Gate on RMS to avoid amplifying background noise.
         let peakAmplitude = peakAbs(floatSamples)
-        if peakAmplitude > 0 && peakAmplitude < normalizationThreshold {
+        let rms = rmsEnergy(floatSamples)
+        if peakAmplitude > 0 && peakAmplitude < normalizationThreshold
+            && rms >= minimumRMSForNormalization {
             let gain = normalizationTarget / peakAmplitude
             applyGain(&floatSamples, gain: gain)
             let before = String(format: "%.4f", peakAmplitude)
             let after = String(format: "%.4f", peakAmplitude * gain)
             let factor = String(format: "%.1f", gain)
-            logger.info("Normalized audio: peak \(before) → \(after) (gain \(factor)x)")
+            logger.info("Normalized audio: peak \(before) → \(after) (gain \(factor)x), rms=\(String(format: "%.6f", rms))")
+        } else if peakAmplitude > 0 && peakAmplitude < normalizationThreshold {
+            logger.debug("Skipped normalization: rms=\(String(format: "%.6f", rms)) below noise floor \(minimumRMSForNormalization)")
         }
 
         let audioDurationSec = Double(floatSamples.count) / 16000.0
@@ -176,6 +186,12 @@ public actor WhisperKitSTTService {
         var result: Float = 0
         vDSP_maxmgv(samples, 1, &result, vDSP_Length(samples.count))
         return result
+    }
+
+    /// Root-mean-square energy using Accelerate (O(n) vectorized).
+    private func rmsEnergy(_ samples: [Float]) -> Float {
+        guard !samples.isEmpty else { return 0 }
+        return vDSP.rootMeanSquare(samples)
     }
 
     /// In-place gain using Accelerate (O(n) vectorized).
