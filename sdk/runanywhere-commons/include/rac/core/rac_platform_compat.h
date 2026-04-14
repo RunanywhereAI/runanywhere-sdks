@@ -6,6 +6,46 @@
  * can use dirent.h, S_ISDIR, S_ISREG, etc. without #ifdef clutter.
  *
  * On non-Windows platforms this header is a no-op passthrough.
+ *
+ * -----------------------------------------------------------------------------
+ * TODO(future): Move this shim out of the public include path.
+ * -----------------------------------------------------------------------------
+ * Flagged in PR #383 review (coderabbitai): this header currently lives under
+ * `include/rac/core/` which means any SDK consumer that pulls a commons public
+ * header transitively inherits *un-prefixed* global names — `DIR`, `dirent`,
+ * `opendir`, `readdir`, `closedir`, `strcasecmp`, `strncasecmp`, and the
+ * `S_IS*` / `S_IFLNK` macros. That:
+ *   1. Breaks the project's "all public symbols must be `rac_` prefixed" rule
+ *      (see `sdk/runanywhere-commons/CLAUDE.md`).
+ *   2. Can collide with a consumer's own dirent shim or the platform's real
+ *      headers if they include in a different order.
+ * Impact is Windows-only in practice (POSIX platforms just pass through to
+ * system headers), but it's still a leaky public contract.
+ *
+ * Options for the cleanup:
+ *   A) Move the implementation to `src/internal/rac_platform_compat.h` so it's
+ *      never installed / never visible to consumers. All current call sites
+ *      would need their `#include` path updated. This is the preferred fix.
+ *   B) Keep the header public but rename every exposed symbol to `rac_*`
+ *      (`rac_opendir`, `rac_readdir`, `rac_dirent`, `rac_strcasecmp`, …) and
+ *      update every call site. More invasive in source but keeps drop-in
+ *      POSIX-ish semantics; less aligned with the project rule.
+ *
+ * Current call sites to update (option A or B):
+ *   - src/features/vlm/vlm_component.cpp
+ *   - src/features/rag/onnx_embedding_provider.cpp
+ *   - src/features/result_free.cpp
+ *   - src/backends/onnx/onnx_backend.cpp
+ *   - src/backends/onnx/wakeword_onnx.cpp
+ *   - src/infrastructure/download/download_orchestrator.cpp
+ *   - src/infrastructure/extraction/rac_extraction.cpp
+ *   - src/infrastructure/telemetry/telemetry_json.cpp
+ *   - tests/test_extraction.cpp, tests/test_download_orchestrator.cpp, tests/test_common.h
+ *   - Any new Windows-facing file that uses opendir/stat/etc.
+ *
+ * Deferred because it's orthogonal to the "make Windows build work" goal.
+ * Deferring is safe: the pollution only manifests on Windows, and today no
+ * external consumer builds commons on Windows yet.
  */
 
 #ifndef RAC_PLATFORM_COMPAT_H
@@ -129,17 +169,33 @@ static inline int closedir(DIR* dir) {
 
 #ifdef _WIN32
 /**
- * Convert a UTF-8 std::string to std::wstring for Windows wide-char APIs.
- * Used by ONNX Runtime Session creation which requires wchar_t* on Windows.
+ * Convert a UTF-8 std::string to std::wstring (UTF-16) for Windows wide-char APIs.
+ * Uses MultiByteToWideChar so non-ASCII paths (Chinese, Japanese, accented chars)
+ * convert correctly — a plain byte-widening copy would corrupt multi-byte UTF-8
+ * sequences. Used by ONNX Runtime session creation which requires wchar_t*.
  */
 inline std::wstring rac_to_wstring(const std::string& s) {
-    return std::wstring(s.begin(), s.end());
+    if (s.empty()) return {};
+    int size = MultiByteToWideChar(CP_UTF8, 0, s.data(),
+                                   static_cast<int>(s.size()), nullptr, 0);
+    if (size <= 0) return {};
+    std::wstring out(static_cast<size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()),
+                        &out[0], size);
+    return out;
 }
 inline std::wstring rac_to_wstring(const char* s) {
-    if (!s) return {};
-    return std::wstring(s, s + strlen(s));
+    if (!s || !*s) return {};
+    return rac_to_wstring(std::string(s));
 }
-/** On Windows, ONNX Runtime expects wchar_t* paths */
+/**
+ * On Windows, ONNX Runtime expects wchar_t* paths.
+ * NOTE: The macro returns a pointer into a temporary std::wstring. Callers MUST
+ * store the result in a named local before calling .c_str(), otherwise the
+ * pointer dangles at the end of the full-expression:
+ *     std::wstring wp = rac_to_wstring(p);
+ *     Ort::Session s(env, wp.c_str(), options);
+ */
 #define RAC_ORT_PATH(p) rac_to_wstring(p).c_str()
 #else
 /** On non-Windows, ONNX Runtime expects char* paths */

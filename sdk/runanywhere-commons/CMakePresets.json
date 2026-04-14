@@ -42,17 +42,16 @@
         "RAC_BUILD_BACKENDS": "ON",
         "RAC_BACKEND_LLAMACPP": "ON",
         "RAC_BACKEND_ONNX": "ON",
-        "RAC_BACKEND_RAG": "ON",
+        "RAC_BACKEND_RAG": "OFF",
         "RAC_BACKEND_WHISPERCPP": "OFF",
         "RAC_BUILD_PLATFORM": "OFF",
-        "RAC_BUILD_TESTS": "ON",
-        "CMAKE_BUILD_TYPE": "Release"
+        "RAC_BUILD_TESTS": "ON"
       }
     },
     {
       "name": "windows-msvc-core",
       "displayName": "Windows MSVC (core only)",
-      "description": "Windows build with MSVC, core library only (no backends)",
+      "description": "Windows build with MSVC, core library only (no backends). Build config is selected at build time via --config Release (Visual Studio generators are multi-config and ignore CMAKE_BUILD_TYPE).",
       "binaryDir": "${sourceDir}/build/windows-core",
       "generator": "Visual Studio 17 2022",
       "architecture": {
@@ -62,8 +61,7 @@
       "cacheVariables": {
         "RAC_BUILD_BACKENDS": "OFF",
         "RAC_BUILD_PLATFORM": "OFF",
-        "RAC_BUILD_TESTS": "ON",
-        "CMAKE_BUILD_TYPE": "Release"
+        "RAC_BUILD_TESTS": "ON"
       }
     }
   ]

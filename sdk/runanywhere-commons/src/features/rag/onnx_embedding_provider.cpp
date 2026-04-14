@@ -6,6 +6,7 @@
 #include "onnx_embedding_provider.h"
 #include "rac/features/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 #include "../../backends/onnx/onnx_backend.h"
 
 #include <nlohmann/json.hpp>
@@ -1006,10 +1007,12 @@ private:
             return false;
         }
 
-        // Load model with session options
+        // Load model with session options.
+        // On Windows, ONNX Runtime requires wchar_t* paths; use rac_to_wstring
+        // (UTF-8 → UTF-16 via MultiByteToWideChar) so non-ASCII paths work.
+        // Materialize to a named local so the wchar_t* doesn't dangle.
 #ifdef _WIN32
-        // ONNX Runtime on Windows requires wchar_t* paths
-        std::wstring wpath(model_path.begin(), model_path.end());
+        std::wstring wpath = rac_to_wstring(model_path);
         status_guard.reset(ort_api_->CreateSession(
             ort_env_,
             wpath.c_str(),

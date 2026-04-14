@@ -147,7 +147,15 @@ static bool mkdir_p(const char* path) {
     std::string s(path);
     std::string::size_type pos = 0;
 
-    while ((pos = s.find('/', pos + 1)) != std::string::npos) {
+    // Accept both '/' and '\\' as separators on Windows so paths like
+    // "C:\foo\bar\baz" get their intermediate dirs created correctly.
+#ifdef _WIN32
+    const char* kSeparators = "/\\";
+#else
+    const char* kSeparators = "/";
+#endif
+
+    while ((pos = s.find_first_of(kSeparators, pos + 1)) != std::string::npos) {
         std::string sub = s.substr(0, pos);
         if (!sub.empty()) {
 #ifdef _WIN32

@@ -39,7 +39,7 @@ static inline int compat_mkdir(const char* path) {
 #ifdef _WIN32
     return _mkdir(path);
 #else
-    return compat_mkdir(path);
+    return mkdir(path, 0755);
 #endif
 }
 
@@ -56,7 +56,10 @@ static std::string create_temp_dir(const std::string& suffix) {
     GetTempPathA(MAX_PATH, tmp_path);
     char tmp_dir[MAX_PATH];
     snprintf(tmp_dir, sizeof(tmp_dir), "%srac_test_%s_%d", tmp_path, suffix.c_str(), _getpid());
-    _mkdir(tmp_dir);
+    if (_mkdir(tmp_dir) != 0 && errno != EEXIST) {
+        std::cerr << "Failed to create temp dir: " << tmp_dir << " (errno=" << errno << ")\n";
+        return "";
+    }
     return std::string(tmp_dir);
 #else
     char tmpl[256];
@@ -72,7 +75,11 @@ static std::string create_temp_dir(const std::string& suffix) {
 
 /** Recursively remove a directory. */
 static void remove_dir(const std::string& path) {
+#ifdef _WIN32
+    std::string cmd = "rmdir /s /q \"" + path + "\" 2>nul";
+#else
     std::string cmd = "rm -rf \"" + path + "\"";
+#endif
     system(cmd.c_str());
 }
 

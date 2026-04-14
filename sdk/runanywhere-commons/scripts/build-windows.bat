@@ -168,11 +168,15 @@ cmake -B "%BUILD_DIR%" ^
     -DRAC_BACKEND_ONNX=%BUILD_ONNX% ^
     -DRAC_BACKEND_LLAMACPP=%BUILD_LLAMACPP% ^
     -DRAC_BACKEND_WHISPERCPP=OFF ^
-    -DRAC_BACKEND_RAG=ON ^
+    -DRAC_BACKEND_RAG=OFF ^
     -DRAC_BUILD_TESTS=%BUILD_TESTS% ^
     -DRAC_BUILD_SHARED=%BUILD_SHARED% ^
     -DRAC_BUILD_PLATFORM=OFF ^
     "%ROOT_DIR%"
+::
+:: NOTE: RAC_BACKEND_RAG is disabled here because the RAG backend has known
+:: Windows build issues (tracked separately). Enable it manually once those
+:: are fixed.
 
 if errorlevel 1 (
     echo [ERROR] CMake configure failed.
@@ -204,10 +208,14 @@ echo [DIST] Copying libraries to distribution directory...
 
 if "%BUILD_SHARED%"=="ON" (set "LIB_EXT=dll") else (set "LIB_EXT=lib")
 
-:: Core library
+:: Core library (copy .lib import lib + .dll runtime lib for shared builds)
 if exist "%BUILD_DIR%\Release\rac_commons.lib" (
     copy /y "%BUILD_DIR%\Release\rac_commons.lib" "%DIST_DIR%\" >nul
     echo [OK] Copied rac_commons.lib
+)
+if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\Release\rac_commons.dll" (
+    copy /y "%BUILD_DIR%\Release\rac_commons.dll" "%DIST_DIR%\" >nul
+    echo [OK] Copied rac_commons.dll
 )
 
 :: ONNX backend
@@ -216,6 +224,10 @@ if "%BUILD_ONNX%"=="ON" (
         copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.lib" "%DIST_DIR%\" >nul
         echo [OK] Copied rac_backend_onnx.lib
     )
+    if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" (
+        copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" "%DIST_DIR%\" >nul
+        echo [OK] Copied rac_backend_onnx.dll
+    )
 )
 
 :: LlamaCPP backend
@@ -223,6 +235,10 @@ if "%BUILD_LLAMACPP%"=="ON" (
     if exist "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.lib" (
         copy /y "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.lib" "%DIST_DIR%\" >nul
         echo [OK] Copied rac_backend_llamacpp.lib
+    )
+    if "%BUILD_SHARED%"=="ON" if exist "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.dll" (
+        copy /y "%BUILD_DIR%\src\backends\llamacpp\Release\rac_backend_llamacpp.dll" "%DIST_DIR%\" >nul
+        echo [OK] Copied rac_backend_llamacpp.dll
     )
 )
 
@@ -262,6 +278,11 @@ if "%RUN_TESTS%"=="1" (
     echo ========================================
     echo  Test Results: !TESTS_PASSED! passed, !TESTS_FAILED! failed
     echo ========================================
+
+    if !TESTS_FAILED! GTR 0 (
+        echo [ERROR] !TESTS_FAILED! test suite^(s^) failed.
+        exit /b 1
+    )
 )
 
 :: =============================================================================

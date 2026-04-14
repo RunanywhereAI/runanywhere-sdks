@@ -44,11 +44,11 @@ struct RAGBackendConfig {
  * Coordinates vector store, embeddings service, and LLM service for
  * retrieval-augmented generation. Thread-safe for all operations.
  */
-#if defined(_MSC_VER)
+// RAGBackend is an internal implementation class — it is only referenced from
+// translation units inside this library and is never exposed through a public
+// header. No visibility attribute is needed (and asymmetric visibility on
+// non-MSVC vs MSVC previously caused inconsistent ABI behavior).
 class RAGBackend {
-#else
-class __attribute__((visibility("default"))) RAGBackend {
-#endif
 public:
     /**
      * @brief Construct RAG pipeline with service handles

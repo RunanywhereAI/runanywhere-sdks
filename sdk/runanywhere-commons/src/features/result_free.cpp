@@ -13,8 +13,11 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 
-// MSVC does not support __attribute__((weak)).
-// Use /alternatename linker directive for weak symbol emulation on MSVC.
+// MSVC does not support __attribute__((weak)). On MSVC this whole file is
+// excluded from the build via CMakeLists.txt, and each service translation
+// unit provides its own strong definition of `rac_*_result_free`. On other
+// compilers the weak attribute lets backend-specific .cpp files override
+// these fallback definitions at link time.
 #ifdef _MSC_VER
 #define RAC_WEAK_SYMBOL
 #else

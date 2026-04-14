@@ -68,7 +68,12 @@ static void remove_dir(const std::string& path) {
 
 /** Create a directory (like mkdir -p). */
 static void mkdir_p(const std::string& path) {
+#ifdef _WIN32
+    // Windows `mkdir` creates intermediate dirs automatically; no -p equivalent needed.
+    std::string cmd = "mkdir \"" + path + "\" 2>nul";
+#else
     std::string cmd = "mkdir -p \"" + path + "\"";
+#endif
     system(cmd.c_str());
 }
 

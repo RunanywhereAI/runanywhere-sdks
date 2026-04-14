@@ -147,12 +147,13 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # --- Windows: Copy DLLs to test output directory ---
-if(WIN32)
-    set(ONNX_WIN_BIN_DIR "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-windows/bin")
-    set(SHERPA_WIN_BIN_DIR "${CMAKE_SOURCE_DIR}/third_party/sherpa-onnx-windows/bin")
+# Only attempt DLL staging when the ONNX FetchContent variable is actually
+# populated in this scope (set by FetchONNXRuntime.cmake when RAC_BACKEND_ONNX
+# is ON). If it's unset the EXISTS check silently evaluates against
+# "/lib/onnxruntime.dll" which is never what we want.
+if(WIN32 AND DEFINED onnxruntime_SOURCE_DIR AND NOT "${onnxruntime_SOURCE_DIR}" STREQUAL "")
     foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
         if(TARGET ${test_target})
-            # Copy ONNX Runtime DLL if present
             if(EXISTS "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll")
                 add_custom_command(TARGET ${test_target} POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different

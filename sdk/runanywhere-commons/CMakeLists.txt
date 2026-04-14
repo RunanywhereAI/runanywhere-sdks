@@ -46,6 +46,10 @@ option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server
 # C++ CONFIGURATION
 # =============================================================================
 
+# C++20 is required because MSVC does not implement C++17 designated initializers
+# (e.g. `struct S s = {.field = value};`) — the codebase uses them in several
+# places (service vtable registration, config structs). All supported compilers
+# (GCC 10+, Clang 11+, MSVC 19.28+ / VS 2019 16.8+) support C++20.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -329,9 +333,14 @@ elseif(MSVC)
     # Suppress common harmless warnings in third-party code
     add_compile_options(/wd4244 /wd4267 /wd4996)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN)
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(/O2 /DNDEBUG)
-    endif()
+    # Use generator expressions instead of CMAKE_BUILD_TYPE so Release flags
+    # apply correctly with multi-config generators (Visual Studio), where
+    # CMAKE_BUILD_TYPE is empty at configure time and the config is selected
+    # at build time via --config Release.
+    add_compile_options(
+        $<$<CONFIG:Release>:/O2>
+        $<$<CONFIG:Release>:/DNDEBUG>
+    )
 endif()
 
 # =============================================================================
