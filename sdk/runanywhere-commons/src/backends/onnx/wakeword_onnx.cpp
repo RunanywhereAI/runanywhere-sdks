@@ -567,7 +567,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
     try {
         // Load melspectrogram model (required for proper pipeline).
         // Store the wstring in a named local so the wchar_t* outlives the ctor call
-        // (RAC_ORT_PATH returns a pointer into a temporary on Windows).
+        // (passing `rac_to_wstring(p).c_str()` directly would dangle).
         if (melspec_model_path) {
 #ifdef _WIN32
             std::wstring melspec_wpath = rac_to_wstring(melspec_model_path);

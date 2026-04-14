@@ -188,19 +188,13 @@ inline std::wstring rac_to_wstring(const char* s) {
     if (!s || !*s) return {};
     return rac_to_wstring(std::string(s));
 }
-/**
- * On Windows, ONNX Runtime expects wchar_t* paths.
- * NOTE: The macro returns a pointer into a temporary std::wstring. Callers MUST
- * store the result in a named local before calling .c_str(), otherwise the
- * pointer dangles at the end of the full-expression:
- *     std::wstring wp = rac_to_wstring(p);
- *     Ort::Session s(env, wp.c_str(), options);
- */
-#define RAC_ORT_PATH(p) rac_to_wstring(p).c_str()
-#else
-/** On non-Windows, ONNX Runtime expects char* paths */
-#define RAC_ORT_PATH(p) (p)
 #endif
+// ONNX Runtime path handling:
+//   - On Windows, use `std::wstring wp = rac_to_wstring(p); session(env, wp.c_str(), opts);`
+//   - On non-Windows, pass the `const char*` path directly.
+// No macro is provided on purpose: a macro returning `rac_to_wstring(p).c_str()`
+// would dangle at the end of the full-expression (the temporary wstring is
+// destroyed before Ort::Session reads from the pointer).
 
 #endif /* __cplusplus */
 

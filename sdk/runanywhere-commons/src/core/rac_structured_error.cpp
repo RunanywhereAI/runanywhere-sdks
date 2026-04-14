@@ -246,7 +246,7 @@ int32_t rac_error_capture_stack_trace(rac_error_t* error) {
     error->stack_frame_count = captured;
     return captured;
 #else
-    // Platform doesn't support backtrace (Android, Windows, etc.)
+    // Platform doesn't support backtrace (Android NDK, etc.)
     error->stack_frame_count = 0;
     return 0;
 #endif

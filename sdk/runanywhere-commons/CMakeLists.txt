@@ -247,7 +247,16 @@ set(ENABLE_LIBXML2 OFF CACHE BOOL "" FORCE)
 set(ENABLE_EXPAT OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCREPOSIX OFF CACHE BOOL "" FORCE)
 set(ENABLE_PCRE2POSIX OFF CACHE BOOL "" FORCE)
-set(ENABLE_LIBGCC ON CACHE BOOL "" FORCE)
+# libarchive's ENABLE_LIBGCC gates a `find_library(GCC_LIBRARY gcc)` / `-lgcc`
+# link. Needed on MSVC for the bundled runtime; a no-op on Apple/Clang (no
+# libgcc); on Linux+GCC keep it OFF so we don't add an explicit -lgcc to the
+# link line (it's pulled in implicitly and adding it can cause duplicate-symbol
+# warnings in static configurations).
+if(MSVC)
+    set(ENABLE_LIBGCC ON CACHE BOOL "" FORCE)
+else()
+    set(ENABLE_LIBGCC OFF CACHE BOOL "" FORCE)
+endif()
 set(ENABLE_CNG OFF CACHE BOOL "" FORCE)
 set(ENABLE_TAR OFF CACHE BOOL "" FORCE)      # Don't build bsdtar binary
 set(ENABLE_CPIO OFF CACHE BOOL "" FORCE)     # Don't build bsdcpio binary
