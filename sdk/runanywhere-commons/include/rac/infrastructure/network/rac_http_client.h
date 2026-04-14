@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "rac/core/rac_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,7 +75,7 @@ typedef struct {
 /**
  * @brief Free HTTP response
  */
-void rac_http_response_free(rac_http_response_t* response);
+RAC_API void rac_http_response_free(rac_http_response_t* response);
 
 // =============================================================================
 // Platform Callback Interface
@@ -108,13 +110,13 @@ typedef void (*rac_http_executor_t)(const rac_http_request_t* request, rac_http_
  *
  * @param executor The executor function
  */
-void rac_http_set_executor(rac_http_executor_t executor);
+RAC_API void rac_http_set_executor(rac_http_executor_t executor);
 
 /**
  * @brief Check if HTTP executor is registered
  * @return true if executor has been set
  */
-bool rac_http_has_executor(void);
+RAC_API bool rac_http_has_executor(void);
 
 // =============================================================================
 // Request Building Helpers
@@ -126,14 +128,14 @@ bool rac_http_has_executor(void);
  * @param url Full URL
  * @return New request (caller must free with rac_http_request_free)
  */
-rac_http_request_t* rac_http_request_create(rac_http_method_t method, const char* url);
+RAC_API rac_http_request_t* rac_http_request_create(rac_http_method_t method, const char* url);
 
 /**
  * @brief Set request body
  * @param request The request
  * @param body JSON body string
  */
-void rac_http_request_set_body(rac_http_request_t* request, const char* body);
+RAC_API void rac_http_request_set_body(rac_http_request_t* request, const char* body);
 
 /**
  * @brief Add header to request
@@ -141,19 +143,19 @@ void rac_http_request_set_body(rac_http_request_t* request, const char* body);
  * @param key Header key
  * @param value Header value
  */
-void rac_http_request_add_header(rac_http_request_t* request, const char* key, const char* value);
+RAC_API void rac_http_request_add_header(rac_http_request_t* request, const char* key, const char* value);
 
 /**
  * @brief Set request timeout
  * @param request The request
  * @param timeout_ms Timeout in milliseconds
  */
-void rac_http_request_set_timeout(rac_http_request_t* request, int32_t timeout_ms);
+RAC_API void rac_http_request_set_timeout(rac_http_request_t* request, int32_t timeout_ms);
 
 /**
  * @brief Free HTTP request
  */
-void rac_http_request_free(rac_http_request_t* request);
+RAC_API void rac_http_request_free(rac_http_request_t* request);
 
 // =============================================================================
 // Standard Headers
@@ -168,22 +170,22 @@ void rac_http_request_free(rac_http_request_t* request);
  * @param sdk_version SDK version string
  * @param platform Platform string
  */
-void rac_http_add_sdk_headers(rac_http_request_t* request, const char* sdk_version,
-                              const char* platform);
+RAC_API void rac_http_add_sdk_headers(rac_http_request_t* request, const char* sdk_version,
+                                     const char* platform);
 
 /**
  * @brief Add authorization header
  * @param request The request
  * @param token Bearer token
  */
-void rac_http_add_auth_header(rac_http_request_t* request, const char* token);
+RAC_API void rac_http_add_auth_header(rac_http_request_t* request, const char* token);
 
 /**
  * @brief Add API key header (for Supabase compatibility)
  * @param request The request
  * @param api_key API key
  */
-void rac_http_add_api_key_header(rac_http_request_t* request, const char* api_key);
+RAC_API void rac_http_add_api_key_header(rac_http_request_t* request, const char* api_key);
 
 // =============================================================================
 // High-Level Request Functions
@@ -206,7 +208,7 @@ typedef struct {
  * @param request The request to execute
  * @param context Callback context
  */
-void rac_http_execute(const rac_http_request_t* request, rac_http_context_t* context);
+RAC_API void rac_http_execute(const rac_http_request_t* request, rac_http_context_t* context);
 
 /**
  * @brief Helper: POST JSON to endpoint
@@ -215,8 +217,8 @@ void rac_http_execute(const rac_http_request_t* request, rac_http_context_t* con
  * @param auth_token Bearer token (can be NULL)
  * @param context Callback context
  */
-void rac_http_post_json(const char* url, const char* json_body, const char* auth_token,
-                        rac_http_context_t* context);
+RAC_API void rac_http_post_json(const char* url, const char* json_body, const char* auth_token,
+                               rac_http_context_t* context);
 
 /**
  * @brief Helper: GET from endpoint
@@ -224,7 +226,7 @@ void rac_http_post_json(const char* url, const char* json_body, const char* auth
  * @param auth_token Bearer token (can be NULL)
  * @param context Callback context
  */
-void rac_http_get(const char* url, const char* auth_token, rac_http_context_t* context);
+RAC_API void rac_http_get(const char* url, const char* auth_token, rac_http_context_t* context);
 
 #ifdef __cplusplus
 }

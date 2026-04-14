@@ -339,6 +339,64 @@ RunAnywhere.events.modelEvents.collect { event ->
 
 ---
 
+## Hybrid Routing
+
+The SDK automatically selects the best backend for each request. Local backends run first. When local inference confidence is below a threshold (0.5), the system cascades to a cloud backend automatically.
+
+### How it works
+
+1. Whisper (local) transcribes the audio
+2. If confidence < 0.5, the same audio is sent to Sarvam (cloud)
+3. After cloud fallback, Whisper is restored for the next request
+4. The result includes routing metadata: which backend was used, whether it was a fallback, and the confidence scores
+
+### Cloud backend setup
+
+Register the Sarvam API key at app startup:
+
+```kotlin
+// In your Application.onCreate() or model setup
+Sarvam.register(apiKey = "YOUR_SARVAM_API_KEY")
+```
+
+If no API key is set, Sarvam is excluded from routing and the app works local-only.
+
+### Routing policies
+
+Control routing per request via `STTOptions.routingPolicy`:
+
+```kotlin
+// Default — local first, cloud cascade on low confidence
+val result = RunAnywhere.transcribeWithOptions(audio, STTOptions())
+
+// Force local only (offline mode, no cascade)
+val result = RunAnywhere.transcribeWithOptions(audio, STTOptions(
+    routingPolicy = RoutingPolicy.LOCAL_ONLY
+))
+
+// Force cloud only
+val result = RunAnywhere.transcribeWithOptions(audio, STTOptions(
+    routingPolicy = RoutingPolicy.CLOUD_ONLY
+))
+```
+
+### Routing result metadata
+
+```kotlin
+val result = RunAnywhere.transcribeWithOptions(audio, STTOptions())
+result.routingBackendId    // "whisper-local" or "sarvam-cloud"
+result.routingBackendName  // "Whisper (Local)" or "Sarvam AI (Cloud)"
+result.wasFallback         // true if cloud was used due to low confidence
+result.primaryConfidence   // local confidence that triggered fallback
+result.confidence          // confidence of the final result
+```
+
+### Adding a new provider
+
+Implement `STTBackend`, register it in `HybridRouterRegistry.initialize()`. Nothing else changes. See [docs/impl/hybrid-routing.md](../../docs/impl/hybrid-routing.md) for full details.
+
+---
+
 ## Supported Model Formats
 
 | Format | Extension | Backend | Use Case |

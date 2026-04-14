@@ -48,6 +48,10 @@ export LD_LIBRARY_PATH="../../sdk/runanywhere-commons/dist/linux/x86_64:../../sd
 ./build/test-pipeline /path/to/audio.wav
 ```
 
+### Hybrid Routing System
+
+The SDK includes a hybrid routing system for STT (extensible to LLM/TTS). See [docs/impl/hybrid-routing.md](docs/impl/hybrid-routing.md) for architecture, confidence cascade, API key setup, and adding new providers.
+
 ### Standard commands
 
 See `CLAUDE.md` for comprehensive build/test/lint commands for all SDK platforms. See `CONTRIBUTING.md` for contributor setup flow.

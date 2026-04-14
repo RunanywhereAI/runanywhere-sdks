@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.data
 
 import timber.log.Timber
 import com.runanywhere.runanywhereai.data.models.AppModel
+import com.runanywhere.sdk.cloud.sarvam.Sarvam
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
@@ -182,10 +183,28 @@ object ModelList {
         try {
             LlamaCPP.register(priority = 100)
             ONNX.register(priority = 100)
-            Timber.i("Backends registered")
+            Timber.i("Local backends registered")
         } catch (e: Exception) {
-            Timber.e(e, "Failed to register backends")
+            Timber.e(e, "Failed to register local backends")
             return
+        }
+
+        // Cloud backends
+        try {
+            Sarvam.register(apiKey = "YOUR_SARVAM_API_KEY")
+
+            // Register Sarvam model in C++ registry (not in UI model lists)
+            RunAnywhere.registerModel(
+                id = "sarvam:saarika:v2.5",
+                name = "Sarvam Saarika v2.5",
+                url = "",
+                framework = InferenceFramework.SARVAM,
+                modality = ModelCategory.SPEECH_RECOGNITION,
+                memoryRequirement = 0,
+            )
+            Timber.i("Cloud backends registered")
+        } catch (e: Exception) {
+            Timber.w(e, "Failed to register cloud backends (non-fatal)")
         }
 
         val allModels = listOf(

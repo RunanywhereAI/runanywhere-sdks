@@ -17,6 +17,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
 import com.runanywhere.sdk.foundation.logging.SentryDestination
@@ -150,6 +151,9 @@ object CppBridge {
 
             // CRITICAL: Register platform adapter FIRST before any C++ calls
             CppBridgePlatformAdapter.register()
+
+            // Register HTTP executor so C++ cloud backends can make network calls
+            CppBridgeHTTP.register()
 
             // Configure logging with Sentry integration
             // Setup Sentry hooks so Logging can trigger Sentry setup/teardown
@@ -538,6 +542,7 @@ object CppBridge {
             }
 
             // Unregister Phase 1 core extensions (reverse order)
+            CppBridgeHTTP.unregister()
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
             CppBridgeEvents.unregister()

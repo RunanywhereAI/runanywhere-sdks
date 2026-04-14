@@ -129,6 +129,9 @@ enum class InferenceFramework(
     SYSTEM_TTS("SystemTTS"),
     FLUID_AUDIO("FluidAudio"),
 
+    // Cloud backends
+    SARVAM("Sarvam"),
+
     // Special cases
     BUILT_IN("BuiltIn"), // For simple services (e.g., energy-based VAD)
     NONE("None"), // For services that don't use a model
@@ -144,6 +147,7 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "Foundation Models"
                 SYSTEM_TTS -> "System TTS"
                 FLUID_AUDIO -> "FluidAudio"
+                SARVAM -> "Sarvam AI"
                 BUILT_IN -> "Built-in"
                 NONE -> "None"
                 UNKNOWN -> "Unknown"
@@ -158,6 +162,7 @@ enum class InferenceFramework(
                 FOUNDATION_MODELS -> "foundation_models"
                 SYSTEM_TTS -> "system_tts"
                 FLUID_AUDIO -> "fluid_audio"
+                SARVAM -> "sarvam"
                 BUILT_IN -> "built_in"
                 NONE -> "none"
                 UNKNOWN -> "unknown"

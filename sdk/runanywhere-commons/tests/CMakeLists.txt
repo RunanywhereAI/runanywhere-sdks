@@ -80,6 +80,27 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     add_test(NAME wakeword_tests COMMAND test_wakeword --run-all)
 endif()
 
+# --- Sarvam STT backend tests ---
+if(RAC_BACKEND_SARVAM AND TARGET rac_backend_sarvam)
+    add_executable(test_stt_sarvam test_stt_sarvam.cpp)
+    target_include_directories(test_stt_sarvam PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src/backends/sarvam
+    )
+    target_link_libraries(test_stt_sarvam PRIVATE rac_commons rac_backend_sarvam)
+    target_compile_features(test_stt_sarvam PRIVATE cxx_std_20)
+
+    # Enable real API tests if libcurl is available
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        target_compile_definitions(test_stt_sarvam PRIVATE RAC_TEST_HAS_CURL)
+        target_link_libraries(test_stt_sarvam PRIVATE CURL::libcurl)
+    endif()
+
+    add_test(NAME stt_sarvam_tests COMMAND test_stt_sarvam --run-all)
+endif()
+
 # --- LLM test: Requires LlamaCPP backend ---
 if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     add_executable(test_llm test_llm.cpp)

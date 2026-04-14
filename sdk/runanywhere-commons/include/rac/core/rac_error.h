@@ -250,6 +250,8 @@ extern "C" {
 #define RAC_ERROR_EMPTY_AUDIO_BUFFER ((rac_result_t) - 284)
 /** Audio session activation failed */
 #define RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED ((rac_result_t) - 285)
+/** Audio data exceeds maximum allowed duration */
+#define RAC_ERROR_AUDIO_TOO_LONG ((rac_result_t) - 286)
 
 // =============================================================================
 // LANGUAGE/VOICE ERRORS (-300 to -319)

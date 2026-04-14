@@ -112,7 +112,9 @@ class ModelSelectionViewModel(
                 // Filter models by context - matches iOS relevantCategories filtering
                 val filteredModels =
                     allModels.filter { model ->
-                        isModelRelevantForContext(model.category, context)
+                        isModelRelevantForContext(model.category, context) &&
+                            // Exclude cloud backends from model picker — routing handles them
+                            model.framework != InferenceFramework.SARVAM
                     }
                 Timber.d("📦 Filtered to ${filteredModels.size} models for context $context")
 

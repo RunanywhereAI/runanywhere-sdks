@@ -207,6 +207,8 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Audio buffer is empty";
         case RAC_ERROR_AUDIO_SESSION_ACTIVATION_FAILED:
             return "Audio session activation failed";
+        case RAC_ERROR_AUDIO_TOO_LONG:
+            return "Audio data exceeds maximum allowed duration";
 
         // =================================================================
         // LANGUAGE/VOICE ERRORS (-300 to -319)

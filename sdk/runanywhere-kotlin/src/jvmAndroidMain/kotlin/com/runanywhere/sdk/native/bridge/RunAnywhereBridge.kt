@@ -456,6 +456,27 @@ object RunAnywhereBridge {
     external fun racVlmComponentGetMetrics(handle: Long): String?
 
     // ========================================================================
+    // HTTP EXECUTOR (platform → C++ bridge for cloud backends)
+    // ========================================================================
+
+    /** Register a Kotlin HTTP executor callback with the C++ HTTP client.
+     *  The callback object must have: httpExecutorCallback(Long, String, Int, String, ByteArray?, Int) */
+    @JvmStatic
+    external fun racHttpSetExecutor(callback: Any): Int
+
+    /** Complete a pending HTTP request initiated by C++.
+     *  Called by Kotlin after performing the HTTP request. */
+    @JvmStatic
+    external fun racHttpExecutorComplete(
+        requestId: Long,
+        statusCode: Int,
+        responseBody: ByteArray?,
+        responseHeaders: String?,
+        errorCode: Int,
+        errorMessage: String?,
+    ): Int
+
+    // ========================================================================
     // HTTP DOWNLOAD (platform adapter callbacks)
     // ========================================================================
 

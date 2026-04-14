@@ -15,6 +15,7 @@ import com.runanywhere.sdk.core.types.ComponentConfiguration
 import com.runanywhere.sdk.core.types.ComponentOutput
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.core.types.SDKComponent
+import com.runanywhere.sdk.routing.RoutingPolicy
 import kotlinx.serialization.Serializable
 
 // MARK: - STT Configuration
@@ -83,6 +84,8 @@ data class STTOptions(
     val sampleRate: Int = STTConfiguration.DEFAULT_SAMPLE_RATE,
     /** Preferred framework for transcription (ONNX, etc.) */
     val preferredFramework: InferenceFramework? = null,
+    /** Routing policy controlling local vs cloud preference. */
+    val routingPolicy: RoutingPolicy = RoutingPolicy.AUTO,
 ) {
     companion object {
         /** Create options with default settings for a specific language */
@@ -110,6 +113,14 @@ data class STTOutput(
     val alternatives: List<TranscriptionAlternative>? = null,
     /** Processing metadata */
     val metadata: TranscriptionMetadata,
+    /** ID of the backend that produced this result (e.g. "whisper-local", "sarvam-cloud") */
+    val routingBackendId: String? = null,
+    /** Human-readable backend name */
+    val routingBackendName: String? = null,
+    /** True if this result came from a fallback after primary backend had low confidence */
+    val wasFallback: Boolean = false,
+    /** Confidence from the primary backend before fallback (null if no fallback occurred) */
+    val primaryConfidence: Float? = null,
     /** Timestamp (required by ComponentOutput) */
     override val timestamp: Long = System.currentTimeMillis(),
 ) : ComponentOutput

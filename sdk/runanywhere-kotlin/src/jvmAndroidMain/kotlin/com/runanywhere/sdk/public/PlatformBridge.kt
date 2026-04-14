@@ -11,6 +11,7 @@ package com.runanywhere.sdk.public
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.routing.HybridRouterRegistry
 import kotlinx.coroutines.runBlocking
 
 private const val TAG = "PlatformBridge"
@@ -58,6 +59,8 @@ internal actual fun initializePlatformBridgeServices() {
         CppBridge.initializeServices()
     }
 
+    HybridRouterRegistry.initialize()
+
     logger.info("CppBridge services initialization complete")
 }
 
@@ -66,6 +69,7 @@ internal actual fun initializePlatformBridgeServices() {
  */
 internal actual fun shutdownPlatformBridge() {
     logger.info("Shutting down CppBridge...")
+    HybridRouterRegistry.shutdown()
     CppBridge.shutdown()
     logger.info("CppBridge shutdown complete")
 }
