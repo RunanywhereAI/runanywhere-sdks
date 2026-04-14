@@ -13,12 +13,12 @@
 // ---------------------------------------------------------------------------
 
 export interface ConfigOffsets { logLevel: number; }
-export interface LLMOptionsOffsets { maxTokens: number; temperature: number; topP: number; systemPrompt: number; }
+export interface LLMOptionsOffsets { maxTokens: number; temperature: number; topP: number; systemPrompt: number; grammar: number; }
 export interface LLMResultOffsets { text: number; promptTokens: number; completionTokens: number; }
 export interface VLMImageOffsets { format: number; filePath: number; pixelData: number; base64Data: number; width: number; height: number; dataSize: number; }
 export interface VLMOptionsOffsets { maxTokens: number; temperature: number; topP: number; streamingEnabled: number; systemPrompt: number; modelFamily: number; }
 export interface VLMResultOffsets { text: number; promptTokens: number; imageTokens: number; completionTokens: number; totalTokens: number; timeToFirstTokenMs: number; imageEncodeTimeMs: number; totalTimeMs: number; tokensPerSecond: number; }
-export interface StructuredOutputConfigOffsets { jsonSchema: number; includeSchemaInPrompt: number; }
+export interface StructuredOutputConfigOffsets { jsonSchema: number; includeSchemaInPrompt: number; useGrammar: number; maxRetries: number; fallback: number; }
 export interface StructuredOutputValidationOffsets { isValid: number; errorMessage: number; extractedJson: number; }
 export interface EmbeddingsOptionsOffsets { normalize: number; pooling: number; nThreads: number; }
 export interface EmbeddingsResultOffsets { embeddings: number; numEmbeddings: number; dimension: number; processingTimeMs: number; totalTokens: number; }

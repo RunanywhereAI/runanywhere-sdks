@@ -114,6 +114,63 @@ internal object LlamaCPPBridge {
     external fun nativeGetVersion(): String
 
     // ==========================================================================
+    // LLM Direct Operations
+    // ==========================================================================
+
+    /**
+     * Create a LlamaCPP instance and load a model.
+     *
+     * @param modelPath Path to the GGUF model file
+     * @param contextSize Context window size
+     * @param numThreads Number of inference threads
+     * @param gpuLayers Number of layers to offload to GPU
+     * @return Native handle (0 on failure)
+     */
+    @JvmStatic
+    external fun nativeCreate(modelPath: String, contextSize: Int, numThreads: Int, gpuLayers: Int): Long
+
+    /**
+     * Destroy a LlamaCPP instance.
+     */
+    @JvmStatic
+    external fun nativeDestroy(handle: Long)
+
+    /**
+     * Generate text (blocking).
+     *
+     * @param handle Native handle
+     * @param prompt Input prompt
+     * @param maxTokens Max tokens to generate
+     * @param temperature Sampling temperature
+     * @param grammar GBNF grammar string for constrained decoding (null for unconstrained)
+     * @return Generated text or null on failure
+     */
+    @JvmStatic
+    external fun nativeGenerate(handle: Long, prompt: String, maxTokens: Int, temperature: Float, grammar: String?): String?
+
+    /**
+     * Convert a JSON Schema to a GBNF grammar string.
+     *
+     * @param handle Native handle
+     * @param jsonSchema JSON Schema string
+     * @return GBNF grammar string or null on failure
+     */
+    @JvmStatic
+    external fun nativeJsonSchemaToGrammar(handle: Long, jsonSchema: String): String?
+
+    /**
+     * Cancel ongoing generation.
+     */
+    @JvmStatic
+    external fun nativeCancel(handle: Long)
+
+    /**
+     * Get model info as JSON.
+     */
+    @JvmStatic
+    external fun nativeGetModelInfo(handle: Long): String?
+
+    // ==========================================================================
     // VLM Registration JNI Methods
     // ==========================================================================
 

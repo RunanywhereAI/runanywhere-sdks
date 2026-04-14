@@ -146,6 +146,12 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
     return rac_llm_llamacpp_clear_context(impl);
 }
 
+// JSON Schema → GBNF grammar conversion
+static rac_result_t llamacpp_vtable_json_schema_to_grammar(void* impl, const char* json_schema,
+                                                            char** out_grammar) {
+    return rac_llm_llamacpp_json_schema_to_grammar(impl, json_schema, out_grammar);
+}
+
 // Static vtable for LlamaCpp
 static const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
@@ -163,6 +169,7 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .append_context = llamacpp_vtable_append_context,
 .generate_from_context = llamacpp_vtable_generate_from_context,
     .clear_context = llamacpp_vtable_clear_context,
+    .json_schema_to_grammar = llamacpp_vtable_json_schema_to_grammar,
 };
 
 // =============================================================================

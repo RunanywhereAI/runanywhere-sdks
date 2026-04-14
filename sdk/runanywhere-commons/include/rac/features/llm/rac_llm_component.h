@@ -166,6 +166,51 @@ RAC_API rac_result_t rac_llm_component_generate(rac_handle_t handle, const char*
                                                 const rac_llm_options_t* options,
                                                 rac_llm_result_t* out_result);
 
+// =============================================================================
+// STRUCTURED OUTPUT - Grammar-constrained generation
+// =============================================================================
+
+/**
+ * @brief Generate structured output with grammar-constrained decoding
+ *
+ * Converts JSON schema to GBNF grammar, applies grammar constraint during
+ * token generation so the LLM can only produce valid JSON matching the schema.
+ * Falls back to prompt-only mode if grammar conversion is not supported.
+ *
+ * @param handle Component handle
+ * @param prompt Input prompt
+ * @param options Generation options (can be NULL for defaults)
+ * @param so_config Structured output config with JSON schema and fallback settings
+ * @param out_result Output: Generation result (text will be valid JSON)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_generate_structured(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    const rac_structured_output_config_t* so_config, rac_llm_result_t* out_result);
+
+/**
+ * @brief Generate structured output with streaming and grammar constraints
+ *
+ * Same as generate_structured but with token-by-token streaming callbacks.
+ * Each emitted token is guaranteed to conform to the grammar.
+ *
+ * @param handle Component handle
+ * @param prompt Input prompt
+ * @param options Generation options (can be NULL for defaults)
+ * @param so_config Structured output config with JSON schema
+ * @param token_callback Called for each generated token
+ * @param complete_callback Called when generation completes
+ * @param error_callback Called on error
+ * @param user_data User context passed to callbacks
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_component_generate_structured_stream(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    const rac_structured_output_config_t* so_config,
+    rac_llm_component_token_callback_fn token_callback,
+    rac_llm_component_complete_callback_fn complete_callback,
+    rac_llm_component_error_callback_fn error_callback, void* user_data);
+
 /**
  * @brief Check if streaming is supported
  *

@@ -151,6 +151,15 @@ static const rac_llm_service_ops_t g_platform_llm_ops = {
     .cancel = platform_llm_vtable_cancel,
     .cleanup = platform_llm_vtable_cleanup,
     .destroy = platform_llm_vtable_destroy,
+    .load_lora = nullptr,
+    .remove_lora = nullptr,
+    .clear_lora = nullptr,
+    .get_lora_info = nullptr,
+    .inject_system_prompt = nullptr,
+    .append_context = nullptr,
+    .generate_from_context = nullptr,
+    .clear_context = nullptr,
+    .json_schema_to_grammar = nullptr,
 };
 
 // =============================================================================

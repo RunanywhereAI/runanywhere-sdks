@@ -93,6 +93,9 @@ typedef struct rac_llm_options {
 
     /** System prompt (can be NULL) */
     const char* system_prompt;
+
+    /** GBNF grammar string for constrained decoding (can be NULL for unconstrained) */
+    const char* grammar;
 } rac_llm_options_t;
 
 /**
@@ -104,7 +107,8 @@ static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
                                                           .stop_sequences = RAC_NULL,
                                                           .num_stop_sequences = 0,
                                                           .streaming_enabled = RAC_FALSE,
-                                                          .system_prompt = RAC_NULL};
+                                                          .system_prompt = RAC_NULL,
+                                                          .grammar = RAC_NULL};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult
@@ -210,6 +214,18 @@ static const rac_thinking_tag_pattern_t RAC_THINKING_TAG_FULL = {.opening_tag = 
 // =============================================================================
 
 /**
+ * @brief Fallback strategy when grammar-constrained structured output fails
+ */
+typedef enum rac_structured_output_fallback {
+    /** Return raw text output (no parsing attempt) */
+    RAC_STRUCTURED_OUTPUT_FALLBACK_RAW = 0,
+    /** Retry generation with grammar constraint (default) */
+    RAC_STRUCTURED_OUTPUT_FALLBACK_RETRY = 1,
+    /** Fall back to prompt-only mode (no grammar constraint) */
+    RAC_STRUCTURED_OUTPUT_FALLBACK_PROMPT_ONLY = 2
+} rac_structured_output_fallback_t;
+
+/**
  * @brief Structured output configuration
  *
  * Mirrors Swift's StructuredOutputConfig struct.
@@ -223,13 +239,26 @@ typedef struct rac_structured_output_config {
 
     /** Whether to include the schema in the prompt */
     rac_bool_t include_schema_in_prompt;
+
+    /** Enable GBNF grammar-constrained decoding (default: true when json_schema is set) */
+    rac_bool_t use_grammar;
+
+    /** Maximum retry attempts on failure (default: 3) */
+    int32_t max_retries;
+
+    /** Fallback strategy on failure (default: RETRY) */
+    rac_structured_output_fallback_t fallback;
 } rac_structured_output_config_t;
 
 /**
  * @brief Default structured output configuration
  */
 static const rac_structured_output_config_t RAC_STRUCTURED_OUTPUT_DEFAULT = {
-    .json_schema = RAC_NULL, .include_schema_in_prompt = RAC_TRUE};
+    .json_schema = RAC_NULL,
+    .include_schema_in_prompt = RAC_TRUE,
+    .use_grammar = RAC_TRUE,
+    .max_retries = 3,
+    .fallback = RAC_STRUCTURED_OUTPUT_FALLBACK_RETRY};
 
 /**
  * @brief Structured output validation result

@@ -302,6 +302,9 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_top_p(void) {
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_system_prompt(void) {
     return (int)offsetof(rac_llm_options_t, system_prompt);
 }
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_options_grammar(void) {
+    return (int)offsetof(rac_llm_options_t, grammar);
+}
 
 // ---- rac_llm_result_t ----
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_llm_result_text(void) {
@@ -392,6 +395,15 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_json_schema(
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_include_schema(void) {
     return (int)offsetof(rac_structured_output_config_t, include_schema_in_prompt);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_use_grammar(void) {
+    return (int)offsetof(rac_structured_output_config_t, use_grammar);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_max_retries(void) {
+    return (int)offsetof(rac_structured_output_config_t, max_retries);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_fallback(void) {
+    return (int)offsetof(rac_structured_output_config_t, fallback);
 }
 
 // ---- rac_structured_output_validation_t ----

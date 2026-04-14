@@ -770,6 +770,117 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     return RAC_SUCCESS;
 }
 
+// =============================================================================
+// STRUCTURED OUTPUT API
+// =============================================================================
+
+extern "C" rac_result_t rac_llm_component_generate_structured(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    const rac_structured_output_config_t* so_config, rac_llm_result_t* out_result) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt || !so_config || !out_result)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Get service from lifecycle manager
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "No model loaded - cannot generate structured");
+        return result;
+    }
+
+    // Use provided options or defaults
+    const rac_llm_options_t* base_options = options ? options : &component->default_options;
+
+    // Build effective options with grammar if requested
+    rac_llm_options_t effective_options = *base_options;
+
+    char* grammar_str = nullptr;
+    if (so_config->use_grammar && so_config->json_schema != nullptr) {
+        // Convert JSON schema to GBNF grammar via backend
+        result = rac_llm_json_schema_to_grammar(service, so_config->json_schema, &grammar_str);
+        if (result == RAC_SUCCESS && grammar_str) {
+            effective_options.grammar = grammar_str;
+            RAC_LOG_INFO("LLM.Component", "Grammar-constrained structured output enabled");
+        } else {
+            RAC_LOG_WARNING("LLM.Component",
+                            "Grammar conversion failed (result=%d), falling back to prompt-only",
+                            result);
+            // Proceed without grammar — prompt-only fallback
+        }
+    }
+
+    // Delegate to standard generate with grammar-augmented options
+    result = rac_llm_component_generate(handle, prompt, &effective_options, out_result);
+
+    // Free grammar string if we allocated one
+    if (grammar_str) {
+        free(grammar_str);
+    }
+
+    return result;
+}
+
+extern "C" rac_result_t rac_llm_component_generate_structured_stream(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    const rac_structured_output_config_t* so_config,
+    rac_llm_component_token_callback_fn token_callback,
+    rac_llm_component_complete_callback_fn complete_callback,
+    rac_llm_component_error_callback_fn error_callback, void* user_data) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt || !so_config)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Get service from lifecycle manager
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "No model loaded - cannot generate structured stream");
+        if (error_callback) {
+            error_callback(result, "No model loaded", user_data);
+        }
+        return result;
+    }
+
+    // Use provided options or defaults
+    const rac_llm_options_t* base_options = options ? options : &component->default_options;
+
+    // Build effective options with grammar if requested
+    rac_llm_options_t effective_options = *base_options;
+
+    char* grammar_str = nullptr;
+    if (so_config->use_grammar && so_config->json_schema != nullptr) {
+        result = rac_llm_json_schema_to_grammar(service, so_config->json_schema, &grammar_str);
+        if (result == RAC_SUCCESS && grammar_str) {
+            effective_options.grammar = grammar_str;
+            RAC_LOG_INFO("LLM.Component", "Grammar-constrained structured streaming enabled");
+        } else {
+            RAC_LOG_WARNING("LLM.Component",
+                            "Grammar conversion failed (result=%d), falling back to prompt-only",
+                            result);
+        }
+    }
+
+    // Delegate to standard stream generate with grammar-augmented options
+    result = rac_llm_component_generate_stream(handle, prompt, &effective_options, token_callback,
+                                                complete_callback, error_callback, user_data);
+
+    // Free grammar string if we allocated one
+    if (grammar_str) {
+        free(grammar_str);
+    }
+
+    return result;
+}
+
 extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;

@@ -289,6 +289,26 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
 
 // =============================================================================
+// JSON SCHEMA → GBNF GRAMMAR CONVERSION
+// =============================================================================
+
+/**
+ * Convert a JSON Schema string to a GBNF grammar string for constrained decoding.
+ *
+ * Uses llama.cpp's built-in json-schema-to-grammar converter. The resulting
+ * grammar can be passed via rac_llm_options_t.grammar for grammar-constrained
+ * token generation.
+ *
+ * @param handle Service handle (from rac_llm_llamacpp_create)
+ * @param json_schema JSON Schema string
+ * @param out_grammar Output: GBNF grammar string (caller must free with rac_free)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_json_schema_to_grammar(rac_handle_t handle,
+                                                                        const char* json_schema,
+                                                                        char** out_grammar);
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 

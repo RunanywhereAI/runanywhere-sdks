@@ -174,10 +174,15 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                 }
             }
         }
+        // Wire grammar field for constrained decoding
+        if (options->grammar != nullptr) {
+            request.grammar = options->grammar;
+        }
         RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=%s",
+             "top_p=%.4f, system_prompt=%s, grammar=%s",
              request.max_tokens, request.temperature, request.top_p,
-             request.system_prompt.empty() ? "(none)" : "(set)");
+             request.system_prompt.empty() ? "(none)" : "(set)",
+             request.grammar.empty() ? "(none)" : "(set)");
     } else {
         RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=(none)",
@@ -264,10 +269,15 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
             }
         }
+        // Wire grammar field for constrained decoding
+        if (options->grammar != nullptr) {
+            request.grammar = options->grammar;
+        }
         RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=%s",
+             "top_p=%.4f, system_prompt=%s, grammar=%s",
              request.max_tokens, request.temperature, request.top_p,
-             request.system_prompt.empty() ? "(none)" : "(set)");
+             request.system_prompt.empty() ? "(none)" : "(set)",
+             request.grammar.empty() ? "(none)" : "(set)");
     } else {
         RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
              "top_p=%.4f, system_prompt=(none)",
@@ -479,6 +489,10 @@ rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const c
                 }
             }
         }
+        // Wire grammar field for constrained decoding
+        if (options->grammar != nullptr) {
+            request.grammar = options->grammar;
+        }
     }
 
     try {
@@ -520,6 +534,37 @@ rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle) {
 
     h->text_gen->clear_context();
     return RAC_SUCCESS;
+}
+
+// =============================================================================
+// JSON SCHEMA → GBNF GRAMMAR CONVERSION
+// =============================================================================
+
+rac_result_t rac_llm_llamacpp_json_schema_to_grammar(rac_handle_t handle,
+                                                       const char* json_schema,
+                                                       char** out_grammar) {
+    if (handle == nullptr || json_schema == nullptr || out_grammar == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_llm_llamacpp_handle_impl*>(handle);
+    if (!h->text_gen) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    try {
+        std::string grammar = h->text_gen->convert_json_schema_to_grammar(json_schema);
+        if (grammar.empty()) {
+            rac_error_set_details("Failed to convert JSON schema to GBNF grammar");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+
+        *out_grammar = strdup(grammar.c_str());
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
 }
 
 void rac_llm_llamacpp_destroy(rac_handle_t handle) {

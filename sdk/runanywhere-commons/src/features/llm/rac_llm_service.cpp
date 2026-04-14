@@ -268,4 +268,20 @@ rac_result_t rac_llm_clear_context(rac_handle_t handle) {
     return service->ops->clear_context(service->impl);
 }
 
+// =============================================================================
+// JSON SCHEMA → GBNF GRAMMAR - VTable dispatch
+// =============================================================================
+
+rac_result_t rac_llm_json_schema_to_grammar(rac_handle_t handle, const char* json_schema,
+                                              char** out_grammar) {
+    if (!handle || !json_schema || !out_grammar)
+        return RAC_ERROR_NULL_POINTER;
+
+    auto* service = static_cast<rac_llm_service_t*>(handle);
+    if (!service->ops || !service->ops->json_schema_to_grammar)
+        return RAC_ERROR_NOT_SUPPORTED;
+
+    return service->ops->json_schema_to_grammar(service->impl, json_schema, out_grammar);
+}
+
 }  // extern "C"

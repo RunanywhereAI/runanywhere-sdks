@@ -240,6 +240,22 @@ interface Generatable {
 }
 
 /**
+ * Fallback strategy when grammar-constrained decoding fails.
+ * Mirrors Swift StructuredOutputFallback and C rac_structured_output_fallback.
+ */
+@Serializable
+enum class StructuredOutputFallback(val value: Int) {
+    /** Return raw output without validation */
+    RAW(0),
+
+    /** Retry generation (default) */
+    RETRY(1),
+
+    /** Fall back to prompt-only mode (no grammar constraint) */
+    PROMPT_ONLY(2),
+}
+
+/**
  * Structured output configuration.
  * Note: In Kotlin, we use KClass instead of Type.
  */
@@ -251,6 +267,12 @@ data class StructuredOutputConfig(
     val includeSchemaInPrompt: Boolean = true,
     /** JSON schema for the type */
     val jsonSchema: String = Generatable.DEFAULT_JSON_SCHEMA,
+    /** Whether to use GBNF grammar-constrained decoding (default: true) */
+    val useGrammar: Boolean = true,
+    /** Maximum retries for structured output parsing (default: 3) */
+    val maxRetries: Int = 3,
+    /** Fallback strategy when grammar fails */
+    val fallback: StructuredOutputFallback = StructuredOutputFallback.RETRY,
 )
 
 /**

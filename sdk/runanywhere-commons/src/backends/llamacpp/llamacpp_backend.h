@@ -46,6 +46,9 @@ struct TextGenerationRequest {
     int top_k = 40;
     float repetition_penalty = 1.1f;
     std::vector<std::string> stop_sequences;
+
+    /** GBNF grammar string for constrained decoding (empty = no constraint) */
+    std::string grammar;
 };
 
 struct TextGenerationResult {
@@ -168,6 +171,13 @@ class LlamaCppTextGeneration {
 
     nlohmann::json get_model_info() const;
 
+    /**
+     * @brief Convert JSON Schema to GBNF grammar string
+     * @param json_schema JSON Schema as string
+     * @return GBNF grammar string, or empty on error
+     */
+    std::string convert_json_schema_to_grammar(const std::string& json_schema);
+
     // LoRA adapter management
     bool load_lora_adapter(const std::string& adapter_path, float scale);
     bool remove_lora_adapter(const std::string& adapter_path);
@@ -192,6 +202,7 @@ class LlamaCppTextGeneration {
     float cached_top_p_ = -1.0f;
     int cached_top_k_ = -1;
     float cached_repetition_penalty_ = -1.0f;
+    std::string cached_grammar_;
 
     bool model_loaded_ = false;
     std::atomic<bool> cancel_requested_{false};

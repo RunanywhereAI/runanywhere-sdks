@@ -540,6 +540,16 @@ public extension Generatable {
     }
 }
 
+/// Fallback strategy when grammar-constrained structured output fails
+public enum StructuredOutputFallback: Int32, Sendable {
+    /// Return raw text output (no parsing attempt)
+    case raw = 0
+    /// Retry generation with grammar constraint (default)
+    case retry = 1
+    /// Fall back to prompt-only mode (no grammar constraint)
+    case promptOnly = 2
+}
+
 /// Structured output configuration
 public struct StructuredOutputConfig: @unchecked Sendable {
     /// The type to generate
@@ -548,12 +558,27 @@ public struct StructuredOutputConfig: @unchecked Sendable {
     /// Whether to include schema in prompt
     public let includeSchemaInPrompt: Bool
 
+    /// Enable GBNF grammar-constrained decoding (default: true)
+    public let useGrammar: Bool
+
+    /// Maximum retry attempts on failure (default: 3)
+    public let maxRetries: Int
+
+    /// Fallback strategy on failure (default: .retry)
+    public let fallback: StructuredOutputFallback
+
     public init(
         type: Generatable.Type,
-        includeSchemaInPrompt: Bool = true
+        includeSchemaInPrompt: Bool = true,
+        useGrammar: Bool = true,
+        maxRetries: Int = 3,
+        fallback: StructuredOutputFallback = .retry
     ) {
         self.type = type
         self.includeSchemaInPrompt = includeSchemaInPrompt
+        self.useGrammar = useGrammar
+        self.maxRetries = maxRetries
+        self.fallback = fallback
     }
 }
 
