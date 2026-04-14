@@ -626,7 +626,8 @@ TextGenerationResult LlamaCppTextGeneration::generate(const TextGenerationReques
 
 bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& request,
                                              TextStreamCallback callback,
-                                             int* out_prompt_tokens) {
+                                             int* out_prompt_tokens,
+                                             rac_benchmark_timing_t* timing_out) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     if (!is_ready()) {
@@ -660,6 +661,12 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
     if (available_tokens <= 0) {
         RAC_LOG_ERROR("LLM.LlamaCpp","Prompt too long: %d tokens, context size: %d", prompt_tokens, n_ctx);
+        if (timing_out != nullptr) {
+            int64_t now = rac_monotonic_now_ms();
+            timing_out->t2_prefill_start_ms = now;
+            timing_out->t3_prefill_end_ms = now;
+            timing_out->t5_last_token_ms = now;
+        }
         return false;
     }
 
@@ -670,6 +677,11 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
     const int n_batch = batch_size_ > 0 ? batch_size_ : n_ctx;
     RAC_LOG_INFO("LLM.LlamaCpp", "generate_stream: processing %d prompt tokens in chunks of %d", prompt_tokens, n_batch);
     llama_batch batch = llama_batch_init(n_batch, 0, 1);
+
+    // t2: Record prefill start (before the first llama_decode on the prompt chunks)
+    if (timing_out != nullptr) {
+        timing_out->t2_prefill_start_ms = rac_monotonic_now_ms();
+    }
 
     for (int chunk_start = 0; chunk_start < prompt_tokens; chunk_start += n_batch) {
         batch.n_tokens = 0;
@@ -683,11 +695,21 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
         if (llama_decode(context_, batch) != 0) {
             RAC_LOG_ERROR("LLM.LlamaCpp", "llama_decode failed for prompt chunk [%d..%d)", chunk_start, chunk_end);
+            if (timing_out != nullptr) {
+                int64_t now = rac_monotonic_now_ms();
+                timing_out->t3_prefill_end_ms = now;
+                timing_out->t5_last_token_ms = now;
+            }
             llama_batch_free(batch);
             return false;
         }
     }
     RAC_LOG_INFO("LLM.LlamaCpp", "generate_stream: prompt decoded successfully");
+
+    // t3: Record prefill end (after the prompt prefill loop completes)
+    if (timing_out != nullptr) {
+        timing_out->t3_prefill_end_ms = rac_monotonic_now_ms();
+    }
 
     // Configure sampler with request parameters — skip rebuild if params unchanged
     {
@@ -846,6 +868,12 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             decode_failed_ = true;
             break;
         }
+    }
+
+    // t5: Record last token time (decode loop exit)
+    if (timing_out != nullptr) {
+        timing_out->t5_last_token_ms = rac_monotonic_now_ms();
+        timing_out->output_tokens = static_cast<int32_t>(tokens_generated);
     }
 
     // Flush any remaining partial UTF-8 bytes (e.g. trailing multi-byte char at end of generation)

@@ -18,6 +18,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "rac/core/rac_benchmark.h"
+
 namespace runanywhere {
 
 // =============================================================================
@@ -133,11 +135,26 @@ class LlamaCppTextGeneration {
     bool unload_model();
 
     TextGenerationResult generate(const TextGenerationRequest& request);
-    bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback) {
-        return generate_stream(request, callback, nullptr);
-    }
+
+    /**
+     * Generate text with streaming, optional prompt-token output, and optional benchmark timing.
+     *
+     * When @p timing_out is non-null, captures:
+     *   - t2_prefill_start_ms: before the first llama_decode on the prompt
+     *   - t3_prefill_end_ms:   after the prompt prefill loop completes
+     *   - t5_last_token_ms:    after the decode loop exits
+     *   - output_tokens:       number of tokens generated
+     * Note: t4 (first token) is written at the LLM component layer, not in the backend.
+     *
+     * @param request           Generation request.
+     * @param callback          Streaming callback; return false to cancel.
+     * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
+     * @param timing_out        Optional: benchmark timing struct (may be NULL for no timing).
+     */
     bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens);
+                         int* out_prompt_tokens = nullptr,
+                         rac_benchmark_timing_t* timing_out = nullptr);
+
     void cancel();
 
     /**
