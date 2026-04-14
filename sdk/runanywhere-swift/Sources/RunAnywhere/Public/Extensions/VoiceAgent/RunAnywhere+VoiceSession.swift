@@ -122,6 +122,12 @@ public actor VoiceSessionHandle {
     /// Resume listening after a completed turn (for push-to-talk when continuousMode is false)
     public func resumeListening() async {
         guard isRunning else { return }
+        // Idempotency guard: if capture is already active, don't stack a second
+        // audio-level monitoring task (see QEF-20).
+        guard !audioCapture.isRecording else {
+            logger.debug("resumeListening() called but already listening; skipping")
+            return
+        }
         try? await startListening()
     }
 
@@ -227,8 +233,14 @@ public actor VoiceSessionHandle {
             emit(.transcribed(text: transcription))
 
             // Step 2: Generate LLM response (apply /no_think prefix if needed)
+            // Only inject `/no_think` when the currently loaded LLM actually supports
+            // thinking — otherwise ordinary models receive a stray slash command
+            // (see QEF-21).
             let effectivePrompt: String
-            if !config.thinkingModeEnabled {
+            let loadedSupportsThinking = await RunAnywhere.currentLLMModel?.supportsThinking ?? false
+            if !config.thinkingModeEnabled,
+               loadedSupportsThinking,
+               !transcription.hasPrefix("/no_think") {
                 effectivePrompt = "/no_think\n\(transcription)"
             } else {
                 effectivePrompt = transcription
@@ -251,22 +263,33 @@ public actor VoiceSessionHandle {
                     emit(.speaking)
                     do {
                         try await audioPlayback.play(ttsAudio)
-                    } catch is AudioPlaybackError {
-                        logger.info("TTS playback interrupted by user")
+                    } catch let error as AudioPlaybackError {
+                        // Only swallow user-initiated interrupts; propagate real
+                        // failures so they reach the outer catch (QEF-22).
+                        switch error {
+                        case .playbackInterrupted:
+                            logger.info("TTS playback interrupted by user")
+                        default:
+                            throw error
+                        }
                     }
                 }
             }
+
+            // Success path: only emit turnCompleted when the whole pipeline
+            // finished without throwing (QEF-2). On error, the outer catch
+            // below emits .error and we skip turnCompleted so the UI state
+            // isn't overwritten.
+            emit(.turnCompleted(
+                transcript: transcription,
+                response: cleanedResponse,
+                thinkingContent: thinkingContent,
+                audio: synthesizedAudio
+            ))
         } catch {
             logger.error("Processing failed: \(error)")
             emit(.error(error.localizedDescription))
         }
-
-        emit(.turnCompleted(
-            transcript: transcription,
-            response: cleanedResponse,
-            thinkingContent: thinkingContent,
-            audio: synthesizedAudio
-        ))
 
         // Resume listening if continuous mode
         if config.continuousMode && isRunning {

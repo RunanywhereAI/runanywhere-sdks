@@ -8,6 +8,61 @@
 import SwiftUI
 import RunAnywhere
 
+// MARK: - Math Expression Validation
+
+/// Strict syntactic validation for math expressions before evaluation.
+/// `NSExpression(format:)` can raise uncatchable ObjC exceptions on malformed
+/// input that passes a simple character whitelist (e.g., "2*/3", "(", "1+").
+/// This routine rejects the common unsafe patterns.
+fileprivate func isValidMathExpression(_ expr: String) -> Bool {
+    let trimmed = expr.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return false }
+
+    let operators: Set<Character> = ["+", "-", "*", "/"]
+    // Chars after which a unary "-" is acceptable.
+    let unaryMinusContext: Set<Character> = ["(", "+", "-", "*", "/"]
+
+    var parenDepth = 0
+    var prevNonSpace: Character? = nil
+    var prevWasDot = false
+
+    for ch in trimmed {
+        if ch == " " { continue }
+
+        if ch == "(" {
+            parenDepth += 1
+        } else if ch == ")" {
+            parenDepth -= 1
+            if parenDepth < 0 { return false }
+        }
+
+        // Consecutive decimal dots (e.g., "1..2").
+        if ch == "." {
+            if prevWasDot { return false }
+            prevWasDot = true
+        } else {
+            prevWasDot = false
+        }
+
+        // Consecutive operators (allow unary "-" after operators or "(").
+        if operators.contains(ch), let prev = prevNonSpace, operators.contains(prev) {
+            if !(ch == "-" && unaryMinusContext.contains(prev)) {
+                return false
+            }
+        }
+
+        prevNonSpace = ch
+    }
+
+    // Balanced parentheses.
+    guard parenDepth == 0 else { return false }
+
+    // No trailing operator.
+    if let last = prevNonSpace, operators.contains(last) { return false }
+
+    return true
+}
+
 // MARK: - Tool Settings View Model
 
 @MainActor
@@ -85,7 +140,7 @@ class ToolSettingsViewModel: ObservableObject {
                 ),
                 executor: { args in
                     // Extract expression from args, handling both string and number ToolValue types
-                    let expression: String = {
+                    let expression: String? = {
                         let keys = ["expression", "input", "expr"]
                         for key in keys {
                             if let val = args[key] {
@@ -98,8 +153,13 @@ class ToolSettingsViewModel: ObservableObject {
                             if let s = val.stringValue { return s }
                             if let n = val.numberValue { return "\(n)" }
                         }
-                        return "0"
+                        return nil
                     }()
+                    guard let expression, !expression.isEmpty else {
+                        return [
+                            "error": .string("Missing expression argument")
+                        ]
+                    }
                     print("Calculator received args: \(args), using expression: '\(expression)'")
                     // Clean the expression - remove any non-math characters
                     let cleanedExpression = expression
@@ -115,6 +175,15 @@ class ToolSettingsViewModel: ObservableObject {
                           !cleanedExpression.isEmpty else {
                         return [
                             "error": .string("Could not evaluate expression: \(expression)"),
+                            "expression": .string(expression)
+                        ]
+                    }
+
+                    // Strict pre-validation: NSExpression(format:) can throw uncatchable
+                    // ObjC exceptions on malformed input (e.g., "2*/3", "(", "1+").
+                    guard isValidMathExpression(cleanedExpression) else {
+                        return [
+                            "error": .string("Invalid expression syntax"),
                             "expression": .string(expression)
                         ]
                     }

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -788,8 +789,11 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             if (stop_window.size() > MAX_STOP_LEN) {
                 size_t safe_len = stop_window.size() - MAX_STOP_LEN;
                 // Don't cut inside a UTF-8 multi-byte sequence; back up until
-                // we're on a leading-byte boundary.
-                while (safe_len > 0 && (stop_window[safe_len] & 0xC0) == 0x80) {
+                // we're on a leading-byte boundary. Cast to uint8_t so bytes
+                // >= 0x80 aren't treated as negative signed char (UB on platforms
+                // where char is signed).
+                while (safe_len > 0 &&
+                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
                     safe_len--;
                 }
                 if (safe_len > 0) {
@@ -1089,7 +1093,12 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
 
             if (stop_window.size() > MAX_STOP_LEN) {
                 size_t safe_len = stop_window.size() - MAX_STOP_LEN;
-                while (safe_len > 0 && (stop_window[safe_len] & 0xC0) == 0x80) {
+                // Don't cut inside a UTF-8 multi-byte sequence; back up until
+                // we're on a leading-byte boundary. Cast to uint8_t so bytes
+                // >= 0x80 aren't treated as negative signed char (UB on platforms
+                // where char is signed).
+                while (safe_len > 0 &&
+                       (static_cast<uint8_t>(stop_window[safe_len]) & 0xC0) == 0x80) {
                     safe_len--;
                 }
                 if (safe_len > 0) {
@@ -1109,6 +1118,12 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
             decode_failed_ = true;
             break;
         }
+    }
+
+    // Flush any remaining partial UTF-8 bytes (e.g. trailing multi-byte char at end of generation)
+    // so trailing codepoints aren't silently dropped. Mirrors generate_stream() behavior.
+    if (!cancel_requested_.load() && !stop_sequence_hit && !partial_utf8_buffer.empty()) {
+        stop_window.append(partial_utf8_buffer);
     }
 
     if (!cancel_requested_.load() && !stop_sequence_hit && !stop_window.empty()) {

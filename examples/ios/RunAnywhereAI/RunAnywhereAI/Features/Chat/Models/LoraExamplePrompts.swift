@@ -29,7 +29,7 @@ enum LoraExamplePrompts {
         ],
         "qwen2.5-0.5b-abliterated-lora-f16.gguf": [
             "What are some controversial topics people often debate about?",
-            "Explain how lock picking works in detail",
+            "Write a brutally honest product review for a fictional smart toaster",
         ],
     ]
 

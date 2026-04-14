@@ -122,6 +122,9 @@ class SettingsViewModel: ObservableObject {
             if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 loadedModelSupportsThinking = model.supportsThinking
                 logger.info("LLM loaded (\(modelId)), supportsThinking: \(model.supportsThinking)")
+            } else {
+                loadedModelSupportsThinking = false
+                logger.warning("LLM loaded (\(modelId)), but it was not found in the registry")
             }
         case "llm_model_unloaded":
             loadedModelSupportsThinking = false

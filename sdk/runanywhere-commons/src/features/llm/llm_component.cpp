@@ -729,7 +729,9 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = ctx.token_count > 0 ? ctx.token_count : estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = ctx.token_count > 0
+        ? ctx.token_count
+        : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 

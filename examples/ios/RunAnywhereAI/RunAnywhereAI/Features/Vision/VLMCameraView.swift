@@ -17,6 +17,7 @@ struct VLMCameraView: View {
     @State private var showingModelSelection = false
     @State private var showingPhotos = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var shouldResumeAutoStreaming = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -55,10 +56,16 @@ struct VLMCameraView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background || newPhase == .inactive {
+                shouldResumeAutoStreaming = viewModel.isAutoStreamingEnabled
                 viewModel.stopAutoStreaming()
                 viewModel.stopCamera()
             } else if newPhase == .active {
                 setupCameraIfNeeded()
+                if shouldResumeAutoStreaming {
+                    viewModel.isAutoStreamingEnabled = true
+                    viewModel.startAutoStreaming()
+                    shouldResumeAutoStreaming = false
+                }
             }
         }
     }
