@@ -722,6 +722,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
                         InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
                         InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
+                        InferenceFramework.GENIE -> CppBridgeModelRegistry.Framework.GENIE
                         InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
                     }
                     val racFormat = when (modelInfo.format) {
@@ -729,6 +730,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                         ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
                         ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
                         ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
+                        ModelFormat.QNN_CONTEXT -> CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT
                         ModelFormat.UNKNOWN -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
                     }
                     val extractedPath = extractArchive(downloadedFile, modelId, racFramework, racFormat, downloadLogger)
