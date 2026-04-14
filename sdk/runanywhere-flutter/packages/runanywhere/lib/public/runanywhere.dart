@@ -2677,72 +2677,7 @@ class RunAnywhere {
     return null;
   }
 
-  // ============================================================================
-  // MARK: - RAG (Retrieval-Augmented Generation)
-  //
-  // Note: Additional RAG methods are also available via the RunAnywhereRAG
-  // extension in lib/public/extensions/runanywhere_rag.dart (async variants
-  // with event publishing). The inline methods below are the simpler static
-  // entry points from main.
-  // ============================================================================
-
-  /// Create a RAG pipeline with the given configuration.
-  ///
-  /// Auto-registers the RAG module if needed — no explicit RAGModule.register()
-  /// required. The C++ bridge handles model path resolution (GGUF directory
-  /// scanning, vocab.txt discovery).
-  static Future<void> ragCreatePipeline(RAGConfiguration config) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.createPipeline(config);
-  }
-
-  /// Destroy the RAG pipeline and release resources.
-  static Future<void> ragDestroyPipeline() async {
-    DartBridgeRAG.shared.destroyPipeline();
-  }
-
-  /// Ingest a document into the RAG pipeline.
-  ///
-  /// The document is split into chunks, embedded, and indexed.
-  static Future<void> ragIngest(String text, {String? metadataJson}) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
-  }
-
-  /// Ingest multiple documents in batch.
-  ///
-  /// More efficient than calling [ragIngest] multiple times.
-  /// Each document map should have a 'text' key and optional 'metadataJson' key.
-  static Future<void> ragAddDocumentsBatch(
-      List<Map<String, String>> documents) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.addDocumentsBatch(documents);
-  }
-
-  /// Clear all documents from the RAG pipeline.
-  static Future<void> ragClearDocuments() async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.clearDocuments();
-  }
-
-  /// Get the number of indexed document chunks.
-  static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
-
-  /// Get pipeline statistics as JSON.
-  static Future<RAGStatistics> ragGetStatistics() async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    return DartBridgeRAG.shared.getStatistics();
-  }
-
-  /// Query the RAG pipeline with a question.
-  ///
-  /// Returns a [RAGResult] with the generated answer and retrieved chunks.
-  static Future<RAGResult> ragQuery(
-    String question, {
-    RAGQueryOptions? options,
-  }) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    final queryOptions = options ?? RAGQueryOptions(question: question);
-    return DartBridgeRAG.shared.query(queryOptions);
-  }
+  // RAG methods are available via the RunAnywhereRAG extension in
+  // lib/public/extensions/runanywhere_rag.dart (async variants with event
+  // publishing).
 }
