@@ -15,7 +15,6 @@
 		58ABEDD22ED16DA40058D033 /* RunAnywhereONNX in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */; };
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
 		58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */; };
-		58METALRT12ED16DA40058D0 /* RunAnywhereMetalRT in Frameworks */ = {isa = PBXBuildFile; productRef = 58METALRT02ED16DA40058D0 /* RunAnywhereMetalRT */; };
 		RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */; };
 		RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };
 		RACSHARED03RACSHARED03RACS /* SharedDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */; };
@@ -170,7 +169,6 @@
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */,
 				58WHISPERKIT1ED16DA40058D0 /* RunAnywhereWhisperKit in Frameworks */,
-				58METALRT12ED16DA40058D0 /* RunAnywhereMetalRT in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -311,7 +309,6 @@
 				58ABEDD12ED16DA40058D033 /* RunAnywhereONNX */,
 				58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */,
 				58WHISPERKIT0ED16DA40058D0 /* RunAnywhereWhisperKit */,
-				58METALRT02ED16DA40058D0 /* RunAnywhereMetalRT */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -1082,11 +1079,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
 			productName = RunAnywhereWhisperKit;
-		};
-		58METALRT02ED16DA40058D0 /* RunAnywhereMetalRT */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../.." */;
-			productName = RunAnywhereMetalRT;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
