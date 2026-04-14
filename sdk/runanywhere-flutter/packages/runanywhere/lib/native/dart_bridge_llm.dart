@@ -21,6 +21,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 /// LLM component bridge for C++ interop.
@@ -78,13 +79,9 @@ class DartBridgeLLM {
     }
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-          int Function(Pointer<RacHandle>)>('rac_llm_component_create');
-
       final handlePtr = calloc<RacHandle>();
       try {
-        final result = create(handlePtr);
+        final result = NativeFunctions.llmCreate(handlePtr);
 
         if (result != RAC_SUCCESS) {
           throw StateError(
@@ -111,11 +108,7 @@ class DartBridgeLLM {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_is_loaded');
-
-      return isLoadedFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.llmIsLoaded(_handle!) == RAC_TRUE;
     } catch (e) {
       _logger.debug('isLoaded check failed: $e');
       return false;
@@ -130,11 +123,7 @@ class DartBridgeLLM {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final supportsStreamingFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_supports_streaming');
-
-      return supportsStreamingFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.llmSupportsStreaming(_handle!) == RAC_TRUE;
     } catch (e) {
       return false;
     }
@@ -161,16 +150,8 @@ class DartBridgeLLM {
     final namePtr = modelName.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadModelFn = lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_llm_component_load_model');
-
-      _logger.debug(
-          'Calling rac_llm_component_load_model with handle: $_handle, path: $modelPath');
-      final result = loadModelFn(handle, pathPtr, idPtr, namePtr);
+      _logger.debug('Calling rac_llm_component_load_model with handle=$handle');
+      final result = NativeFunctions.llmLoadModel(handle, pathPtr, idPtr, namePtr);
       _logger.debug(
           'rac_llm_component_load_model returned: $result (${RacResultCode.getMessage(result)})');
 
@@ -194,11 +175,7 @@ class DartBridgeLLM {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_cleanup');
-
-      cleanupFn(_handle!);
+      NativeFunctions.llmCleanup(_handle!);
       _loadedModelId = null;
       _logger.info('LLM model unloaded');
     } catch (e) {
@@ -211,11 +188,7 @@ class DartBridgeLLM {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cancelFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_cancel');
-
-      cancelFn(_handle!);
+      NativeFunctions.llmCancel(_handle!);
       _logger.debug('LLM generation cancelled');
     } catch (e) {
       _logger.error('Failed to cancel generation: $e');
@@ -373,11 +346,7 @@ class DartBridgeLLM {
   void destroy() {
     if (_handle != null) {
       try {
-        final lib = PlatformLoader.loadCommons();
-        final destroyFn = lib.lookupFunction<Void Function(RacHandle),
-            void Function(RacHandle)>('rac_llm_component_destroy');
-
-        destroyFn(_handle!);
+        NativeFunctions.llmDestroy(_handle!);
         _handle = null;
         _loadedModelId = null;
         _logger.debug('LLM component destroyed');
@@ -486,7 +455,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     // Set systemPrompt if provided
     if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
       systemPromptPtr = params.systemPrompt!.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -553,7 +522,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
     _isolateSendPort = null;
   }
@@ -622,7 +591,7 @@ _IsolateGenerationResult _generateInIsolate(
     // Set systemPrompt if provided
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
       systemPromptPtr = systemPrompt.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -658,7 +627,7 @@ _IsolateGenerationResult _generateInIsolate(
     calloc.free(optionsPtr);
     calloc.free(resultPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
   }
 }
