@@ -274,6 +274,9 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 
     uint32_t n_ctx_min = 2048;  // Configurable parameter
+    if (config.contains("n_ctx_min")) {
+        n_ctx_min = config["n_ctx_min"].get<uint32_t>();
+    }
 
     RAC_LOG_INFO("LLM.LlamaCpp", "Calling llama_params_fit (margin=%zuMiB, n_ctx_min=%u, n_devices=%zu)",
          margin_mib, n_ctx_min, n_devices);
@@ -298,6 +301,10 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
             RAC_LOG_INFO("LLM.LlamaCpp", "llama_params_fit FAILURE: could not fit model to device memory. "
                  "Proceeding with conservative CPU-only defaults.");
             model_params.n_gpu_layers = 0;
+            if (user_context_size > 0 && user_context_size > 2048) {
+                RAC_LOG_INFO("LLM.LlamaCpp", "Capping user-requested context_size=%d to 2048 after fit FAILURE",
+                     user_context_size);
+            }
             if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 2048) {
                 ctx_params.n_ctx = 2048;
             }
@@ -306,30 +313,37 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
             RAC_LOG_ERROR("LLM.LlamaCpp", "llama_params_fit ERROR for model: %s. "
                  "Falling back to conservative CPU-only defaults.", model_path.c_str());
             model_params.n_gpu_layers = 0;
+            if (user_context_size > 0 && user_context_size > 2048) {
+                RAC_LOG_INFO("LLM.LlamaCpp", "Capping user-requested context_size=%d to 2048 after fit ERROR",
+                     user_context_size);
+            }
             if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 2048) {
                 ctx_params.n_ctx = 2048;
             }
             break;
     }
 
-    // Apply user gpu_layers override after fit
-    if (user_gpu_layers >= 0) {
-        model_params.n_gpu_layers = user_gpu_layers;
-        RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d", user_gpu_layers);
-    }
-
-    // Currently llama_params_fit does not detect cpu only memory
-    // There is an ongoing upstream PR (https://github.com/ggml-org/llama.cpp/pull/19711)
-    // that will solve this; until then, force CPU-only defaults.
+    // Apply user gpu_layers override after fit, respecting the CPU-only build constraint.
+    // llama_params_fit does not yet account for host memory in CPU-only builds
+    // (upstream PR: https://github.com/ggml-org/llama.cpp/pull/19711).
 #if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) && !defined(GGML_USE_WEBGPU)
     if (fit_status == LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
         RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: llama_params_fit fitted to GPU memory but no GPU backend active. "
              "Applying conservative CPU defaults.");
     }
+    if (user_gpu_layers > 0) {
+        RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: ignoring user gpu_layers=%d (no GPU backend available)",
+             user_gpu_layers);
+    }
     model_params.n_gpu_layers = 0;
     if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 4096) {
         ctx_params.n_ctx = 4096;
         RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only: capping context to %u", ctx_params.n_ctx);
+    }
+#else
+    if (user_gpu_layers >= 0) {
+        model_params.n_gpu_layers = user_gpu_layers;
+        RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d", user_gpu_layers);
     }
 #endif
 
