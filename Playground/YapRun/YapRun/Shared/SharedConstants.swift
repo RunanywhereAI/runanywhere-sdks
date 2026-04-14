@@ -39,6 +39,8 @@ enum SharedConstants {
         // app → keyboard
         static let transcriptionReady = "com.runanywhere.yaprun.keyboard.transcriptionReady"
         static let sessionReady       = "com.runanywhere.yaprun.session.ready"
+        static let stateChanged       = "com.runanywhere.yaprun.session.stateChanged"
+        static let audioLevelChanged  = "com.runanywhere.yaprun.audioLevelChanged"
         // keyboard → app
         static let startListening     = "com.runanywhere.yaprun.keyboard.startListening"
         static let stopListening      = "com.runanywhere.yaprun.keyboard.stopListening"

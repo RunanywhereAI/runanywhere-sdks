@@ -276,6 +276,13 @@ extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        // Early guard: skip if this exact model is already loaded
+        if let currentId = await CppBridge.STT.shared.currentModelId, currentId == modelId {
+            let logger = SDKLogger(category: "RunAnywhere.STT")
+            logger.info("STT model '\(modelId)' already loaded — skipping")
+            return
+        }
+
         try await ensureServicesReady()
 
         // Resolve model ID to local file path
@@ -308,6 +315,13 @@ extension RunAnywhere {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }
 
+        // Early guard: skip if this exact voice is already loaded
+        if let currentId = await CppBridge.TTS.shared.currentVoiceId, currentId == voiceId {
+            let logger = SDKLogger(category: "RunAnywhere.TTS")
+            logger.info("TTS voice '\(voiceId)' already loaded — skipping")
+            return
+        }
+
         try await ensureServicesReady()
 
         // Resolve voice ID to local file path
@@ -333,6 +347,42 @@ extension RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.TTS")
         logger.info("Loading TTS voice from resolved path: \(modelPath.lastPathComponent)")
         try await CppBridge.TTS.shared.loadVoice(modelPath.path, voiceId: voiceId, voiceName: modelInfo.name)
+    }
+
+    /// Load a VAD (Voice Activity Detection) model by ID
+    /// This loads the model into the VAD component (e.g., Silero VAD via ONNX)
+    /// - Parameter modelId: The model identifier (e.g., "silero-vad")
+    public static func loadVADModel(_ modelId: String) async throws {
+        guard isInitialized else {
+            throw SDKError.general(.notInitialized, "SDK not initialized")
+        }
+
+        // Early guard: skip if this exact model is already loaded
+        if let currentId = await CppBridge.VAD.shared.currentModelId, currentId == modelId {
+            let logger = SDKLogger(category: "RunAnywhere.VAD")
+            logger.info("VAD model '\(modelId)' already loaded — skipping")
+            return
+        }
+
+        try await ensureServicesReady()
+
+        let allModels = try await availableModels()
+        guard let modelInfo = allModels.first(where: { $0.id == modelId }) else {
+            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' not found in registry")
+        }
+        guard modelInfo.localPath != nil else {
+            throw SDKError.vad(.modelNotFound, "VAD model '\(modelId)' is not downloaded")
+        }
+
+        let modelPath = try resolveModelFilePath(for: modelInfo)
+        let logger = SDKLogger(category: "RunAnywhere.VAD")
+        logger.info("Loading VAD model from resolved path: \(modelPath.path)")
+
+        try await CppBridge.VAD.shared.loadModel(
+            modelPath.path,
+            modelId: modelId,
+            modelName: modelInfo.name
+        )
     }
 
     /// Get available models
@@ -387,6 +437,30 @@ extension RunAnywhere {
             guard isInitialized else { return nil }
             return await CppBridge.TTS.shared.currentVoiceId
         }
+    }
+
+    /// Get the currently loaded VAD model as ModelInfo
+    ///
+    /// - Returns: The currently loaded VAD ModelInfo, or nil if no VAD model is loaded
+    public static var currentVADModel: ModelInfo? {
+        get async {
+            guard isInitialized else { return nil }
+            guard let modelId = await CppBridge.VAD.shared.currentModelId else { return nil }
+            let models = (try? await availableModels()) ?? []
+            return models.first { $0.id == modelId }
+        }
+    }
+
+    /// Whether a VAD model is loaded (vs. built-in energy VAD)
+    public static var isVADModelLoaded: Bool {
+        get async {
+            await CppBridge.VAD.shared.isModelLoaded
+        }
+    }
+
+    /// Unload the current VAD model (reverts to built-in energy-based VAD)
+    public static func unloadVADModel() async {
+        await CppBridge.VAD.shared.unloadModel()
     }
 
     /// Cancel the current text generation

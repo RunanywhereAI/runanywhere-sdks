@@ -154,6 +154,42 @@ RAC_API float rac_vad_component_get_energy_threshold(rac_handle_t handle);
 RAC_API rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t handle, float threshold);
 
 /**
+ * @brief Load a VAD model via the service registry.
+ *
+ * Queries the service registry for a VAD provider that can handle the model
+ * (e.g., ONNX backend for Silero VAD). When a model is loaded, process()
+ * dispatches through the model service instead of the built-in energy VAD.
+ *
+ * @param handle Component handle
+ * @param model_path Path to the model files
+ * @param model_id Model identifier
+ * @param model_name Human-readable model name
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_vad_component_load_model(rac_handle_t handle,
+                                                   const char* model_path,
+                                                   const char* model_id,
+                                                   const char* model_name);
+
+/**
+ * @brief Check if a VAD model is loaded
+ *
+ * @param handle Component handle
+ * @return RAC_TRUE if a model is loaded, RAC_FALSE otherwise
+ */
+RAC_API rac_bool_t rac_vad_component_is_loaded(rac_handle_t handle);
+
+/**
+ * @brief Unload the current VAD model
+ *
+ * Reverts to built-in energy-based VAD for processing.
+ *
+ * @param handle Component handle
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_vad_component_unload(rac_handle_t handle);
+
+/**
  * @brief Get lifecycle state
  *
  * @param handle Component handle

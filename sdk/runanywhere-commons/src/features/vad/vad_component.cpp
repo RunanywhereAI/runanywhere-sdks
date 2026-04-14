@@ -17,6 +17,7 @@
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
@@ -29,8 +30,17 @@
 // =============================================================================
 
 struct rac_vad_component {
-    /** Energy VAD service handle */
+    /** Energy VAD service handle (built-in fallback) */
     rac_energy_vad_handle_t vad_service;
+
+    /** Model-loaded VAD service (from service registry, e.g. ONNX Silero) */
+    rac_vad_service_t* model_service;
+
+    /** Whether a model-based VAD service is loaded */
+    bool is_model_loaded;
+
+    /** Loaded model ID */
+    char* loaded_model_id;
 
     /** Configuration */
     rac_vad_config_t config;
@@ -51,6 +61,9 @@ struct rac_vad_component {
 
     rac_vad_component()
         : vad_service(nullptr),
+          model_service(nullptr),
+          is_model_loaded(false),
+          loaded_model_id(nullptr),
           activity_callback(nullptr),
           activity_user_data(nullptr),
           audio_callback(nullptr),
@@ -242,6 +255,20 @@ extern "C" rac_result_t rac_vad_component_cleanup(rac_handle_t handle) {
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
+    // Clean up model-loaded VAD service
+    if (component->model_service) {
+        if (component->model_service->ops && component->model_service->ops->destroy) {
+            component->model_service->ops->destroy(component->model_service->impl);
+        }
+        free(const_cast<char*>(component->model_service->model_id));
+        free(component->model_service);
+        component->model_service = nullptr;
+    }
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    // Clean up energy VAD service
     if (component->vad_service) {
         rac_energy_vad_stop(component->vad_service);
         rac_energy_vad_destroy(component->vad_service);
@@ -368,6 +395,109 @@ extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
 }
 
 // =============================================================================
+// MODEL LOADING API
+// =============================================================================
+
+extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle,
+                                                     const char* model_path,
+                                                     const char* model_id,
+                                                     const char* model_name) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!model_path)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    (void)model_name;  // Reserved for future use
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Unload any previously loaded model
+    if (component->model_service) {
+        if (component->model_service->ops && component->model_service->ops->destroy) {
+            component->model_service->ops->destroy(component->model_service->impl);
+        }
+        free(const_cast<char*>(component->model_service->model_id));
+        free(component->model_service);
+        component->model_service = nullptr;
+    }
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    // Create VAD service via the service registry
+    rac_service_request_t request = {};
+    request.capability = RAC_CAPABILITY_VAD;
+    request.identifier = model_path;
+
+    rac_handle_t service_handle = nullptr;
+    rac_result_t result = rac_service_create(RAC_CAPABILITY_VAD, &request, &service_handle);
+    if (result != RAC_SUCCESS) {
+        log_error("VAD.Component", "Failed to create VAD service from registry");
+        return result;
+    }
+
+    if (!service_handle) {
+        log_error("VAD.Component", "Service registry returned null handle");
+        return RAC_ERROR_NO_CAPABLE_PROVIDER;
+    }
+
+    // The service registry returns a rac_vad_service_t* (vtable-wrapped)
+    component->model_service = reinterpret_cast<rac_vad_service_t*>(service_handle);
+    component->is_model_loaded = true;
+    component->loaded_model_id = model_id ? strdup(model_id) : nullptr;
+
+    // Start the model-based VAD
+    if (component->model_service->ops && component->model_service->ops->start) {
+        result = component->model_service->ops->start(component->model_service->impl);
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_WARNING("VAD.Component", "Model VAD start returned non-success, continuing");
+        }
+    }
+
+    log_info("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
+
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_bool_t rac_vad_component_is_loaded(rac_handle_t handle) {
+    if (!handle)
+        return RAC_FALSE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    return component->is_model_loaded ? RAC_TRUE : RAC_FALSE;
+}
+
+extern "C" rac_result_t rac_vad_component_unload(rac_handle_t handle) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+
+    auto* component = reinterpret_cast<rac_vad_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    if (!component->model_service) {
+        return RAC_SUCCESS;  // Nothing to unload
+    }
+
+    if (component->model_service->ops && component->model_service->ops->stop) {
+        component->model_service->ops->stop(component->model_service->impl);
+    }
+    if (component->model_service->ops && component->model_service->ops->destroy) {
+        component->model_service->ops->destroy(component->model_service->impl);
+    }
+    free(const_cast<char*>(component->model_service->model_id));
+    free(component->model_service);
+    component->model_service = nullptr;
+    component->is_model_loaded = false;
+    free(component->loaded_model_id);
+    component->loaded_model_id = nullptr;
+
+    log_info("VAD.Component", "VAD model unloaded, reverted to energy VAD");
+
+    return RAC_SUCCESS;
+}
+
+// =============================================================================
 // PROCESSING API
 // =============================================================================
 
@@ -381,14 +511,21 @@ extern "C" rac_result_t rac_vad_component_process(rac_handle_t handle, const flo
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    if (!component->is_initialized || !component->vad_service) {
+    rac_bool_t has_voice = RAC_FALSE;
+    rac_result_t result;
+
+    // Dispatch through model service if loaded (e.g., Silero via ONNX)
+    if (component->is_model_loaded && component->model_service &&
+        component->model_service->ops && component->model_service->ops->process) {
+        result = component->model_service->ops->process(
+            component->model_service->impl, samples, num_samples, &has_voice);
+    } else if (component->is_initialized && component->vad_service) {
+        // Fall back to energy-based VAD
+        result = rac_energy_vad_process_audio(
+            component->vad_service, samples, num_samples, &has_voice);
+    } else {
         return RAC_ERROR_NOT_INITIALIZED;
     }
-
-    // Process audio through energy VAD
-    rac_bool_t has_voice = RAC_FALSE;
-    rac_result_t result =
-        rac_energy_vad_process_audio(component->vad_service, samples, num_samples, &has_voice);
 
     if (result != RAC_SUCCESS) {
         return result;
@@ -479,8 +616,16 @@ extern "C" rac_lifecycle_state_t rac_vad_component_get_state(rac_handle_t handle
         return RAC_LIFECYCLE_STATE_IDLE;
 
     auto* component = reinterpret_cast<rac_vad_component*>(handle);
-    return component->is_initialized.load(std::memory_order_acquire) ? RAC_LIFECYCLE_STATE_LOADED
-                                                                      : RAC_LIFECYCLE_STATE_IDLE;
+
+    if (component->is_model_loaded) {
+        return RAC_LIFECYCLE_STATE_LOADED;
+    }
+
+    if (component->is_initialized.load(std::memory_order_acquire)) {
+        return RAC_LIFECYCLE_STATE_LOADED;
+    }
+
+    return RAC_LIFECYCLE_STATE_IDLE;
 }
 
 extern "C" rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,

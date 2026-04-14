@@ -67,6 +67,10 @@ public enum RunAnywhere {
     internal static var hasCompletedServicesInit = false
     /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect)
     internal static var hasCompletedHTTPSetup = false
+    /// Serialized Phase 2 task — ensures only one init runs at a time.
+    /// Concurrent callers of completeServicesInitialization() await this shared task
+    /// instead of racing through the init logic with an unprotected boolean guard.
+    private static var _servicesInitTask: Task<Void, Error>?
 
     // MARK: - SDK State
 
@@ -312,6 +316,31 @@ public enum RunAnywhere {
             return
         }
 
+        // If another task is already running Phase 2, join it instead of
+        // starting a duplicate. This prevents the race between the background
+        // Task.detached spawned by initialize() and any caller that reaches
+        // completeServicesInitialization() via ensureServicesReady().
+        if let existingTask = _servicesInitTask {
+            try await existingTask.value
+            return
+        }
+
+        let task = Task<Void, Error> {
+            try await _performServicesInitialization()
+        }
+        _servicesInitTask = task
+
+        do {
+            try await task.value
+        } catch {
+            _servicesInitTask = nil
+            throw error
+        }
+    }
+
+    /// The actual Phase 2 work, separated so completeServicesInitialization()
+    /// can wrap it in a shared Task for serialization.
+    private static func _performServicesInitialization() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }

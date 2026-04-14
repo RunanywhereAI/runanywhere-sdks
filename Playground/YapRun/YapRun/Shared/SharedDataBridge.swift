@@ -74,12 +74,15 @@ final class SharedDataBridge {
 
     var sessionState: String {
         get {
-            defaults?.synchronize()
             return defaults?.string(forKey: SharedConstants.Keys.sessionState) ?? "idle"
         }
         set {
             defaults?.set(newValue, forKey: SharedConstants.Keys.sessionState)
-            defaults?.synchronize()
+            // Push-notify the keyboard extension (or main app) immediately so it
+            // doesn't have to wait for the next poll timer tick to see the change.
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.stateChanged
+            )
         }
     }
 
@@ -87,7 +90,6 @@ final class SharedDataBridge {
 
     var transcribedText: String? {
         get {
-            defaults?.synchronize()
             return defaults?.string(forKey: SharedConstants.Keys.transcribedText)
         }
         set {
@@ -96,7 +98,6 @@ final class SharedDataBridge {
             } else {
                 defaults?.removeObject(forKey: SharedConstants.Keys.transcribedText)
             }
-            defaults?.synchronize()
         }
     }
 
@@ -118,7 +119,14 @@ final class SharedDataBridge {
 
     var audioLevel: Float {
         get { defaults?.float(forKey: SharedConstants.Keys.audioLevel) ?? 0 }
-        set { defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel) }
+        set {
+            defaults?.set(newValue, forKey: SharedConstants.Keys.audioLevel)
+            // Push-notify the keyboard extension so it can read the cached value
+            // instead of polling UserDefaults on every waveform tick.
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.audioLevelChanged
+            )
+        }
     }
 
     // MARK: - Heartbeat

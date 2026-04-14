@@ -20,6 +20,7 @@ extension CppBridge {
         public static let shared = VAD()
 
         private var handle: rac_handle_t?
+        private var loadedModelId: String?
         private let logger = SDKLogger(category: "CppBridge.VAD")
 
         private init() {}
@@ -49,6 +50,53 @@ extension CppBridge {
         public var isInitialized: Bool {
             guard let handle = handle else { return false }
             return rac_vad_component_is_initialized(handle) == RAC_TRUE
+        }
+
+        // MARK: - Model Lifecycle
+
+        /// Check if a VAD model is loaded
+        public var isModelLoaded: Bool {
+            guard let handle = handle else { return false }
+            return rac_vad_component_is_loaded(handle) == RAC_TRUE
+        }
+
+        /// Get the currently loaded model ID
+        public var currentModelId: String? { loadedModelId }
+
+        /// Load a VAD model (e.g., Silero VAD via ONNX backend)
+        public func loadModel(
+            _ modelPath: String,
+            modelId: String,
+            modelName: String
+        ) throws {
+            // Skip if the same model is already loaded
+            guard loadedModelId != modelId else {
+                logger.info("VAD model already loaded: \(modelId)")
+                return
+            }
+
+            let handle = try getHandle()
+
+            let result = modelPath.withCString { pathPtr in
+                modelId.withCString { idPtr in
+                    modelName.withCString { namePtr in
+                        rac_vad_component_load_model(handle, pathPtr, idPtr, namePtr)
+                    }
+                }
+            }
+            guard result == RAC_SUCCESS else {
+                throw SDKError.vad(.modelLoadFailed, "Failed to load VAD model: \(result)")
+            }
+            loadedModelId = modelId
+            logger.info("VAD model loaded: \(modelId)")
+        }
+
+        /// Unload the current VAD model (reverts to energy-based VAD)
+        public func unloadModel() {
+            guard let handle = handle else { return }
+            rac_vad_component_unload(handle)
+            loadedModelId = nil
+            logger.info("VAD model unloaded")
         }
 
         // MARK: - Lifecycle
@@ -95,6 +143,7 @@ extension CppBridge {
             if let handle = handle {
                 rac_vad_component_destroy(handle)
                 self.handle = nil
+                loadedModelId = nil
                 logger.debug("VAD component destroyed")
             }
         }

@@ -126,7 +126,7 @@ public actor VoiceSessionHandle {
         lastSpeechTime = nil
         isSpeechActive = false
 
-        try audioCapture.startRecording { [weak self] data in
+        try await audioCapture.startRecording { [weak self] data in
             guard let self = self else { return }
             Task {
                 await self.handleAudioData(data)

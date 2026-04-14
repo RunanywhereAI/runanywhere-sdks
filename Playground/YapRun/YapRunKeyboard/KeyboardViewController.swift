@@ -8,6 +8,10 @@
 import UIKit
 import SwiftUI
 
+extension Notification.Name {
+    static let yapRunStateChanged = Notification.Name("yapRunStateChanged")
+}
+
 final class KeyboardViewController: UIInputViewController {
 
     private var hostingController: UIHostingController<KeyboardView>!
@@ -31,9 +35,20 @@ final class KeyboardViewController: UIInputViewController {
             self?.handleTranscriptionReady()
         }
 
+        // Observe all state transitions from the main app.
+        // Post a local notification so KeyboardView can react immediately
+        // instead of waiting for the 2s fallback poll timer.
+        DarwinNotificationCenter.shared.addObserver(
+            name: SharedConstants.DarwinNotifications.stateChanged
+        ) {
+            NotificationCenter.default.post(name: .yapRunStateChanged, object: nil)
+        }
+
         DarwinNotificationCenter.shared.addObserver(
             name: SharedConstants.DarwinNotifications.sessionReady
-        ) { /* KeyboardView's 0.3s poll handles the visual update */ }
+        ) {
+            NotificationCenter.default.post(name: .yapRunStateChanged, object: nil)
+        }
 
         setupKeyboardView()
     }
@@ -117,10 +132,29 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - Transcription Result
 
     private func handleTranscriptionReady() {
-        guard let text = SharedDataBridge.shared.transcribedText, !text.isEmpty else { return }
+        insertTranscribedText(retriesRemaining: 3)
+    }
+
+    /// Attempts to read transcribed text from SharedDataBridge and insert it.
+    /// Retries with a short delay if the text isn't available yet (cross-process
+    /// UserDefaults propagation can lag behind the Darwin notification).
+    private func insertTranscribedText(retriesRemaining: Int) {
+        guard let text = SharedDataBridge.shared.transcribedText, !text.isEmpty else {
+            if retriesRemaining > 0 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                    self?.insertTranscribedText(retriesRemaining: retriesRemaining - 1)
+                }
+            }
+            return
+        }
         textDocumentProxy.insertText(text)
         SharedDataBridge.shared.lastInsertedText = text
         SharedDataBridge.shared.transcribedText = nil
+
+        // Copy to clipboard if we have full access
+        if hasFullAccess {
+            UIPasteboard.general.string = text
+        }
     }
 
     // MARK: - URL Opening

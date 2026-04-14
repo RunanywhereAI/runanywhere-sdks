@@ -1149,7 +1149,32 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
         sherpa_vad_ = nullptr;
     }
 
+    // Resolve model_path: if it's a directory, find the .onnx file inside
     model_path_ = model_path;
+    struct stat path_stat;
+    if (stat(model_path.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+        std::string resolved;
+        DIR* dir = opendir(model_path.c_str());
+        if (dir) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                std::string filename = entry->d_name;
+                if (filename.size() > 5 &&
+                    filename.substr(filename.size() - 5) == ".onnx") {
+                    resolved = model_path + "/" + filename;
+                    RAC_LOG_DEBUG("ONNX.VAD", "Found VAD model file: %s", resolved.c_str());
+                    break;
+                }
+            }
+            closedir(dir);
+        }
+        if (!resolved.empty()) {
+            model_path_ = resolved;
+        } else {
+            RAC_LOG_ERROR("ONNX.VAD", "No .onnx file found in directory: %s", model_path.c_str());
+            return false;
+        }
+    }
 
     SherpaOnnxVadModelConfig vad_config;
     memset(&vad_config, 0, sizeof(vad_config));

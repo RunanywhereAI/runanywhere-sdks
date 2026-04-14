@@ -413,7 +413,20 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 65_000_000
             )
         }
-        logger.info("✅ ONNX STT/TTS models registered")
+        // Register ONNX VAD model (Silero VAD)
+        // Silero VAD is a lightweight (~2MB) voice activity detection model
+        if let sileroVADURL = URL(string: "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx") {
+            RunAnywhere.registerModel(
+                id: "silero-vad",
+                name: "Silero VAD",
+                url: sileroVADURL,
+                framework: .onnx,
+                modality: .voiceActivityDetection,
+                memoryRequirement: 5_000_000
+            )
+        }
+
+        logger.info("✅ ONNX STT/TTS/VAD models registered")
 
         // Register WhisperKit STT models (Apple Neural Engine via Core ML)
         // These run on the ANE, freeing up CPU for other tasks — ideal for background STT on iOS

@@ -219,6 +219,8 @@ public extension CppBridge {
                 return RAC_MODEL_CATEGORY_AUDIO
             case .embedding:
                 return RAC_MODEL_CATEGORY_EMBEDDING
+            case .voiceActivityDetection:
+                return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
             }
         }
     }

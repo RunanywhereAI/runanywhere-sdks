@@ -41,6 +41,13 @@ struct PlaygroundView: View {
             }
         }
         .task { await viewModel.checkModelStatus() }
+        .onDisappear {
+            // Release audio resources when leaving the tab to prevent conflicts
+            // with FlowSessionManager's AudioCaptureManager.
+            if viewModel.isRecording {
+                Task { await viewModel.toggleRecording() }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             Task { await viewModel.checkModelStatus() }
         }
@@ -126,18 +133,38 @@ struct PlaygroundView: View {
                 if viewModel.isRecording {
                     // Recording indicator
                     VStack(spacing: 12) {
-                        // Elapsed time
-                        Text(formatTime(viewModel.elapsedSeconds))
-                            .font(.system(size: 20, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(Color.red)
+                        // Elapsed time + speech indicator
+                        HStack(spacing: 8) {
+                            Text(formatTime(viewModel.elapsedSeconds))
+                                .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Color.red)
+
+                            if viewModel.isAutoStopEnabled {
+                                Circle()
+                                    .fill(viewModel.speechDetected ? Color.green : Color.gray.opacity(0.4))
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
 
                         // Waveform bars
                         WaveformBars(level: viewModel.audioLevel)
                     }
                 } else {
-                    Text(viewModel.transcription.isEmpty ? "Tap to record" : "Tap to record again")
-                        .font(.subheadline)
-                        .foregroundStyle(AppColors.textTertiary)
+                    VStack(spacing: 12) {
+                        Text(viewModel.transcription.isEmpty ? "Tap to record" : "Tap to record again")
+                            .font(.subheadline)
+                            .foregroundStyle(AppColors.textTertiary)
+
+                        // Auto-stop toggle
+                        Toggle(isOn: $viewModel.isAutoStopEnabled) {
+                            Label("Auto-stop on silence", systemImage: "waveform.badge.minus")
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .toggleStyle(.switch)
+                        .tint(AppColors.primaryGreen)
+                        .frame(width: 240)
+                    }
                 }
             }
         }

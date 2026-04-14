@@ -158,7 +158,7 @@ public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendab
         }
 
         // Start audio capture that feeds into the streaming transcription
-        try audioCapture.startRecording { [weak self] audioData in
+        try await audioCapture.startRecording { [weak self] audioData in
             Task {
                 guard let self = self else { return }
                 // Convert Data to [Float] for streaming

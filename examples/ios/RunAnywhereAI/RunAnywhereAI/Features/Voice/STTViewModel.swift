@@ -229,7 +229,7 @@ class STTViewModel: ObservableObject {
 
         do {
             // Both modes use audio capture - live mode adds VAD-based auto-transcription
-            try audioCapture.startRecording { [weak self] audioData in
+            try await audioCapture.startRecording { [weak self] audioData in
                 Task { @MainActor in
                     self?.audioBuffer.append(audioData)
                 }
