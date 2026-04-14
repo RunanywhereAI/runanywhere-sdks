@@ -881,8 +881,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         event.data.llm_generation.model_id = model_id;
         event.data.llm_generation.model_name = model_name;
         event.data.llm_generation.is_streaming = RAC_TRUE;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;
@@ -901,7 +900,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     ctx.generation_id = generation_id;
     ctx.model_id = model_id;
     ctx.model_name = model_name;
-    ctx.framework = static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+    ctx.framework = component->actual_framework;
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
@@ -947,6 +946,18 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
 
     rac_llm_result_t final_result = {};
     final_result.text = strdup(ctx.full_text.c_str());
+    if (final_result.text == nullptr) {
+        log_error("LLM.Component", "strdup failed for result text");
+        if (timing_out != nullptr) {
+            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = RAC_ERROR_OUT_OF_MEMORY;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        }
+        if (error_callback) {
+            error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     // Use actual backend token counts if available, fall back to estimates
     if (timing_out != nullptr && timing_out->prompt_tokens > 0) {
@@ -981,10 +992,17 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         final_result.tokens_per_second = static_cast<float>(tokens_per_second);
     }
 
-    // Record t6 (request end) before complete callback
+    // Record t6 (request end) before complete callback.
+    // Backfill prompt/output tokens when backend didn't populate them (fallback path)
+    // so downstream decode-TPS and CSV/JSON stats are computed from estimates, not zero.
     if (timing_out != nullptr) {
+        if (timing_out->prompt_tokens <= 0) {
+            timing_out->prompt_tokens = final_result.prompt_tokens;
+        }
+        if (timing_out->output_tokens <= 0) {
+            timing_out->output_tokens = final_result.completion_tokens;
+        }
         timing_out->t6_request_end_ms = rac_monotonic_now_ms();
-        // prompt_tokens and output_tokens already set by backend
         timing_out->status = RAC_BENCHMARK_STATUS_SUCCESS;
         timing_out->error_code = RAC_SUCCESS;
     }
@@ -1006,8 +1024,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         event.data.llm_generation.tokens_per_second = tokens_per_second;
         event.data.llm_generation.is_streaming = RAC_TRUE;
         event.data.llm_generation.time_to_first_token_ms = ttft_ms;
-        event.data.llm_generation.framework =
-            static_cast<rac_inference_framework_t>(component->config.preferred_framework);
+        event.data.llm_generation.framework = component->actual_framework;
         event.data.llm_generation.temperature = effective_options->temperature;
         event.data.llm_generation.max_tokens = effective_options->max_tokens;
         event.data.llm_generation.context_length = context_length;

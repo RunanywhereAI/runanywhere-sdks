@@ -135,20 +135,25 @@ class LlamaCppTextGeneration {
     bool unload_model();
 
     TextGenerationResult generate(const TextGenerationRequest& request);
-    bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback) {
-        return generate_stream(request, callback, nullptr);
-    }
-    bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
-                         int* out_prompt_tokens);
 
     /**
-     * Generate text with streaming and benchmark timing.
-     * Captures t2 (prefill start), t3 (prefill end), t5 (last token).
-     * @param timing_out Benchmark timing struct (can be NULL for no timing)
+     * Generate text with streaming, optional prompt-token output, and optional benchmark timing.
+     *
+     * When @p timing_out is non-null, captures:
+     *   - t2_prefill_start_ms: before the first llama_decode on the prompt
+     *   - t3_prefill_end_ms:   after the prompt prefill loop completes
+     *   - t5_last_token_ms:    after the decode loop exits
+     *   - output_tokens:       number of tokens generated
+     * Note: t4 (first token) is written at the LLM component layer, not in the backend.
+     *
+     * @param request           Generation request.
+     * @param callback          Streaming callback; return false to cancel.
+     * @param out_prompt_tokens Optional: tokenized prompt length (may be NULL).
+     * @param timing_out        Optional: benchmark timing struct (may be NULL for no timing).
      */
-    bool generate_stream_with_timing(const TextGenerationRequest& request,
-                                     TextStreamCallback callback, int* out_prompt_tokens,
-                                     rac_benchmark_timing_t* timing_out);
+    bool generate_stream(const TextGenerationRequest& request, TextStreamCallback callback,
+                         int* out_prompt_tokens = nullptr,
+                         rac_benchmark_timing_t* timing_out = nullptr);
 
     void cancel();
 

@@ -11,6 +11,7 @@
 
 #include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_benchmark_log.h"
+#include "rac/core/rac_error.h"
 
 namespace {
 
@@ -41,8 +42,10 @@ rac_benchmark_timing_t make_test_timing() {
 
 TEST(BenchmarkLog, TimingToJsonContainsAllFields) {
     auto timing = make_test_timing();
-    char* json = rac_benchmark_timing_to_json(&timing);
+    char* json = nullptr;
+    rac_result_t rc = rac_benchmark_timing_to_json(&timing, &json);
 
+    EXPECT_EQ(rc, RAC_SUCCESS);
     ASSERT_NE(json, nullptr);
 
     std::string s(json);
@@ -73,9 +76,19 @@ TEST(BenchmarkLog, TimingToJsonContainsAllFields) {
     free(json);
 }
 
-TEST(BenchmarkLog, TimingToJsonNullReturnsNull) {
-    char* json = rac_benchmark_timing_to_json(nullptr);
+TEST(BenchmarkLog, TimingToJsonNullTimingReturnsError) {
+    char* json = reinterpret_cast<char*>(0xdeadbeef);  // sentinel to verify reset
+    rac_result_t rc = rac_benchmark_timing_to_json(nullptr, &json);
+
+    EXPECT_EQ(rc, RAC_ERROR_NULL_POINTER);
     EXPECT_EQ(json, nullptr);
+}
+
+TEST(BenchmarkLog, TimingToJsonNullOutParamReturnsError) {
+    auto timing = make_test_timing();
+    rac_result_t rc = rac_benchmark_timing_to_json(&timing, nullptr);
+
+    EXPECT_EQ(rc, RAC_ERROR_NULL_POINTER);
 }
 
 // =============================================================================
@@ -83,8 +96,10 @@ TEST(BenchmarkLog, TimingToJsonNullReturnsNull) {
 // =============================================================================
 
 TEST(BenchmarkLog, TimingToCsvHeader) {
-    char* header = rac_benchmark_timing_to_csv(nullptr, RAC_TRUE);
+    char* header = nullptr;
+    rac_result_t rc = rac_benchmark_timing_to_csv(nullptr, RAC_TRUE, &header);
 
+    EXPECT_EQ(rc, RAC_SUCCESS);
     ASSERT_NE(header, nullptr);
 
     std::string s(header);
@@ -97,8 +112,10 @@ TEST(BenchmarkLog, TimingToCsvHeader) {
 
 TEST(BenchmarkLog, TimingToCsvRow) {
     auto timing = make_test_timing();
-    char* row = rac_benchmark_timing_to_csv(&timing, RAC_FALSE);
+    char* row = nullptr;
+    rac_result_t rc = rac_benchmark_timing_to_csv(&timing, RAC_FALSE, &row);
 
+    EXPECT_EQ(rc, RAC_SUCCESS);
     ASSERT_NE(row, nullptr);
 
     std::string s(row);
@@ -115,9 +132,23 @@ TEST(BenchmarkLog, TimingToCsvRow) {
     free(row);
 }
 
-TEST(BenchmarkLog, TimingToCsvNullDataReturnsNull) {
-    char* row = rac_benchmark_timing_to_csv(nullptr, RAC_FALSE);
+TEST(BenchmarkLog, TimingToCsvNullDataReturnsError) {
+    char* row = reinterpret_cast<char*>(0xdeadbeef);  // sentinel to verify reset
+    rac_result_t rc = rac_benchmark_timing_to_csv(nullptr, RAC_FALSE, &row);
+
+    EXPECT_EQ(rc, RAC_ERROR_NULL_POINTER);
     EXPECT_EQ(row, nullptr);
+}
+
+TEST(BenchmarkLog, TimingToCsvNullOutParamReturnsError) {
+    auto timing = make_test_timing();
+    rac_result_t rc = rac_benchmark_timing_to_csv(&timing, RAC_FALSE, nullptr);
+
+    EXPECT_EQ(rc, RAC_ERROR_NULL_POINTER);
+
+    // Also verify for the header case
+    rc = rac_benchmark_timing_to_csv(nullptr, RAC_TRUE, nullptr);
+    EXPECT_EQ(rc, RAC_ERROR_NULL_POINTER);
 }
 
 // =============================================================================
@@ -128,7 +159,11 @@ TEST(BenchmarkLog, TimingLogNoCrash) {
     auto timing = make_test_timing();
 
     // Should not crash even without platform adapter
-    rac_benchmark_timing_log(&timing, "test_run");
-    rac_benchmark_timing_log(&timing, nullptr);
-    rac_benchmark_timing_log(nullptr, "test_run");
+    EXPECT_EQ(rac_benchmark_timing_log(&timing, "test_run"), RAC_SUCCESS);
+    EXPECT_EQ(rac_benchmark_timing_log(&timing, nullptr), RAC_SUCCESS);
+}
+
+TEST(BenchmarkLog, TimingLogNullTimingReturnsError) {
+    EXPECT_EQ(rac_benchmark_timing_log(nullptr, "test_run"), RAC_ERROR_NULL_POINTER);
+    EXPECT_EQ(rac_benchmark_timing_log(nullptr, nullptr), RAC_ERROR_NULL_POINTER);
 }

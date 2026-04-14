@@ -1101,7 +1101,13 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     env->GetJavaVM(&jvm);
 
     jclass callbackClass = env->GetObjectClass(tokenCallback);
-    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+    bool onTokenExpectsBytes = true;
+    jmethodID onTokenMethod = env->GetMethodID(callbackClass, "onToken", "([B)Z");
+    if (!onTokenMethod) {
+        env->ExceptionClear();
+        onTokenMethod = env->GetMethodID(callbackClass, "onToken", "(Ljava/lang/String;)Z");
+        onTokenExpectsBytes = false;
+    }
     env->DeleteLocalRef(callbackClass);
 
     if (!onTokenMethod) {
@@ -1118,12 +1124,34 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
     options.temperature = 0.7f;
     options.top_p = 1.0f;
     options.streaming_enabled = RAC_TRUE;
+    options.system_prompt = RAC_NULL;
+
+    std::string sys_prompt_storage;
+    if (config != nullptr) {
+        try {
+            auto j = nlohmann::json::parse(config);
+            options.max_tokens = j.value("max_tokens", 512);
+            options.temperature = j.value("temperature", 0.7f);
+            options.top_p = j.value("top_p", 1.0f);
+            sys_prompt_storage = j.value("system_prompt", std::string(""));
+            if (!sys_prompt_storage.empty()) {
+                options.system_prompt = sys_prompt_storage.c_str();
+            }
+        } catch (const nlohmann::json::exception& e) {
+            LOGe("Failed to parse LLM timing config JSON: %s", e.what());
+        }
+    }
+
+    LOGi("racLlmComponentGenerateStreamWithTiming options: temp=%.2f, max_tokens=%d, top_p=%.2f, system_prompt=%s",
+         options.temperature, options.max_tokens, options.top_p,
+         options.system_prompt ? "(set)" : "(none)");
 
     // Create streaming callback context
     LLMStreamCallbackContext ctx;
     ctx.jvm = jvm;
     ctx.callback = globalCallback;
     ctx.onTokenMethod = onTokenMethod;
+    ctx.onTokenExpectsBytes = onTokenExpectsBytes;
 
     // Initialize benchmark timing struct
     rac_benchmark_timing_t timing = {};
@@ -1136,13 +1164,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
         llm_stream_callback_token, llm_stream_callback_complete, llm_stream_callback_error, &ctx,
         &timing);
 
-    // Clean up global ref
-    env->DeleteGlobalRef(globalCallback);
-
     if (status != RAC_SUCCESS) {
+        env->DeleteGlobalRef(globalCallback);
         LOGe("rac_llm_component_generate_stream_with_timing failed with status=%d", status);
         return nullptr;
     }
+
+    // Wait until completion/error before releasing callback/context.
+    {
+        std::unique_lock<std::mutex> lock(ctx.mtx);
+        constexpr auto kStreamWaitTimeout = std::chrono::minutes(10);
+        if (!ctx.cv.wait_for(lock, kStreamWaitTimeout, [&ctx] { return ctx.is_complete; })) {
+            ctx.has_error = true;
+            ctx.error_message = "Streaming timed out waiting for completion callback";
+            ctx.is_complete = true;
+        }
+    }
+
+    // Clean up global ref after callbacks have finished.
+    env->DeleteGlobalRef(globalCallback);
 
     if (ctx.has_error) {
         LOGe("Streaming with timing failed: %s", ctx.error_message.c_str());

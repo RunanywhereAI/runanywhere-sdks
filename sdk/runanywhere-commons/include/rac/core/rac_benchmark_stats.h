@@ -68,16 +68,28 @@ typedef struct rac_benchmark_summary {
     double prefill_p50_ms;
     double prefill_p95_ms;
     double prefill_p99_ms;
+    double prefill_min_ms;
+    double prefill_max_ms;
+    double prefill_mean_ms;
+    double prefill_stddev_ms;
 
     // Decode throughput stats (output_tokens / (t5 - t3) * 1000)
     double decode_tps_p50;
     double decode_tps_p95;
     double decode_tps_p99;
+    double decode_tps_min;
+    double decode_tps_max;
+    double decode_tps_mean;
+    double decode_tps_stddev;
 
     // End-to-end latency stats (t6 - t0)
     double e2e_p50_ms;
     double e2e_p95_ms;
     double e2e_p99_ms;
+    double e2e_min_ms;
+    double e2e_max_ms;
+    double e2e_mean_ms;
+    double e2e_stddev_ms;
 
     /** Number of observations where E2E > mean + 2*stddev */
     int32_t outlier_count;

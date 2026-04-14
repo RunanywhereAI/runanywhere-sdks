@@ -9,24 +9,38 @@
 
 #include "rac/core/rac_benchmark_metrics.h"
 
-#include <atomic>
 #include <cstring>
+#include <memory>
 #include <mutex>
 
 namespace {
 
-struct MetricsProvider {
+struct ProviderWrapper {
     rac_benchmark_metrics_provider_fn fn = nullptr;
     void* user_data = nullptr;
 };
 
-// Atomic pointer for lock-free provider access.
-// Provider registration is rare; reads are frequent.
-std::atomic<MetricsProvider*> g_provider{nullptr};
+// Published as a shared_ptr under a mutex so concurrent capture callers keep
+// the wrapper (fn + user_data) alive for the duration of their invocation,
+// even if the platform unregisters or replaces the provider mid-call.
+//
+// A std::atomic<std::shared_ptr<T>> would be preferable, but Apple Clang's
+// libc++ has not yet shipped the C++20 specialization (requires trivially
+// copyable T). A short mutex-guarded load/store is equally lifetime-safe and
+// only marginally slower on the capture path — which is invoked twice per
+// benchmark, not in a hot loop.
+std::mutex g_provider_mutex;
+std::shared_ptr<ProviderWrapper> g_provider;
 
-// Storage for the current provider (swapped atomically)
-MetricsProvider g_provider_storage[2];
-std::atomic<int> g_provider_index{0};
+std::shared_ptr<ProviderWrapper> load_provider() {
+    std::lock_guard<std::mutex> lock(g_provider_mutex);
+    return g_provider;
+}
+
+void store_provider(std::shared_ptr<ProviderWrapper> next) {
+    std::lock_guard<std::mutex> lock(g_provider_mutex);
+    g_provider = std::move(next);
+}
 
 }  // namespace
 
@@ -46,21 +60,12 @@ void rac_benchmark_extended_metrics_init(rac_benchmark_extended_metrics_t* metri
 
 void rac_benchmark_set_metrics_provider(rac_benchmark_metrics_provider_fn provider,
                                          void* user_data) {
-    static std::mutex write_mutex;
-
     if (provider == nullptr) {
-        g_provider.store(nullptr, std::memory_order_release);
+        store_provider(nullptr);
         return;
     }
 
-    // Serialize the rare registration path to prevent torn fn/user_data pairs
-    std::lock_guard<std::mutex> lock(write_mutex);
-    int idx = g_provider_index.load(std::memory_order_relaxed);
-    int next = 1 - idx;
-    g_provider_storage[next].fn = provider;
-    g_provider_storage[next].user_data = user_data;
-    g_provider.store(&g_provider_storage[next], std::memory_order_release);
-    g_provider_index.store(next, std::memory_order_relaxed);
+    store_provider(std::make_shared<ProviderWrapper>(ProviderWrapper{provider, user_data}));
 }
 
 void rac_benchmark_capture_metrics(rac_benchmark_extended_metrics_t* out) {
@@ -71,10 +76,12 @@ void rac_benchmark_capture_metrics(rac_benchmark_extended_metrics_t* out) {
     // Initialize to unavailable
     rac_benchmark_extended_metrics_init(out);
 
-    // Call provider if registered
-    MetricsProvider* provider = g_provider.load(std::memory_order_acquire);
-    if (provider != nullptr && provider->fn != nullptr) {
-        provider->fn(out, provider->user_data);
+    // Snapshot the provider; the local shared_ptr keeps the wrapper (and its
+    // user_data pointer) alive for the duration of the call, even if another
+    // thread concurrently unregisters or replaces it.
+    auto local = load_provider();
+    if (local && local->fn != nullptr) {
+        local->fn(out, local->user_data);
     }
 }
 

@@ -14,6 +14,7 @@
 #include <cstring>
 #include <string>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 
 namespace {
@@ -41,13 +42,30 @@ double decode_tps(const rac_benchmark_timing_t* t) {
     return static_cast<double>(t->output_tokens) / decode_ms * 1000.0;
 }
 
+/**
+ * Duplicates a std::string to a heap-allocated C string.
+ * Returns nullptr on allocation failure.
+ */
+char* strdup_from_string(const std::string& s) {
+    char* result = static_cast<char*>(malloc(s.size() + 1));
+    if (result != nullptr) {
+        memcpy(result, s.c_str(), s.size() + 1);
+    }
+    return result;
+}
+
 }  // namespace
 
 extern "C" {
 
-char* rac_benchmark_timing_to_json(const rac_benchmark_timing_t* timing) {
+rac_result_t rac_benchmark_timing_to_json(const rac_benchmark_timing_t* timing, char** out_json) {
+    if (out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_json = nullptr;
+
     if (timing == nullptr) {
-        return nullptr;
+        return RAC_ERROR_NULL_POINTER;
     }
 
     double ttft_ms = safe_diff(timing->t4_first_token_ms, timing->t0_request_start_ms);
@@ -87,14 +105,22 @@ char* rac_benchmark_timing_to_json(const rac_benchmark_timing_t* timing) {
     json += "}";
 
     // Copy to heap-allocated C string
-    char* result = static_cast<char*>(malloc(json.size() + 1));
-    if (result != nullptr) {
-        memcpy(result, json.c_str(), json.size() + 1);
+    char* result = strdup_from_string(json);
+    if (result == nullptr) {
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
-    return result;
+
+    *out_json = result;
+    return RAC_SUCCESS;
 }
 
-char* rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, rac_bool_t header) {
+rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, rac_bool_t header,
+                                         char** out_csv) {
+    if (out_csv == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_csv = nullptr;
+
     std::string csv;
     csv.reserve(256);
 
@@ -105,7 +131,7 @@ char* rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, rac_bool
               "ttft_ms,prefill_ms,decode_ms,e2e_ms,decode_tps";
     } else {
         if (timing == nullptr) {
-            return nullptr;
+            return RAC_ERROR_NULL_POINTER;
         }
 
         double ttft_ms = safe_diff(timing->t4_first_token_ms, timing->t0_request_start_ms);
@@ -126,16 +152,18 @@ char* rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, rac_bool
         csv = buf;
     }
 
-    char* result = static_cast<char*>(malloc(csv.size() + 1));
-    if (result != nullptr) {
-        memcpy(result, csv.c_str(), csv.size() + 1);
+    char* result = strdup_from_string(csv);
+    if (result == nullptr) {
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
-    return result;
+
+    *out_csv = result;
+    return RAC_SUCCESS;
 }
 
-void rac_benchmark_timing_log(const rac_benchmark_timing_t* timing, const char* label) {
+rac_result_t rac_benchmark_timing_log(const rac_benchmark_timing_t* timing, const char* label) {
     if (timing == nullptr) {
-        return;
+        return RAC_ERROR_NULL_POINTER;
     }
 
     double ttft_ms = safe_diff(timing->t4_first_token_ms, timing->t0_request_start_ms);
@@ -151,6 +179,8 @@ void rac_benchmark_timing_log(const rac_benchmark_timing_t* timing, const char* 
                  "prompt=%d output=%d tps=%.1f status=%d error=%d",
                  tag, ttft_ms, prefill_ms, decode_ms_val, e2e_ms, timing->prompt_tokens,
                  timing->output_tokens, tps, timing->status, timing->error_code);
+
+    return RAC_SUCCESS;
 }
 
 }  // extern "C"

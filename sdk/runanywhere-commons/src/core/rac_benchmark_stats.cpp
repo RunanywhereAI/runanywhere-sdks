@@ -118,6 +118,10 @@ class BenchmarkStatsCollector {
             out->prefill_p50_ms = percentile(sorted, 50);
             out->prefill_p95_ms = percentile(sorted, 95);
             out->prefill_p99_ms = percentile(sorted, 99);
+            out->prefill_min_ms = sorted.front();
+            out->prefill_max_ms = sorted.back();
+            out->prefill_mean_ms = mean(sorted);
+            out->prefill_stddev_ms = stddev(sorted, out->prefill_mean_ms);
         }
 
         // Decode TPS stats
@@ -127,6 +131,10 @@ class BenchmarkStatsCollector {
             out->decode_tps_p50 = percentile(sorted, 50);
             out->decode_tps_p95 = percentile(sorted, 95);
             out->decode_tps_p99 = percentile(sorted, 99);
+            out->decode_tps_min = sorted.front();
+            out->decode_tps_max = sorted.back();
+            out->decode_tps_mean = mean(sorted);
+            out->decode_tps_stddev = stddev(sorted, out->decode_tps_mean);
         }
 
         // E2E stats + outlier detection
@@ -136,11 +144,13 @@ class BenchmarkStatsCollector {
             out->e2e_p50_ms = percentile(sorted, 50);
             out->e2e_p95_ms = percentile(sorted, 95);
             out->e2e_p99_ms = percentile(sorted, 99);
+            out->e2e_min_ms = sorted.front();
+            out->e2e_max_ms = sorted.back();
+            out->e2e_mean_ms = mean(sorted);
+            out->e2e_stddev_ms = stddev(sorted, out->e2e_mean_ms);
 
             // Outlier detection: count observations > mean + 2*stddev
-            double e2e_mean = mean(sorted);
-            double e2e_sd = stddev(sorted, e2e_mean);
-            double threshold = e2e_mean + 2.0 * e2e_sd;
+            double threshold = out->e2e_mean_ms + 2.0 * out->e2e_stddev_ms;
             int32_t outliers = 0;
             for (double val : e2e_values_) {
                 if (val > threshold) {
@@ -181,6 +191,9 @@ class BenchmarkStatsCollector {
         return sum / static_cast<double>(values.size());
     }
 
+    // Sample stddev (Bessel-corrected, ÷ N−1). Benchmark samples are a subset of
+    // a larger distribution, so population stddev (÷ N) underestimates spread
+    // for small sample sizes.
     static double stddev(const std::vector<double>& values, double mean_val) {
         if (values.size() <= 1) {
             return 0.0;
@@ -190,7 +203,7 @@ class BenchmarkStatsCollector {
             double diff = v - mean_val;
             sum_sq += diff * diff;
         }
-        return std::sqrt(sum_sq / static_cast<double>(values.size()));
+        return std::sqrt(sum_sq / static_cast<double>(values.size() - 1));
     }
 
     mutable std::mutex mutex_;
@@ -292,6 +305,14 @@ char* rac_benchmark_stats_summary_to_json(const rac_benchmark_summary_t* summary
     json += "\"prefill_p95_ms\":" + std::string(buf) + ",";
     snprintf(buf, sizeof(buf), "%.2f", summary->prefill_p99_ms);
     json += "\"prefill_p99_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->prefill_min_ms);
+    json += "\"prefill_min_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->prefill_max_ms);
+    json += "\"prefill_max_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->prefill_mean_ms);
+    json += "\"prefill_mean_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->prefill_stddev_ms);
+    json += "\"prefill_stddev_ms\":" + std::string(buf) + ",";
 
     // Decode TPS
     snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_p50);
@@ -300,6 +321,14 @@ char* rac_benchmark_stats_summary_to_json(const rac_benchmark_summary_t* summary
     json += "\"decode_tps_p95\":" + std::string(buf) + ",";
     snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_p99);
     json += "\"decode_tps_p99\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_min);
+    json += "\"decode_tps_min\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_max);
+    json += "\"decode_tps_max\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_mean);
+    json += "\"decode_tps_mean\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->decode_tps_stddev);
+    json += "\"decode_tps_stddev\":" + std::string(buf) + ",";
 
     // E2E
     snprintf(buf, sizeof(buf), "%.2f", summary->e2e_p50_ms);
@@ -308,6 +337,14 @@ char* rac_benchmark_stats_summary_to_json(const rac_benchmark_summary_t* summary
     json += "\"e2e_p95_ms\":" + std::string(buf) + ",";
     snprintf(buf, sizeof(buf), "%.2f", summary->e2e_p99_ms);
     json += "\"e2e_p99_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->e2e_min_ms);
+    json += "\"e2e_min_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->e2e_max_ms);
+    json += "\"e2e_max_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->e2e_mean_ms);
+    json += "\"e2e_mean_ms\":" + std::string(buf) + ",";
+    snprintf(buf, sizeof(buf), "%.2f", summary->e2e_stddev_ms);
+    json += "\"e2e_stddev_ms\":" + std::string(buf) + ",";
 
     // Outliers
     json += "\"outlier_count\":" + std::to_string(summary->outlier_count);

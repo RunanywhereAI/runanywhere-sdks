@@ -316,6 +316,9 @@ rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, c
         request.max_tokens = options->max_tokens;
         request.temperature = options->temperature;
         request.top_p = options->top_p;
+        if (options->system_prompt != nullptr) {
+            request.system_prompt = options->system_prompt;
+        }
         if (options->stop_sequences != nullptr && options->num_stop_sequences > 0) {
             for (int32_t i = 0; i < options->num_stop_sequences; i++) {
                 if (options->stop_sequences[i]) {
@@ -325,16 +328,24 @@ rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, c
         }
     }
 
-    // Stream using C++ class with timing
+    // Stream using C++ class with timing (see generate for rationale on try-catch)
     int prompt_tokens = 0;
-    bool success = h->text_gen->generate_stream_with_timing(
-        request,
-        [callback, user_data](const std::string& token) -> bool {
-            return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
-        },
-        &prompt_tokens,
-        timing_out
-    );
+    bool success = false;
+    try {
+        success = h->text_gen->generate_stream(
+            request,
+            [callback, user_data](const std::string& token) -> bool {
+                return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
+            },
+            &prompt_tokens,
+            timing_out);
+    } catch (const std::exception& e) {
+        rac_error_set_details(e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    } catch (...) {
+        rac_error_set_details("Unknown C++ exception during timed streaming LLM generation");
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
 
     // Capture prompt token count in timing struct
     if (timing_out != nullptr && prompt_tokens > 0) {

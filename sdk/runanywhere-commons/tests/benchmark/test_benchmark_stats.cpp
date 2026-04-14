@@ -189,6 +189,27 @@ TEST(BenchmarkStats, PercentilesBasic) {
     // Mean should be 50.5
     EXPECT_NEAR(summary.ttft_mean_ms, 50.5, 0.01);
 
+    // Prefill is a constant 50ms across all 100 observations, so
+    // min/max/mean all equal 50 and stddev is 0.
+    EXPECT_DOUBLE_EQ(summary.prefill_min_ms, 50.0);
+    EXPECT_DOUBLE_EQ(summary.prefill_max_ms, 50.0);
+    EXPECT_DOUBLE_EQ(summary.prefill_mean_ms, 50.0);
+    EXPECT_DOUBLE_EQ(summary.prefill_stddev_ms, 0.0);
+
+    // Decode TPS is a constant 100 tokens/sec across all observations.
+    EXPECT_DOUBLE_EQ(summary.decode_tps_min, 100.0);
+    EXPECT_DOUBLE_EQ(summary.decode_tps_max, 100.0);
+    EXPECT_DOUBLE_EQ(summary.decode_tps_mean, 100.0);
+    EXPECT_DOUBLE_EQ(summary.decode_tps_stddev, 0.0);
+
+    // E2E varies from 101..200 (e2e_ms = 100 + i for i in 1..100).
+    // Mean = 150.5, sample stddev (Bessel-corrected, N-1) for 1..100 is
+    // sqrt(100 * 101 / 12) / sqrt(99/100) ≈ 29.01.
+    EXPECT_DOUBLE_EQ(summary.e2e_min_ms, 101.0);
+    EXPECT_DOUBLE_EQ(summary.e2e_max_ms, 200.0);
+    EXPECT_NEAR(summary.e2e_mean_ms, 150.5, 0.01);
+    EXPECT_NEAR(summary.e2e_stddev_ms, 29.01, 0.05);
+
     rac_benchmark_stats_destroy(handle);
 }
 
@@ -235,6 +256,12 @@ TEST(BenchmarkStats, SummaryToJson) {
     EXPECT_EQ(s.back(), '}');
     EXPECT_NE(s.find("\"count\":1"), std::string::npos);
     EXPECT_NE(s.find("\"ttft_p50_ms\":"), std::string::npos);
+    EXPECT_NE(s.find("\"prefill_mean_ms\":"), std::string::npos);
+    EXPECT_NE(s.find("\"prefill_stddev_ms\":"), std::string::npos);
+    EXPECT_NE(s.find("\"decode_tps_min\":"), std::string::npos);
+    EXPECT_NE(s.find("\"decode_tps_max\":"), std::string::npos);
+    EXPECT_NE(s.find("\"e2e_mean_ms\":"), std::string::npos);
+    EXPECT_NE(s.find("\"e2e_stddev_ms\":"), std::string::npos);
     EXPECT_NE(s.find("\"outlier_count\":"), std::string::npos);
 
     free(json);
