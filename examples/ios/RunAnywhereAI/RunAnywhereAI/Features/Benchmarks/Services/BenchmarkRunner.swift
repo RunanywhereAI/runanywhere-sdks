@@ -112,6 +112,7 @@ final class BenchmarkRunner {
 
     func runBenchmarks(
         categories: Set<BenchmarkCategory>,
+        modelIds: Set<String>? = nil,
         onProgress: @escaping @Sendable (BenchmarkProgressUpdate) -> Void
     ) async throws -> BenchmarkRunOutput {
         let preflight = try await preflight(categories: categories)
@@ -129,8 +130,9 @@ final class BenchmarkRunner {
         for category in BenchmarkCategory.allCases where categories.contains(category) {
             guard let provider = providers[category],
                   let models = preflight.availableCategories[category] else { continue }
+            let filteredModels = modelIds == nil ? models : models.filter { modelIds!.contains($0.id) }
             let scenarioList = provider.scenarios()
-            for model in models {
+            for model in filteredModels {
                 for scenario in scenarioList {
                     workItems.append((category, model, scenario))
                 }

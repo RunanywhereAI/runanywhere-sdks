@@ -10,6 +10,9 @@ import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
 import WhisperKitRuntime
+#if canImport(MetalRTRuntime)
+import MetalRTRuntime
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -64,6 +67,7 @@ struct RunAnywhereAIApp: App {
                 }
             }
             .task {
+                _ = SettingsViewModel.shared
                 logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
             }
@@ -84,6 +88,9 @@ struct RunAnywhereAIApp: App {
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
             WhisperKitSTT.register(priority: 200)
+            #if canImport(MetalRTRuntime)
+            MetalRT.register(priority: 100)
+            #endif
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -207,11 +214,21 @@ struct RunAnywhereAIApp: App {
                 memoryRequirement: 4_000_000_000
             )
         }
-        if let qwenURL = URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf") {
+        if let qwenURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen2.5-0.5b-instruct-q6_k",
                 name: "Qwen 2.5 0.5B Instruct Q6_K",
                 url: qwenURL,
+                framework: .llamaCpp,
+                memoryRequirement: 600_000_000
+            )
+        }
+        // Qwen 2.5 0.5B base model (Q8_0) — LoRA-compatible base for abliterated adapter
+        if let qwenBaseURL = URL(string: "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/base-model-q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "qwen2.5-0.5b-base-q8_0",
+                name: "Qwen 2.5 0.5B Base Q8_0",
+                url: qwenBaseURL,
                 framework: .llamaCpp,
                 memoryRequirement: 600_000_000
             )
@@ -267,6 +284,26 @@ struct RunAnywhereAIApp: App {
             )
         }
 
+        // LFM2.5-1.2B-Instruct - General-purpose instruction-tuned LFM (Liquid AI)
+        if let lfm25InstructQ4URL = URL(string: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm25-1.2b-instruct-q4_k_m",
+                name: "LiquidAI LFM2.5 1.2B Instruct Q4_K_M",
+                url: lfm25InstructQ4URL,
+                framework: .llamaCpp,
+                memoryRequirement: 900_000_000
+            )
+        }
+        if let lfm25InstructQ8URL = URL(string: "https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q8_0.gguf") {
+            RunAnywhere.registerModel(
+                id: "lfm25-1.2b-instruct-q8_0",
+                name: "LiquidAI LFM2.5 1.2B Instruct Q8_0",
+                url: lfm25InstructQ8URL,
+                framework: .llamaCpp,
+                memoryRequirement: 1_400_000_000
+            )
+        }
+
         // Qwen3 models
         if let qwen3_06bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
@@ -274,7 +311,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 0.6B Q4_K_M",
                 url: qwen3_06bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 500_000_000
+                memoryRequirement: 500_000_000,
+                supportsThinking: true
             )
         }
         if let qwen3_17bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf") {
@@ -283,7 +321,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 1.7B Q4_K_M",
                 url: qwen3_17bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 1_200_000_000
+                memoryRequirement: 1_200_000_000,
+                supportsThinking: true
             )
         }
         if let qwen3_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf") {
@@ -292,7 +331,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3 4B Q4_K_M",
                 url: qwen3_4bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 2_800_000_000
+                memoryRequirement: 2_800_000_000,
+                supportsThinking: true
             )
         }
 
@@ -303,7 +343,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 0.8B Q4_K_M",
                 url: qwen35_08bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 600_000_000
+                memoryRequirement: 600_000_000,
+                supportsThinking: true
             )
         }
         if let qwen35_2bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf") {
@@ -312,7 +353,8 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 2B Q4_K_M",
                 url: qwen35_2bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 1_500_000_000
+                memoryRequirement: 1_500_000_000,
+                supportsThinking: true
             )
         }
         if let qwen35_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf") {
@@ -321,11 +363,138 @@ struct RunAnywhereAIApp: App {
                 name: "Qwen3.5 4B Q4_K_M",
                 url: qwen35_4bURL,
                 framework: .llamaCpp,
-                memoryRequirement: 2_800_000_000
+                memoryRequirement: 2_800_000_000,
+                supportsThinking: true
             )
         }
 
         logger.info("✅ LLM models registered (including tool-calling optimized models)")
+
+        // ============================================================================
+        // Register MetalRT models (custom Metal GPU kernels, framework-hint only)
+        // These models use MetalRT's safetensors format, NOT GGUF.
+        // Models are from runanywhere/ HuggingFace org, packaged as tar.gz archives.
+        // ============================================================================
+        #if canImport(MetalRTRuntime)
+
+        // --- MetalRT LLM models ---
+        // All MetalRT iOS models are hosted at: huggingface.co/runanywhere/metalrt-ios
+        let metalrtBase = "https://huggingface.co/runanywhere/metalrt-ios/resolve/main"
+
+        if let url = URL(string: "\(metalrtBase)/qwen3-0.6b-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "qwen3-0.6b-metalrt",
+                name: "Qwen3 0.6B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 400_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/qwen3-4b-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "qwen3-4b-metalrt",
+                name: "Qwen3 4B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 2_500_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/llama3-3b-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "llama3-3b-metalrt",
+                name: "Llama 3.2 3B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 1_800_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/lfm25-1.2b-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "lfm25-1.2b-metalrt",
+                name: "LFM 2.5 1.2B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 800_000_000
+            )
+        }
+
+        // --- MetalRT STT models (Whisper) ---
+
+        if let url = URL(string: "\(metalrtBase)/whisper-tiny-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisper-tiny-metalrt",
+                name: "Whisper Tiny (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 35_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/whisper-small-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "whisper-small-metalrt",
+                name: "Whisper Small (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .speechRecognition,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 100_000_000
+            )
+        }
+
+        // --- MetalRT TTS model (Kokoro) ---
+
+        if let url = URL(string: "\(metalrtBase)/kokoro-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "kokoro-metalrt",
+                name: "Kokoro TTS (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .speechSynthesis,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 350_000_000
+            )
+        }
+
+        // --- MetalRT VLM models ---
+
+        if let url = URL(string: "\(metalrtBase)/qwen3-vl-2b-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "qwen3-vl-2b-metalrt",
+                name: "Qwen3-VL 2B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 1_800_000_000
+            )
+        }
+
+        if let url = URL(string: "\(metalrtBase)/lfm25-vl-metalrt.tar.gz") {
+            RunAnywhere.registerModel(
+                id: "lfm25-vl-metalrt",
+                name: "LFM2.5-VL 1.6B (MetalRT)",
+                url: url,
+                framework: .metalrt,
+                modality: .multimodal,
+                artifactType: .archive(.tarGz, structure: .nestedDirectory),
+                memoryRequirement: 1_600_000_000
+            )
+        }
+
+        logger.info("ℹ️ MetalRT runtime available; no downloadable MetalRT models are configured yet")
+        #else
+        logger.info("ℹ️ MetalRT not available (MetalRTRuntime not linked)")
+        #endif
 
         // Register VLM (Vision Language) models
         // VLM models require 2 files: main model + mmproj (vision projector)

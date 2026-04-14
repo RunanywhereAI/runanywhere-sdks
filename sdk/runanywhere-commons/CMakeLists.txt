@@ -37,8 +37,10 @@ option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 if(APPLE)
     option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
+    option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
 else()
     set(RAC_BACKEND_WHISPERKIT_COREML OFF CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_METALRT OFF CACHE BOOL "" FORCE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
@@ -643,6 +645,35 @@ if(RAC_BUILD_BACKENDS)
         add_subdirectory(src/backends/whispercpp)
     endif()
 
+    if(RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/metalrt/CMakeLists.txt")
+        message(STATUS "  - MetalRT backend — folded into rac_commons")
+        add_subdirectory(src/backends/metalrt)
+
+        # MetalRT is an OBJECT library. Fold its compiled objects into
+        # rac_commons so there is no separate rac_backend_metalrt artifact
+        # to distribute — mirrors how RAG is integrated. Public builds ship
+        # stub implementations; engine-enabled builds link the private
+        # libmetalrt_engine.a via RAC_METALRT_ENGINE_LIB propagated from
+        # the subdirectory.
+        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+
+        # Apple frameworks are needed wherever the wrappers are compiled.
+        if(APPLE)
+            target_link_libraries(rac_commons PUBLIC
+                "-framework Metal"
+                "-framework Foundation"
+                "-framework Accelerate"
+            )
+        endif()
+
+        # If the engine is available, link the private static lib onto
+        # rac_commons so the OBJECT target's unresolved metalrt_* symbols
+        # resolve in the final archive.
+        if(RAC_METALRT_ENGINE_LIB)
+            target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+        endif()
+    endif()
+
     if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
         message(STATUS "  - RAG pipeline (USearch) — folded into rac_commons")
         add_subdirectory(src/features/rag)
@@ -730,7 +761,7 @@ if(RAC_PLATFORM_WINDOWS)
     message(STATUS "  Platform:     Windows (MSVC)")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}")
+    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}, MetalRT=${RAC_BACKEND_METALRT}")
     if(RAC_BACKEND_RAG)
         message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
     endif()

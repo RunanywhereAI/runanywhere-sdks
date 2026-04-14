@@ -82,6 +82,8 @@ enum BenchmarkReportFormatter {
                         lines.append("- Warmup: \(String(format: "%.0f", m.warmupTimeMs))ms")
                     }
                     lines.append("- End-to-end: \(String(format: "%.0f", m.endToEndLatencyMs))ms")
+                    if let decode = m.decodeTokensPerSecond { lines.append("- Decode: \(String(format: "%.1f", decode)) tok/s") }
+                    if let prefill = m.prefillTokensPerSecond { lines.append("- Prefill: \(String(format: "%.1f", prefill)) tok/s") }
                     if let tps = m.tokensPerSecond { lines.append("- Tokens/s: \(String(format: "%.1f", tps))") }
                     if let ttft = m.ttftMs { lines.append("- TTFT: \(String(format: "%.0f", ttft))ms") }
                     if let inp = m.inputTokens { lines.append("- Input tokens: \(inp)") }
@@ -129,7 +131,7 @@ enum BenchmarkReportFormatter {
     // MARK: - File Export: CSV
 
     static func writeCSV(run: BenchmarkRun) -> URL {
-        var csv = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,TPS,TTFT,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,GenMs,MemDeltaBytes,Success,Error\n"
+        var csv = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,DecodeTPS,PrefillTPS,TPS,TTFT,InTokens,OutTokens,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,GenMs,MemDeltaBytes,Success,Error\n"
         for r in run.results {
             let m = r.metrics
             var row: [String] = []
@@ -140,8 +142,12 @@ enum BenchmarkReportFormatter {
             row.append(String(format: "%.0f", m.loadTimeMs))
             row.append(String(format: "%.0f", m.warmupTimeMs))
             row.append(String(format: "%.0f", m.endToEndLatencyMs))
+            row.append(m.decodeTokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
+            row.append(m.prefillTokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
             row.append(m.tokensPerSecond.map { String(format: "%.1f", $0) } ?? "")
             row.append(m.ttftMs.map { String(format: "%.0f", $0) } ?? "")
+            row.append(m.inputTokens.map { "\($0)" } ?? "")
+            row.append(m.outputTokens.map { "\($0)" } ?? "")
             row.append(m.realTimeFactor.map { String(format: "%.2f", $0) } ?? "")
             row.append(m.audioLengthSeconds.map { String(format: "%.1f", $0) } ?? "")
             row.append(m.audioDurationSeconds.map { String(format: "%.1f", $0) } ?? "")

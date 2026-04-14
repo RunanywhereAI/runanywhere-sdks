@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RunAnywhere
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -33,6 +34,13 @@ final class BenchmarkViewModel {
     /// Categories that had no downloaded models during the last run
     var skippedCategoriesMessage: String?
 
+    /// Available downloaded models grouped by category, for user selection
+    var availableModels: [BenchmarkCategory: [ModelInfo]] = [:]
+
+    /// Which model IDs the user has selected for benchmarking.
+    /// Empty means "all models" (backwards-compatible default).
+    var selectedModelIds: Set<String> = []
+
     // MARK: - Private
 
     private let runner = BenchmarkRunner()
@@ -44,6 +52,45 @@ final class BenchmarkViewModel {
 
     func loadPastRuns() {
         pastRuns = store.loadRuns().reversed()
+    }
+
+    func refreshAvailableModels() {
+        Task {
+            do {
+                let allModels = try await RunAnywhere.availableModels()
+                var grouped: [BenchmarkCategory: [ModelInfo]] = [:]
+                for category in BenchmarkCategory.allCases {
+                    let models = allModels.filter {
+                        $0.category == category.modelCategory && $0.isDownloaded && !$0.isBuiltIn
+                    }
+                    if !models.isEmpty {
+                        grouped[category] = models
+                    }
+                }
+                availableModels = grouped
+                if selectedModelIds.isEmpty {
+                    selectedModelIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
+                }
+            } catch {
+                availableModels = [:]
+            }
+        }
+    }
+
+    func toggleModel(_ modelId: String) {
+        if selectedModelIds.contains(modelId) {
+            selectedModelIds.remove(modelId)
+        } else {
+            selectedModelIds.insert(modelId)
+        }
+    }
+
+    func selectAllModels() {
+        selectedModelIds = Set(availableModels.values.flatMap { $0 }.map { $0.id })
+    }
+
+    func deselectAllModels() {
+        selectedModelIds.removeAll()
     }
 
     // MARK: - Run
@@ -65,7 +112,8 @@ final class BenchmarkViewModel {
 
             do {
                 let output = try await runner.runBenchmarks(
-                    categories: selectedCategories
+                    categories: selectedCategories,
+                    modelIds: selectedModelIds
                 ) { [weak self] update in
                     Task { @MainActor in
                         self?.progress = update.progress

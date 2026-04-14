@@ -43,6 +43,15 @@ let useLocalBinaries = false //  Toggle: true for local dev, false for release
 // Updated automatically by CI/CD during releases
 let sdkVersion = "0.19.7"
 
+// MetalRT remote binary availability flag.
+// Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip
+// has been published. When `false`, the MetalRT product/targets are only
+// exposed under `useLocalBinaries = true`, so SPM resolution will not fail
+// for external consumers due to a placeholder checksum.
+let metalrtRemoteBinaryAvailable = false
+
+let includeMetalRT = useLocalBinaries || metalrtRemoteBinaryAvailable
+
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -81,7 +90,8 @@ let package = Package(
             name: "RunAnywhereWhisperKit",
             targets: ["WhisperKitRuntime"]
         ),
-    ],
+
+    ] + metalRTProducts(),
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
@@ -221,8 +231,61 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-    ] + binaryTargets()
+    ] + metalRTTargets() + binaryTargets()
 )
+
+// =============================================================================
+// METALRT PRODUCT / TARGET GATING
+// =============================================================================
+// The RABackendMetalRT.xcframework is not yet published to GitHub releases
+// with a real checksum. To avoid SPM resolution failures for external
+// consumers due to a placeholder zero-checksum binary target, the MetalRT
+// product and its dependent targets are only included when:
+//   - `useLocalBinaries == true` (local dev with a checked-out xcframework), or
+//   - `metalrtRemoteBinaryAvailable == true` (once a real checksum is wired in).
+func metalRTProducts() -> [Product] {
+    guard includeMetalRT else { return [] }
+    return [
+        .library(
+            name: "RunAnywhereMetalRT",
+            targets: ["MetalRTRuntime"]
+        ),
+    ]
+}
+
+func metalRTTargets() -> [Target] {
+    guard includeMetalRT else { return [] }
+    return [
+        // MetalRT C Bridge Module - exposes rac_backend_metalrt_register()
+        .target(
+            name: "MetalRTBackend",
+            dependencies: ["RABackendMetalRTBinary"],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
+            publicHeadersPath: "."
+        ),
+        // MetalRT Runtime Backend (custom Metal GPU kernels)
+        .target(
+            name: "MetalRTRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "MetalRTBackend",
+                "RABackendMetalRTBinary",
+            ],
+            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
+            exclude: ["include"],
+            resources: [
+                .copy("Resources/default.metallib"),
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("CoreGraphics"),
+                .linkedFramework("ImageIO"),
+            ]
+        ),
+    ]
+}
 
 // =============================================================================
 // BINARY TARGET SELECTION
@@ -250,6 +313,10 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
+            ),
+            .binaryTarget(
+                name: "RABackendMetalRTBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
             ),
         ]
 
@@ -301,6 +368,19 @@ func binaryTargets() -> [Target] {
                 checksum: "f73db9dc09012325b35fd3da74de794a75f4e9971d9b923af0805d6ab1dfc243"
             ),
         ]
+
+        // MetalRT remote binary is only appended once a real checksum has been
+        // published. Until then the MetalRT product/targets are omitted from
+        // the package graph entirely (see metalRTProducts/metalRTTargets).
+        if metalrtRemoteBinaryAvailable {
+            targets.append(
+                .binaryTarget(
+                    name: "RABackendMetalRTBinary",
+                    url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMetalRT-v\(sdkVersion).zip",
+                    checksum: "0000000000000000000000000000000000000000000000000000000000000000" // TODO: replace with real checksum
+                )
+            )
+        }
 
         return targets
     }

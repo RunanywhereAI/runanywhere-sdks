@@ -123,6 +123,8 @@ struct BenchmarkMetrics: Codable, Sendable {
     // LLM-specific
     var ttftMs: Double?
     var tokensPerSecond: Double?
+    var prefillTokensPerSecond: Double?
+    var decodeTokensPerSecond: Double?
     var inputTokens: Int?
     var outputTokens: Int?
 

@@ -179,6 +179,35 @@ public enum CppBridge {
 
         guard wasInitialized else { return }
 
+        // Synchronously wait for all actor-isolated destroys to complete BEFORE
+        // tearing down the C++ core. Fire-and-forget here would race with
+        // rac_core_shutdown / Telemetry.shutdown / Events.unregister below,
+        // causing use-after-free inside the C++ layer and allowing reinit
+        // while destruction is still in flight.
+        //
+        // We hop to a GCD global queue (not the Swift cooperative thread pool)
+        // and block that GCD worker on a semaphore. Blocking a cooperative
+        // thread-pool thread via `Task.detached { ... }` + `semaphore.wait()`
+        // on the caller risks priority inversion / pool starvation, since the
+        // detached task and the caller may share the same limited pool. The
+        // GCD global pool is separate and safe to block briefly.
+        //
+        // reset() is not annotated @MainActor, so callers are expected to
+        // invoke it off the main thread.
+        let semaphore = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            Task {
+                await LLM.shared.destroy()
+                await STT.shared.destroy()
+                await TTS.shared.destroy()
+                await VAD.shared.destroy()
+                await VoiceAgent.shared.destroy()
+                await VLM.shared.destroy()
+                semaphore.signal()
+            }
+        }
+        semaphore.wait()
+
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)
 

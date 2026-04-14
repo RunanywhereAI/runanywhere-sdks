@@ -85,19 +85,26 @@ public extension RunAnywhere {
         let totalTimeMs = endTime.timeIntervalSince(startTime) * 1000
 
         // Extract result
-        let generatedText: String
+        let rawText: String
         if let textPtr = llmResult.text {
-            generatedText = String(cString: textPtr)
+            rawText = String(cString: textPtr)
         } else {
-            generatedText = ""
+            rawText = ""
         }
         let inputTokens = Int(llmResult.prompt_tokens)
         let outputTokens = Int(llmResult.completion_tokens)
         let tokensPerSecond = llmResult.tokens_per_second > 0 ? Double(llmResult.tokens_per_second) : 0
 
+        let (generatedText, thinkingContent) = ThinkingContentParser.extract(from: rawText)
+        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
+            totalCompletionTokens: outputTokens,
+            responseText: generatedText,
+            thinkingContent: thinkingContent
+        )
+
         return LLMGenerationResult(
             text: generatedText,
-            thinkingContent: nil,
+            thinkingContent: thinkingContent,
             inputTokens: inputTokens,
             tokensUsed: outputTokens,
             modelUsed: modelId,
@@ -105,8 +112,8 @@ public extension RunAnywhere {
             framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: nil,
-            thinkingTokens: 0,
-            responseTokens: outputTokens
+            thinkingTokens: thinkingTokens,
+            responseTokens: responseTokens
         )
     }
 
@@ -189,49 +196,42 @@ public extension RunAnywhere {
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream<String, Error> { continuation in
             Task {
-                do {
-                    await collector.markStart()
+                await collector.markStart()
 
-                    let context = LLMStreamCallbackContext(continuation: continuation, collector: collector)
-                    let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                let context = LLMStreamCallbackContext(continuation: continuation, collector: collector)
+                // passRetained: context is released in completeCallback or errorCallback
+                let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
-                    let callbacks = LLMStreamCallbacks.create()
-                    var cOptions = options
+                let callbacks = LLMStreamCallbacks.create()
+                var cOptions = options
 
-                    let callCFunction: () -> rac_result_t = {
-                        prompt.withCString { promptPtr in
-                            rac_llm_component_generate_stream(
-                                handle,
-                                promptPtr,
-                                &cOptions,
-                                callbacks.token,
-                                callbacks.complete,
-                                callbacks.error,
-                                contextPtr
-                            )
-                        }
+                let callCFunction: () -> rac_result_t = {
+                    prompt.withCString { promptPtr in
+                        rac_llm_component_generate_stream(
+                            handle,
+                            promptPtr,
+                            &cOptions,
+                            callbacks.token,
+                            callbacks.complete,
+                            callbacks.error,
+                            contextPtr
+                        )
                     }
+                }
 
-                    let streamResult: rac_result_t
-                    if let systemPrompt = systemPrompt {
-                        streamResult = systemPrompt.withCString { sysPtr in
-                            cOptions.system_prompt = sysPtr
-                            return callCFunction()
-                        }
-                    } else {
-                        cOptions.system_prompt = nil
-                        streamResult = callCFunction()
+                let streamResult: rac_result_t
+                if let systemPrompt = systemPrompt {
+                    streamResult = systemPrompt.withCString { sysPtr in
+                        cOptions.system_prompt = sysPtr
+                        return callCFunction()
                     }
+                } else {
+                    cOptions.system_prompt = nil
+                    streamResult = callCFunction()
+                }
 
-                    if streamResult != RAC_SUCCESS {
-                        Unmanaged<LLMStreamCallbackContext>.fromOpaque(contextPtr).release()
-                        let error = SDKError.llm(.generationFailed, "Stream generation failed: \(streamResult)")
-                        continuation.finish(throwing: error)
-                        await collector.markFailed(error)
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                    await collector.markFailed(error)
+                if streamResult != RAC_SUCCESS {
+                    return
                 }
             }
         }
@@ -264,16 +264,28 @@ private enum LLMStreamCallbacks {
             return RAC_TRUE
         }
 
-        let completeCallback: CompleteFn = { _, userData in
+        let completeCallback: CompleteFn = { resultPtr, userData in
             guard let userData = userData else { return }
-            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
             ctx.continuation.finish()
-            Task { await ctx.collector.markComplete() }
+
+            if let result = resultPtr?.pointee {
+                Task {
+                    await ctx.collector.markCompleteWithMetrics(
+                        promptTokens: Int(result.prompt_tokens),
+                        completionTokens: Int(result.completion_tokens),
+                        tokensPerSecond: Double(result.tokens_per_second),
+                        timeToFirstTokenMs: Double(result.time_to_first_token_ms)
+                    )
+                }
+            } else {
+                Task { await ctx.collector.markComplete() }
+            }
         }
 
         let errorCallback: ErrorFn = { _, errorMsg, userData in
             guard let userData = userData else { return }
-            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+            let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeRetainedValue()
             let message = errorMsg.map { String(cString: $0) } ?? "Unknown error"
             let error = SDKError.llm(.generationFailed, message)
             ctx.continuation.finish(throwing: error)
@@ -296,6 +308,68 @@ private final class LLMStreamCallbackContext: @unchecked Sendable {
     }
 }
 
+// MARK: - Thinking Content Parser
+
+enum ThinkingContentParser {
+    /// Extracts `<think>...</think>` content from generated text.
+    /// - NOTE: Only the first `<think>` block is extracted; additional blocks are left inline in the response text.
+    /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
+    static func extract(from text: String) -> (text: String, thinking: String?) {
+        guard let startRange = text.range(of: "<think>"),
+              let endRange = text.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound else {
+            return (text: text, thinking: nil)
+        }
+        let thinkingContent = String(text[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Include any text before <think> and after </think>
+        let textBefore = String(text[..<startRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let textAfter = String(text[endRange.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let responseText = [textBefore, textAfter]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        return (
+            text: responseText,
+            thinking: thinkingContent.isEmpty ? nil : thinkingContent
+        )
+    }
+
+    /// Apportions the total completion token count between the thinking segment
+    /// and the visible response segment using character-length ratios.
+    ///
+    /// The C++ layer reports only a total `completion_tokens` count — it does
+    /// not break it down by segment. Rather than guessing with an independent
+    /// word-count heuristic (which would not sum to the reported total), we
+    /// split the known total proportionally by character length. This keeps
+    /// `thinkingTokens + responseTokens == totalCompletionTokens`.
+    ///
+    /// - Returns: `(thinkingTokens, responseTokens)`. If there is no thinking
+    ///   content, `thinkingTokens` is 0 and all tokens are attributed to the
+    ///   response.
+    static func splitTokens(
+        totalCompletionTokens: Int,
+        responseText: String,
+        thinkingContent: String?
+    ) -> (thinkingTokens: Int, responseTokens: Int) {
+        guard let thinking = thinkingContent, !thinking.isEmpty else {
+            return (0, totalCompletionTokens)
+        }
+        let thinkingChars = thinking.count
+        let responseChars = responseText.count
+        let totalChars = thinkingChars + responseChars
+        guard totalChars > 0, totalCompletionTokens > 0 else {
+            return (0, totalCompletionTokens)
+        }
+        let thinkingTokens = Int(
+            (Double(thinkingChars) / Double(totalChars)) * Double(totalCompletionTokens)
+        )
+        let clamped = max(0, min(thinkingTokens, totalCompletionTokens))
+        return (clamped, totalCompletionTokens - clamped)
+    }
+}
+
 // MARK: - Streaming Metrics Collector
 
 /// Internal actor for collecting streaming metrics
@@ -311,6 +385,11 @@ private actor LLMStreamingMetricsCollector {
     private var isComplete = false
     private var error: Error?
     private var resultContinuation: CheckedContinuation<LLMGenerationResult, Error>?
+
+    private var cppPromptTokens: Int?
+    private var cppCompletionTokens: Int?
+    private var cppTokensPerSecond: Double?
+    private var cppTimeToFirstTokenMs: Double?
 
     init(modelId: String, promptLength: Int) {
         self.modelId = modelId
@@ -332,6 +411,24 @@ private actor LLMStreamingMetricsCollector {
     }
 
     func markComplete() {
+        isComplete = true
+        if let continuation = resultContinuation {
+            continuation.resume(returning: buildResult())
+            resultContinuation = nil
+        }
+    }
+
+    func markCompleteWithMetrics(
+        promptTokens: Int,
+        completionTokens: Int,
+        tokensPerSecond: Double,
+        timeToFirstTokenMs: Double
+    ) {
+        if promptTokens > 0 { cppPromptTokens = promptTokens }
+        if completionTokens > 0 { cppCompletionTokens = completionTokens }
+        if tokensPerSecond > 0 { cppTokensPerSecond = tokensPerSecond }
+        if timeToFirstTokenMs > 0 { cppTimeToFirstTokenMs = timeToFirstTokenMs }
+
         isComplete = true
         if let continuation = resultContinuation {
             continuation.resume(returning: buildResult())
@@ -363,28 +460,48 @@ private actor LLMStreamingMetricsCollector {
         let endTime = Date()
         let latencyMs = (startTime.map { endTime.timeIntervalSince($0) } ?? 0) * 1000
 
-        var timeToFirstTokenMs: Double?
-        if let start = startTime, let firstToken = firstTokenTime {
+        let timeToFirstTokenMs: Double?
+        if let cppTtft = cppTimeToFirstTokenMs {
+            timeToFirstTokenMs = cppTtft
+        } else if let start = startTime, let firstToken = firstTokenTime {
             timeToFirstTokenMs = firstToken.timeIntervalSince(start) * 1000
+        } else {
+            timeToFirstTokenMs = nil
         }
 
-        // Use actual token count from streaming callbacks, not character estimation (fixes #339)
-        let outputTokens = max(1, tokenCount)
-        let totalTimeSec = latencyMs / 1000.0
-        let tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
+        let outputTokens = cppCompletionTokens ?? max(1, tokenCount)
+        // Fallback: if backend didn't report prompt tokens, estimate from prompt
+        // character length (~4 chars per token) rather than reporting 0.
+        let estimatedPromptTokens = promptLength > 0 ? max(1, promptLength / 4) : 0
+        let inputTokens = cppPromptTokens ?? estimatedPromptTokens
+
+        let tokensPerSecond: Double
+        if let cppTps = cppTokensPerSecond {
+            tokensPerSecond = cppTps
+        } else {
+            let totalTimeSec = latencyMs / 1000.0
+            tokensPerSecond = totalTimeSec > 0 ? Double(outputTokens) / totalTimeSec : 0
+        }
+
+        let (responseText, thinkingContent) = ThinkingContentParser.extract(from: fullText)
+        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
+            totalCompletionTokens: outputTokens,
+            responseText: responseText,
+            thinkingContent: thinkingContent
+        )
 
         return LLMGenerationResult(
-            text: fullText,
-            thinkingContent: nil,
-            inputTokens: 0,
+            text: responseText,
+            thinkingContent: thinkingContent,
+            inputTokens: inputTokens,
             tokensUsed: outputTokens,
             modelUsed: modelId,
             latencyMs: latencyMs,
             framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: timeToFirstTokenMs,
-            thinkingTokens: 0,
-            responseTokens: outputTokens
+            thinkingTokens: thinkingTokens,
+            responseTokens: responseTokens
         )
     }
 }

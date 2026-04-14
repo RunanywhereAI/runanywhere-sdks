@@ -307,6 +307,8 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Backend initialization failed";
         case RAC_ERROR_BACKEND_BUSY:
             return "Backend busy";
+        case RAC_ERROR_BACKEND_UNAVAILABLE:
+            return "Backend binary not installed (compiled as stub)";
         case RAC_ERROR_INVALID_HANDLE:
             return "Invalid handle";
 

@@ -188,6 +188,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     RAC_FRAMEWORK_WHISPERKIT_COREML = 9,  /**< WhisperKit CoreML (Apple Neural Engine STT) */
+    RAC_FRAMEWORK_METALRT = 10,           /**< MetalRT (custom Metal GPU kernels, Apple only) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 
