@@ -96,6 +96,11 @@ public extension RunAnywhere {
         let tokensPerSecond = llmResult.tokens_per_second > 0 ? Double(llmResult.tokens_per_second) : 0
 
         let (generatedText, thinkingContent) = ThinkingContentParser.extract(from: rawText)
+        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
+            totalCompletionTokens: outputTokens,
+            responseText: generatedText,
+            thinkingContent: thinkingContent
+        )
 
         return LLMGenerationResult(
             text: generatedText,
@@ -107,8 +112,8 @@ public extension RunAnywhere {
             framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: nil,
-            thinkingTokens: thinkingContent.map { _ in outputTokens } ?? 0,
-            responseTokens: outputTokens
+            thinkingTokens: thinkingTokens,
+            responseTokens: responseTokens
         )
     }
 
@@ -333,6 +338,39 @@ enum ThinkingContentParser {
             thinking: thinkingContent.isEmpty ? nil : thinkingContent
         )
     }
+
+    /// Apportions the total completion token count between the thinking segment
+    /// and the visible response segment using character-length ratios.
+    ///
+    /// The C++ layer reports only a total `completion_tokens` count — it does
+    /// not break it down by segment. Rather than guessing with an independent
+    /// word-count heuristic (which would not sum to the reported total), we
+    /// split the known total proportionally by character length. This keeps
+    /// `thinkingTokens + responseTokens == totalCompletionTokens`.
+    ///
+    /// - Returns: `(thinkingTokens, responseTokens)`. If there is no thinking
+    ///   content, `thinkingTokens` is 0 and all tokens are attributed to the
+    ///   response.
+    static func splitTokens(
+        totalCompletionTokens: Int,
+        responseText: String,
+        thinkingContent: String?
+    ) -> (thinkingTokens: Int, responseTokens: Int) {
+        guard let thinking = thinkingContent, !thinking.isEmpty else {
+            return (0, totalCompletionTokens)
+        }
+        let thinkingChars = thinking.count
+        let responseChars = responseText.count
+        let totalChars = thinkingChars + responseChars
+        guard totalChars > 0, totalCompletionTokens > 0 else {
+            return (0, totalCompletionTokens)
+        }
+        let thinkingTokens = Int(
+            (Double(thinkingChars) / Double(totalChars)) * Double(totalCompletionTokens)
+        )
+        let clamped = max(0, min(thinkingTokens, totalCompletionTokens))
+        return (clamped, totalCompletionTokens - clamped)
+    }
 }
 
 // MARK: - Streaming Metrics Collector
@@ -435,7 +473,10 @@ private actor LLMStreamingMetricsCollector {
         }
 
         let outputTokens = cppCompletionTokens ?? max(1, tokenCount)
-        let inputTokens = cppPromptTokens ?? 0
+        // Fallback: if backend didn't report prompt tokens, estimate from prompt
+        // character length (~4 chars per token) rather than reporting 0.
+        let estimatedPromptTokens = promptLength > 0 ? max(1, promptLength / 4) : 0
+        let inputTokens = cppPromptTokens ?? estimatedPromptTokens
 
         let tokensPerSecond: Double
         if let cppTps = cppTokensPerSecond {
@@ -446,6 +487,11 @@ private actor LLMStreamingMetricsCollector {
         }
 
         let (responseText, thinkingContent) = ThinkingContentParser.extract(from: fullText)
+        let (thinkingTokens, responseTokens) = ThinkingContentParser.splitTokens(
+            totalCompletionTokens: outputTokens,
+            responseText: responseText,
+            thinkingContent: thinkingContent
+        )
 
         return LLMGenerationResult(
             text: responseText,
@@ -457,8 +503,8 @@ private actor LLMStreamingMetricsCollector {
             framework: "llamacpp",
             tokensPerSecond: tokensPerSecond,
             timeToFirstTokenMs: timeToFirstTokenMs,
-            thinkingTokens: 0,
-            responseTokens: outputTokens
+            thinkingTokens: thinkingTokens,
+            responseTokens: responseTokens
         )
     }
 }

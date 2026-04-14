@@ -55,7 +55,7 @@ public enum MetalRT: RunAnywhereModule {
 
     public static let moduleId = "metalrt"
     public static let moduleName = "MetalRT"
-    public static let capabilities: Set<SDKComponent> = [.llm, .stt, .tts]
+    public static let capabilities: Set<SDKComponent> = [.llm, .vlm, .stt, .tts]
     public static let defaultPriority: Int = 100
 
     /// MetalRT uses custom Metal GPU kernels

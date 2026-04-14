@@ -447,6 +447,13 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
     const char* name = model_info->name ? model_info->name : model_id;
 
     if (rac_framework_uses_directory_based_models(model_info->framework) == RAC_TRUE) {
+        struct stat dir_stat;
+        if (stat(model_folder, &dir_stat) != 0 || !S_ISDIR(dir_stat.st_mode)) {
+            RAC_LOG_ERROR(LOG_CAT, "Directory-based model requires a valid directory path: %s",
+                          model_folder);
+            rac_model_info_free(model_info);
+            return RAC_ERROR_NOT_FOUND;
+        }
         RAC_LOG_INFO(LOG_CAT, "Loading directory-based VLM model by ID: %s (dir=%s)", model_id, model_folder);
         result = rac_vlm_component_load_model(handle, model_folder, nullptr, model_id, name);
     } else {

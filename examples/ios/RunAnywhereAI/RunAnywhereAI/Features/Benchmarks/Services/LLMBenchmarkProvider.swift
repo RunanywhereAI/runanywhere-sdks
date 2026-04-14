@@ -27,10 +27,10 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         let maxTokens = Int(scenario.parameters?["maxTokens"] ?? "") ?? 512
         var metrics = BenchmarkMetrics()
 
-        let memBefore = SyntheticInputGenerator.availableMemoryBytes()
-
         // Ensure clean state: unload any model left over from Chat or a previous run
         try? await RunAnywhere.unloadModel()
+
+        let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
         // Load
         let loadStart = Date()
@@ -66,8 +66,9 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
 
             if let ttft = result.timeToFirstTokenMs, ttft > 0 {
                 let decodeMs = e2eMs - ttft
-                if decodeMs > 0, result.tokensUsed > 0 {
-                    metrics.decodeTokensPerSecond = Double(result.tokensUsed) / (decodeMs / 1000.0)
+                let decodeTokens = max(result.tokensUsed - 1, 0)
+                if decodeMs > 0, decodeTokens > 0 {
+                    metrics.decodeTokensPerSecond = Double(decodeTokens) / (decodeMs / 1000.0)
                 }
                 if result.inputTokens > 0 {
                     metrics.prefillTokensPerSecond = Double(result.inputTokens) / (ttft / 1000.0)

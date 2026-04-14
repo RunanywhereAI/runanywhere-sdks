@@ -28,8 +28,6 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
         #if canImport(UIKit)
         var metrics = BenchmarkMetrics()
 
-        let memBefore = SyntheticInputGenerator.availableMemoryBytes()
-
         // Ensure clean state: unload any VLM model left over from Camera or a previous run
         await RunAnywhere.unloadVLMModel()
         // Also unload any lingering LLM model to free memory headroom
@@ -37,12 +35,14 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
         // Brief pause to let iOS reclaim GPU/Metal memory from the previous model
         try await Task.sleep(nanoseconds: 500_000_000) // 0.5s
 
-        // Load
-        let loadStart = Date()
-        try await RunAnywhere.loadVLMModel(model)
-        metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+        let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
         do {
+            // Load
+            let loadStart = Date()
+            try await RunAnywhere.loadVLMModel(model)
+            metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
+
             // Generate a small synthetic image inside an autoreleasepool so CoreGraphics
             // intermediates are released promptly before we allocate the vision encoder.
             let vlmImage: VLMImage = autoreleasepool {

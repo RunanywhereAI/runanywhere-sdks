@@ -179,14 +179,27 @@ public enum CppBridge {
 
         guard wasInitialized else { return }
 
-        Task {
+        // Synchronously wait for all actor-isolated destroys to complete BEFORE
+        // tearing down the C++ core. Fire-and-forget here would race with
+        // rac_core_shutdown / Telemetry.shutdown / Events.unregister below,
+        // causing use-after-free inside the C++ layer and allowing reinit
+        // while destruction is still in flight.
+        //
+        // The destroy() methods are actor-isolated but not @MainActor, so
+        // blocking a background/non-MainActor caller on a semaphore is safe.
+        // reset() is not annotated @MainActor, so callers are expected to
+        // invoke it off the main thread.
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
             await LLM.shared.destroy()
             await STT.shared.destroy()
             await TTS.shared.destroy()
             await VAD.shared.destroy()
             await VoiceAgent.shared.destroy()
             await VLM.shared.destroy()
+            semaphore.signal()
         }
+        semaphore.wait()
 
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)

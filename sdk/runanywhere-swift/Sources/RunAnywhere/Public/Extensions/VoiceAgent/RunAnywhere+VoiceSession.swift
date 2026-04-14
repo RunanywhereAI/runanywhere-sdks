@@ -210,6 +210,7 @@ public actor VoiceSessionHandle {
         var cleanedResponse = ""
         var thinkingContent: String?
         var synthesizedAudio: Data?
+        var turnSucceeded = false
 
         do {
             // Step 1: Transcribe audio
@@ -256,17 +257,21 @@ public actor VoiceSessionHandle {
                     }
                 }
             }
+
+            turnSucceeded = true
         } catch {
             logger.error("Processing failed: \(error)")
             emit(.error(error.localizedDescription))
         }
 
-        emit(.turnCompleted(
-            transcript: transcription,
-            response: cleanedResponse,
-            thinkingContent: thinkingContent,
-            audio: synthesizedAudio
-        ))
+        if turnSucceeded {
+            emit(.turnCompleted(
+                transcript: transcription,
+                response: cleanedResponse,
+                thinkingContent: thinkingContent,
+                audio: synthesizedAudio
+            ))
+        }
 
         // Resume listening if continuous mode
         if config.continuousMode && isRunning {

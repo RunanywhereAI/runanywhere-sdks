@@ -734,7 +734,8 @@ create_backend_xcframework() {
 
         # For MetalRT: strip sentencepiece's flag.cc.o to avoid duplicate _FLAGS_help with sherpa-onnx
         if [[ "$BACKEND_NAME" == "metalrt" ]]; then
-            local TMPSTRIP=$(mktemp -d)
+            local TMPSTRIP
+            TMPSTRIP=$(mktemp -d) || { log_error "Failed to create temp directory"; exit 1; }
             cd "$TMPSTRIP"
             ar x "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}"
             rm -f flag.cc.o init.cc.o

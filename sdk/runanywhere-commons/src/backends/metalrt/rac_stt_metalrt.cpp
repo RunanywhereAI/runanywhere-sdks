@@ -18,7 +18,7 @@ static const char* LOG_CAT = "STT.MetalRT";
 
 struct rac_stt_metalrt_impl {
     void* handle;  // metalrt_whisper_create() handle
-    bool loaded;
+    bool loaded = false;
 };
 
 extern "C" {
@@ -88,6 +88,10 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
     }
 
     out_result->text = strdup(text);
+    if (!out_result->text) {
+        metalrt_whisper_free_text(text);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->detected_language = nullptr;
     out_result->words = nullptr;
     out_result->num_words = 0;

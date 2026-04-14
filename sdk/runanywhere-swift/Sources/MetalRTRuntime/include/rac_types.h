@@ -12,6 +12,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 /**
  * Null pointer macro for use in static initializers.
@@ -115,8 +116,25 @@ typedef struct rac_string_view {
 
 /**
  * Creates a string view from a null-terminated C string.
+ *
+ * Implemented as an inline function to ensure the argument is evaluated
+ * exactly once, which makes it safe to pass expressions with side effects
+ * such as `RAC_STRING_VIEW(get_string())`.
  */
-#define RAC_STRING_VIEW(s) ((rac_string_view_t){(s), (s) ? strlen(s) : 0})
+#ifdef __cplusplus
+inline rac_string_view_t rac_make_string_view(const char* s) {
+    return rac_string_view_t{s, s ? strlen(s) : 0};
+}
+#define RAC_STRING_VIEW(s) rac_make_string_view(s)
+#else
+static inline rac_string_view_t rac_make_string_view(const char* s) {
+    rac_string_view_t v;
+    v.data = s;
+    v.length = s ? strlen(s) : 0;
+    return v;
+}
+#define RAC_STRING_VIEW(s) rac_make_string_view(s)
+#endif
 
 // =============================================================================
 // AUDIO TYPES

@@ -589,7 +589,7 @@ rac_result_t rac_backend_metalrt_unregister(void) {
     rac_service_unregister_provider(state.llm_provider, RAC_CAPABILITY_TEXT_GENERATION);
     rac_service_unregister_provider(state.stt_provider, RAC_CAPABILITY_STT);
     rac_service_unregister_provider(state.tts_provider, RAC_CAPABILITY_TTS);
-    rac_service_unregister_provider(state.vlm_provider, RAC_CAPABILITY_TEXT_GENERATION);
+    rac_service_unregister_provider(state.vlm_provider, RAC_CAPABILITY_VISION_LANGUAGE);
     rac_module_unregister(state.module_id);
 
     state.registered = false;

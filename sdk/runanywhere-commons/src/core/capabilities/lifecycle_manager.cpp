@@ -199,6 +199,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         mgr->current_model_id.clear();
         mgr->current_model_name.clear();
         mgr->total_unloads++;
+        mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
     }
 
     // Track load started (mirrors Swift: trackEvent(type: .loadStarted))

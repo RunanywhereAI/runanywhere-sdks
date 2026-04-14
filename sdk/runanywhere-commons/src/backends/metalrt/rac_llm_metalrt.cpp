@@ -20,7 +20,7 @@ static const char* LOG_CAT = "LLM.MetalRT";
 
 struct rac_llm_metalrt_impl {
     void* handle;  // metalrt_create() handle
-    bool loaded;
+    bool loaded = false;
 };
 
 // =============================================================================
@@ -112,6 +112,7 @@ struct MetalRTStreamCtx {
     void* user_data;
     int32_t max_tokens;
     int32_t emitted_tokens;
+    bool client_cancelled;
 };
 
 static bool metalrt_stream_bridge(const char* piece, void* ctx) {
@@ -121,7 +122,11 @@ static bool metalrt_stream_bridge(const char* piece, void* ctx) {
         return false;
     }
     adapter->emitted_tokens++;
-    return adapter->callback(piece, RAC_FALSE, adapter->user_data) == RAC_TRUE;
+    if (adapter->callback(piece, RAC_FALSE, adapter->user_data) != RAC_TRUE) {
+        adapter->client_cancelled = true;
+        return false;
+    }
+    return true;
 }
 
 rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* prompt,
@@ -142,15 +147,17 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
     opts.reset_cache = true;
     opts.ignore_eos = false;
 
-    MetalRTStreamCtx ctx = {callback, user_data, max_tok, 0};
+    MetalRTStreamCtx ctx = {callback, user_data, max_tok, 0, false};
     struct MetalRTResult result = metalrt_generate_stream(
         impl->handle, prompt, metalrt_stream_bridge, &ctx, &opts);
 
-    // Send final token
-    callback("", RAC_TRUE, user_data);
+    // Send final token only if client did not cancel.
+    if (!ctx.client_cancelled) {
+        callback("", RAC_TRUE, user_data);
+    }
 
     metalrt_free_result(result);
-    return RAC_SUCCESS;
+    return ctx.client_cancelled ? RAC_ERROR_STREAM_CANCELLED : RAC_SUCCESS;
 }
 
 rac_result_t rac_llm_metalrt_inject_system_prompt(rac_handle_t handle, const char* prompt) {

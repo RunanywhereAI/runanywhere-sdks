@@ -16,7 +16,7 @@ static const char* LOG_CAT = "TTS.MetalRT";
 
 struct rac_tts_metalrt_impl {
     void* handle;  // metalrt_tts_create() handle
-    bool loaded;
+    bool loaded = false;
 };
 
 extern "C" {

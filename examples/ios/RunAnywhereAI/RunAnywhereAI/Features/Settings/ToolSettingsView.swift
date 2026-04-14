@@ -100,7 +100,6 @@ class ToolSettingsViewModel: ObservableObject {
                         }
                         return "0"
                     }()
-                    print("Calculator received args: \(args), using expression: '\(expression)'")
                     // Clean the expression - remove any non-math characters
                     let cleanedExpression = expression
                         .replacingOccurrences(of: "=", with: "")
@@ -109,20 +108,12 @@ class ToolSettingsViewModel: ObservableObject {
                         .replacingOccurrences(of: "÷", with: "/")
                         .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                    // Validate expression contains only safe math characters
-                    let allowedChars = CharacterSet(charactersIn: "0123456789.+-*/() ")
-                    guard cleanedExpression.unicodeScalars.allSatisfy({ allowedChars.contains($0) }),
-                          !cleanedExpression.isEmpty else {
+                    // Safely evaluate using a deterministic parser that validates
+                    // grammar and returns errors instead of crashing (unlike
+                    // NSExpression, whose Obj-C exceptions cannot be caught from Swift).
+                    if let value = SafeMathEvaluator.evaluate(cleanedExpression) {
                         return [
-                            "error": .string("Could not evaluate expression: \(expression)"),
-                            "expression": .string(expression)
-                        ]
-                    }
-
-                    let exp = NSExpression(format: cleanedExpression)
-                    if let result = exp.expressionValue(with: nil, context: nil) as? NSNumber {
-                        return [
-                            "result": .number(result.doubleValue),
+                            "result": .number(value),
                             "expression": .string(expression)
                         ]
                     }
@@ -412,6 +403,131 @@ enum WeatherService {
         case 95: return "Thunderstorm"
         case 96, 99: return "Thunderstorm with hail"
         default: return "Unknown"
+        }
+    }
+}
+
+// MARK: - Safe Math Evaluator
+//
+// Deterministic recursive-descent parser for simple arithmetic expressions.
+// Replaces NSExpression(format:) which can raise uncaught Objective-C
+// exceptions (e.g. for "1 2", "(1+2", "1++2") that Swift's do-catch cannot
+// intercept. Supports the grammar:
+//   expr    := term (("+" | "-") term)*
+//   term    := factor (("*" | "/") factor)*
+//   factor  := ("+" | "-") factor | primary
+//   primary := number | "(" expr ")"
+enum SafeMathEvaluator {
+    static func evaluate(_ expression: String) -> Double? {
+        var parser = Parser(input: expression)
+        guard let value = parser.parseExpression() else { return nil }
+        guard parser.isAtEnd else { return nil }
+        guard value.isFinite else { return nil }
+        return value
+    }
+
+    private struct Parser {
+        let scalars: [Character]
+        var index: Int = 0
+
+        init(input: String) {
+            self.scalars = Array(input)
+        }
+
+        var isAtEnd: Bool {
+            skipWhitespace()
+            return index >= scalars.count
+        }
+
+        mutating func skipWhitespace() {
+            while index < scalars.count, scalars[index].isWhitespace {
+                index += 1
+            }
+        }
+
+        mutating func peek() -> Character? {
+            skipWhitespace()
+            return index < scalars.count ? scalars[index] : nil
+        }
+
+        mutating func advance() -> Character? {
+            skipWhitespace()
+            guard index < scalars.count else { return nil }
+            let char = scalars[index]
+            index += 1
+            return char
+        }
+
+        mutating func match(_ char: Character) -> Bool {
+            if peek() == char {
+                _ = advance()
+                return true
+            }
+            return false
+        }
+
+        mutating func parseExpression() -> Double? {
+            guard var value = parseTerm() else { return nil }
+            while let op = peek(), op == "+" || op == "-" {
+                _ = advance()
+                guard let rhs = parseTerm() else { return nil }
+                value = op == "+" ? value + rhs : value - rhs
+            }
+            return value
+        }
+
+        mutating func parseTerm() -> Double? {
+            guard var value = parseFactor() else { return nil }
+            while let op = peek(), op == "*" || op == "/" {
+                _ = advance()
+                guard let rhs = parseFactor() else { return nil }
+                if op == "/" {
+                    guard rhs != 0 else { return nil }
+                    value /= rhs
+                } else {
+                    value *= rhs
+                }
+            }
+            return value
+        }
+
+        mutating func parseFactor() -> Double? {
+            if match("+") { return parseFactor() }
+            if match("-") {
+                guard let value = parseFactor() else { return nil }
+                return -value
+            }
+            return parsePrimary()
+        }
+
+        mutating func parsePrimary() -> Double? {
+            guard let next = peek() else { return nil }
+            if next == "(" {
+                _ = advance()
+                guard let value = parseExpression() else { return nil }
+                guard match(")") else { return nil }
+                return value
+            }
+            return parseNumber()
+        }
+
+        mutating func parseNumber() -> Double? {
+            skipWhitespace()
+            let start = index
+            var seenDot = false
+            while index < scalars.count {
+                let char = scalars[index]
+                if char.isNumber {
+                    index += 1
+                } else if char == "." && !seenDot {
+                    seenDot = true
+                    index += 1
+                } else {
+                    break
+                }
+            }
+            guard index > start else { return nil }
+            return Double(String(scalars[start..<index]))
         }
     }
 }

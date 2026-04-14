@@ -491,7 +491,7 @@ struct RunAnywhereAIApp: App {
             )
         }
 
-        logger.info("✅ MetalRT models registered")
+        logger.info("ℹ️ MetalRT runtime available; no downloadable MetalRT models are configured yet")
         #else
         logger.info("ℹ️ MetalRT not available (MetalRTRuntime not linked)")
         #endif

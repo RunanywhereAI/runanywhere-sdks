@@ -5,6 +5,7 @@
 
 #include "rac_vlm_metalrt.h"
 
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -32,14 +33,15 @@ static std::vector<uint8_t> rgb_to_rgba(const uint8_t* rgb, uint32_t w, uint32_t
 }
 
 struct rac_vlm_metalrt_impl {
-    void* handle;  // metalrt_vision_create() handle
-    bool loaded;
+    void* handle = nullptr;  // metalrt_vision_create() handle
+    bool loaded = false;
 };
 
 extern "C" {
 
 rac_result_t rac_vlm_metalrt_create(const char* model_path, rac_handle_t* out_handle) {
     if (!out_handle) return RAC_ERROR_NULL_POINTER;
+    if (!model_path || model_path[0] == '\0') return RAC_ERROR_VALIDATION_FAILED;
 
     auto* impl = new (std::nothrow) rac_vlm_metalrt_impl();
     if (!impl) return RAC_ERROR_OUT_OF_MEMORY;
@@ -92,6 +94,13 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
         result = metalrt_vision_analyze(impl->handle, image->file_path, prompt, &vopts);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
+        if (image->width == 0 || image->height == 0 ||
+            image->width > static_cast<uint32_t>(INT_MAX) ||
+            image->height > static_cast<uint32_t>(INT_MAX)) {
+            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions: %u x %u",
+                          image->width, image->height);
+            return RAC_ERROR_VALIDATION_FAILED;
+        }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
         result = metalrt_vision_analyze_pixels(impl->handle, rgba.data(),
                                                 (int)image->width, (int)image->height,
@@ -102,6 +111,10 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     }
 
     out_result->text = result.text ? strdup(result.text) : nullptr;
+    if (result.text && !out_result->text) {
+        metalrt_vision_free_result(result);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     out_result->prompt_tokens = result.prompt_tokens;
     out_result->image_tokens = 0;
     out_result->completion_tokens = result.generated_tokens;
@@ -149,6 +162,13 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
         result = metalrt_vision_analyze_stream(
             impl->handle, image->file_path, prompt, vlm_stream_bridge, &ctx, &vopts);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
+        if (image->width == 0 || image->height == 0 ||
+            image->width > static_cast<uint32_t>(INT_MAX) ||
+            image->height > static_cast<uint32_t>(INT_MAX)) {
+            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions for streaming: %u x %u",
+                          image->width, image->height);
+            return RAC_ERROR_VALIDATION_FAILED;
+        }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
         result = metalrt_vision_analyze_pixels_stream(
             impl->handle, rgba.data(), (int)image->width, (int)image->height,
