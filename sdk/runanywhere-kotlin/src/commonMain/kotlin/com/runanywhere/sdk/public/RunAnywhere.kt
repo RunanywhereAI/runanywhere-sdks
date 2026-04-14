@@ -14,6 +14,8 @@ import com.runanywhere.sdk.foundation.LogLevel
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.utils.SDKConstants
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SDK INITIALIZATION FLOW (Two-Phase Pattern)
@@ -91,6 +93,7 @@ object RunAnywhere {
     private var _areServicesReady: Boolean = false
 
     private val lock = Any()
+    private val servicesMutex = Mutex()
 
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Public Properties
@@ -240,7 +243,7 @@ object RunAnywhere {
             return
         }
 
-        synchronized(lock) {
+        servicesMutex.withLock {
             if (_areServicesReady) {
                 return
             }
@@ -334,7 +337,7 @@ object RunAnywhere {
      * Initialize CppBridge services (Phase 2)
      * Implementation is in jvmAndroidMain via expect/actual
      */
-    private fun initializeCppBridgeServices() {
+    private suspend fun initializeCppBridgeServices() {
         logger.debug("CppBridge services initialization requested")
         initializePlatformBridgeServices()
     }
@@ -367,7 +370,7 @@ internal expect fun initializePlatformBridge(environment: SDKEnvironment, apiKey
  * Initialize platform-specific bridge services (Phase 2).
  * On JVM/Android, this calls CppBridge.initializeServices().
  */
-internal expect fun initializePlatformBridgeServices()
+internal expect suspend fun initializePlatformBridgeServices()
 
 /**
  * Shutdown platform-specific bridge.

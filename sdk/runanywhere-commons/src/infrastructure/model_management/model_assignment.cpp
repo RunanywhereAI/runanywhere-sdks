@@ -243,6 +243,8 @@ static std::vector<rac_model_info_t*> parse_models_json(const char* json_str, si
             model->framework = RAC_FRAMEWORK_MLX;
         else if (framework == "fluid_audio" || framework == "FluidAudio")
             model->framework = RAC_FRAMEWORK_FLUID_AUDIO;
+        else if (framework == "genie" || framework == "qnn_genie" || framework == "Genie")
+            model->framework = RAC_FRAMEWORK_GENIE;
         else
             model->framework = RAC_FRAMEWORK_UNKNOWN;
 

@@ -174,7 +174,11 @@ android {
             "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
             "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
             "**/librac_commons.so",
-            "**/libomp.so"
+            "**/libomp.so",
+            "**/libcdsprpc.so",
+            "**/libGenie.so",
+            "**/libQnnHtpV81Skel.so",
+            "**/libQnnHtpV81Stub.so"
         ]
     }
 
@@ -202,6 +206,7 @@ dependencies {
     implementation project(':runanywhere_core')
     implementation project(':runanywhere_llamacpp')
     implementation project(':runanywhere_onnx')
+    implementation project(':runanywhere_genie')
 
     def isHermesEnabled = project.hasProperty("hermesEnabled") ? project.hermesEnabled.toBoolean() : true
     // Expose hermesEnabled for other modules (like react-native-worklets)

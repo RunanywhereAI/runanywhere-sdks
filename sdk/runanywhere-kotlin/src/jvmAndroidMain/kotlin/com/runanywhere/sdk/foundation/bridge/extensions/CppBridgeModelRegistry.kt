@@ -14,6 +14,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import java.io.File
 
 /**
  * Model registry bridge that provides direct access to the C++ model registry.
@@ -73,13 +74,13 @@ object CppBridgeModelRegistry {
      * Model format constants matching C++ RAC_MODEL_FORMAT_* values.
      */
     object ModelFormat {
-        const val UNKNOWN = 0 // RAC_MODEL_FORMAT_UNKNOWN
-        const val GGUF = 1 // RAC_MODEL_FORMAT_GGUF
-        const val ONNX = 2 // RAC_MODEL_FORMAT_ONNX
-        const val ORT = 3 // RAC_MODEL_FORMAT_ORT
-        const val BIN = 4 // RAC_MODEL_FORMAT_BIN
-        const val COREML = 5 // RAC_MODEL_FORMAT_COREML
-        const val TFLITE = 6 // RAC_MODEL_FORMAT_TFLITE
+        const val ONNX = 0 // RAC_MODEL_FORMAT_ONNX
+        const val ORT = 1 // RAC_MODEL_FORMAT_ORT
+        const val GGUF = 2 // RAC_MODEL_FORMAT_GGUF
+        const val BIN = 3 // RAC_MODEL_FORMAT_BIN
+        const val COREML = 4 // RAC_MODEL_FORMAT_COREML
+        const val QNN_CONTEXT = 5 // RAC_MODEL_FORMAT_QNN_CONTEXT
+        const val UNKNOWN = 99 // RAC_MODEL_FORMAT_UNKNOWN
     }
 
     /**
@@ -94,6 +95,11 @@ object CppBridgeModelRegistry {
         const val FLUID_AUDIO = 4 // RAC_FRAMEWORK_FLUID_AUDIO
         const val BUILTIN = 5 // RAC_FRAMEWORK_BUILTIN
         const val NONE = 6 // RAC_FRAMEWORK_NONE
+        const val MLX = 7 // RAC_FRAMEWORK_MLX
+        const val COREML = 8 // RAC_FRAMEWORK_COREML
+        const val WHISPERKIT_COREML = 9 // RAC_FRAMEWORK_WHISPERKIT_COREML
+        const val METALRT = 10 // RAC_FRAMEWORK_METALRT
+        const val GENIE = 11 // RAC_FRAMEWORK_GENIE
         const val UNKNOWN = 99 // RAC_FRAMEWORK_UNKNOWN
     }
 
@@ -214,7 +220,7 @@ object CppBridgeModelRegistry {
     }
 
     /**
-     * Update download status in C++ registry.
+     * Update download status in C++ registry (in-memory only).
      *
      * @param modelId The model ID
      * @param localPath The local path (or null to clear download)
@@ -258,71 +264,43 @@ object CppBridgeModelRegistry {
     }
 
     /**
-     * Scan filesystem and restore downloaded models.
+     * Scan filesystem and restore downloaded models whose filename matches their model ID.
+     * This handles single-file models (GGUF, ONNX) and archive models that extracted into
+     * a named directory matching the model ID.
      *
-     * This is called during SDK initialization to detect previously
-     * downloaded models and update their status in the C++ registry.
+     * For archive models with flat extraction (e.g. Genie), see
+     * [RunAnywhere.restorePersistedDownloadPaths] in RunAnywhere+ModelManagement.jvmAndroid.kt.
      */
     fun scanAndRestoreDownloadedModels() {
-        log(LogLevel.DEBUG, "Scanning for previously downloaded models...")
-
         val baseDir = CppBridgeModelPaths.getBaseDirectory()
-        val modelsDir = java.io.File(baseDir, "models")
+        val modelsDir = File(baseDir, "models")
 
         if (!modelsDir.exists()) {
             log(LogLevel.DEBUG, "Models directory does not exist: ${modelsDir.absolutePath}")
             return
         }
 
-        val typeDirectories =
-    mapOf(
-        "llm" to ModelCategory.LANGUAGE,
-        "stt" to ModelCategory.SPEECH_RECOGNITION,
-        "tts" to ModelCategory.SPEECH_SYNTHESIS,
-        "vad" to ModelCategory.AUDIO,
-
-        // RAG
-        "embedding" to ModelType.EMBEDDING,
-
-        // Vision / VLM
-        "vision" to ModelCategory.VISION,
-        "multimodal" to ModelCategory.MULTIMODAL,
-
-        // Backward compatibility
-        "other" to -1,
-    )
-
+        log(LogLevel.DEBUG, "Scanning for previously downloaded models...")
         var restoredCount = 0
 
-        for ((dirName, _) in typeDirectories) {
-            val typeDir = java.io.File(modelsDir, dirName)
+        val typeDirectories = listOf("llm", "stt", "tts", "vad", "embedding", "vision", "multimodal", "other")
+        for (dirName in typeDirectories) {
+            val typeDir = File(modelsDir, dirName)
             if (!typeDir.exists() || !typeDir.isDirectory) continue
 
-            log(LogLevel.DEBUG, "Scanning type directory: ${typeDir.absolutePath}")
-
-            // Scan each model file or folder in this type directory
             typeDir.listFiles()?.forEach { modelPath ->
-                // Model can be stored as:
-                // 1. A directory containing the model (e.g., models/llm/model-name/)
-                // 2. A file directly (e.g., models/llm/model-name)
                 val modelId = modelPath.name
-                log(LogLevel.DEBUG, "Found: $modelId (isDir=${modelPath.isDirectory}, isFile=${modelPath.isFile})")
-
-                // Check if this model exists in registry
                 val existingModel = get(modelId)
-                if (existingModel != null) {
-                    // Update with local path
+                if (existingModel != null && existingModel.localPath == null) {
                     if (updateDownloadStatus(modelId, modelPath.absolutePath)) {
                         restoredCount++
-                        log(LogLevel.DEBUG, "Restored downloaded model: $modelId at ${modelPath.absolutePath}")
+                        log(LogLevel.DEBUG, "Restored $modelId at ${modelPath.absolutePath}")
                     }
-                } else {
-                    log(LogLevel.DEBUG, "Model $modelId not found in registry, skipping")
                 }
             }
         }
 
-        log(LogLevel.INFO, "Scan complete: Restored $restoredCount previously downloaded models")
+        log(LogLevel.INFO, "Filesystem scan complete: restored $restoredCount models")
     }
 
     // ========================================================================

@@ -25,7 +25,6 @@ import 'package:runanywhere/native/dart_bridge_model_registry.dart'
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
-import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -2660,6 +2659,11 @@ class RunAnywhere {
 
   // ============================================================================
   // MARK: - RAG (Retrieval-Augmented Generation)
+  //
+  // Note: Additional RAG methods are also available via the RunAnywhereRAG
+  // extension in lib/public/extensions/runanywhere_rag.dart (async variants
+  // with event publishing). The inline methods below are the simpler static
+  // entry points from main.
   // ============================================================================
 
   /// Create a RAG pipeline with the given configuration.

@@ -45,6 +45,7 @@ enum class ModelFormat(
     ORT("ort"),
     GGUF("gguf"),
     BIN("bin"),
+    QNN_CONTEXT("qnn_context"),
     UNKNOWN("unknown"),
 }
 
@@ -115,6 +116,7 @@ enum class ModelSelectionContext(
         when (this) {
             LLM ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.LLAMA_CPP ||
+                    framework == com.runanywhere.sdk.core.types.InferenceFramework.GENIE ||
                     framework == com.runanywhere.sdk.core.types.InferenceFramework.FOUNDATION_MODELS
             STT ->
                 framework == com.runanywhere.sdk.core.types.InferenceFramework.ONNX

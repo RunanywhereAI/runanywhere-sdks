@@ -7,7 +7,10 @@
     <application
         android:label="RunAnywhere AI"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:extractNativeLibs="true">
+        <!-- Declare vendor public library for Genie NPU (Qualcomm FastRPC DSP communication) -->
+        <uses-native-library android:name="libcdsprpc.so" android:required="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -2,11 +2,16 @@
 
 #include "common.h"
 
+// Internal llama.cpp header for LoRA adapter introspection (ab_map tensor count)
+#include "llama-adapter.h"
+
 #include <algorithm>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -644,6 +649,26 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
 
     cancel_requested_.store(false);
     decode_failed_ = false;
+
+    // Verify LoRA adapters are applied before generation
+    if (!lora_adapters_.empty()) {
+        RAC_LOG_INFO("LLM.LlamaCpp","[LORA] %zu adapter(s) loaded for generation:", lora_adapters_.size());
+        bool all_applied = true;
+        for (const auto& entry : lora_adapters_) {
+            RAC_LOG_INFO("LLM.LlamaCpp","[LORA]   %s: applied=%d, adapter_scale=%.2f",
+                 entry.path.c_str(), entry.applied ? 1 : 0, entry.scale);
+            if (!entry.applied) {
+                all_applied = false;
+            }
+        }
+        if (!all_applied) {
+            RAC_LOG_ERROR("LLM.LlamaCpp","[LORA] Some adapters not applied, attempting re-apply");
+            if (!apply_lora_adapters()) {
+                RAC_LOG_ERROR("LLM.LlamaCpp","[LORA] Failed to re-apply adapters before generation");
+                return false;
+            }
+        }
+    }
 
     std::string prompt = build_prompt(request);
     RAC_LOG_INFO("LLM.LlamaCpp","Generating with prompt length: %zu", prompt.length());
@@ -1315,7 +1340,7 @@ bool LlamaCppTextGeneration::apply_lora_adapters() {
 
     for (auto& entry : lora_adapters_) {
         entry.applied = true;
-        RAC_LOG_INFO("LLM.LlamaCpp","Applied LoRA adapter: %s (scale=%.2f)", entry.path.c_str(), entry.scale);
+        RAC_LOG_INFO("LLM.LlamaCpp","Applied LoRA adapter: %s (adapter_scale=%.2f)", entry.path.c_str(), entry.scale);
     }
     return true;
 }
@@ -1328,10 +1353,32 @@ bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, 
         return false;
     }
 
+    // Validate scale
+    if (scale <= 0.0f || !std::isfinite(scale)) {
+        RAC_LOG_ERROR("LLM.LlamaCpp","Invalid LoRA scale: %.4f (must be positive and finite)", scale);
+        return false;
+    }
+
     // Check if adapter already loaded
     for (const auto& entry : lora_adapters_) {
         if (entry.path == adapter_path) {
             RAC_LOG_ERROR("LLM.LlamaCpp","LoRA adapter already loaded: %s", adapter_path.c_str());
+            return false;
+        }
+    }
+
+    // Validate file exists and is a valid GGUF before passing to llama.cpp
+    {
+        std::ifstream file(adapter_path, std::ios::binary);
+        if (!file.is_open()) {
+            RAC_LOG_ERROR("LLM.LlamaCpp","LoRA adapter file not found: %s", adapter_path.c_str());
+            return false;
+        }
+        uint32_t magic = 0;
+        file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+        if (!file || magic != 0x46554747u) {  // "GGUF" in little-endian
+            RAC_LOG_ERROR("LLM.LlamaCpp","LoRA adapter is not a valid GGUF file: %s (magic=0x%08X)",
+                 adapter_path.c_str(), magic);
             return false;
         }
     }
@@ -1341,8 +1388,35 @@ bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, 
     // Load adapter against model
     llama_adapter_lora* adapter = llama_adapter_lora_init(model_, adapter_path.c_str());
     if (!adapter) {
-        RAC_LOG_ERROR("LLM.LlamaCpp","Failed to load LoRA adapter from: %s", adapter_path.c_str());
+        RAC_LOG_ERROR("LLM.LlamaCpp","Failed to load LoRA adapter: %s "
+             "(possible architecture mismatch with loaded model)", adapter_path.c_str());
         return false;
+    }
+
+    // Verify the adapter actually matched tensors in the model
+    size_t matched_tensors = adapter->ab_map.size();
+    if (matched_tensors == 0) {
+        RAC_LOG_ERROR("LLM.LlamaCpp","LoRA adapter matched 0 tensors in model — "
+             "adapter has no effect (wrong base model?): %s", adapter_path.c_str());
+        return false;
+    }
+    RAC_LOG_INFO("LLM.LlamaCpp","LoRA adapter matched %zu tensor pairs", matched_tensors);
+
+    // Log adapter metadata for diagnostics
+    {
+        char alpha_buf[64] = {0};
+        if (llama_adapter_meta_val_str(adapter, "general.lora.alpha", alpha_buf, sizeof(alpha_buf)) > 0) {
+            RAC_LOG_INFO("LLM.LlamaCpp","LoRA adapter metadata: alpha=%s", alpha_buf);
+        }
+        int n_meta = llama_adapter_meta_count(adapter);
+        RAC_LOG_INFO("LLM.LlamaCpp","LoRA adapter has %d metadata entries", n_meta);
+        for (int i = 0; i < n_meta && i < 20; i++) {
+            char key_buf[128] = {0};
+            char val_buf[128] = {0};
+            llama_adapter_meta_key_by_index(adapter, i, key_buf, sizeof(key_buf));
+            llama_adapter_meta_val_str_by_index(adapter, i, val_buf, sizeof(val_buf));
+            RAC_LOG_INFO("LLM.LlamaCpp","  [%d] %s = %s", i, key_buf, val_buf);
+        }
     }
 
     // Store adapter entry
@@ -1353,24 +1427,24 @@ bool LlamaCppTextGeneration::load_lora_adapter(const std::string& adapter_path, 
     entry.applied = false;
     lora_adapters_.push_back(std::move(entry));
 
-    // Recreate context so the new adapter is visible
+    // Per llama.cpp docs: "All adapters must be loaded before context creation."
+    // Recreate context so it properly accounts for LoRA operations in the compute graph.
     if (!recreate_context()) {
-        // Remove the adapter entry we just added on failure
+        RAC_LOG_ERROR("LLM.LlamaCpp","Failed to recreate context after LoRA adapter load");
         lora_adapters_.pop_back();
         return false;
     }
 
-    // Apply all loaded adapters to the new context
+    // Apply all loaded adapters to the fresh context
     if (!apply_lora_adapters()) {
         lora_adapters_.pop_back();
         return false;
     }
 
-    // Clear KV cache after adapter changes
-    llama_memory_clear(llama_get_memory(context_), true);
+    // KV cache is already empty from context recreation — no need to clear
 
-    RAC_LOG_INFO("LLM.LlamaCpp","LoRA adapter loaded and applied: %s (%zu total adapters)",
-         adapter_path.c_str(), lora_adapters_.size());
+    RAC_LOG_INFO("LLM.LlamaCpp","LoRA adapter loaded and applied: %s (%zu total adapters, %zu matched tensors)",
+         adapter_path.c_str(), lora_adapters_.size(), matched_tensors);
     return true;
 }
 

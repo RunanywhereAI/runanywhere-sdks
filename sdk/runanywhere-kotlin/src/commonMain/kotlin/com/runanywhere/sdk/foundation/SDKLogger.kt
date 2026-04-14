@@ -332,8 +332,8 @@ object Logging {
         // Forward to runanywhere-commons bridge if set
         commonsLogBridge?.invoke(entry)
 
-        // Write to all registered destinations
-        for (destination in _destinations) {
+        // Write to all registered destinations (snapshot to avoid concurrent modification)
+        for (destination in _destinations.toList()) {
             if (destination.isAvailable) {
                 destination.write(entry)
             }
@@ -358,6 +358,7 @@ object Logging {
     /**
      * Add a log destination (non-suspending version).
      */
+    @Synchronized
     fun addDestinationSync(destination: LogDestination) {
         if (_destinations.none { it.identifier == destination.identifier }) {
             _destinations.add(destination)
@@ -761,6 +762,9 @@ class SDKLogger(
 
         /** Logger for RAG (Retrieval-Augmented Generation) operations */
         val rag = SDKLogger("RAG")
+
+        /** Logger for Qualcomm Genie (NPU LLM) operations */
+        val genie = SDKLogger("Genie")
 
         /** Logger for VoiceAgent operations */
         val voiceAgent = SDKLogger("VoiceAgent")

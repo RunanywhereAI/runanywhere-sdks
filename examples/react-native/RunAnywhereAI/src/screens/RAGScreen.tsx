@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { NativeModules } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { pick, types, isErrorWithCode, errorCodes } from '@react-native-documents/picker';
+import { pick as documentPick } from '@react-native-documents/picker';
 import { Colors } from '../theme/colors';
 import { Typography, FontWeight } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -167,8 +167,8 @@ export const RAGScreen: React.FC = () => {
     if (!areModelsReady || !isNitroReady) return;
 
     try {
-      const [result] = await pick({
-        type: [types.pdf, types.plainText, types.json],
+      const [result] = await documentPick({
+        type: ['application/pdf', 'text/plain', 'application/json'],
       });
 
       const fileUri = result.uri;
@@ -204,8 +204,8 @@ export const RAGScreen: React.FC = () => {
 
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
-    } catch (err) {
-      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
+    } catch (err: any) {
+      if (err?.code === 'OPERATION_CANCELED') {
         return; // User cancelled
       }
       const msg = err instanceof Error ? err.message : 'Failed to load document';

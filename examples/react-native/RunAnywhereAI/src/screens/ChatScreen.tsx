@@ -374,13 +374,14 @@ export const ChatScreen: React.FC = () => {
       const success = await RunAnywhere.loadModel(model.localPath);
 
       if (success) {
-        // Set the model info with actual ID and name for format detection
+        // Set the model info preserving the actual framework from the SDK model
+        const fw = (model.preferredFramework as unknown as LLMFramework) ?? LLMFramework.LlamaCpp;
         const modelInfo = {
           id: model.id,
           name: model.name,
           category: ModelCategory.Language,
-          compatibleFrameworks: [LLMFramework.LlamaCpp],
-          preferredFramework: LLMFramework.LlamaCpp,
+          compatibleFrameworks: model.compatibleFrameworks as unknown as LLMFramework[] ?? [fw],
+          preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
           supportsThinking: false,
@@ -506,8 +507,8 @@ export const ChatScreen: React.FC = () => {
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
-          framework: 'llama.cpp',
-          frameworkDisplayName: 'llama.cpp',
+          framework: currentModel?.preferredFramework || 'unknown',
+          frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
         },
         analytics: {
           totalGenerationTime: 0,

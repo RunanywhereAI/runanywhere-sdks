@@ -13,6 +13,13 @@
 #include <cstdlib>
 #include <cstring>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "RAC_LLM_SVC", __VA_ARGS__)
+#else
+#define ALOGD(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -32,16 +39,20 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
 
     *out_handle = nullptr;
 
+    ALOGD("rac_llm_create: model_id=%s", model_id);
     RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_id);
 
     // Query model registry to get framework
     rac_model_info_t* model_info = nullptr;
     rac_result_t result = rac_get_model(model_id, &model_info);
+    ALOGD("rac_get_model result=%d", result);
 
     // If not found by model_id, try looking up by path (model_id might be a path)
     if (result != RAC_SUCCESS) {
+        ALOGD("Trying path lookup: %s", model_id);
         RAC_LOG_DEBUG(LOG_CAT, "Model not found by ID, trying path lookup: %s", model_id);
         result = rac_get_model_by_path(model_id, &model_info);
+        ALOGD("rac_get_model_by_path result=%d", result);
     }
 
     // If still not found, extract last path component and try as model ID
@@ -68,10 +79,15 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
         } else {
             model_path = reg_path;
         }
+        ALOGD("Found in registry: id=%s, framework=%d, local_path=%s",
+              model_info->id ? model_info->id : "NULL",
+              static_cast<int>(framework), model_path ? model_path : "NULL");
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL",
                      static_cast<int>(framework), model_path ? model_path : "NULL");
     } else {
+        ALOGD("NOT found in registry (result=%d), default framework=%d",
+              result, static_cast<int>(framework));
         RAC_LOG_WARNING(LOG_CAT,
                         "Model NOT found in registry (result=%d), using default framework=%d",
                         result, static_cast<int>(framework));
@@ -84,22 +100,28 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     request.framework = framework;
     request.model_path = model_path;
 
+    ALOGD("Service request: framework=%d, model_path=%s",
+          static_cast<int>(request.framework),
+          request.model_path ? request.model_path : "NULL");
     RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
                  static_cast<int>(request.framework),
                  request.model_path ? request.model_path : "NULL");
 
     // Service registry returns an rac_llm_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_TEXT_GENERATION, &request, out_handle);
+    ALOGD("rac_service_create result=%d", result);
 
     if (model_info) {
         rac_model_info_free(model_info);
     }
 
     if (result != RAC_SUCCESS) {
+        ALOGD("Failed to create service: %d", result);
         RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
         return result;
     }
 
+    ALOGD("LLM service created successfully");
     RAC_LOG_INFO(LOG_CAT, "LLM service created");
     return RAC_SUCCESS;
 }
