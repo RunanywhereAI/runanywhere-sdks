@@ -18,9 +18,10 @@ import 'dart:ffi';
 import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/llm/llm_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 /// LLM component bridge for C++ interop.
@@ -48,6 +49,7 @@ class DartBridgeLLM {
 
   RacHandle? _handle;
   String? _loadedModelId;
+  int? _loadedContextLength;
   final _logger = SDKLogger('DartBridge.LLM');
 
   /// Active stream subscription for cancellation
@@ -78,13 +80,9 @@ class DartBridgeLLM {
     }
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-          int Function(Pointer<RacHandle>)>('rac_llm_component_create');
-
       final handlePtr = calloc<RacHandle>();
       try {
-        final result = create(handlePtr);
+        final result = NativeFunctions.llmCreate(handlePtr);
 
         if (result != RAC_SUCCESS) {
           throw StateError(
@@ -111,11 +109,7 @@ class DartBridgeLLM {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_is_loaded');
-
-      return isLoadedFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.llmIsLoaded(_handle!) == RAC_TRUE;
     } catch (e) {
       _logger.debug('isLoaded check failed: $e');
       return false;
@@ -130,11 +124,7 @@ class DartBridgeLLM {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final supportsStreamingFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_supports_streaming');
-
-      return supportsStreamingFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.llmSupportsStreaming(_handle!) == RAC_TRUE;
     } catch (e) {
       return false;
     }
@@ -153,6 +143,7 @@ class DartBridgeLLM {
     String modelPath,
     String modelId,
     String modelName,
+    int? contextLength,
   ) async {
     final handle = getHandle();
 
@@ -161,16 +152,8 @@ class DartBridgeLLM {
     final namePtr = modelName.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadModelFn = lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_llm_component_load_model');
-
-      _logger.debug(
-          'Calling rac_llm_component_load_model with handle: $_handle, path: $modelPath');
-      final result = loadModelFn(handle, pathPtr, idPtr, namePtr);
+      _logger.debug('Calling rac_llm_component_load_model with handle=$handle');
+      final result = NativeFunctions.llmLoadModel(handle, pathPtr, idPtr, namePtr);
       _logger.debug(
           'rac_llm_component_load_model returned: $result (${RacResultCode.getMessage(result)})');
 
@@ -181,6 +164,7 @@ class DartBridgeLLM {
       }
 
       _loadedModelId = modelId;
+      _loadedContextLength = contextLength;
       _logger.info('LLM model loaded: $modelId');
     } finally {
       calloc.free(pathPtr);
@@ -194,12 +178,9 @@ class DartBridgeLLM {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_cleanup');
-
-      cleanupFn(_handle!);
+      NativeFunctions.llmCleanup(_handle!);
       _loadedModelId = null;
+      _loadedContextLength = null;
       _logger.info('LLM model unloaded');
     } catch (e) {
       _logger.error('Failed to unload LLM model: $e');
@@ -211,11 +192,7 @@ class DartBridgeLLM {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cancelFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_llm_component_cancel');
-
-      cancelFn(_handle!);
+      NativeFunctions.llmCancel(_handle!);
       _logger.debug('LLM generation cancelled');
     } catch (e) {
       _logger.error('Failed to cancel generation: $e');
@@ -246,6 +223,13 @@ class DartBridgeLLM {
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
+
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+    );
 
     // Run FFI call in a separate isolate to avoid heap corruption
     // from C++ background threads (Metal GPU operations)
@@ -289,6 +273,14 @@ class DartBridgeLLM {
     if (!isLoaded) {
       throw StateError('No LLM model loaded. Call loadModel() first.');
     }
+
+    _validateGenerationParameters(
+      contextLength: _requireLoadedContextLength(),
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: true,
+    );
 
     // Create stream controller for emitting tokens to the caller
     final controller = StreamController<String>();
@@ -335,11 +327,11 @@ class DartBridgeLLM {
         controller.add(message);
       } else if (message is _StreamingMessage) {
         if (message.isComplete) {
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         } else if (message.error != null) {
           controller.addError(StateError(message.error!));
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         }
       }
@@ -367,19 +359,39 @@ class DartBridgeLLM {
     }
   }
 
+  int _requireLoadedContextLength() {
+    final contextLength = _loadedContextLength;
+    // Fall back to a generous ceiling when registry metadata is absent,
+    // so generation is not blocked for models without explicit contextLength.
+    return (contextLength != null && contextLength > 0) ? contextLength : 32768;
+  }
+
+  void _validateGenerationParameters({
+    required int contextLength,
+    required int maxTokens,
+    required double temperature,
+    String? systemPrompt,
+    bool streamingEnabled = false,
+  }) {
+    LLMConfiguration(
+      contextLength: contextLength,
+      maxTokens: maxTokens,
+      temperature: temperature,
+      systemPrompt: systemPrompt,
+      streamingEnabled: streamingEnabled,
+    ).validate();
+  }
+
   // MARK: - Cleanup
 
   /// Destroy the component and release resources.
   void destroy() {
     if (_handle != null) {
       try {
-        final lib = PlatformLoader.loadCommons();
-        final destroyFn = lib.lookupFunction<Void Function(RacHandle),
-            void Function(RacHandle)>('rac_llm_component_destroy');
-
-        destroyFn(_handle!);
+        NativeFunctions.llmDestroy(_handle!);
         _handle = null;
         _loadedModelId = null;
+        _loadedContextLength = null;
         _logger.debug('LLM component destroyed');
       } catch (e) {
         _logger.error('Failed to destroy LLM component: $e');
@@ -486,7 +498,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     // Set systemPrompt if provided
     if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
       systemPromptPtr = params.systemPrompt!.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -553,7 +565,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
     _isolateSendPort = null;
   }
@@ -622,7 +634,7 @@ _IsolateGenerationResult _generateInIsolate(
     // Set systemPrompt if provided
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
       systemPromptPtr = systemPrompt.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -658,7 +670,7 @@ _IsolateGenerationResult _generateInIsolate(
     calloc.free(optionsPtr);
     calloc.free(resultPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
   }
 }

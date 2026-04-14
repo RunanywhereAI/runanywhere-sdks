@@ -148,6 +148,7 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_MULTIMODAL = 5,         /**< Multi-modality models */
     RAC_MODEL_CATEGORY_AUDIO = 6,              /**< Audio processing (diarization, etc.) */
     RAC_MODEL_CATEGORY_EMBEDDING = 7,          /**< Embedding models (RAG, semantic search) */
+    RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 8, /**< VAD models (Silero, etc.) */
     RAC_MODEL_CATEGORY_UNKNOWN = 99            /**< Unknown category */
 } rac_model_category_t;
 
@@ -164,8 +165,9 @@ typedef enum rac_model_format {
     RAC_MODEL_FORMAT_ORT = 1,     /**< ONNX Runtime format */
     RAC_MODEL_FORMAT_GGUF = 2,    /**< GGUF format (llama.cpp) */
     RAC_MODEL_FORMAT_BIN = 3,     /**< Binary format */
-    RAC_MODEL_FORMAT_COREML = 4,  /**< Core ML format (.mlmodelc, .mlpackage) */
-    RAC_MODEL_FORMAT_UNKNOWN = 99 /**< Unknown format */
+    RAC_MODEL_FORMAT_COREML = 4,      /**< Core ML format (.mlmodelc, .mlpackage) */
+    RAC_MODEL_FORMAT_QNN_CONTEXT = 5, /**< QNN context binary (Qualcomm Genie) */
+    RAC_MODEL_FORMAT_UNKNOWN = 99     /**< Unknown format */
 } rac_model_format_t;
 
 // =============================================================================
@@ -187,6 +189,8 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     RAC_FRAMEWORK_WHISPERKIT_COREML = 9,  /**< WhisperKit CoreML (Apple Neural Engine STT) */
+    RAC_FRAMEWORK_METALRT = 10,           /**< MetalRT (custom Metal GPU kernels, Apple only) */
+    RAC_FRAMEWORK_GENIE = 11,             /**< Qualcomm Genie (Hexagon NPU LLM) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 

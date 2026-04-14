@@ -418,16 +418,38 @@ extension VoiceAssistantView {
                 isLoading: isLoading,
                 activeColor: viewModel.micButtonColor.swiftUIColor,
                 inactiveColor: viewModel.micButtonColor.swiftUIColor,
-                icon: viewModel.micButtonIcon
-            ) {
-                Task {
-                    if viewModel.isActive {
-                        await viewModel.stopConversation()
-                    } else {
-                        await viewModel.startConversation()
+                icon: viewModel.micButtonIcon,
+                action: {
+                    // Snapshot state synchronously so the decision can't race with
+                    // state updates that happen between the tap and the Task firing.
+                    let isSpeaking = viewModel.isSpeaking
+                    let isListening = viewModel.isListening
+                    let isConnected = viewModel.sessionState == .connected
+                    let isActive = viewModel.isActive
+                    let action: (() async -> Void)? = {
+                        if isSpeaking {
+                            return { await viewModel.interruptSpeaking() }
+                        } else if isListening {
+                            return { await viewModel.sendAudioNow() }
+                        } else if isConnected {
+                            return { await viewModel.resumeListening() }
+                        } else if !isActive {
+                            return { await viewModel.startConversation() }
+                        } else {
+                            return nil
+                        }
+                    }()
+                    if let action = action {
+                        Task { await action() }
                     }
+                },
+                onLongPress: {
+                    // Snapshot state synchronously before spawning the Task.
+                    let shouldStop = viewModel.isActive || viewModel.sessionState == .connected
+                    guard shouldStop else { return }
+                    Task { await viewModel.stopConversation() }
                 }
-            }
+            )
 
             Spacer()
         }

@@ -18,6 +18,9 @@
 #if defined(__APPLE__) || defined(__linux__)
 #include <execinfo.h>
 #endif
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 // =============================================================================
 // THREAD-LOCAL STORAGE
@@ -227,8 +230,23 @@ int32_t rac_error_capture_stack_trace(rac_error_t* error) {
     }
 
     return captured;
+#elif defined(_WIN32)
+    void* buffer[RAC_MAX_STACK_FRAMES];
+    USHORT frame_count = CaptureStackBackTrace(2, RAC_MAX_STACK_FRAMES, buffer, NULL);
+
+    int captured = 0;
+    for (USHORT i = 0; i < frame_count && captured < RAC_MAX_STACK_FRAMES; i++) {
+        error->stack_frames[captured].address = buffer[i];
+        error->stack_frames[captured].function = nullptr;
+        error->stack_frames[captured].file = nullptr;
+        error->stack_frames[captured].line = 0;
+        captured++;
+    }
+
+    error->stack_frame_count = captured;
+    return captured;
 #else
-    // Platform doesn't support backtrace (Android, Windows, etc.)
+    // Platform doesn't support backtrace (Android NDK, etc.)
     error->stack_frame_count = 0;
     return 0;
 #endif

@@ -43,6 +43,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
     case vision = "vision"                  // Image understanding models
     case imageGeneration = "image-generation"      // Text-to-image models
     case multimodal = "multimodal"          // Models that handle multiple modalities
+    case voiceActivityDetection = "voice-activity-detection"  // VAD models (Silero, etc.)
     case audio = "audio"                    // Audio processing (diarization, etc.)
     case embedding = "embedding"            // Embedding models (RAG, semantic search)
 
@@ -52,7 +53,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio, .embedding:
+        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
             return false
         }
     }
@@ -63,7 +64,7 @@ public enum ModelCategory: String, CaseIterable, Codable, Sendable {
         switch self {
         case .language, .multimodal:
             return true
-        case .speechRecognition, .speechSynthesis, .vision, .imageGeneration, .audio, .embedding:
+        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .vision, .imageGeneration, .audio, .embedding:
             return false
         }
     }
@@ -82,6 +83,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
     case coreml = "CoreML"        // Core ML (Apple Neural Engine) for diffusion models
     case mlx = "MLX"              // MLX (Apple Silicon VLM via MLX C++)
     case whisperKitCoreML = "WhisperKitCoreML" // WhisperKit CoreML (Apple Neural Engine) for STT
+    case metalrt = "MetalRT"      // MetalRT (custom Metal GPU kernels, Apple only)
 
     // Special cases
     case builtIn = "BuiltIn"      // For simple services (e.g., energy-based VAD)
@@ -99,6 +101,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .coreml: return "Core ML"
         case .mlx: return "MLX"
         case .whisperKitCoreML: return "WhisperKit CoreML"
+        case .metalrt: return "MetalRT"
         case .builtIn: return "Built-in"
         case .none: return "None"
         case .unknown: return "Unknown"
@@ -116,6 +119,7 @@ public enum InferenceFramework: String, CaseIterable, Codable, Sendable {
         case .coreml: return "coreml"
         case .mlx: return "mlx"
         case .whisperKitCoreML: return "whisperkit_coreml"
+        case .metalrt: return "metalrt"
         case .builtIn: return "built_in"
         case .none: return "none"
         case .unknown: return "unknown"
@@ -137,6 +141,7 @@ public extension InferenceFramework {
         case .coreml: return RAC_FRAMEWORK_COREML
         case .mlx: return RAC_FRAMEWORK_MLX
         case .whisperKitCoreML: return RAC_FRAMEWORK_WHISPERKIT_COREML
+        case .metalrt: return RAC_FRAMEWORK_METALRT
         case .builtIn: return RAC_FRAMEWORK_BUILTIN
         case .none: return RAC_FRAMEWORK_NONE
         case .unknown: return RAC_FRAMEWORK_UNKNOWN
@@ -154,6 +159,7 @@ public extension InferenceFramework {
         case RAC_FRAMEWORK_COREML: return .coreml
         case RAC_FRAMEWORK_MLX: return .mlx
         case RAC_FRAMEWORK_WHISPERKIT_COREML: return .whisperKitCoreML
+        case RAC_FRAMEWORK_METALRT: return .metalrt
         case RAC_FRAMEWORK_BUILTIN: return .builtIn
         case RAC_FRAMEWORK_NONE: return .none
         default: return .unknown

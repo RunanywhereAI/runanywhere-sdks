@@ -8,25 +8,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_tts/flutter_tts.dart';
-
-/// Configuration for TTS synthesis
-class TTSConfiguration {
-  final String voice;
-  final String language;
-  final double speakingRate;
-  final double pitch;
-  final double volume;
-  final String audioFormat;
-
-  const TTSConfiguration({
-    this.voice = 'system',
-    this.language = 'en-US',
-    this.speakingRate = 0.5,
-    this.pitch = 1.0,
-    this.volume = 1.0,
-    this.audioFormat = 'pcm',
-  });
-}
+import 'package:runanywhere/features/tts/tts_configuration.dart';
 
 /// Input for TTS synthesis
 class TTSSynthesisInput {

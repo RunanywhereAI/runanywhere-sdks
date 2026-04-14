@@ -1,6 +1,13 @@
 #ifndef TEST_COMMON_H
 #define TEST_COMMON_H
 
+// Ensure M_PI is defined on MSVC (requires _USE_MATH_DEFINES before <cmath>)
+#ifdef _MSC_VER
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>

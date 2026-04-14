@@ -25,7 +25,6 @@ import 'package:runanywhere/native/dart_bridge_model_registry.dart'
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
-import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -451,7 +450,12 @@ class RunAnywhere {
       // Load model directly via DartBridgeLLM (mirrors Swift CppBridge.LLM pattern)
       // The C++ layer handles finding the right backend via the service registry
       logger.debug('Loading model via C++ bridge: $resolvedPath');
-      await DartBridge.llm.loadModel(resolvedPath, modelId, model.name);
+      await DartBridge.llm.loadModel(
+        resolvedPath,
+        modelId,
+        model.name,
+        model.contextLength,
+      );
 
       // Verify the model loaded successfully
       if (!DartBridge.llm.isLoaded) {
@@ -664,6 +668,8 @@ class RunAnywhere {
       logger.info(
           'Transcription complete: ${result.text.length} chars, confidence: ${result.confidence}');
       return result.text;
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
@@ -741,6 +747,10 @@ class RunAnywhere {
         durationMs: audioDurationMs,
         language: result.language,
       );
+    } on SDKError {
+      // Re-throw validation / SDK errors so callers see the structured error
+      // instead of it being logged as a generic transcription failure.
+      rethrow;
     } catch (e) {
       // Track transcription failure
       TelemetryService.shared.trackError(
@@ -927,6 +937,8 @@ class RunAnywhere {
         sampleRate: result.sampleRate,
         durationMs: result.durationMs,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track synthesis failure
       TelemetryService.shared.trackError(
@@ -1943,7 +1955,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         isStreaming: false,
       );
@@ -1975,6 +1987,8 @@ class RunAnywhere {
         tokensPerSecond: tokensPerSecond,
         structuredData: structuredData,
       );
+    } on SDKError {
+      rethrow;
     } catch (e) {
       // Track generation failure
       TelemetryService.shared.trackError(
@@ -2056,12 +2070,17 @@ class RunAnywhere {
     final allTokens = <String>[];
 
     // Start streaming generation via DartBridgeLLM
-    final tokenStream = DartBridge.llm.generateStream(
-      prompt,
-      maxTokens: opts.maxTokens,
-      temperature: opts.temperature,
-      systemPrompt: effectiveSystemPrompt,
-    );
+    late final Stream<String> tokenStream;
+    try {
+      tokenStream = DartBridge.llm.generateStream(
+        prompt,
+        maxTokens: opts.maxTokens,
+        temperature: opts.temperature,
+        systemPrompt: effectiveSystemPrompt,
+      );
+    } on SDKError {
+      rethrow;
+    }
 
     // Forward tokens and collect them, track subscription in bridge for cancellation
     DartBridge.llm.setActiveStreamSubscription(
@@ -2122,7 +2141,7 @@ class RunAnywhere {
         latencyMs: latencyMs.round(),
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
-        contextLength: 8192, // Default context length for LlamaCpp
+        contextLength: modelInfo?.contextLength,
         tokensPerSecond: tokensPerSecond,
         timeToFirstTokenMs: timeToFirstTokenMs,
         isStreaming: true,
@@ -2658,67 +2677,7 @@ class RunAnywhere {
     return null;
   }
 
-  // ============================================================================
-  // MARK: - RAG (Retrieval-Augmented Generation)
-  // ============================================================================
-
-  /// Create a RAG pipeline with the given configuration.
-  ///
-  /// Auto-registers the RAG module if needed — no explicit RAGModule.register()
-  /// required. The C++ bridge handles model path resolution (GGUF directory
-  /// scanning, vocab.txt discovery).
-  static Future<void> ragCreatePipeline(RAGConfiguration config) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.createPipeline(config);
-  }
-
-  /// Destroy the RAG pipeline and release resources.
-  static Future<void> ragDestroyPipeline() async {
-    DartBridgeRAG.shared.destroyPipeline();
-  }
-
-  /// Ingest a document into the RAG pipeline.
-  ///
-  /// The document is split into chunks, embedded, and indexed.
-  static Future<void> ragIngest(String text, {String? metadataJson}) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.addDocument(text, metadataJson: metadataJson);
-  }
-
-  /// Ingest multiple documents in batch.
-  ///
-  /// More efficient than calling [ragIngest] multiple times.
-  /// Each document map should have a 'text' key and optional 'metadataJson' key.
-  static Future<void> ragAddDocumentsBatch(
-      List<Map<String, String>> documents) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.addDocumentsBatch(documents);
-  }
-
-  /// Clear all documents from the RAG pipeline.
-  static Future<void> ragClearDocuments() async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    DartBridgeRAG.shared.clearDocuments();
-  }
-
-  /// Get the number of indexed document chunks.
-  static int get ragDocumentCount => DartBridgeRAG.shared.documentCount;
-
-  /// Get pipeline statistics as JSON.
-  static Future<RAGStatistics> ragGetStatistics() async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    return DartBridgeRAG.shared.getStatistics();
-  }
-
-  /// Query the RAG pipeline with a question.
-  ///
-  /// Returns a [RAGResult] with the generated answer and retrieved chunks.
-  static Future<RAGResult> ragQuery(
-    String question, {
-    RAGQueryOptions? options,
-  }) async {
-    if (!_isInitialized) throw SDKError.notInitialized();
-    final queryOptions = options ?? RAGQueryOptions(question: question);
-    return DartBridgeRAG.shared.query(queryOptions);
-  }
+  // RAG methods are available via the RunAnywhereRAG extension in
+  // lib/public/extensions/runanywhere_rag.dart (async variants with event
+  // publishing).
 }

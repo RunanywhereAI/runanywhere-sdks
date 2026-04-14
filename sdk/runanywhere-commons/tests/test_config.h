@@ -4,7 +4,20 @@
 #include <climits>
 #include <cstdlib>
 #include <string>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#ifndef PATH_MAX
+#define PATH_MAX MAX_PATH
+#endif
+// realpath equivalent on Windows
+static inline char* realpath(const char* path, char* resolved) {
+    return _fullpath(resolved, path, PATH_MAX);
+}
+#else
+#include <unistd.h>
+#endif
 
 #include "test_common.h"
 

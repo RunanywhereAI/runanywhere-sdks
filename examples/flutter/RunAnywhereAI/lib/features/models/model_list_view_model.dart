@@ -137,6 +137,8 @@ class ModelListViewModel extends ChangeNotifier {
         return LLMFramework.onnxRuntime;
       case sdk.InferenceFramework.systemTTS:
         return LLMFramework.systemTTS;
+      case sdk.InferenceFramework.genie:
+        return LLMFramework.genie;
       default:
         return LLMFramework.unknown;
     }
@@ -153,6 +155,8 @@ class ModelListViewModel extends ChangeNotifier {
         return sdk.InferenceFramework.onnx;
       case LLMFramework.systemTTS:
         return sdk.InferenceFramework.systemTTS;
+      case LLMFramework.genie:
+        return sdk.InferenceFramework.genie;
       case LLMFramework.mediaPipe:
       case LLMFramework.whisperKit:
       case LLMFramework.unknown:

@@ -103,6 +103,7 @@ set_target_properties(rac_backend_rag PROPERTIES
 target_compile_options(rac_backend_rag PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-unused-parameter>
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wno-missing-field-initializers>
+    $<$<CXX_COMPILER_ID:MSVC>:/wd4244;/wd4267;/wd4996>
 )
 
 target_compile_definitions(rac_backend_rag PRIVATE

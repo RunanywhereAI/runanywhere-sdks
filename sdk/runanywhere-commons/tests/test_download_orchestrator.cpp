@@ -19,8 +19,17 @@
 #include <cstring>
 #include <fstream>
 #include <string>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
+
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+#include <windows.h>
+#define getpid _getpid
+#else
 #include <unistd.h>
+#endif
 
 // =============================================================================
 // Test helpers
@@ -28,6 +37,14 @@
 
 /** Create a unique temporary directory for test artifacts. */
 static std::string create_temp_dir(const std::string& suffix) {
+#ifdef _WIN32
+    char tmp_path[MAX_PATH];
+    GetTempPathA(MAX_PATH, tmp_path);
+    char tmp_dir[MAX_PATH];
+    snprintf(tmp_dir, sizeof(tmp_dir), "%srac_dl_test_%s_%d", tmp_path, suffix.c_str(), getpid());
+    _mkdir(tmp_dir);
+    return std::string(tmp_dir);
+#else
     char tmpl[256];
     snprintf(tmpl, sizeof(tmpl), "/tmp/rac_dl_test_%s_XXXXXX", suffix.c_str());
     char* result = mkdtemp(tmpl);
@@ -36,17 +53,27 @@ static std::string create_temp_dir(const std::string& suffix) {
         return "";
     }
     return std::string(result);
+#endif
 }
 
 /** Recursively remove a directory. */
 static void remove_dir(const std::string& path) {
+#ifdef _WIN32
+    std::string cmd = "rmdir /s /q \"" + path + "\" 2>nul";
+#else
     std::string cmd = "rm -rf \"" + path + "\"";
+#endif
     system(cmd.c_str());
 }
 
 /** Create a directory (like mkdir -p). */
 static void mkdir_p(const std::string& path) {
+#ifdef _WIN32
+    // Windows `mkdir` creates intermediate dirs automatically; no -p equivalent needed.
+    std::string cmd = "mkdir \"" + path + "\" 2>nul";
+#else
     std::string cmd = "mkdir -p \"" + path + "\"";
+#endif
     system(cmd.c_str());
 }
 

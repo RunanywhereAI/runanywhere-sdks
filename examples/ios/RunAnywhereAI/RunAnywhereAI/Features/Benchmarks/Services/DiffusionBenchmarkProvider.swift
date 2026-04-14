@@ -57,9 +57,7 @@ struct DiffusionBenchmarkProvider: BenchmarkScenarioProvider {
                 guidanceScale: 0.0,
                 seed: 42
             )
-            // Note: prompt: is required by the SDK API signature, but is ignored when options is provided
-        // (the SDK uses `options ?? DiffusionGenerationOptions(prompt: prompt)`).
-        let result = try await RunAnywhere.generateImage(prompt: options.prompt, options: options)
+            let result = try await RunAnywhere.generateImage(prompt: options.prompt, options: options)
 
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
             metrics.generationTimeMs = Double(result.generationTimeMs)

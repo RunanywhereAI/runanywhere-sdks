@@ -25,7 +25,7 @@ final class AudioCaptureManagerTests: XCTestCase {
         // Attempt start without granting permission (may throw at session or engine start).
         // We only care that if it throws, isRecording stays false and we can retry.
         do {
-            try manager.startRecording { _ in }
+            try await manager.startRecording { _ in }
             // If we get here, permission was granted and engine started; stop so we're clean.
             manager.stopRecording()
         } catch {
@@ -36,7 +36,7 @@ final class AudioCaptureManagerTests: XCTestCase {
         // State must be clean: either we never started, or we stopped. Try starting again
         // (will only succeed if permission is granted and engine starts).
         do {
-            try manager.startRecording { _ in }
+            try await manager.startRecording { _ in }
             XCTAssertTrue(manager.isRecording)
             manager.stopRecording()
         } catch {

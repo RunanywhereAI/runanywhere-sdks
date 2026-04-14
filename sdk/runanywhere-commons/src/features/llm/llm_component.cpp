@@ -9,15 +9,19 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <mutex>
 #include <random>
 #include <string>
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_analytics_events.h"
+#include "rac/core/rac_benchmark.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
@@ -45,6 +49,9 @@ struct rac_llm_component {
 
     /** Mutex for thread safety */
     std::mutex mtx;
+
+    /** Cancellation flag - set by cancel(), read by token callback without holding mtx */
+    std::atomic<bool> cancel_requested{false};
 
     /** Resolved inference framework (defaults to LlamaCPP, the primary LLM backend) */
     rac_inference_framework_t actual_framework;
@@ -514,6 +521,10 @@ struct llm_stream_context {
     float temperature;
     int32_t max_tokens;
     int32_t token_count;  // Track tokens for streaming updates
+
+    std::atomic<bool>* cancel_flag;
+    // Benchmark timing (optional, NULL when not benchmarking)
+    rac_benchmark_timing_t* timing_out;
 };
 
 /**
@@ -522,10 +533,19 @@ struct llm_stream_context {
 static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<llm_stream_context*>(user_data);
 
+    if (ctx->cancel_flag && ctx->cancel_flag->load(std::memory_order_relaxed)) {
+        return RAC_FALSE;
+    }
+
     // Track first token time and emit first token event
     if (!ctx->first_token_recorded) {
         ctx->first_token_recorded = true;
         ctx->first_token_time = std::chrono::steady_clock::now();
+
+        // Record t4 (first token) for benchmark timing
+        if (ctx->timing_out != nullptr) {
+            ctx->timing_out->t4_first_token_ms = rac_monotonic_now_ms();
+        }
 
         // Calculate TTFT
         auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -580,6 +600,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
+
+    component->cancel_requested.store(false, std::memory_order_relaxed);
 
     // Generate unique ID for this generation
     std::string generation_id = generate_unique_id();
@@ -672,6 +694,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.temperature = effective_options->temperature;
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
+    ctx.cancel_flag = &component->cancel_requested;
+    ctx.timing_out = nullptr;  // No benchmark timing for regular generate_stream
     // Pre-allocate to avoid repeated reallocations during streaming
     ctx.full_text.reserve(2048);
 
@@ -716,7 +740,9 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = ctx.token_count > 0
+        ? ctx.token_count
+        : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -770,11 +796,275 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     return RAC_SUCCESS;
 }
 
+extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
+    rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
+    rac_llm_component_token_callback_fn token_callback,
+    rac_llm_component_complete_callback_fn complete_callback,
+    rac_llm_component_error_callback_fn error_callback, void* user_data,
+    rac_benchmark_timing_t* timing_out) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!prompt)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    auto* component = reinterpret_cast<rac_llm_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    // Initialize timing if provided
+    if (timing_out != nullptr) {
+        rac_benchmark_timing_init(timing_out);
+        // Record t0 (request start) - first thing after validation
+        timing_out->t0_request_start_ms = rac_monotonic_now_ms();
+    }
+
+    // Generate unique ID for this generation
+    std::string generation_id = generate_unique_id();
+    const char* model_id = rac_lifecycle_get_model_id(component->lifecycle);
+    const char* model_name = rac_lifecycle_get_model_name(component->lifecycle);
+
+    // Get service from lifecycle manager
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "No model loaded - cannot generate stream");
+
+        // Emit generation failed event
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_GENERATION_FAILED;
+        event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
+        event.data.llm_generation.generation_id = generation_id.c_str();
+        event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
+        event.data.llm_generation.error_code = result;
+        event.data.llm_generation.error_message = "No model loaded";
+        rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
+
+        if (timing_out != nullptr) {
+            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = result;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        }
+
+        if (error_callback) {
+            error_callback(result, "No model loaded", user_data);
+        }
+        return result;
+    }
+
+    // Check if streaming is supported
+    rac_llm_info_t info;
+    result = rac_llm_get_info(service, &info);
+    if (result != RAC_SUCCESS || (info.supports_streaming == 0)) {
+        log_error("LLM.Component", "Streaming not supported");
+
+        // Emit generation failed event
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_GENERATION_FAILED;
+        event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
+        event.data.llm_generation.generation_id = generation_id.c_str();
+        event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
+        event.data.llm_generation.error_code = RAC_ERROR_NOT_SUPPORTED;
+        event.data.llm_generation.error_message = "Streaming not supported";
+        rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
+
+        if (timing_out != nullptr) {
+            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = RAC_ERROR_NOT_SUPPORTED;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        }
+
+        if (error_callback) {
+            error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
+        }
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    log_info("LLM.Component", "Starting streaming generation with timing");
+
+    // Get context_length from service info
+    int32_t context_length = info.context_length;
+
+    // Use provided options or defaults
+    const rac_llm_options_t* effective_options = options ? options : &component->default_options;
+
+    // Emit generation started event
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_GENERATION_STARTED;
+        event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
+        event.data.llm_generation.generation_id = generation_id.c_str();
+        event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
+        event.data.llm_generation.is_streaming = RAC_TRUE;
+        event.data.llm_generation.framework = component->actual_framework;
+        event.data.llm_generation.temperature = effective_options->temperature;
+        event.data.llm_generation.max_tokens = effective_options->max_tokens;
+        event.data.llm_generation.context_length = context_length;
+        rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_STARTED, &event);
+    }
+
+    // Setup streaming context
+    llm_stream_context ctx;
+    ctx.token_callback = token_callback;
+    ctx.complete_callback = complete_callback;
+    ctx.error_callback = error_callback;
+    ctx.user_data = user_data;
+    ctx.start_time = std::chrono::steady_clock::now();
+    ctx.first_token_recorded = false;
+    ctx.prompt_tokens = estimate_tokens(prompt);
+    ctx.generation_id = generation_id;
+    ctx.model_id = model_id;
+    ctx.model_name = model_name;
+    ctx.framework = component->actual_framework;
+    ctx.temperature = effective_options->temperature;
+    ctx.max_tokens = effective_options->max_tokens;
+    ctx.token_count = 0;
+    ctx.timing_out = timing_out;  // Pass timing for t4 capture in callback
+
+    // Perform streaming generation with timing
+    // Note: Backend timing (t2, t3, t5) will be captured if backend supports it
+    result = rac_llm_generate_stream_with_timing(service, prompt, effective_options,
+                                                 llm_stream_token_callback, &ctx, timing_out);
+
+    if (result != RAC_SUCCESS) {
+        log_error("LLM.Component", "Streaming generation failed");
+        rac_lifecycle_track_error(component->lifecycle, result, "generateStream");
+
+        // Emit generation failed event
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_GENERATION_FAILED;
+        event.data.llm_generation = RAC_ANALYTICS_LLM_GENERATION_DEFAULT;
+        event.data.llm_generation.generation_id = generation_id.c_str();
+        event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
+        event.data.llm_generation.error_code = result;
+        event.data.llm_generation.error_message = "Streaming generation failed";
+        rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
+
+        if (timing_out != nullptr) {
+            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = result;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        }
+
+        if (error_callback) {
+            error_callback(result, "Streaming generation failed", user_data);
+        }
+        return result;
+    }
+
+    // Build final result for completion callback
+    auto end_time = std::chrono::steady_clock::now();
+    auto total_duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - ctx.start_time);
+    int64_t total_time_ms = total_duration.count();
+
+    rac_llm_result_t final_result = {};
+    final_result.text = strdup(ctx.full_text.c_str());
+    if (final_result.text == nullptr) {
+        log_error("LLM.Component", "strdup failed for result text");
+        if (timing_out != nullptr) {
+            timing_out->status = RAC_BENCHMARK_STATUS_ERROR;
+            timing_out->error_code = RAC_ERROR_OUT_OF_MEMORY;
+            timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        }
+        if (error_callback) {
+            error_callback(RAC_ERROR_OUT_OF_MEMORY, "Failed to allocate result text", user_data);
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Use actual backend token counts if available, fall back to estimates
+    if (timing_out != nullptr && timing_out->prompt_tokens > 0) {
+        final_result.prompt_tokens = timing_out->prompt_tokens;
+    } else {
+        final_result.prompt_tokens = ctx.prompt_tokens;
+    }
+
+    if (timing_out != nullptr && timing_out->output_tokens > 0) {
+        final_result.completion_tokens = timing_out->output_tokens;
+    } else {
+        final_result.completion_tokens = estimate_tokens(ctx.full_text.c_str());
+    }
+
+    final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
+    final_result.total_time_ms = total_time_ms;
+
+    double ttft_ms = 0.0;
+    // Calculate TTFT
+    if (ctx.first_token_recorded) {
+        auto ttft_duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            ctx.first_token_time - ctx.start_time);
+        final_result.time_to_first_token_ms = ttft_duration.count();
+        ttft_ms = static_cast<double>(ttft_duration.count());
+    }
+
+    // Calculate tokens per second
+    double tokens_per_second = 0.0;
+    if (final_result.total_time_ms > 0) {
+        tokens_per_second = static_cast<double>(final_result.completion_tokens) /
+                            (static_cast<double>(final_result.total_time_ms) / 1000.0);
+        final_result.tokens_per_second = static_cast<float>(tokens_per_second);
+    }
+
+    // Record t6 (request end) before complete callback.
+    // Backfill prompt/output tokens when backend didn't populate them (fallback path)
+    // so downstream decode-TPS and CSV/JSON stats are computed from estimates, not zero.
+    if (timing_out != nullptr) {
+        if (timing_out->prompt_tokens <= 0) {
+            timing_out->prompt_tokens = final_result.prompt_tokens;
+        }
+        if (timing_out->output_tokens <= 0) {
+            timing_out->output_tokens = final_result.completion_tokens;
+        }
+        timing_out->t6_request_end_ms = rac_monotonic_now_ms();
+        timing_out->status = RAC_BENCHMARK_STATUS_SUCCESS;
+        timing_out->error_code = RAC_SUCCESS;
+    }
+
+    if (complete_callback) {
+        complete_callback(&final_result, user_data);
+    }
+
+    // Emit generation completed event
+    {
+        rac_analytics_event_data_t event = {};
+        event.type = RAC_EVENT_LLM_GENERATION_COMPLETED;
+        event.data.llm_generation.generation_id = generation_id.c_str();
+        event.data.llm_generation.model_id = model_id;
+        event.data.llm_generation.model_name = model_name;
+        event.data.llm_generation.input_tokens = final_result.prompt_tokens;
+        event.data.llm_generation.output_tokens = final_result.completion_tokens;
+        event.data.llm_generation.duration_ms = static_cast<double>(total_time_ms);
+        event.data.llm_generation.tokens_per_second = tokens_per_second;
+        event.data.llm_generation.is_streaming = RAC_TRUE;
+        event.data.llm_generation.time_to_first_token_ms = ttft_ms;
+        event.data.llm_generation.framework = component->actual_framework;
+        event.data.llm_generation.temperature = effective_options->temperature;
+        event.data.llm_generation.max_tokens = effective_options->max_tokens;
+        event.data.llm_generation.context_length = context_length;
+        event.data.llm_generation.error_code = RAC_SUCCESS;
+        rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
+    }
+
+    // Free the duplicated text
+    free(final_result.text);
+
+    log_info("LLM.Component", "Streaming generation with timing completed");
+
+    return RAC_SUCCESS;
+}
+
 extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
+
+    // Set atomic cancel flag so the streaming token callback can observe it
+    // without holding component->mtx (which generate_stream is holding).
+    component->cancel_requested.store(true, std::memory_order_relaxed);
 
     // Use acquire/release to pin the service for the duration of the cancel call,
     // preventing use-after-free if destroy races with cancel.
@@ -906,14 +1196,28 @@ extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Basic pre-check: verify the backend supports LoRA at all
+    // Verify file exists and is a valid GGUF
+    {
+        std::ifstream file(adapter_path, std::ios::binary);
+        if (!file.is_open()) {
+            *out_error = rac_strdup("Adapter file not found");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+        uint32_t magic = 0;
+        file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
+        if (!file || magic != 0x46554747u) {  // "GGUF" in little-endian
+            *out_error = rac_strdup("Adapter file is not a valid GGUF file");
+            return RAC_ERROR_INVALID_ARGUMENT;
+        }
+    }
+
+    // Verify the backend supports LoRA
     auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
     if (!llm_service->ops || !llm_service->ops->load_lora) {
         *out_error = rac_strdup("Backend does not support LoRA adapters");
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    // Adapter path and backend both valid - considered compatible
     return RAC_SUCCESS;
 }
 

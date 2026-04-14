@@ -8,6 +8,7 @@
 
 import SwiftUI
 import Combine
+import os
 
 // MARK: - Brand Colors (keyboard extension can't import main target)
 // All colors adapt to the system color scheme via the `scheme` environment value.
@@ -59,18 +60,25 @@ struct KeyboardView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var sessionState: String = "idle"
-    @State private var audioLevel: Float = 0
-    @State private var barPhase: Double = 0
     @State private var checkmarkTapped = false
+    @State private var stopRequestId = UUID()
     @State private var canUndo = false
     @State private var canRedo = false
     @State private var showStats = false
     @State private var isDeleting = false
-    @State private var deleteStartTime: Date?
+    @State private var deleteTask: Task<Void, Never>?
+    @State private var deepLinkSentTime: Date?
 
-    private let stateTimer = Timer.publish(every: 0.3, on: .main, in: .common).autoconnect()
-    private let waveformTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
-    private let deleteRepeatTimer = Timer.publish(every: 0.08, on: .main, in: .common).autoconnect()
+    // Safety-net poll timer — Darwin notifications handle immediate updates;
+    // this only catches missed notifications. 5s interval minimizes CPU.
+    private let stateTimer = Timer.publish(every: 5.0, on: .main, in: .common).autoconnect()
+    private let logger = Logger(subsystem: "com.runanywhere.yaprun", category: "KeyboardUI")
+
+    /// Whether the waveform animation should be running.
+    private var isWaveformActive: Bool {
+        sessionState == "listening" || sessionState == "transcribing"
+            || (checkmarkTapped && sessionState != "done")
+    }
 
     // MARK: - Body
 
@@ -102,13 +110,14 @@ struct KeyboardView: View {
             canRedo = SharedDataBridge.shared.undoText != nil
         }
         .onReceive(stateTimer) { _ in refreshState() }
-        .onReceive(waveformTimer) { _ in
-            guard sessionState == "listening" || (checkmarkTapped && sessionState != "done") else { return }
-            audioLevel = SharedDataBridge.shared.audioLevel
-            barPhase += 0.15
+        .onReceive(NotificationCenter.default.publisher(for: .yapRunStateChanged)) { _ in
+            refreshState()
         }
         .onChange(of: sessionState) { _, newState in
+            logger.info("sessionState -> \(newState, privacy: .public)")
             switch newState {
+            case "activating":
+                deepLinkSentTime = Date()
             case "done":
                 checkmarkTapped = false
                 canUndo = true
@@ -119,14 +128,18 @@ struct KeyboardView: View {
                 canRedo = false
             case "idle", "ready":
                 checkmarkTapped = false
+                deepLinkSentTime = nil
             default:
                 break
             }
         }
-        .onReceive(deleteRepeatTimer) { _ in
-            guard isDeleting, let start = deleteStartTime,
-                  Date().timeIntervalSince(start) > 0.35 else { return }
-            onDelete()
+        .onChange(of: isDeleting) { _, deleting in
+            if deleting {
+                startDeleteRepeat()
+            } else {
+                deleteTask?.cancel()
+                deleteTask = nil
+            }
         }
     }
 
@@ -250,13 +263,11 @@ struct KeyboardView: View {
                         .onChanged { _ in
                             if !isDeleting {
                                 isDeleting = true
-                                deleteStartTime = Date()
                                 onDelete()
                             }
                         }
                         .onEnded { _ in
                             isDeleting = false
-                            deleteStartTime = nil
                         }
                 )
         }
@@ -482,8 +493,22 @@ struct KeyboardView: View {
                         .padding(.trailing, 20)
                 } else {
                     Button {
+                        let requestId = UUID()
+                        stopRequestId = requestId
+                        if sessionState == "listening" {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                sessionState = "transcribing"
+                            }
+                        }
                         checkmarkTapped = true
+                        logger.info("checkmark tapped; sessionState=\(sessionState, privacy: .public)")
                         onStopTap()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            if stopRequestId == requestId && sessionState == "listening" {
+                                logger.warning("checkmark timeout; still listening")
+                                checkmarkTapped = false
+                            }
+                        }
                     } label: {
                         Image(systemName: "checkmark")
                             .font(.system(size: 20, weight: .semibold))
@@ -506,27 +531,48 @@ struct KeyboardView: View {
     // MARK: Waveform Bars
 
     private var waveformBars: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<40, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(barGradient)
-                    .frame(width: 4, height: barHeight(for: index))
-                    .animation(.easeOut(duration: 0.08), value: audioLevel)
+        // TimelineView drives the animation — it automatically pauses when
+        // isWaveformActive is false, eliminating timer overhead in idle states.
+        // The Canvas draws all 40 bars in a single draw call.
+        TimelineView(.animation(minimumInterval: 0.15, paused: !isWaveformActive)) { timeline in
+            Canvas { context, size in
+                let phase = timeline.date.timeIntervalSinceReferenceDate * 6.67
+                let currentAudioLevel = SharedDataBridge.shared.audioLevel
+
+                let barCount = 40
+                let spacing: CGFloat = 3
+                let barWidth: CGFloat = 4
+                let totalWidth = CGFloat(barCount) * barWidth + CGFloat(barCount - 1) * spacing
+                let startX = (size.width - totalWidth) / 2
+                let gradient = barGradientForCanvas
+
+                for i in 0..<barCount {
+                    let height = barHeight(for: i, phase: phase, audioLevel: currentAudioLevel)
+                    let x = startX + CGFloat(i) * (barWidth + spacing)
+                    let y = (size.height - height) / 2
+                    let rect = CGRect(x: x, y: y, width: barWidth, height: height)
+                    let path = Path(roundedRect: rect, cornerRadius: 2.5)
+                    context.fill(path, with: .linearGradient(
+                        gradient,
+                        startPoint: CGPoint(x: 0, y: y),
+                        endPoint: CGPoint(x: 0, y: y + height)
+                    ))
+                }
             }
         }
     }
 
-    private func barHeight(for index: Int) -> CGFloat {
+    private func barHeight(for index: Int, phase: Double, audioLevel: Float) -> CGFloat {
         let base: CGFloat = 12
         let maxH: CGFloat = 200
         if sessionState == "transcribing" {
-            let wave = CGFloat(sin(Double(index) * 0.5 + barPhase))
+            let wave = CGFloat(sin(Double(index) * 0.5 + phase))
             return base + (maxH * 0.3) * (0.5 + 0.5 * wave)
         }
         if sessionState == "done" {
             return base + 30
         }
-        let wave = CGFloat(sin(Double(index) * 0.45 + barPhase))
+        let wave = CGFloat(sin(Double(index) * 0.45 + phase))
         let raw = CGFloat(min(max(audioLevel, 0), 1))
         // Boost low audio levels so bars are visually prominent
         let level = min(raw * 3.0 + 0.15, 1.0)
@@ -534,18 +580,12 @@ struct KeyboardView: View {
         return base + dynamic
     }
 
-    private var barGradient: LinearGradient {
+    private var barGradientForCanvas: Gradient {
         switch sessionState {
         case "done":
-            return LinearGradient(
-                colors: [Brand.green.opacity(0.9), Brand.green.opacity(0.5)],
-                startPoint: .top, endPoint: .bottom
-            )
+            return Gradient(colors: [Brand.green.opacity(0.9), Brand.green.opacity(0.5)])
         default:
-            return LinearGradient(
-                colors: [Brand.accent(colorScheme).opacity(0.95), Brand.accentDark(colorScheme).opacity(0.5)],
-                startPoint: .top, endPoint: .bottom
-            )
+            return Gradient(colors: [Brand.accent(colorScheme).opacity(0.95), Brand.accentDark(colorScheme).opacity(0.5)])
         }
     }
 
@@ -591,19 +631,50 @@ struct KeyboardView: View {
         return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
     }
 
+    // MARK: - Delete Key Repeat
+
+    /// Starts a Task-based repeat loop for the delete key.
+    /// Only runs while `isDeleting` is true — no continuous timer overhead.
+    private func startDeleteRepeat() {
+        deleteTask = Task {
+            // Initial delay before repeat starts
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            while !Task.isCancelled {
+                onDelete()
+                try? await Task.sleep(nanoseconds: 80_000_000)
+            }
+        }
+    }
+
     // MARK: - State Refresh
 
     private func refreshState() {
         var newState = SharedDataBridge.shared.sessionState
 
         if newState != "idle" {
-            let heartbeat = SharedDataBridge.shared.lastHeartbeatTimestamp
-            if heartbeat > 0 && (Date().timeIntervalSince1970 - heartbeat) > 3.0 {
-                newState = "idle"
+            // Skip heartbeat timeout check during the initial grace period after
+            // sending the deep link — the app may still be cold-launching.
+            let inGracePeriod: Bool
+            if let sentTime = deepLinkSentTime {
+                inGracePeriod = Date().timeIntervalSince(sentTime) < 5.0
+            } else {
+                inGracePeriod = false
+            }
+
+            if !inGracePeriod {
+                let heartbeat = SharedDataBridge.shared.lastHeartbeatTimestamp
+                if heartbeat > 0 && (Date().timeIntervalSince1970 - heartbeat) > 5.0 {
+                    newState = "idle"
+                }
             }
         }
 
+        if checkmarkTapped && newState == "listening" {
+            return
+        }
+
         if newState != sessionState {
+            logger.info("refreshState: \(sessionState, privacy: .public) -> \(newState, privacy: .public)")
             withAnimation(.easeInOut(duration: 0.2)) {
                 sessionState = newState
             }

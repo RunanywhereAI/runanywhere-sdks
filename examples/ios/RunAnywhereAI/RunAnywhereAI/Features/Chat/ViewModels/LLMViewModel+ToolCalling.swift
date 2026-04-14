@@ -69,10 +69,16 @@ extension LLMViewModel {
             toolCallInfo = nil
         }
 
+        // Split `<think>...</think>` content from the response so the UI can render
+        // the thinking block separately and avoid silently dropping SDK-provided
+        // thinking content on the tool-calling path.
+        let (displayText, thinkingContent) = ThinkingContentParser.extract(from: result.text)
+
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: result.text,
+            text: displayText,
+            thinkingContent: thinkingContent,
             toolCallInfo: toolCallInfo
         )
     }
@@ -82,6 +88,7 @@ extension LLMViewModel {
     func updateMessageWithToolResult(
         at index: Int,
         text: String,
+        thinkingContent: String?,
         toolCallInfo: ToolCallInfo?
     ) async {
         await MainActor.run {
@@ -100,7 +107,7 @@ extension LLMViewModel {
                 id: currentMessage.id,
                 role: currentMessage.role,
                 content: text,
-                thinkingContent: nil,
+                thinkingContent: thinkingContent,
                 timestamp: currentMessage.timestamp,
                 analytics: nil, // Tool calling doesn't use standard analytics
                 modelInfo: modelInfo,

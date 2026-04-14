@@ -14,12 +14,17 @@
 
 #include "onnx_backend.h"
 
-#include <dirent.h>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
 
+#ifdef _WIN32
+#include <direct.h>  // for _mkdir
+#endif
+
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "rac/core/rac_logger.h"
 
@@ -673,7 +678,11 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
     }
 
     if (stat(voices_dir.c_str(), &st) != 0) {
+#ifdef _WIN32
+        int mk = _mkdir(voices_dir.c_str());
+#else
         int mk = mkdir(voices_dir.c_str(), 0755);
+#endif
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk, errno);
     } else {
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] voices/ dir already exists");
@@ -834,7 +843,14 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
     }
 
     if (S_ISDIR(path_stat.st_mode)) {
-        model_onnx_path = model_path + "/model.onnx";
+        // Prefer the quantized int8 model over the full-precision one when both exist.
+        const std::string int8_candidate = model_path + "/model.int8.onnx";
+        if (stat(int8_candidate.c_str(), &path_stat) == 0) {
+            model_onnx_path = int8_candidate;
+            RAC_LOG_DEBUG("ONNX.TTS", "Using int8 model: %s", model_onnx_path.c_str());
+        } else {
+            model_onnx_path = model_path + "/model.onnx";
+        }
         tokens_path = model_path + "/tokens.txt";
         lexicon_path = model_path + "/lexicon.txt";
 
@@ -1149,7 +1165,37 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
         sherpa_vad_ = nullptr;
     }
 
+    // Resolve model_path: if it's a directory, find the .onnx file inside
     model_path_ = model_path;
+    struct stat path_stat;
+    if (stat(model_path.c_str(), &path_stat) == 0 && S_ISDIR(path_stat.st_mode)) {
+        // Collect every `.onnx` filename and sort lexicographically so the
+        // choice is deterministic across runs (readdir() order is
+        // filesystem-dependent and not stable).
+        std::vector<std::string> candidates;
+        DIR* dir = opendir(model_path.c_str());
+        if (dir) {
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                std::string filename = entry->d_name;
+                if (filename.size() > 5 &&
+                    filename.substr(filename.size() - 5) == ".onnx") {
+                    candidates.push_back(std::move(filename));
+                }
+            }
+            closedir(dir);
+        }
+        if (!candidates.empty()) {
+            std::sort(candidates.begin(), candidates.end());
+            model_path_ = model_path + "/" + candidates.front();
+            RAC_LOG_DEBUG("ONNX.VAD", "Found VAD model file: %s (%zu candidate%s)",
+                          model_path_.c_str(), candidates.size(),
+                          candidates.size() == 1 ? "" : "s");
+        } else {
+            RAC_LOG_ERROR("ONNX.VAD", "No .onnx file found in directory: %s", model_path.c_str());
+            return false;
+        }
+    }
 
     SherpaOnnxVadModelConfig vad_config;
     memset(&vad_config, 0, sizeof(vad_config));

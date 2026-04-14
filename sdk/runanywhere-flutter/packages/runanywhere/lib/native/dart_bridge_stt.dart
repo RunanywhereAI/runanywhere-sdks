@@ -9,9 +9,10 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-
+import 'package:runanywhere/features/stt/stt_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/native_functions.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 
 /// STT component bridge for C++ interop.
@@ -48,13 +49,9 @@ class DartBridgeSTT {
     }
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final create = lib.lookupFunction<Int32 Function(Pointer<RacHandle>),
-          int Function(Pointer<RacHandle>)>('rac_stt_component_create');
-
       final handlePtr = calloc<RacHandle>();
       try {
-        final result = create(handlePtr);
+        final result = NativeFunctions.sttCreate(handlePtr);
 
         if (result != RAC_SUCCESS) {
           throw StateError(
@@ -81,11 +78,7 @@ class DartBridgeSTT {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final isLoadedFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_stt_component_is_loaded');
-
-      return isLoadedFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.sttIsLoaded(_handle!) == RAC_TRUE;
     } catch (e) {
       _logger.debug('isLoaded check failed: $e');
       return false;
@@ -100,11 +93,7 @@ class DartBridgeSTT {
     if (_handle == null) return false;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final supportsStreamingFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_stt_component_supports_streaming');
-
-      return supportsStreamingFn(_handle!) == RAC_TRUE;
+      return NativeFunctions.sttSupportsStreaming(_handle!) == RAC_TRUE;
     } catch (e) {
       return false;
     }
@@ -131,14 +120,7 @@ class DartBridgeSTT {
     final namePtr = modelName.toNativeUtf8();
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final loadModelFn = lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_stt_component_load_model');
-
-      final result = loadModelFn(handle, pathPtr, idPtr, namePtr);
+      final result = NativeFunctions.sttLoadModel(handle, pathPtr, idPtr, namePtr);
 
       if (result != RAC_SUCCESS) {
         throw StateError(
@@ -160,11 +142,7 @@ class DartBridgeSTT {
     if (_handle == null) return;
 
     try {
-      final lib = PlatformLoader.loadCommons();
-      final cleanupFn = lib.lookupFunction<Int32 Function(RacHandle),
-          int Function(RacHandle)>('rac_stt_component_cleanup');
-
-      cleanupFn(_handle!);
+      NativeFunctions.sttCleanup(_handle!);
       _loadedModelId = null;
       _logger.info('STT model unloaded');
     } catch (e) {
@@ -185,6 +163,8 @@ class DartBridgeSTT {
     Uint8List audioData, {
     int sampleRate = 16000,
   }) async {
+    STTConfiguration(sampleRate: sampleRate).validate();
+
     final handle = getHandle();
 
     if (!isLoaded) {
@@ -357,11 +337,7 @@ class DartBridgeSTT {
   void destroy() {
     if (_handle != null) {
       try {
-        final lib = PlatformLoader.loadCommons();
-        final destroyFn = lib.lookupFunction<Void Function(RacHandle),
-            void Function(RacHandle)>('rac_stt_component_destroy');
-
-        destroyFn(_handle!);
+        NativeFunctions.sttDestroy(_handle!);
         _handle = null;
         _loadedModelId = null;
         _logger.debug('STT component destroyed');

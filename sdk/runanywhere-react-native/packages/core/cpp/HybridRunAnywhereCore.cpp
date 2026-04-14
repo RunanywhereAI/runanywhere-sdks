@@ -273,6 +273,7 @@ rac_inference_framework_t frameworkFromString(const std::string& framework) {
 #endif
     if (framework == "FoundationModels") return RAC_FRAMEWORK_FOUNDATION_MODELS;
     if (framework == "SystemTTS") return RAC_FRAMEWORK_SYSTEM_TTS;
+    if (framework == "Genie" || framework == "genie") return (rac_inference_framework_t)11; // RAC_FRAMEWORK_GENIE
     return RAC_FRAMEWORK_UNKNOWN;
 }
 
@@ -913,6 +914,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getAvailableModels(
 #endif
                     case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
                     case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+                    case 11: frameworkStr = "Genie"; break; // RAC_FRAMEWORK_GENIE
                     default: frameworkStr = "unknown"; break;
                 }
 
@@ -986,6 +988,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getModelInfo(
 #endif
             case RAC_FRAMEWORK_FOUNDATION_MODELS: frameworkStr = "FoundationModels"; break;
             case RAC_FRAMEWORK_SYSTEM_TTS: frameworkStr = "SystemTTS"; break;
+            case 11: frameworkStr = "Genie"; break; // RAC_FRAMEWORK_GENIE
             default: frameworkStr = "unknown"; break;
         }
 
@@ -1335,7 +1338,10 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpGet(
 // ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getLastError() {
-    return Promise<std::string>::async([this]() { return lastError_; });
+    return Promise<std::string>::async([this]() {
+        std::lock_guard<std::mutex> lock(errorMutex_);
+        return lastError_;
+    });
 }
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::extractArchive(
@@ -1442,7 +1448,10 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::getMemoryUsage() {
 // ============================================================================
 
 void HybridRunAnywhereCore::setLastError(const std::string& error) {
-    lastError_ = error;
+    {
+        std::lock_guard<std::mutex> lock(errorMutex_);
+        lastError_ = error;
+    }
     LOGE("%s", error.c_str());
 }
 
@@ -1559,12 +1568,15 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::generate(
 
         std::string text = llmResult.text ? llmResult.text : "";
         int tokensUsed = llmResult.completion_tokens;
+        double latencyMs = llmResult.total_time_ms;
+
+        rac_llm_result_free(&llmResult);
 
         return buildJsonObject({
             {"text", jsonString(text)},
             {"tokensUsed", std::to_string(tokensUsed)},
             {"modelUsed", jsonString("llm")},
-            {"latencyMs", std::to_string(llmResult.total_time_ms)}
+            {"latencyMs", std::to_string(latencyMs)}
         });
     });
 }
@@ -1991,11 +2003,12 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribeFile(
             while (pos + 8 < dataSize) {
                 char chunkId[5] = {0};
                 memcpy(chunkId, &data[pos], 4);
-                uint32_t chunkSize = *reinterpret_cast<const uint32_t*>(&data[pos + 4]);
+                uint32_t chunkSize;
+                memcpy(&chunkSize, &data[pos + 4], sizeof(chunkSize));
 
                 if (strcmp(chunkId, "fmt ") == 0) {
                     if (pos + 8 + chunkSize <= dataSize && chunkSize >= 16) {
-                        sampleRate = *reinterpret_cast<const int32_t*>(&data[pos + 12]);
+                        memcpy(&sampleRate, &data[pos + 12], sizeof(sampleRate));
                         if (sampleRate <= 0 || sampleRate > 48000) sampleRate = 16000;
                         LOGI("WAV sample rate: %d Hz", sampleRate);
                     }
@@ -2049,11 +2062,11 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::transcribeFile(
 
             rac_stt_result_free(&result);
             LOGI("Transcription result: %s", transcribedText.c_str());
-            return transcribedText;
+            return "{\"text\":" + jsonString(transcribedText) + ",\"confidence\":0}";
         } catch (const std::exception& e) {
             std::string msg = e.what();
             LOGI("TranscribeFile exception: %s", msg.c_str());
-            return "{\"error\":\"" + msg + "\"}";
+            return "{\"error\":" + jsonString(msg) + "}";
         } catch (...) {
             return "{\"error\":\"Transcription failed (unknown error)\"}";
         }

@@ -166,6 +166,42 @@ elseif(RAC_PLATFORM_LINUX)
     else()
         message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
     endif()
+
+elseif(RAC_PLATFORM_WINDOWS)
+    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-windows")
+
+    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
+        set(SHERPA_ONNX_AVAILABLE ON)
+        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
+        set(SHERPA_DLL_PATH "${SHERPA_ONNX_ROOT}/bin/sherpa-onnx-c-api.dll")
+        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
+
+        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
+        set_target_properties(sherpa_onnx PROPERTIES
+            IMPORTED_IMPLIB "${SHERPA_LIB_PATH}"
+            IMPORTED_LOCATION "${SHERPA_DLL_PATH}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
+        )
+
+        # Link supporting libraries if present
+        set(SHERPA_ONNX_DEPS
+            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
+            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
+            "piper_phonemize" "espeak-ng" "ucd"
+        )
+
+        foreach(dep ${SHERPA_ONNX_DEPS})
+            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/${dep}.lib")
+                add_library(sherpa_${dep} STATIC IMPORTED GLOBAL)
+                set_target_properties(sherpa_${dep} PROPERTIES IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/${dep}.lib")
+                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
+            endif()
+        endforeach()
+
+        message(STATUS "Found Sherpa-ONNX Windows: ${SHERPA_LIB_PATH}")
+    else()
+        message(STATUS "Sherpa-ONNX not found for Windows at ${SHERPA_ONNX_ROOT}")
+    endif()
 endif()
 
 # =============================================================================
@@ -282,6 +318,10 @@ elseif(RAC_PLATFORM_MACOS)
 
 elseif(RAC_PLATFORM_LINUX)
     target_link_libraries(rac_backend_onnx PUBLIC pthread dl)
+
+elseif(RAC_PLATFORM_WINDOWS)
+    # No extra link libraries needed on Windows
+    message(STATUS "ONNX Backend: CPU EP for Windows")
 endif()
 
 # =============================================================================

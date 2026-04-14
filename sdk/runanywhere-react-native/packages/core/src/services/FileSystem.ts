@@ -107,6 +107,9 @@ try {
 const RUN_ANYWHERE_DIR = 'RunAnywhere';
 const MODELS_DIR = 'Models';
 
+/** Tracks active RNFS download jobIds by modelId for cancellation support. */
+const activeDownloadJobs = new Map<string, number>();
+
 /**
  * Describes a single file within a multi-file model.
  * Mirrors Swift SDK's ModelFileDescriptor.
@@ -399,7 +402,15 @@ export const FileSystem = {
       },
     });
 
-    const result = await downloadResult.promise;
+    // Track jobId for cancellation support
+    activeDownloadJobs.set(modelId, downloadResult.jobId);
+
+    let result;
+    try {
+      result = await downloadResult.promise;
+    } finally {
+      activeDownloadJobs.delete(modelId);
+    }
 
     if (result.statusCode !== 200) {
       throw new Error(`Download failed with status: ${result.statusCode}`);
@@ -569,6 +580,21 @@ export const FileSystem = {
       logger.error(`Failed to delete model: ${modelId}`, { error });
       return false;
     }
+  },
+
+  /**
+   * Cancel an active download by modelId.
+   * Calls RNFS.stopDownload to abort the underlying HTTP request.
+   */
+  cancelDownload(modelId: string): boolean {
+    const jobId = activeDownloadJobs.get(modelId);
+    if (jobId != null && RNFS) {
+      RNFS.stopDownload(jobId);
+      activeDownloadJobs.delete(modelId);
+      logger.info(`Cancelled download for: ${modelId} (jobId=${jobId})`);
+      return true;
+    }
+    return false;
   },
 
   /**

@@ -68,5 +68,16 @@ enum LoRAAdapterCatalog {
             fileSize: 765_952,
             defaultScale: 1.0
         ),
+        // --- Abliterated adapter (uncensored fine-tune for Qwen 2.5 0.5B base) ---
+        LoraAdapterCatalogEntry(
+            id: "abliterated-lora",
+            name: "Abliterated (Uncensored)",
+            description: "Removes content restrictions for unrestricted responses",
+            downloadURL: URL(string: "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf")!,
+            filename: "qwen2.5-0.5b-abliterated-lora-f16.gguf",
+            compatibleModelIds: ["qwen2.5-0.5b-base-q8_0"],
+            fileSize: 17_620_224,
+            defaultScale: 1.0
+        ),
     ]
 }

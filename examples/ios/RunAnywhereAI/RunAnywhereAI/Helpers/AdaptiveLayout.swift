@@ -449,6 +449,7 @@ struct AdaptiveMicButton: View {
     let inactiveColor: Color
     let icon: String
     let action: () -> Void
+    let onLongPress: (() -> Void)?
 
     init(
         isActive: Bool = false,
@@ -457,7 +458,8 @@ struct AdaptiveMicButton: View {
         activeColor: Color = .red,
         inactiveColor: Color = AppColors.primaryAccent,
         icon: String = "mic.fill",
-        action: @escaping () -> Void
+        action: @escaping () -> Void,
+        onLongPress: (() -> Void)? = nil
     ) {
         self.isActive = isActive
         self.isPulsing = isPulsing
@@ -466,83 +468,65 @@ struct AdaptiveMicButton: View {
         self.inactiveColor = inactiveColor
         self.icon = icon
         self.action = action
+        self.onLongPress = onLongPress
+    }
+
+    private var micContent: some View {
+        ZStack {
+            // Background circle
+            Circle()
+                .fill(isActive ? activeColor : inactiveColor)
+                .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+
+            // Pulsing effect when active
+            if isPulsing {
+                Circle()
+                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                    .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
+                    .scaleEffect(1.3)
+                    .opacity(0)
+                    .animation(
+                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
+                        value: isPulsing
+                    )
+            }
+
+            // Icon or loading indicator
+            if isLoading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.2)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: AdaptiveSizing.micIconSize))
+                    .foregroundColor(.white)
+                    .contentTransition(.symbolEffect(.replace))
+                    .animation(.smooth(duration: 0.3), value: icon)
+            }
+        }
     }
 
     var body: some View {
         Group {
             if #available(iOS 26.0, macOS 26.0, *) {
-                Button(action: action) {
-                    ZStack {
-                        // Background circle
-                        Circle()
-                            .fill(isActive ? activeColor : inactiveColor)
-                            .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-
-                        // Pulsing effect when active
-                        if isPulsing {
-                            Circle()
-                                .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                                .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-                                .scaleEffect(1.3)
-                                .opacity(0)
-                                .animation(
-                                    .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                                    value: isPulsing
-                                )
-                        }
-
-                        // Icon or loading indicator
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.2)
-                        } else {
-                            Image(systemName: icon)
-                                .font(.system(size: AdaptiveSizing.micIconSize))
-                                .foregroundColor(.white)
-                                .contentTransition(.symbolEffect(.replace))
-                                .animation(.smooth(duration: 0.3), value: icon)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive())
+                micContent
+                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onTapGesture(perform: action)
+                    .glassEffect(.regular.interactive())
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Microphone")
+                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityAction(.default, action)
+                    .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             } else {
-                Button(action: action) {
-                    ZStack {
-                        // Background circle
-                        Circle()
-                            .fill(isActive ? activeColor : inactiveColor)
-                            .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-
-                        // Pulsing effect when active
-                        if isPulsing {
-                            Circle()
-                                .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                                .frame(width: AdaptiveSizing.micButtonSize, height: AdaptiveSizing.micButtonSize)
-                                .scaleEffect(1.3)
-                                .opacity(0)
-                                .animation(
-                                    .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                                    value: isPulsing
-                                )
-                        }
-
-                        // Icon or loading indicator
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.2)
-                        } else {
-                            Image(systemName: icon)
-                                .font(.system(size: AdaptiveSizing.micIconSize))
-                                .foregroundColor(.white)
-                                .contentTransition(.symbolEffect(.replace))
-                                .animation(.smooth(duration: 0.3), value: icon)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
+                micContent
+                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onTapGesture(perform: action)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityLabel("Microphone")
+                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityAction(.default, action)
+                    .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             }
         }
     }

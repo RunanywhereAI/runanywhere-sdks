@@ -175,7 +175,7 @@ final class FlowSessionManager: ObservableObject {
         // but the engine MUST be started here while the app is still visible.
         // Buffer accumulation is gated by sessionPhase (.listening only) in the callback.
         do {
-            try audioCapture.startRecording { [weak self] data in
+            try await audioCapture.startRecording { [weak self] data in
                 // AudioCaptureManager dispatches this callback on DispatchQueue.main
                 MainActor.assumeIsolated {
                     guard let self else { return }

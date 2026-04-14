@@ -9,11 +9,10 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
 #include <mutex>
 #include <random>
 #include <string>
-#include <sys/stat.h>
+#include "rac/core/rac_platform_compat.h"
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
@@ -442,25 +441,36 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         }
     }
 
-    // 3. Resolve model files within the directory
-    char model_path[1024] = {};
-    char mmproj_path[1024] = {};
-    result = rac_vlm_resolve_model_files(model_folder, model_path, sizeof(model_path), mmproj_path,
-                                         sizeof(mmproj_path));
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to resolve model files in: %s", model_folder);
-        rac_model_info_free(model_info);
-        return result;
-    }
-
-    // 4. Delegate to the existing load function
-    const char* mmproj = mmproj_path[0] != '\0' ? mmproj_path : nullptr;
+    // 3. For directory-based models (MetalRT), pass the directory directly.
+    //    For GGUF-based models (llama.cpp), resolve .gguf + mmproj files.
     const char* name = model_info->name ? model_info->name : model_id;
 
-    RAC_LOG_INFO(LOG_CAT, "Loading VLM model by ID: %s (model=%s, mmproj=%s)", model_id, model_path,
-                 mmproj ? mmproj : "none");
+    if (rac_framework_uses_directory_based_models(model_info->framework) == RAC_TRUE) {
+        struct stat dir_stat;
+        if (stat(model_folder, &dir_stat) != 0 || !S_ISDIR(dir_stat.st_mode)) {
+            RAC_LOG_ERROR(LOG_CAT, "Directory-based model requires a valid directory path: %s",
+                          model_folder);
+            rac_model_info_free(model_info);
+            return RAC_ERROR_NOT_FOUND;
+        }
+        RAC_LOG_INFO(LOG_CAT, "Loading directory-based VLM model by ID: %s (dir=%s)", model_id, model_folder);
+        result = rac_vlm_component_load_model(handle, model_folder, nullptr, model_id, name);
+    } else {
+        char model_path[1024] = {};
+        char mmproj_path[1024] = {};
+        result = rac_vlm_resolve_model_files(model_folder, model_path, sizeof(model_path), mmproj_path,
+                                             sizeof(mmproj_path));
+        if (result != RAC_SUCCESS) {
+            RAC_LOG_ERROR(LOG_CAT, "Failed to resolve model files in: %s", model_folder);
+            rac_model_info_free(model_info);
+            return result;
+        }
 
-    result = rac_vlm_component_load_model(handle, model_path, mmproj, model_id, name);
+        const char* mmproj = mmproj_path[0] != '\0' ? mmproj_path : nullptr;
+        RAC_LOG_INFO(LOG_CAT, "Loading VLM model by ID: %s (model=%s, mmproj=%s)", model_id, model_path,
+                     mmproj ? mmproj : "none");
+        result = rac_vlm_component_load_model(handle, model_path, mmproj, model_id, name);
+    }
 
     rac_model_info_free(model_info);
     return result;

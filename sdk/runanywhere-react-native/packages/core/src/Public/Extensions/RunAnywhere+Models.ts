@@ -85,7 +85,10 @@ export async function getModelInfo(modelId: string): Promise<ModelInfo | null> {
   const infoJson = await native.getModelInfo(modelId);
   try {
     const result = JSON.parse(infoJson);
-    return result === 'null' ? null : result;
+    if (result === null || result === 'null' || (typeof result === 'object' && Object.keys(result).length === 0)) {
+      return null;
+    }
+    return result;
   } catch {
     return null;
   }
@@ -227,7 +230,6 @@ export async function registerModel(options: {
   memoryRequirement?: number;
   supportsThinking?: boolean;
 }): Promise<ModelInfo> {
-
   const now = new Date().toISOString();
   const modelId = options.id ?? generateModelId(options.url);
 
@@ -291,7 +293,6 @@ export async function registerMultiFileModel(options: {
   modality?: ModelCategory;
   memoryRequirement?: number;
 }): Promise<ModelInfo> {
-
   const now = new Date().toISOString();
 
   MultiFileModelCache.set(options.id, options.files);
@@ -553,8 +554,10 @@ export async function downloadModel(
  */
 export async function cancelDownload(modelId: string): Promise<boolean> {
   if (activeDownloads.has(modelId)) {
+    // Stop the native RNFS download job
+    FileSystem.cancelDownload(modelId);
     activeDownloads.delete(modelId);
-    logger.info(`Marked download as cancelled: ${modelId}`);
+    logger.info(`Cancelled download: ${modelId}`);
     return true;
   }
   return false;
@@ -566,9 +569,19 @@ export async function cancelDownload(modelId: string): Promise<boolean> {
 export async function deleteModel(modelId: string): Promise<boolean> {
   try {
     const modelInfo = await ModelRegistry.getModel(modelId);
-    const extension = modelInfo?.downloadURL?.includes('.gguf')
-      ? '.gguf'
-      : '';
+    const url = modelInfo?.downloadURL ?? '';
+    let extension = '';
+    if (url.includes('.gguf')) {
+      extension = '.gguf';
+    } else if (url.includes('.onnx')) {
+      extension = '.onnx';
+    } else if (url.includes('.tar.bz2')) {
+      extension = '.tar.bz2';
+    } else if (url.includes('.tar.gz')) {
+      extension = '.tar.gz';
+    } else if (url.includes('.zip')) {
+      extension = '.zip';
+    }
     const fileName = `${modelId}${extension}`;
 
     // Delete using FileSystem service

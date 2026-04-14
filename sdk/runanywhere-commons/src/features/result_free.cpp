@@ -13,9 +13,20 @@
 #include "rac/features/tts/rac_tts_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 
+// MSVC does not support __attribute__((weak)). On MSVC this whole file is
+// excluded from the build via CMakeLists.txt, and each service translation
+// unit provides its own strong definition of `rac_*_result_free`. On other
+// compilers the weak attribute lets backend-specific .cpp files override
+// these fallback definitions at link time.
+#ifdef _MSC_VER
+#define RAC_WEAK_SYMBOL
+#else
+#define RAC_WEAK_SYMBOL __attribute__((weak))
+#endif
+
 extern "C" {
 
-__attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
+RAC_WEAK_SYMBOL void rac_llm_result_free(rac_llm_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -24,7 +35,7 @@ __attribute__((weak)) void rac_llm_result_free(rac_llm_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
+RAC_WEAK_SYMBOL void rac_stt_result_free(rac_stt_result_t* result) {
     if (result) {
         if (result->text) {
             free(const_cast<char*>(result->text));
@@ -48,7 +59,7 @@ __attribute__((weak)) void rac_stt_result_free(rac_stt_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
+RAC_WEAK_SYMBOL void rac_tts_result_free(rac_tts_result_t* result) {
     if (result) {
         if (result->audio_data) {
             free(result->audio_data);
@@ -58,7 +69,7 @@ __attribute__((weak)) void rac_tts_result_free(rac_tts_result_t* result) {
     }
 }
 
-__attribute__((weak)) void rac_embeddings_result_free(rac_embeddings_result_t* result) {
+RAC_WEAK_SYMBOL void rac_embeddings_result_free(rac_embeddings_result_t* result) {
     if (result) {
         if (result->embeddings) {
             for (size_t i = 0; i < result->num_embeddings; i++) {

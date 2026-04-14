@@ -153,6 +153,17 @@ struct MoreHubView: View {
                     }
 
                     NavigationLink {
+                        VoiceActivityDetectionView()
+                    } label: {
+                        FeatureRow(
+                            icon: "waveform.badge.mic",
+                            iconColor: .cyan,
+                            title: "Voice Detection",
+                            subtitle: "Detect speech activity in real-time"
+                        )
+                    }
+
+                    NavigationLink {
                         StorageView()
                     } label: {
                         FeatureRow(

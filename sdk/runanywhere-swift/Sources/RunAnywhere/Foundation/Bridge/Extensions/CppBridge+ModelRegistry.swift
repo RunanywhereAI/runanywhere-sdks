@@ -324,6 +324,8 @@ extension CppBridge {
                         return RAC_TRUE
                     }
                     return RAC_FALSE
+                case RAC_FRAMEWORK_METALRT:
+                    return (ext == "safetensors" || ext == "json") ? RAC_TRUE : RAC_FALSE
                 case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
                     // Built-in models don't need file check
                     return RAC_TRUE

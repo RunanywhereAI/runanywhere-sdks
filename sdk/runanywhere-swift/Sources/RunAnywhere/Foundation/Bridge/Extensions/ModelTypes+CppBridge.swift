@@ -31,6 +31,8 @@ extension ModelCategory {
             return RAC_MODEL_CATEGORY_AUDIO
         case .embedding:
             return RAC_MODEL_CATEGORY_EMBEDDING
+        case .voiceActivityDetection:
+            return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
         }
     }
 
@@ -53,6 +55,8 @@ extension ModelCategory {
             self = .audio
         case RAC_MODEL_CATEGORY_EMBEDDING:
             self = .embedding
+        case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
+            self = .voiceActivityDetection
         default:
             self = .language  // Default fallback
         }
@@ -121,6 +125,8 @@ extension InferenceFramework {
             return RAC_FRAMEWORK_MLX
         case .whisperKitCoreML:
             return RAC_FRAMEWORK_WHISPERKIT_COREML
+        case .metalrt:
+            return RAC_FRAMEWORK_METALRT
         case .builtIn:
             return RAC_FRAMEWORK_BUILTIN
         case .none:
@@ -149,6 +155,8 @@ extension InferenceFramework {
             self = .mlx
         case RAC_FRAMEWORK_WHISPERKIT_COREML:
             self = .whisperKitCoreML
+        case RAC_FRAMEWORK_METALRT:
+            self = .metalrt
         case RAC_FRAMEWORK_BUILTIN:
             self = .builtIn
         case RAC_FRAMEWORK_NONE:

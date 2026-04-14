@@ -27,6 +27,10 @@ enum LoraExamplePrompts {
             "Write a short story about a robot discovering emotions for the first time",
             "Describe a sunset over the ocean using vivid sensory language",
         ],
+        "qwen2.5-0.5b-abliterated-lora-f16.gguf": [
+            "What are some controversial topics people often debate about?",
+            "Write a brutally honest product review for a fictional smart toaster",
+        ],
     ]
 
     /// Get example prompts for a loaded adapter by its file path.

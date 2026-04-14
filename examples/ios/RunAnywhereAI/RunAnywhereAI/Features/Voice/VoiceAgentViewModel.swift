@@ -150,13 +150,15 @@ final class VoiceAgentViewModel: ObservableObject {
     var instructionText: String {
         switch sessionState {
         case .listening:
-            return "Listening... Pause to send"
+            return "Tap to send · Hold to stop"
         case .processing:
             return "Processing your message..."
         case .speaking:
             return "Speaking..."
         case .connecting:
             return "Connecting..."
+        case .connected:
+            return "Tap to speak · Hold to end"
         default:
             return "Tap to start conversation"
         }
@@ -387,7 +389,13 @@ final class VoiceAgentViewModel: ObservableObject {
         assistantResponse = ""
 
         do {
-            session = try await RunAnywhere.startVoiceSession()
+            let settings = SettingsViewModel.shared
+            let voiceConfig = VoiceSessionConfig(
+                continuousMode: false,
+                thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled,
+                maxTokens: settings.maxTokens
+            )
+            session = try await RunAnywhere.startVoiceSession(config: voiceConfig)
             sessionState = .listening
             currentStatus = "Listening..."
             eventTask = Task { [weak self] in
@@ -419,10 +427,21 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Voice session stopped")
     }
 
+    func interruptSpeaking() async {
+        await session?.interruptPlayback()
+    }
+
     /// Force send current audio buffer (for push-to-talk mode)
     func sendAudioNow() async {
         await session?.sendNow()
         logger.debug("Forced audio send")
+    }
+
+    /// Resume listening on the current session (push-to-talk: user taps mic after turn completes)
+    func resumeListening() async {
+        await session?.resumeListening()
+        // State will be updated via handleSessionEvent when .listening event arrives
+        logger.debug("Resumed listening")
     }
 
     // MARK: - Session Event Handling
@@ -430,15 +449,23 @@ final class VoiceAgentViewModel: ObservableObject {
     private func handleSessionEvent(_ event: VoiceSessionEvent) {
         switch event {
         case .started: sessionState = .listening; currentStatus = "Listening..."
-        case .listening(let level): audioLevel = level
+        case .listening(let level):
+            audioLevel = level
+            // Transition to .listening state when listening resumes after a turn
+            // (e.g., push-to-talk via resumeListening()). Avoid clobbering
+            // transient states like .speaking or .processing.
+            if sessionState != .listening && sessionState != .speaking && sessionState != .processing {
+                sessionState = .listening
+                currentStatus = "Listening..."
+            }
         case .speechStarted: isSpeechDetected = true; currentStatus = "Listening..."
         case .processing: sessionState = .processing; currentStatus = "Processing..."; isSpeechDetected = false
         case .transcribed(let text): currentTranscript = text
-        case .responded(let text): assistantResponse = text
+        case .responded(let text, _): assistantResponse = text
         case .speaking: sessionState = .speaking; currentStatus = "Speaking..."
-        case let .turnCompleted(transcript, response, _):
+        case let .turnCompleted(transcript, response, _, _):
             currentTranscript = transcript; assistantResponse = response
-            sessionState = .listening; currentStatus = "Listening..."
+            sessionState = .connected; currentStatus = "Ready"
         case .stopped: sessionState = .disconnected; currentStatus = "Ready"
         case .error(let message): logger.error("Session error: \(message)"); errorMessage = message
         }

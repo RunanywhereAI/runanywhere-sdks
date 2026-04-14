@@ -169,7 +169,7 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
     }
 
     auto* mgr = static_cast<LifecycleManager*>(handle);
-    std::lock_guard<std::mutex> lock(mgr->mutex);
+    std::unique_lock<std::mutex> lock(mgr->mutex);
 
     // Check if already loaded with same path - skip duplicate events
     // Mirrors Swift: if await lifecycle.currentResourceId == modelId
@@ -179,6 +179,33 @@ rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path, con
         RAC_LOG_INFO(mgr->logger_category.c_str(), "Model already loaded, skipping duplicate load");
         *out_service = mgr->current_service.load();
         return RAC_SUCCESS;
+    }
+
+    // Auto-unload previous model if a different one is loaded.
+    // Without this, the old service leaks resources (GPU memory, file handles)
+    // and the new service creation may fail due to resource contention.
+    if (mgr->state.load() == RAC_LIFECYCLE_STATE_LOADED && mgr->current_service.load() != nullptr) {
+        // Wait for all acquired services to be released (mirror unload fence)
+        mgr->service_cv.wait(lock, [mgr] { return mgr->service_refcount.load() == 0; });
+
+        RAC_LOG_INFO(mgr->logger_category.c_str(),
+                     "Auto-unloading previous model '%s' before loading '%s'",
+                     mgr->current_model_id.c_str(), model_id);
+
+        // Store nullptr BEFORE calling destroy_fn so that concurrent cancel()
+        // reads via get_service() see nullptr rather than a dangling pointer.
+        rac_handle_t old_service = mgr->current_service.load();
+        mgr->current_service.store(nullptr);
+        if (mgr->destroy_fn != nullptr && old_service != nullptr) {
+            mgr->destroy_fn(old_service, mgr->user_data);
+        }
+        track_lifecycle_event(mgr, "unloaded", mgr->current_model_id.c_str(), 0.0, RAC_SUCCESS);
+
+        mgr->current_model_path.clear();
+        mgr->current_model_id.clear();
+        mgr->current_model_name.clear();
+        mgr->total_unloads++;
+        mgr->state.store(RAC_LIFECYCLE_STATE_IDLE);
     }
 
     // Track load started (mirrors Swift: trackEvent(type: .loadStarted))

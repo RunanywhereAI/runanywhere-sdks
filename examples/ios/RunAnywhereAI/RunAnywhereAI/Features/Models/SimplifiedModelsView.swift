@@ -137,6 +137,7 @@ struct SimplifiedModelsView: View {
                     SimplifiedModelRow(
                         model: model,
                         isSelected: selectedModel?.id == model.id,
+                        isLoadingModel: viewModel.isLoadingModel,
                         onDownloadCompleted: {
                             Task {
                                 await viewModel.loadModels()
@@ -178,6 +179,7 @@ struct SimplifiedModelsView: View {
 private struct SimplifiedModelRow: View {
     let model: ModelInfo
     let isSelected: Bool
+    let isLoadingModel: Bool
     let onDownloadCompleted: () -> Void
     let onSelectModel: () -> Void
     let onModelUpdated: () -> Void
@@ -299,7 +301,7 @@ private struct SimplifiedModelRow: View {
                 .buttonStyle(.borderedProminent)
                 .tint(AppColors.primaryAccent)
                 .controlSize(.small)
-                .disabled(isSelected)
+                .disabled(isSelected || isLoadingModel)
             } else if model.localPath == nil {
                 if isDownloading {
                     ProgressView()
@@ -339,6 +341,7 @@ private struct SimplifiedModelRow: View {
                     .buttonStyle(.borderedProminent)
                     .tint(AppColors.primaryAccent)
                     .controlSize(.small)
+                    .disabled(isLoadingModel)
                 }
             }
         }

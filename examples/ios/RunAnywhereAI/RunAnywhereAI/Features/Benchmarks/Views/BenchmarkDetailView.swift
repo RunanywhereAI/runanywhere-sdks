@@ -198,9 +198,13 @@ private struct MetricsGrid: View {
 
         switch category {
         case .llm:
-            if let tps = metrics.tokensPerSecond { items.append(("tok/s", String(format: "%.1f", tps))) }
+            if let decode = metrics.decodeTokensPerSecond { items.append(("Decode", String(format: "%.1f tok/s", decode))) }
+            if let prefill = metrics.prefillTokensPerSecond { items.append(("Prefill", String(format: "%.1f tok/s", prefill))) }
+            if let tps = metrics.tokensPerSecond, metrics.decodeTokensPerSecond == nil { items.append(("tok/s", String(format: "%.1f", tps))) }
             if let ttft = metrics.ttftMs { items.append(("TTFT", String(format: "%.0fms", ttft))) }
-            if let out = metrics.outputTokens { items.append(("Tokens", "\(out)")) }
+            if let inp = metrics.inputTokens, inp > 0 { items.append(("In Tokens", "\(inp)")) }
+            if let out = metrics.outputTokens { items.append(("Out Tokens", "\(out)")) }
+            if metrics.warmupTimeMs > 0 { items.append(("Warmup", String(format: "%.0fms", metrics.warmupTimeMs))) }
         case .stt:
             if let rtf = metrics.realTimeFactor { items.append(("RTF", String(format: "%.2fx", rtf))) }
             if let dur = metrics.audioLengthSeconds { items.append(("Audio", String(format: "%.1fs", dur))) }
@@ -209,7 +213,9 @@ private struct MetricsGrid: View {
             if let chars = metrics.charactersProcessed { items.append(("Chars", "\(chars)")) }
         case .vlm:
             if let tps = metrics.tokensPerSecond { items.append(("tok/s", String(format: "%.1f", tps))) }
-            if let ct = metrics.completionTokens { items.append(("Tokens", "\(ct)")) }
+            if let pt = metrics.promptTokens, pt > 0 { items.append(("Prompt Tok", "\(pt)")) }
+            if let ct = metrics.completionTokens { items.append(("Comp Tok", "\(ct)")) }
+            if metrics.warmupTimeMs > 0 { items.append(("Warmup", String(format: "%.0fms", metrics.warmupTimeMs))) }
         case .diffusion:
             if let gen = metrics.generationTimeMs { items.append(("Gen", String(format: "%.0fms", gen))) }
         }

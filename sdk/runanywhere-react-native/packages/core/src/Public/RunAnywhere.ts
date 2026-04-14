@@ -16,6 +16,7 @@ import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceConta
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
+import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
 import {
   HTTPService,
   SDKEnvironment as NetworkSDKEnvironment,
@@ -49,6 +50,7 @@ import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
+import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VLM';
 
 const logger = new SDKLogger('RunAnywhere');
@@ -346,7 +348,6 @@ export const RunAnywhere = {
 
       // Store tokens in secure storage for persistence
       try {
-        const { SecureStorageService } = await import('../Foundation/Security/SecureStorageService');
         await SecureStorageService.storeAuthTokens(
           authResponse.access_token,
           authResponse.refresh_token,
@@ -500,6 +501,12 @@ export const RunAnywhere = {
       return '';
     }
   },
+
+  // ============================================================================
+  // Device / NPU Chip Detection (Delegated to Extension)
+  // ============================================================================
+
+  getChip: Device.getChip,
 
   // ============================================================================
   // Logging (Delegated to Extension)

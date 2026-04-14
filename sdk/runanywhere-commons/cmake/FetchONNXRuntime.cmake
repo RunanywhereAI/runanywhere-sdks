@@ -265,6 +265,39 @@ elseif(UNIX)
 
     message(STATUS "ONNX Runtime Linux library: ${onnxruntime_SOURCE_DIR}/lib/libonnxruntime.so")
 
+elseif(WIN32)
+    # Windows: Download Windows binaries
+    if(NOT DEFINED ONNX_VERSION_WINDOWS OR "${ONNX_VERSION_WINDOWS}" STREQUAL "")
+        message(FATAL_ERROR "ONNX_VERSION_WINDOWS not defined in VERSIONS file")
+    endif()
+
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-x64-${ONNX_VERSION_WINDOWS}.zip")
+    else()
+        set(ONNX_URL "https://github.com/microsoft/onnxruntime/releases/download/v${ONNX_VERSION_WINDOWS}/onnxruntime-win-x86-${ONNX_VERSION_WINDOWS}.zip")
+    endif()
+
+    FetchContent_Declare(
+        onnxruntime
+        URL ${ONNX_URL}
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    )
+
+    FetchContent_MakeAvailable(onnxruntime)
+
+    add_library(onnxruntime SHARED IMPORTED GLOBAL)
+
+    set_target_properties(onnxruntime PROPERTIES
+        IMPORTED_IMPLIB "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.lib"
+        IMPORTED_LOCATION "${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll"
+    )
+
+    target_include_directories(onnxruntime INTERFACE
+        "${onnxruntime_SOURCE_DIR}/include"
+    )
+
+    message(STATUS "ONNX Runtime Windows library: ${onnxruntime_SOURCE_DIR}/lib/onnxruntime.lib")
+
 else()
     message(FATAL_ERROR "Unsupported platform for ONNX Runtime")
 endif()

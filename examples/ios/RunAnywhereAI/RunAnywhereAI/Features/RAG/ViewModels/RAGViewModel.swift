@@ -19,6 +19,36 @@ enum MessageRole {
     case system
 }
 
+// MARK: - RAG Message
+
+struct RAGMessage: Identifiable {
+    let id = UUID()
+    let role: MessageRole
+    let text: String
+    let thinkingContent: String?
+
+    init(role: MessageRole, text: String, thinkingContent: String? = nil) {
+        self.role = role
+        self.text = text
+        self.thinkingContent = thinkingContent
+    }
+
+    // MARK: - Think Tag Helpers
+    //
+    // Thin pass-throughs to the SDK's canonical `ThinkingContentParser` so the
+    // app has a single source of truth for `<think>` tag handling.
+
+    /// Extract the content inside `<think>...</think>` tags.
+    static func extractThinkingContent(from text: String) -> String? {
+        ThinkingContentParser.extract(from: text).thinking
+    }
+
+    /// Strip all `<think>...</think>` blocks and trailing incomplete `<think>` tags.
+    static func stripThinkTags(from text: String) -> String {
+        ThinkingContentParser.strip(from: text)
+    }
+}
+
 // MARK: - RAG View Model
 
 @MainActor
@@ -33,7 +63,7 @@ final class RAGViewModel {
 
     // MARK: - Query State
 
-    private(set) var messages: [(role: MessageRole, text: String)] = []
+    private(set) var messages: [RAGMessage] = []
     private(set) var isQuerying = false
     /// Settable from the view layer to surface file-picker failures in the error banner.
     var error: Error?
@@ -97,7 +127,7 @@ final class RAGViewModel {
         guard !question.isEmpty else { return }
         guard isDocumentLoaded else { return }
 
-        messages.append((role: .user, text: question))
+        messages.append(RAGMessage(role: .user, text: question))
         currentQuestion = ""
         isQuerying = true
         error = nil
@@ -107,13 +137,23 @@ final class RAGViewModel {
         }
 
         do {
+            let settings = SettingsViewModel.shared
+            let effectiveQuestion: String
+            if settings.loadedModelSupportsThinking && !settings.thinkingModeEnabled {
+                effectiveQuestion = "/no_think\n\(question)"
+            } else {
+                effectiveQuestion = question
+            }
+
             logger.info("Querying RAG pipeline: \(question)")
-            let result = try await RunAnywhere.ragQuery(question: question)
-            messages.append((role: .assistant, text: result.answer))
+            let result = try await RunAnywhere.ragQuery(question: effectiveQuestion)
+            let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
+            let displayText = RAGMessage.stripThinkTags(from: result.answer)
+            messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
             logger.info("Query complete (\(result.totalTimeMs, format: .fixed(precision: 0))ms)")
         } catch {
             self.error = error
-            messages.append((role: .assistant, text: "Error: \(error.localizedDescription)"))
+            messages.append(RAGMessage(role: .assistant, text: "Error: \(error.localizedDescription)"))
             logger.error("Query failed: \(error.localizedDescription)")
         }
     }

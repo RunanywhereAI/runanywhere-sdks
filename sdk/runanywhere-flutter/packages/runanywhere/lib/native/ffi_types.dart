@@ -1039,6 +1039,18 @@ base class RacVadOnnxResultStruct extends Struct {
   external double probability;
 }
 
+/// VAD result struct matching rac_vad_result_t
+base class RacVadResultStruct extends Struct {
+  @Int32()
+  external int isSpeech;
+
+  @Float()
+  external double energy;
+
+  @Float()
+  external double speechProbability;
+}
+
 // =============================================================================
 // VLM API Types (from rac_vlm_types.h)
 // =============================================================================

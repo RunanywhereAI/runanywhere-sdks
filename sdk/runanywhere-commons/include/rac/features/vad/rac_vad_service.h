@@ -20,6 +20,54 @@ extern "C" {
 #endif
 
 // =============================================================================
+// SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
+
+/**
+ * VAD Service operations vtable.
+ * Each backend implements these functions and provides a static vtable.
+ * Mirrors the STT service vtable pattern (rac_stt_service.h).
+ */
+typedef struct rac_vad_service_ops {
+    /** Process audio samples and detect speech */
+    rac_result_t (*process)(void* impl, const float* samples,
+                            size_t num_samples, rac_bool_t* out_is_speech);
+
+    /** Start VAD processing session */
+    rac_result_t (*start)(void* impl);
+
+    /** Stop VAD processing session */
+    rac_result_t (*stop)(void* impl);
+
+    /** Reset VAD internal state */
+    rac_result_t (*reset)(void* impl);
+
+    /** Set detection threshold */
+    rac_result_t (*set_threshold)(void* impl, float threshold);
+
+    /** Query whether speech is currently active */
+    rac_bool_t (*is_speech_active)(void* impl);
+
+    /** Destroy the backend service */
+    void (*destroy)(void* impl);
+} rac_vad_service_ops_t;
+
+/**
+ * VAD Service instance.
+ * Contains vtable pointer and backend-specific implementation.
+ */
+typedef struct rac_vad_service {
+    /** Vtable with backend operations */
+    const rac_vad_service_ops_t* ops;
+
+    /** Backend-specific implementation handle */
+    void* impl;
+
+    /** Model ID for reference */
+    const char* model_id;
+} rac_vad_service_t;
+
+// =============================================================================
 // SERVICE INTERFACE - Mirrors Swift's VADService protocol
 // =============================================================================
 

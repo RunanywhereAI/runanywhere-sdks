@@ -129,8 +129,14 @@ class ModelListViewModel: ObservableObject {
         await loadModelsFromRegistry()
     }
 
+    @Published private(set) var isLoadingModel = false
+
     /// Select and load a model
     func selectModel(_ model: ModelInfo) async {
+        guard !isLoadingModel else { return }
+        isLoadingModel = true
+        defer { isLoadingModel = false }
+
         do {
             try await loadModel(model)
             setCurrentModel(model)

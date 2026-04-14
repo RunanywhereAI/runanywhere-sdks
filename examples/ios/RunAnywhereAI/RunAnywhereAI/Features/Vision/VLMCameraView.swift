@@ -17,6 +17,8 @@ struct VLMCameraView: View {
     @State private var showingModelSelection = false
     @State private var showingPhotos = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var shouldResumeAutoStreaming = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -51,6 +53,20 @@ struct VLMCameraView: View {
         .onDisappear {
             viewModel.stopAutoStreaming()
             viewModel.stopCamera()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                shouldResumeAutoStreaming = viewModel.isAutoStreamingEnabled
+                viewModel.stopAutoStreaming()
+                viewModel.stopCamera()
+            } else if newPhase == .active {
+                setupCameraIfNeeded()
+                if shouldResumeAutoStreaming {
+                    viewModel.isAutoStreamingEnabled = true
+                    viewModel.startAutoStreaming()
+                    shouldResumeAutoStreaming = false
+                }
+            }
         }
     }
 
@@ -287,8 +303,10 @@ struct VLMCameraView: View {
     private func setupCameraIfNeeded() {
         Task {
             await viewModel.checkCameraAuthorization()
-            if viewModel.isCameraAuthorized && viewModel.captureSession == nil {
-                viewModel.setupCamera()
+            if viewModel.isCameraAuthorized {
+                if viewModel.captureSession == nil {
+                    viewModel.setupCamera()
+                }
                 viewModel.startCamera()
             }
         }

@@ -67,6 +67,13 @@ public enum RunAnywhere {
     internal static var hasCompletedServicesInit = false
     /// Track if HTTP/auth setup succeeded (separate from core services so auth can be retried on reconnect)
     internal static var hasCompletedHTTPSetup = false
+    /// Serialized Phase 2 task — ensures only one init runs at a time.
+    /// Concurrent callers of completeServicesInitialization() await this shared task
+    /// instead of racing through the init logic with an unprotected boolean guard.
+    private static var _servicesInitTask: Task<Void, Error>?
+    /// Serializes the check-and-set on `_servicesInitTask` so two concurrent callers
+    /// can't both observe `nil` and spawn duplicate init tasks.
+    private static let _servicesInitLock = DispatchQueue(label: "com.runanywhere.sdk.servicesInit")
 
     // MARK: - SDK State
 
@@ -136,7 +143,7 @@ public enum RunAnywhere {
 
     /// Reset SDK state (for testing purposes)
     /// Clears all initialization state and cached data
-    public static func reset() {
+    public static func reset() async {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
 
@@ -147,7 +154,7 @@ public enum RunAnywhere {
         currentEnvironment = nil
 
         // Shutdown all C++ bridges and state
-        CppBridge.shutdown()
+        await CppBridge.shutdown()
         CppBridge.State.shutdown()
 
         logger.info("SDK state reset completed")
@@ -312,6 +319,35 @@ public enum RunAnywhere {
             return
         }
 
+        // Atomically check-or-create the shared init task. Without the lock, two
+        // concurrent callers could both see `_servicesInitTask == nil` and spawn
+        // duplicate init tasks (e.g., the background Task.detached from initialize()
+        // racing a caller via ensureServicesReady()).
+        let task: Task<Void, Error> = _servicesInitLock.sync {
+            if let existingTask = _servicesInitTask {
+                return existingTask
+            }
+            let newTask = Task<Void, Error> {
+                try await _performServicesInitialization()
+            }
+            _servicesInitTask = newTask
+            return newTask
+        }
+
+        do {
+            try await task.value
+            // Clear on success so the completed Task is released; subsequent calls
+            // hit the fast path via `hasCompletedServicesInit`.
+            _servicesInitLock.sync { _servicesInitTask = nil }
+        } catch {
+            _servicesInitLock.sync { _servicesInitTask = nil }
+            throw error
+        }
+    }
+
+    /// The actual Phase 2 work, separated so completeServicesInitialization()
+    /// can wrap it in a shared Task for serialization.
+    private static func _performServicesInitialization() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
             throw SDKError.general(.notInitialized, "SDK not initialized")
         }

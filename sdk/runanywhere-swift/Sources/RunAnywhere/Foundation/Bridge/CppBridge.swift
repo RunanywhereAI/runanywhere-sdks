@@ -172,12 +172,24 @@ public enum CppBridge {
     // MARK: - Shutdown
 
     /// Shutdown all C++ bridges
-    public static func shutdown() {
+    ///
+    /// Async because AI component destroy() methods are actor-isolated.
+    /// Awaiting them sequentially (instead of wrapping in `Task { ... }`)
+    /// ensures Telemetry/Events teardown does not race destroy completion.
+    public static func shutdown() async {
         lock.lock()
         let wasInitialized = _isInitialized
         lock.unlock()
 
         guard wasInitialized else { return }
+
+        // Destroy AI components sequentially before tearing down Telemetry/Events
+        await LLM.shared.destroy()
+        await STT.shared.destroy()
+        await TTS.shared.destroy()
+        await VAD.shared.destroy()
+        await VoiceAgent.shared.destroy()
+        await VLM.shared.destroy()
 
         // Shutdown in reverse order
         // Note: ModelAssignment and Platform callbacks remain valid (static)

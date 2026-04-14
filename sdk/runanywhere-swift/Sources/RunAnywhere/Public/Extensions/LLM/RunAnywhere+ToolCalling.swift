@@ -168,8 +168,17 @@ public extension RunAnywhere {
         let registeredTools = await ToolRegistry.shared.getAll()
         let tools = opts.tools ?? registeredTools
 
+        // Extract /no_think prefix before building the full prompt so it stays
+        // at the beginning where the C++ inference layer expects it.
+        let noThinkPrefix = "/no_think\n"
+        let hasNoThink = prompt.hasPrefix(noThinkPrefix)
+        let cleanPrompt = hasNoThink ? String(prompt.dropFirst(noThinkPrefix.count)) : prompt
+
         let systemPrompt = buildToolSystemPrompt(tools: tools, options: opts)
-        var fullPrompt = systemPrompt.isEmpty ? prompt : "\(systemPrompt)\n\nUser: \(prompt)"
+        var fullPrompt = systemPrompt.isEmpty ? cleanPrompt : "\(systemPrompt)\n\nUser: \(cleanPrompt)"
+        if hasNoThink {
+            fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
+        }
 
         var allToolCalls: [ToolCall] = []
         var allToolResults: [ToolResult] = []
@@ -197,12 +206,15 @@ public extension RunAnywhere {
             allToolResults.append(result)
 
             fullPrompt = buildFollowUpPrompt(
-                prompt: prompt,
+                prompt: cleanPrompt,
                 systemPrompt: systemPrompt,
                 toolCall: toolCall,
                 result: result,
                 keepToolsAvailable: opts.keepToolsAvailable
             )
+            if hasNoThink {
+                fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
+            }
         }
 
         return ToolCallingResult(

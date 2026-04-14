@@ -148,6 +148,7 @@ typedef enum rac_model_category {
     RAC_MODEL_CATEGORY_MULTIMODAL = 5,         /**< Multi-modality models */
     RAC_MODEL_CATEGORY_AUDIO = 6,              /**< Audio processing (diarization, etc.) */
     RAC_MODEL_CATEGORY_EMBEDDING = 7,          /**< Embedding models (RAG, semantic search) */
+    RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 8, /**< VAD models (Silero, etc.) */
     RAC_MODEL_CATEGORY_UNKNOWN = 99            /**< Unknown category */
 } rac_model_category_t;
 
@@ -187,6 +188,7 @@ typedef enum rac_inference_framework {
     RAC_FRAMEWORK_MLX = 7,               /**< MLX C++ (Apple Silicon VLM) */
     RAC_FRAMEWORK_COREML = 8,            /**< Core ML (Apple Neural Engine) */
     RAC_FRAMEWORK_WHISPERKIT_COREML = 9,  /**< WhisperKit CoreML (Apple Neural Engine STT) */
+    RAC_FRAMEWORK_METALRT = 10,           /**< MetalRT (custom Metal GPU kernels, Apple only) */
     RAC_FRAMEWORK_UNKNOWN = 99           /**< Unknown framework */
 } rac_inference_framework_t;
 

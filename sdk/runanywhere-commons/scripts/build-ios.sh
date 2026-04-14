@@ -12,11 +12,12 @@
 # OPTIONS:
 #   --skip-download     Skip downloading dependencies
 #   --skip-backends     Build RACommons only, skip backend frameworks
-#   --backend NAME      Build specific backend: llamacpp, onnx, rag, all (default: all)
+#   --backend NAME      Build specific backend: llamacpp, onnx, metalrt, rag, all (default: all)
 #                       - llamacpp: LLM text generation (GGUF models)
 #                       - onnx: STT/TTS/VAD (Sherpa-ONNX models)
+#                       - metalrt: LLM/STT/TTS/VLM via Metal GPU kernels (iOS device only)
 #                       - rag: RAG pipeline with embeddings and text generation
-#                       - all: All backends (default)
+#                       - all: All backends (default, excludes metalrt)
 #   --clean             Clean build directories first
 #   --release           Release build (default)
 #   --debug             Debug build
@@ -27,6 +28,7 @@
 #   dist/RACommons.xcframework                 (always built, includes RAG pipeline)
 #   dist/RABackendLLAMACPP.xcframework         (if --backend llamacpp or all)
 #   dist/RABackendONNX.xcframework             (if --backend onnx or all)
+#   dist/RABackendMetalRT.xcframework          (if --backend metalrt)
 #
 # EXAMPLES:
 #   # Full build (all backends, iOS only)
@@ -200,6 +202,11 @@ build_macos() {
             onnx)
                 BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
                 ;;
+            metalrt)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_METALRT=ON"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_METALRT_ENGINE_AVAILABLE=ON"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DMETALRT_ROOT=${METALRT_ROOT}"
+                ;;
             all|*)
                 BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
                 ;;
@@ -220,6 +227,61 @@ build_macos() {
 
     cd "${PROJECT_ROOT}"
     log_info "Built macOS arm64"
+}
+
+# =============================================================================
+# MetalRT Engine Pre-Build (iOS arm64 device only)
+# =============================================================================
+# Builds the MetalRT engine (libmetalrt_engine.a + default.metallib) for
+# arm64-iphoneos. Must run before the RAC adapter build since
+# rac_backend_metalrt links against libmetalrt_engine.a.
+
+METALRT_ROOT="${METALRT_ROOT:-$(cd "${PROJECT_ROOT}/../../../MetalRT" 2>/dev/null && pwd || echo "")}"
+METALRT_IOS_BUILD_DIR=""
+
+build_metalrt_engine() {
+    if [[ -z "$METALRT_ROOT" || ! -d "$METALRT_ROOT" ]]; then
+        log_error "MetalRT root not found at ${METALRT_ROOT}. Set METALRT_ROOT env var or place MetalRT as sibling to runanywhere-sdks."
+    fi
+
+    log_header "Building MetalRT Engine for iOS (arm64)"
+    echo "MetalRT root: ${METALRT_ROOT}"
+
+    METALRT_IOS_BUILD_DIR="${BUILD_DIR}/metalrt-engine-ios"
+    mkdir -p "${METALRT_IOS_BUILD_DIR}"
+    cd "${METALRT_IOS_BUILD_DIR}"
+
+    # Resolve MLX include dir for steel kernels (needed for cross-compilation
+    # since the CMake python3 probe is skipped when CMAKE_CROSSCOMPILING)
+    local MLX_FLAGS=""
+    local MLX_INC
+    MLX_INC=$(python3 -c "import mlx, os; print(os.path.join(mlx.__path__[0], 'include'))" 2>/dev/null || echo "")
+    if [[ -n "$MLX_INC" && -d "$MLX_INC" ]]; then
+        MLX_FLAGS="-DMLX_INCLUDE_DIR=${MLX_INC}"
+        log_info "MLX include dir: ${MLX_INC}"
+    else
+        log_warn "MLX not found. Steel attention/gemm kernels may fail to compile."
+    fi
+
+    cmake "${METALRT_ROOT}" \
+        -DCMAKE_TOOLCHAIN_FILE="${PROJECT_ROOT}/cmake/ios.toolchain.cmake" \
+        -DIOS_PLATFORM="OS" \
+        -DIOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET}" \
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+        $MLX_FLAGS
+
+    cmake --build . --config "${BUILD_TYPE}" --target metalrt_engine -j"$(sysctl -n hw.ncpu)"
+
+    # Verify outputs
+    if [[ ! -f "${METALRT_IOS_BUILD_DIR}/libmetalrt_engine.a" ]]; then
+        log_error "MetalRT engine build failed: libmetalrt_engine.a not found"
+    fi
+    if [[ ! -f "${METALRT_IOS_BUILD_DIR}/default.metallib" ]]; then
+        log_error "MetalRT engine build failed: default.metallib not found"
+    fi
+
+    cd "${PROJECT_ROOT}"
+    log_info "MetalRT engine built: libmetalrt_engine.a + default.metallib"
 }
 
 # =============================================================================
@@ -247,6 +309,14 @@ build_platform() {
                 ;;
             onnx)
                 BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
+                ;;
+            metalrt)
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=OFF -DRAC_BACKEND_ONNX=OFF -DRAC_BACKEND_WHISPERCPP=OFF -DRAC_BACKEND_METALRT=ON"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_METALRT_ENGINE_AVAILABLE=ON"
+                BACKEND_FLAGS="$BACKEND_FLAGS -DMETALRT_ROOT=${METALRT_ROOT}"
+                if [[ -n "${METALRT_IOS_BUILD_DIR}" ]]; then
+                    BACKEND_FLAGS="$BACKEND_FLAGS -DMETALRT_LIB_DIR=${METALRT_IOS_BUILD_DIR}"
+                fi
                 ;;
             all|*)
                 BACKEND_FLAGS="$BACKEND_FLAGS -DRAC_BACKEND_LLAMACPP=ON -DRAC_BACKEND_ONNX=ON -DRAC_BACKEND_WHISPERCPP=OFF"
@@ -377,10 +447,16 @@ create_xcframework() {
 
     log_step "Creating ${FRAMEWORK_NAME}.xcframework..."
 
-    # Platforms to build frameworks for (iOS always, macOS if requested)
-    local PLATFORMS="OS SIMULATORARM64 SIMULATOR"
-    if [[ "$INCLUDE_MACOS" == true ]]; then
-        PLATFORMS="$PLATFORMS MACOS"
+    # Platforms to build frameworks for
+    # MetalRT is device-only (Metal GPU unavailable in simulator)
+    local PLATFORMS
+    if [[ "$BUILD_BACKEND" == "metalrt" ]]; then
+        PLATFORMS="OS"
+    else
+        PLATFORMS="OS SIMULATORARM64 SIMULATOR"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            PLATFORMS="$PLATFORMS MACOS"
+        fi
     fi
 
     # Create framework for each platform
@@ -470,8 +546,19 @@ EOF
 EOF
     done
 
-    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
+    local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
+        local SIM_ARCHS
+        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
+        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
+            log_step "Creating fat simulator binary (arm64 + x86_64)..."
+            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
+                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        fi
+    fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -481,13 +568,16 @@ EOF
     local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
     cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
 
-    local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
-    cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
-
     local XCFW_ARGS=(
         -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
-        -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
     )
+
+    # Add simulator slice if it was built
+    if [[ -f "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+        local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+        cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+        XCFW_ARGS+=(-library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers")
+    fi
 
     if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
         local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
@@ -515,10 +605,15 @@ create_backend_xcframework() {
 
     local FOUND_ANY=false
 
-    # Platforms to build frameworks for (iOS always, macOS if requested)
-    local PLATFORMS="OS SIMULATORARM64 SIMULATOR"
-    if [[ "$INCLUDE_MACOS" == true ]]; then
-        PLATFORMS="$PLATFORMS MACOS"
+    # Platforms to build frameworks for
+    local PLATFORMS
+    if [[ "$BUILD_BACKEND" == "metalrt" ]]; then
+        PLATFORMS="OS"
+    else
+        PLATFORMS="OS SIMULATORARM64 SIMULATOR"
+        if [[ "$INCLUDE_MACOS" == true ]]; then
+            PLATFORMS="$PLATFORMS MACOS"
+        fi
     fi
 
     for PLATFORM in $PLATFORMS; do
@@ -610,6 +705,23 @@ create_backend_xcframework() {
             fi
         done
     fi
+    elif [[ "$BACKEND_NAME" == "metalrt" ]]; then
+        # Bundle MetalRT engine + tokenizer libraries from the pre-built engine dir
+        local METALRT_ENGINE_DIR="${METALRT_IOS_BUILD_DIR}"
+        if [[ -n "$METALRT_ENGINE_DIR" ]]; then
+            # Core engine library
+            if [[ -f "${METALRT_ENGINE_DIR}/libmetalrt_engine.a" ]]; then
+                LIBS_TO_BUNDLE+=("${METALRT_ENGINE_DIR}/libmetalrt_engine.a")
+            fi
+            # tokenizers-cpp, the Rust tokenizers_c (already contains all Rust deps), and sentencepiece
+            local TOK_BUILD="${METALRT_ENGINE_DIR}/_deps/tokenizers_cpp-build"
+            for tok_lib in \
+                "${TOK_BUILD}/libtokenizers_cpp.a" \
+                "${TOK_BUILD}/libtokenizers_c.a" \
+                "${TOK_BUILD}/sentencepiece/src/libsentencepiece.a"; do
+                [[ -f "$tok_lib" ]] && LIBS_TO_BUNDLE+=("$tok_lib")
+            done
+        fi
     fi
 
         # Bundle all libraries
@@ -620,6 +732,21 @@ create_backend_xcframework() {
         else
             log_warn "No libraries found for ${BACKEND_NAME} on ${PLATFORM}"
             continue
+        fi
+
+        # For MetalRT: strip sentencepiece's flag.cc.o/init.cc.o to avoid duplicate _FLAGS_help with sherpa-onnx
+        if [[ "$BACKEND_NAME" == "metalrt" ]]; then
+            ar -d "${FRAMEWORK_DIR}/${FRAMEWORK_NAME}" flag.cc.o init.cc.o 2>/dev/null || true
+            log_info "  ${PLATFORM}: Stripped duplicate flag.cc.o/init.cc.o from bundle"
+        fi
+
+        # For MetalRT: copy default.metallib into the framework as a resource
+        if [[ "$BACKEND_NAME" == "metalrt" && -n "$METALRT_IOS_BUILD_DIR" ]]; then
+            mkdir -p "${FRAMEWORK_DIR}/Resources"
+            if [[ -f "${METALRT_IOS_BUILD_DIR}/default.metallib" ]]; then
+                cp "${METALRT_IOS_BUILD_DIR}/default.metallib" "${FRAMEWORK_DIR}/Resources/"
+                log_info "  ${PLATFORM}: Bundled default.metallib as resource"
+            fi
         fi
 
         # Headers
@@ -665,8 +792,20 @@ EOF
         return 0
     fi
 
-    # SIMULATOR already contains universal binary (arm64 + x86_64)
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
+    local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+    if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
+        # Only combine if the simulator binary doesn't already contain arm64
+        local SIM_ARCHS
+        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
+        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
+            log_step "Creating fat simulator binary (arm64 + x86_64)..."
+            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
+                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        fi
+    fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
     local XCFW_PATH="${DIST_DIR}/${FRAMEWORK_NAME}.xcframework"
@@ -677,13 +816,16 @@ EOF
         local IOS_LIB="${BUILD_DIR}/OS/lib${FRAMEWORK_NAME}.a"
         cp "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${IOS_LIB}"
 
-        local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
-        cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
-
         local XCFW_ARGS=(
             -library "${IOS_LIB}" -headers "${BUILD_DIR}/OS/${FRAMEWORK_NAME}.framework/Headers"
-            -library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers"
         )
+
+        # Add simulator slice (not available for device-only backends like MetalRT)
+        if [[ -f "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
+            local SIM_LIB="${SIM_FAT}/lib${FRAMEWORK_NAME}.a"
+            cp "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" "${SIM_LIB}"
+            XCFW_ARGS+=(-library "${SIM_LIB}" -headers "${SIM_FAT}/${FRAMEWORK_NAME}.framework/Headers")
+        fi
 
         if [[ "$INCLUDE_MACOS" == true && -f "${BUILD_DIR}/MACOS/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}" ]]; then
             local MACOS_LIB="${BUILD_DIR}/MACOS/lib${FRAMEWORK_NAME}.a"
@@ -694,6 +836,19 @@ EOF
 
         xcodebuild -create-xcframework "${XCFW_ARGS[@]}" -output "${XCFW_PATH}"
         inject_xcframework_info_plist "${XCFW_PATH}" "${FRAMEWORK_NAME}"
+
+        # For MetalRT: copy metallib resource into the xcframework
+        if [[ "$BACKEND_NAME" == "metalrt" && -n "$METALRT_IOS_BUILD_DIR" ]]; then
+            local METALLIB_SRC="${METALRT_IOS_BUILD_DIR}/default.metallib"
+            if [[ -f "$METALLIB_SRC" ]]; then
+                for ios_dir in "${XCFW_PATH}"/ios-*; do
+                    if [[ -d "$ios_dir" ]]; then
+                        cp "$METALLIB_SRC" "$ios_dir/"
+                        log_info "Copied default.metallib into $(basename "$ios_dir")/"
+                    fi
+                done
+            fi
+        fi
 
         log_info "Created: ${XCFW_PATH}"
         echo "  Size: $(du -sh "${XCFW_PATH}" | cut -f1)"
@@ -750,22 +905,30 @@ main() {
 
     mkdir -p "${DIST_DIR}"
 
-    # Step 1: Download dependencies
-    if [[ "$SKIP_DOWNLOAD" != true ]]; then
+    # Step 0: Pre-build MetalRT engine if metalrt backend is selected
+    if [[ "$BUILD_BACKEND" == "metalrt" && "$SKIP_BACKENDS" != true ]]; then
+        build_metalrt_engine
+    fi
+
+    # Step 1: Download dependencies (skip for metalrt-only builds)
+    if [[ "$SKIP_DOWNLOAD" != true && "$BUILD_BACKEND" != "metalrt" ]]; then
         download_deps
         if [[ "$INCLUDE_MACOS" == true ]]; then
             download_macos_deps
         fi
     fi
 
-    # Step 2: Build for all iOS platforms
+    # Step 2: Build for iOS platforms
     log_header "Building for iOS"
     build_platform "OS"
-    build_platform "SIMULATORARM64"
-    build_platform "SIMULATOR"
+    if [[ "$BUILD_BACKEND" != "metalrt" ]]; then
+        # Simulator builds not useful for MetalRT (Metal GPU not available in sim)
+        build_platform "SIMULATORARM64"
+        build_platform "SIMULATOR"
+    fi
 
-    # Step 2b: Build for macOS if requested
-    if [[ "$INCLUDE_MACOS" == true ]]; then
+    # Step 2b: Build for macOS if requested (skip for metalrt — iOS device only)
+    if [[ "$INCLUDE_MACOS" == true && "$BUILD_BACKEND" != "metalrt" ]]; then
         log_header "Building for macOS"
         build_macos
     fi
@@ -781,6 +944,18 @@ main() {
         fi
         if [[ "$BUILD_BACKEND" == "all" || "$BUILD_BACKEND" == "onnx" ]]; then
             create_backend_xcframework "onnx" "RABackendONNX"
+        fi
+        if [[ "$BUILD_BACKEND" == "metalrt" ]]; then
+            create_backend_xcframework "metalrt" "RABackendMetalRT"
+
+            # Auto-copy to Binaries/ for SPM consumption
+            local BINARIES_DIR="${PROJECT_ROOT}/../runanywhere-swift/Binaries"
+            mkdir -p "${BINARIES_DIR}"
+            if [[ -d "${DIST_DIR}/RABackendMetalRT.xcframework" ]]; then
+                rm -rf "${BINARIES_DIR}/RABackendMetalRT.xcframework"
+                cp -R "${DIST_DIR}/RABackendMetalRT.xcframework" "${BINARIES_DIR}/"
+                log_info "Copied RABackendMetalRT.xcframework to ${BINARIES_DIR}/"
+            fi
         fi
     fi
 

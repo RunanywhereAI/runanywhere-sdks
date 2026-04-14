@@ -151,6 +151,7 @@ class DartBridgeModelRegistry {
         modelPtr.ref.localPath =
             pathDart != null ? strdupFn(pathDart) : nullptr;
         modelPtr.ref.downloadSize = model.sizeBytes;
+        modelPtr.ref.contextLength = model.contextLength;
         modelPtr.ref.source = model.source;
 
         final result = saveFn(_registryHandle!, modelPtr);
@@ -187,7 +188,15 @@ class DartBridgeModelRegistry {
     }
 
     try {
-      // Convert public ModelInfo to FFI ModelInfo
+      // Convert public ModelInfo to FFI ModelInfo.
+      //
+      // Nullable -> non-nullable at the adapter boundary:
+      //   public_types.ModelInfo.downloadSize and .contextLength are `int?`
+      //   (null means "unknown"), while the internal FFI ModelInfo uses
+      //   non-nullable `int` to mirror the C struct (which uses 0 as the
+      //   sentinel for "unset"). The `?? 0` here encodes that null -> 0
+      //   convention; the reverse conversion in `_ffiModelToPublic` maps
+      //   `> 0 ? value : null` back to public types.
       final ffiModel = ModelInfo(
         id: model.id,
         name: model.name,
@@ -196,6 +205,7 @@ class DartBridgeModelRegistry {
         framework: _frameworkToFfi(model.framework),
         source: _sourceToFfi(model.source),
         sizeBytes: model.downloadSize ?? 0,
+        contextLength: model.contextLength ?? 0,
         downloadURL: model.downloadURL?.toString(),
         localPath: model.localPath?.toFilePath(),
         version: null,
@@ -271,6 +281,8 @@ class DartBridgeModelRegistry {
         return 5; // RAC_FRAMEWORK_BUILTIN
       case public_types.InferenceFramework.none:
         return 6; // RAC_FRAMEWORK_NONE
+      case public_types.InferenceFramework.genie:
+        return 11; // RAC_FRAMEWORK_GENIE
       case public_types.InferenceFramework.unknown:
         return 99; // RAC_FRAMEWORK_UNKNOWN
     }
@@ -384,6 +396,7 @@ class DartBridgeModelRegistry {
           ? Uri.file(ffiModel.localPath!)
           : null,
       downloadSize: ffiModel.sizeBytes > 0 ? ffiModel.sizeBytes : null,
+      contextLength: ffiModel.contextLength > 0 ? ffiModel.contextLength : null,
       source: _sourceFromFfi(ffiModel.source),
     );
   }
@@ -804,6 +817,7 @@ class DartBridgeModelRegistry {
       framework: struct.ref.framework,
       source: struct.ref.source,
       sizeBytes: struct.ref.downloadSize,
+      contextLength: struct.ref.contextLength,
       downloadURL: downloadURL,
       localPath: localPath,
       version: null,
@@ -1032,6 +1046,9 @@ base class RacModelInfoStruct extends Struct {
   @Int64()
   external int sizeBytes;
 
+  @Int32()
+  external int contextLength;
+
   external Pointer<Utf8> downloadURL;
   external Pointer<Utf8> localPath;
   external Pointer<Utf8> version;
@@ -1092,6 +1109,7 @@ class ModelInfo {
   final int framework;
   final int source;
   final int sizeBytes;
+  final int contextLength;
   final String? downloadURL;
   final String? localPath;
   final String? version;
@@ -1104,6 +1122,7 @@ class ModelInfo {
     required this.framework,
     required this.source,
     required this.sizeBytes,
+    required this.contextLength,
     this.downloadURL,
     this.localPath,
     this.version,
@@ -1119,6 +1138,7 @@ class ModelInfo {
         'framework': framework,
         'source': source,
         'sizeBytes': sizeBytes,
+        'contextLength': contextLength,
         if (downloadURL != null) 'downloadURL': downloadURL,
         if (localPath != null) 'localPath': localPath,
         if (version != null) 'version': version,

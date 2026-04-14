@@ -159,7 +159,7 @@ final class FlowSessionManager: ObservableObject {
         // Start AVAudioEngine while foregrounded
         do {
             // AudioCaptureManager dispatches this callback on DispatchQueue.main
-            try audioCapture.startRecording { [weak self] data in
+            try await audioCapture.startRecording { [weak self] data in
                 MainActor.assumeIsolated {
                     guard let self else { return }
                     SharedDataBridge.shared.audioLevel = self.audioCapture.audioLevel
@@ -191,6 +191,7 @@ final class FlowSessionManager: ObservableObject {
             logger.warning("startListening received in unexpected phase: \(self.sessionPhase.description)")
             return
         }
+        logger.info("startListening received; transitioning to listening")
         audioBuffer = Data()
         transition(to: .listening)
         SharedDataBridge.shared.sessionState = "listening"
@@ -206,6 +207,7 @@ final class FlowSessionManager: ObservableObject {
             return
         }
 
+        logger.info("stopListening received; transitioning to transcribing")
         transition(to: .transcribing)
         SharedDataBridge.shared.sessionState = "transcribing"
         if #available(iOS 16.1, *) {
@@ -251,8 +253,20 @@ final class FlowSessionManager: ObservableObject {
         logger.info("Transcribing \(audio.count) bytes")
 
         do {
-            let text = try await RunAnywhere.transcribe(audio)
+            let text = try await Task.detached(priority: .userInitiated) {
+                try await RunAnywhere.transcribe(audio)
+            }.value
             logger.info("Transcription complete: \"\(text)\"")
+
+            // Task.detached drops structured cancellation, so endSession()/killSession()
+            // cannot cancel the transcription in flight. If the session was torn down
+            // while transcription was running, discard the result rather than writing
+            // it to SharedDataBridge after the session is idle.
+            guard case .transcribing = sessionPhase else {
+                logger.info("Session no longer transcribing — discarding result")
+                return
+            }
+
             wordCount += text.split(separator: " ").count
 
             if #available(iOS 16.1, *) {
@@ -277,9 +291,15 @@ final class FlowSessionManager: ObservableObject {
         SharedDataBridge.shared.lastInsertedText = text
         SharedDataBridge.shared.sessionState = "done"
 
-        DarwinNotificationCenter.shared.post(
-            name: SharedConstants.DarwinNotifications.transcriptionReady
-        )
+        // Small delay to allow cross-process UserDefaults propagation before posting
+        // the Darwin notification. Modern iOS syncs UserDefaults automatically within
+        // ~100ms — the 50ms delay + notification timing accounts for this.
+        Task {
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            DarwinNotificationCenter.shared.post(
+                name: SharedConstants.DarwinNotifications.transcriptionReady
+            )
+        }
 
         transition(to: .done(text))
         appendHistory(text: text)

@@ -10,6 +10,7 @@ import Foundation
 import SwiftUI
 import RunAnywhere
 import Combine
+import os
 
 @MainActor
 class SettingsViewModel: ObservableObject {
@@ -18,7 +19,9 @@ class SettingsViewModel: ObservableObject {
     // Generation Settings
     @Published var temperature: Double = 0.7
     @Published var maxTokens: Int = 10000
-    @Published var systemPrompt: String = ""
+    @Published var systemPrompt: String = "You are a helpful, concise AI assistant."
+    @Published var thinkingModeEnabled: Bool = false
+    @Published private(set) var loadedModelSupportsThinking: Bool = false
 
     // API Configuration
     @Published var apiKey: String = ""
@@ -43,6 +46,7 @@ class SettingsViewModel: ObservableObject {
 
     // MARK: - Private Properties
 
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "Settings")
     private var cancellables = Set<AnyCancellable>()
     private let keychainService = KeychainService.shared
     private let apiKeyStorageKey = "runanywhere_api_key"
@@ -50,6 +54,7 @@ class SettingsViewModel: ObservableObject {
     private let temperatureDefaultsKey = "defaultTemperature"
     private let maxTokensDefaultsKey = "defaultMaxTokens"
     private let systemPromptDefaultsKey = "defaultSystemPrompt"
+    private let thinkingModeKey = "thinkingModeEnabled"
     private let analyticsLogKey = "analyticsLogToLocal"
     private let deviceRegisteredKey = "com.runanywhere.sdk.deviceRegistered"
 
@@ -92,6 +97,41 @@ class SettingsViewModel: ObservableObject {
     init() {
         loadSettings()
         setupObservers()
+        subscribeToModelNotifications()
+    }
+
+    private func subscribeToModelNotifications() {
+        // Subscribe to SDK events directly so any LLM model load
+        // (from chat, voice agent, or RAG) updates the thinking mode flag.
+        RunAnywhere.events.events
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                Task { @MainActor in
+                    self?.handleSDKEvent(event)
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handleSDKEvent(_ event: any SDKEvent) {
+        guard event.category == .llm else { return }
+
+        switch event.type {
+        case "llm_model_load_completed":
+            let modelId = event.properties["model_id"] ?? ""
+            if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
+                loadedModelSupportsThinking = model.supportsThinking
+                logger.info("LLM loaded (\(modelId)), supportsThinking: \(model.supportsThinking)")
+            } else {
+                loadedModelSupportsThinking = false
+                logger.warning("LLM loaded (\(modelId)), but it was not found in the registry")
+            }
+        case "llm_model_unloaded":
+            loadedModelSupportsThinking = false
+            logger.info("LLM unloaded, thinking mode disabled")
+        default:
+            break
+        }
     }
 
     // MARK: - Setup
@@ -124,6 +164,14 @@ class SettingsViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // Auto-save thinking mode preference
+        $thinkingModeEnabled
+            .dropFirst()
+            .sink { [weak self] newValue in
+                self?.saveThinkingModePreference(newValue)
+            }
+            .store(in: &cancellables)
+
         // Auto-save analytics logging preference
         $analyticsLogToLocal
             .dropFirst() // Skip initial value to avoid saving on init
@@ -143,16 +191,23 @@ class SettingsViewModel: ObservableObject {
     }
 
     private func loadGenerationSettings() {
-        // Load temperature
-        let savedTemperature = UserDefaults.standard.double(forKey: temperatureDefaultsKey)
-        temperature = savedTemperature > 0 ? savedTemperature : 0.7
+        // Load temperature — use object(forKey:) to distinguish unset (nil) from explicit 0.0
+        let savedTemperature = UserDefaults.standard.object(forKey: temperatureDefaultsKey) as? Double
+        temperature = savedTemperature ?? 0.7
 
         // Load max tokens
         let savedMaxTokens = UserDefaults.standard.integer(forKey: maxTokensDefaultsKey)
         maxTokens = savedMaxTokens > 0 ? savedMaxTokens : 10000
 
-        // Load system prompt
-        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? ""
+        // Load system prompt — fall back to the default when the key has never been set
+        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? "You are a helpful, concise AI assistant."
+        // Persist the default so that other ViewModels reading UserDefaults directly always find a value
+        if UserDefaults.standard.string(forKey: systemPromptDefaultsKey) == nil {
+            UserDefaults.standard.set(systemPrompt, forKey: systemPromptDefaultsKey)
+        }
+
+        // Load thinking mode
+        thinkingModeEnabled = UserDefaults.standard.bool(forKey: thinkingModeKey)
     }
 
     private func loadApiKeyConfiguration() {
@@ -200,12 +255,18 @@ class SettingsViewModel: ObservableObject {
         print("Settings: Saved system prompt (\(value.count) chars)")
     }
 
+    private func saveThinkingModePreference(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: thinkingModeKey)
+        print("Settings: Thinking mode set to: \(value)")
+    }
+
     /// Get current generation configuration for SDK usage
     func getGenerationConfiguration() -> GenerationConfiguration {
         GenerationConfiguration(
             temperature: temperature,
             maxTokens: maxTokens,
-            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt
+            systemPrompt: systemPrompt.isEmpty ? nil : systemPrompt,
+            thinkingModeEnabled: thinkingModeEnabled
         )
     }
 
@@ -418,4 +479,5 @@ struct GenerationConfiguration {
     let temperature: Double
     let maxTokens: Int
     let systemPrompt: String?
+    let thinkingModeEnabled: Bool
 }

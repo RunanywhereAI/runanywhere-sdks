@@ -70,6 +70,13 @@ extension CppBridge {
             modelName: String,
             framework: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
         ) throws {
+            // Skip if the same model is already loaded — avoids redundant
+            // WhisperKit CoreML/ANE compilation (~8s per load).
+            guard loadedModelId != modelId else {
+                logger.info("Model already loaded: \(modelId)")
+                return
+            }
+
             let handle = try getHandle()
 
             // Configure the component with the correct framework so telemetry events
