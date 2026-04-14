@@ -326,24 +326,119 @@ static bool extract_json_object_raw(const char* str, size_t pos, size_t len, cha
 }
 
 /**
+ * @brief Find matching closing bracket for a JSON array
+ *
+ * Tracks string boundaries to ignore brackets inside strings.
+ *
+ * @param str String to search
+ * @param start_pos Position of opening bracket '['
+ * @param out_end Output: Position of matching closing bracket ']'
+ * @return true if found, false otherwise
+ */
+static bool find_matching_bracket(const char* str, size_t start_pos, size_t* out_end) {
+    if (!str || str[start_pos] != '[') {
+        return false;
+    }
+
+    size_t len = strlen(str);
+    int depth = 0;
+    bool in_string = false;
+    bool escaped = false;
+
+    for (size_t i = start_pos; i < len; i++) {
+        char ch = str[i];
+
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+
+        if (ch == '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (ch == '"') {
+            in_string = !in_string;
+            continue;
+        }
+
+        if (!in_string) {
+            if (ch == '[') {
+                depth++;
+            } else if (ch == ']') {
+                depth--;
+                if (depth == 0) {
+                    *out_end = i;
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @brief Extract a JSON array as a raw string (including brackets)
+ */
+static bool extract_json_array_raw(const char* str, size_t pos, size_t len, char** out_value,
+                                   size_t* out_end_pos) {
+    if (str[pos] != '[') {
+        return false;
+    }
+
+    size_t end_bracket;
+    if (!find_matching_bracket(str, pos, &end_bracket)) {
+        return false;
+    }
+
+    size_t arr_len = end_bracket - pos + 1;
+    *out_value = static_cast<char*>(malloc(arr_len + 1));
+    if (!*out_value) {
+        return false;
+    }
+
+    memcpy(*out_value, str + pos, arr_len);
+    (*out_value)[arr_len] = '\0';
+    *out_end_pos = end_bracket + 1;
+    return true;
+}
+
+/**
+ * @brief Kind of JSON value extracted by extract_json_value.
+ *
+ * Distinguishes between quoted strings and raw scalar/composite literals so
+ * callers can re-emit the value correctly (e.g., quote strings but not
+ * numbers/bools/null/arrays/objects).
+ */
+enum json_value_kind_t {
+    JSON_VALUE_STRING,   // Quoted string (content, quotes stripped)
+    JSON_VALUE_OBJECT,   // Raw JSON object `{...}` (verbatim)
+    JSON_VALUE_LITERAL,  // Raw scalar literal: number, boolean, null (verbatim)
+    JSON_VALUE_ARRAY     // Raw JSON array `[...]` (verbatim)
+};
+
+/**
  * @brief Simple JSON key-value extractor
  *
- * Extracts a string or object value for a given key from a JSON object string.
+ * Extracts a string, object, array, or scalar literal value for a given key
+ * from a JSON object string.
  *
  * @param json_obj JSON object string (must include braces)
  * @param key Key to find (case-insensitive)
  * @param out_value Output: Allocated value string (caller must free)
- * @param out_is_object Output: Whether the value is an object (vs string)
+ * @param out_kind Output: Kind of the extracted value (string/object/literal/array)
  * @return true if found
  */
 static bool extract_json_value(const char* json_obj, const char* key, char** out_value,
-                               bool* out_is_object) {
-    if (!json_obj || !key || !out_value) {
+                               json_value_kind_t* out_kind) {
+    if (!json_obj || !key || !out_value || !out_kind) {
         return false;
     }
 
     *out_value = nullptr;
-    *out_is_object = false;
+    *out_kind = JSON_VALUE_STRING;
 
     size_t len = strlen(json_obj);
     bool in_string = false;
@@ -388,7 +483,7 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                     size_t value_end;
                                     if (extract_json_string(json_obj, pos + 1, len, out_value,
                                                             &value_end)) {
-                                        *out_is_object = false;
+                                        *out_kind = JSON_VALUE_STRING;
                                         return true;
                                     }
                                 } else if (json_obj[pos] == '{') {
@@ -396,12 +491,20 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                     size_t value_end;
                                     if (extract_json_object_raw(json_obj, pos, len, out_value,
                                                                 &value_end)) {
-                                        *out_is_object = true;
+                                        *out_kind = JSON_VALUE_OBJECT;
+                                        return true;
+                                    }
+                                } else if (json_obj[pos] == '[') {
+                                    // Array value
+                                    size_t value_end;
+                                    if (extract_json_array_raw(json_obj, pos, len, out_value,
+                                                               &value_end)) {
+                                        *out_kind = JSON_VALUE_ARRAY;
                                         return true;
                                     }
                                 } else {
-                                    // Scalar value (number, boolean, null)
-                                    // Read until comma, closing brace, or whitespace
+                                    // Scalar literal value (number, boolean, null)
+                                    // Read until comma, closing brace/bracket, or newline
                                     size_t val_start = pos;
                                     size_t val_end = pos;
                                     while (val_end < len && json_obj[val_end] != ',' &&
@@ -421,7 +524,7 @@ static bool extract_json_value(const char* json_obj, const char* key, char** out
                                             memcpy(*out_value, json_obj + val_start, val_len);
                                             (*out_value)[val_len] = '\0';
                                         }
-                                        *out_is_object = false;
+                                        *out_kind = JSON_VALUE_LITERAL;
                                         return true;
                                     }
                                 }
@@ -702,20 +805,25 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
     // Strategy 1 & 2: Try standard tool name keys
     for (int i = 0; TOOL_NAME_KEYS[i] != nullptr; i++) {
         char* value = nullptr;
-        bool is_obj = false;
-        if (extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &is_obj)) {
-            if (!is_obj && value && strlen(value) > 0) {
+        json_value_kind_t kind = JSON_VALUE_STRING;
+        if (extract_json_value(json_obj, TOOL_NAME_KEYS[i], &value, &kind)) {
+            // Tool name must be a string literal (not object/array/raw literal)
+            if (kind == JSON_VALUE_STRING && value && strlen(value) > 0) {
                 *out_tool_name = value;
+
+                // Record the specific alias that matched, so the flat-args
+                // reassembly only drops that exact key (not every alias).
+                const std::string matched_tool_name_key = TOOL_NAME_KEYS[i];
 
                 // Now find arguments
                 for (int j = 0; ARGUMENT_KEYS[j] != nullptr; j++) {
                     char* args_value = nullptr;
-                    bool args_is_obj = false;
-                    if (extract_json_value(json_obj, ARGUMENT_KEYS[j], &args_value, &args_is_obj)) {
-                        if (args_is_obj) {
+                    json_value_kind_t args_kind = JSON_VALUE_STRING;
+                    if (extract_json_value(json_obj, ARGUMENT_KEYS[j], &args_value, &args_kind)) {
+                        if (args_kind == JSON_VALUE_OBJECT) {
                             *out_args_json = args_value;
                         } else {
-                            // Wrap scalar in {"input": value} - escape the value for valid JSON
+                            // Wrap scalar/array/string in {"input": value} - escape the value for valid JSON
                             std::string escaped_args = escape_json_string(args_value);
                             size_t wrap_len = escaped_args.size() + 14; // {"input":"" } + null
                             *out_args_json = static_cast<char*>(malloc(wrap_len));
@@ -729,41 +837,43 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                 }
 
                 // No standard argument wrapper key found.
-                // Fallback: collect all remaining keys (excluding the tool name key)
-                // as flat arguments. This handles LLM output like:
-                // {"tool": "calculate", "expression": "5 * 100"}
+                // Fallback: collect all remaining keys (excluding the specific
+                // key that matched the tool name alias) as flat arguments.
+                // This handles LLM output like:
+                //   {"tool": "calculate", "expression": "5 * 100"}
+                // Only the exact matched alias is skipped, so a later tool
+                // that accepts a `name` argument still sees `name` preserved.
                 {
                     std::vector<std::string> all_keys = get_json_keys(json_obj);
                     std::string flat_args = "{";
                     bool first = true;
                     for (const auto& k : all_keys) {
-                        // Skip the key that matched the tool name
-                        bool is_tool_key = false;
-                        for (int t = 0; TOOL_NAME_KEYS[t] != nullptr; t++) {
-                            if (str_equals_ignore_case(k.c_str(), TOOL_NAME_KEYS[t])) {
-                                is_tool_key = true;
-                                break;
-                            }
+                        // Only skip the specific alias that matched the tool name
+                        if (str_equals_ignore_case(k.c_str(), matched_tool_name_key.c_str())) {
+                            continue;
                         }
-                        if (is_tool_key) continue;
 
                         char* kval = nullptr;
-                        bool kval_is_obj = false;
-                        if (extract_json_value(json_obj, k.c_str(), &kval, &kval_is_obj)) {
+                        json_value_kind_t kval_kind = JSON_VALUE_STRING;
+                        if (extract_json_value(json_obj, k.c_str(), &kval, &kval_kind)) {
                             if (!first) flat_args += ",";
                             std::string escaped_key = escape_json_string(k.c_str());
-                            if (kval_is_obj) {
-                                flat_args += "\"" + escaped_key + "\":" + std::string(kval);
-                            } else if (kval) {
-                                // Emit JSON numbers/booleans/null verbatim; quote strings.
-                                // extract_json_value strips quotes from string values but
-                                // preserves raw scalars, so we classify the stripped value
-                                // using JSON scalar syntax rules.
-                                if (is_json_scalar_literal(kval)) {
-                                    flat_args += "\"" + escaped_key + "\":" + std::string(kval);
-                                } else {
+                            if (kval) {
+                                switch (kval_kind) {
+                                case JSON_VALUE_STRING: {
+                                    // Re-escape and re-quote strings
                                     std::string escaped_val = escape_json_string(kval);
                                     flat_args += "\"" + escaped_key + "\":\"" + escaped_val + "\"";
+                                    break;
+                                }
+                                case JSON_VALUE_OBJECT:
+                                case JSON_VALUE_LITERAL:
+                                case JSON_VALUE_ARRAY:
+                                    // Emit verbatim: raw JSON objects, scalar
+                                    // literals (number/bool/null), and arrays
+                                    // round-trip as their original JSON form.
+                                    flat_args += "\"" + escaped_key + "\":" + std::string(kval);
+                                    break;
                                 }
                             }
                             free(kval);
@@ -773,9 +883,15 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
                     flat_args += "}";
 
                     *out_args_json = static_cast<char*>(malloc(flat_args.size() + 1));
-                    if (*out_args_json) {
-                        std::memcpy(*out_args_json, flat_args.c_str(), flat_args.size() + 1);
+                    if (*out_args_json == nullptr) {
+                        // Allocation failed - don't return success with partial state.
+                        // Free the already-populated tool name so the caller sees a
+                        // fully-cleared failure rather than a dangling *out_tool_name.
+                        free(*out_tool_name);
+                        *out_tool_name = nullptr;
+                        return false;
                     }
+                    std::memcpy(*out_args_json, flat_args.c_str(), flat_args.size() + 1);
                 }
                 return true;
             }
@@ -789,18 +905,18 @@ static bool extract_tool_name_and_args(const char* json_obj, char** out_tool_nam
         if (!is_standard_key(key.c_str())) {
             // Found a non-standard key - treat it as tool name
             char* value = nullptr;
-            bool is_obj = false;
-            if (extract_json_value(json_obj, key.c_str(), &value, &is_obj)) {
+            json_value_kind_t kind = JSON_VALUE_STRING;
+            if (extract_json_value(json_obj, key.c_str(), &value, &kind)) {
                 *out_tool_name = static_cast<char*>(malloc(key.size() + 1));
                 if (*out_tool_name) {
                     std::memcpy(*out_tool_name, key.c_str(), key.size() + 1);
                 }
 
-                if (is_obj) {
-                    // Value is object - use as arguments
+                if (kind == JSON_VALUE_OBJECT) {
+                    // Value is object - use as arguments verbatim
                     *out_args_json = value;
                 } else if (value) {
-                    // Value is scalar - wrap in {"input": value} - escape for valid JSON
+                    // Value is string / scalar literal / array - wrap in {"input": value}
                     std::string escaped_value = escape_json_string(value);
                     size_t wrap_len = escaped_value.size() + 14; // {"input":"" } + null
                     *out_args_json = static_cast<char*>(malloc(wrap_len));

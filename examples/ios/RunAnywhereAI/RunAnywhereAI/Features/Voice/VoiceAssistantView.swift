@@ -420,24 +420,34 @@ extension VoiceAssistantView {
                 inactiveColor: viewModel.micButtonColor.swiftUIColor,
                 icon: viewModel.micButtonIcon,
                 action: {
-                    Task {
-                        if viewModel.isSpeaking {
-                            await viewModel.interruptSpeaking()
-                        } else if viewModel.isListening {
-                            await viewModel.sendAudioNow()
-                        } else if viewModel.sessionState == .connected {
-                            await viewModel.resumeListening()
-                        } else if !viewModel.isActive {
-                            await viewModel.startConversation()
+                    // Snapshot state synchronously so the decision can't race with
+                    // state updates that happen between the tap and the Task firing.
+                    let isSpeaking = viewModel.isSpeaking
+                    let isListening = viewModel.isListening
+                    let isConnected = viewModel.sessionState == .connected
+                    let isActive = viewModel.isActive
+                    let action: (() async -> Void)? = {
+                        if isSpeaking {
+                            return { await viewModel.interruptSpeaking() }
+                        } else if isListening {
+                            return { await viewModel.sendAudioNow() }
+                        } else if isConnected {
+                            return { await viewModel.resumeListening() }
+                        } else if !isActive {
+                            return { await viewModel.startConversation() }
+                        } else {
+                            return nil
                         }
+                    }()
+                    if let action = action {
+                        Task { await action() }
                     }
                 },
                 onLongPress: {
-                    Task {
-                        if viewModel.isActive || viewModel.sessionState == .connected {
-                            await viewModel.stopConversation()
-                        }
-                    }
+                    // Snapshot state synchronously before spawning the Task.
+                    let shouldStop = viewModel.isActive || viewModel.sessionState == .connected
+                    guard shouldStop else { return }
+                    Task { await viewModel.stopConversation() }
                 }
             )
 

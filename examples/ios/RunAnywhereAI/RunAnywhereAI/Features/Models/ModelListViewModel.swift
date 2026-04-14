@@ -129,7 +129,7 @@ class ModelListViewModel: ObservableObject {
         await loadModelsFromRegistry()
     }
 
-    private var isLoadingModel = false
+    @Published private(set) var isLoadingModel = false
 
     /// Select and load a model
     func selectModel(_ model: ModelInfo) async {

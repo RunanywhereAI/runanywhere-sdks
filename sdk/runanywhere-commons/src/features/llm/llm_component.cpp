@@ -687,6 +687,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.cancel_flag = &component->cancel_requested;
     // Pre-allocate to avoid repeated reallocations during streaming
     ctx.full_text.reserve(2048);
+    ctx.cancel_flag = &component->cancel_requested;
 
     // Perform streaming generation
     result = rac_llm_generate_stream(service, prompt, effective_options, llm_stream_token_callback,
@@ -729,7 +730,9 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = ctx.token_count > 0 ? ctx.token_count : estimate_tokens(ctx.full_text.c_str());
+    final_result.completion_tokens = ctx.token_count > 0
+        ? ctx.token_count
+        : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -789,6 +792,8 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
 
+    // Set atomic cancel flag so the streaming token callback can observe it
+    // without holding component->mtx (which generate_stream is holding).
     component->cancel_requested.store(true, std::memory_order_relaxed);
 
     // Use acquire/release to pin the service for the duration of the cancel call,

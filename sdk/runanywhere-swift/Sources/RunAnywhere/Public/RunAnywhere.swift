@@ -143,7 +143,7 @@ public enum RunAnywhere {
 
     /// Reset SDK state (for testing purposes)
     /// Clears all initialization state and cached data
-    public static func reset() {
+    public static func reset() async {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
 
@@ -154,7 +154,7 @@ public enum RunAnywhere {
         currentEnvironment = nil
 
         // Shutdown all C++ bridges and state
-        CppBridge.shutdown()
+        await CppBridge.shutdown()
         CppBridge.State.shutdown()
 
         logger.info("SDK state reset completed")

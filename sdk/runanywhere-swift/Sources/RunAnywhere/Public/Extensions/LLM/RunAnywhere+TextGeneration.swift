@@ -231,7 +231,13 @@ public extension RunAnywhere {
                 }
 
                 if streamResult != RAC_SUCCESS {
-                    return
+                    // NOTE: Do not release contextPtr here. The C++ layer always invokes
+                    // errorCallback before returning non-SUCCESS, and errorCallback consumes
+                    // the retained reference via takeRetainedValue(). Releasing here would
+                    // cause a double-release.
+                    let error = SDKError.llm(.generationFailed, "Stream generation failed: \(streamResult)")
+                    continuation.finish(throwing: error)
+                    await collector.markFailed(error)
                 }
             }
         }
@@ -254,6 +260,8 @@ private enum LLMStreamCallbacks {
 
     static func create() -> Callbacks {
         let tokenCallback: TokenFn = { tokenPtr, userData -> rac_bool_t in
+            // Cancellation is handled by an atomic flag in llm_component.cpp — no Swift Task
+            // context exists on this C callback thread, so Task.isCancelled would always be false.
             guard let tokenPtr = tokenPtr, let userData = userData else { return RAC_TRUE }
             let ctx = Unmanaged<LLMStreamCallbackContext>.fromOpaque(userData).takeUnretainedValue()
             let token = String(cString: tokenPtr)
@@ -310,11 +318,11 @@ private final class LLMStreamCallbackContext: @unchecked Sendable {
 
 // MARK: - Thinking Content Parser
 
-enum ThinkingContentParser {
+public enum ThinkingContentParser {
     /// Extracts `<think>...</think>` content from generated text.
     /// - NOTE: Only the first `<think>` block is extracted; additional blocks are left inline in the response text.
     /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
-    static func extract(from text: String) -> (text: String, thinking: String?) {
+    public static func extract(from text: String) -> (text: String, thinking: String?) {
         guard let startRange = text.range(of: "<think>"),
               let endRange = text.range(of: "</think>"),
               startRange.upperBound <= endRange.lowerBound else {
@@ -348,7 +356,7 @@ enum ThinkingContentParser {
     /// - Returns: `(thinkingTokens, responseTokens)`. If there is no thinking
     ///   content, `thinkingTokens` is 0 and all tokens are attributed to the
     ///   response.
-    static func splitTokens(
+    public static func splitTokens(
         totalCompletionTokens: Int,
         responseText: String,
         thinkingContent: String?
@@ -367,6 +375,26 @@ enum ThinkingContentParser {
         )
         let clamped = max(0, min(thinkingTokens, totalCompletionTokens))
         return (clamped, totalCompletionTokens - clamped)
+    }
+
+    /// Strips all `<think>...</think>` blocks (including multiple blocks) and trailing unclosed
+    /// `<think>` tags from the given text, returning only the response portion.
+    /// - Parameter text: Raw text potentially containing thinking blocks.
+    /// - Returns: Text with all thinking blocks removed, trimmed of surrounding whitespace.
+    public static func strip(from text: String) -> String {
+        var result = text
+        // Remove all complete <think>...</think> blocks
+        while let startRange = result.range(of: "<think>"),
+              let endRange = result.range(of: "</think>"),
+              startRange.upperBound <= endRange.lowerBound {
+            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
+        }
+        // Drop any trailing unclosed <think> ... (still streaming)
+        if let trailingStart = result.range(of: "<think>", options: .backwards),
+           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
+            result = String(result[result.startIndex..<trailingStart.lowerBound])
+        }
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

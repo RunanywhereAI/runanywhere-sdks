@@ -34,32 +34,18 @@ struct RAGMessage: Identifiable {
     }
 
     // MARK: - Think Tag Helpers
+    //
+    // Thin pass-throughs to the SDK's canonical `ThinkingContentParser` so the
+    // app has a single source of truth for `<think>` tag handling.
 
     /// Extract the content inside `<think>...</think>` tags.
     static func extractThinkingContent(from text: String) -> String? {
-        guard let startRange = text.range(of: "<think>"),
-              let endRange = text.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound else {
-            return nil
-        }
-        let content = String(text[startRange.upperBound..<endRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return content.isEmpty ? nil : content
+        ThinkingContentParser.extract(from: text).thinking
     }
 
     /// Strip all `<think>...</think>` blocks and trailing incomplete `<think>` tags.
     static func stripThinkTags(from text: String) -> String {
-        var result = text
-        while let startRange = result.range(of: "<think>"),
-              let endRange = result.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound {
-            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
-        }
-        if let trailingStart = result.range(of: "<think>", options: .backwards),
-           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
-            result = String(result[result.startIndex..<trailingStart.lowerBound])
-        }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        ThinkingContentParser.strip(from: text)
     }
 }
 

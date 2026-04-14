@@ -32,7 +32,7 @@ struct ChatInterfaceView: View {
     @State private var pendingLoRAURL: URL?
     @State private var loraScale: Float = 1.0
     @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
-    @AppStorage("thinkingModeEnabled") private var thinkingModeEnabled = false
+    @ObservedObject private var settingsViewModel = SettingsViewModel.shared
     @FocusState private var isTextFieldFocused: Bool
 
     private let logger = Logger(
@@ -449,7 +449,7 @@ extension ChatInterfaceView {
 
             // Status badges (thinking mode + tool calling + LoRA)
             HStack(spacing: 8) {
-                if thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
+                if settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking {
                     thinkingModeBadge
                 }
 
@@ -465,7 +465,7 @@ extension ChatInterfaceView {
                     loraAddButton
                 }
             }
-            .padding(.top, ((thinkingModeEnabled && viewModel.loadedModelSupportsThinking) || viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
+            .padding(.top, ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking) || viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
 
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
@@ -501,7 +501,7 @@ extension ChatInterfaceView {
 
     var thinkingModeBadge: some View {
         Button {
-            thinkingModeEnabled.toggle()
+            settingsViewModel.thinkingModeEnabled.toggle()
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "lightbulb.min.fill")

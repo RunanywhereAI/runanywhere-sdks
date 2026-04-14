@@ -206,12 +206,15 @@ public extension RunAnywhere {
             allToolResults.append(result)
 
             fullPrompt = buildFollowUpPrompt(
-                prompt: prompt,
+                prompt: cleanPrompt,
                 systemPrompt: systemPrompt,
                 toolCall: toolCall,
                 result: result,
                 keepToolsAvailable: opts.keepToolsAvailable
             )
+            if hasNoThink {
+                fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
+            }
         }
 
         return ToolCallingResult(
