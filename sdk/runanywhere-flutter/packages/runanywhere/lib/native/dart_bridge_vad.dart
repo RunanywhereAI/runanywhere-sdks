@@ -329,15 +329,3 @@ class VADSpeechEndedEvent extends VADActivityEvent {
 
   const VADSpeechEndedEvent({required this.energy});
 }
-
-/// FFI struct for VAD result (matches rac_vad_result_t)
-final class RacVadResultStruct extends Struct {
-  @Int32()
-  external int isSpeech;
-
-  @Float()
-  external double energy;
-
-  @Float()
-  external double speechProbability;
-}

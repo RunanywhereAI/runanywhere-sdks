@@ -12,7 +12,6 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/dart_bridge_vad.dart' as vad;
 
 /// Cached native function pointers for the RACommons library.
 ///
@@ -87,9 +86,11 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_stt_component_cleanup');
 
-  static final void Function(Pointer<RacSttResultStruct>) sttResultFree =
-      _lib.lookupFunction<Void Function(Pointer<RacSttResultStruct>),
-          void Function(Pointer<RacSttResultStruct>)>('rac_stt_result_free');
+  // Note: rac_stt_result_free is intentionally NOT cached here. The STT
+  // transcription path runs inside Isolate.run(...), which cannot access
+  // main-isolate static state — `_transcribeInIsolate` in dart_bridge_stt.dart
+  // performs its own inline lookup so each spawned isolate resolves the
+  // symbol once. A main-isolate cache entry would be dead code.
 
   static final void Function(RacHandle) sttDestroy =
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
@@ -177,19 +178,19 @@ abstract class NativeFunctions {
     RacHandle,
     Pointer<Float>,
     int,
-    Pointer<vad.RacVadResultStruct>,
+    Pointer<RacVadResultStruct>,
   ) vadProcess = _lib.lookupFunction<
       Int32 Function(
         RacHandle,
         Pointer<Float>,
         IntPtr,
-        Pointer<vad.RacVadResultStruct>,
+        Pointer<RacVadResultStruct>,
       ),
       int Function(
         RacHandle,
         Pointer<Float>,
         int,
-        Pointer<vad.RacVadResultStruct>,
+        Pointer<RacVadResultStruct>,
       )>('rac_vad_component_process');
 
   static final void Function(RacHandle) vadDestroy =
