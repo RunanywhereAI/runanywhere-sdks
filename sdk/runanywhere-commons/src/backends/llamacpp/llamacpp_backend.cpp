@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -239,70 +240,130 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     model_params.use_mmap = false;
 #endif
 
-    // Detect model size from filename to set appropriate GPU layers BEFORE loading
-    // This prevents OOM crashes on mobile devices with limited GPU memory
-    // Note: We use filename heuristics here because we can't know param count until after loading
-    std::string path_lower = model_path;
-    std::transform(path_lower.begin(), path_lower.end(), path_lower.begin(), ::tolower);
-
-    int gpu_layers = -1;  // Default: all layers to GPU
-
-    // Check for large model indicators in filename using word boundary detection
-    // Patterns like "7b", "8b", "13b" should match at word boundaries to avoid
-    // false positives like "/backup7b/" or "/2017beta/"
-    auto is_model_size_marker = [&path_lower](const char* marker) {
-        size_t pos = path_lower.find(marker);
-        while (pos != std::string::npos) {
-            // Check for word boundary before (start of string, or non-alphanumeric)
-            bool valid_start = (pos == 0) || !std::isalnum(path_lower[pos - 1]);
-            // Check for word boundary after (end of string, or non-alphanumeric except digits for patterns like "7b-q4")
-            size_t end_pos = pos + strlen(marker);
-            bool valid_end = (end_pos >= path_lower.size()) ||
-                            (!std::isalpha(path_lower[end_pos]) || path_lower[end_pos] == '-' || path_lower[end_pos] == '_');
-
-            if (valid_start && valid_end) {
-                return true;
-            }
-            pos = path_lower.find(marker, pos + 1);
-        }
-        return false;
-    };
-
-    // Detect large models (7B+) that may need GPU layer limiting on mobile
-    // First check for config-based override (for custom-named models)
-    bool is_large_model = false;
-    if (config.contains("expected_params_billions")) {
-        double expected_params = config["expected_params_billions"].get<double>();
-        is_large_model = (expected_params >= kLargeModelThresholdB);
-        if (is_large_model) {
-            RAC_LOG_INFO("LLM.LlamaCpp","Large model detected from config (%.1fB expected params)", expected_params);
-        }
-    }
-
-    // Fall back to filename heuristics if no config provided
-    if (!is_large_model) {
-        is_large_model = is_model_size_marker("7b") ||
-                         is_model_size_marker("8b") ||
-                         is_model_size_marker("9b") ||
-                         is_model_size_marker("13b") ||
-                         is_model_size_marker("70b");
-    }
-
-    if (is_large_model) {
-        // For 7B+ models on mobile: limit GPU layers to prevent OOM
-        // Most 7B models have 32 layers, offload ~24 to GPU, rest to CPU
-        gpu_layers = kLargeModelGpuLayers;
-        RAC_LOG_INFO("LLM.LlamaCpp","Large model detected, limiting GPU layers to %d to prevent OOM", gpu_layers);
-    }
-
-    // Allow user override via config
+    // If llama_params_fit aborts, use the user-provided value
+    int user_gpu_layers = -1;  // -1 = not set by user
     if (config.contains("gpu_layers")) {
-        gpu_layers = config["gpu_layers"].get<int>();
-        RAC_LOG_INFO("LLM.LlamaCpp","Using user-provided GPU layers: %d", gpu_layers);
+        user_gpu_layers = config["gpu_layers"].get<int>();
+        RAC_LOG_INFO("LLM.LlamaCpp", "User-provided GPU layers: %d (will apply after fit)", user_gpu_layers);
     }
 
-    model_params.n_gpu_layers = gpu_layers;
-    RAC_LOG_INFO("LLM.LlamaCpp","Loading model with n_gpu_layers=%d", gpu_layers);
+    // Set up context params early for llama_params_fit
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = 0;
+    ctx_params.n_threads = backend_->get_num_threads();
+    ctx_params.n_threads_batch = backend_->get_num_threads();
+    ctx_params.no_perf = true;
+
+    if (user_context_size > 0) {
+        ctx_params.n_ctx = user_context_size;
+        RAC_LOG_INFO("LLM.LlamaCpp", "User-provided context size: %d", user_context_size);
+    }
+
+    size_t n_devices = llama_max_devices();
+    size_t n_overrides = llama_max_tensor_buft_overrides();
+
+    std::vector<float> tensor_split(n_devices, 0.0f);
+    // llama.cpp iterates tensor_buft_overrides until it hits a zero-valued
+    // sentinel entry (pattern == nullptr). Value-initializing the vector to
+    // all zeros means the first element is already that sentinel, so an
+    // empty vector is interpreted as "no tensor buft overrides."
+    std::vector<llama_model_tensor_buft_override> tensor_buft_overrides(n_overrides);
+    std::vector<size_t> margins(n_devices, 0);
+
+    size_t margin_mib = 1024;  // Configurable parameter
+    if (config.contains("fit_margin_mib")) {
+        margin_mib = config["fit_margin_mib"].get<size_t>();
+    }
+    for (size_t i = 0; i < n_devices; ++i) {
+        margins[i] = margin_mib * 1024 * 1024;
+    }
+
+    uint32_t n_ctx_min = 2048;  // Configurable parameter
+    if (config.contains("n_ctx_min")) {
+        n_ctx_min = config["n_ctx_min"].get<uint32_t>();
+    }
+
+    RAC_LOG_INFO("LLM.LlamaCpp", "Calling llama_params_fit (margin=%zuMiB, n_ctx_min=%u, n_devices=%zu)",
+         margin_mib, n_ctx_min, n_devices);
+
+    llama_params_fit_status fit_status = llama_params_fit(
+        model_path.c_str(),
+        &model_params,
+        &ctx_params,
+        tensor_split.data(),
+        tensor_buft_overrides.data(),
+        margins.data(),
+        n_ctx_min,
+        GGML_LOG_LEVEL_INFO
+    );
+
+    switch (fit_status) {
+        case LLAMA_PARAMS_FIT_STATUS_SUCCESS:
+            RAC_LOG_INFO("LLM.LlamaCpp", "llama_params_fit SUCCESS: n_gpu_layers=%d, n_ctx=%u",
+                 model_params.n_gpu_layers, ctx_params.n_ctx);
+            break;
+        case LLAMA_PARAMS_FIT_STATUS_FAILURE:
+            RAC_LOG_INFO("LLM.LlamaCpp", "llama_params_fit FAILURE: could not fit model to device memory. "
+                 "Proceeding with conservative CPU-only defaults.");
+            model_params.n_gpu_layers = 0;
+            if (user_context_size > 0 && user_context_size > 2048) {
+                RAC_LOG_INFO("LLM.LlamaCpp", "Capping user-requested context_size=%d to 2048 after fit FAILURE",
+                     user_context_size);
+            }
+            if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 2048) {
+                ctx_params.n_ctx = 2048;
+            }
+            break;
+        case LLAMA_PARAMS_FIT_STATUS_ERROR:
+            RAC_LOG_ERROR("LLM.LlamaCpp", "llama_params_fit ERROR for model: %s. "
+                 "Falling back to conservative CPU-only defaults.", model_path.c_str());
+            model_params.n_gpu_layers = 0;
+            if (user_context_size > 0 && user_context_size > 2048) {
+                RAC_LOG_INFO("LLM.LlamaCpp", "Capping user-requested context_size=%d to 2048 after fit ERROR",
+                     user_context_size);
+            }
+            if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 2048) {
+                ctx_params.n_ctx = 2048;
+            }
+            break;
+    }
+
+    // Apply user gpu_layers override after fit, respecting the CPU-only build constraint.
+    // llama_params_fit does not yet account for host memory in CPU-only builds
+    // (upstream PR: https://github.com/ggml-org/llama.cpp/pull/19711).
+#if !defined(GGML_USE_METAL) && !defined(GGML_USE_CUDA) && !defined(GGML_USE_WEBGPU)
+    if (fit_status == LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
+        RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: llama_params_fit fitted to GPU memory but no GPU backend active. "
+             "Applying conservative CPU defaults.");
+    }
+    if (user_gpu_layers > 0) {
+        RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only build: ignoring user gpu_layers=%d (no GPU backend available)",
+             user_gpu_layers);
+    }
+    model_params.n_gpu_layers = 0;
+    if (ctx_params.n_ctx == 0 || ctx_params.n_ctx > 4096) {
+        ctx_params.n_ctx = 4096;
+        RAC_LOG_INFO("LLM.LlamaCpp", "CPU-only: capping context to %u", ctx_params.n_ctx);
+    }
+#else
+    if (user_gpu_layers >= 0) {
+        // llama_params_fit fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
+        // honouring the user override here reinstates the OOM risk the fit call
+        // was supposed to prevent. Log a warning so it's visible in the event of
+        // a subsequent crash/OOM, but keep honouring the user's explicit request.
+        if (fit_status != LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
+            const char* fit_label =
+                fit_status == LLAMA_PARAMS_FIT_STATUS_FAILURE ? "FAILURE" : "ERROR";
+            RAC_LOG_WARNING("LLM.LlamaCpp",
+                "Applying user gpu_layers=%d override despite llama_params_fit %s — risk of OOM",
+                user_gpu_layers, fit_label);
+        }
+        model_params.n_gpu_layers = user_gpu_layers;
+        RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d", user_gpu_layers);
+    }
+#endif
+
+    RAC_LOG_INFO("LLM.LlamaCpp", "Loading model with n_gpu_layers=%d", model_params.n_gpu_layers);
 
     model_ = llama_model_load_from_file(model_path.c_str(), model_params);
 
@@ -312,64 +373,30 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 
     int model_train_ctx = llama_model_n_ctx_train(model_);
-    RAC_LOG_INFO("LLM.LlamaCpp","Model training context size: %d", model_train_ctx);
-
-    // Get model parameter count to determine appropriate context size
-    // Large models (7B+) need smaller context on mobile to fit in memory
     uint64_t n_params = llama_model_n_params(model_);
     double params_billions = static_cast<double>(n_params) / 1e9;
-    RAC_LOG_INFO("LLM.LlamaCpp","Model parameters: %.2fB", params_billions);
+    RAC_LOG_INFO("LLM.LlamaCpp", "Model loaded: %.2fB params, training context=%d", params_billions, model_train_ctx);
 
-    // Post-load verification: warn if actual param count differs from filename heuristic
-    bool actual_is_large = (params_billions >= kLargeModelThresholdB);
-    if (actual_is_large && !is_large_model) {
-        RAC_LOG_INFO("LLM.LlamaCpp","WARNING: Model has %.1fB params but filename didn't indicate large model. "
-             "Consider using gpu_layers config for optimal performance.", params_billions);
-    } else if (!actual_is_large && is_large_model) {
-        RAC_LOG_INFO("LLM.LlamaCpp","NOTE: Filename suggested large model but actual params are %.1fB. "
-             "GPU layer limiting may be conservative.", params_billions);
+    if (ctx_params.n_ctx == 0) {
+        ctx_params.n_ctx = std::min(model_train_ctx, max_default_context_);
     }
+    // ctx_params.n_ctx is uint32_t; clamp to INT_MAX before converting to int so
+    // a pathological fitted/user value above ~2.1B can't wrap to a negative
+    // number that `std::min` would then pick as the "smallest" context size.
+    const int fitted_ctx = static_cast<int>(
+        std::min(ctx_params.n_ctx, static_cast<uint32_t>(INT_MAX)));
+    context_size_ = std::min({fitted_ctx, model_train_ctx, max_default_context_});
 
-    // Adaptive context size based on model size for mobile devices
-    int adaptive_max_context;
-    if (params_billions >= kLargeModelThresholdB) {
-        adaptive_max_context = kLargeModelContextSize;
-        RAC_LOG_INFO("LLM.LlamaCpp","Large model detected (%.1fB params), limiting context to %d for memory", params_billions, adaptive_max_context);
-    } else if (params_billions >= kMediumModelThresholdB) {
-        adaptive_max_context = kMediumModelContextSize;
-        RAC_LOG_INFO("LLM.LlamaCpp","Medium model detected (%.1fB params), limiting context to %d", params_billions, adaptive_max_context);
-    } else if (params_billions >= kSmallModelThresholdB) {
-        adaptive_max_context = kSmallModelContextSize;
-        RAC_LOG_INFO("LLM.LlamaCpp","Small-medium model detected (%.1fB params), limiting context to %d", params_billions, adaptive_max_context);
-    } else {
-        // Tiny models (<1B): can use larger context
-        adaptive_max_context = max_default_context_;
-    }
+    RAC_LOG_INFO("LLM.LlamaCpp", "Final context size: %d (fitted=%u, train=%d, cap=%d)",
+         context_size_, ctx_params.n_ctx, model_train_ctx, max_default_context_);
 
-    if (user_context_size > 0) {
-        context_size_ = std::min(user_context_size, model_train_ctx);
-        RAC_LOG_INFO("LLM.LlamaCpp","Using user-provided context size: %d (requested: %d, model max: %d)", context_size_,
-             user_context_size, model_train_ctx);
-    } else {
-        context_size_ = std::min({model_train_ctx, max_default_context_, adaptive_max_context});
-        RAC_LOG_INFO("LLM.LlamaCpp","Auto-detected context size: %d (model: %d, cap: %d, adaptive: %d)", context_size_,
-             model_train_ctx, max_default_context_, adaptive_max_context);
-    }
-
-    // Cap batch sizes to avoid exceeding Metal's 4 GB single-buffer limit on iOS.
-    // n_ctx controls conversation history length; n_batch/n_ubatch control how many
-    // tokens are processed in one GPU pass. llama.cpp splits larger prompts automatically.
     static constexpr int MAX_BATCH_SIZE = 2048;
     static constexpr int MAX_UBATCH_SIZE = 512;
     batch_size_ = std::min(context_size_, MAX_BATCH_SIZE);
 
-    llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
     ctx_params.n_batch = batch_size_;
     ctx_params.n_ubatch = std::min(batch_size_, MAX_UBATCH_SIZE);
-    ctx_params.n_threads = backend_->get_num_threads();
-    ctx_params.n_threads_batch = backend_->get_num_threads();
-    ctx_params.no_perf = true;
 
     RAC_LOG_INFO("LLM.LlamaCpp", "Context params: n_ctx=%d, n_batch=%d, n_ubatch=%d",
          ctx_params.n_ctx, ctx_params.n_batch, ctx_params.n_ubatch);
@@ -1194,7 +1221,6 @@ bool LlamaCppTextGeneration::recreate_context() {
         context_ = nullptr;
     }
 
-    // Create new context (adapters are now visible to it)
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = context_size_;
     ctx_params.n_batch = batch_size_;
