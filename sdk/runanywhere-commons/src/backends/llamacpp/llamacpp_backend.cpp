@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -262,6 +263,10 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     size_t n_overrides = llama_max_tensor_buft_overrides();
 
     std::vector<float> tensor_split(n_devices, 0.0f);
+    // llama.cpp iterates tensor_buft_overrides until it hits a zero-valued
+    // sentinel entry (pattern == nullptr). Value-initializing the vector to
+    // all zeros means the first element is already that sentinel, so an
+    // empty vector is interpreted as "no tensor buft overrides."
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides(n_overrides);
     std::vector<size_t> margins(n_devices, 0);
 
@@ -342,6 +347,17 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     }
 #else
     if (user_gpu_layers >= 0) {
+        // llama_params_fit fell back to n_gpu_layers=0 for non-SUCCESS outcomes;
+        // honouring the user override here reinstates the OOM risk the fit call
+        // was supposed to prevent. Log a warning so it's visible in the event of
+        // a subsequent crash/OOM, but keep honouring the user's explicit request.
+        if (fit_status != LLAMA_PARAMS_FIT_STATUS_SUCCESS) {
+            const char* fit_label =
+                fit_status == LLAMA_PARAMS_FIT_STATUS_FAILURE ? "FAILURE" : "ERROR";
+            RAC_LOG_WARNING("LLM.LlamaCpp",
+                "Applying user gpu_layers=%d override despite llama_params_fit %s — risk of OOM",
+                user_gpu_layers, fit_label);
+        }
         model_params.n_gpu_layers = user_gpu_layers;
         RAC_LOG_INFO("LLM.LlamaCpp", "Applying user GPU layers override: %d", user_gpu_layers);
     }
@@ -364,7 +380,12 @@ bool LlamaCppTextGeneration::load_model(const std::string& model_path,
     if (ctx_params.n_ctx == 0) {
         ctx_params.n_ctx = std::min(model_train_ctx, max_default_context_);
     }
-    context_size_ = std::min({(int)ctx_params.n_ctx, model_train_ctx, max_default_context_});
+    // ctx_params.n_ctx is uint32_t; clamp to INT_MAX before converting to int so
+    // a pathological fitted/user value above ~2.1B can't wrap to a negative
+    // number that `std::min` would then pick as the "smallest" context size.
+    const int fitted_ctx = static_cast<int>(
+        std::min(ctx_params.n_ctx, static_cast<uint32_t>(INT_MAX)));
+    context_size_ = std::min({fitted_ctx, model_train_ctx, max_default_context_});
 
     RAC_LOG_INFO("LLM.LlamaCpp", "Final context size: %d (fitted=%u, train=%d, cap=%d)",
          context_size_, ctx_params.n_ctx, model_train_ctx, max_default_context_);
