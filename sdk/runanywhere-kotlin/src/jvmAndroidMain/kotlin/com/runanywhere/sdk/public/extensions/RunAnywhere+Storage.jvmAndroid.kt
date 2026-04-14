@@ -9,6 +9,7 @@ package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
@@ -41,10 +42,10 @@ actual suspend fun RunAnywhere.storageInfo(): StorageInfo {
     val modelsDir = File(baseDir, "models")
     val appSupportDir = File(baseDir, "data")
 
-    // Calculate directory sizes
-    val cacheSize = calculateDirectorySize(cacheDir)
-    val modelsSize = calculateDirectorySize(modelsDir)
-    val appSupportSize = calculateDirectorySize(appSupportDir)
+    // Calculate directory sizes via C++ (recursive traversal in C++, Kotlin provides I/O callbacks)
+    val cacheSize = CppBridgeFileManager.calculateDirectorySize(cacheDir.absolutePath)
+    val modelsSize = CppBridgeFileManager.calculateDirectorySize(modelsDir.absolutePath)
+    val appSupportSize = CppBridgeFileManager.calculateDirectorySize(appSupportDir.absolutePath)
 
     val appStorage =
         AppStorageInfo(
@@ -85,26 +86,21 @@ actual suspend fun RunAnywhere.checkStorageAvailability(requiredBytes: Long): St
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    // Delegate to C++ for storage check (1GB warning threshold logic is in C++)
+    val json = CppBridgeFileManager.checkStorageJson(requiredBytes)
+    if (json != null) {
+        return parseStorageAvailabilityJson(json, requiredBytes)
+    }
+
+    // Fallback if C++ call fails
     val baseDir = File(CppBridgeModelPaths.getBaseDirectory())
     val availableSpace = baseDir.freeSpace
-    val isAvailable = availableSpace >= requiredBytes
-
-    // Check if we're getting low on space (less than 1GB after this operation)
-    val hasWarning = isAvailable && (availableSpace - requiredBytes) < 1024L * 1024 * 1024
-
-    val recommendation =
-        when {
-            !isAvailable -> "Not enough storage space. Required: ${formatBytes(requiredBytes)}, Available: ${formatBytes(availableSpace)}"
-            hasWarning -> "Storage is running low. Consider clearing cache or removing unused models."
-            else -> null
-        }
-
     return StorageAvailability(
-        isAvailable = isAvailable,
+        isAvailable = availableSpace >= requiredBytes,
         requiredSpace = requiredBytes,
         availableSpace = availableSpace,
-        hasWarning = hasWarning,
-        recommendation = recommendation,
+        hasWarning = false,
+        recommendation = null,
     )
 }
 
@@ -113,8 +109,7 @@ actual suspend fun RunAnywhere.cacheSize(): Long {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val cacheDir = File(CppBridgeModelPaths.getBaseDirectory(), "cache")
-    return calculateDirectorySize(cacheDir)
+    return CppBridgeFileManager.cacheSize()
 }
 
 actual suspend fun RunAnywhere.clearCache() {
@@ -127,12 +122,8 @@ actual suspend fun RunAnywhere.clearCache() {
     // Clear the storage cache namespace
     CppBridgeStorage.clear(CppBridgeStorage.StorageNamespace.INFERENCE_CACHE, CppBridgeStorage.StorageType.CACHE)
 
-    // Also clear the file cache directory
-    val cacheDir = File(CppBridgeModelPaths.getBaseDirectory(), "cache")
-    if (cacheDir.exists()) {
-        cacheDir.deleteRecursively()
-        cacheDir.mkdirs()
-    }
+    // Clear the file cache directory via C++
+    CppBridgeFileManager.clearCache()
 
     storageLogger.info("Cache cleared")
 }
@@ -151,25 +142,13 @@ actual suspend fun RunAnywhere.modelStorageUsed(): Long {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    val modelsDir = File(CppBridgeModelPaths.getBaseDirectory(), "models")
-    return calculateDirectorySize(modelsDir)
+    return CppBridgeFileManager.modelsStorageUsed()
 }
 
-// Helper function to calculate directory size recursively
+// Delegate to C++ for recursive directory size calculation
 private fun calculateDirectorySize(directory: File): Long {
     if (!directory.exists()) return 0L
-    if (directory.isFile) return directory.length()
-
-    var size = 0L
-    directory.listFiles()?.forEach { file ->
-        size +=
-            if (file.isDirectory) {
-                calculateDirectorySize(file)
-            } else {
-                file.length()
-            }
-    }
-    return size
+    return CppBridgeFileManager.calculateDirectorySize(directory.absolutePath)
 }
 
 // Helper function to format bytes as human-readable string
@@ -181,6 +160,29 @@ private fun formatBytes(bytes: Long): String {
     if (mb < 1024) return "%.1f MB".format(mb)
     val gb = mb / 1024.0
     return "%.2f GB".format(gb)
+}
+
+/**
+ * Parse storage availability JSON from C++ rac_file_manager_check_storage.
+ */
+private fun parseStorageAvailabilityJson(json: String, requiredBytes: Long): StorageAvailability {
+    // Simple JSON parsing without external library
+    val isAvailable = json.contains("\"isAvailable\":true")
+    val hasWarning = json.contains("\"hasWarning\":true")
+
+    val availableSpace = Regex("\"availableSpace\":(\\d+)").find(json)
+        ?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+
+    val recommendation = Regex("\"recommendation\":\"([^\"]*)\"").find(json)
+        ?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
+
+    return StorageAvailability(
+        isAvailable = isAvailable,
+        requiredSpace = requiredBytes,
+        availableSpace = availableSpace,
+        hasWarning = hasWarning,
+        recommendation = recommendation,
+    )
 }
 
 /**

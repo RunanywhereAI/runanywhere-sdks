@@ -21,6 +21,10 @@ dependencies:
   # RunAnywhere SDK - Genie NPU Backend (Android/Snapdragon only)
   runanywhere_genie:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
+
+  # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
+  runanywhere_onnx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.0
@@ -63,6 +67,8 @@ dependency_overrides:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
   runanywhere_genie:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
+  runanywhere_onnx:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
 
 flutter:
   uses-material-design: true

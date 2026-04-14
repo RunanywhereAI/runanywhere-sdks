@@ -28,6 +28,7 @@ export 'core/types/npu_chip.dart';
 export 'public/extensions/runanywhere_device.dart';
 export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
+export 'public/extensions/runanywhere_lora.dart';
 export 'public/extensions/runanywhere_storage.dart';
 export 'native/dart_bridge_rag.dart' show DartBridgeRAG;
 export 'public/runanywhere.dart';

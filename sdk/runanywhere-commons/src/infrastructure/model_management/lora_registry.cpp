@@ -96,8 +96,11 @@ rac_result_t rac_lora_registry_create(rac_lora_registry_handle_t* out_handle) {
 
 void rac_lora_registry_destroy(rac_lora_registry_handle_t handle) {
     if (!handle) return;
-    for (auto& pair : handle->entries) { free_lora_entry(pair.second); }
-    handle->entries.clear();
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        for (auto& pair : handle->entries) { free_lora_entry(pair.second); }
+        handle->entries.clear();
+    }
     delete handle;
     RAC_LOG_DEBUG("LoraRegistry", "LoRA registry destroyed");
 }

@@ -30,6 +30,7 @@ struct Subscription {
     uint64_t id;
     rac_event_callback_fn callback;
     void* user_data;
+    std::shared_ptr<std::atomic<bool>> alive;
 };
 
 std::mutex g_event_mutex;
@@ -40,9 +41,6 @@ std::unordered_map<rac_event_category_t, std::vector<Subscription>> g_subscripti
 
 // All-events subscriptions
 std::vector<Subscription> g_all_subscriptions;
-
-// Sentinel category for "all events"
-const rac_event_category_t CATEGORY_ALL_SENTINEL = static_cast<rac_event_category_t>(-1);
 
 uint64_t current_time_ms() {
     using namespace std::chrono;
@@ -80,6 +78,7 @@ uint64_t rac_event_subscribe(rac_event_category_t category, rac_event_callback_f
     sub.id = g_next_subscription_id.fetch_add(1);
     sub.callback = callback;
     sub.user_data = user_data;
+    sub.alive = std::make_shared<std::atomic<bool>>(true);
 
     g_subscriptions[category].push_back(sub);
 
@@ -97,6 +96,7 @@ uint64_t rac_event_subscribe_all(rac_event_callback_fn callback, void* user_data
     sub.id = g_next_subscription_id.fetch_add(1);
     sub.callback = callback;
     sub.user_data = user_data;
+    sub.alive = std::make_shared<std::atomic<bool>>(true);
 
     g_all_subscriptions.push_back(sub);
 
@@ -112,8 +112,12 @@ void rac_event_unsubscribe(uint64_t subscription_id) {
 
     auto remove_from = [subscription_id](std::vector<Subscription>& subs) {
         auto it =
-            std::remove_if(subs.begin(), subs.end(), [subscription_id](const Subscription& s) {
-                return s.id == subscription_id;
+            std::remove_if(subs.begin(), subs.end(), [subscription_id](Subscription& s) {
+                if (s.id == subscription_id) {
+                    s.alive->store(false);
+                    return true;
+                }
+                return false;
             });
         if (it != subs.end()) {
             subs.erase(it, subs.end());
@@ -146,19 +150,33 @@ rac_result_t rac_event_publish(const rac_event_t* event) {
         event_copy.timestamp_ms = static_cast<int64_t>(current_time_ms());
     }
 
-    std::lock_guard<std::mutex> lock(g_event_mutex);
+    // Copy subscriber lists under lock, then invoke callbacks without lock
+    // to avoid deadlock if a callback subscribes/unsubscribes/publishes.
+    std::vector<Subscription> category_subs;
+    std::vector<Subscription> all_subs;
 
-    // Notify category-specific subscribers
-    auto it = g_subscriptions.find(event_copy.category);
-    if (it != g_subscriptions.end()) {
-        for (const auto& sub : it->second) {
+    {
+        std::lock_guard<std::mutex> lock(g_event_mutex);
+
+        auto it = g_subscriptions.find(event_copy.category);
+        if (it != g_subscriptions.end()) {
+            category_subs = it->second;
+        }
+        all_subs = g_all_subscriptions;
+    }
+
+    // Notify category-specific subscribers (skip if unsubscribed after snapshot)
+    for (const auto& sub : category_subs) {
+        if (sub.alive->load()) {
             sub.callback(&event_copy, sub.user_data);
         }
     }
 
-    // Notify all-events subscribers
-    for (const auto& sub : g_all_subscriptions) {
-        sub.callback(&event_copy, sub.user_data);
+    // Notify all-events subscribers (skip if unsubscribed after snapshot)
+    for (const auto& sub : all_subs) {
+        if (sub.alive->load()) {
+            sub.callback(&event_copy, sub.user_data);
+        }
     }
 
     return RAC_SUCCESS;

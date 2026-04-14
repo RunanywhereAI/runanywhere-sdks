@@ -135,9 +135,12 @@ export function useVLMCamera(cameraRef: React.RefObject<Camera>): VLMCameraHook 
         enableShutterSound: false
       });
 
+      // Strip file:// prefix if present (VisionCamera may return a URI)
+      const cleanPath = photo.path.replace('file://', '');
+
       // Use the service to describe with a callback for streaming
       await vlmService.describeImage(
-        photo.path,
+        cleanPath,
         SINGLE_CAPTURE_PROMPT,
         SINGLE_CAPTURE_MAX_TOKENS,
         (token) => {
@@ -194,9 +197,12 @@ export function useVLMCamera(cameraRef: React.RefObject<Camera>): VLMCameraHook 
         enableShutterSound: false
       });
 
+      // Strip file:// prefix if present (VisionCamera may return a URI)
+      const cleanPath = photo.path.replace('file://', '');
+
       let accumulatedText = '';
       await vlmService.describeImage(
-        photo.path,
+        cleanPath,
         AUTO_STREAM_PROMPT,
         AUTO_STREAM_MAX_TOKENS,
         (token) => {

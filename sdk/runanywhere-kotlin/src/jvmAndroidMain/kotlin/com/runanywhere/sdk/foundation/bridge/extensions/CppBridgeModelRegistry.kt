@@ -53,8 +53,8 @@ object CppBridgeModelRegistry {
         const val STT = ModelCategory.SPEECH_RECOGNITION
         const val TTS = ModelCategory.SPEECH_SYNTHESIS
         const val VAD = ModelCategory.AUDIO
-        const val EMBEDDING = 99
-        const val UNKNOWN = 99
+        const val EMBEDDING = ModelCategory.EMBEDDING
+        const val UNKNOWN = -1
 
         /**
          * Get display name for a model type.

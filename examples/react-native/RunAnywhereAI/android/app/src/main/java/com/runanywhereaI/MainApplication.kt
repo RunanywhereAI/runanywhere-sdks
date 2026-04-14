@@ -25,6 +25,7 @@ class MainApplication : Application(), ReactApplication {
           add(RunAnywhereLlamaPackage())
           add(RunAnywhereONNXPackage())
           add(RunAnywhereGeniePackage())
+          add(DocumentServicePackage())
         },
     )
   }

@@ -140,7 +140,7 @@ android {
                           "-DCMAKE_MODULE_PATH=${projectDir}"
             }
         }
-        ndkVersion "26.3.11579264"
+        ndkVersion "27.0.12077973"
     }
     signingConfigs {
         debug {
@@ -171,8 +171,8 @@ android {
             "**/libfbjni.so",
             "**/libfolly_runtime.so",
             "**/libreactnative.so",
-            "**/libNitroModules.so",
-            "**/librac_backend_onnx.so",
+            "**/libNitroModules.so",  // Nitro modules shared by @runanywhere/onnx and react-native-nitro-modules
+            "**/librac_backend_onnx.so", // ONNX backend shared by multiple modules
             "**/librac_commons.so",
             "**/libomp.so",
             "**/libcdsprpc.so",
@@ -195,6 +195,9 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+
+    // PDF text extraction for DocumentService (RAG)
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
     // Manually link Nitro modules (excluded from autolinking)
     implementation project(':react-native-nitro-modules')

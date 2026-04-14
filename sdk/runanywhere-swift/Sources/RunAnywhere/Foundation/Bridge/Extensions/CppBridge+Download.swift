@@ -19,6 +19,71 @@ extension CppBridge {
         /// Shared download manager instance
         public static let shared = Download()
 
+        // MARK: - Download Orchestrator Utilities (stateless, nonisolated)
+
+        /// Find model path after archive extraction using C++ rac_find_model_path_after_extraction().
+        /// Consolidates Swift findModelPath/findNestedDirectory/findSingleModelFile into one C++ call.
+        public static func findModelPathAfterExtraction(
+            extractedDir: URL,
+            structure: ArchiveStructure,
+            framework: InferenceFramework,
+            format: ModelFormat
+        ) -> URL? {
+            var outPath = [CChar](repeating: 0, count: 4096)
+
+            let result = extractedDir.path.withCString { dir in
+                rac_find_model_path_after_extraction(
+                    dir,
+                    structure.toC(),
+                    framework.toC(),
+                    format.toC(),
+                    &outPath,
+                    outPath.count
+                )
+            }
+
+            guard result == RAC_SUCCESS else { return nil }
+            return URL(fileURLWithPath: String(cString: outPath))
+        }
+
+        /// Check if a download URL requires extraction.
+        /// Uses C++ rac_download_requires_extraction() — convenience wrapper around rac_archive_type_from_path().
+        public static func downloadRequiresExtraction(url: URL) -> Bool {
+            return url.absoluteString.withCString { urlStr in
+                rac_download_requires_extraction(urlStr) == RAC_TRUE
+            }
+        }
+
+        /// Compute download destination path using C++ rac_download_compute_destination().
+        /// Returns the path and whether extraction is needed, or nil on failure.
+        public static func computeDownloadDestination(
+            modelId: String,
+            downloadURL: URL,
+            framework: InferenceFramework,
+            format: ModelFormat
+        ) -> (path: URL, needsExtraction: Bool)? {
+            var outPath = [CChar](repeating: 0, count: 4096)
+            var needsExtraction: rac_bool_t = RAC_FALSE
+
+            let result = modelId.withCString { mid in
+                downloadURL.absoluteString.withCString { urlStr in
+                    rac_download_compute_destination(
+                        mid, urlStr,
+                        framework.toC(),
+                        format.toC(),
+                        &outPath, outPath.count,
+                        &needsExtraction
+                    )
+                }
+            }
+
+            guard result == RAC_SUCCESS else { return nil }
+            return (
+                path: URL(fileURLWithPath: String(cString: outPath)),
+                needsExtraction: needsExtraction == RAC_TRUE
+            )
+        }
+
         private var handle: rac_download_manager_handle_t?
         private let logger = SDKLogger(category: "CppBridge.Download")
 

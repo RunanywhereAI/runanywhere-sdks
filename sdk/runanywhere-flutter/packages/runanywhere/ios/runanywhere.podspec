@@ -48,7 +48,7 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   s.ios.deployment_target = '14.0'
   s.swift_version = '5.0'
 
-  # Source files (minimal - main logic is in the xcframework)
+  # Source files: plugin code + C++ RAG bridge (symlinked from ../src/ into Classes/)
   s.source_files = 'Classes/**/*'
 
   # Flutter dependency
@@ -124,8 +124,6 @@ https://github.com/RunanywhereAI/runanywhere-sdks
     ]
   end
 
-  s.preserve_paths = 'Frameworks/**/*'
-
   # Required frameworks
   s.frameworks = [
     'Foundation',
@@ -146,13 +144,19 @@ https://github.com/RunanywhereAI/runanywhere-sdks
   # Note: -all_load forces all symbols from static libraries to be loaded
   # With static linkage (use_frameworks! :linkage => :static in Podfile),
   # all symbols from RACommons.xcframework will be available in the final app
+  # C++ bridge needs nlohmann/json headers and C++17
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
     'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
     'ENABLE_BITCODE' => 'NO',
+    'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
+    'HEADER_SEARCH_PATHS' => '"${PODS_TARGET_SRCROOT}/Classes" "${PODS_TARGET_SRCROOT}/Classes/third_party" "${PODS_TARGET_SRCROOT}/../src" "${PODS_TARGET_SRCROOT}/../src/third_party"',
+    'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited)',
   }
+
+  s.preserve_paths = ['Frameworks/**/*', '../src/**/*', 'Classes/third_party/**/*']
 
   # CRITICAL: These flags propagate to the main app target to ensure all symbols
   # from vendored static frameworks are linked AND EXPORTED in the final binary.

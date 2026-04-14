@@ -15,6 +15,7 @@ import 'package:runanywhere/public/extensions/runanywhere_device.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
+import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
 /// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
 ///
@@ -323,6 +324,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     );
     debugPrint('✅ ONNX Embedding models registered');
     await Future<void>.delayed(Duration.zero);
+
+    // --- ONNX BACKEND (required for embeddings used by RAG) ---
+    try {
+      await Onnx.register();
+      debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
+    } catch (e) {
+      debugPrint('⚠️ ONNX backend not available: $e');
+    }
 
     // --- RAG BACKEND ---
     try {

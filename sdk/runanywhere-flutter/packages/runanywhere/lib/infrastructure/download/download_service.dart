@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
@@ -265,7 +270,8 @@ class ModelDownloadService {
           final extractedPath = await _extractArchive(
             downloadPath,
             destDir.path,
-            model.artifactType,
+            framework: model.framework,
+            format: model.format,
           );
 
           // Clean up archive file after extraction
@@ -332,43 +338,45 @@ class ModelDownloadService {
     return Directory(modelPath);
   }
 
-  /// Extract an archive using the system `tar`/`unzip` command.
-  /// This runs in a separate process (non-blocking) and is orders of magnitude
-  /// faster than the pure-Dart `archive` package for large model files (1GB+).
-  /// Android has `tar` via toybox since API 23 (min SDK 24).
+  /// Extract an archive to the destination using native C++ (libarchive).
+  /// Supports ZIP, TAR.GZ, TAR.BZ2, TAR.XZ with auto-detection.
   Future<String> _extractArchive(
     String archivePath,
-    String destDir,
-    ModelArtifactType artifactType,
-  ) async {
+    String destDir, {
+    required InferenceFramework framework,
+    required ModelFormat format,
+  }) async {
     _logger.info('Extracting archive: $archivePath');
 
-    final List<String> args;
+    final lib = PlatformLoader.loadCommons();
+    final extractFn = lib.lookupFunction<
+        Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
+            Pointer<Void>, Pointer<Void>, Pointer<Void>),
+        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
+            Pointer<Void>, Pointer<Void>, Pointer<Void>)>(
+      'rac_extract_archive_native',
+    );
 
-    if (archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
-      args = ['-xzf', archivePath, '-C', destDir];
-    } else if (archivePath.endsWith('.tar.bz2') ||
-        archivePath.endsWith('.tbz2')) {
-      args = ['-xjf', archivePath, '-C', destDir];
-    } else if (archivePath.endsWith('.tar')) {
-      args = ['-xf', archivePath, '-C', destDir];
-    } else if (archivePath.endsWith('.zip')) {
-      // Use unzip for .zip files
-      final result = await Process.run('unzip', ['-o', archivePath, '-d', destDir]);
-      if (result.exitCode != 0) {
-        throw Exception('unzip failed (exit ${result.exitCode}): ${result.stderr}');
+    final archivePathPtr = archivePath.toNativeUtf8(allocator: calloc);
+    final destPathPtr = destDir.toNativeUtf8(allocator: calloc);
+
+    try {
+      final result = extractFn(
+        archivePathPtr,
+        destPathPtr,
+        nullptr,
+        nullptr,
+        nullptr,
+        nullptr,
+      );
+
+      if (result != 0) {
+        _logger.error('Native extraction failed with code: $result');
+        throw Exception('Native extraction failed with code: $result');
       }
-      _logger.info('Extraction complete: $destDir');
-      return destDir;
-    } else {
-      _logger.warning('Unknown archive format: $archivePath');
-      return archivePath;
-    }
-
-    // Run tar extraction — runs as a separate OS process, does not block the Dart event loop
-    final result = await Process.run('tar', args);
-    if (result.exitCode != 0) {
-      throw Exception('tar failed (exit ${result.exitCode}): ${result.stderr}');
+    } finally {
+      calloc.free(archivePathPtr);
+      calloc.free(destPathPtr);
     }
 
     _logger.info('Extraction complete: $destDir');
