@@ -106,6 +106,10 @@ class DartBridgeVoiceAgent {
         _handle = handlePtr.value;
         _logger.info('Voice agent created with shared component handles');
         completer.complete(_handle!);
+        // Clear _initFuture after completing the completer so that concurrent
+        // callers that already hold a reference to completer.future receive the
+        // value normally. New callers arriving after this line hit the
+        // `_handle != null` fast path.
         _initFuture = null;
         return _handle!;
       } finally {
@@ -214,7 +218,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent STT model loaded: $modelId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(component: 'stt'));
+      _eventController.add(const VoiceAgentModelLoadedEvent(
+          component: VoiceAgentComponent.stt));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -239,7 +244,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent LLM model loaded: $modelId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(component: 'llm'));
+      _eventController.add(const VoiceAgentModelLoadedEvent(
+          component: VoiceAgentComponent.llm));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -264,7 +270,8 @@ class DartBridgeVoiceAgent {
       }
 
       _logger.info('Voice agent TTS voice loaded: $voiceId');
-      _eventController.add(const VoiceAgentModelLoadedEvent(component: 'tts'));
+      _eventController.add(const VoiceAgentModelLoadedEvent(
+          component: VoiceAgentComponent.tts));
     } finally {
       calloc.free(pathPtr);
       calloc.free(idPtr);
@@ -314,16 +321,22 @@ class DartBridgeVoiceAgent {
           'Voice agent not ready. Load models and initialize first.');
     }
 
-    // Run the heavy C++ processing in a background isolate
-    return Isolate.run(() => _processVoiceTurnInIsolate(handle, audioData));
+    // Capture handle address before entering isolate — passing the raw Pointer
+    // across an isolate boundary is unsafe; pass the address and reconstruct it.
+    final handleAddress = handle.address;
+    return Isolate.run(
+        () => _processVoiceTurnInIsolate(handleAddress, audioData));
   }
 
   /// Static helper for processing voice turn in an isolate.
   /// The C++ API expects raw audio bytes (PCM16), not float samples.
+  /// Must be static/top-level for Isolate.run().
   static Future<VoiceTurnResult> _processVoiceTurnInIsolate(
-    RacHandle handle,
+    int handleAddress,
     Uint8List audioData,
   ) async {
+    final handle = RacHandle.fromAddress(handleAddress);
+
     // Allocate native memory for audio data (raw PCM16 bytes)
     final audioPtr = calloc<Uint8>(audioData.length);
     final resultPtr = calloc<RacVoiceAgentResultStruct>();
@@ -555,9 +568,12 @@ class VoiceAgentInitializedEvent extends VoiceAgentEvent {
   const VoiceAgentInitializedEvent();
 }
 
+/// Component types that can emit a model-loaded event on the voice agent.
+enum VoiceAgentComponent { stt, llm, tts }
+
 /// Voice agent model loaded.
 class VoiceAgentModelLoadedEvent extends VoiceAgentEvent {
-  final String component; // 'stt', 'llm', or 'tts'
+  final VoiceAgentComponent component;
   const VoiceAgentModelLoadedEvent({required this.component});
 }
 
