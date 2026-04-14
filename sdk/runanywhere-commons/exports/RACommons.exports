@@ -226,6 +226,13 @@ _rac_llm_component_load_model
 _rac_llm_component_supports_streaming
 _rac_llm_component_unload
 
+# LLM Component - Structured Output
+_rac_llm_component_generate_structured
+_rac_llm_component_generate_structured_stream
+
+# LLM Service - Grammar
+_rac_llm_json_schema_to_grammar
+
 # LLM Component - LoRA
 _rac_llm_component_load_lora
 _rac_llm_component_remove_lora

@@ -1,6 +1,7 @@
 #include "llamacpp_backend.h"
 
 #include "common.h"
+#include "json-schema-to-grammar.h"
 
 #include <algorithm>
 #include <chrono>
@@ -667,7 +668,8 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             cached_temperature_ == request.temperature &&
             cached_top_p_ == request.top_p &&
             cached_top_k_ == request.top_k &&
-            cached_repetition_penalty_ == request.repetition_penalty;
+            cached_repetition_penalty_ == request.repetition_penalty &&
+            cached_grammar_ == request.grammar;
 
         if (!params_match) {
             if (sampler_) {
@@ -677,6 +679,22 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             auto sparams = llama_sampler_chain_default_params();
             sparams.no_perf = true;
             sampler_ = llama_sampler_chain_init(sparams);
+
+            // Grammar sampler goes first — masks invalid tokens before other samplers run
+            if (!request.grammar.empty()) {
+                const auto* const grammar_vocab = llama_model_get_vocab(model_);
+                auto* grammar_sampler =
+                    llama_sampler_init_grammar(grammar_vocab, request.grammar.c_str(), "root");
+                if (grammar_sampler) {
+                    llama_sampler_chain_add(sampler_, grammar_sampler);
+                    RAC_LOG_INFO("LLM.LlamaCpp",
+                                 "Grammar-constrained decoding enabled (GBNF length=%zu)",
+                                 request.grammar.size());
+                } else {
+                    RAC_LOG_WARNING("LLM.LlamaCpp",
+                                    "Failed to parse GBNF grammar, proceeding without constraint");
+                }
+            }
 
             if (request.temperature > 0.0f) {
                 llama_sampler_chain_add(sampler_,
@@ -697,16 +715,18 @@ bool LlamaCppTextGeneration::generate_stream(const TextGenerationRequest& reques
             cached_top_p_ = request.top_p;
             cached_top_k_ = request.top_k;
             cached_repetition_penalty_ = request.repetition_penalty;
+            cached_grammar_ = request.grammar;
         }
     }
 
     // Log generation parameters
     RAC_LOG_INFO("LLM.LlamaCpp","[PARAMS] LLM generate_stream (per-request options): temperature=%.4f, top_p=%.4f, top_k=%d, "
          "max_tokens=%d (effective=%d), repetition_penalty=%.4f, "
-         "system_prompt_len=%zu",
+         "system_prompt_len=%zu, grammar=%s",
          request.temperature, request.top_p, request.top_k,
          request.max_tokens, effective_max_tokens, request.repetition_penalty,
-         request.system_prompt.length());
+         request.system_prompt.length(),
+         request.grammar.empty() ? "none" : "enabled");
 
     const auto* const vocab = llama_model_get_vocab(model_);
 
@@ -992,10 +1012,20 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
     }
 
     llama_sampler* sampler = nullptr;
+    const auto vocab = llama_model_get_vocab(model_);
     {
         auto sparams = llama_sampler_chain_default_params();
         sparams.no_perf = true;
         sampler = llama_sampler_chain_init(sparams);
+
+        // Grammar sampler first (masks invalid tokens)
+        if (!request.grammar.empty()) {
+            auto* grammar_sampler =
+                llama_sampler_init_grammar(vocab, request.grammar.c_str(), "root");
+            if (grammar_sampler) {
+                llama_sampler_chain_add(sampler, grammar_sampler);
+            }
+        }
 
         if (request.temperature > 0.0f) {
             llama_sampler_chain_add(sampler,
@@ -1010,8 +1040,6 @@ TextGenerationResult LlamaCppTextGeneration::generate_from_context(const TextGen
             llama_sampler_chain_add(sampler, llama_sampler_init_greedy());
         }
     }
-
-    const auto vocab = llama_model_get_vocab(model_);
 
     static const std::vector<std::string> STOP_SEQUENCES = {
         "<|im_end|>", "<|eot_id|>", "</s>", "<|end|>", "<|endoftext|>",
@@ -1220,6 +1248,7 @@ bool LlamaCppTextGeneration::recreate_context() {
     cached_top_p_ = -1.0f;
     cached_top_k_ = -1;
     cached_repetition_penalty_ = -1.0f;
+    cached_grammar_.clear();
 
     RAC_LOG_INFO("LLM.LlamaCpp","Context recreated successfully");
     return true;
@@ -1370,6 +1399,28 @@ nlohmann::json LlamaCppTextGeneration::get_lora_info() const {
         adapters.push_back(adapter_info);
     }
     return adapters;
+}
+
+// =============================================================================
+// JSON SCHEMA → GBNF GRAMMAR CONVERSION
+// =============================================================================
+
+std::string LlamaCppTextGeneration::convert_json_schema_to_grammar(const std::string& json_schema) {
+    if (json_schema.empty()) {
+        LOGW("convert_json_schema_to_grammar: empty schema");
+        return "";
+    }
+
+    try {
+        auto schema = nlohmann::ordered_json::parse(json_schema);
+        std::string grammar = json_schema_to_grammar(schema);
+        LOGI("Converted JSON schema to GBNF grammar (schema=%zu chars, grammar=%zu chars)",
+             json_schema.size(), grammar.size());
+        return grammar;
+    } catch (const std::exception& e) {
+        LOGW("Failed to convert JSON schema to GBNF: %s", e.what());
+        return "";
+    }
 }
 
 }  // namespace runanywhere

@@ -552,6 +552,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     // Parse configJson if provided
     std::string sys_prompt_storage;
+    std::string grammar_storage;
     if (config != nullptr) {
         try {
             auto j = nlohmann::json::parse(config);
@@ -561,6 +562,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
             sys_prompt_storage = j.value("system_prompt", std::string(""));
             if (!sys_prompt_storage.empty()) {
                 options.system_prompt = sys_prompt_storage.c_str();
+            }
+            grammar_storage = j.value("grammar", std::string(""));
+            if (!grammar_storage.empty()) {
+                options.grammar = grammar_storage.c_str();
             }
         } catch (const nlohmann::json::exception& e) {
             LOGe("Failed to parse LLM config JSON: %s", e.what());
@@ -859,6 +864,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     // Parse configJson if provided
     std::string sys_prompt_storage;
+    std::string grammar_storage;
     if (config != nullptr) {
         try {
             auto j = nlohmann::json::parse(config);
@@ -868,6 +874,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
             sys_prompt_storage = j.value("system_prompt", std::string(""));
             if (!sys_prompt_storage.empty()) {
                 options.system_prompt = sys_prompt_storage.c_str();
+            }
+            grammar_storage = j.value("grammar", std::string(""));
+            if (!grammar_storage.empty()) {
+                options.grammar = grammar_storage.c_str();
             }
         } catch (const nlohmann::json::exception& e) {
             LOGe("Failed to parse LLM config JSON: %s", e.what());
@@ -994,6 +1004,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
 
     // Parse configJson if provided
     std::string sys_prompt_storage;
+    std::string grammar_storage;
     if (config != nullptr) {
         try {
             auto j = nlohmann::json::parse(config);
@@ -1003,6 +1014,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentGenerate
             sys_prompt_storage = j.value("system_prompt", std::string(""));
             if (!sys_prompt_storage.empty()) {
                 options.system_prompt = sys_prompt_storage.c_str();
+            }
+            grammar_storage = j.value("grammar", std::string(""));
+            if (!grammar_storage.empty()) {
+                options.grammar = grammar_storage.c_str();
             }
         } catch (const nlohmann::json::exception& e) {
             LOGe("Failed to parse LLM config JSON: %s", e.what());

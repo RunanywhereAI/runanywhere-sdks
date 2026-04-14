@@ -219,7 +219,8 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeDestroy(
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
     JNIEnv* env, jclass clazz,
-    jlong handle, jstring prompt, jint maxTokens, jfloat temperature) {
+    jlong handle, jstring prompt, jint maxTokens, jfloat temperature,
+    jstring grammar) {
     (void)clazz;
 
     if (handle == 0) {
@@ -240,12 +241,24 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
     options.max_tokens = maxTokens;
     options.temperature = temperature;
 
+    // Wire grammar field for constrained decoding
+    const char* grammarStr = nullptr;
+    if (grammar != nullptr) {
+        grammarStr = env->GetStringUTFChars(grammar, nullptr);
+        if (grammarStr && grammarStr[0] != '\0') {
+            options.grammar = grammarStr;
+        }
+    }
+
     rac_llm_result_t result = {};
     rac_result_t status = rac_llm_llamacpp_generate(
         reinterpret_cast<rac_handle_t>(handle),
         promptStr, &options, &result);
 
     env->ReleaseStringUTFChars(prompt, promptStr);
+    if (grammarStr) {
+        env->ReleaseStringUTFChars(grammar, grammarStr);
+    }
 
     if (status != RAC_SUCCESS) {
         LOGe("nativeGenerate: Failed with status %d", status);
@@ -261,6 +274,43 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
     }
 
     return output;
+}
+
+/**
+ * Convert JSON Schema to GBNF grammar string
+ */
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeJsonSchemaToGrammar(
+    JNIEnv* env, jclass clazz,
+    jlong handle, jstring jsonSchema) {
+    (void)clazz;
+
+    if (handle == 0) {
+        LOGe("nativeJsonSchemaToGrammar: Invalid handle");
+        return nullptr;
+    }
+
+    const char* schemaStr = env->GetStringUTFChars(jsonSchema, nullptr);
+    if (!schemaStr) {
+        LOGe("nativeJsonSchemaToGrammar: Failed to get schema");
+        return nullptr;
+    }
+
+    char* grammarOut = nullptr;
+    rac_result_t status = rac_llm_llamacpp_json_schema_to_grammar(
+        reinterpret_cast<rac_handle_t>(handle),
+        schemaStr, &grammarOut);
+
+    env->ReleaseStringUTFChars(jsonSchema, schemaStr);
+
+    if (status != RAC_SUCCESS || !grammarOut) {
+        LOGe("nativeJsonSchemaToGrammar: Failed with status %d", status);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(grammarOut);
+    free(grammarOut);
+    return result;
 }
 
 /**

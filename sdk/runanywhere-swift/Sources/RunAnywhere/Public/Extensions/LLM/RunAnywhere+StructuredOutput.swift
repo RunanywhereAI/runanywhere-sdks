@@ -224,7 +224,7 @@ public extension RunAnywhere {
         }
     }
 
-    /// Internal generation for structured output (calls C++ directly)
+    /// Internal generation for structured output using grammar-constrained decoding
     private static func generateForStructuredOutput(
         _ prompt: String,
         options: LLMGenerationOptions
@@ -248,21 +248,59 @@ public extension RunAnywhere {
         cOptions.temperature = options.temperature
         cOptions.top_p = options.topP
         cOptions.streaming_enabled = RAC_FALSE
+        cOptions.grammar = nil
 
-        // Generate - wrap in system_prompt lifetime scope
+        // Build structured output C config
+        var soConfig = rac_structured_output_config_t()
+        if let structuredOutput = options.structuredOutput {
+            soConfig.include_schema_in_prompt = structuredOutput.includeSchemaInPrompt ? RAC_TRUE : RAC_FALSE
+            soConfig.use_grammar = structuredOutput.useGrammar ? RAC_TRUE : RAC_FALSE
+            soConfig.max_retries = Int32(structuredOutput.maxRetries)
+            soConfig.fallback = rac_structured_output_fallback(rawValue: UInt32(structuredOutput.fallback.rawValue))
+        } else {
+            soConfig.include_schema_in_prompt = RAC_TRUE
+            soConfig.use_grammar = RAC_TRUE
+            soConfig.max_retries = 3
+            soConfig.fallback = RAC_STRUCTURED_OUTPUT_FALLBACK_RETRY
+        }
+
+        // Generate using grammar-constrained structured output API
         var llmResult = rac_llm_result_t()
         let generateResult: rac_result_t
+
+        // Get JSON schema from the structured output type
+        let jsonSchema = options.structuredOutput?.type.jsonSchema
+
         if let systemPrompt = options.systemPrompt {
             generateResult = systemPrompt.withCString { sysPromptPtr in
                 cOptions.system_prompt = sysPromptPtr
                 return prompt.withCString { promptPtr in
-                    rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                    if let schema = jsonSchema {
+                        return schema.withCString { schemaPtr in
+                            soConfig.json_schema = schemaPtr
+                            return rac_llm_component_generate_structured(
+                                handle, promptPtr, &cOptions, &soConfig, &llmResult
+                            )
+                        }
+                    } else {
+                        // No schema - fall back to regular generate
+                        return rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                    }
                 }
             }
         } else {
             cOptions.system_prompt = nil
             generateResult = prompt.withCString { promptPtr in
-                rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                if let schema = jsonSchema {
+                    return schema.withCString { schemaPtr in
+                        soConfig.json_schema = schemaPtr
+                        return rac_llm_component_generate_structured(
+                            handle, promptPtr, &cOptions, &soConfig, &llmResult
+                        )
+                    }
+                } else {
+                    return rac_llm_component_generate(handle, promptPtr, &cOptions, &llmResult)
+                }
             }
         }
 

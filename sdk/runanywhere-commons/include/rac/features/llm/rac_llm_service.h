@@ -78,6 +78,12 @@ typedef struct rac_llm_service_ops {
 
     /** Clear all KV cache state (optional, NULL if not supported) */
     rac_result_t (*clear_context)(void* impl);
+
+    /**
+     * Convert JSON Schema to GBNF grammar string (optional, NULL if not supported).
+     * Caller must free out_grammar with rac_free().
+     */
+    rac_result_t (*json_schema_to_grammar)(void* impl, const char* json_schema, char** out_grammar);
 } rac_llm_service_ops_t;
 
 /**
@@ -184,6 +190,21 @@ RAC_API void rac_llm_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_llm_result_free(rac_llm_result_t* result);
+
+/**
+ * @brief Convert JSON Schema to GBNF grammar string
+ *
+ * Routes through service registry to the backend's json_schema_to_grammar op.
+ * The resulting GBNF grammar can be passed in rac_llm_options_t.grammar
+ * for grammar-constrained decoding.
+ *
+ * @param handle Service handle
+ * @param json_schema JSON Schema string
+ * @param out_grammar Output: GBNF grammar string (caller must free with rac_free)
+ * @return RAC_SUCCESS or RAC_ERROR_NOT_SUPPORTED if backend doesn't support grammar
+ */
+RAC_API rac_result_t rac_llm_json_schema_to_grammar(rac_handle_t handle, const char* json_schema,
+                                                      char** out_grammar);
 
 // =============================================================================
 // ADAPTIVE CONTEXT API - For RAG and similar pipelines

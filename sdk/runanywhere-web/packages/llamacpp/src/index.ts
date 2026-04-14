@@ -39,7 +39,7 @@ export type {
   ToolValue, ToolParameterType, ToolParameter, ToolDefinition,
   ToolCall, ToolResult, ToolCallingOptions, ToolCallingResult, ToolExecutor,
 } from './Extensions/RunAnywhere+ToolCalling';
-export { StructuredOutput } from './Extensions/RunAnywhere+StructuredOutput';
+export { StructuredOutput, StructuredOutputFallback } from './Extensions/RunAnywhere+StructuredOutput';
 export type { StructuredOutputConfig, StructuredOutputValidation } from './Extensions/RunAnywhere+StructuredOutput';
 export { Diffusion } from './Extensions/RunAnywhere+Diffusion';
 export { DiffusionScheduler, DiffusionModelVariant, DiffusionMode } from './Extensions/RunAnywhere+Diffusion';

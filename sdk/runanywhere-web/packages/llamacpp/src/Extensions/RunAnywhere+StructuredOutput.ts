@@ -32,11 +32,27 @@ function requireBridge(): LlamaCppBridge {
 // Structured Output Types
 // ---------------------------------------------------------------------------
 
+/** Fallback strategy when grammar-constrained decoding fails */
+export enum StructuredOutputFallback {
+  /** Return raw output without validation */
+  Raw = 0,
+  /** Retry generation (default) */
+  Retry = 1,
+  /** Fall back to prompt-only mode (no grammar constraint) */
+  PromptOnly = 2,
+}
+
 export interface StructuredOutputConfig {
   /** JSON Schema string */
   jsonSchema: string;
   /** Whether to include the schema in the prompt (default: true) */
   includeSchemaInPrompt?: boolean;
+  /** Whether to use GBNF grammar-constrained decoding (default: true) */
+  useGrammar?: boolean;
+  /** Maximum retries for structured output parsing (default: 3) */
+  maxRetries?: number;
+  /** Fallback strategy when grammar fails (default: Retry) */
+  fallback?: StructuredOutputFallback;
 }
 
 export interface StructuredOutputValidation {
@@ -106,6 +122,9 @@ export const StructuredOutput = {
     const schemaPtr = bridge.allocString(config.jsonSchema);
     m.setValue(configPtr + soConf.jsonSchema, schemaPtr, '*');
     m.setValue(configPtr + soConf.includeSchemaInPrompt, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf.useGrammar, (config.useGrammar !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf.maxRetries, config.maxRetries ?? 3, 'i32');
+    m.setValue(configPtr + soConf.fallback, config.fallback ?? StructuredOutputFallback.Retry, 'i32');
 
     const outPromptPtr = m._malloc(4);
 
@@ -188,6 +207,9 @@ export const StructuredOutput = {
     const schemaPtr = bridge.allocString(config.jsonSchema);
     m.setValue(configPtr + soConf2.jsonSchema, schemaPtr, '*');
     m.setValue(configPtr + soConf2.includeSchemaInPrompt, (config.includeSchemaInPrompt !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf2.useGrammar, (config.useGrammar !== false) ? 1 : 0, 'i32');
+    m.setValue(configPtr + soConf2.maxRetries, config.maxRetries ?? 3, 'i32');
+    m.setValue(configPtr + soConf2.fallback, config.fallback ?? StructuredOutputFallback.Retry, 'i32');
 
     // rac_structured_output_validation_t (size from sizeof helper)
     const valSize = 12; // 3 fields × 4 bytes on wasm32 — all i32/ptr

@@ -44,6 +44,7 @@ function loadLLMOptionsOffsets(): LLMOptionsOffsets {
     temperature: off('llm_options_temperature'),
     topP: off('llm_options_top_p'),
     systemPrompt: off('llm_options_system_prompt'),
+    grammar: off('llm_options_grammar'),
   };
 }
 
@@ -96,6 +97,9 @@ function loadStructuredOutputConfigOffsets(): StructuredOutputConfigOffsets {
   return {
     jsonSchema: off('structured_output_config_json_schema'),
     includeSchemaInPrompt: off('structured_output_config_include_schema_in_prompt'),
+    useGrammar: off('structured_output_config_use_grammar'),
+    maxRetries: off('structured_output_config_max_retries'),
+    fallback: off('structured_output_config_fallback'),
   };
 }
 
