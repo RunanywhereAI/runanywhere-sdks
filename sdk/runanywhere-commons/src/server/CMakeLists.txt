@@ -66,7 +66,7 @@ if(UNIX AND NOT APPLE)
 endif()
 
 # Compiler options
-target_compile_features(rac_server PUBLIC cxx_std_17)
+target_compile_features(rac_server PUBLIC cxx_std_20)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(rac_server PRIVATE -Wall -Wextra -Wpedantic)

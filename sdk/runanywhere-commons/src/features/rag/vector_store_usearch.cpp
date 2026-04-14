@@ -38,6 +38,7 @@
 #define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
+
 namespace runanywhere {
 namespace rag {
 
@@ -66,7 +67,7 @@ public:
         // Create index
         auto result = index_dense_t::make(metric, usearch_config);
         if (!result) {
-            LOGE("Failed to create USearch index: %s", result.error.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to create USearch index: %s", result.error.what());
             throw std::runtime_error("Failed to create USearch index");
         }
         index_ = std::move(result.index);
@@ -81,14 +82,14 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (chunk.embedding.size() != config_.dimension) {
-            LOGE("Invalid embedding dimension: %zu (expected %zu)",
+            RAC_LOG_ERROR(LOG_TAG,"Invalid embedding dimension: %zu (expected %zu)",
                  chunk.embedding.size(), config_.dimension);
             return false;
         }
 
         // Check for duplicate ID
         if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
-            LOGE("Duplicate chunk ID: %s", chunk.id.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Duplicate chunk ID: %s", chunk.id.c_str());
             return false;
         }
 
@@ -98,7 +99,7 @@ public:
         // Add to USearch index
         auto add_result = index_.add(key, chunk.embedding.data());
         if (!add_result) {
-            LOGE("Failed to add chunk to index: %s", add_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to add chunk to index: %s", add_result.error.what());
             return false;
         }
 
@@ -118,13 +119,13 @@ public:
 
         for (const auto& chunk : chunks) {
             if (chunk.embedding.size() != config_.dimension) {
-                LOGE("Invalid embedding dimension in batch");
+                RAC_LOG_ERROR(LOG_TAG,"Invalid embedding dimension in batch");
                 continue;
             }
 
             // Check for duplicate ID
             if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
-                LOGE("Duplicate chunk ID in batch: %s", chunk.id.c_str());
+                RAC_LOG_ERROR(LOG_TAG,"Duplicate chunk ID in batch: %s", chunk.id.c_str());
                 continue;
             }
 
@@ -132,7 +133,7 @@ public:
             std::size_t key = next_key_++;
             auto add_result = index_.add(key, chunk.embedding.data());
             if (!add_result) {
-                LOGE("Failed to add chunk to batch: %s", add_result.error.what());
+                RAC_LOG_ERROR(LOG_TAG,"Failed to add chunk to batch: %s", add_result.error.what());
                 continue;
             }
             // Store metadata
@@ -155,7 +156,7 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (query_embedding.size() != config_.dimension) {
-            LOGE("Invalid query embedding dimension");
+            RAC_LOG_ERROR(LOG_TAG,"Invalid query embedding dimension");
             return {};
         }
 
@@ -166,7 +167,7 @@ public:
         // Search for the closest K matches
         auto matches = index_.search(query_embedding.data(), top_k);
 
-        LOGI("USearch returned %zu matches from %zu total vectors", 
+        RAC_LOG_INFO(LOG_TAG,"USearch returned %zu matches from %zu total vectors", 
              matches.size(), index_.size());
 
         float effective_threshold = threshold;
@@ -185,18 +186,13 @@ public:
             // USearch cosine distance is 1 - cosine_similarity
             float similarity = 1.0f - distance;
 
-            LOGI("Match %zu: key=%zu, distance=%.4f, similarity=%.4f, effective_threshold=%.4f",
-                 i, key, distance, similarity, effective_threshold);
-
-            // Use our capped threshold for filtering
             if (similarity < effective_threshold) {
-                LOGI("  Skipping: similarity %.4f < effective_threshold %.4f", similarity, effective_threshold);
                 continue;
             }
 
             auto it = chunks_.find(key);
             if (it == chunks_.end()) {
-                LOGE("Chunk key %zu not found in metadata map", key);
+                RAC_LOG_ERROR(LOG_TAG,"Chunk key %zu not found in metadata map", key);
                 continue;
             }
 
@@ -240,7 +236,7 @@ public:
         std::size_t key = it->second;
         auto remove_result = index_.remove(key);
         if (!remove_result) {
-            LOGE("Failed to remove chunk from index: %s", remove_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to remove chunk from index: %s", remove_result.error.what());
             return false;
         }
         chunks_.erase(key);
@@ -255,7 +251,7 @@ public:
         chunks_.clear();
         id_to_key_.clear();
         next_key_ = 0;  // Reset counter
-        LOGI("Cleared vector store");
+        RAC_LOG_INFO(LOG_TAG,"Cleared vector store");
     }
 
     size_t size() const {
@@ -281,13 +277,13 @@ public:
         return stats;
     }
 
-    bool save(const std::string& path) {
+    bool save(const std::string& path) const {
         std::lock_guard<std::mutex> lock(mutex_);
         
         // Save USearch index
         auto save_result = index_.save(path.c_str());
         if (!save_result) {
-            LOGE("Failed to save USearch index: %s", save_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to save USearch index: %s", save_result.error.what());
             return false;
         }
         
@@ -308,13 +304,13 @@ public:
         std::string metadata_path = path + ".metadata.json";
         std::ofstream metadata_file(metadata_path);
         if (!metadata_file) {
-            LOGE("Failed to open metadata file: %s", metadata_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to open metadata file: %s", metadata_path.c_str());
             return false;
         }
         metadata_file << metadata.dump();
         metadata_file.close();
         
-        LOGI("Saved index and metadata to %s", path.c_str());
+        RAC_LOG_INFO(LOG_TAG,"Saved index and metadata to %s", path.c_str());
         return true;
     }
 
@@ -324,7 +320,7 @@ public:
         // Load USearch index
         auto load_result = index_.load(path.c_str());
         if (!load_result) {
-            LOGE("Failed to load USearch index: %s", load_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to load USearch index: %s", load_result.error.what());
             return false;
         }
         
@@ -332,7 +328,7 @@ public:
         std::string metadata_path = path + ".metadata.json";
         std::ifstream metadata_file(metadata_path);
         if (!metadata_file) {
-            LOGE("Failed to open metadata file: %s", metadata_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to open metadata file: %s", metadata_path.c_str());
             return false;
         }
         
@@ -357,19 +353,21 @@ public:
                 }
                 chunk.metadata = chunk_json.at("metadata");
 
+                std::string chunk_id = chunk.id;
                 new_chunks[key] = std::move(chunk);
-                new_id_to_key[new_chunks[key].id] = key;
+                new_id_to_key[chunk_id] = key;
             }
 
             next_key_ = parsed_next_key;
             chunks_ = std::move(new_chunks);
             id_to_key_ = std::move(new_id_to_key);
         } catch (const std::exception& e) {
-            LOGE("Failed to parse metadata JSON: %s", e.what());
+            RAC_LOG_ERROR(LOG_TAG,"Failed to parse metadata JSON: %s", e.what());
+            index_.clear(); // Revert to consistent empty state
             return false;
         }
         
-        LOGI("Loaded index and metadata from %s (next_key=%zu, chunks=%zu)", 
+        RAC_LOG_INFO(LOG_TAG,"Loaded index and metadata from %s (next_key=%zu, chunks=%zu)", 
              path.c_str(), next_key_, chunks_.size());
         return true;
     }
@@ -409,10 +407,10 @@ std::vector<SearchResult> VectorStoreUSearch::search(
     try {
         return impl_->search(query_embedding, top_k, threshold);
     } catch (const std::exception& e) {
-        LOGE("search() exception: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG,"search() exception: %s", e.what());
         return {};
     } catch (...) {
-        LOGE("search() unknown exception");
+        RAC_LOG_ERROR(LOG_TAG,"search() unknown exception");
         return {};
     }
 }

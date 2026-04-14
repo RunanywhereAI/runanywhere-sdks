@@ -217,7 +217,7 @@ rac_result_t rac_model_strategy_get_download_dest(rac_inference_framework_t fram
             if (len >= path_size) {
                 return RAC_ERROR_BUFFER_TOO_SMALL;
             }
-            strcpy(out_path, config->destination_folder);
+            memcpy(out_path, config->destination_folder, len + 1);
             return RAC_SUCCESS;
         }
         return RAC_ERROR_INVALID_PARAMETER;
@@ -238,6 +238,9 @@ rac_result_t rac_model_strategy_post_process(rac_inference_framework_t framework
     if (!strategy || !strategy->post_process) {
         // No custom strategy - set basic result
         out_result->final_path = strdup(downloaded_path);
+        if (!out_result->final_path) {
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
         out_result->downloaded_size = 0;  // Unknown
         out_result->was_extracted = RAC_FALSE;
         out_result->file_count = 1;
