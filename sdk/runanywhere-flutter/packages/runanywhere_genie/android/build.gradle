@@ -103,10 +103,21 @@ task downloadNativeLibs {
 
             println "Downloading from: ${downloadUrl}"
 
-            // Download the zip file
-            ant.get(src: downloadUrl, dest: zipFile)
-
-            println "✅ Downloaded successfully"
+            // The Genie engine is a closed-source private backend. If the
+            // release asset isn't reachable (no network, release not yet
+            // published, auth-gated distribution), we must NOT fail the build —
+            // the Flutter plugin's GeniePlugin.kt wraps System.loadLibrary in
+            // try/catch, so absence is handled gracefully at runtime. Public
+            // builds that don't need Genie can proceed with empty jniLibs.
+            try {
+                ant.get(src: downloadUrl, dest: zipFile)
+                println "✅ Downloaded successfully"
+            } catch (Exception e) {
+                println "⚠️  Could not download RABackendGenie native libraries: ${e.message}"
+                println "⚠️  Continuing without Genie binaries — loadLibrary will fail gracefully at runtime."
+                println "⚠️  To build with the engine, either host the release at ${downloadUrl} or set testLocal=true with local .so files."
+                return
+            }
 
             // Extract to temp directory first
             def tempDir = file("${buildDir}/genie-temp")
