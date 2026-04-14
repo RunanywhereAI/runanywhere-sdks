@@ -337,6 +337,15 @@ MetalRTRegistryState& get_state() {
 rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user_data*/) {
     if (!request) return RAC_FALSE;
 
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    // Stub build: the private MetalRT engine binary is not linked. Refuse to
+    // handle any request so the service registry surfaces BACKEND_NOT_FOUND
+    // at the loadModel call site instead of silently dispatching to stubs.
+    (void)request;
+    RAC_LOG_DEBUG(LOG_CAT,
+                  "can_handle: NO (MetalRT engine not available — stub build)");
+    return RAC_FALSE;
+#else
     if (request->framework == RAC_FRAMEWORK_METALRT) {
         RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (framework=METALRT)");
         return RAC_TRUE;
@@ -345,6 +354,7 @@ rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user
     RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (framework=%d, want METALRT=%d)",
                   static_cast<int>(request->framework), RAC_FRAMEWORK_METALRT);
     return RAC_FALSE;
+#endif
 }
 
 // =============================================================================
@@ -487,6 +497,18 @@ rac_result_t rac_backend_metalrt_register(void) {
     if (state.registered) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
+
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    // Stub build: the private MetalRT engine binary is not linked. Log clearly
+    // and skip provider registration entirely so the registry never dispatches
+    // a model load into no-op stubs.
+    RAC_LOG_WARNING(LOG_CAT,
+                    "MetalRT backend compiled without engine binary — skipping "
+                    "provider registration. loadModel(..., framework: .metalrt) "
+                    "will fail with BACKEND_NOT_FOUND until the engine is installed.");
+    state.registered = true;
+    return RAC_SUCCESS;
+#endif
 
     // Register module
     rac_module_info_t module_info = {};

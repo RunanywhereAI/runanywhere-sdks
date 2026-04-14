@@ -507,8 +507,32 @@ if(RAC_BUILD_BACKENDS)
     endif()
 
     if(RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/metalrt/CMakeLists.txt")
-        message(STATUS "  - MetalRT backend")
+        message(STATUS "  - MetalRT backend — folded into rac_commons")
         add_subdirectory(src/backends/metalrt)
+
+        # MetalRT is an OBJECT library. Fold its compiled objects into
+        # rac_commons so there is no separate rac_backend_metalrt artifact
+        # to distribute — mirrors how RAG is integrated. Public builds ship
+        # stub implementations; engine-enabled builds link the private
+        # libmetalrt_engine.a via RAC_METALRT_ENGINE_LIB propagated from
+        # the subdirectory.
+        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+
+        # Apple frameworks are needed wherever the wrappers are compiled.
+        if(APPLE)
+            target_link_libraries(rac_commons PUBLIC
+                "-framework Metal"
+                "-framework Foundation"
+                "-framework Accelerate"
+            )
+        endif()
+
+        # If the engine is available, link the private static lib onto
+        # rac_commons so the OBJECT target's unresolved metalrt_* symbols
+        # resolve in the final archive.
+        if(RAC_METALRT_ENGINE_LIB)
+            target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+        endif()
     endif()
 
     if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")

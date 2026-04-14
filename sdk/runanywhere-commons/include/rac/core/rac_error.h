@@ -365,6 +365,8 @@ extern "C" {
 #define RAC_ERROR_BACKEND_INIT_FAILED ((rac_result_t) - 602)
 /** Backend busy */
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
+/** Backend unavailable: backend compiled as stub, engine binary not installed */
+#define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 
