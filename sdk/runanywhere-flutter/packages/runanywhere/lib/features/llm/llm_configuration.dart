@@ -27,9 +27,9 @@ class LLMConfiguration implements ComponentConfiguration {
 
   @override
   void validate() {
-    if (contextLength <= 0 || contextLength > 32768) {
+    if (contextLength <= 0) {
       throw SDKError.validationFailed(
-        'Context length must be between 1 and 32768',
+        'Context length must be greater than 0',
       );
     }
 
@@ -42,6 +42,16 @@ class LLMConfiguration implements ComponentConfiguration {
     if (maxTokens <= 0 || maxTokens > contextLength) {
       throw SDKError.validationFailed(
         'Max tokens must be between 1 and context length',
+      );
+    }
+
+    // Guard against clearly oversized prompts (chars) — a system prompt larger
+    // than the model's context window (in chars) is clearly invalid.
+    // Uses ~4 chars per token as a generous char-level bound.
+    final prompt = systemPrompt;
+    if (prompt != null && prompt.length > contextLength * 4) {
+      throw SDKError.validationFailed(
+        "systemPrompt length (${prompt.length} chars) exceeds the model's context window",
       );
     }
   }

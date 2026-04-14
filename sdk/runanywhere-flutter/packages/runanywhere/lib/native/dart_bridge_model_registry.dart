@@ -188,7 +188,15 @@ class DartBridgeModelRegistry {
     }
 
     try {
-      // Convert public ModelInfo to FFI ModelInfo
+      // Convert public ModelInfo to FFI ModelInfo.
+      //
+      // Nullable -> non-nullable at the adapter boundary:
+      //   public_types.ModelInfo.downloadSize and .contextLength are `int?`
+      //   (null means "unknown"), while the internal FFI ModelInfo uses
+      //   non-nullable `int` to mirror the C struct (which uses 0 as the
+      //   sentinel for "unset"). The `?? 0` here encodes that null -> 0
+      //   convention; the reverse conversion in `_ffiModelToPublic` maps
+      //   `> 0 ? value : null` back to public types.
       final ffiModel = ModelInfo(
         id: model.id,
         name: model.name,
@@ -1035,6 +1043,9 @@ base class RacModelInfoStruct extends Struct {
 
   @Int64()
   external int sizeBytes;
+
+  @Int32()
+  external int contextLength;
 
   external Pointer<Utf8> downloadURL;
   external Pointer<Utf8> localPath;

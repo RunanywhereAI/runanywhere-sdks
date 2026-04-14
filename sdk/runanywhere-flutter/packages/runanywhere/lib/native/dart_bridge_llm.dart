@@ -19,7 +19,6 @@ import 'dart:isolate'; // Keep for non-streaming generation
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/features/llm/llm_configuration.dart';
-import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -355,11 +354,11 @@ class DartBridgeLLM {
         controller.add(message);
       } else if (message is _StreamingMessage) {
         if (message.isComplete) {
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         } else if (message.error != null) {
           controller.addError(StateError(message.error!));
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         }
       }
@@ -389,13 +388,9 @@ class DartBridgeLLM {
 
   int _requireLoadedContextLength() {
     final contextLength = _loadedContextLength;
-    if (contextLength != null && contextLength > 0) {
-      return contextLength;
-    }
-
-    throw SDKError.validationFailed(
-      'Loaded model is missing context length metadata for maxTokens validation',
-    );
+    // Fall back to a generous ceiling when registry metadata is absent,
+    // so generation is not blocked for models without explicit contextLength.
+    return (contextLength != null && contextLength > 0) ? contextLength : 32768;
   }
 
   void _validateGenerationParameters({
@@ -534,7 +529,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     // Set systemPrompt if provided
     if (params.systemPrompt != null && params.systemPrompt!.isNotEmpty) {
       systemPromptPtr = params.systemPrompt!.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -601,7 +596,7 @@ void _streamingIsolateEntry(_StreamingIsolateParams params) {
     calloc.free(promptPtr);
     calloc.free(optionsPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
     _isolateSendPort = null;
   }
@@ -670,7 +665,7 @@ _IsolateGenerationResult _generateInIsolate(
     // Set systemPrompt if provided
     if (systemPrompt != null && systemPrompt.isNotEmpty) {
       systemPromptPtr = systemPrompt.toNativeUtf8();
-      optionsPtr.ref.systemPrompt = systemPromptPtr!;
+      optionsPtr.ref.systemPrompt = systemPromptPtr;
     } else {
       optionsPtr.ref.systemPrompt = nullptr;
     }
@@ -706,7 +701,7 @@ _IsolateGenerationResult _generateInIsolate(
     calloc.free(optionsPtr);
     calloc.free(resultPtr);
     if (systemPromptPtr != null) {
-      calloc.free(systemPromptPtr!);
+      calloc.free(systemPromptPtr);
     }
   }
 }

@@ -13,7 +13,7 @@ class TTSConfiguration implements ComponentConfiguration {
   const TTSConfiguration({
     this.voice = 'system',
     this.language = 'en-US',
-    this.speakingRate = 0.5,
+    this.speakingRate = 1.0,
     this.pitch = 1.0,
     this.volume = 1.0,
     this.audioFormat = 'pcm',
