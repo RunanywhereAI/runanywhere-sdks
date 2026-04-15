@@ -50,26 +50,15 @@ set_target_properties(onnxruntime PROPERTIES
 message(STATUS "[RunAnywhereONNX] Found ONNX Runtime at ${JNILIB_DIR}/libonnxruntime.so")
 
 # =============================================================================
-# Sherpa ONNX libraries (optional but typically present)
+# Sherpa-ONNX C API (the only sherpa variant we ship)
+# libsherpa-onnx-jni.so and libsherpa-onnx-cxx-api.so are intentionally not
+# included — our backend uses sherpa's C API through librac_backend_onnx.so,
+# and we have our own JNI bridge at librac_backend_onnx_jni.so.
 # =============================================================================
 if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-c-api.so")
     add_library(sherpa_onnx_c_api SHARED IMPORTED)
     set_target_properties(sherpa_onnx_c_api PROPERTIES
         IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-c-api.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-endif()
-if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so")
-    add_library(sherpa_onnx_cxx_api SHARED IMPORTED)
-    set_target_properties(sherpa_onnx_cxx_api PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-cxx-api.so"
-        IMPORTED_NO_SONAME TRUE
-    )
-endif()
-if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
-    add_library(sherpa_onnx_jni SHARED IMPORTED)
-    set_target_properties(sherpa_onnx_jni PROPERTIES
-        IMPORTED_LOCATION "${JNILIB_DIR}/libsherpa-onnx-jni.so"
         IMPORTED_NO_SONAME TRUE
     )
 endif()
@@ -169,15 +158,9 @@ target_link_libraries(
     onnxruntime
 )
 
-# Also link sherpa-onnx libraries if available
+# Also link sherpa-onnx C API if available
 if(TARGET sherpa_onnx_c_api)
     target_link_libraries(${PACKAGE_NAME} sherpa_onnx_c_api)
-endif()
-if(TARGET sherpa_onnx_cxx_api)
-    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_cxx_api)
-endif()
-if(TARGET sherpa_onnx_jni)
-    target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
 endif()
 
 # HAS_ONNX is always defined since ONNX backend is required

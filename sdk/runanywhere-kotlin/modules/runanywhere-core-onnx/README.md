@@ -244,12 +244,12 @@ This module bundles the following native libraries (~25MB total for ARM64):
 
 | Library | Size | Description |
 |---------|------|-------------|
-| `librac_backend_onnx_jni.so` | ~1MB | JNI bridge |
+| `librac_backend_onnx_jni.so` | ~1MB | JNI bridge (ours; the only JNI in the AAR) |
 | `librunanywhere_onnx.so` | ~2MB | RunAnywhere ONNX wrapper |
-| `libonnxruntime.so` | ~15MB | ONNX Runtime |
-| `libsherpa-onnx-c-api.so` | ~2MB | Sherpa-ONNX C API |
-| `libsherpa-onnx-cxx-api.so` | ~3MB | Sherpa-ONNX C++ API |
-| `libsherpa-onnx-jni.so` | ~2MB | Sherpa-ONNX JNI bridge |
+| `libonnxruntime.so` | ~15MB | ONNX Runtime (shared by backend and sherpa) |
+| `libsherpa-onnx-c-api.so` | ~2MB | Sherpa-ONNX C API (linked by our backend) |
+
+> **Note:** `libsherpa-onnx-jni.so` and `libsherpa-onnx-cxx-api.so` are deliberately NOT shipped. The sherpa-provided JNI duplicates what our own JNI already does, and our backend links the C API, not the C++ API. Stripping them saves ~4.6 MB per ABI. See `download-sherpa-onnx.sh` → `strip_unused_sherpa_libs()`.
 
 ### Supported ABIs
 

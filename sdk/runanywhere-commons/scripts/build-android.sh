@@ -673,8 +673,8 @@ if [ "$BUILD_ONNX" = "ON" ]; then
         echo "│   └── ${ABI}/"
         echo "│       ├── librunanywhere_onnx.so"
         echo "│       ├── libonnxruntime.so"
-        if [ -f "${DIST_DIR}/onnx/${ABI}/libsherpa-onnx-jni.so" ]; then
-            echo "│       └── libsherpa-onnx-jni.so  # STT/TTS/VAD"
+        if [ -f "${DIST_DIR}/onnx/${ABI}/libsherpa-onnx-c-api.so" ]; then
+            echo "│       └── libsherpa-onnx-c-api.so  # STT/TTS/VAD (via our backend)"
         fi
     done
 fi

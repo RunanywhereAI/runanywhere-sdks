@@ -30,8 +30,6 @@ runanywhere-sdk-android AAR          runanywhere-llamacpp-android AAR     runany
     librunanywhere_jni.so                librac_backend_llamacpp_jni.so       librac_backend_onnx_jni.so
     libc++_shared.so                                                          libonnxruntime.so
     libomp.so                                                                 libsherpa-onnx-c-api.so
-                                                                              libsherpa-onnx-cxx-api.so
-                                                                              libsherpa-onnx-jni.so
 ```
 
 **How native libs are obtained (two modes):**
@@ -140,14 +138,13 @@ for ABI in arm64-v8a armeabi-v7a x86_64; do
   cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp.so modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/$ABI/
   cp ../runanywhere-commons/dist/android/llamacpp/$ABI/librac_backend_llamacpp_jni.so modules/runanywhere-core-llamacpp/src/androidMain/jniLibs/$ABI/
 
-  # ONNX module: backend only
+  # ONNX module: backend + ORT + sherpa C API only (sherpa-jni / sherpa-cxx-api
+  # are intentionally not shipped — we use our own JNI and link the C API).
   mkdir -p modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI
   cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
   cp ../runanywhere-commons/dist/android/onnx/$ABI/librac_backend_onnx_jni.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
   cp ../runanywhere-commons/dist/android/onnx/$ABI/libonnxruntime.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
   cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-c-api.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-cxx-api.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
-  cp ../runanywhere-commons/dist/android/onnx/$ABI/libsherpa-onnx-jni.so modules/runanywhere-core-onnx/src/androidMain/jniLibs/$ABI/
 done
 
 # 3. Publish

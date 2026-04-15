@@ -395,19 +395,25 @@ copy_jni_libs() {
             log_info "ONNX: librac_backend_onnx_jni.so (from build)"
         fi
 
-        # Copy Sherpa-ONNX and ONNX Runtime from dist or third_party
+        # Copy Sherpa-ONNX and ONNX Runtime from dist or third_party.
+        # We intentionally ship only libonnxruntime.so + libsherpa-onnx-c-api.so
+        # (our backend links the C API; we have our own JNI bridge). The sherpa
+        # JNI and C++ API .so are stripped upstream by download-sherpa-onnx.sh.
         if [ -d "${COMMONS_DIST}/onnx/${ABI}" ]; then
-            for lib in libonnxruntime.so libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so libsherpa-onnx-jni.so; do
+            for lib in libonnxruntime.so libsherpa-onnx-c-api.so; do
                 if [ -f "${COMMONS_DIST}/onnx/${ABI}/${lib}" ]; then
                     cp "${COMMONS_DIST}/onnx/${ABI}/${lib}" "${ONNX_JNILIBS_DIR}/${ABI}/"
                     log_info "ONNX: ${lib}"
                 fi
             done
         elif [ -d "${SHERPA_ONNX_LIBS}/${ABI}" ]; then
-            for lib in "${SHERPA_ONNX_LIBS}/${ABI}"/*.so; do
-                if [ -f "$lib" ]; then
-                    cp "$lib" "${ONNX_JNILIBS_DIR}/${ABI}/"
-                    log_info "ONNX: $(basename $lib)"
+            # Whitelist which sherpa-bundled .so files to copy (skip sherpa-jni
+            # and sherpa-cxx-api, which we don't use).
+            for lib_name in libonnxruntime.so libsherpa-onnx-c-api.so; do
+                local src_lib="${SHERPA_ONNX_LIBS}/${ABI}/${lib_name}"
+                if [ -f "${src_lib}" ]; then
+                    cp "${src_lib}" "${ONNX_JNILIBS_DIR}/${ABI}/"
+                    log_info "ONNX: ${lib_name}"
                 fi
             done
         fi
