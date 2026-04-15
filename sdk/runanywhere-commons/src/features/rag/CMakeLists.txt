@@ -81,8 +81,12 @@ add_library(rac_backend_rag OBJECT ${RAG_PIPELINE_SOURCES} ${RAG_PIPELINE_HEADER
 
 target_include_directories(rac_backend_rag PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
+    # Walk up from src/features/rag/ to commons/, then into include/. Uses
+    # CMAKE_CURRENT_SOURCE_DIR (not CMAKE_SOURCE_DIR) so the path is correct
+    # whether commons is the top-level CMake project or pulled in via
+    # add_subdirectory() from another project (e.g., the Web/WASM build).
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../include/rac/backends
     ${usearch_SOURCE_DIR}/include
 )
 

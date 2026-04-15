@@ -46,8 +46,12 @@ JAVA_VERSION=17
 # Gradle wrapper version baseline
 GRADLE_VERSION=8.11.1
 
-# CMake minimum version (matches sdk/runanywhere-commons/CMakeLists.txt:1)
-CMAKE_VERSION=3.22
+# CMake version installed in CI. Must be >= 3.24 because
+# cmake/FetchONNXRuntime.cmake uses the DOWNLOAD_EXTRACT_TIMESTAMP keyword
+# which was added in CMake 3.24. (The repo's CMakeLists.txt advertises
+# cmake_minimum_required(3.22) for build-system documentation, but the
+# toolchain installed in CI has to be 3.24+ to actually run the build.)
+CMAKE_VERSION=3.27
 
 # =============================================================================
 # ONNX Runtime

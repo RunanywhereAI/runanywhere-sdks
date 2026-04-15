@@ -87,8 +87,10 @@ if [ "$ARCH" = "aarch64" ]; then
     URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${VERSION}/sherpa-onnx-v${VERSION}-linux-aarch64-shared-cpu.tar.bz2"
     ARCHIVE_NAME="sherpa-onnx-v${VERSION}-linux-aarch64-shared-cpu"
 elif [ "$ARCH" = "x86_64" ]; then
-    URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${VERSION}/sherpa-onnx-v${VERSION}-linux-x64-shared-cpu.tar.bz2"
-    ARCHIVE_NAME="sherpa-onnx-v${VERSION}-linux-x64-shared-cpu"
+    # Note: sherpa-onnx publishes Linux x64 as `-shared` (no `-cpu` suffix);
+    # aarch64 keeps the `-shared-cpu` suffix.
+    URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/v${VERSION}/sherpa-onnx-v${VERSION}-linux-x64-shared.tar.bz2"
+    ARCHIVE_NAME="sherpa-onnx-v${VERSION}-linux-x64-shared"
 else
     print_error "Unsupported architecture: $ARCH"
     echo "Supported architectures: x86_64, aarch64"
@@ -121,7 +123,17 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf ${TEMP_DIR}" EXIT
 
 print_step "Downloading Sherpa-ONNX v${VERSION}..."
-curl -L -o "${TEMP_DIR}/sherpa-onnx.tar.bz2" "${URL}"
+# `--fail` makes curl exit non-zero on HTTP 4xx/5xx so a 404 page doesn't end
+# up being passed to tar/bzip2 below as a 9-byte "Not Found" file.
+curl -L --fail -o "${TEMP_DIR}/sherpa-onnx.tar.bz2" "${URL}"
+
+# Sanity-check the archive size — anything under 1 MB is almost certainly an
+# error page that slipped past --fail (e.g. proxy-mediated redirect).
+DL_SIZE=$(stat -c%s "${TEMP_DIR}/sherpa-onnx.tar.bz2" 2>/dev/null || stat -f%z "${TEMP_DIR}/sherpa-onnx.tar.bz2")
+if [ "${DL_SIZE}" -lt 1048576 ]; then
+    print_error "Downloaded file is suspiciously small (${DL_SIZE} bytes). URL may be wrong: ${URL}"
+    exit 1
+fi
 
 print_step "Extracting archive..."
 mkdir -p "${DEST_DIR}"
