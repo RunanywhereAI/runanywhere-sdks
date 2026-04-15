@@ -58,7 +58,7 @@ import Foundation
 //   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
 //
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalBinaries = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when testLocal = false)
 // Updated automatically by CI/CD during releases
@@ -71,7 +71,21 @@ let sdkVersion = "0.19.7"
 // for external consumers due to a placeholder checksum.
 let metalrtRemoteBinaryAvailable = false
 
-let includeMetalRT = useLocalBinaries || metalrtRemoteBinaryAvailable
+// In local-mode we additionally probe the filesystem. MetalRT is an optional
+// backend and many local dev flows skip it (build-ios.sh --backend onnx, etc.)
+// without producing the xcframework. Without this existence check, SPM
+// resolution would fatal-error on "local binary target ... does not contain a
+// binary artifact" — breaking the package graph whenever a dev builds fewer
+// backends than the full set.
+let metalrtLocalBinaryExists: Bool = {
+    let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    let frameworkPath = packageDir.appendingPathComponent(
+        "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+    ).path
+    return FileManager.default.fileExists(atPath: frameworkPath)
+}()
+
+let includeMetalRT = (useLocalBinaries && metalrtLocalBinaryExists) || metalrtRemoteBinaryAvailable
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -335,11 +349,20 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
-            .binaryTarget(
-                name: "RABackendMetalRTBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
-            ),
         ]
+
+        // MetalRT is optional. Only declare its binary target when the
+        // xcframework is actually present locally — otherwise SPM resolution
+        // fatal-errors with "does not contain a binary artifact" on any dev
+        // flow that skipped metalrt (e.g. build-ios.sh --backend onnx).
+        if metalrtLocalBinaryExists {
+            targets.append(
+                .binaryTarget(
+                    name: "RABackendMetalRTBinary",
+                    path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+                )
+            )
+        }
 
         // ONNX Runtime xcframeworks - split by platform
         // iOS: static library format (not embedded in app bundle)
