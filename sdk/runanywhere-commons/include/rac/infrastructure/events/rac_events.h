@@ -143,7 +143,7 @@ RAC_API void rac_event_unsubscribe(uint64_t subscription_id);
  * @param event The event to publish
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_event_publish(const rac_event_t* event);
+RAC_API RAC_NODISCARD rac_result_t rac_event_publish(const rac_event_t* event);
 
 /**
  * Track an event (convenience function matching Swift's EventPublisher.track).
@@ -154,7 +154,7 @@ RAC_API rac_result_t rac_event_publish(const rac_event_t* event);
  * @param properties_json Event properties as JSON (can be NULL)
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_event_track(const char* type, rac_event_category_t category,
+RAC_API RAC_NODISCARD rac_result_t rac_event_track(const char* type, rac_event_category_t category,
                                      rac_event_destination_t destination,
                                      const char* properties_json);
 

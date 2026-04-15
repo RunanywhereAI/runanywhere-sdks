@@ -97,7 +97,7 @@ rac_model_assignment_set_callbacks(const rac_assignment_callbacks_t* callbacks);
  * @param out_count Number of models returned
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh,
+RAC_API RAC_NODISCARD rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh,
                                                 rac_model_info_t*** out_models, size_t* out_count);
 
 /**
@@ -111,7 +111,7 @@ RAC_API rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh,
  * @param out_count Number of models returned
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_model_assignment_get_by_framework(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_assignment_get_by_framework(rac_inference_framework_t framework,
                                                            rac_model_info_t*** out_models,
                                                            size_t* out_count);
 
@@ -126,7 +126,7 @@ RAC_API rac_result_t rac_model_assignment_get_by_framework(rac_inference_framewo
  * @param out_count Number of models returned
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_model_assignment_get_by_category(rac_model_category_t category,
+RAC_API RAC_NODISCARD rac_result_t rac_model_assignment_get_by_category(rac_model_category_t category,
                                                           rac_model_info_t*** out_models,
                                                           size_t* out_count);
 

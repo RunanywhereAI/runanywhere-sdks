@@ -24,14 +24,14 @@ extern "C" {
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_backend_onnx_embeddings_register(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_onnx_embeddings_register(void);
 
 /**
  * @brief Unregister the ONNX embeddings backend
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_backend_onnx_embeddings_unregister(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_onnx_embeddings_unregister(void);
 
 #ifdef __cplusplus
 }

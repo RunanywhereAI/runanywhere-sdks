@@ -82,7 +82,7 @@ static const rac_llm_llamacpp_config_t RAC_LLM_LLAMACPP_CONFIG_DEFAULT = {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_create(const char* model_path,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_create(const char* model_path,
                                                       const rac_llm_llamacpp_config_t* config,
                                                       rac_handle_t* out_handle);
 
@@ -96,7 +96,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_create(const char* model_path,
  * @param config LlamaCPP configuration (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle,
                                                           const char* model_path,
                                                           const rac_llm_llamacpp_config_t* config);
 
@@ -108,7 +108,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_model(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_unload_model(rac_handle_t handle);
 
 /**
  * Checks if a model is loaded.
@@ -131,7 +131,7 @@ RAC_LLAMACPP_API rac_bool_t rac_llm_llamacpp_is_model_loaded(rac_handle_t handle
  * @param out_result Output: Generation result (caller must free text with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                                                         const rac_llm_options_t* options,
                                                         rac_llm_result_t* out_result);
 
@@ -160,7 +160,7 @@ typedef rac_bool_t (*rac_llm_llamacpp_stream_callback_fn)(const char* token, rac
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_generate_stream(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_llamacpp_stream_callback_fn callback, void* user_data);
 
@@ -185,7 +185,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream(
  *                   Pass NULL to skip timing (zero overhead).
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_stream_with_timing(
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_generate_stream_with_timing(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_llamacpp_stream_callback_fn callback, void* user_data,
     rac_benchmark_timing_t* timing_out);
@@ -206,7 +206,7 @@ RAC_LLAMACPP_API void rac_llm_llamacpp_cancel(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_json);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_json);
 
 /**
  * Destroys a LlamaCPP LLM service.
@@ -231,7 +231,7 @@ RAC_LLAMACPP_API void rac_llm_llamacpp_destroy(rac_handle_t handle);
  * @param scale Adapter scale factor (0.0-1.0, default 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
                                                           const char* adapter_path,
                                                           float scale);
 
@@ -243,7 +243,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
  * @param adapter_path Path used when loading the adapter
  * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
                                                             const char* adapter_path);
 
 /**
@@ -253,7 +253,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
 
 /**
  * Get info about loaded LoRA adapters as JSON.
@@ -264,7 +264,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle,
                                                               char** out_json);
 
 // =============================================================================
@@ -279,7 +279,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle
  * @param prompt System prompt text
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle,
                                                                      const char* prompt);
 
 /**
@@ -290,7 +290,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t
  * @param text Text to append
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle,
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle,
                                                                const char* text);
 
 /**
@@ -303,7 +303,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handl
  * @param out_result Output: Generation result
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_generate_from_context(
     rac_handle_t handle, const char* query, const rac_llm_options_t* options,
     rac_llm_result_t* out_result);
 
@@ -313,7 +313,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_generate_from_context(
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle);
 
 // =============================================================================
 // BACKEND REGISTRATION
@@ -329,14 +329,14 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_context(rac_handle_t handle
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_backend_llamacpp_register(void);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_backend_llamacpp_register(void);
 
 /**
  * Unregisters the LlamaCPP backend.
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_backend_llamacpp_unregister(void);
+RAC_LLAMACPP_API RAC_NODISCARD rac_result_t rac_backend_llamacpp_unregister(void);
 
 #ifdef __cplusplus
 }

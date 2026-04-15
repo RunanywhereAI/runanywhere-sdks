@@ -16,6 +16,15 @@ function(rac_link_archive_deps target)
     if(TARGET bz2_bundled)
         target_link_libraries(${target} PRIVATE bz2_bundled)
     endif()
+    # If sanitizers are enabled at the global level, test executables must link
+    # their runtime too (otherwise you get `__asan_after_dynamic_init` unresolved
+    # symbols coming from rac_commons's instrumentation). This is a no-op when
+    # no sanitizer is enabled.
+    target_enable_sanitizers(${target})
+    # Tests may include internal shim headers like
+    # `internal/rac_platform_compat.h` (which lives under src/internal/).
+    # Add src/ as a PRIVATE include root so those references resolve.
+    target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 endfunction()
 
 # --- test_core: Always built (no backend dependency) ---
@@ -23,6 +32,7 @@ add_executable(test_core test_core.cpp)
 target_include_directories(test_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
 )
 target_link_libraries(test_core PRIVATE rac_commons)
 rac_link_archive_deps(test_core)
@@ -61,6 +71,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     )
     target_link_libraries(test_vad PRIVATE rac_commons rac_backend_onnx)
     target_compile_features(test_vad PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_vad)
     add_test(NAME vad_tests COMMAND test_vad --run-all)
 
     # STT test
@@ -71,6 +82,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     )
     target_link_libraries(test_stt PRIVATE rac_commons rac_backend_onnx)
     target_compile_features(test_stt PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_stt)
     add_test(NAME stt_tests COMMAND test_stt --run-all)
 
     # TTS test
@@ -81,6 +93,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     )
     target_link_libraries(test_tts PRIVATE rac_commons rac_backend_onnx)
     target_compile_features(test_tts PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_tts)
     add_test(NAME tts_tests COMMAND test_tts --run-all)
 
     # WakeWord test
@@ -91,6 +104,7 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     )
     target_link_libraries(test_wakeword PRIVATE rac_commons rac_backend_onnx)
     target_compile_features(test_wakeword PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_wakeword)
     add_test(NAME wakeword_tests COMMAND test_wakeword --run-all)
 endif()
 
@@ -103,6 +117,7 @@ if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     )
     target_link_libraries(test_llm PRIVATE rac_commons rac_backend_llamacpp)
     target_compile_features(test_llm PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_llm)
     add_test(NAME llm_tests COMMAND test_llm --run-all)
 endif()
 
@@ -117,6 +132,7 @@ if(RAC_BACKEND_ONNX AND RAC_BACKEND_LLAMACPP
     target_link_libraries(test_voice_agent PRIVATE
         rac_commons rac_backend_onnx rac_backend_llamacpp)
     target_compile_features(test_voice_agent PRIVATE cxx_std_20)
+    rac_link_archive_deps(test_voice_agent)
     add_test(NAME voice_agent_tests COMMAND test_voice_agent --run-all)
 endif()
 
@@ -199,6 +215,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         GTest::gtest_main
     )
     target_compile_features(rac_rag_backend_thread_safety_test PRIVATE cxx_std_20)
+    target_enable_sanitizers(rac_rag_backend_thread_safety_test)
     gtest_discover_tests(rac_rag_backend_thread_safety_test
         DISCOVERY_MODE PRE_TEST
     )
@@ -222,6 +239,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         GTest::gtest_main
     )
     target_compile_features(rac_chunker_test PRIVATE cxx_std_20)
+    target_enable_sanitizers(rac_chunker_test)
     gtest_discover_tests(rac_chunker_test
         DISCOVERY_MODE PRE_TEST
     )
@@ -241,6 +259,7 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         GTest::gtest_main
     )
     target_compile_features(rac_simple_tokenizer_test PRIVATE cxx_std_20)
+    target_enable_sanitizers(rac_simple_tokenizer_test)
     gtest_discover_tests(rac_simple_tokenizer_test
         DISCOVERY_MODE PRE_TEST
     )
@@ -279,6 +298,7 @@ target_link_libraries(rac_benchmark_tests
         rac_commons
         GTest::gtest_main
 )
+target_enable_sanitizers(rac_benchmark_tests)
 
 target_include_directories(rac_benchmark_tests
     PRIVATE

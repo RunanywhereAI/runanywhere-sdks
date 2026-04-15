@@ -82,7 +82,7 @@ RAC_API const char* rac_diffusion_tokenizer_get_base_url(rac_diffusion_tokenizer
  * // url = "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/tokenizer/vocab.json"
  * @endcode
  */
-RAC_API rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
                                                           const char* custom_url,
                                                           const char* filename, char* out_url,
                                                           size_t out_url_size);
@@ -99,7 +99,7 @@ RAC_API rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenize
  * @param out_has_merges Output: true if merges.txt exists
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_tokenizer_check_files(const char* model_dir,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_tokenizer_check_files(const char* model_dir,
                                                          rac_bool_t* out_has_vocab,
                                                          rac_bool_t* out_has_merges);
 
@@ -140,7 +140,7 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
  * @param output_path Full path where the file should be saved
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
                                                            const char* custom_url,
                                                            const char* filename,
                                                            const char* output_path);

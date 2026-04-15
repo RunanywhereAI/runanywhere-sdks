@@ -1,51 +1,25 @@
 /**
- * @file rac_platform_compat.h
- * @brief RunAnywhere Commons - Platform Compatibility Layer
+ * @file src/internal/rac_platform_compat.h
+ * @brief RunAnywhere Commons - Internal Platform Compatibility Layer
  *
  * Provides POSIX-like APIs on Windows (MSVC) so that the rest of the codebase
  * can use dirent.h, S_ISDIR, S_ISREG, etc. without #ifdef clutter.
  *
  * On non-Windows platforms this header is a no-op passthrough.
  *
- * -----------------------------------------------------------------------------
- * TODO(future): Move this shim out of the public include path.
- * -----------------------------------------------------------------------------
- * Flagged in PR #383 review (coderabbitai): this header currently lives under
- * `include/rac/core/` which means any SDK consumer that pulls a commons public
- * header transitively inherits *un-prefixed* global names — `DIR`, `dirent`,
- * `opendir`, `readdir`, `closedir`, `strcasecmp`, `strncasecmp`, and the
- * `S_IS*` / `S_IFLNK` macros. That:
- *   1. Breaks the project's "all public symbols must be `rac_` prefixed" rule
- *      (see `sdk/runanywhere-commons/CLAUDE.md`).
- *   2. Can collide with a consumer's own dirent shim or the platform's real
- *      headers if they include in a different order.
- * Impact is Windows-only in practice (POSIX platforms just pass through to
- * system headers), but it's still a leaky public contract.
+ * INTERNAL ONLY. Not installed. Not visible to SDK consumers.
  *
- * Options for the cleanup:
- *   A) Move the implementation to `src/internal/rac_platform_compat.h` so it's
- *      never installed / never visible to consumers. All current call sites
- *      would need their `#include` path updated. This is the preferred fix.
- *   B) Keep the header public but rename every exposed symbol to `rac_*`
- *      (`rac_opendir`, `rac_readdir`, `rac_dirent`, `rac_strcasecmp`, …) and
- *      update every call site. More invasive in source but keeps drop-in
- *      POSIX-ish semantics; less aligned with the project rule.
+ * Header history:
+ *   This file used to live under `include/rac/core/rac_platform_compat.h`
+ *   which leaked un-prefixed global names - `DIR`, `dirent`, `opendir`,
+ *   `readdir`, `closedir`, `strcasecmp`, `strncasecmp`, `S_IS*`, `S_IFLNK` -
+ *   into the public namespace on Windows. That violated the project's
+ *   "all public symbols must be `rac_` prefixed" rule (PR #383 review
+ *   comment). Moved to `src/internal/` so consumers never see it.
  *
- * Current call sites to update (option A or B):
- *   - src/features/vlm/vlm_component.cpp
- *   - src/features/rag/onnx_embedding_provider.cpp
- *   - src/features/result_free.cpp
- *   - src/backends/onnx/onnx_backend.cpp
- *   - src/backends/onnx/wakeword_onnx.cpp
- *   - src/infrastructure/download/download_orchestrator.cpp
- *   - src/infrastructure/extraction/rac_extraction.cpp
- *   - src/infrastructure/telemetry/telemetry_json.cpp
- *   - tests/test_extraction.cpp, tests/test_download_orchestrator.cpp, tests/test_common.h
- *   - Any new Windows-facing file that uses opendir/stat/etc.
- *
- * Deferred because it's orthogonal to the "make Windows build work" goal.
- * Deferring is safe: the pollution only manifests on Windows, and today no
- * external consumer builds commons on Windows yet.
+ * Callers use `#include "internal/rac_platform_compat.h"` because the
+ * PRIVATE include root is the src/ dir (configured in top-level
+ * CMakeLists.txt via target_include_directories(rac_commons PRIVATE ...)).
  */
 
 #ifndef RAC_PLATFORM_COMPAT_H

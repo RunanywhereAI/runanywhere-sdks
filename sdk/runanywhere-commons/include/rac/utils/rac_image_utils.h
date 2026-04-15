@@ -80,7 +80,7 @@ typedef struct rac_image_float {
  * @param out_image Output: Loaded image data (must be freed with rac_image_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_load_file(const char* file_path, rac_image_data_t* out_image);
+RAC_API RAC_NODISCARD rac_result_t rac_image_load_file(const char* file_path, rac_image_data_t* out_image);
 
 /**
  * @brief Decode a base64-encoded image
@@ -93,7 +93,7 @@ RAC_API rac_result_t rac_image_load_file(const char* file_path, rac_image_data_t
  * @param out_image Output: Loaded image data (must be freed with rac_image_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_decode_base64(const char* base64_data, size_t data_size,
+RAC_API RAC_NODISCARD rac_result_t rac_image_decode_base64(const char* base64_data, size_t data_size,
                                              rac_image_data_t* out_image);
 
 /**
@@ -106,7 +106,7 @@ RAC_API rac_result_t rac_image_decode_base64(const char* base64_data, size_t dat
  * @param out_image Output: Loaded image data (must be freed with rac_image_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_decode_bytes(const uint8_t* data, size_t data_size,
+RAC_API RAC_NODISCARD rac_result_t rac_image_decode_bytes(const uint8_t* data, size_t data_size,
                                             rac_image_data_t* out_image);
 
 // =============================================================================
@@ -124,7 +124,7 @@ RAC_API rac_result_t rac_image_decode_bytes(const uint8_t* data, size_t data_siz
  * @param out_image Output: Resized image (must be freed with rac_image_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_resize(const rac_image_data_t* image, int32_t new_width,
+RAC_API RAC_NODISCARD rac_result_t rac_image_resize(const rac_image_data_t* image, int32_t new_width,
                                       int32_t new_height, rac_image_data_t* out_image);
 
 /**
@@ -138,7 +138,7 @@ RAC_API rac_result_t rac_image_resize(const rac_image_data_t* image, int32_t new
  * @param out_image Output: Resized image (must be freed with rac_image_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_resize_max(const rac_image_data_t* image, int32_t max_size,
+RAC_API RAC_NODISCARD rac_result_t rac_image_resize_max(const rac_image_data_t* image, int32_t max_size,
                                           rac_image_data_t* out_image);
 
 /**
@@ -155,7 +155,7 @@ RAC_API rac_result_t rac_image_resize_max(const rac_image_data_t* image, int32_t
  * @param out_float Output: Normalized float image (must be freed with rac_image_float_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_normalize(const rac_image_data_t* image, const float* mean,
+RAC_API RAC_NODISCARD rac_result_t rac_image_normalize(const rac_image_data_t* image, const float* mean,
                                          const float* std, rac_image_float_t* out_float);
 
 /**
@@ -168,7 +168,7 @@ RAC_API rac_result_t rac_image_normalize(const rac_image_data_t* image, const fl
  * @param out_chw Output: Float image in CHW format (must be freed with rac_image_float_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_float_t* out_chw);
+RAC_API RAC_NODISCARD rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_float_t* out_chw);
 
 // =============================================================================
 // PIXEL FORMAT CONVERSION
@@ -188,7 +188,7 @@ RAC_API rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_
  * @param out_size Size of the output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uint32_t width,
+RAC_API RAC_NODISCARD rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uint32_t width,
                                                    uint32_t height, uint32_t row_stride,
                                                    uint8_t* out_rgb_data, size_t out_size);
 
@@ -206,7 +206,7 @@ RAC_API rac_result_t rac_image_convert_rgba_to_rgb(const uint8_t* rgba_data, uin
  * @param out_size Size of the output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_image_convert_bgra_to_rgb(const uint8_t* bgra_data, uint32_t width,
+RAC_API RAC_NODISCARD rac_result_t rac_image_convert_bgra_to_rgb(const uint8_t* bgra_data, uint32_t width,
                                                    uint32_t height, uint32_t bytes_per_row,
                                                    uint8_t* out_rgb_data, size_t out_size);
 

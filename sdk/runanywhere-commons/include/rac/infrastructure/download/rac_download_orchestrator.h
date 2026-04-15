@@ -61,7 +61,7 @@ extern "C" {
  * @param out_task_id Output: Task ID for tracking/cancellation (owned, free with rac_free)
  * @return RAC_SUCCESS if download started, error code if failed to start
  */
-RAC_API rac_result_t rac_download_orchestrate(
+RAC_API RAC_NODISCARD rac_result_t rac_download_orchestrate(
     rac_download_manager_handle_t dm_handle, const char* model_id, const char* download_url,
     rac_inference_framework_t framework, rac_model_format_t format,
     rac_archive_structure_t archive_structure,
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_download_orchestrate(
  * @param out_task_id Output: Task ID for tracking/cancellation (owned, free with rac_free)
  * @return RAC_SUCCESS if download started, error code if failed to start
  */
-RAC_API rac_result_t rac_download_orchestrate_multi(
+RAC_API RAC_NODISCARD rac_result_t rac_download_orchestrate_multi(
     rac_download_manager_handle_t dm_handle, const char* model_id,
     const rac_model_file_descriptor_t* files, size_t file_count, const char* base_download_url,
     rac_inference_framework_t framework, rac_model_format_t format,
@@ -118,7 +118,7 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS if model path found, RAC_ERROR_NOT_FOUND if no model file found
  */
-RAC_API rac_result_t rac_find_model_path_after_extraction(
+RAC_API RAC_NODISCARD rac_result_t rac_find_model_path_after_extraction(
     const char* extracted_dir, rac_archive_structure_t structure,
     rac_inference_framework_t framework, rac_model_format_t format, char* out_path,
     size_t path_size);
@@ -142,7 +142,7 @@ RAC_API rac_result_t rac_find_model_path_after_extraction(
  * @param out_needs_extraction Output: RAC_TRUE if download needs extraction
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_compute_destination(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_download_compute_destination(const char* model_id,
                                                        const char* download_url,
                                                        rac_inference_framework_t framework,
                                                        rac_model_format_t format, char* out_path,

@@ -39,7 +39,7 @@ extern "C" {
  * @param[out] out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
 
 /**
  * @brief Initialize the wake word service
@@ -51,7 +51,7 @@ RAC_API rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
  * @param config Configuration (NULL for defaults)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_initialize(rac_handle_t handle,
                                               const rac_wakeword_config_t* config);
 
 /**
@@ -79,7 +79,7 @@ RAC_API void rac_wakeword_destroy(rac_handle_t handle);
  * @param wake_word Human-readable wake word phrase (e.g., "Hey Jarvis")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_load_model(rac_handle_t handle,
                                               const char* model_path,
                                               const char* model_id,
                                               const char* wake_word);
@@ -94,7 +94,7 @@ RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
  * @param vad_model_path Path to Silero VAD ONNX model
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
                                             const char* vad_model_path);
 
 /**
@@ -104,7 +104,7 @@ RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
  * @param model_id Model identifier to unload
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
                                                 const char* model_id);
 
 /**
@@ -115,7 +115,7 @@ RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
 
 /**
  * @brief Get list of loaded models
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
  * @param[out] out_count Output: Number of models
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_get_models(rac_handle_t handle,
                                               const rac_wakeword_model_info_t** out_models,
                                               int32_t* out_count);
 
@@ -144,7 +144,7 @@ RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
                                                 rac_wakeword_callback_fn callback,
                                                 void* user_data);
 
@@ -156,7 +156,7 @@ RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
                                                     rac_wakeword_vad_callback_fn callback,
                                                     void* user_data);
 
@@ -173,7 +173,7 @@ RAC_API rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_start(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_start(rac_handle_t handle);
 
 /**
  * @brief Stop listening for wake words
@@ -184,7 +184,7 @@ RAC_API rac_result_t rac_wakeword_start(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_stop(rac_handle_t handle);
 
 /**
  * @brief Pause detection temporarily
@@ -195,7 +195,7 @@ RAC_API rac_result_t rac_wakeword_stop(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_pause(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_pause(rac_handle_t handle);
 
 /**
  * @brief Resume detection after pause
@@ -203,7 +203,7 @@ RAC_API rac_result_t rac_wakeword_pause(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_resume(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_resume(rac_handle_t handle);
 
 /**
  * @brief Reset detector state
@@ -214,7 +214,7 @@ RAC_API rac_result_t rac_wakeword_resume(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_reset(rac_handle_t handle);
 
 // =============================================================================
 // AUDIO PROCESSING
@@ -232,7 +232,7 @@ RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle);
  * @param[out] out_result Optional: Frame processing result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_process(rac_handle_t handle,
                                            const float* samples,
                                            size_t num_samples,
                                            rac_wakeword_frame_result_t* out_result);
@@ -248,7 +248,7 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
  * @param[out] out_result Optional: Frame processing result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
                                                  const int16_t* samples,
                                                  size_t num_samples,
                                                  rac_wakeword_frame_result_t* out_result);
@@ -267,7 +267,7 @@ RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
  * @param threshold New threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
                                                  float threshold);
 
 /**
@@ -278,7 +278,7 @@ RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
  * @param threshold Model threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
                                                        const char* model_id,
                                                        float threshold);
 
@@ -289,7 +289,7 @@ RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
  * @param enabled Whether to enable VAD filtering
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
                                                    rac_bool_t enabled);
 
 // =============================================================================
@@ -303,7 +303,7 @@ RAC_API rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
  * @param[out] out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_get_info(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_get_info(rac_handle_t handle,
                                             rac_wakeword_info_t* out_info);
 
 /**
@@ -321,6 +321,128 @@ RAC_API rac_bool_t rac_wakeword_is_ready(rac_handle_t handle);
  * @return RAC_TRUE if listening, RAC_FALSE otherwise
  */
 RAC_API rac_bool_t rac_wakeword_is_listening(rac_handle_t handle);
+
+// =============================================================================
+// PROVIDER REGISTRATION (backend hook)
+// =============================================================================
+//
+// The wake-word service layer lives in rac_commons and therefore cannot
+// directly link against any concrete inference backend. Instead, any backend
+// that wants to serve wake-word detection (today: the ONNX wake-word backend
+// in src/backends/onnx/wakeword_onnx.cpp, and any future backends such as
+// MetalRT) registers a vtable of function pointers via
+// rac_wakeword_provider_set(). The service layer then dispatches every
+// model-load / audio-process / reset / destroy call through that vtable.
+//
+// If no provider has registered, all service operations still succeed
+// structurally (the service can be created, started, stopped) but
+// rac_wakeword_process() becomes a no-op - detections never fire. Callers
+// can detect this via rac_wakeword_has_provider() or by observing zero
+// detections on known-positive audio.
+//
+// Lifetime: the callbacks struct passed to rac_wakeword_provider_set() must
+// outlive every wake-word service instance. Typically this is a static
+// global inside the provider backend's translation unit. The caller retains
+// ownership; the service layer does not copy or free the struct.
+//
+// Thread-safety: rac_wakeword_provider_set() is expected to be called once
+// at SDK startup, before any wake-word services exist. Calling it
+// concurrently with live service instances is undefined.
+// =============================================================================
+
+/**
+ * @brief Callback vtable a wake-word inference backend must implement to
+ *        serve as the wake-word provider for rac_wakeword_* services.
+ *
+ * All function pointers may be NULL if the provider does not support that
+ * operation; the service layer checks each before calling. The `user_data`
+ * pointer is stored and passed back into every callback so providers can
+ * associate each `backend_handle` with their own state.
+ */
+typedef struct rac_wakeword_provider_ops {
+    /** Create a backend-specific handle. Called once per wake-word service
+     *  during rac_wakeword_initialize(). Must return a handle suitable for
+     *  passing to every other vtable method (and to `destroy`). */
+    rac_result_t (*create)(const rac_wakeword_config_t* config,
+                           rac_handle_t* out_backend_handle,
+                           void* user_data);
+
+    /** Load a wake-word classification model (ONNX, etc.). */
+    rac_result_t (*load_model)(rac_handle_t backend_handle,
+                               const char* model_path,
+                               const char* model_id,
+                               const char* wake_word,
+                               void* user_data);
+
+    /** Unload a wake-word model previously loaded with load_model. */
+    rac_result_t (*unload_model)(rac_handle_t backend_handle,
+                                 const char* model_id,
+                                 void* user_data);
+
+    /** Load a VAD pre-filter model (Silero). Optional. */
+    rac_result_t (*load_vad)(rac_handle_t backend_handle,
+                             const char* vad_model_path,
+                             void* user_data);
+
+    /** Run one frame of audio through inference + optional VAD.
+     *  out_detected_index is set to >= 0 if a wake word fires (index into
+     *  the provider's loaded-models list) or -1 otherwise. */
+    rac_result_t (*process)(rac_handle_t backend_handle,
+                            const float* samples, size_t num_samples,
+                            int32_t* out_detected_index,
+                            float* out_confidence,
+                            rac_bool_t* out_vad_speech,
+                            float* out_vad_confidence,
+                            void* user_data);
+
+    /** Reset internal state (KV cache, sliding window, etc.). */
+    rac_result_t (*reset)(rac_handle_t backend_handle, void* user_data);
+
+    /** Adjust detection threshold at runtime. */
+    rac_result_t (*set_threshold)(rac_handle_t backend_handle,
+                                  float threshold,
+                                  void* user_data);
+
+    /** Tear down the backend handle. */
+    void (*destroy)(rac_handle_t backend_handle, void* user_data);
+
+    /** Opaque user-data passed through to every callback. */
+    void* user_data;
+} rac_wakeword_provider_ops_t;
+
+/**
+ * @brief Register a wake-word inference provider.
+ *
+ * Called once at SDK startup by the concrete backend
+ * (e.g. rac_backend_wakeword_onnx_register() wires up the ONNX provider).
+ *
+ * THREADING CONTRACT:
+ *   - Callers MUST call this exactly once at SDK initialisation, BEFORE
+ *     any wake-word service instance has been created via rac_wakeword_create.
+ *   - `ops` must point to memory that outlives every wake-word service. In
+ *     practice this means the provider struct must be a file-scope `static`
+ *     constant in the backend module (see g_onnx_wakeword_provider_ops in
+ *     wakeword_onnx.cpp for the canonical example).
+ *   - Re-registering (i.e. calling this with different `ops` while services
+ *     are alive) is UNDEFINED BEHAVIOUR. Services retain a raw pointer to
+ *     the ops struct they were created under; swapping the provider while
+ *     the old services are still dispatching is a use-after-free.
+ *   - Passing NULL is only legal after all services have been destroyed.
+ *     It's provided for teardown in tests and shutdown paths.
+ *
+ * @param ops Provider vtable. Must outlive all wake-word services.
+ *            Pass NULL only during teardown.
+ * @return RAC_SUCCESS always.
+ */
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops);
+
+/**
+ * @brief Query whether a wake-word provider is currently registered.
+ *
+ * @return RAC_TRUE if a provider has been set via rac_wakeword_provider_set(),
+ *         RAC_FALSE otherwise. Useful for test code and graceful degradation.
+ */
+RAC_API rac_bool_t rac_wakeword_has_provider(void);
 
 #ifdef __cplusplus
 }

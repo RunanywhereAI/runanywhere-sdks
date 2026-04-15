@@ -245,7 +245,7 @@ typedef struct {
  * @param strategy Storage strategy callbacks
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_storage_strategy_register(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_storage_strategy_register(rac_inference_framework_t framework,
                                                    const rac_storage_strategy_t* strategy);
 
 /**
@@ -257,7 +257,7 @@ RAC_API rac_result_t rac_storage_strategy_register(rac_inference_framework_t fra
  * @param strategy Download strategy callbacks
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_download_strategy_register(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_download_strategy_register(rac_inference_framework_t framework,
                                                     const rac_download_strategy_t* strategy);
 
 /**
@@ -304,7 +304,7 @@ rac_download_strategy_get(rac_inference_framework_t framework);
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS if found
  */
-RAC_API rac_result_t rac_model_strategy_find_path(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_strategy_find_path(rac_inference_framework_t framework,
                                                   const char* model_id, const char* model_folder,
                                                   char* out_path, size_t path_size);
 
@@ -316,7 +316,7 @@ RAC_API rac_result_t rac_model_strategy_find_path(rac_inference_framework_t fram
  * @param out_details Output storage details
  * @return RAC_SUCCESS if model detected
  */
-RAC_API rac_result_t rac_model_strategy_detect(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_strategy_detect(rac_inference_framework_t framework,
                                                const char* model_folder,
                                                rac_model_storage_details_t* out_details);
 
@@ -337,7 +337,7 @@ RAC_API rac_bool_t rac_model_strategy_is_valid(rac_inference_framework_t framewo
  * @param config Download configuration
  * @return RAC_SUCCESS if ready
  */
-RAC_API rac_result_t rac_model_strategy_prepare_download(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_strategy_prepare_download(rac_inference_framework_t framework,
                                                          const rac_model_download_config_t* config);
 
 /**
@@ -349,7 +349,7 @@ RAC_API rac_result_t rac_model_strategy_prepare_download(rac_inference_framework
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_model_strategy_get_download_dest(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_strategy_get_download_dest(rac_inference_framework_t framework,
                                                           const rac_model_download_config_t* config,
                                                           char* out_path, size_t path_size);
 
@@ -362,7 +362,7 @@ RAC_API rac_result_t rac_model_strategy_get_download_dest(rac_inference_framewor
  * @param out_result Output result
  * @return RAC_SUCCESS if successful
  */
-RAC_API rac_result_t rac_model_strategy_post_process(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_strategy_post_process(rac_inference_framework_t framework,
                                                      const rac_model_download_config_t* config,
                                                      const char* downloaded_path,
                                                      rac_download_result_t* out_result);

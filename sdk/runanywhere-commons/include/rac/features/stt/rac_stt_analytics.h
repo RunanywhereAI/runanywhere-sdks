@@ -74,7 +74,7 @@ typedef struct rac_stt_metrics {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_create(rac_stt_analytics_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_create(rac_stt_analytics_handle_t* out_handle);
 
 /**
  * @brief Destroy an STT analytics service instance
@@ -101,7 +101,7 @@ RAC_API void rac_stt_analytics_destroy(rac_stt_analytics_handle_t handle);
  * @param out_transcription_id Output: Generated unique ID (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_start_transcription(
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_start_transcription(
     rac_stt_analytics_handle_t handle, const char* model_id, double audio_length_ms,
     int32_t audio_size_bytes, const char* language, rac_bool_t is_streaming, int32_t sample_rate,
     rac_inference_framework_t framework, char** out_transcription_id);
@@ -113,7 +113,7 @@ RAC_API rac_result_t rac_stt_analytics_start_transcription(
  * @param text Partial transcript text
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_partial_transcript(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_track_partial_transcript(rac_stt_analytics_handle_t handle,
                                                                 const char* text);
 
 /**
@@ -124,7 +124,7 @@ RAC_API rac_result_t rac_stt_analytics_track_partial_transcript(rac_stt_analytic
  * @param confidence Confidence score (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_final_transcript(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_track_final_transcript(rac_stt_analytics_handle_t handle,
                                                               const char* text, float confidence);
 
 /**
@@ -136,7 +136,7 @@ RAC_API rac_result_t rac_stt_analytics_track_final_transcript(rac_stt_analytics_
  * @param confidence Confidence score (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_handle_t handle,
                                                               const char* transcription_id,
                                                               const char* text, float confidence);
 
@@ -149,7 +149,7 @@ RAC_API rac_result_t rac_stt_analytics_complete_transcription(rac_stt_analytics_
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analytics_handle_t handle,
                                                                   const char* transcription_id,
                                                                   rac_result_t error_code,
                                                                   const char* error_message);
@@ -162,7 +162,7 @@ RAC_API rac_result_t rac_stt_analytics_track_transcription_failed(rac_stt_analyt
  * @param confidence Detection confidence (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_language_detection(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_track_language_detection(rac_stt_analytics_handle_t handle,
                                                                 const char* language,
                                                                 float confidence);
 
@@ -177,7 +177,7 @@ RAC_API rac_result_t rac_stt_analytics_track_language_detection(rac_stt_analytic
  * @param transcription_id Transcription ID (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t handle,
                                                    rac_result_t error_code,
                                                    const char* error_message, const char* operation,
                                                    const char* model_id,
@@ -194,7 +194,7 @@ RAC_API rac_result_t rac_stt_analytics_track_error(rac_stt_analytics_handle_t ha
  * @param out_metrics Output: Metrics structure
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_analytics_get_metrics(rac_stt_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_analytics_get_metrics(rac_stt_analytics_handle_t handle,
                                                    rac_stt_metrics_t* out_metrics);
 
 #ifdef __cplusplus

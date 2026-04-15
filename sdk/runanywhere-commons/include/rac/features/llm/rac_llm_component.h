@@ -71,7 +71,7 @@ typedef void (*rac_llm_component_error_callback_fn)(rac_result_t error_code,
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the LLM component
@@ -82,7 +82,7 @@ RAC_API rac_result_t rac_llm_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_configure(rac_handle_t handle,
                                                  const rac_llm_config_t* config);
 
 /**
@@ -118,7 +118,7 @@ RAC_API const char* rac_llm_component_get_model_id(rac_handle_t handle);
  *                   Optional: if NULL, defaults to model_id
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_load_model(rac_handle_t handle, const char* model_path,
                                                   const char* model_id, const char* model_name);
 
 /**
@@ -129,7 +129,7 @@ RAC_API rac_result_t rac_llm_component_load_model(rac_handle_t handle, const cha
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -139,7 +139,7 @@ RAC_API rac_result_t rac_llm_component_unload(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Cancel ongoing generation
@@ -150,7 +150,7 @@ RAC_API rac_result_t rac_llm_component_cleanup(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_cancel(rac_handle_t handle);
 
 /**
  * @brief Generate text (non-streaming)
@@ -163,7 +163,7 @@ RAC_API rac_result_t rac_llm_component_cancel(rac_handle_t handle);
  * @param out_result Output: Generation result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_generate(rac_handle_t handle, const char* prompt,
                                                 const rac_llm_options_t* options,
                                                 rac_llm_result_t* out_result);
 
@@ -191,7 +191,7 @@ RAC_API rac_bool_t rac_llm_component_supports_streaming(rac_handle_t handle);
  * @param user_data User context passed to callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_generate_stream(
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_generate_stream(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_component_token_callback_fn token_callback,
     rac_llm_component_complete_callback_fn complete_callback,
@@ -226,7 +226,7 @@ RAC_API rac_result_t rac_llm_component_generate_stream(
  *                   Pass NULL to skip timing (zero overhead).
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_generate_stream_with_timing(
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_generate_stream_with_timing(
     rac_handle_t handle, const char* prompt, const rac_llm_options_t* options,
     rac_llm_component_token_callback_fn token_callback,
     rac_llm_component_complete_callback_fn complete_callback,
@@ -248,7 +248,7 @@ RAC_API rac_lifecycle_state_t rac_llm_component_get_state(rac_handle_t handle);
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 // =============================================================================
@@ -266,7 +266,7 @@ RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
  * @param scale Adapter scale factor (0.0-1.0, default 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
                                                   const char* adapter_path,
                                                   float scale);
 
@@ -277,7 +277,7 @@ RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
  * @param adapter_path Path used when loading the adapter
  * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
  */
-RAC_API rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
                                                     const char* adapter_path);
 
 /**
@@ -286,7 +286,7 @@ RAC_API rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
 
 /**
  * @brief Get loaded LoRA adapters info as JSON
@@ -297,7 +297,7 @@ RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
                                                       char** out_json);
 
 /**
@@ -311,7 +311,7 @@ RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
  * @param out_error Output: error message if incompatible (caller must free with rac_free), NULL if compatible
  * @return RAC_SUCCESS if the backend supports LoRA, error code otherwise
  */
-RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
                                                            const char* adapter_path,
                                                            char** out_error);
 

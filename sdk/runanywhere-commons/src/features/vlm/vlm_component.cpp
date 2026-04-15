@@ -12,7 +12,7 @@
 #include <mutex>
 #include <random>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
+#include "internal/rac_platform_compat.h"
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"

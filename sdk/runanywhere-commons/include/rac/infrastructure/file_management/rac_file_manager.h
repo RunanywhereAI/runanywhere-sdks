@@ -157,7 +157,7 @@ typedef struct {
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_create_directory_structure(const rac_file_callbacks_t* cb);
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_create_directory_structure(const rac_file_callbacks_t* cb);
 
 // =============================================================================
 // MODEL FOLDER MANAGEMENT
@@ -175,7 +175,7 @@ RAC_API rac_result_t rac_file_manager_create_directory_structure(const rac_file_
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
                                                            const char* model_id,
                                                            rac_inference_framework_t framework,
                                                            char* out_path, size_t path_size);
@@ -190,7 +190,7 @@ RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbac
  * @param out_has_contents Output: RAC_TRUE if folder has files (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb,
                                                            const char* model_id,
                                                            rac_inference_framework_t framework,
                                                            rac_bool_t* out_exists,
@@ -208,7 +208,7 @@ RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbac
  * @param framework Inference framework
  * @return RAC_SUCCESS, or RAC_ERROR_FILE_NOT_FOUND if folder doesn't exist
  */
-RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb,
                                                     const char* model_id,
                                                     rac_inference_framework_t framework);
 
@@ -233,7 +233,7 @@ RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* c
  * @param out_size Output: Total size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb,
                                                           const char* path, int64_t* out_size);
 
 /**
@@ -245,7 +245,7 @@ RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callback
  * @param out_size Output: Total models size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
                                                            int64_t* out_size);
 
 // =============================================================================
@@ -266,7 +266,7 @@ RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbac
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_clear_cache(const rac_file_callbacks_t* cb);
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_clear_cache(const rac_file_callbacks_t* cb);
 
 /**
  * @brief Clear the temp directory.
@@ -281,7 +281,7 @@ RAC_API rac_result_t rac_file_manager_clear_cache(const rac_file_callbacks_t* cb
  * @param cb Platform I/O callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb);
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb);
 
 /**
  * @brief Get the cache directory size.
@@ -290,7 +290,7 @@ RAC_API rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb)
  * @param out_size Output: Cache size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
                                                   int64_t* out_size);
 
 // =============================================================================
@@ -312,7 +312,7 @@ RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
  * @param out_info Output: Storage information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
                                                         rac_file_manager_storage_info_t* out_info);
 
 /**
@@ -331,7 +331,7 @@ RAC_API rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_
  *        from rac_storage_analyzer.h)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_check_storage(
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_check_storage(
     const rac_file_callbacks_t* cb, int64_t required_bytes,
     rac_storage_availability_t* out_availability);
 
@@ -349,7 +349,7 @@ RAC_API rac_result_t rac_file_manager_check_storage(
  * @param path Directory path to clear
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_clear_directory(const rac_file_callbacks_t* cb,
+RAC_API RAC_NODISCARD rac_result_t rac_file_manager_clear_directory(const rac_file_callbacks_t* cb,
                                                        const char* path);
 
 #ifdef __cplusplus

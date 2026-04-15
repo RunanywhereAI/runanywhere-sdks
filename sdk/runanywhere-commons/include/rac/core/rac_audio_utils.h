@@ -54,7 +54,7 @@ extern "C" {
  * }
  * @endcode
  */
-RAC_API rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size,
+RAC_API RAC_NODISCARD rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_size,
                                               int32_t sample_rate, void** out_wav_data,
                                               size_t* out_wav_size);
 
@@ -70,7 +70,7 @@ RAC_API rac_result_t rac_audio_float32_to_wav(const void* pcm_data, size_t pcm_s
  * @param out_wav_size Output: Size of WAV data in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size,
+RAC_API RAC_NODISCARD rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_size,
                                             int32_t sample_rate, void** out_wav_data,
                                             size_t* out_wav_size);
 

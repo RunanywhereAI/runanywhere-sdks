@@ -13,6 +13,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Pull in portable attribute macros (RAC_NODISCARD, RAC_NONNULL, RAC_DEPRECATED,
+ * RAC_NORETURN, RAC_ATTR_PRINTF, RAC_PURE) - every RAC public header gets
+ * these via its rac_types.h include. */
+#include "rac_attrs.h"
+
 /**
  * Null pointer macro for use in static initializers.
  * Uses nullptr in C++ (preferred by clang-tidy modernize-use-nullptr)

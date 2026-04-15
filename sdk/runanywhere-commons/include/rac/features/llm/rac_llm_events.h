@@ -94,7 +94,7 @@ typedef struct rac_llm_generation_event {
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_started(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_model_load_started(const char* model_id,
                                                       int64_t model_size_bytes,
                                                       rac_inference_framework_t framework);
 
@@ -107,7 +107,7 @@ RAC_API rac_result_t rac_llm_event_model_load_started(const char* model_id,
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_completed(const char* model_id, double duration_ms,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_model_load_completed(const char* model_id, double duration_ms,
                                                         int64_t model_size_bytes,
                                                         rac_inference_framework_t framework);
 
@@ -120,7 +120,7 @@ RAC_API rac_result_t rac_llm_event_model_load_completed(const char* model_id, do
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_load_failed(const char* model_id, rac_result_t error_code,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_model_load_failed(const char* model_id, rac_result_t error_code,
                                                      const char* error_message,
                                                      rac_inference_framework_t framework);
 
@@ -130,7 +130,7 @@ RAC_API rac_result_t rac_llm_event_model_load_failed(const char* model_id, rac_r
  * @param model_id Model identifier
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_model_unloaded(const char* model_id);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_model_unloaded(const char* model_id);
 
 /**
  * @brief Publish a generation started event
@@ -141,7 +141,7 @@ RAC_API rac_result_t rac_llm_event_model_unloaded(const char* model_id);
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_started(const char* generation_id,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_generation_started(const char* generation_id,
                                                       const char* model_id, rac_bool_t is_streaming,
                                                       rac_inference_framework_t framework);
 
@@ -154,7 +154,7 @@ RAC_API rac_result_t rac_llm_event_generation_started(const char* generation_id,
  * @param framework Inference framework
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_first_token(const char* generation_id, const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_first_token(const char* generation_id, const char* model_id,
                                                double time_to_first_token_ms,
                                                rac_inference_framework_t framework);
 
@@ -165,7 +165,7 @@ RAC_API rac_result_t rac_llm_event_first_token(const char* generation_id, const 
  * @param tokens_generated Number of tokens generated so far
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_streaming_update(const char* generation_id,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_streaming_update(const char* generation_id,
                                                     int32_t tokens_generated);
 
 /**
@@ -174,7 +174,7 @@ RAC_API rac_result_t rac_llm_event_streaming_update(const char* generation_id,
  * @param event Generation event data
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_completed(const rac_llm_generation_event_t* event);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_generation_completed(const rac_llm_generation_event_t* event);
 
 /**
  * @brief Publish a generation failed event
@@ -184,7 +184,7 @@ RAC_API rac_result_t rac_llm_event_generation_completed(const rac_llm_generation
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_event_generation_failed(const char* generation_id,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_event_generation_failed(const char* generation_id,
                                                      rac_result_t error_code,
                                                      const char* error_message);
 

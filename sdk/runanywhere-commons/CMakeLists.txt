@@ -74,6 +74,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # Load versions from VERSIONS file (single source of truth)
 include(LoadVersions)
 
+# Sanitizer support (ASan / UBSan / TSan / MSan). No-op unless enabled via
+# -DENABLE_ASAN=ON etc. See cmake/Sanitizers.cmake for the full option matrix.
+include(Sanitizers)
+
 # Make project version available to subdirectories
 set(RAC_PROJECT_VERSION "${RAC_VERSION}" CACHE STRING "Project version" FORCE)
 
@@ -406,6 +410,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_structured_error.cpp
     src/core/capabilities/lifecycle_manager.cpp
     src/core/rac_error_model.cpp
+    src/core/rac_hardware.cpp
 )
 
 # Infrastructure sources - registry, model management, network, telemetry
@@ -523,6 +528,10 @@ if(RAC_BUILD_SHARED)
 else()
     add_library(rac_commons STATIC ${RAC_COMMONS_SOURCES})
 endif()
+
+# Hook sanitizers into rac_commons if ENABLE_ASAN/UBSAN/TSAN/MSAN is set.
+# No-op otherwise.
+target_enable_sanitizers(rac_commons)
 
 # Public headers
 target_include_directories(rac_commons PUBLIC

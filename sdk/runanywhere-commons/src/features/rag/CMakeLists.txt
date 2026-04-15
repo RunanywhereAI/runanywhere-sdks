@@ -85,6 +85,11 @@ target_include_directories(rac_backend_rag PUBLIC
     ${CMAKE_SOURCE_DIR}/include/rac/backends
     ${usearch_SOURCE_DIR}/include
 )
+# Internal headers (e.g. internal/rac_platform_compat.h used by
+# onnx_embedding_provider.cpp). PRIVATE - never leaks to consumers.
+target_include_directories(rac_backend_rag PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 # nlohmann_json is used by RAG for config parsing.
 # It's header-only (INTERFACE lib) so no link-time cost.

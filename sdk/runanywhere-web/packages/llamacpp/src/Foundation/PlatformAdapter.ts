@@ -80,11 +80,17 @@ export class PlatformAdapter {
       httpDownload: this.registerHttpDownload(m),
     };
 
-    // Write function pointers into the struct.
+    // Write fields into the struct.
     // The struct layout matches rac_platform_adapter.h field order.
-    // Each field is a function pointer (4 bytes on wasm32).
+    // Field 1 is a uint32_t `version`; the rest are function pointers
+    // (4 bytes each on wasm32).
     const PTR_SIZE = 4;
+    const RAC_PLATFORM_ADAPTER_VERSION = 1;
     let offset = 0;
+
+    // ABI version - rac_init() rejects adapters with version == 0 or
+    // > RAC_PLATFORM_ADAPTER_VERSION.
+    m.setValue(this.adapterPtr + offset, RAC_PLATFORM_ADAPTER_VERSION, 'i32'); offset += 4;
 
     m.setValue(this.adapterPtr + offset, this.callbacks.fileExists, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.fileRead, '*'); offset += PTR_SIZE;

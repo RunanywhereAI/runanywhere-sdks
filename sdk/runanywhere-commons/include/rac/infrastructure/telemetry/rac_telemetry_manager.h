@@ -115,7 +115,7 @@ RAC_API void rac_telemetry_manager_set_http_callback(rac_telemetry_manager_t* ma
  *
  * Queues the payload for batching and sending.
  */
-RAC_API rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
+RAC_API RAC_NODISCARD rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manager,
                                                  const rac_telemetry_payload_t* payload);
 
 /**
@@ -123,7 +123,7 @@ RAC_API rac_result_t rac_telemetry_manager_track(rac_telemetry_manager_t* manage
  *
  * Converts analytics event to telemetry payload and queues it.
  */
-RAC_API rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* manager,
+RAC_API RAC_NODISCARD rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager_t* manager,
                                                            rac_event_type_t event_type,
                                                            const rac_analytics_event_data_t* data);
 
@@ -132,7 +132,7 @@ RAC_API rac_result_t rac_telemetry_manager_track_analytics(rac_telemetry_manager
  *
  * Sends all queued events to the backend.
  */
-RAC_API rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager);
+RAC_API RAC_NODISCARD rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manager);
 
 // =============================================================================
 // JSON SERIALIZATION
@@ -147,7 +147,7 @@ RAC_API rac_result_t rac_telemetry_manager_flush(rac_telemetry_manager_t* manage
  * @param out_length Output: Length of JSON string
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t* payload,
+RAC_API RAC_NODISCARD rac_result_t rac_telemetry_manager_payload_to_json(const rac_telemetry_payload_t* payload,
                                                            rac_environment_t env, char** out_json,
                                                            size_t* out_length);
 
@@ -171,7 +171,7 @@ rac_telemetry_manager_batch_to_json(const rac_telemetry_batch_request_t* request
  * @param out_response Output: Parsed response (caller must free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_telemetry_manager_parse_response(
+RAC_API RAC_NODISCARD rac_result_t rac_telemetry_manager_parse_response(
     const char* json, rac_telemetry_batch_response_t* out_response);
 
 // =============================================================================

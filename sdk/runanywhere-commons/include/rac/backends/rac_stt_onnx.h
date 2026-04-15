@@ -64,25 +64,25 @@ static const rac_stt_onnx_config_t RAC_STT_ONNX_CONFIG_DEFAULT = {
 // ONNX STT API
 // =============================================================================
 
-RAC_ONNX_API rac_result_t rac_stt_onnx_create(const char* model_path,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_stt_onnx_create(const char* model_path,
                                               const rac_stt_onnx_config_t* config,
                                               rac_handle_t* out_handle);
 
-RAC_ONNX_API rac_result_t rac_stt_onnx_transcribe(rac_handle_t handle, const float* audio_samples,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_stt_onnx_transcribe(rac_handle_t handle, const float* audio_samples,
                                                   size_t num_samples,
                                                   const rac_stt_options_t* options,
                                                   rac_stt_result_t* out_result);
 
 RAC_ONNX_API rac_bool_t rac_stt_onnx_supports_streaming(rac_handle_t handle);
 
-RAC_ONNX_API rac_result_t rac_stt_onnx_create_stream(rac_handle_t handle, rac_handle_t* out_stream);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_stt_onnx_create_stream(rac_handle_t handle, rac_handle_t* out_stream);
 
-RAC_ONNX_API rac_result_t rac_stt_onnx_feed_audio(rac_handle_t handle, rac_handle_t stream,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_stt_onnx_feed_audio(rac_handle_t handle, rac_handle_t stream,
                                                   const float* audio_samples, size_t num_samples);
 
 RAC_ONNX_API rac_bool_t rac_stt_onnx_stream_is_ready(rac_handle_t handle, rac_handle_t stream);
 
-RAC_ONNX_API rac_result_t rac_stt_onnx_decode_stream(rac_handle_t handle, rac_handle_t stream,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_stt_onnx_decode_stream(rac_handle_t handle, rac_handle_t stream,
                                                      char** out_text);
 
 RAC_ONNX_API void rac_stt_onnx_input_finished(rac_handle_t handle, rac_handle_t stream);

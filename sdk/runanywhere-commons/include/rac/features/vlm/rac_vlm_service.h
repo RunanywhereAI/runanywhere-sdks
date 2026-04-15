@@ -118,7 +118,7 @@ typedef struct rac_vlm_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize a VLM service with model paths
@@ -128,7 +128,7 @@ RAC_API rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_hand
  * @param mmproj_path Path to vision projector (can be NULL for some backends)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_initialize(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_initialize(rac_handle_t handle, const char* model_path,
                                         const char* mmproj_path);
 
 /**
@@ -141,7 +141,7 @@ RAC_API rac_result_t rac_vlm_initialize(rac_handle_t handle, const char* model_p
  * @param out_result Output: Generation result (caller must free with rac_vlm_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t* image,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t* image,
                                      const char* prompt, const rac_vlm_options_t* options,
                                      rac_vlm_result_t* out_result);
 
@@ -156,7 +156,7 @@ RAC_API rac_result_t rac_vlm_process(rac_handle_t handle, const rac_vlm_image_t*
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
                                             const char* prompt, const rac_vlm_options_t* options,
                                             rac_vlm_stream_callback_fn callback, void* user_data);
 
@@ -167,7 +167,7 @@ RAC_API rac_result_t rac_vlm_process_stream(rac_handle_t handle, const rac_vlm_i
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_get_info(rac_handle_t handle, rac_vlm_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_get_info(rac_handle_t handle, rac_vlm_info_t* out_info);
 
 /**
  * @brief Cancel ongoing generation
@@ -175,7 +175,7 @@ RAC_API rac_result_t rac_vlm_get_info(rac_handle_t handle, rac_vlm_info_t* out_i
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_cancel(rac_handle_t handle);
 
 /**
  * @brief Cleanup and release model resources
@@ -183,7 +183,7 @@ RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy a VLM service instance

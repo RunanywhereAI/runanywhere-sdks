@@ -122,14 +122,14 @@ RAC_API rac_bool_t rac_whisperkit_coreml_stt_is_available(void);
  *
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_backend_whisperkit_coreml_register(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_whisperkit_coreml_register(void);
 
 /**
  * Unregister the WhisperKit CoreML backend.
  *
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_backend_whisperkit_coreml_unregister(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_whisperkit_coreml_unregister(void);
 
 #ifdef __cplusplus
 }

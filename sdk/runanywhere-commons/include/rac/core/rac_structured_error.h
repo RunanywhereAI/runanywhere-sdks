@@ -427,7 +427,7 @@ RAC_API void rac_clear_last_error(void);
  * @param message Error message
  * @return The error code (for easy return statements)
  */
-RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t category,
+RAC_API RAC_NODISCARD rac_result_t rac_set_error(rac_result_t code, rac_error_category_t category,
                                    const char* message);
 
 /**
@@ -457,7 +457,7 @@ RAC_API rac_result_t rac_set_error(rac_result_t code, rac_error_category_t categ
  * @param function Function name (__func__)
  * @return The error code (for easy return statements)
  */
-RAC_API rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_category_t category,
+RAC_API RAC_NODISCARD rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_category_t category,
                                              const char* message, const char* file, int32_t line,
                                              const char* function);
 
@@ -476,7 +476,7 @@ RAC_API rac_result_t rac_error_log_and_track(rac_result_t code, rac_error_catego
  * @param function Function name
  * @return The error code
  */
-RAC_API rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_category_t category,
+RAC_API RAC_NODISCARD rac_result_t rac_error_log_and_track_model(rac_result_t code, rac_error_category_t category,
                                                    const char* message, const char* model_id,
                                                    const char* framework, const char* file,
                                                    int32_t line, const char* function);

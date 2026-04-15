@@ -72,7 +72,7 @@ typedef struct rac_embeddings_service {
  * @param out_handle Output: Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
  * @brief Create an embeddings service with additional configuration JSON.
@@ -85,7 +85,7 @@ RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* o
  * @param out_handle  Output: Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_create_with_config(const char* model_id,
                                                         const char* config_json,
                                                         rac_handle_t* out_handle);
 
@@ -96,7 +96,7 @@ RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
  * @param model_path Path to the embedding model
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* model_path);
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* model_path);
 
 /**
  * @brief Generate embedding for a single text
@@ -107,7 +107,7 @@ RAC_API rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* 
  * @param out_result Output: Embedding result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
                                            const rac_embeddings_options_t* options,
                                            rac_embeddings_result_t* out_result);
 
@@ -121,7 +121,7 @@ RAC_API rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
  * @param out_result Output: Embedding results
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char* const* texts,
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char* const* texts,
                                                  size_t num_texts,
                                                  const rac_embeddings_options_t* options,
                                                  rac_embeddings_result_t* out_result);
@@ -133,7 +133,7 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
  * @param out_info Output: Service info
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_get_info(rac_handle_t handle, rac_embeddings_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_get_info(rac_handle_t handle, rac_embeddings_info_t* out_info);
 
 /**
  * @brief Cleanup service resources
@@ -141,7 +141,7 @@ RAC_API rac_result_t rac_embeddings_get_info(rac_handle_t handle, rac_embeddings
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_embeddings_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_embeddings_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy the embeddings service

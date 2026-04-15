@@ -61,9 +61,13 @@ struct rac_download_manager {
     // Thread safety
     std::mutex mutex;
 
-    // Health state
-    bool is_healthy;
-    bool is_paused;
+    // Health state. These flags are read without the mutex held on the hot
+    // path (e.g. rac_download_manager_start_download consults is_paused
+    // before acquiring the mutex), and they may be written by the pause /
+    // resume / set-healthy entry points on any thread. They MUST be
+    // std::atomic to avoid torn reads and data races flagged by TSan.
+    std::atomic<bool> is_healthy{true};
+    std::atomic<bool> is_paused{false};
 };
 
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp

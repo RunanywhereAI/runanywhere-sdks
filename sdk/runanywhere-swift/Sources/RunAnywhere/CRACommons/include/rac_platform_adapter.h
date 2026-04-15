@@ -21,6 +21,17 @@ extern "C" {
 #endif
 
 // =============================================================================
+// ADAPTER ABI VERSIONING
+// =============================================================================
+//
+// Callers MUST set `rac_platform_adapter_t::version = RAC_PLATFORM_ADAPTER_VERSION`
+// before passing the struct to rac_init(). The runtime validates this and
+// refuses adapters whose version is 0 (uninitialised) or greater than the
+// latest version it knows about.
+// =============================================================================
+#define RAC_PLATFORM_ADAPTER_VERSION ((uint32_t)1)
+
+// =============================================================================
 // CALLBACK TYPES (defined outside struct for C compatibility)
 // =============================================================================
 
@@ -62,6 +73,11 @@ typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_
  * The SDK layer (Swift/Kotlin) provides these implementations.
  */
 typedef struct rac_platform_adapter {
+    // -------------------------------------------------------------------------
+    // Version (set by caller; validated by rac_init)
+    // -------------------------------------------------------------------------
+    uint32_t version;  // Must equal RAC_PLATFORM_ADAPTER_VERSION.
+
     // -------------------------------------------------------------------------
     // File System Operations
     // -------------------------------------------------------------------------

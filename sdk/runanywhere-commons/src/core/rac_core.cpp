@@ -87,6 +87,20 @@ void rac_log(rac_log_level_t level, const char* category, const char* message) {
 // INITIALIZATION API
 // =============================================================================
 
+// Compile-time layout locks for the versioned ABI. If someone reorders
+// rac_platform_adapter_t's fields or changes the first-field type, these
+// static_asserts will fail at compile time - catching the mistake before
+// it becomes a runtime adapter misalignment across Swift/Kotlin/RN/Flutter/Web.
+//
+// - offsetof(version) must be 0 so rac_init can read it at a known location
+//   even if the rest of the struct evolved.
+// - sizeof(version) is locked to 4 bytes (the wire format that SDK consumers
+//   serialize / write into the struct).
+static_assert(offsetof(rac_platform_adapter_t, version) == 0,
+              "rac_platform_adapter_t.version must be the first field");
+static_assert(sizeof(((rac_platform_adapter_t*)0)->version) == sizeof(uint32_t),
+              "rac_platform_adapter_t.version must be exactly uint32_t (4 bytes)");
+
 rac_result_t rac_init(const rac_config_t* config) {
     std::lock_guard<std::mutex> lock(s_init_mutex);
 
@@ -101,6 +115,27 @@ rac_result_t rac_init(const rac_config_t* config) {
     if (config->platform_adapter == nullptr) {
         rac_error_set_details("Platform adapter is required for initialization");
         return RAC_ERROR_ADAPTER_NOT_SET;
+    }
+
+    // Adapter ABI version check. Every caller MUST set
+    // `.version = RAC_PLATFORM_ADAPTER_VERSION` before calling rac_init.
+    // No grace period - an unversioned adapter is a programming error and
+    // we'd rather fail loudly at init than hit UB later when the runtime
+    // tries to call a callback at a wrong offset.
+    const uint32_t adapter_version = config->platform_adapter->version;
+    if (adapter_version == 0) {
+        rac_error_set_details(
+            "Platform adapter .version is 0. Every caller must set "
+            "`.version = RAC_PLATFORM_ADAPTER_VERSION` before passing the "
+            "adapter to rac_init(). If you are using {0}-init, add the "
+            "assignment explicitly.");
+        return RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION;
+    }
+    if (adapter_version > RAC_PLATFORM_ADAPTER_VERSION) {
+        rac_error_set_details(
+            "Platform adapter version is newer than this runtime supports. "
+            "Upgrade runanywhere-commons or set .version to a supported value.");
+        return RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION;
     }
 
     // Store configuration

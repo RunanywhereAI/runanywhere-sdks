@@ -79,7 +79,7 @@ typedef struct rac_tts_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize a TTS service
@@ -87,7 +87,7 @@ RAC_API rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_hand
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_initialize(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_initialize(rac_handle_t handle);
 
 /**
  * @brief Synthesize text to audio
@@ -98,7 +98,7 @@ RAC_API rac_result_t rac_tts_initialize(rac_handle_t handle);
  * @param out_result Output: Synthesis result (caller must free with rac_tts_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
                                         const rac_tts_options_t* options,
                                         rac_tts_result_t* out_result);
 
@@ -112,7 +112,7 @@ RAC_API rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_synthesize_stream(rac_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_synthesize_stream(rac_handle_t handle, const char* text,
                                                const rac_tts_options_t* options,
                                                rac_tts_stream_callback_t callback, void* user_data);
 
@@ -122,7 +122,7 @@ RAC_API rac_result_t rac_tts_synthesize_stream(rac_handle_t handle, const char* 
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_stop(rac_handle_t handle);
 
 /**
  * @brief Get service information
@@ -131,7 +131,7 @@ RAC_API rac_result_t rac_tts_stop(rac_handle_t handle);
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_get_info(rac_handle_t handle, rac_tts_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_get_info(rac_handle_t handle, rac_tts_info_t* out_info);
 
 /**
  * @brief Cleanup and release resources
@@ -139,7 +139,7 @@ RAC_API rac_result_t rac_tts_get_info(rac_handle_t handle, rac_tts_info_t* out_i
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy a TTS service instance

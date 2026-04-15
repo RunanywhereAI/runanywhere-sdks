@@ -77,7 +77,7 @@ typedef struct rac_vad_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_create(rac_handle_t* out_handle);
 
 /**
  * @brief Initialize the VAD service
@@ -87,7 +87,7 @@ RAC_API rac_result_t rac_vad_create(rac_handle_t* out_handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_initialize(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_initialize(rac_handle_t handle);
 
 /**
  * @brief Set speech activity callback
@@ -99,7 +99,7 @@ RAC_API rac_result_t rac_vad_initialize(rac_handle_t handle);
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_set_activity_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_set_activity_callback(rac_handle_t handle,
                                                    rac_vad_activity_callback_fn callback,
                                                    void* user_data);
 
@@ -113,7 +113,7 @@ RAC_API rac_result_t rac_vad_set_activity_callback(rac_handle_t handle,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
                                                 rac_vad_audio_callback_fn callback,
                                                 void* user_data);
 
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_vad_set_audio_callback(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_start(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_start(rac_handle_t handle);
 
 /**
  * @brief Stop VAD processing
@@ -135,7 +135,7 @@ RAC_API rac_result_t rac_vad_start(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_stop(rac_handle_t handle);
 
 /**
  * @brief Reset VAD state
@@ -145,7 +145,7 @@ RAC_API rac_result_t rac_vad_stop(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_reset(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_reset(rac_handle_t handle);
 
 /**
  * @brief Pause VAD processing
@@ -155,7 +155,7 @@ RAC_API rac_result_t rac_vad_reset(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_pause(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_pause(rac_handle_t handle);
 
 /**
  * @brief Resume VAD processing
@@ -165,7 +165,7 @@ RAC_API rac_result_t rac_vad_pause(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_resume(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_resume(rac_handle_t handle);
 
 /**
  * @brief Process audio samples
@@ -178,7 +178,7 @@ RAC_API rac_result_t rac_vad_resume(rac_handle_t handle);
  * @param out_is_speech Output: Whether speech is detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* samples,
                                              size_t num_samples, rac_bool_t* out_is_speech);
 
 /**
@@ -190,7 +190,7 @@ RAC_API rac_result_t rac_vad_process_samples(rac_handle_t handle, const float* s
  * @param threshold New threshold (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_set_energy_threshold(rac_handle_t handle, float threshold);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_set_energy_threshold(rac_handle_t handle, float threshold);
 
 /**
  * @brief Get service information
@@ -199,7 +199,7 @@ RAC_API rac_result_t rac_vad_set_energy_threshold(rac_handle_t handle, float thr
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_get_info(rac_handle_t handle, rac_vad_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_get_info(rac_handle_t handle, rac_vad_info_t* out_info);
 
 /**
  * @brief Destroy a VAD service instance

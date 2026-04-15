@@ -12,6 +12,7 @@
 #include "rac/backends/rac_embeddings_onnx.h"
 
 #include <cstdint>
+#include <cstdio>  // sscanf for sherpa-onnx version parsing
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -30,6 +31,10 @@ namespace fs = std::filesystem;
 #include "rac/features/vad/rac_vad_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+
+#if SHERPA_ONNX_AVAILABLE
+#include "sherpa-onnx/c-api/c-api.h"
+#endif
 
 // =============================================================================
 // STT VTABLE IMPLEMENTATION
@@ -543,6 +548,70 @@ rac_result_t rac_backend_onnx_register(void) {
     if (g_registered) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
+
+#if SHERPA_ONNX_AVAILABLE
+    // ---- Sherpa-ONNX ABI compatibility check --------------------------------
+    //
+    // The sherpa-onnx C API exposes struct types (SherpaOnnxOnlineRecognizerConfig,
+    // SherpaOnnxOfflineRecognizerConfig, SherpaOnnxVadModelConfig, ...) whose
+    // layouts are compiled into our .cpp files at the version of sherpa-onnx
+    // whose headers are currently on the include path (see VERSIONS file:
+    // SHERPA_ONNX_VERSION_*). The actual inference happens via prebuilt
+    // sherpa binaries shipped under third_party/sherpa-onnx-*/.
+    //
+    // If the prebuilt binary's struct layout diverges from our compile-time
+    // header's layout (major-version skew), struct field access -> SIGSEGV.
+    //
+    // Defensive check: query the runtime version string, log it loudly, and
+    // refuse registration if the major.minor does not match "1.12". This
+    // gives SDK integrators a clear error instead of a mysterious crash.
+    //
+    // NOTE: sherpa-onnx has been 1.12.x across all supported VERSIONS targets
+    //       (iOS 1.12.18, macOS 1.12.18, Android 1.12.20, Linux 1.12.23,
+    //       Windows 1.12.23). If we ever bump to 1.13 or 2.x, update the
+    //       expected_major / expected_minor constants below.
+    {
+        const char* runtime_version = SherpaOnnxGetVersionStr();
+        if (runtime_version == nullptr) {
+            RAC_LOG_ERROR(LOG_CAT,
+                "Sherpa-ONNX runtime did not return a version string; "
+                "refusing to register backend.");
+            return RAC_ERROR_BACKEND_INIT_FAILED;
+        }
+
+        constexpr int expected_major = 1;
+        constexpr int expected_minor = 12;
+        int got_major = 0;
+        int got_minor = 0;
+        int got_patch = 0;
+        // sscanf returns number of fields successfully scanned.
+        int scanned =
+            std::sscanf(runtime_version, "%d.%d.%d", &got_major, &got_minor, &got_patch);
+
+        if (scanned < 2) {
+            RAC_LOG_ERROR(LOG_CAT,
+                "Sherpa-ONNX runtime version string '%s' is unparseable; "
+                "refusing to register backend.", runtime_version);
+            return RAC_ERROR_BACKEND_INIT_FAILED;
+        }
+
+        if (got_major != expected_major || got_minor != expected_minor) {
+            RAC_LOG_ERROR(LOG_CAT,
+                "Sherpa-ONNX ABI mismatch: runtime reports %d.%d.%d, "
+                "compile-time headers expect %d.%d.x. "
+                "Refusing to register backend - struct layouts may differ, "
+                "which would cause SIGSEGV on first inference. "
+                "Rebuild third_party/sherpa-onnx-* binaries to match headers, "
+                "or upgrade the commons SDK to a version aligned with your "
+                "sherpa-onnx binary.",
+                got_major, got_minor, got_patch, expected_major, expected_minor);
+            return RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION;
+        }
+
+        RAC_LOG_INFO(LOG_CAT, "Sherpa-ONNX runtime version: %s (expected %d.%d.x) - OK",
+                     runtime_version, expected_major, expected_minor);
+    }
+#endif  // SHERPA_ONNX_AVAILABLE
 
     // Register module (STT, TTS, VAD only; diffusion is CoreML-only in Swift SDK)
     rac_module_info_t module_info = {};

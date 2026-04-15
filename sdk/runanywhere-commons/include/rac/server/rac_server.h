@@ -153,7 +153,7 @@ typedef struct rac_server_status {
  *   - RAC_ERROR_MODEL_LOAD_FAILED: Failed to load model
  *   - RAC_ERROR_BIND_FAILED: Failed to bind to port
  */
-RAC_API rac_result_t rac_server_start(const rac_server_config_t* config);
+RAC_API RAC_NODISCARD rac_result_t rac_server_start(const rac_server_config_t* config);
 
 /**
  * @brief Stop the HTTP server
@@ -163,7 +163,7 @@ RAC_API rac_result_t rac_server_start(const rac_server_config_t* config);
  *
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_RUNNING if not running
  */
-RAC_API rac_result_t rac_server_stop(void);
+RAC_API RAC_NODISCARD rac_result_t rac_server_stop(void);
 
 /**
  * @brief Check if the server is running
@@ -178,7 +178,7 @@ RAC_API rac_bool_t rac_server_is_running(void);
  * @param status Output parameter for status (must not be NULL)
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_server_get_status(rac_server_status_t* status);
+RAC_API RAC_NODISCARD rac_result_t rac_server_get_status(rac_server_status_t* status);
 
 /**
  * @brief Block until the server stops

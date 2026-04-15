@@ -19,7 +19,8 @@
 #include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
+#include "rac/features/wakeword/rac_wakeword_service.h"  // provider vtable hook
+#include "internal/rac_platform_compat.h"
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
@@ -1022,6 +1023,97 @@ RAC_ONNX_API void rac_wakeword_onnx_destroy(rac_handle_t handle) {
 }
 
 // =============================================================================
+// WAKE-WORD PROVIDER VTABLE ADAPTERS
+// =============================================================================
+//
+// The rac_commons wake-word service (include/rac/features/wakeword/
+// rac_wakeword_service.h) dispatches to whichever concrete backend is
+// registered via rac_wakeword_provider_set(). These adapter functions
+// translate that generic vtable into our ONNX-specific API
+// (rac_wakeword_onnx_* at the top of this file), so we can serve wake-word
+// detection without the service layer taking a hard link dependency on
+// rac_backend_onnx.
+// =============================================================================
+
+static rac_result_t onnx_wakeword_provider_create(const rac_wakeword_config_t* cfg,
+                                                  rac_handle_t* out_handle,
+                                                  void* /*user_data*/) {
+    rac_wakeword_onnx_config_t onnx_cfg = RAC_WAKEWORD_ONNX_CONFIG_DEFAULT;
+    if (cfg != nullptr) {
+        onnx_cfg.sample_rate = cfg->sample_rate;
+        onnx_cfg.threshold   = cfg->threshold;
+        onnx_cfg.num_threads = cfg->num_threads;
+        // Convert ms -> samples. Default 80ms -> 1280 samples at 16kHz.
+        onnx_cfg.frame_length =
+            (cfg->sample_rate > 0 && cfg->frame_length_ms > 0)
+                ? (cfg->sample_rate * cfg->frame_length_ms) / 1000
+                : 1280;
+        onnx_cfg.enable_optimization = RAC_TRUE;
+        // embedding_model_path / melspec_model_path are plumbed separately
+        // via rac_wakeword_onnx_init_shared_models() today; the generic
+        // service API doesn't yet expose them. See follow-up work on the
+        // unified stream config in Phase 9.
+    }
+    return rac_wakeword_onnx_create(&onnx_cfg, out_handle);
+}
+
+static rac_result_t onnx_wakeword_provider_load_model(rac_handle_t h,
+                                                      const char* path,
+                                                      const char* id,
+                                                      const char* word,
+                                                      void* /*user_data*/) {
+    return rac_wakeword_onnx_load_model(h, path, id, word);
+}
+
+static rac_result_t onnx_wakeword_provider_unload_model(rac_handle_t h,
+                                                        const char* id,
+                                                        void* /*user_data*/) {
+    return rac_wakeword_onnx_unload_model(h, id);
+}
+
+static rac_result_t onnx_wakeword_provider_load_vad(rac_handle_t h,
+                                                    const char* path,
+                                                    void* /*user_data*/) {
+    return rac_wakeword_onnx_load_vad(h, path);
+}
+
+static rac_result_t onnx_wakeword_provider_process(
+    rac_handle_t h,
+    const float* samples, size_t n,
+    int32_t* out_det, float* out_conf,
+    rac_bool_t* out_vad_speech, float* out_vad_conf,
+    void* /*user_data*/) {
+    return rac_wakeword_onnx_process_with_vad(
+        h, samples, n, out_det, out_conf, out_vad_speech, out_vad_conf);
+}
+
+static rac_result_t onnx_wakeword_provider_reset(rac_handle_t h, void* /*user_data*/) {
+    return rac_wakeword_onnx_reset(h);
+}
+
+static rac_result_t onnx_wakeword_provider_set_threshold(rac_handle_t h,
+                                                         float threshold,
+                                                         void* /*user_data*/) {
+    return rac_wakeword_onnx_set_threshold(h, threshold);
+}
+
+static void onnx_wakeword_provider_destroy(rac_handle_t h, void* /*user_data*/) {
+    rac_wakeword_onnx_destroy(h);
+}
+
+static const rac_wakeword_provider_ops_t g_onnx_wakeword_provider_ops = {
+    onnx_wakeword_provider_create,
+    onnx_wakeword_provider_load_model,
+    onnx_wakeword_provider_unload_model,
+    onnx_wakeword_provider_load_vad,
+    onnx_wakeword_provider_process,
+    onnx_wakeword_provider_reset,
+    onnx_wakeword_provider_set_threshold,
+    onnx_wakeword_provider_destroy,
+    /* user_data */ nullptr,
+};
+
+// =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================
 
@@ -1032,8 +1124,13 @@ RAC_ONNX_API rac_result_t rac_backend_wakeword_onnx_register(void) {
         return RAC_SUCCESS;
     }
 
+    // Install ourselves as the wake-word provider in rac_commons. From this
+    // point on, any rac_wakeword_* service call will route through our
+    // rac_wakeword_onnx_* functions.
+    (void)rac_wakeword_provider_set(&g_onnx_wakeword_provider_ops);
+
     g_wakeword_onnx_registered = true;
-    RAC_LOG_INFO(LOG_TAG, "Backend registered");
+    RAC_LOG_INFO(LOG_TAG, "Backend registered (wakeword provider installed)");
 
     return RAC_SUCCESS;
 }
@@ -1043,8 +1140,12 @@ RAC_ONNX_API rac_result_t rac_backend_wakeword_onnx_unregister(void) {
         return RAC_SUCCESS;
     }
 
+    // Clear the provider so subsequent rac_wakeword_initialize calls no
+    // longer create ONNX backend handles that would outlive us.
+    (void)rac_wakeword_provider_set(nullptr);
+
     g_wakeword_onnx_registered = false;
-    RAC_LOG_INFO(LOG_TAG, "Backend unregistered");
+    RAC_LOG_INFO(LOG_TAG, "Backend unregistered (wakeword provider cleared)");
 
     return RAC_SUCCESS;
 }
