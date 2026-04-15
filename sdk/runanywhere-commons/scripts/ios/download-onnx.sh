@@ -17,6 +17,24 @@ if [ -z "${ONNX_VERSION_IOS:-}" ]; then
 fi
 ONNX_VERSION="${ONNX_VERSION_IOS}"
 DOWNLOAD_URL="https://download.onnxruntime.ai/pod-archive-onnxruntime-c-${ONNX_VERSION}.zip"
+VERSION_SENTINEL="${ONNX_DIR}/.version"
+
+# Idempotency guard: skip re-download when the on-disk xcframework already
+# matches the requested version. A mismatched sentinel (or none at all
+# alongside an existing framework) triggers a clean re-download so the
+# ORT version can't silently drift from sherpa-onnx's expected version.
+if [ -d "${ONNX_DIR}/onnxruntime.xcframework" ]; then
+    EXISTING=""
+    [ -f "${VERSION_SENTINEL}" ] && EXISTING=$(cat "${VERSION_SENTINEL}")
+    if [ "${EXISTING}" = "${ONNX_VERSION}" ]; then
+        echo "✅ ONNX Runtime iOS v${ONNX_VERSION} already present at ${ONNX_DIR}"
+        echo "   To force re-download, remove: rm -rf ${ONNX_DIR}"
+        exit 0
+    fi
+    echo "⚠️  ONNX Runtime iOS version mismatch at ${ONNX_DIR}"
+    echo "   Found: ${EXISTING:-unknown}, want: ${ONNX_VERSION}"
+    echo "   Clearing stale cache and re-downloading…"
+fi
 
 echo "Downloading ONNX Runtime iOS xcframework v${ONNX_VERSION}..."
 
@@ -58,6 +76,9 @@ cp -R "${XCFRAMEWORK}" "${ONNX_DIR}/"
 if [ -d "${TEMP_DIR}/extracted/Headers" ]; then
     cp -R "${TEMP_DIR}/extracted/Headers" "${ONNX_DIR}/"
 fi
+
+# Stamp the version so future runs can detect drift and re-download.
+echo "${ONNX_VERSION}" > "${VERSION_SENTINEL}"
 
 # Clean up
 rm -rf "${TEMP_DIR}"

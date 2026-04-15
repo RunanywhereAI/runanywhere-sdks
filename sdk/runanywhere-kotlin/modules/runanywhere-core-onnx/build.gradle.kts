@@ -153,19 +153,73 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        // Safety net: drop Sherpa-ONNX's own JNI bridge and C++ API wrapper if
-        // they ever leak back into jniLibs (stale prebuilt, manual copy, etc).
-        // Our backend uses the C API exclusively and ships its own JNI bridge
-        // at librac_backend_onnx_jni.so — these two add ~4.6 MB/ABI of dead weight.
-        jniLibs {
-            excludes += "**/libsherpa-onnx-jni.so"
-            excludes += "**/libsherpa-onnx-cxx-api.so"
-        }
     }
 
     // Native libs shipped: librac_backend_onnx.so, librac_backend_onnx_jni.so,
     // libonnxruntime.so, libsherpa-onnx-c-api.so.
     // Downloaded from RABackendONNX-android GitHub release assets, or built locally.
+}
+
+// =============================================================================
+// Strip Sherpa's own JNI bridge and C++ API wrapper from the AAR's jniLibs tree.
+//
+// Sherpa-ONNX's Android prebuilt ships four .so files per ABI but we only need
+// two (libonnxruntime.so + libsherpa-onnx-c-api.so). The other two —
+// libsherpa-onnx-jni.so and libsherpa-onnx-cxx-api.so — are:
+//
+//   * libsherpa-onnx-jni.so   → sherpa's own Java/JNI bridge. Never loaded via
+//                                System.loadLibrary from our Kotlin code.
+//   * libsherpa-onnx-cxx-api.so → sherpa's C++ API shim. Our backend uses the
+//                                C API directly, not this wrapper.
+//
+// packaging.jniLibs.excludes (the idiomatic knob) would've been cleaner, but it
+// only takes effect when a downstream APP packages this AAR — it does NOT strip
+// from the AAR itself during assembleRelease. The AAR is built from whatever's
+// in src/androidMain/jniLibs/, so we delete the unwanted files from that tree
+// BEFORE any packaging task runs.
+//
+// Runs for both testLocal modes:
+//   * testLocal=false: downloadJniLibs's whitelist already filtered them out at
+//                      copy time — this task becomes a no-op, but guards against
+//                      stale files from an earlier testLocal=true build.
+//   * testLocal=true:  build-kotlin.sh's copy loop may have brought them in from
+//                      commons/dist/android/onnx/<abi>/ — strip them here.
+// =============================================================================
+val unshippedSherpaSoPatterns = listOf(
+    "libsherpa-onnx-jni.so",
+    "libsherpa-onnx-cxx-api.so",
+)
+
+tasks.register<Delete>("stripUnshippedSherpaLibs") {
+    group = "runanywhere"
+    description = "Remove Sherpa-ONNX's own JNI + C++ API .so files from jniLibs/ (we don't ship them)"
+    val jniRoot = file("src/androidMain/jniLibs")
+    delete(
+        fileTree(jniRoot) {
+            unshippedSherpaSoPatterns.forEach { include("**/$it") }
+        },
+    )
+    doLast {
+        logger.lifecycle(
+            "ONNX: stripped ${unshippedSherpaSoPatterns.joinToString(", ")} " +
+                "from src/androidMain/jniLibs (see module KDoc for rationale).",
+        )
+    }
+}
+
+// Wire stripUnshippedSherpaLibs so it runs after downloadJniLibs completes (so
+// freshly-downloaded files also get filtered) and before any merge/bundle step
+// that would otherwise shovel them into the AAR.
+tasks.matching { it.name == "downloadJniLibs" }.configureEach {
+    finalizedBy("stripUnshippedSherpaLibs")
+}
+tasks.matching {
+    it.name.contains("merge") && it.name.contains("JniLibFolders")
+}.configureEach {
+    dependsOn("stripUnshippedSherpaLibs")
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn("stripUnshippedSherpaLibs")
 }
 
 // Native lib version for downloads
