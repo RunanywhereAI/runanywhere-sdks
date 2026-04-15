@@ -343,11 +343,15 @@ jobs:
       - name: Install web deps
         working-directory: sdk/runanywhere-web
         run: npm install
-      - name: Typecheck + build TS
+      - name: Build TS (core then llamacpp then onnx)
         working-directory: sdk/runanywhere-web
-        run: |
-          npm run typecheck
-          npm run build:ts
+        # build:ts must run before typecheck because llamacpp/onnx packages
+        # import from `@runanywhere/web`; tsc can only resolve those imports
+        # once the core package has produced its `dist/` (with .d.ts files).
+        run: npm run build:ts
+      - name: Typecheck (now that dist/ exists)
+        working-directory: sdk/runanywhere-web
+        run: npm run typecheck
 
   sdk_flutter:
     needs: detect
