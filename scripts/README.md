@@ -10,7 +10,6 @@ Every shell script in the repo lives in one of these places, organized by scope:
 | `sync-versions.sh <version>` | Bumps the version string in every manifest across the monorepo (`VERSION`, `VERSIONS`, `Package.swift`, `gradle.properties`, all `package.json`, all `pubspec.yaml`). Run locally before tagging a release. |
 | `sync-checksums.sh <zip_dir>` | Reads SHA-256 of freshly-built XCFramework zips and updates the `checksum: "..."` lines in root `Package.swift`. Run in the release workflow after native iOS/macOS builds produce the zips. |
 | `validate-artifact.sh <file>...` | Type-aware sanity check for each artifact extension (XCFramework Info.plist + slices, `.so` ELF magic, `.aar` classes.jar + jni, `.wasm` magic bytes, `.tgz` package.json). Same script runs locally and in CI. |
-| `lint-all.sh`, `lint-android.sh`, `lint-ios.sh` | Cross-project lint runners (pre-existing — not part of the artifact system). |
 
 ## Per-SDK `sdk/runanywhere-<lang>/scripts/`
 
