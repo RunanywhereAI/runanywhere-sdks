@@ -49,15 +49,15 @@ static const rac_tts_onnx_config_t RAC_TTS_ONNX_CONFIG_DEFAULT = {
 // ONNX TTS API
 // =============================================================================
 
-RAC_ONNX_API rac_result_t rac_tts_onnx_create(const char* model_path,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_tts_onnx_create(const char* model_path,
                                               const rac_tts_onnx_config_t* config,
                                               rac_handle_t* out_handle);
 
-RAC_ONNX_API rac_result_t rac_tts_onnx_synthesize(rac_handle_t handle, const char* text,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_tts_onnx_synthesize(rac_handle_t handle, const char* text,
                                                   const rac_tts_options_t* options,
                                                   rac_tts_result_t* out_result);
 
-RAC_ONNX_API rac_result_t rac_tts_onnx_get_voices(rac_handle_t handle, char*** out_voices,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_tts_onnx_get_voices(rac_handle_t handle, char*** out_voices,
                                                   size_t* out_count);
 
 RAC_ONNX_API void rac_tts_onnx_stop(rac_handle_t handle);

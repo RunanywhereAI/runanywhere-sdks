@@ -51,14 +51,14 @@ extern "C" {
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_METALRT_API rac_result_t rac_backend_metalrt_register(void);
+RAC_METALRT_API RAC_NODISCARD rac_result_t rac_backend_metalrt_register(void);
 
 /**
  * Unregisters the MetalRT backend.
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_METALRT_API rac_result_t rac_backend_metalrt_unregister(void);
+RAC_METALRT_API RAC_NODISCARD rac_result_t rac_backend_metalrt_unregister(void);
 
 #ifdef __cplusplus
 }

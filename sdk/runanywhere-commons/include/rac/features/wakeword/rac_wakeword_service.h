@@ -420,7 +420,7 @@ typedef struct rac_wakeword_provider_ops {
  *            Pass NULL to clear the registration.
  * @return RAC_SUCCESS always.
  */
-RAC_API rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops);
 
 /**
  * @brief Query whether a wake-word provider is currently registered.

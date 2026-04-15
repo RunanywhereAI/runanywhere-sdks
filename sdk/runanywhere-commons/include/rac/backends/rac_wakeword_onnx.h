@@ -95,7 +95,7 @@ static const rac_wakeword_onnx_config_t RAC_WAKEWORD_ONNX_CONFIG_DEFAULT = {
  * @param[out] out_handle Output: Detector handle
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_create(
     const rac_wakeword_onnx_config_t* config,
     rac_handle_t* out_handle);
 
@@ -110,7 +110,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
  * @param melspec_model_path Path to melspectrogram model ONNX file (optional)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_init_shared_models(
     rac_handle_t handle,
     const char* embedding_model_path,
     const char* melspec_model_path);
@@ -124,7 +124,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
  * @param wake_word Human-readable wake word
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_load_model(
     rac_handle_t handle,
     const char* model_path,
     const char* model_id,
@@ -137,7 +137,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
  * @param vad_model_path Path to Silero VAD ONNX model
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_load_vad(
     rac_handle_t handle,
     const char* vad_model_path);
 
@@ -151,7 +151,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
  * @param[out] out_confidence Detection confidence (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_process(
     rac_handle_t handle,
     const float* samples,
     size_t num_samples,
@@ -170,7 +170,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(
  * @param[out] out_vad_confidence VAD confidence
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_process_with_vad(
     rac_handle_t handle,
     const float* samples,
     size_t num_samples,
@@ -186,7 +186,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
  * @param threshold New threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_set_threshold(
     rac_handle_t handle,
     float threshold);
 
@@ -196,7 +196,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(
  * @param handle Detector handle
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle);
 
 /**
  * @brief Unload a wake word model
@@ -205,7 +205,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle);
  * @param model_id Model identifier to unload
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_wakeword_onnx_unload_model(
     rac_handle_t handle,
     const char* model_id);
 
@@ -227,14 +227,14 @@ RAC_ONNX_API void rac_wakeword_onnx_destroy(rac_handle_t handle);
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_backend_wakeword_onnx_register(void);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_backend_wakeword_onnx_register(void);
 
 /**
  * @brief Unregister ONNX wake word backend
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_backend_wakeword_onnx_unregister(void);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_backend_wakeword_onnx_unregister(void);
 
 #ifdef __cplusplus
 }

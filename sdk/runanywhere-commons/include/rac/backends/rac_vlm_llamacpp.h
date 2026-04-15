@@ -86,7 +86,7 @@ static const rac_vlm_llamacpp_config_t RAC_VLM_LLAMACPP_CONFIG_DEFAULT = {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_create(const char* model_path,
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_create(const char* model_path,
                                                           const char* mmproj_path,
                                                           const rac_vlm_llamacpp_config_t* config,
                                                           rac_handle_t* out_handle);
@@ -100,7 +100,7 @@ RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_create(const char* model_path
  * @param config LlamaCPP configuration (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_load_model(
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_load_model(
     rac_handle_t handle, const char* model_path, const char* mmproj_path,
     const rac_vlm_llamacpp_config_t* config);
 
@@ -110,7 +110,7 @@ RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_load_model(
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle);
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle);
 
 /**
  * Checks if a model is loaded.
@@ -130,7 +130,7 @@ RAC_LLAMACPP_VLM_API rac_bool_t rac_vlm_llamacpp_is_model_loaded(rac_handle_t ha
  * @param out_result Output: Generation result (caller must free text with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle,
                                                            const rac_vlm_image_t* image,
                                                            const char* prompt,
                                                            const rac_vlm_options_t* options,
@@ -158,7 +158,7 @@ typedef rac_bool_t (*rac_vlm_llamacpp_stream_callback_fn)(const char* token, rac
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_process_stream(
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_process_stream(
     rac_handle_t handle, const rac_vlm_image_t* image, const char* prompt,
     const rac_vlm_options_t* options, rac_vlm_llamacpp_stream_callback_fn callback, void* user_data);
 
@@ -176,7 +176,7 @@ RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_cancel(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle,
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle,
                                                                   char** out_json);
 
 /**
@@ -200,14 +200,14 @@ RAC_LLAMACPP_VLM_API void rac_vlm_llamacpp_destroy(rac_handle_t handle);
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_register(void);
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_backend_llamacpp_vlm_register(void);
 
 /**
  * Unregisters the LlamaCPP VLM backend.
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_VLM_API rac_result_t rac_backend_llamacpp_vlm_unregister(void);
+RAC_LLAMACPP_VLM_API RAC_NODISCARD rac_result_t rac_backend_llamacpp_vlm_unregister(void);
 
 #ifdef __cplusplus
 }

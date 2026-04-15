@@ -50,20 +50,20 @@ static const rac_vad_onnx_config_t RAC_VAD_ONNX_CONFIG_DEFAULT = {
 // ONNX VAD API
 // =============================================================================
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_create(const char* model_path,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_create(const char* model_path,
                                               const rac_vad_onnx_config_t* config,
                                               rac_handle_t* out_handle);
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_process(rac_handle_t handle, const float* samples,
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_process(rac_handle_t handle, const float* samples,
                                                size_t num_samples, rac_bool_t* out_is_speech);
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_start(rac_handle_t handle);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_start(rac_handle_t handle);
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_stop(rac_handle_t handle);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_stop(rac_handle_t handle);
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_reset(rac_handle_t handle);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_reset(rac_handle_t handle);
 
-RAC_ONNX_API rac_result_t rac_vad_onnx_set_threshold(rac_handle_t handle, float threshold);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_vad_onnx_set_threshold(rac_handle_t handle, float threshold);
 
 RAC_ONNX_API rac_bool_t rac_vad_onnx_is_speech_active(rac_handle_t handle);
 
@@ -73,9 +73,9 @@ RAC_ONNX_API void rac_vad_onnx_destroy(rac_handle_t handle);
 // BACKEND REGISTRATION
 // =============================================================================
 
-RAC_ONNX_API rac_result_t rac_backend_onnx_register(void);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_backend_onnx_register(void);
 
-RAC_ONNX_API rac_result_t rac_backend_onnx_unregister(void);
+RAC_ONNX_API RAC_NODISCARD rac_result_t rac_backend_onnx_unregister(void);
 
 #ifdef __cplusplus
 }

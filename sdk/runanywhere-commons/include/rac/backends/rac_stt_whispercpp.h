@@ -83,7 +83,7 @@ static const rac_stt_whispercpp_config_t RAC_STT_WHISPERCPP_CONFIG_DEFAULT = {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_create(const char* model_path,
+RAC_WHISPERCPP_API RAC_NODISCARD rac_result_t rac_stt_whispercpp_create(const char* model_path,
                                                           const rac_stt_whispercpp_config_t* config,
                                                           rac_handle_t* out_handle);
 
@@ -97,7 +97,7 @@ RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_create(const char* model_path
  * @param out_result Output: Transcription result
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle,
+RAC_WHISPERCPP_API RAC_NODISCARD rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle,
                                                               const float* audio_samples,
                                                               size_t num_samples,
                                                               const rac_stt_options_t* options,
@@ -110,7 +110,7 @@ RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handl
  * @param out_language Output: Language code (caller must free)
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle,
+RAC_WHISPERCPP_API RAC_NODISCARD rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle,
                                                                 char** out_language);
 
 /**
@@ -137,14 +137,14 @@ RAC_WHISPERCPP_API void rac_stt_whispercpp_destroy(rac_handle_t handle);
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t rac_backend_whispercpp_register(void);
+RAC_WHISPERCPP_API RAC_NODISCARD rac_result_t rac_backend_whispercpp_register(void);
 
 /**
  * Unregisters the WhisperCPP backend.
  *
  * @return RAC_SUCCESS or error code
  */
-RAC_WHISPERCPP_API rac_result_t rac_backend_whispercpp_unregister(void);
+RAC_WHISPERCPP_API RAC_NODISCARD rac_result_t rac_backend_whispercpp_unregister(void);
 
 #ifdef __cplusplus
 }
