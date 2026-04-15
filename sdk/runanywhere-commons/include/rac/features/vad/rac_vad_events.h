@@ -39,33 +39,33 @@ typedef enum rac_vad_event_type {
 // EVENT PUBLISHING FUNCTIONS
 // =============================================================================
 
-RAC_API rac_result_t rac_vad_event_initialized(rac_inference_framework_t framework);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_initialized(rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_vad_event_initialization_failed(rac_result_t error_code,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_initialization_failed(rac_result_t error_code,
                                                          const char* error_message,
                                                          rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_vad_event_cleaned_up(void);
-RAC_API rac_result_t rac_vad_event_started(void);
-RAC_API rac_result_t rac_vad_event_stopped(void);
-RAC_API rac_result_t rac_vad_event_speech_started(void);
-RAC_API rac_result_t rac_vad_event_speech_ended(double duration_ms);
-RAC_API rac_result_t rac_vad_event_paused(void);
-RAC_API rac_result_t rac_vad_event_resumed(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_cleaned_up(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_started(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_stopped(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_speech_started(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_speech_ended(double duration_ms);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_paused(void);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_resumed(void);
 
-RAC_API rac_result_t rac_vad_event_model_load_started(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_model_load_started(const char* model_id,
                                                       int64_t model_size_bytes,
                                                       rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_vad_event_model_load_completed(const char* model_id, double duration_ms,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_model_load_completed(const char* model_id, double duration_ms,
                                                         int64_t model_size_bytes,
                                                         rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_vad_event_model_load_failed(const char* model_id, rac_result_t error_code,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_model_load_failed(const char* model_id, rac_result_t error_code,
                                                      const char* error_message,
                                                      rac_inference_framework_t framework);
 
-RAC_API rac_result_t rac_vad_event_model_unloaded(const char* model_id);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_event_model_unloaded(const char* model_id);
 
 RAC_API const char* rac_vad_event_type_string(rac_vad_event_type_t event_type);
 

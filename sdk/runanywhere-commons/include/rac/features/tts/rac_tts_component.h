@@ -32,7 +32,7 @@ extern "C" {
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the TTS component
@@ -41,7 +41,7 @@ RAC_API rac_result_t rac_tts_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_configure(rac_handle_t handle,
                                                  const rac_tts_config_t* config);
 
 /**
@@ -71,7 +71,7 @@ RAC_API const char* rac_tts_component_get_voice_id(rac_handle_t handle);
  *                   Optional: if NULL, defaults to voice_id
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_path,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const char* voice_path,
                                                   const char* voice_id, const char* voice_name);
 
 /**
@@ -80,7 +80,7 @@ RAC_API rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const cha
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_tts_component_unload(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Stop current synthesis
@@ -96,7 +96,7 @@ RAC_API rac_result_t rac_tts_component_cleanup(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_stop(rac_handle_t handle);
 
 /**
  * @brief Synthesize text to audio
@@ -107,7 +107,7 @@ RAC_API rac_result_t rac_tts_component_stop(rac_handle_t handle);
  * @param out_result Output: Synthesis result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const char* text,
                                                   const rac_tts_options_t* options,
                                                   rac_tts_result_t* out_result);
 
@@ -121,7 +121,7 @@ RAC_API rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const cha
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle, const char* text,
                                                          const rac_tts_options_t* options,
                                                          rac_tts_stream_callback_t callback,
                                                          void* user_data);
@@ -141,7 +141,7 @@ RAC_API rac_lifecycle_state_t rac_tts_component_get_state(rac_handle_t handle);
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 /**

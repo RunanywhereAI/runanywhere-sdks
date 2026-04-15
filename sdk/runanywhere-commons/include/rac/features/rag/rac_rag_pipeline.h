@@ -176,7 +176,7 @@ typedef struct rac_rag_result {
  * @param out_pipeline Pointer to receive pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_pipeline_create(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_pipeline_create(
     rac_handle_t llm_service,
     rac_handle_t embeddings_service,
     const rac_rag_pipeline_config_t* config,
@@ -194,7 +194,7 @@ RAC_API rac_result_t rac_rag_pipeline_create(
  * @param out_pipeline Pointer to receive pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_pipeline_create_standalone(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_pipeline_create_standalone(
     const rac_rag_config_t* config,
     rac_rag_pipeline_t** out_pipeline
 );
@@ -209,7 +209,7 @@ RAC_API rac_result_t rac_rag_pipeline_create_standalone(
  * @param metadata_json Optional JSON metadata
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_add_document(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_add_document(
     rac_rag_pipeline_t* pipeline,
     const char* document_text,
     const char* metadata_json
@@ -226,7 +226,7 @@ RAC_API rac_result_t rac_rag_add_document(
  * @param count Number of documents
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_add_documents_batch(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_add_documents_batch(
     rac_rag_pipeline_t* pipeline,
     const char** documents,
     const char** metadata_array,
@@ -243,7 +243,7 @@ RAC_API rac_result_t rac_rag_add_documents_batch(
  * @param out_result Pointer to receive result (caller must free with rac_rag_result_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_query(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_query(
     rac_rag_pipeline_t* pipeline,
     const rac_rag_query_t* query,
     rac_rag_result_t* out_result
@@ -255,7 +255,7 @@ RAC_API rac_result_t rac_rag_query(
  * @param pipeline RAG pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline);
+RAC_API RAC_NODISCARD rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline);
 
 /**
  * @brief Get number of indexed documents
@@ -272,7 +272,7 @@ RAC_API size_t rac_rag_get_document_count(rac_rag_pipeline_t* pipeline);
  * @param out_stats_json Pointer to receive JSON stats string (caller must free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_get_statistics(
+RAC_API RAC_NODISCARD rac_result_t rac_rag_get_statistics(
     rac_rag_pipeline_t* pipeline,
     char** out_stats_json
 );

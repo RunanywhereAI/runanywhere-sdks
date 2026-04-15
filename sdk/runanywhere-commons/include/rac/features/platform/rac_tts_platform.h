@@ -135,7 +135,7 @@ typedef struct rac_platform_tts_callbacks {
  * @param callbacks Callback functions (copied internally)
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_platform_tts_set_callbacks(const rac_platform_tts_callbacks_t* callbacks);
+RAC_API RAC_NODISCARD rac_result_t rac_platform_tts_set_callbacks(const rac_platform_tts_callbacks_t* callbacks);
 
 /**
  * Gets the current Swift callbacks.
@@ -162,7 +162,7 @@ RAC_API rac_bool_t rac_platform_tts_is_available(void);
  * @param out_handle Output: Service handle
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_tts_platform_create(const rac_tts_platform_config_t* config,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_platform_create(const rac_tts_platform_config_t* config,
                                              rac_tts_platform_handle_t* out_handle);
 
 /**
@@ -180,7 +180,7 @@ RAC_API void rac_tts_platform_destroy(rac_tts_platform_handle_t handle);
  * @param options Synthesis options (can be NULL for defaults)
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle, const char* text,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_platform_synthesize(rac_tts_platform_handle_t handle, const char* text,
                                                  const rac_tts_platform_options_t* options);
 
 /**

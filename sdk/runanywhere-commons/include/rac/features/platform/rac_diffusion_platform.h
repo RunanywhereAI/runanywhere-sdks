@@ -216,7 +216,7 @@ typedef struct rac_platform_diffusion_callbacks {
  * @param callbacks Callback functions (copied internally)
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_platform_diffusion_set_callbacks(
+RAC_API RAC_NODISCARD rac_result_t rac_platform_diffusion_set_callbacks(
     const rac_platform_diffusion_callbacks_t* callbacks);
 
 /**
@@ -245,7 +245,7 @@ RAC_API rac_bool_t rac_platform_diffusion_is_available(void);
  * @param out_handle Output: Service handle
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_diffusion_platform_create(const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_platform_create(const char* model_path,
                                                    const rac_diffusion_platform_config_t* config,
                                                    rac_diffusion_platform_handle_t* out_handle);
 
@@ -264,7 +264,7 @@ RAC_API void rac_diffusion_platform_destroy(rac_diffusion_platform_handle_t hand
  * @param out_result Output: Generated image
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_diffusion_platform_generate(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_platform_generate(
     rac_diffusion_platform_handle_t handle, const rac_diffusion_platform_options_t* options,
     rac_diffusion_platform_result_t* out_result);
 
@@ -278,7 +278,7 @@ RAC_API rac_result_t rac_diffusion_platform_generate(
  * @param out_result Output: Generated image
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_diffusion_platform_generate_with_progress(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_platform_generate_with_progress(
     rac_diffusion_platform_handle_t handle, const rac_diffusion_platform_options_t* options,
     rac_platform_diffusion_progress_fn progress_callback, void* progress_user_data,
     rac_diffusion_platform_result_t* out_result);
@@ -289,7 +289,7 @@ RAC_API rac_result_t rac_diffusion_platform_generate_with_progress(
  * @param handle Service handle
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_diffusion_platform_cancel(rac_diffusion_platform_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_platform_cancel(rac_diffusion_platform_handle_t handle);
 
 /**
  * Frees a platform diffusion result.

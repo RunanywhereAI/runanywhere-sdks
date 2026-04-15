@@ -76,7 +76,7 @@ typedef struct rac_stt_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize an STT service
@@ -85,7 +85,7 @@ RAC_API rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_ha
  * @param model_path Path to the model file (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_path);
 
 /**
  * @brief Transcribe audio data (batch mode)
@@ -97,7 +97,7 @@ RAC_API rac_result_t rac_stt_initialize(rac_handle_t handle, const char* model_p
  * @param out_result Output: Transcription result (caller must free with rac_stt_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data,
                                         size_t audio_size, const rac_stt_options_t* options,
                                         rac_stt_result_t* out_result);
 
@@ -112,7 +112,7 @@ RAC_API rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_d
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_data,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_data,
                                                size_t audio_size, const rac_stt_options_t* options,
                                                rac_stt_stream_callback_t callback, void* user_data);
 
@@ -123,7 +123,7 @@ RAC_API rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* 
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_get_info(rac_handle_t handle, rac_stt_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_get_info(rac_handle_t handle, rac_stt_info_t* out_info);
 
 /**
  * @brief Cleanup and release resources
@@ -131,7 +131,7 @@ RAC_API rac_result_t rac_stt_get_info(rac_handle_t handle, rac_stt_info_t* out_i
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy an STT service instance

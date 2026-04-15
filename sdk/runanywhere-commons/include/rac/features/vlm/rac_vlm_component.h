@@ -27,7 +27,7 @@ extern "C" {
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the VLM component
@@ -36,7 +36,7 @@ RAC_API rac_result_t rac_vlm_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_configure(rac_handle_t handle,
                                                  const rac_vlm_config_t* config);
 
 /**
@@ -65,7 +65,7 @@ RAC_API const char* rac_vlm_component_get_model_id(rac_handle_t handle);
  * @param model_name Human-readable model name (optional: if NULL, defaults to model_id)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_load_model(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_load_model(rac_handle_t handle, const char* model_path,
                                                   const char* mmproj_path, const char* model_id,
                                                   const char* model_name);
 
@@ -80,7 +80,7 @@ RAC_API rac_result_t rac_vlm_component_load_model(rac_handle_t handle, const cha
  * @param model_id Model identifier (must be registered in the global registry)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle, const char* model_id);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle, const char* model_id);
 
 /**
  * @brief Resolve VLM model files within a directory
@@ -104,7 +104,7 @@ RAC_API rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle, con
  * @param mmproj_path_size Size of the mmproj path output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* out_model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* out_model_path,
                                                  size_t model_path_size, char* out_mmproj_path,
                                                  size_t mmproj_path_size);
 
@@ -114,7 +114,7 @@ RAC_API rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char* ou
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -122,7 +122,7 @@ RAC_API rac_result_t rac_vlm_component_unload(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Cancel ongoing generation
@@ -132,7 +132,7 @@ RAC_API rac_result_t rac_vlm_component_cleanup(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_cancel(rac_handle_t handle);
 
 /**
  * @brief Process an image with text prompt (non-streaming)
@@ -144,7 +144,7 @@ RAC_API rac_result_t rac_vlm_component_cancel(rac_handle_t handle);
  * @param out_result Output: Generation result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_process(rac_handle_t handle, const rac_vlm_image_t* image,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_process(rac_handle_t handle, const rac_vlm_image_t* image,
                                                const char* prompt, const rac_vlm_options_t* options,
                                                rac_vlm_result_t* out_result);
 
@@ -169,7 +169,7 @@ RAC_API rac_bool_t rac_vlm_component_supports_streaming(rac_handle_t handle);
  * @param user_data User context passed to callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_process_stream(
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_process_stream(
     rac_handle_t handle, const rac_vlm_image_t* image, const char* prompt,
     const rac_vlm_options_t* options, rac_vlm_component_token_callback_fn token_callback,
     rac_vlm_component_complete_callback_fn complete_callback,
@@ -190,7 +190,7 @@ RAC_API rac_lifecycle_state_t rac_vlm_component_get_state(rac_handle_t handle);
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vlm_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 /**

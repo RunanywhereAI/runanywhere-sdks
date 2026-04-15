@@ -63,7 +63,7 @@ typedef struct rac_config {
  * @note HTTP requests return RAC_ERROR_NOT_SUPPORTED - networking should be
  *       handled by the SDK layer (Swift/Kotlin), not the C++ layer.
  */
-RAC_API rac_result_t rac_init(const rac_config_t* config);
+RAC_API RAC_NODISCARD rac_result_t rac_init(const rac_config_t* config);
 
 /**
  * Shuts down the commons library.
@@ -100,7 +100,7 @@ RAC_API rac_version_t rac_get_version(void);
  * @param environment The current SDK environment
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_configure_logging(rac_environment_t environment);
+RAC_API RAC_NODISCARD rac_result_t rac_configure_logging(rac_environment_t environment);
 
 // =============================================================================
 // MODULE INFORMATION
@@ -133,7 +133,7 @@ typedef struct rac_module_info {
  * @param info Module information (copied internally)
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_module_register(const rac_module_info_t* info);
+RAC_API RAC_NODISCARD rac_result_t rac_module_register(const rac_module_info_t* info);
 
 /**
  * Unregisters a module from the registry.
@@ -141,7 +141,7 @@ RAC_API rac_result_t rac_module_register(const rac_module_info_t* info);
  * @param module_id The unique ID of the module to unregister
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_module_unregister(const char* module_id);
+RAC_API RAC_NODISCARD rac_result_t rac_module_unregister(const char* module_id);
 
 /**
  * Gets the list of registered modules.
@@ -152,7 +152,7 @@ RAC_API rac_result_t rac_module_unregister(const char* module_id);
  *
  * @note The returned list is valid until the next module registration/unregistration.
  */
-RAC_API rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count);
+RAC_API RAC_NODISCARD rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count);
 
 /**
  * Gets modules that provide a specific capability.
@@ -162,7 +162,7 @@ RAC_API rac_result_t rac_module_list(const rac_module_info_t** out_modules, size
  * @param out_count Pointer to receive the number of modules
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
+RAC_API RAC_NODISCARD rac_result_t rac_modules_for_capability(rac_capability_t capability,
                                                 const rac_module_info_t** out_modules,
                                                 size_t* out_count);
 
@@ -173,7 +173,7 @@ RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
  * @param out_info Pointer to receive the module info (do not free)
  * @return RAC_SUCCESS on success, or RAC_ERROR_MODULE_NOT_FOUND if not found
  */
-RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
 
 // =============================================================================
 // SERVICE PROVIDER API - Mirrors Swift's ServiceRegistry
@@ -257,7 +257,7 @@ typedef struct rac_service_provider {
  * @param provider Provider information (copied internally)
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_service_register_provider(const rac_service_provider_t* provider);
+RAC_API RAC_NODISCARD rac_result_t rac_service_register_provider(const rac_service_provider_t* provider);
 
 /**
  * Unregisters a service provider.
@@ -266,7 +266,7 @@ RAC_API rac_result_t rac_service_register_provider(const rac_service_provider_t*
  * @param capability The capability the provider was registered for
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability);
+RAC_API RAC_NODISCARD rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability);
 
 /**
  * Creates a service for a specific capability.
@@ -279,7 +279,7 @@ RAC_API rac_result_t rac_service_unregister_provider(const char* name, rac_capab
  * @param out_handle Pointer to receive the service handle
  * @return RAC_SUCCESS on success, or an error code on failure
  */
-RAC_API rac_result_t rac_service_create(rac_capability_t capability,
+RAC_API RAC_NODISCARD rac_result_t rac_service_create(rac_capability_t capability,
                                         const rac_service_request_t* request,
                                         rac_handle_t* out_handle);
 
@@ -291,7 +291,7 @@ RAC_API rac_result_t rac_service_create(rac_capability_t capability,
  * @param out_count Pointer to receive count
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_service_list_providers(rac_capability_t capability,
+RAC_API RAC_NODISCARD rac_result_t rac_service_list_providers(rac_capability_t capability,
                                                 const char*** out_names, size_t* out_count);
 
 // =============================================================================
@@ -313,7 +313,7 @@ RAC_API struct rac_model_registry* rac_get_model_registry(void);
  * @param model Model info to register
  * @return RAC_SUCCESS on success, or error code
  */
-RAC_API rac_result_t rac_register_model(const struct rac_model_info* model);
+RAC_API RAC_NODISCARD rac_result_t rac_register_model(const struct rac_model_info* model);
 
 /**
  * Gets model info from the global registry.
@@ -323,7 +323,7 @@ RAC_API rac_result_t rac_register_model(const struct rac_model_info* model);
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info** out_model);
+RAC_API RAC_NODISCARD rac_result_t rac_get_model(const char* model_id, struct rac_model_info** out_model);
 
 /**
  * Gets model info from the global registry by local path.
@@ -334,7 +334,7 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+RAC_API RAC_NODISCARD rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
 
 // =============================================================================
 // GLOBAL LORA REGISTRY API
@@ -354,7 +354,7 @@ RAC_API struct rac_lora_registry* rac_get_lora_registry(void);
  * @param entry Adapter entry to register (deep-copied internally)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
+RAC_API RAC_NODISCARD rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
 
 /**
  * @brief Query the global registry for adapters compatible with a model
@@ -363,7 +363,7 @@ RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
  * @param out_count Output: number of matching entries
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_get_lora_for_model(const char* model_id,
                                              struct rac_lora_entry*** out_entries,
                                              size_t* out_count);
 

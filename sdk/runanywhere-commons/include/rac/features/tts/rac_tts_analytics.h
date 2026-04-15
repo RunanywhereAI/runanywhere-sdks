@@ -74,7 +74,7 @@ typedef struct rac_tts_metrics {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_create(rac_tts_analytics_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_create(rac_tts_analytics_handle_t* out_handle);
 
 /**
  * @brief Destroy a TTS analytics service instance
@@ -98,7 +98,7 @@ RAC_API void rac_tts_analytics_destroy(rac_tts_analytics_handle_t handle);
  * @param out_synthesis_id Output: Generated unique ID (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_t handle,
                                                        const char* text, const char* voice,
                                                        int32_t sample_rate,
                                                        rac_inference_framework_t framework,
@@ -112,7 +112,7 @@ RAC_API rac_result_t rac_tts_analytics_start_synthesis(rac_tts_analytics_handle_
  * @param chunk_size Size of the chunk in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_track_synthesis_chunk(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_track_synthesis_chunk(rac_tts_analytics_handle_t handle,
                                                              const char* synthesis_id,
                                                              int32_t chunk_size);
 
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_tts_analytics_track_synthesis_chunk(rac_tts_analytics_h
  * @param audio_size_bytes Size of the generated audio in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_handle_t handle,
                                                           const char* synthesis_id,
                                                           double audio_duration_ms,
                                                           int32_t audio_size_bytes);
@@ -139,7 +139,7 @@ RAC_API rac_result_t rac_tts_analytics_complete_synthesis(rac_tts_analytics_hand
  * @param error_message Error message
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_handle_t handle,
                                                               const char* synthesis_id,
                                                               rac_result_t error_code,
                                                               const char* error_message);
@@ -155,7 +155,7 @@ RAC_API rac_result_t rac_tts_analytics_track_synthesis_failed(rac_tts_analytics_
  * @param synthesis_id Synthesis ID (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t handle,
                                                    rac_result_t error_code,
                                                    const char* error_message, const char* operation,
                                                    const char* model_id, const char* synthesis_id);
@@ -171,7 +171,7 @@ RAC_API rac_result_t rac_tts_analytics_track_error(rac_tts_analytics_handle_t ha
  * @param out_metrics Output: Metrics structure
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_tts_analytics_get_metrics(rac_tts_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_tts_analytics_get_metrics(rac_tts_analytics_handle_t handle,
                                                    rac_tts_metrics_t* out_metrics);
 
 #ifdef __cplusplus

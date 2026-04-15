@@ -39,7 +39,7 @@ extern "C" {
  * @param out_length Output: Length of extracted JSON string (can be NULL)
  * @return RAC_SUCCESS if JSON found and extracted, error code otherwise
  */
-RAC_API rac_result_t rac_structured_output_extract_json(const char* text, char** out_json,
+RAC_API RAC_NODISCARD rac_result_t rac_structured_output_extract_json(const char* text, char** out_json,
                                                         size_t* out_length);
 
 /**
@@ -96,7 +96,7 @@ RAC_API rac_bool_t rac_structured_output_find_matching_bracket(const char* text,
  * @param out_prompt Output: Allocated prepared prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_structured_output_prepare_prompt(
+RAC_API RAC_NODISCARD rac_result_t rac_structured_output_prepare_prompt(
     const char* original_prompt, const rac_structured_output_config_t* config, char** out_prompt);
 
 /**
@@ -110,7 +110,7 @@ RAC_API rac_result_t rac_structured_output_prepare_prompt(
  * @param out_prompt Output: Allocated system prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
+RAC_API RAC_NODISCARD rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
                                                              char** out_prompt);
 
 /**

@@ -124,7 +124,7 @@ typedef struct rac_llm_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
  * @brief Initialize an LLM service
@@ -133,7 +133,7 @@ RAC_API rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_hand
  * @param model_path Path to the model file (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path);
 
 /**
  * @brief Generate text from prompt
@@ -144,7 +144,7 @@ RAC_API rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_p
  * @param out_result Output: Generation result (caller must free with rac_llm_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                                       const rac_llm_options_t* options,
                                       rac_llm_result_t* out_result);
 
@@ -158,7 +158,7 @@ RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
                                              const rac_llm_options_t* options,
                                              rac_llm_stream_callback_fn callback, void* user_data);
 
@@ -182,7 +182,7 @@ RAC_API rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* pr
  * @param timing_out Output: Benchmark timing (can be NULL for no timing)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
                                                          const rac_llm_options_t* options,
                                                          rac_llm_stream_callback_fn callback,
                                                          void* user_data,
@@ -195,7 +195,7 @@ RAC_API rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, co
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_info);
 
 /**
  * @brief Cancel ongoing generation
@@ -203,7 +203,7 @@ RAC_API rac_result_t rac_llm_get_info(rac_handle_t handle, rac_llm_info_t* out_i
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_cancel(rac_handle_t handle);
 
 /**
  * @brief Cleanup and release model resources
@@ -211,7 +211,7 @@ RAC_API rac_result_t rac_llm_cancel(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy an LLM service instance
@@ -241,7 +241,7 @@ RAC_API void rac_llm_result_free(rac_llm_result_t* result);
  * @param prompt System prompt text
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const char* prompt);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const char* prompt);
 
 /**
  * @brief Append text to the LLM's KV cache after current content
@@ -253,7 +253,7 @@ RAC_API rac_result_t rac_llm_inject_system_prompt(rac_handle_t handle, const cha
  * @param text Text to append
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text);
 
 /**
  * @brief Generate a response from accumulated KV cache state
@@ -268,7 +268,7 @@ RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* tex
  * @param out_result Output: Generation result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
+RAC_API RAC_NODISCARD rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
                                                     const rac_llm_options_t* options,
                                                     rac_llm_result_t* out_result);
 
@@ -281,7 +281,7 @@ RAC_API rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const ch
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_clear_context(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_llm_clear_context(rac_handle_t handle);
 
 #ifdef __cplusplus
 }

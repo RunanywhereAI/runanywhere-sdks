@@ -39,7 +39,7 @@ extern "C" {
  * "/var/mobile/Containers/Data/Application/.../Documents")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_set_base_dir(const char* base_dir);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_set_base_dir(const char* base_dir);
 
 /**
  * @brief Get the configured base directory.
@@ -60,7 +60,7 @@ RAC_API const char* rac_model_paths_get_base_dir(void);
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t path_size);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t path_size);
 
 /**
  * @brief Get the models directory.
@@ -72,7 +72,7 @@ RAC_API rac_result_t rac_model_paths_get_base_directory(char* out_path, size_t p
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t path_size);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t path_size);
 
 // =============================================================================
 // FRAMEWORK-SPECIFIC PATHS - Mirrors ModelPathUtils framework methods
@@ -89,7 +89,7 @@ RAC_API rac_result_t rac_model_paths_get_models_directory(char* out_path, size_t
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_framework_directory(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_framework_directory(rac_inference_framework_t framework,
                                                              char* out_path, size_t path_size);
 
 /**
@@ -104,7 +104,7 @@ RAC_API rac_result_t rac_model_paths_get_framework_directory(rac_inference_frame
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_folder(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_model_folder(const char* model_id,
                                                       rac_inference_framework_t framework,
                                                       char* out_path, size_t path_size);
 
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_model_paths_get_model_folder(const char* model_id,
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
                                                          rac_inference_framework_t framework,
                                                          rac_model_format_t format, char* out_path,
                                                          size_t path_size);
@@ -144,7 +144,7 @@ RAC_API rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_expected_model_path(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_expected_model_path(const char* model_id,
                                                              rac_inference_framework_t framework,
                                                              rac_model_format_t format,
                                                              char* out_path, size_t path_size);
@@ -158,7 +158,7 @@ RAC_API rac_result_t rac_model_paths_get_expected_model_path(const char* model_i
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* model_info,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* model_info,
                                                     char* out_path, size_t path_size);
 
 // =============================================================================
@@ -175,7 +175,7 @@ RAC_API rac_result_t rac_model_paths_get_model_path(const rac_model_info_t* mode
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t path_size);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t path_size);
 
 /**
  * @brief Get the temporary files directory.
@@ -187,7 +187,7 @@ RAC_API rac_result_t rac_model_paths_get_cache_directory(char* out_path, size_t 
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t path_size);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t path_size);
 
 /**
  * @brief Get the downloads directory.
@@ -199,7 +199,7 @@ RAC_API rac_result_t rac_model_paths_get_temp_directory(char* out_path, size_t p
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_paths_get_downloads_directory(char* out_path, size_t path_size);
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_get_downloads_directory(char* out_path, size_t path_size);
 
 // =============================================================================
 // PATH ANALYSIS - Mirrors ModelPathUtils analysis methods
@@ -214,7 +214,7 @@ RAC_API rac_result_t rac_model_paths_get_downloads_directory(char* out_path, siz
  * @param model_id_size Size of output buffer
  * @return RAC_SUCCESS if model ID found, RAC_ERROR_NOT_FOUND otherwise
  */
-RAC_API rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_id,
                                                       size_t model_id_size);
 
 /**
@@ -225,7 +225,7 @@ RAC_API rac_result_t rac_model_paths_extract_model_id(const char* path, char* ou
  * @param out_framework Output: The framework if found
  * @return RAC_SUCCESS if framework found, RAC_ERROR_NOT_FOUND otherwise
  */
-RAC_API rac_result_t rac_model_paths_extract_framework(const char* path,
+RAC_API RAC_NODISCARD rac_result_t rac_model_paths_extract_framework(const char* path,
                                                        rac_inference_framework_t* out_framework);
 
 /**

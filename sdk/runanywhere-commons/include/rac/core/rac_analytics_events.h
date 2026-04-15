@@ -448,7 +448,7 @@ typedef void (*rac_analytics_callback_fn)(rac_event_type_t type,
  * @param user_data User data passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callback,
+RAC_API RAC_NODISCARD rac_result_t rac_analytics_events_set_callback(rac_analytics_callback_fn callback,
                                                        void* user_data);
 
 /**
@@ -500,7 +500,7 @@ typedef void (*rac_public_event_callback_fn)(rac_event_type_t type,
  * @param user_data User data passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_analytics_events_set_public_callback(rac_public_event_callback_fn callback,
+RAC_API RAC_NODISCARD rac_result_t rac_analytics_events_set_public_callback(rac_public_event_callback_fn callback,
                                                               void* user_data);
 
 /**

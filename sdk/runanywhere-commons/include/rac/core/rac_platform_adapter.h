@@ -257,7 +257,7 @@ typedef struct rac_platform_adapter {
  * @param adapter Platform adapter (must not be NULL)
  * @return RAC_SUCCESS on success, error code on failure
  */
-RAC_API rac_result_t rac_set_platform_adapter(const rac_platform_adapter_t* adapter);
+RAC_API RAC_NODISCARD rac_result_t rac_set_platform_adapter(const rac_platform_adapter_t* adapter);
 
 /**
  * Gets the current platform adapter.
@@ -296,7 +296,7 @@ RAC_API int64_t rac_get_current_time_ms(void);
  * @param out_task_id Output: Task ID (owned, must be freed)
  * @return RAC_SUCCESS if started, error code otherwise
  */
-RAC_API rac_result_t rac_http_download(const char* url, const char* destination_path,
+RAC_API RAC_NODISCARD rac_result_t rac_http_download(const char* url, const char* destination_path,
                                        rac_http_progress_callback_fn progress_callback,
                                        rac_http_complete_callback_fn complete_callback,
                                        void* callback_user_data, char** out_task_id);
@@ -308,7 +308,7 @@ RAC_API rac_result_t rac_http_download(const char* url, const char* destination_
  * @param task_id Task ID to cancel
  * @return RAC_SUCCESS if cancelled, error code otherwise
  */
-RAC_API rac_result_t rac_http_download_cancel(const char* task_id);
+RAC_API RAC_NODISCARD rac_result_t rac_http_download_cancel(const char* task_id);
 
 /**
  * Extract an archive using the platform adapter.
@@ -320,7 +320,7 @@ RAC_API rac_result_t rac_http_download_cancel(const char* task_id);
  * @param callback_user_data User data for callback
  * @return RAC_SUCCESS if extracted, error code otherwise
  */
-RAC_API rac_result_t rac_extract_archive(const char* archive_path, const char* destination_dir,
+RAC_API RAC_NODISCARD rac_result_t rac_extract_archive(const char* archive_path, const char* destination_dir,
                                          rac_extract_progress_callback_fn progress_callback,
                                          void* callback_user_data);
 

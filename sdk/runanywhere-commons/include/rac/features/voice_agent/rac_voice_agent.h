@@ -381,7 +381,7 @@ typedef struct rac_voice_agent* rac_voice_agent_handle_t;
  * @param out_handle Output: Handle to the created voice agent
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
 
 /**
  * @brief Create a voice agent instance with external component handles.
@@ -396,7 +396,7 @@ RAC_API rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t*
  * @param out_handle Output: Handle to the created voice agent
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
                                             rac_handle_t stt_component_handle,
                                             rac_handle_t tts_component_handle,
                                             rac_handle_t vad_component_handle,
@@ -425,7 +425,7 @@ RAC_API void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
  * @param model_name Human-readable model name (e.g., "Whisper Base")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t handle,
                                                     const char* model_path, const char* model_id,
                                                     const char* model_name);
 
@@ -438,7 +438,7 @@ RAC_API rac_result_t rac_voice_agent_load_stt_model(rac_voice_agent_handle_t han
  * @param model_name Human-readable model name (e.g., "Llama 3.2 1B Instruct")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t handle,
                                                     const char* model_path, const char* model_id,
                                                     const char* model_name);
 
@@ -451,7 +451,7 @@ RAC_API rac_result_t rac_voice_agent_load_llm_model(rac_voice_agent_handle_t han
  * @param voice_name Human-readable voice name (e.g., "Piper TTS (British English)")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t handle,
                                                     const char* voice_path, const char* voice_id,
                                                     const char* voice_name);
 
@@ -462,7 +462,7 @@ RAC_API rac_result_t rac_voice_agent_load_tts_voice(rac_voice_agent_handle_t han
  * @param out_loaded Output: RAC_TRUE if loaded
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t handle,
                                                    rac_bool_t* out_loaded);
 
 /**
@@ -472,7 +472,7 @@ RAC_API rac_result_t rac_voice_agent_is_stt_loaded(rac_voice_agent_handle_t hand
  * @param out_loaded Output: RAC_TRUE if loaded
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t handle,
                                                    rac_bool_t* out_loaded);
 
 /**
@@ -482,7 +482,7 @@ RAC_API rac_result_t rac_voice_agent_is_llm_loaded(rac_voice_agent_handle_t hand
  * @param out_loaded Output: RAC_TRUE if loaded
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_is_tts_loaded(rac_voice_agent_handle_t handle,
                                                    rac_bool_t* out_loaded);
 
 /**
@@ -519,7 +519,7 @@ RAC_API const char* rac_voice_agent_get_tts_voice_id(rac_voice_agent_handle_t ha
  * @param config Configuration (can be NULL for defaults)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
                                                 const rac_voice_agent_config_t* config);
 
 /**
@@ -531,7 +531,7 @@ RAC_API rac_result_t rac_voice_agent_initialize(rac_voice_agent_handle_t handle,
  * @param handle Voice agent handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_agent_handle_t handle);
 
 /**
  * @brief Cleanup voice agent resources.
@@ -541,7 +541,7 @@ RAC_API rac_result_t rac_voice_agent_initialize_with_loaded_models(rac_voice_age
  * @param handle Voice agent handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle);
 
 /**
  * @brief Check if voice agent is ready.
@@ -552,7 +552,7 @@ RAC_API rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle);
  * @param out_is_ready Output: RAC_TRUE if ready
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
                                               rac_bool_t* out_is_ready);
 
 // =============================================================================
@@ -571,7 +571,7 @@ RAC_API rac_result_t rac_voice_agent_is_ready(rac_voice_agent_handle_t handle,
  * rac_voice_agent_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
                                                         const void* audio_data, size_t audio_size,
                                                         rac_voice_agent_result_t* out_result);
 
@@ -588,7 +588,7 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle,
                                                     const void* audio_data, size_t audio_size,
                                                     rac_voice_agent_event_callback_fn callback,
                                                     void* user_data);
@@ -608,7 +608,7 @@ RAC_API rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t han
  * @param out_transcription Output: Transcribed text (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
                                                 const void* audio_data, size_t audio_size,
                                                 char** out_transcription);
 
@@ -622,7 +622,7 @@ RAC_API rac_result_t rac_voice_agent_transcribe(rac_voice_agent_handle_t handle,
  * @param out_response Output: Generated response (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t handle,
                                                        const char* prompt, char** out_response);
 
 /**
@@ -636,7 +636,7 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  * @param out_audio_size Output: Size of audio data in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t handle,
                                                        const char* text, void** out_audio,
                                                        size_t* out_audio_size);
 
@@ -651,7 +651,7 @@ RAC_API rac_result_t rac_voice_agent_synthesize_speech(rac_voice_agent_handle_t 
  * @param out_speech_detected Output: RAC_TRUE if speech detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_voice_agent_detect_speech(rac_voice_agent_handle_t handle,
                                                    const float* samples, size_t sample_count,
                                                    rac_bool_t* out_speech_detected);
 

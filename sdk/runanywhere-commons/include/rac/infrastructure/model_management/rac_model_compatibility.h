@@ -55,7 +55,7 @@ typedef struct rac_model_compatibility_result {
  * @param out_result        Output: compatibility result
  * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND if model not in registry, or other error
  */
-RAC_API rac_result_t rac_model_check_compatibility(
+RAC_API RAC_NODISCARD rac_result_t rac_model_check_compatibility(
     rac_model_registry_handle_t registry_handle,
     const char* model_id,
     int64_t available_ram,

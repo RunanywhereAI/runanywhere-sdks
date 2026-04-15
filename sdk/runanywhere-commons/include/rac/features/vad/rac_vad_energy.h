@@ -153,7 +153,7 @@ typedef void (*rac_audio_buffer_callback_fn)(const void* audio_data, size_t audi
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_create(const rac_energy_vad_config_t* config,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_create(const rac_energy_vad_config_t* config,
                                            rac_energy_vad_handle_t* out_handle);
 
 /**
@@ -172,7 +172,7 @@ RAC_API void rac_energy_vad_destroy(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_initialize(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_initialize(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Start voice activity detection.
@@ -182,7 +182,7 @@ RAC_API rac_result_t rac_energy_vad_initialize(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_start(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_start(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Stop voice activity detection.
@@ -192,7 +192,7 @@ RAC_API rac_result_t rac_energy_vad_start(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Reset the VAD state.
@@ -202,7 +202,7 @@ RAC_API rac_result_t rac_energy_vad_stop(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_reset(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_reset(rac_energy_vad_handle_t handle);
 
 // =============================================================================
 // PROCESSING API
@@ -219,7 +219,7 @@ RAC_API rac_result_t rac_energy_vad_reset(rac_energy_vad_handle_t handle);
  * @param out_has_voice Output: Whether voice was detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle,
                                                   const float* audio_data, size_t sample_count,
                                                   rac_bool_t* out_has_voice);
 
@@ -246,7 +246,7 @@ RAC_API float rac_energy_vad_calculate_rms(const float* __restrict audio_data,si
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Resume VAD processing.
@@ -256,7 +256,7 @@ RAC_API rac_result_t rac_energy_vad_pause(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle);
 
 // =============================================================================
 // CALIBRATION API
@@ -271,7 +271,7 @@ RAC_API rac_result_t rac_energy_vad_resume(rac_energy_vad_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_start_calibration(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_start_calibration(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Check if calibration is in progress.
@@ -280,7 +280,7 @@ RAC_API rac_result_t rac_energy_vad_start_calibration(rac_energy_vad_handle_t ha
  * @param out_is_calibrating Output: RAC_TRUE if calibrating
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_is_calibrating(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_is_calibrating(rac_energy_vad_handle_t handle,
                                                    rac_bool_t* out_is_calibrating);
 
 /**
@@ -292,7 +292,7 @@ RAC_API rac_result_t rac_energy_vad_is_calibrating(rac_energy_vad_handle_t handl
  * @param multiplier Calibration multiplier (clamped to 1.5-4.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_set_calibration_multiplier(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_set_calibration_multiplier(rac_energy_vad_handle_t handle,
                                                                float multiplier);
 
 // =============================================================================
@@ -308,7 +308,7 @@ RAC_API rac_result_t rac_energy_vad_set_calibration_multiplier(rac_energy_vad_ha
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_notify_tts_start(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_notify_tts_start(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Notify VAD that TTS has finished playing.
@@ -319,7 +319,7 @@ RAC_API rac_result_t rac_energy_vad_notify_tts_start(rac_energy_vad_handle_t han
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t handle);
 
 /**
  * @brief Set TTS threshold multiplier.
@@ -330,7 +330,7 @@ RAC_API rac_result_t rac_energy_vad_notify_tts_finish(rac_energy_vad_handle_t ha
  * @param multiplier TTS threshold multiplier (clamped to 2.0-5.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_set_tts_multiplier(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_set_tts_multiplier(rac_energy_vad_handle_t handle,
                                                        float multiplier);
 
 // =============================================================================
@@ -346,7 +346,7 @@ RAC_API rac_result_t rac_energy_vad_set_tts_multiplier(rac_energy_vad_handle_t h
  * @param out_is_active Output: RAC_TRUE if speech is active
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_is_speech_active(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_is_speech_active(rac_energy_vad_handle_t handle,
                                                      rac_bool_t* out_is_active);
 
 /**
@@ -356,7 +356,7 @@ RAC_API rac_result_t rac_energy_vad_is_speech_active(rac_energy_vad_handle_t han
  * @param out_threshold Output: Current threshold value
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_get_threshold(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_get_threshold(rac_energy_vad_handle_t handle,
                                                   float* out_threshold);
 
 /**
@@ -366,7 +366,7 @@ RAC_API rac_result_t rac_energy_vad_get_threshold(rac_energy_vad_handle_t handle
  * @param threshold New threshold value
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_set_threshold(rac_energy_vad_handle_t handle, float threshold);
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_set_threshold(rac_energy_vad_handle_t handle, float threshold);
 
 /**
  * @brief Get VAD statistics for debugging.
@@ -377,7 +377,7 @@ RAC_API rac_result_t rac_energy_vad_set_threshold(rac_energy_vad_handle_t handle
  * @param out_stats Output: VAD statistics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_get_statistics(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_get_statistics(rac_energy_vad_handle_t handle,
                                                    rac_energy_vad_stats_t* out_stats);
 
 /**
@@ -389,7 +389,7 @@ RAC_API rac_result_t rac_energy_vad_get_statistics(rac_energy_vad_handle_t handl
  * @param out_sample_rate Output: Sample rate
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_get_sample_rate(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_get_sample_rate(rac_energy_vad_handle_t handle,
                                                     int32_t* out_sample_rate);
 
 /**
@@ -401,7 +401,7 @@ RAC_API rac_result_t rac_energy_vad_get_sample_rate(rac_energy_vad_handle_t hand
  * @param out_frame_length Output: Frame length in samples
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_get_frame_length_samples(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_get_frame_length_samples(rac_energy_vad_handle_t handle,
                                                              int32_t* out_frame_length);
 
 // =============================================================================
@@ -418,7 +418,7 @@ RAC_API rac_result_t rac_energy_vad_get_frame_length_samples(rac_energy_vad_hand
  * @param user_data User-provided context
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_set_speech_callback(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_set_speech_callback(rac_energy_vad_handle_t handle,
                                                         rac_speech_activity_callback_fn callback,
                                                         void* user_data);
 
@@ -432,7 +432,7 @@ RAC_API rac_result_t rac_energy_vad_set_speech_callback(rac_energy_vad_handle_t 
  * @param user_data User-provided context
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_energy_vad_set_audio_callback(rac_energy_vad_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_energy_vad_set_audio_callback(rac_energy_vad_handle_t handle,
                                                        rac_audio_buffer_callback_fn callback,
                                                        void* user_data);
 

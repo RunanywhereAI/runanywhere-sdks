@@ -39,7 +39,7 @@ extern "C" {
  * @param[out] out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
 
 /**
  * @brief Initialize the wake word service
@@ -51,7 +51,7 @@ RAC_API rac_result_t rac_wakeword_create(rac_handle_t* out_handle);
  * @param config Configuration (NULL for defaults)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_initialize(rac_handle_t handle,
                                               const rac_wakeword_config_t* config);
 
 /**
@@ -79,7 +79,7 @@ RAC_API void rac_wakeword_destroy(rac_handle_t handle);
  * @param wake_word Human-readable wake word phrase (e.g., "Hey Jarvis")
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_load_model(rac_handle_t handle,
                                               const char* model_path,
                                               const char* model_id,
                                               const char* wake_word);
@@ -94,7 +94,7 @@ RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
  * @param vad_model_path Path to Silero VAD ONNX model
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
                                             const char* vad_model_path);
 
 /**
@@ -104,7 +104,7 @@ RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
  * @param model_id Model identifier to unload
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
                                                 const char* model_id);
 
 /**
@@ -115,7 +115,7 @@ RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
 
 /**
  * @brief Get list of loaded models
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_wakeword_unload_all(rac_handle_t handle);
  * @param[out] out_count Output: Number of models
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_get_models(rac_handle_t handle,
                                               const rac_wakeword_model_info_t** out_models,
                                               int32_t* out_count);
 
@@ -144,7 +144,7 @@ RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
                                                 rac_wakeword_callback_fn callback,
                                                 void* user_data);
 
@@ -156,7 +156,7 @@ RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
                                                     rac_wakeword_vad_callback_fn callback,
                                                     void* user_data);
 
@@ -173,7 +173,7 @@ RAC_API rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_start(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_start(rac_handle_t handle);
 
 /**
  * @brief Stop listening for wake words
@@ -184,7 +184,7 @@ RAC_API rac_result_t rac_wakeword_start(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_stop(rac_handle_t handle);
 
 /**
  * @brief Pause detection temporarily
@@ -195,7 +195,7 @@ RAC_API rac_result_t rac_wakeword_stop(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_pause(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_pause(rac_handle_t handle);
 
 /**
  * @brief Resume detection after pause
@@ -203,7 +203,7 @@ RAC_API rac_result_t rac_wakeword_pause(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_resume(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_resume(rac_handle_t handle);
 
 /**
  * @brief Reset detector state
@@ -214,7 +214,7 @@ RAC_API rac_result_t rac_wakeword_resume(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_reset(rac_handle_t handle);
 
 // =============================================================================
 // AUDIO PROCESSING
@@ -232,7 +232,7 @@ RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle);
  * @param[out] out_result Optional: Frame processing result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_process(rac_handle_t handle,
                                            const float* samples,
                                            size_t num_samples,
                                            rac_wakeword_frame_result_t* out_result);
@@ -248,7 +248,7 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
  * @param[out] out_result Optional: Frame processing result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
                                                  const int16_t* samples,
                                                  size_t num_samples,
                                                  rac_wakeword_frame_result_t* out_result);
@@ -267,7 +267,7 @@ RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
  * @param threshold New threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
                                                  float threshold);
 
 /**
@@ -278,7 +278,7 @@ RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle,
  * @param threshold Model threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
                                                        const char* model_id,
                                                        float threshold);
 
@@ -289,7 +289,7 @@ RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
  * @param enabled Whether to enable VAD filtering
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
                                                    rac_bool_t enabled);
 
 // =============================================================================
@@ -303,7 +303,7 @@ RAC_API rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle,
  * @param[out] out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_wakeword_get_info(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_wakeword_get_info(rac_handle_t handle,
                                             rac_wakeword_info_t* out_info);
 
 /**

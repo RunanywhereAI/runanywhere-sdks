@@ -156,7 +156,7 @@ typedef struct rac_tool_calling_options {
  * @param out_result Output: Parsed result (caller must free with rac_tool_call_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result);
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t* out_result);
 
 /**
  * @brief Parse LLM output for tool calls with specified format
@@ -172,7 +172,7 @@ RAC_API rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t
  * @param out_result Output: Parsed result (caller must free with rac_tool_call_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
                                                      rac_tool_call_format_t format,
                                                      rac_tool_call_t* out_result);
 
@@ -229,7 +229,7 @@ RAC_API rac_tool_call_format_t rac_tool_call_format_from_name(const char* name);
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* definitions,
                                                  size_t num_definitions, char** out_prompt);
 
 /**
@@ -244,7 +244,7 @@ RAC_API rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* de
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
                                                              size_t num_definitions,
                                                              rac_tool_call_format_t format,
                                                              char** out_prompt);
@@ -258,7 +258,7 @@ RAC_API rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_defi
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
 
 /**
  * @brief Format tools from JSON array string with specified format
@@ -268,7 +268,7 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, ch
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
                                                                   rac_tool_call_format_t format,
                                                                   char** out_prompt);
 
@@ -285,7 +285,7 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format(const char* to
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
                                                                        const char* format_name,
                                                                        char** out_prompt);
 
@@ -300,7 +300,7 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format_name(const cha
  * @param out_prompt Output: Complete formatted prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
                                                         const char* tools_json,
                                                         const rac_tool_calling_options_t* options,
                                                         char** out_prompt);
@@ -319,7 +319,7 @@ RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
  * @param out_prompt Output: Follow-up prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_prompt,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_prompt,
                                                          const char* tools_prompt,
                                                          const char* tool_name,
                                                          const char* tool_result_json,
@@ -339,7 +339,7 @@ RAC_API rac_result_t rac_tool_call_build_followup_prompt(const char* original_us
  * @param out_normalized Output: Normalized JSON (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized);
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized);
 
 /**
  * @brief Serialize tool definitions to JSON array
@@ -349,7 +349,7 @@ RAC_API rac_result_t rac_tool_call_normalize_json(const char* json_str, char** o
  * @param out_json Output: JSON array string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
                                                        size_t num_definitions, char** out_json);
 
 /**
@@ -362,7 +362,7 @@ RAC_API rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
+RAC_API RAC_NODISCARD rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
                                                   const char* result_json,
                                                   const char* error_message, char** out_json);
 

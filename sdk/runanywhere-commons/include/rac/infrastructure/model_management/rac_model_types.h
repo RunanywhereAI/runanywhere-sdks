@@ -337,7 +337,7 @@ RAC_API rac_model_category_t rac_model_category_from_framework(rac_inference_fra
  * @param out_count Output: Number of formats
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t framework,
+RAC_API RAC_NODISCARD rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t framework,
                                                          rac_model_format_t** out_formats,
                                                          size_t* out_count);
 
@@ -433,7 +433,7 @@ RAC_API rac_bool_t rac_artifact_requires_download(const rac_model_artifact_info_
  * @param out_artifact Output: Inferred artifact info
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_artifact_infer_from_url(const char* url, rac_model_format_t format,
+RAC_API RAC_NODISCARD rac_result_t rac_artifact_infer_from_url(const char* url, rac_model_format_t format,
                                                  rac_model_artifact_info_t* out_artifact);
 
 /**

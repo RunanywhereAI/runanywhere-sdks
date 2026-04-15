@@ -131,7 +131,7 @@ typedef void (*rac_lifecycle_destroy_service_fn)(rac_handle_t service, void* use
  * @param out_handle Output: Handle to the lifecycle manager
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
                                           rac_lifecycle_create_service_fn create_fn,
                                           rac_lifecycle_destroy_service_fn destroy_fn,
                                           rac_handle_t* out_handle);
@@ -151,7 +151,7 @@ RAC_API rac_result_t rac_lifecycle_create(const rac_lifecycle_config_t* config,
  * @param out_service Output: Handle to the loaded service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_path,
                                         const char* model_id, const char* model_name,
                                         rac_handle_t* out_service);
 
@@ -163,7 +163,7 @@ RAC_API rac_result_t rac_lifecycle_load(rac_handle_t handle, const char* model_p
  * @param handle Lifecycle manager handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_unload(rac_handle_t handle);
 
 /**
  * @brief Reset all state
@@ -173,7 +173,7 @@ RAC_API rac_result_t rac_lifecycle_unload(rac_handle_t handle);
  * @param handle Lifecycle manager handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_reset(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_reset(rac_handle_t handle);
 
 /**
  * @brief Get current lifecycle state
@@ -232,7 +232,7 @@ RAC_API rac_handle_t rac_lifecycle_get_service(rac_handle_t handle);
  * @param out_service Output: Service handle
  * @return RAC_SUCCESS or RAC_ERROR_NOT_INITIALIZED if not loaded
  */
-RAC_API rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* out_service);
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_handle_t* out_service);
 
 /**
  * @brief Acquire (pin) the current service, preventing unload while held.
@@ -244,7 +244,7 @@ RAC_API rac_result_t rac_lifecycle_require_service(rac_handle_t handle, rac_hand
  * @param out_service Output: Service handle (pinned)
  * @return RAC_SUCCESS or RAC_ERROR_NOT_INITIALIZED if not loaded
  */
-RAC_API rac_result_t rac_lifecycle_acquire_service(rac_handle_t handle, rac_handle_t* out_service);
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_acquire_service(rac_handle_t handle, rac_handle_t* out_service);
 
 /**
  * @brief Release a previously acquired service reference.
@@ -274,7 +274,7 @@ RAC_API void rac_lifecycle_track_error(rac_handle_t handle, rac_result_t error_c
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_lifecycle_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_lifecycle_get_metrics(rac_handle_t handle,
                                                rac_lifecycle_metrics_t* out_metrics);
 
 /**

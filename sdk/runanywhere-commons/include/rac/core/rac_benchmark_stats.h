@@ -106,7 +106,7 @@ typedef struct rac_benchmark_summary {
  * @param out_handle Output: collector handle
  * @return RAC_SUCCESS or RAC_ERROR_NULL_POINTER
  */
-RAC_API rac_result_t rac_benchmark_stats_create(rac_benchmark_stats_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_benchmark_stats_create(rac_benchmark_stats_handle_t* out_handle);
 
 /**
  * Destroys a stats collector and frees all associated memory.
@@ -151,7 +151,7 @@ RAC_API int32_t rac_benchmark_stats_count(rac_benchmark_stats_handle_t handle);
  * @param out_summary Output: summary struct
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, or RAC_ERROR_INVALID_STATE (no data)
  */
-RAC_API rac_result_t rac_benchmark_stats_get_summary(rac_benchmark_stats_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_benchmark_stats_get_summary(rac_benchmark_stats_handle_t handle,
                                                       rac_benchmark_summary_t* out_summary);
 
 /**

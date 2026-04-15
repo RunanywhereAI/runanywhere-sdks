@@ -122,7 +122,7 @@ typedef struct rac_device_callbacks {
  * @param callbacks Callback structure (copied internally)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* callbacks);
+RAC_API RAC_NODISCARD rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks_t* callbacks);
 
 /**
  * @brief Register device with backend if not already registered
@@ -140,7 +140,7 @@ RAC_API rac_result_t rac_device_manager_set_callbacks(const rac_device_callbacks
  * @param build_token Optional build token for development mode (can be NULL)
  * @return RAC_SUCCESS on success or if already registered, error code otherwise
  */
-RAC_API rac_result_t rac_device_manager_register_if_needed(rac_environment_t env,
+RAC_API RAC_NODISCARD rac_result_t rac_device_manager_register_if_needed(rac_environment_t env,
                                                            const char* build_token);
 
 /**

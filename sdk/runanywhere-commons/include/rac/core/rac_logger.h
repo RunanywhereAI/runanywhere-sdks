@@ -95,7 +95,7 @@ typedef struct rac_log_metadata {
  * @param min_level Minimum log level to output
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_logger_init(rac_log_level_t min_level);
+RAC_API RAC_NODISCARD rac_result_t rac_logger_init(rac_log_level_t min_level);
 
 /**
  * @brief Shutdown the logging system.

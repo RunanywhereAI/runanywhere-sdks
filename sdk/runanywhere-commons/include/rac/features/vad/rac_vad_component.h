@@ -32,7 +32,7 @@ extern "C" {
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the VAD component
@@ -41,7 +41,7 @@ RAC_API rac_result_t rac_vad_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_configure(rac_handle_t handle,
                                                  const rac_vad_config_t* config);
 
 /**
@@ -58,7 +58,7 @@ RAC_API rac_bool_t rac_vad_component_is_initialized(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_initialize(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_initialize(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -66,7 +66,7 @@ RAC_API rac_result_t rac_vad_component_initialize(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Set speech activity callback
@@ -76,7 +76,7 @@ RAC_API rac_result_t rac_vad_component_cleanup(rac_handle_t handle);
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_set_activity_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_set_activity_callback(rac_handle_t handle,
                                                              rac_vad_activity_callback_fn callback,
                                                              void* user_data);
 
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_vad_component_set_activity_callback(rac_handle_t handle
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle,
                                                           rac_vad_audio_callback_fn callback,
                                                           void* user_data);
 
@@ -98,7 +98,7 @@ RAC_API rac_result_t rac_vad_component_set_audio_callback(rac_handle_t handle,
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_start(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_start(rac_handle_t handle);
 
 /**
  * @brief Stop VAD processing
@@ -106,7 +106,7 @@ RAC_API rac_result_t rac_vad_component_start(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_stop(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_stop(rac_handle_t handle);
 
 /**
  * @brief Reset VAD state
@@ -114,7 +114,7 @@ RAC_API rac_result_t rac_vad_component_stop(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_reset(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_reset(rac_handle_t handle);
 
 /**
  * @brief Process audio samples
@@ -125,7 +125,7 @@ RAC_API rac_result_t rac_vad_component_reset(rac_handle_t handle);
  * @param out_is_speech Output: Whether speech is detected
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_process(rac_handle_t handle, const float* samples,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_process(rac_handle_t handle, const float* samples,
                                                size_t num_samples, rac_bool_t* out_is_speech);
 
 /**
@@ -151,7 +151,7 @@ RAC_API float rac_vad_component_get_energy_threshold(rac_handle_t handle);
  * @param threshold New threshold (0.0 to 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t handle, float threshold);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t handle, float threshold);
 
 /**
  * @brief Load a VAD model via the service registry.
@@ -166,7 +166,7 @@ RAC_API rac_result_t rac_vad_component_set_energy_threshold(rac_handle_t handle,
  * @param model_name Human-readable model name
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_load_model(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_load_model(rac_handle_t handle,
                                                    const char* model_path,
                                                    const char* model_id,
                                                    const char* model_name);
@@ -187,7 +187,7 @@ RAC_API rac_bool_t rac_vad_component_is_loaded(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_unload(rac_handle_t handle);
 
 /**
  * @brief Get lifecycle state
@@ -204,7 +204,7 @@ RAC_API rac_lifecycle_state_t rac_vad_component_get_state(rac_handle_t handle);
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_vad_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 /**

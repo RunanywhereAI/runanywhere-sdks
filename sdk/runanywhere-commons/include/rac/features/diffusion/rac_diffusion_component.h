@@ -33,7 +33,7 @@ extern "C" {
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the diffusion component
@@ -42,7 +42,7 @@ RAC_API rac_result_t rac_diffusion_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_configure(rac_handle_t handle,
                                                        const rac_diffusion_config_t* config);
 
 /**
@@ -70,7 +70,7 @@ RAC_API const char* rac_diffusion_component_get_model_id(rac_handle_t handle);
  * @param model_name Human-readable model name
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_load_model(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_load_model(rac_handle_t handle, const char* model_path,
                                                         const char* model_id,
                                                         const char* model_name);
 
@@ -80,7 +80,7 @@ RAC_API rac_result_t rac_diffusion_component_load_model(rac_handle_t handle, con
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_diffusion_component_unload(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Cancel ongoing generation
@@ -98,7 +98,7 @@ RAC_API rac_result_t rac_diffusion_component_cleanup(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_cancel(rac_handle_t handle);
 
 /**
  * @brief Generate an image (non-streaming)
@@ -110,7 +110,7 @@ RAC_API rac_result_t rac_diffusion_component_cancel(rac_handle_t handle);
  * @param out_result Output: Generation result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
                                                       const rac_diffusion_options_t* options,
                                                       rac_diffusion_result_t* out_result);
 
@@ -127,7 +127,7 @@ RAC_API rac_result_t rac_diffusion_component_generate(rac_handle_t handle,
  * @param user_data User context passed to callbacks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_generate_with_callbacks(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_generate_with_callbacks(
     rac_handle_t handle, const rac_diffusion_options_t* options,
     rac_diffusion_progress_callback_fn progress_callback,
     rac_diffusion_complete_callback_fn complete_callback,
@@ -154,7 +154,7 @@ RAC_API rac_result_t rac_diffusion_component_generate_with_callbacks(
  * @param config_json JSON string
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle,
                                                             const char* config_json);
 
 /**
@@ -185,7 +185,7 @@ RAC_API rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle,
  * @param out_json Output JSON (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_generate_json(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_generate_json(
     rac_handle_t handle, const char* options_json, const uint8_t* input_image_data,
     size_t input_image_size, const uint8_t* mask_data, size_t mask_size, char** out_json);
 
@@ -209,7 +209,7 @@ RAC_API rac_result_t rac_diffusion_component_generate_json(
  * @param out_json Output JSON (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_get_info_json(rac_handle_t handle, char** out_json);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_get_info_json(rac_handle_t handle, char** out_json);
 
 /**
  * @brief Get supported capabilities
@@ -228,7 +228,7 @@ RAC_API uint32_t rac_diffusion_component_get_capabilities(rac_handle_t handle);
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_get_info(rac_handle_t handle,
                                                       rac_diffusion_info_t* out_info);
 
 /**
@@ -246,7 +246,7 @@ RAC_API rac_lifecycle_state_t rac_diffusion_component_get_state(rac_handle_t han
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_component_get_metrics(rac_handle_t handle,
                                                          rac_lifecycle_metrics_t* out_metrics);
 
 /**

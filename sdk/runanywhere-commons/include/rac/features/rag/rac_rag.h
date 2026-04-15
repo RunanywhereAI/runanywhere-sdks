@@ -23,14 +23,14 @@ extern "C" {
  *
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_backend_rag_register(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_rag_register(void);
 
 /**
  * @brief Unregister the RAG pipeline module
  *
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_backend_rag_unregister(void);
+RAC_API RAC_NODISCARD rac_result_t rac_backend_rag_unregister(void);
 
 #ifdef __cplusplus
 }

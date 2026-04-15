@@ -194,7 +194,7 @@ typedef struct rac_storage_analyzer* rac_storage_analyzer_handle_t;
  * @param out_handle Output: Created analyzer handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_storage_analyzer_create(const rac_storage_callbacks_t* callbacks,
+RAC_API RAC_NODISCARD rac_result_t rac_storage_analyzer_create(const rac_storage_callbacks_t* callbacks,
                                                  rac_storage_analyzer_handle_t* out_handle);
 
 /**
@@ -218,7 +218,7 @@ RAC_API void rac_storage_analyzer_destroy(rac_storage_analyzer_handle_t handle);
  * @param out_info Output: Storage info (caller must call rac_storage_info_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
                                                   rac_model_registry_handle_t registry_handle,
                                                   rac_storage_info_t* out_info);
 
@@ -232,7 +232,7 @@ RAC_API rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t 
  * @param out_metrics Output: Model metrics
  * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
  */
-RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
+RAC_API RAC_NODISCARD rac_result_t rac_storage_analyzer_get_model_metrics(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,
     const char* model_id, rac_inference_framework_t framework,
     rac_model_storage_metrics_t* out_metrics);
@@ -246,7 +246,7 @@ RAC_API rac_result_t rac_storage_analyzer_get_model_metrics(
  * @param out_availability Output: Availability result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_storage_analyzer_check_available(
+RAC_API RAC_NODISCARD rac_result_t rac_storage_analyzer_check_available(
     rac_storage_analyzer_handle_t handle, int64_t model_size, double safety_margin,
     rac_storage_availability_t* out_availability);
 
@@ -258,7 +258,7 @@ RAC_API rac_result_t rac_storage_analyzer_check_available(
  * @param out_size Output: Size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_storage_analyzer_calculate_size(rac_storage_analyzer_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_storage_analyzer_calculate_size(rac_storage_analyzer_handle_t handle,
                                                          const char* path, int64_t* out_size);
 
 // =============================================================================

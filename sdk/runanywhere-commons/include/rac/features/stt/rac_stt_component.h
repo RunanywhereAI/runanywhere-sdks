@@ -32,7 +32,7 @@ extern "C" {
  * @param out_handle Output: Handle to the component
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_create(rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_create(rac_handle_t* out_handle);
 
 /**
  * @brief Configure the STT component
@@ -41,7 +41,7 @@ RAC_API rac_result_t rac_stt_component_create(rac_handle_t* out_handle);
  * @param config Configuration
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_configure(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_configure(rac_handle_t handle,
                                                  const rac_stt_config_t* config);
 
 /**
@@ -71,7 +71,7 @@ RAC_API const char* rac_stt_component_get_model_id(rac_handle_t handle);
  *                   Optional: if NULL, defaults to model_id
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_load_model(rac_handle_t handle, const char* model_path,
                                                   const char* model_id, const char* model_name);
 
 /**
@@ -80,7 +80,7 @@ RAC_API rac_result_t rac_stt_component_load_model(rac_handle_t handle, const cha
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_unload(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_unload(rac_handle_t handle);
 
 /**
  * @brief Cleanup and reset the component
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_stt_component_unload(rac_handle_t handle);
  * @param handle Component handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_cleanup(rac_handle_t handle);
 
 /**
  * @brief Transcribe audio data (batch mode)
@@ -100,7 +100,7 @@ RAC_API rac_result_t rac_stt_component_cleanup(rac_handle_t handle);
  * @param out_result Output: Transcription result
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const void* audio_data,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const void* audio_data,
                                                   size_t audio_size,
                                                   const rac_stt_options_t* options,
                                                   rac_stt_result_t* out_result);
@@ -124,7 +124,7 @@ RAC_API rac_bool_t rac_stt_component_supports_streaming(rac_handle_t handle);
  * @param user_data User context passed to callback
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_transcribe_stream(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_transcribe_stream(rac_handle_t handle,
                                                          const void* audio_data, size_t audio_size,
                                                          const rac_stt_options_t* options,
                                                          rac_stt_stream_callback_t callback,
@@ -145,7 +145,7 @@ RAC_API rac_lifecycle_state_t rac_stt_component_get_state(rac_handle_t handle);
  * @param out_metrics Output: Lifecycle metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
                                                    rac_lifecycle_metrics_t* out_metrics);
 
 /**

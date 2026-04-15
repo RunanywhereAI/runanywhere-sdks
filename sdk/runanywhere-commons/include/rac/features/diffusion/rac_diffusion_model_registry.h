@@ -267,7 +267,7 @@ RAC_API void rac_diffusion_model_registry_cleanup(void);
  * @param strategy Strategy to register (caller retains ownership)
  * @return RAC_SUCCESS on success, RAC_ERROR_ALREADY_EXISTS if name taken
  */
-RAC_API rac_result_t rac_diffusion_model_registry_register(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_model_registry_register(
     const rac_diffusion_model_strategy_t* strategy);
 
 /**
@@ -276,7 +276,7 @@ RAC_API rac_result_t rac_diffusion_model_registry_register(
  * @param name Strategy name to unregister
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_diffusion_model_registry_unregister(const char* name);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_model_registry_unregister(const char* name);
 
 /**
  * @brief Get model definition by ID
@@ -285,7 +285,7 @@ RAC_API rac_result_t rac_diffusion_model_registry_unregister(const char* name);
  * @param out_def Output model definition (filled on success)
  * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND otherwise
  */
-RAC_API rac_result_t rac_diffusion_model_registry_get(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_model_registry_get(
     const char* model_id,
     rac_diffusion_model_def_t* out_def);
 
@@ -296,7 +296,7 @@ RAC_API rac_result_t rac_diffusion_model_registry_get(
  * @param out_count Number of models
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_diffusion_model_registry_list(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_model_registry_list(
     rac_diffusion_model_def_t** out_models,
     size_t* out_count);
 
@@ -331,7 +331,7 @@ RAC_API rac_bool_t rac_diffusion_model_registry_is_available(const char* model_i
  * @param out_def Output model definition (filled on success)
  * @return RAC_SUCCESS if found, RAC_ERROR_NOT_FOUND if no recommendation
  */
-RAC_API rac_result_t rac_diffusion_model_registry_get_recommended(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_model_registry_get_recommended(
     rac_diffusion_model_def_t* out_def);
 
 /**

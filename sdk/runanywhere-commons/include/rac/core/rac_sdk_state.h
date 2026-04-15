@@ -95,7 +95,7 @@ RAC_API rac_sdk_state_handle_t rac_state_get_instance(void);
  * @param device_id The persistent device ID (copied internally)
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_state_initialize(rac_environment_t env, const char* api_key,
+RAC_API RAC_NODISCARD rac_result_t rac_state_initialize(rac_environment_t env, const char* api_key,
                                           const char* base_url, const char* device_id);
 
 /**
@@ -160,7 +160,7 @@ RAC_API const char* rac_state_get_device_id(void);
  * @param auth The auth data to set
  * @return RAC_SUCCESS on success
  */
-RAC_API rac_result_t rac_state_set_auth(const rac_auth_data_t* auth);
+RAC_API RAC_NODISCARD rac_result_t rac_state_set_auth(const rac_auth_data_t* auth);
 
 /**
  * @brief Get current access token

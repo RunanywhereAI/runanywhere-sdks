@@ -63,7 +63,7 @@ extern "C" {
  *         RAC_ERROR_NULL_POINTER if timing or out_json is NULL,
  *         RAC_ERROR_OUT_OF_MEMORY if allocation fails
  */
-RAC_API rac_result_t rac_benchmark_timing_to_json(const rac_benchmark_timing_t* timing,
+RAC_API RAC_NODISCARD rac_result_t rac_benchmark_timing_to_json(const rac_benchmark_timing_t* timing,
                                                   char** out_json);
 
 // =============================================================================
@@ -88,7 +88,7 @@ RAC_API rac_result_t rac_benchmark_timing_to_json(const rac_benchmark_timing_t* 
  *             and timing is NULL,
  *         RAC_ERROR_OUT_OF_MEMORY if allocation fails
  */
-RAC_API rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing,
+RAC_API RAC_NODISCARD rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing,
                                                  rac_bool_t header,
                                                  char** out_csv);
 
@@ -109,7 +109,7 @@ RAC_API rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* t
  * @return RAC_SUCCESS on success,
  *         RAC_ERROR_NULL_POINTER if timing is NULL
  */
-RAC_API rac_result_t rac_benchmark_timing_log(const rac_benchmark_timing_t* timing,
+RAC_API RAC_NODISCARD rac_result_t rac_benchmark_timing_log(const rac_benchmark_timing_t* timing,
                                               const char* label);
 
 #ifdef __cplusplus

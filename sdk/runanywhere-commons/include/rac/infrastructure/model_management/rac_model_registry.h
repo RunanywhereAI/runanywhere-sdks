@@ -48,7 +48,7 @@ typedef struct rac_model_registry* rac_model_registry_handle_t;
  * @param out_handle Output: Handle to the created registry
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_create(rac_model_registry_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_create(rac_model_registry_handle_t* out_handle);
 
 /**
  * @brief Destroy a model registry instance.
@@ -70,7 +70,7 @@ RAC_API void rac_model_registry_destroy(rac_model_registry_handle_t handle);
  * @param model Model info to save
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
                                              const rac_model_info_t* model);
 
 /**
@@ -83,7 +83,7 @@ RAC_API rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
  */
-RAC_API rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle,
                                             const char* model_id, rac_model_info_t** out_model);
 
 /**
@@ -97,7 +97,7 @@ RAC_API rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle,
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS, RAC_ERROR_NOT_FOUND, or other error code
  */
-RAC_API rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
                                                     const char* local_path,
                                                     rac_model_info_t** out_model);
 
@@ -111,7 +111,7 @@ RAC_API rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t 
  * @param out_count Output: Number of models
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t handle,
                                                 rac_model_info_t*** out_models, size_t* out_count);
 
 /**
@@ -126,7 +126,7 @@ RAC_API rac_result_t rac_model_registry_get_all(rac_model_registry_handle_t hand
  * @param out_count Output: Number of models
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_get_by_frameworks(
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_get_by_frameworks(
     rac_model_registry_handle_t handle, const rac_inference_framework_t* frameworks,
     size_t framework_count, rac_model_info_t*** out_models, size_t* out_count);
 
@@ -140,7 +140,7 @@ RAC_API rac_result_t rac_model_registry_get_by_frameworks(
  * @param model_id Model identifier
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_update_last_used(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_update_last_used(rac_model_registry_handle_t handle,
                                                          const char* model_id);
 
 /**
@@ -152,7 +152,7 @@ RAC_API rac_result_t rac_model_registry_update_last_used(rac_model_registry_hand
  * @param model_id Model identifier
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handle,
                                                const char* model_id);
 
 /**
@@ -165,7 +165,7 @@ RAC_API rac_result_t rac_model_registry_remove(rac_model_registry_handle_t handl
  * @param out_count Output: Number of models
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle_t handle,
                                                        rac_model_info_t*** out_models,
                                                        size_t* out_count);
 
@@ -179,7 +179,7 @@ RAC_API rac_result_t rac_model_registry_get_downloaded(rac_model_registry_handle
  * @param local_path Path to downloaded model (can be NULL to clear)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle_t handle,
                                                                const char* model_id,
                                                                const char* local_path);
 
@@ -355,7 +355,7 @@ typedef struct {
  * @param out_result Output: Discovery result (caller must call rac_discovery_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_model_registry_discover_downloaded(
+RAC_API RAC_NODISCARD rac_result_t rac_model_registry_discover_downloaded(
     rac_model_registry_handle_t handle, const rac_discovery_callbacks_t* callbacks,
     rac_discovery_result_t* out_result);
 

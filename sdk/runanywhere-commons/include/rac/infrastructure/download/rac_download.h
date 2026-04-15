@@ -233,7 +233,7 @@ typedef struct rac_download_manager* rac_download_manager_handle_t;
  * @param out_handle Output: Handle to the created manager
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_create(const rac_download_config_t* config,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_create(const rac_download_config_t* config,
                                                  rac_download_manager_handle_t* out_handle);
 
 /**
@@ -264,7 +264,7 @@ RAC_API void rac_download_manager_destroy(rac_download_manager_handle_t handle);
  * @param out_task_id Output: Task ID for tracking (owned, must be freed with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_start(rac_download_manager_handle_t handle,
                                                 const char* model_id, const char* url,
                                                 const char* destination_path,
                                                 rac_bool_t requires_extraction,
@@ -281,7 +281,7 @@ RAC_API rac_result_t rac_download_manager_start(rac_download_manager_handle_t ha
  * @param task_id Task ID to cancel
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_cancel(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_cancel(rac_download_manager_handle_t handle,
                                                  const char* task_id);
 
 /**
@@ -292,7 +292,7 @@ RAC_API rac_result_t rac_download_manager_cancel(rac_download_manager_handle_t h
  * @param handle Manager handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_t handle);
 
 /**
  * @brief Resume all paused downloads.
@@ -302,7 +302,7 @@ RAC_API rac_result_t rac_download_manager_pause_all(rac_download_manager_handle_
  * @param handle Manager handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_resume_all(rac_download_manager_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_resume_all(rac_download_manager_handle_t handle);
 
 // =============================================================================
 // STATUS API
@@ -316,7 +316,7 @@ RAC_API rac_result_t rac_download_manager_resume_all(rac_download_manager_handle
  * @param out_progress Output: Current progress
  * @return RAC_SUCCESS or error code (RAC_ERROR_NOT_FOUND if task doesn't exist)
  */
-RAC_API rac_result_t rac_download_manager_get_progress(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_get_progress(rac_download_manager_handle_t handle,
                                                        const char* task_id,
                                                        rac_download_progress_t* out_progress);
 
@@ -328,7 +328,7 @@ RAC_API rac_result_t rac_download_manager_get_progress(rac_download_manager_hand
  * @param out_count Output: Number of tasks
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_get_active_tasks(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_get_active_tasks(rac_download_manager_handle_t handle,
                                                            char*** out_task_ids, size_t* out_count);
 
 /**
@@ -340,7 +340,7 @@ RAC_API rac_result_t rac_download_manager_get_active_tasks(rac_download_manager_
  * @param out_is_healthy Output: RAC_TRUE if healthy
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_is_healthy(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_is_healthy(rac_download_manager_handle_t handle,
                                                      rac_bool_t* out_is_healthy);
 
 // =============================================================================
@@ -358,7 +358,7 @@ RAC_API rac_result_t rac_download_manager_is_healthy(rac_download_manager_handle
  * @param total_bytes Total bytes to download
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_update_progress(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_update_progress(rac_download_manager_handle_t handle,
                                                           const char* task_id,
                                                           int64_t bytes_downloaded,
                                                           int64_t total_bytes);
@@ -373,7 +373,7 @@ RAC_API rac_result_t rac_download_manager_update_progress(rac_download_manager_h
  * @param downloaded_path Path to the downloaded file
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_mark_complete(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_mark_complete(rac_download_manager_handle_t handle,
                                                         const char* task_id,
                                                         const char* downloaded_path);
 
@@ -388,7 +388,7 @@ RAC_API rac_result_t rac_download_manager_mark_complete(rac_download_manager_han
  * @param error_message Error message (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t handle,
                                                       const char* task_id, rac_result_t error_code,
                                                       const char* error_message);
 
@@ -407,7 +407,7 @@ RAC_API rac_result_t rac_download_manager_mark_failed(rac_download_manager_handl
  * @param extracted_path Path to the extracted model directory
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_mark_extraction_complete(
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_mark_extraction_complete(
     rac_download_manager_handle_t handle, const char* task_id, const char* extracted_path);
 
 /**
@@ -421,7 +421,7 @@ RAC_API rac_result_t rac_download_manager_mark_extraction_complete(
  * @param error_message Error description (can be NULL)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_manager_mark_extraction_failed(
+RAC_API RAC_NODISCARD rac_result_t rac_download_manager_mark_extraction_failed(
     rac_download_manager_handle_t handle, const char* task_id, rac_result_t error_code,
     const char* error_message);
 

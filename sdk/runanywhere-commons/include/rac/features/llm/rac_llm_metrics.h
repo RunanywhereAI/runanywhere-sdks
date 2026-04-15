@@ -148,7 +148,7 @@ typedef struct rac_generation_analytics* rac_generation_analytics_handle_t;
  * @param out_handle Output: Handle to the created collector
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_create(const char* model_id, const char* generation_id,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_create(const char* model_id, const char* generation_id,
                                                   int32_t prompt_length,
                                                   rac_streaming_metrics_handle_t* out_handle);
 
@@ -167,7 +167,7 @@ RAC_API void rac_streaming_metrics_destroy(rac_streaming_metrics_handle_t handle
  * @param handle Collector handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_mark_start(rac_streaming_metrics_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_mark_start(rac_streaming_metrics_handle_t handle);
 
 /**
  * @brief Record a token received during streaming.
@@ -179,7 +179,7 @@ RAC_API rac_result_t rac_streaming_metrics_mark_start(rac_streaming_metrics_hand
  * @param token Token string received
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_record_token(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_record_token(rac_streaming_metrics_handle_t handle,
                                                         const char* token);
 
 /**
@@ -190,7 +190,7 @@ RAC_API rac_result_t rac_streaming_metrics_record_token(rac_streaming_metrics_ha
  * @param handle Collector handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_mark_complete(rac_streaming_metrics_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_mark_complete(rac_streaming_metrics_handle_t handle);
 
 /**
  * @brief Mark generation as failed.
@@ -201,7 +201,7 @@ RAC_API rac_result_t rac_streaming_metrics_mark_complete(rac_streaming_metrics_h
  * @param error_code Error code
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_mark_failed(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_mark_failed(rac_streaming_metrics_handle_t handle,
                                                        rac_result_t error_code);
 
 /**
@@ -214,7 +214,7 @@ RAC_API rac_result_t rac_streaming_metrics_mark_failed(rac_streaming_metrics_han
  * @param out_result Output: Streaming result (must be freed with rac_streaming_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_handle_t handle,
                                                       rac_streaming_result_t* out_result);
 
 /**
@@ -224,7 +224,7 @@ RAC_API rac_result_t rac_streaming_metrics_get_result(rac_streaming_metrics_hand
  * @param out_ttft_ms Output: TTFT in ms (0 if first token not yet received)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_get_ttft(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_get_ttft(rac_streaming_metrics_handle_t handle,
                                                     double* out_ttft_ms);
 
 /**
@@ -234,7 +234,7 @@ RAC_API rac_result_t rac_streaming_metrics_get_ttft(rac_streaming_metrics_handle
  * @param out_token_count Output: Number of tokens recorded
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_get_token_count(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_get_token_count(rac_streaming_metrics_handle_t handle,
                                                            int32_t* out_token_count);
 
 /**
@@ -244,7 +244,7 @@ RAC_API rac_result_t rac_streaming_metrics_get_token_count(rac_streaming_metrics
  * @param out_text Output: Accumulated text (owned, must be freed)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle_t handle,
                                                     char** out_text);
 
 /**
@@ -258,7 +258,7 @@ RAC_API rac_result_t rac_streaming_metrics_get_text(rac_streaming_metrics_handle
  * @param output_tokens Actual output/completion token count (0 to use estimation)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metrics_handle_t handle,
                                                             int32_t input_tokens,
                                                             int32_t output_tokens);
 
@@ -272,7 +272,7 @@ RAC_API rac_result_t rac_streaming_metrics_set_token_counts(rac_streaming_metric
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_create(rac_generation_analytics_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_create(rac_generation_analytics_handle_t* out_handle);
 
 /**
  * @brief Destroy a generation analytics service.
@@ -291,7 +291,7 @@ RAC_API void rac_generation_analytics_destroy(rac_generation_analytics_handle_t 
  * @param model_id Model ID
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_start(rac_generation_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_start(rac_generation_analytics_handle_t handle,
                                                     const char* generation_id,
                                                     const char* model_id);
 
@@ -305,7 +305,7 @@ RAC_API rac_result_t rac_generation_analytics_start(rac_generation_analytics_han
  * @param model_id Model ID
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_start_streaming(
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_start_streaming(
     rac_generation_analytics_handle_t handle, const char* generation_id, const char* model_id);
 
 /**
@@ -317,7 +317,7 @@ RAC_API rac_result_t rac_generation_analytics_start_streaming(
  * @param generation_id Generation identifier
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_track_first_token(
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_track_first_token(
     rac_generation_analytics_handle_t handle, const char* generation_id);
 
 /**
@@ -330,7 +330,7 @@ RAC_API rac_result_t rac_generation_analytics_track_first_token(
  * @param tokens_generated Number of tokens generated so far
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_track_streaming_update(
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_track_streaming_update(
     rac_generation_analytics_handle_t handle, const char* generation_id, int32_t tokens_generated);
 
 /**
@@ -345,7 +345,7 @@ RAC_API rac_result_t rac_generation_analytics_track_streaming_update(
  * @param model_id Model ID used
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_complete(rac_generation_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_complete(rac_generation_analytics_handle_t handle,
                                                        const char* generation_id,
                                                        int32_t input_tokens, int32_t output_tokens,
                                                        const char* model_id);
@@ -360,7 +360,7 @@ RAC_API rac_result_t rac_generation_analytics_complete(rac_generation_analytics_
  * @param error_code Error code
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_track_failed(rac_generation_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_track_failed(rac_generation_analytics_handle_t handle,
                                                            const char* generation_id,
                                                            rac_result_t error_code);
 
@@ -373,7 +373,7 @@ RAC_API rac_result_t rac_generation_analytics_track_failed(rac_generation_analyt
  * @param out_metrics Output: Generation metrics
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_get_metrics(rac_generation_analytics_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_get_metrics(rac_generation_analytics_handle_t handle,
                                                           rac_generation_metrics_t* out_metrics);
 
 /**
@@ -382,7 +382,7 @@ RAC_API rac_result_t rac_generation_analytics_get_metrics(rac_generation_analyti
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_generation_analytics_reset(rac_generation_analytics_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_generation_analytics_reset(rac_generation_analytics_handle_t handle);
 
 // =============================================================================
 // MEMORY MANAGEMENT

@@ -83,7 +83,7 @@ typedef struct rac_diffusion_service {
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle);
 
 /**
  * @brief Create a diffusion service with configuration
@@ -96,7 +96,7 @@ RAC_API rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* ou
  * @param out_handle Output: Handle to the created service
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_create_with_config(const char* model_id,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_create_with_config(const char* model_id,
                                                       const rac_diffusion_config_t* config,
                                                       rac_handle_t* out_handle);
 
@@ -108,7 +108,7 @@ RAC_API rac_result_t rac_diffusion_create_with_config(const char* model_id,
  * @param config Configuration (can be NULL for defaults)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_initialize(rac_handle_t handle, const char* model_path,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_initialize(rac_handle_t handle, const char* model_path,
                                               const rac_diffusion_config_t* config);
 
 /**
@@ -121,7 +121,7 @@ RAC_API rac_result_t rac_diffusion_initialize(rac_handle_t handle, const char* m
  * @param out_result Output: Generation result (caller must free with rac_diffusion_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_generate(rac_handle_t handle,
                                             const rac_diffusion_options_t* options,
                                             rac_diffusion_result_t* out_result);
 
@@ -135,7 +135,7 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
  * @param out_result Output: Generation result (caller must free with rac_diffusion_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_generate_with_progress(
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_generate_with_progress(
     rac_handle_t handle, const rac_diffusion_options_t* options,
     rac_diffusion_progress_callback_fn progress_callback, void* user_data,
     rac_diffusion_result_t* out_result);
@@ -147,7 +147,7 @@ RAC_API rac_result_t rac_diffusion_generate_with_progress(
  * @param out_info Output: Service information
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_get_info(rac_handle_t handle, rac_diffusion_info_t* out_info);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_get_info(rac_handle_t handle, rac_diffusion_info_t* out_info);
 
 /**
  * @brief Get supported capabilities as bitmask
@@ -163,7 +163,7 @@ RAC_API uint32_t rac_diffusion_get_capabilities(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_cancel(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_cancel(rac_handle_t handle);
 
 /**
  * @brief Cleanup and release model resources
@@ -171,7 +171,7 @@ RAC_API rac_result_t rac_diffusion_cancel(rac_handle_t handle);
  * @param handle Service handle
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_cleanup(rac_handle_t handle);
+RAC_API RAC_NODISCARD rac_result_t rac_diffusion_cleanup(rac_handle_t handle);
 
 /**
  * @brief Destroy a diffusion service instance

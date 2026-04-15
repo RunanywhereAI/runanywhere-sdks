@@ -123,7 +123,7 @@ typedef void (*rac_extraction_progress_fn)(int32_t files_extracted, int32_t tota
  *  - RAC_ERROR_FILE_NOT_FOUND: Archive file does not exist
  *  - RAC_ERROR_NULL_POINTER: archive_path or destination_dir is NULL
  */
-RAC_API rac_result_t rac_extract_archive_native(const char* archive_path,
+RAC_API RAC_NODISCARD rac_result_t rac_extract_archive_native(const char* archive_path,
                                                  const char* destination_dir,
                                                  const rac_extraction_options_t* options,
                                                  rac_extraction_progress_fn progress_callback,
