@@ -103,21 +103,21 @@ rac_result_t rac_init(const rac_config_t* config) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    // Adapter ABI version check. Catches callers that forgot to set the
-    // .version field (they'll typically leave it at 0 via {0}-init) AND
-    // callers that were compiled against a FUTURE version of the struct
-    // (newer callbacks we don't know how to call).
-    //
-    // We accept 0 as a soft-deprecated value for backwards compat during
-    // this release cycle (it was the effective value before
-    // RAC_PLATFORM_ADAPTER_VERSION existed). Callers will get a warning
-    // log; in a future release we'll tighten to require version >= 1.
-    if (config->platform_adapter->version == 0) {
-        internal_log(RAC_LOG_WARNING,
-                     "Platform adapter .version is 0. Set .version = "
-                     "RAC_PLATFORM_ADAPTER_VERSION. Accepting for now; this will "
-                     "be rejected in a future release.");
-    } else if (config->platform_adapter->version > RAC_PLATFORM_ADAPTER_VERSION) {
+    // Adapter ABI version check. Every caller MUST set
+    // `.version = RAC_PLATFORM_ADAPTER_VERSION` before calling rac_init.
+    // No grace period - an unversioned adapter is a programming error and
+    // we'd rather fail loudly at init than hit UB later when the runtime
+    // tries to call a callback at a wrong offset.
+    const uint32_t adapter_version = config->platform_adapter->version;
+    if (adapter_version == 0) {
+        rac_error_set_details(
+            "Platform adapter .version is 0. Every caller must set "
+            "`.version = RAC_PLATFORM_ADAPTER_VERSION` before passing the "
+            "adapter to rac_init(). If you are using {0}-init, add the "
+            "assignment explicitly.");
+        return RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION;
+    }
+    if (adapter_version > RAC_PLATFORM_ADAPTER_VERSION) {
         rac_error_set_details(
             "Platform adapter version is newer than this runtime supports. "
             "Upgrade runanywhere-commons or set .version to a supported value.");

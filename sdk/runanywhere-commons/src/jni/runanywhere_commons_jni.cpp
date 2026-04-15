@@ -249,107 +249,128 @@ static rac_result_t jni_file_read_callback(const char* path, void** out_data, si
 }
 
 static rac_result_t jni_file_write_callback(const char* path, const void* data, size_t size,
-                                            void* user_data) {
+                                            void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_write == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jPath = env->NewStringUTF(path ? path : "");
-    jbyteArray jData = env->NewByteArray(static_cast<jsize>(size));
-    env->SetByteArrayRegion(jData, 0, static_cast<jsize>(size),
+    rac::jni::JniScope s(env, "jni_file_write_callback");
+    auto jPath = s.new_string_utf(path != nullptr ? path : "");
+    auto jData = s.new_byte_array(static_cast<jsize>(size));
+    RAC_JNI_TRY(s);
+
+    env->SetByteArrayRegion(jData.get(), 0, static_cast<jsize>(size),
                             reinterpret_cast<const jbyte*>(data));
+    s.check("SetByteArrayRegion");
+    RAC_JNI_TRY(s);
 
-    jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_write, jPath, jData);
+    jboolean result = s.call_boolean_method(g_platform_adapter, g_method_file_write,
+                                            jPath.get(), jData.get());
+    RAC_JNI_TRY(s);
 
-    env->DeleteLocalRef(jPath);
-    env->DeleteLocalRef(jData);
-
-    return result ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
+    return (result != JNI_FALSE) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
 }
 
-static rac_result_t jni_file_delete_callback(const char* path, void* user_data) {
+static rac_result_t jni_file_delete_callback(const char* path, void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jPath = env->NewStringUTF(path ? path : "");
-    jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_delete, jPath);
-    env->DeleteLocalRef(jPath);
+    rac::jni::JniScope s(env, "jni_file_delete_callback");
+    auto jPath = s.new_string_utf(path != nullptr ? path : "");
+    RAC_JNI_TRY(s);
 
-    return result ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
+    jboolean result = s.call_boolean_method(g_platform_adapter, g_method_file_delete, jPath.get());
+    RAC_JNI_TRY(s);
+
+    return (result != JNI_FALSE) ? RAC_SUCCESS : RAC_ERROR_FILE_WRITE_FAILED;
 }
 
-static rac_result_t jni_secure_get_callback(const char* key, char** out_value, void* user_data) {
+static rac_result_t jni_secure_get_callback(const char* key, char** out_value, void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_get == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jKey = env->NewStringUTF(key ? key : "");
-    jstring result =
-        static_cast<jstring>(env->CallObjectMethod(g_platform_adapter, g_method_secure_get, jKey));
-    env->DeleteLocalRef(jKey);
+    rac::jni::JniScope s(env, "jni_secure_get_callback");
+    auto jKey = s.new_string_utf(key != nullptr ? key : "");
+    RAC_JNI_TRY(s);
 
-    if (result == nullptr) {
+    auto result = s.call_object_method(g_platform_adapter, g_method_secure_get, jKey.get());
+    RAC_JNI_TRY(s);
+
+    if (!result) {
         *out_value = nullptr;
         return RAC_ERROR_NOT_FOUND;
     }
 
-    const char* chars = env->GetStringUTFChars(result, nullptr);
-    if (!chars) {
-        env->DeleteLocalRef(result);
+    auto jstr = static_cast<jstring>(result.get());
+    const char* chars = env->GetStringUTFChars(jstr, nullptr);
+    s.check("GetStringUTFChars");
+    if (chars == nullptr || s.failed()) {
         *out_value = nullptr;
-        return RAC_ERROR_INTERNAL;
+        return s.failed() ? s.result() : RAC_ERROR_INTERNAL;
     }
     *out_value = strdup(chars);
-    env->ReleaseStringUTFChars(result, chars);
-    env->DeleteLocalRef(result);
+    env->ReleaseStringUTFChars(jstr, chars);
+    // result auto-freed by Local<jobject> RAII on scope exit.
 
-    if (!*out_value) {
+    if (*out_value == nullptr) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     return RAC_SUCCESS;
 }
 
-static rac_result_t jni_secure_set_callback(const char* key, const char* value, void* user_data) {
+static rac_result_t jni_secure_set_callback(const char* key, const char* value,
+                                            void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_set == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jKey = env->NewStringUTF(key ? key : "");
-    jstring jValue = env->NewStringUTF(value ? value : "");
-    jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_secure_set, jKey, jValue);
+    rac::jni::JniScope s(env, "jni_secure_set_callback");
+    auto jKey = s.new_string_utf(key != nullptr ? key : "");
+    auto jValue = s.new_string_utf(value != nullptr ? value : "");
+    RAC_JNI_TRY(s);
 
-    env->DeleteLocalRef(jKey);
-    env->DeleteLocalRef(jValue);
+    jboolean result = s.call_boolean_method(g_platform_adapter, g_method_secure_set,
+                                            jKey.get(), jValue.get());
+    RAC_JNI_TRY(s);
 
-    return result ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
+    return (result != JNI_FALSE) ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
 }
 
-static rac_result_t jni_secure_delete_callback(const char* key, void* user_data) {
+static rac_result_t jni_secure_delete_callback(const char* key, void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_secure_delete == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jKey = env->NewStringUTF(key ? key : "");
-    jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_secure_delete, jKey);
-    env->DeleteLocalRef(jKey);
+    rac::jni::JniScope s(env, "jni_secure_delete_callback");
+    auto jKey = s.new_string_utf(key != nullptr ? key : "");
+    RAC_JNI_TRY(s);
 
-    return result ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
+    jboolean result = s.call_boolean_method(g_platform_adapter, g_method_secure_delete, jKey.get());
+    RAC_JNI_TRY(s);
+
+    return (result != JNI_FALSE) ? RAC_SUCCESS : RAC_ERROR_STORAGE_ERROR;
 }
 
-static int64_t jni_now_ms_callback(void* user_data) {
+static int64_t jni_now_ms_callback(void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_now_ms == nullptr) {
         // Fallback to system time
         return static_cast<int64_t>(time(nullptr)) * 1000;
     }
 
-    return env->CallLongMethod(g_platform_adapter, g_method_now_ms);
+    rac::jni::JniScope s(env, "jni_now_ms_callback");
+    jlong ms = s.call_long_method(g_platform_adapter, g_method_now_ms);
+    if (s.failed()) {
+        return static_cast<int64_t>(time(nullptr)) * 1000;
+    }
+    return static_cast<int64_t>(ms);
 }
 
 // =============================================================================
@@ -774,30 +795,30 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
         }
 
         if (env) {
+            rac::jni::JniScope js(env, "llm_stream_callback_token");
             jboolean continueGen = JNI_TRUE;
 
             if (ctx->onTokenExpectsBytes) {
                 jsize len = static_cast<jsize>(strlen(token));
-                jbyteArray jToken = env->NewByteArray(len);
-                env->SetByteArrayRegion(
-                    jToken,
-                    0,
-                    len,
-                    reinterpret_cast<const jbyte*>(token)
-                );
-                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
-                env->DeleteLocalRef(jToken);
+                auto jToken = js.new_byte_array(len);
+                if (!js.failed() && jToken) {
+                    env->SetByteArrayRegion(jToken.get(), 0, len,
+                                            reinterpret_cast<const jbyte*>(token));
+                    js.check("SetByteArrayRegion");
+                    if (!js.failed()) {
+                        continueGen = js.call_boolean_method(ctx->callback,
+                                                             ctx->onTokenMethod, jToken.get());
+                    }
+                }
             } else {
-                jstring jToken = env->NewStringUTF(token);
-                continueGen = env->CallBooleanMethod(ctx->callback, ctx->onTokenMethod, jToken);
-                env->DeleteLocalRef(jToken);
+                auto jToken = js.new_string_utf(token);
+                if (!js.failed() && jToken) {
+                    continueGen = js.call_boolean_method(ctx->callback,
+                                                         ctx->onTokenMethod, jToken.get());
+                }
             }
 
-            const bool hadException = env->ExceptionCheck();
-            if (hadException) {
-                env->ExceptionDescribe();
-                env->ExceptionClear();
-            }
+            const bool hadException = js.failed();
 
             if (needsDetach) {
                 ctx->jvm->DetachCurrentThread();
@@ -2473,17 +2494,24 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
     }
 
     // Call Kotlin callback: httpGet(endpoint: String, requiresAuth: Boolean): String
-    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
+    rac::jni::JniScope s(env, "model_assignment_http_get_callback");
+    auto jEndpoint = s.new_string_utf(endpoint != nullptr ? endpoint : "");
     jboolean jRequiresAuth = requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+    if (s.failed()) {
+        if (did_attach) {
+            g_model_assignment_state.jvm->DetachCurrentThread();
+        }
+        if (out_response) {
+            out_response->result = RAC_ERROR_OUT_OF_MEMORY;
+        }
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
-    jstring jResponse =
-        (jstring)env->CallObjectMethod(g_model_assignment_state.callback_obj,
-                                       g_model_assignment_state.http_get_method, jEndpoint, jRequiresAuth);
+    auto response_obj = s.call_object_method(g_model_assignment_state.callback_obj,
+                                             g_model_assignment_state.http_get_method,
+                                             jEndpoint.get(), jRequiresAuth);
 
-    if (env->ExceptionCheck()) {
-        env->ExceptionClear();
-        LOGe("model_assignment_http_get_callback: exception in Kotlin callback");
-        env->DeleteLocalRef(jEndpoint);
+    if (s.failed()) {
         if (did_attach) {
             g_model_assignment_state.jvm->DetachCurrentThread();
         }
@@ -2492,6 +2520,8 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
         }
         return RAC_ERROR_HTTP_REQUEST_FAILED;
     }
+
+    jstring jResponse = static_cast<jstring>(response_obj.get());
 
     rac_result_t result = RAC_SUCCESS;
     if (jResponse) {
@@ -2515,7 +2545,7 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
             }
         }
         env->ReleaseStringUTFChars(jResponse, response_str);
-        env->DeleteLocalRef(jResponse);
+        // response_obj Local<jobject> auto-releases jResponse on scope exit.
     } else {
         if (out_response) {
             out_response->result = RAC_ERROR_HTTP_REQUEST_FAILED;
@@ -2523,7 +2553,7 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
         result = RAC_ERROR_HTTP_REQUEST_FAILED;
     }
 
-    env->DeleteLocalRef(jEndpoint);
+    // jEndpoint Local<jstring> auto-releases on scope exit.
     if (did_attach) {
         g_model_assignment_state.jvm->DetachCurrentThread();
     }
@@ -2810,24 +2840,19 @@ static struct {
 } g_device_info_strings = {};
 
 // Device callback implementations
-static void jni_device_get_info(rac_device_registration_info_t* out_info, void* user_data) {
+static void jni_device_get_info(rac_device_registration_info_t* out_info, void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.get_device_info_method) {
         LOGe("jni_device_get_info: JNI not ready");
         return;
     }
 
-    // Call Java getDeviceInfo() which returns a JSON string
-    jstring jResult = (jstring)env->CallObjectMethod(g_device_jni_state.callback_obj,
-                                                     g_device_jni_state.get_device_info_method);
+    rac::jni::JniScope s(env, "jni_device_get_info");
+    auto cb_result = s.call_object_method(g_device_jni_state.callback_obj,
+                                          g_device_jni_state.get_device_info_method);
+    RAC_JNI_TRY_VOID(s);
 
-    // Check for Java exception after CallObjectMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_device_get_info: Java exception occurred in getDeviceInfo()");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-        return;
-    }
+    jstring jResult = static_cast<jstring>(cb_result.get());
 
     if (jResult && out_info) {
         const char* json_str = env->GetStringUTFChars(jResult, nullptr);
@@ -2912,63 +2937,55 @@ static void jni_device_get_info(rac_device_registration_info_t* out_info, void* 
              out_info->architecture ? out_info->architecture : "(null)");
 
         env->ReleaseStringUTFChars(jResult, json_str);
-        env->DeleteLocalRef(jResult);
+        // cb_result Local<jobject> releases jResult on scope exit.
     }
 }
 
-static const char* jni_device_get_id(void* user_data) {
+static const char* jni_device_get_id(void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.get_device_id_method) {
         LOGe("jni_device_get_id: JNI not ready");
         return "";
     }
 
-    jstring jResult = (jstring)env->CallObjectMethod(g_device_jni_state.callback_obj,
-                                                     g_device_jni_state.get_device_id_method);
+    rac::jni::JniScope s(env, "jni_device_get_id");
+    auto cb_result = s.call_object_method(g_device_jni_state.callback_obj,
+                                          g_device_jni_state.get_device_id_method);
+    RAC_JNI_TRY_PTR(s, "");
 
-    // Check for Java exception after CallObjectMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_device_get_id: Java exception occurred in getDeviceId()");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
+    if (!cb_result) {
+        return "";
+    }
+    auto jResult = static_cast<jstring>(cb_result.get());
+
+    const char* str = env->GetStringUTFChars(jResult, nullptr);
+    s.check("GetStringUTFChars");
+    if (str == nullptr || s.failed()) {
         return "";
     }
 
-    if (jResult) {
-        const char* str = env->GetStringUTFChars(jResult, nullptr);
-        if (str == nullptr) {
-            env->DeleteLocalRef(jResult);
-            return "";
-        }
-
-        // Lock mutex to protect g_cached_device_id from concurrent access
-        std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
-        g_cached_device_id = str;
-        env->ReleaseStringUTFChars(jResult, str);
-        env->DeleteLocalRef(jResult);
-        return g_cached_device_id.c_str();
-    }
-    return "";
+    // Lock mutex to protect g_cached_device_id from concurrent access
+    std::lock_guard<std::mutex> lock(g_device_jni_state.mtx);
+    g_cached_device_id = str;
+    env->ReleaseStringUTFChars(jResult, str);
+    // cb_result Local<jobject> auto-releases on scope exit.
+    return g_cached_device_id.c_str();
 }
 
-static rac_bool_t jni_device_is_registered(void* user_data) {
+static rac_bool_t jni_device_is_registered(void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.is_registered_method) {
         return RAC_FALSE;
     }
 
-    jboolean result = env->CallBooleanMethod(g_device_jni_state.callback_obj,
-                                             g_device_jni_state.is_registered_method);
-
-    // Check for Java exception after CallBooleanMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_device_is_registered: Java exception occurred in isRegistered()");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
+    rac::jni::JniScope s(env, "jni_device_is_registered");
+    jboolean result = s.call_boolean_method(g_device_jni_state.callback_obj,
+                                            g_device_jni_state.is_registered_method);
+    if (s.failed()) {
         return RAC_FALSE;
     }
 
-    return result ? RAC_TRUE : RAC_FALSE;
+    return (result != JNI_FALSE) ? RAC_TRUE : RAC_FALSE;
 }
 
 static void jni_device_set_registered(rac_bool_t registered, void* user_data) {
@@ -2977,21 +2994,18 @@ static void jni_device_set_registered(rac_bool_t registered, void* user_data) {
         return;
     }
 
-    env->CallVoidMethod(g_device_jni_state.callback_obj, g_device_jni_state.set_registered_method,
-                        registered == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
-
-    // Check for Java exception after CallVoidMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_device_set_registered: Java exception occurred in setRegistered()");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-    }
+    rac::jni::JniScope s(env, "jni_device_set_registered");
+    s.call_void_method(g_device_jni_state.callback_obj,
+                       g_device_jni_state.set_registered_method,
+                       registered == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
+    // Errors silently swallowed - set_registered is fire-and-forget from
+    // the C++ side; JniScope has already logged + cleared any exception.
 }
 
 static rac_result_t jni_device_http_post(const char* endpoint, const char* json_body,
                                          rac_bool_t requires_auth,
                                          rac_device_http_response_t* out_response,
-                                         void* user_data) {
+                                         void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (!env || !g_device_jni_state.callback_obj || !g_device_jni_state.http_post_method) {
         LOGe("jni_device_http_post: JNI not ready");
@@ -3002,47 +3016,28 @@ static rac_result_t jni_device_http_post(const char* endpoint, const char* json_
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
-    jstring jBody = env->NewStringUTF(json_body ? json_body : "");
-
-    // Check for allocation failures (can throw OutOfMemoryError)
-    if (env->ExceptionCheck() || !jEndpoint || !jBody) {
-        LOGe("jni_device_http_post: Failed to create JNI strings");
-        if (env->ExceptionCheck()) {
-            env->ExceptionDescribe();
-            env->ExceptionClear();
-        }
-        if (jEndpoint)
-            env->DeleteLocalRef(jEndpoint);
-        if (jBody)
-            env->DeleteLocalRef(jBody);
+    rac::jni::JniScope s(env, "jni_device_http_post");
+    auto jEndpoint = s.new_string_utf(endpoint != nullptr ? endpoint : "");
+    auto jBody = s.new_string_utf(json_body != nullptr ? json_body : "");
+    if (s.failed() || !jEndpoint || !jBody) {
         if (out_response) {
             out_response->result = RAC_ERROR_OUT_OF_MEMORY;
             out_response->status_code = -1;
         }
-        return RAC_ERROR_OUT_OF_MEMORY;
+        return s.failed() ? RAC_ERROR_OUT_OF_MEMORY : RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    jint statusCode =
-        env->CallIntMethod(g_device_jni_state.callback_obj, g_device_jni_state.http_post_method,
-                           jEndpoint, jBody, requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
-
-    // Check for Java exception after CallIntMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_device_http_post: Java exception occurred in httpPost()");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-        env->DeleteLocalRef(jEndpoint);
-        env->DeleteLocalRef(jBody);
+    jint statusCode = s.call_int_method(g_device_jni_state.callback_obj,
+                                        g_device_jni_state.http_post_method,
+                                        jEndpoint.get(), jBody.get(),
+                                        requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
+    if (s.failed()) {
         if (out_response) {
             out_response->result = RAC_ERROR_NETWORK_ERROR;
             out_response->status_code = -1;
         }
         return RAC_ERROR_NETWORK_ERROR;
     }
-
-    env->DeleteLocalRef(jEndpoint);
-    env->DeleteLocalRef(jBody);
 
     if (out_response) {
         out_response->status_code = statusCode;
@@ -3161,7 +3156,7 @@ static struct {
 } g_telemetry_jni_state = {};
 
 // Telemetry HTTP callback from C++ to Java
-static void jni_telemetry_http_callback(void* user_data, const char* endpoint,
+static void jni_telemetry_http_callback(void* /*user_data*/, const char* endpoint,
                                         const char* json_body, size_t json_length,
                                         rac_bool_t requires_auth) {
     JNIEnv* env = getJNIEnv();
@@ -3171,34 +3166,17 @@ static void jni_telemetry_http_callback(void* user_data, const char* endpoint,
         return;
     }
 
-    jstring jEndpoint = env->NewStringUTF(endpoint ? endpoint : "");
-    jstring jBody = env->NewStringUTF(json_body ? json_body : "");
+    rac::jni::JniScope s(env, "jni_telemetry_http_callback");
+    auto jEndpoint = s.new_string_utf(endpoint != nullptr ? endpoint : "");
+    auto jBody = s.new_string_utf(json_body != nullptr ? json_body : "");
+    RAC_JNI_TRY_VOID(s);
 
-    // Check for NewStringUTF allocation failures
-    if (!jEndpoint || !jBody) {
-        LOGe("jni_telemetry_http_callback: failed to allocate JNI strings");
-        if (jEndpoint)
-            env->DeleteLocalRef(jEndpoint);
-        if (jBody)
-            env->DeleteLocalRef(jBody);
-        return;
-    }
-
-    env->CallVoidMethod(g_telemetry_jni_state.http_callback_obj,
-                        g_telemetry_jni_state.http_callback_method, jEndpoint, jBody,
-                        static_cast<jint>(json_length),
-                        requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
-
-    // Check for Java exception after CallVoidMethod
-    if (env->ExceptionCheck()) {
-        LOGe("jni_telemetry_http_callback: Java exception occurred in HTTP callback");
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-    }
-
-    // Always clean up local references
-    env->DeleteLocalRef(jEndpoint);
-    env->DeleteLocalRef(jBody);
+    s.call_void_method(g_telemetry_jni_state.http_callback_obj,
+                       g_telemetry_jni_state.http_callback_method, jEndpoint.get(), jBody.get(),
+                       static_cast<jint>(json_length),
+                       requires_auth == RAC_TRUE ? JNI_TRUE : JNI_FALSE);
+    // JniScope has already logged + cleared any exception. Locals are
+    // auto-freed on scope exit via Local<jstring> RAII.
 }
 
 JNIEXPORT jlong JNICALL
