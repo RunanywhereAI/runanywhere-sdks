@@ -27,6 +27,9 @@
 #include <android/log.h>
 #endif
 
+// RAII JNI exception-safety helpers. See jni_scope.h for design rationale.
+#include "jni_scope.h"
+
 // Include runanywhere-commons C API headers
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_audio_utils.h"
@@ -154,7 +157,7 @@ static const char* getNullableCString(JNIEnv* env, jstring str, std::string& sto
 static rac_platform_adapter_t g_c_adapter;
 
 static void jni_log_callback(rac_log_level_t level, const char* tag, const char* message,
-                             void* user_data) {
+                             void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_log == nullptr) {
         // Fallback to direct native logging (NOT through RAC_LOG_* to avoid recursion,
@@ -168,57 +171,80 @@ static void jni_log_callback(rac_log_level_t level, const char* tag, const char*
         return;
     }
 
-    jstring jTag = env->NewStringUTF(tag ? tag : "RAC");
-    jstring jMessage = env->NewStringUTF(message ? message : "");
-
-    env->CallVoidMethod(g_platform_adapter, g_method_log, static_cast<jint>(level), jTag, jMessage);
-
-    env->DeleteLocalRef(jTag);
-    env->DeleteLocalRef(jMessage);
+    // JniScope handles NewStringUTF failure (OOM) and CallVoidMethod
+    // exceptions automatically: if either raises on the Java side, the
+    // pending exception is logged + cleared and we just return. Locals
+    // (jTag, jMessage) are freed by Local<jstring> RAII.
+    rac::jni::JniScope s(env, "jni_log_callback");
+    auto jTag = s.new_string_utf(tag != nullptr ? tag : "RAC");
+    auto jMessage = s.new_string_utf(message != nullptr ? message : "");
+    if (s.failed()) {
+        return;
+    }
+    s.call_void_method(g_platform_adapter, g_method_log,
+                       static_cast<jint>(level), jTag.get(), jMessage.get());
 }
 
-static rac_bool_t jni_file_exists_callback(const char* path, void* user_data) {
+static rac_bool_t jni_file_exists_callback(const char* path, void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_exists == nullptr) {
         return RAC_FALSE;
     }
 
-    jstring jPath = env->NewStringUTF(path ? path : "");
-    jboolean result = env->CallBooleanMethod(g_platform_adapter, g_method_file_exists, jPath);
-    env->DeleteLocalRef(jPath);
+    rac::jni::JniScope s(env, "jni_file_exists_callback");
+    auto jPath = s.new_string_utf(path != nullptr ? path : "");
+    if (s.failed()) {
+        return RAC_FALSE;
+    }
 
-    return result ? RAC_TRUE : RAC_FALSE;
+    jboolean result = s.call_boolean_method(g_platform_adapter, g_method_file_exists, jPath.get());
+    if (s.failed()) {
+        return RAC_FALSE;
+    }
+
+    return (result != JNI_FALSE) ? RAC_TRUE : RAC_FALSE;
 }
 
 static rac_result_t jni_file_read_callback(const char* path, void** out_data, size_t* out_size,
-                                           void* user_data) {
+                                           void* /*user_data*/) {
     JNIEnv* env = getJNIEnv();
     if (env == nullptr || g_platform_adapter == nullptr || g_method_file_read == nullptr) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
-    jstring jPath = env->NewStringUTF(path ? path : "");
-    jbyteArray result = static_cast<jbyteArray>(
-        env->CallObjectMethod(g_platform_adapter, g_method_file_read, jPath));
-    env->DeleteLocalRef(jPath);
+    rac::jni::JniScope s(env, "jni_file_read_callback");
+    auto jPath = s.new_string_utf(path != nullptr ? path : "");
+    RAC_JNI_TRY(s);
 
-    if (result == nullptr) {
+    auto result = s.call_object_method(g_platform_adapter, g_method_file_read, jPath.get());
+    RAC_JNI_TRY(s);
+
+    if (!result) {
         *out_data = nullptr;
         *out_size = 0;
         return RAC_ERROR_FILE_NOT_FOUND;
     }
 
-    jsize len = env->GetArrayLength(result);
-    *out_data = malloc(len);
+    auto byte_array = static_cast<jbyteArray>(result.get());
+    jsize len = env->GetArrayLength(byte_array);
+    s.check("GetArrayLength");
+    RAC_JNI_TRY(s);
+
+    *out_data = malloc(static_cast<size_t>(len));
     if (*out_data == nullptr) {
         *out_size = 0;
-        env->DeleteLocalRef(result);
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     *out_size = static_cast<size_t>(len);
-    env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(*out_data));
+    env->GetByteArrayRegion(byte_array, 0, len, static_cast<jbyte*>(*out_data));
+    s.check("GetByteArrayRegion");
+    if (s.failed()) {
+        free(*out_data);
+        *out_data = nullptr;
+        *out_size = 0;
+        return s.result();
+    }
 
-    env->DeleteLocalRef(result);
     return RAC_SUCCESS;
 }
 
