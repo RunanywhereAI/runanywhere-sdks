@@ -13,6 +13,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_audio_utils.h"
+#include "rac/core/rac_hardware.h"
 #include "rac/core/rac_platform_adapter.h"
 
 #include <chrono>
@@ -37,6 +38,7 @@ static int64_t test_now_ms(void* /*ctx*/) {
 }
 
 static const rac_platform_adapter_t test_adapter = {
+    /* version           */ RAC_PLATFORM_ADAPTER_VERSION,
     /* file_exists       */ nullptr,
     /* file_read         */ nullptr,
     /* file_write        */ nullptr,
@@ -95,6 +97,84 @@ static TestResult test_double_init() {
               "second rac_init should return RAC_ERROR_ALREADY_INITIALIZED");
 
     rac_shutdown();
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: adapter.version = 0 is rejected (no grace period)
+// =============================================================================
+
+static TestResult test_adapter_version_zero_rejected() {
+    // Callers that zero-init their adapter without setting .version must be
+    // caught at init time with RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION.
+    rac_platform_adapter_t adapter_v0 = test_adapter;
+    adapter_v0.version = 0;
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter_v0;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION,
+              "rac_init with version=0 should return "
+              "RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION");
+    ASSERT_EQ(rac_is_initialized(), RAC_FALSE,
+              "init failure must not leave SDK in initialized state");
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: adapter.version too new is rejected
+// =============================================================================
+
+static TestResult test_adapter_version_future_rejected() {
+    // Callers compiled against a FUTURE version of the struct must be
+    // rejected, not silently misinterpreted.
+    rac_platform_adapter_t adapter_future = test_adapter;
+    adapter_future.version = RAC_PLATFORM_ADAPTER_VERSION + 999;
+
+    rac_config_t config = {};
+    config.platform_adapter = &adapter_future;
+    config.log_level = RAC_LOG_WARNING;
+    config.log_tag = "TEST";
+
+    rac_result_t rc = rac_init(&config);
+    ASSERT_EQ(rc, RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION,
+              "rac_init with future version should return "
+              "RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION");
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: hardware capability query
+// =============================================================================
+
+static TestResult test_hardware_query() {
+    rac_hardware_report_t report = {};
+    report.version = RAC_HARDWARE_REPORT_V1;
+    rac_result_t rc = rac_hardware_query_capabilities(&report);
+    ASSERT_EQ(rc, RAC_SUCCESS, "hardware query should succeed");
+    // logical CPU count is > 0 on every real machine
+    ASSERT_TRUE(report.num_logical_cpus > 0,
+                "should detect at least one logical CPU");
+#if defined(__APPLE__) && defined(__aarch64__)
+    ASSERT_EQ(report.is_apple_silicon, RAC_TRUE,
+              "is_apple_silicon should be TRUE on arm64 macOS host");
+    ASSERT_EQ(report.has_neon, RAC_TRUE,
+              "has_neon should be TRUE on arm64");
+    ASSERT_EQ(report.has_ane, RAC_TRUE,
+              "has_ane should be TRUE on Apple (compile-time honest)");
+#endif
+    return TEST_PASS();
+}
+
+static TestResult test_hardware_wrong_version() {
+    rac_hardware_report_t report = {};
+    report.version = 0;  // unset
+    rac_result_t rc = rac_hardware_query_capabilities(&report);
+    ASSERT_EQ(rc, RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION,
+              "hardware query with unset version should fail");
     return TEST_PASS();
 }
 
@@ -367,6 +447,10 @@ int main(int argc, char** argv) {
 
     suite.add("init_shutdown", test_init_shutdown);
     suite.add("double_init", test_double_init);
+    suite.add("adapter_version_zero_rejected", test_adapter_version_zero_rejected);
+    suite.add("adapter_version_future_rejected", test_adapter_version_future_rejected);
+    suite.add("hardware_query", test_hardware_query);
+    suite.add("hardware_wrong_version", test_hardware_wrong_version);
     suite.add("get_version", test_get_version);
     suite.add("error_message_known", test_error_message_known);
     suite.add("error_message_unknown", test_error_message_unknown);
