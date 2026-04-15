@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:runanywhere_ai/app/runanywhere_ai_app.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:runanywhere_ai/app.dart';
 
 void main() {
-  runApp(const RunAnywhereAIApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: RunAnywhereApp()));
 }

@@ -1,0 +1,108 @@
+Flutter App Development Rules — RunAnywhere AI
+================================================
+
+1. ARCHITECTURE
+   - Feature-first folder structure: lib/features/{feature_name}/
+   - Each feature has: screen (UI), controller (logic), state (immutable data)
+   - Screens are StatelessWidgets — never StatefulWidget for complex screens
+   - All business logic lives in controllers/notifiers, never in widgets
+   - Services are injected via Riverpod providers, no singletons
+   - No god classes — if a file exceeds 300 lines, split it
+
+2. STATE MANAGEMENT (Riverpod)
+   - Use Riverpod (flutter_riverpod) — not Provider, not setState, not BLoC
+   - One immutable state class per feature with copyWith()
+   - Use AsyncNotifier for async operations (model loading, API calls)
+   - Use ref.watch() in build methods, ref.read() in callbacks
+   - Use select() to rebuild only when specific fields change
+   - Never store state in widgets — always in providers
+
+3. NAVIGATION
+   - Use go_router for all navigation
+   - Define routes declaratively in a single router config
+   - Use ShellRoute for bottom navigation (keeps screens alive)
+   - Type-safe route parameters — no raw strings
+
+4. WIDGET RULES
+   - const constructors on every widget and object possible
+   - Small focused widgets — extract when build() exceeds 50 lines
+   - ListView.builder for any list that could grow (never Column + map)
+   - No inline styles — use theme/design system tokens
+   - Prefer composition over inheritance for widgets
+
+5. PERFORMANCE
+   - const everywhere: constructors, EdgeInsets, TextStyle, Colors
+   - Never call functions inside build() that don't depend on state
+   - Use RepaintBoundary for expensive paint operations (camera, animations)
+   - Avoid rebuilding parent when only child state changes (use select())
+   - Image.memory / Image.file with cacheWidth/cacheHeight for large images
+   - Dispose controllers, streams, timers in provider onDispose
+
+6. DESIGN SYSTEM
+   - All colors from AppColors — no Color(0xFF...) in feature code
+   - All spacing from AppSpacing — no magic numbers (8.0, 16.0)
+   - All text styles from AppTypography — no inline TextStyle()
+   - Theme-aware: use context.theme extensions, support light/dark
+   - Consistent corner radii, shadows, and elevation from design tokens
+
+7. CODE STYLE
+   - No comments explaining obvious code
+   - No // MARK: or // TODO: — do it or don't
+   - No unused imports, fields, or parameters — delete them
+   - No ignore: comments to suppress warnings — fix the root cause
+   - No copy-paste — extract shared logic into utilities or shared providers
+   - Named parameters for functions with more than 2 parameters
+   - Trailing commas on all argument lists (formatter-friendly)
+
+8. ERROR HANDLING
+   - Errors in state classes (sealed class or enum), not raw strings
+   - UI reads error state from provider, shows appropriate widget
+   - Never catch-and-ignore — log or surface to user
+   - Network/SDK errors mapped to user-friendly messages in one place
+
+9. ASYNC PATTERNS
+   - Use AsyncValue<T> from Riverpod for loading/error/data states
+   - Cancel operations on provider disposal (CancelToken, completer)
+   - Stream subscriptions managed by Riverpod (ref.listen, StreamProvider)
+   - No unawaited futures without explicit reason
+
+10. DEPENDENCIES
+    - Pin to latest stable versions
+    - No discontinued or deprecated packages
+    - Prefer packages from flutter.dev or verified publishers
+    - Local SDK packages via path dependencies with overrides
+
+11. PROJECT STRUCTURE
+    lib/
+    ├── main.dart                  # runApp() only
+    ├── app.dart                   # MaterialApp.router + theme
+    ├── router.dart                # GoRouter config
+    ├── core/
+    │   ├── theme/                 # AppColors, AppSpacing, AppTypography, AppTheme
+    │   ├── services/              # PermissionService, AudioService, KeychainService
+    │   ├── providers/             # Shared Riverpod providers (SDK, ModelManager)
+    │   └── widgets/               # Reusable widgets (ErrorBanner, LoadingOverlay)
+    ├── features/
+    │   ├── chat/
+    │   │   ├── chat_screen.dart
+    │   │   ├── chat_controller.dart
+    │   │   ├── chat_state.dart
+    │   │   └── widgets/           # Chat-specific widgets (MessageBubble, etc.)
+    │   ├── vision/
+    │   ├── voice/
+    │   ├── rag/
+    │   ├── tools/
+    │   ├── models/
+    │   └── settings/
+    └── data/
+        ├── models/                # Data classes, enums, types
+        └── repositories/          # SDK wrappers if needed
+
+12. WHAT NOT TO DO
+    - No setState() for anything beyond trivial local UI (animation toggle, text field)
+    - No singletons — use Riverpod providers with proper scoping
+    - No business logic in widgets
+    - No raw strings for keys, routes, or identifiers — use constants or enums
+    - No platform channel code in the example app — that belongs in SDK plugins
+    - No hardcoded values (memory sizes, URLs, timeouts) — constants or config
+    - No AI-generated boilerplate comments or placeholder TODOs

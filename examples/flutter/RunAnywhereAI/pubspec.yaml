@@ -1,70 +1,78 @@
 name: runanywhere_ai
-description: RunAnywhere AI Flutter example app demonstrating on-device AI capabilities
+description: RunAnywhere AI - On-device AI assistant showcasing LLM, STT, TTS, VLM, and RAG capabilities
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.10.0'
+  sdk: ^3.11.3
+  flutter: '>=3.41.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  # RunAnywhere SDK - Core
+
+  # RunAnywhere SDK
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
-
-  # RunAnywhere SDK - LlamaCpp Backend (LLM)
   runanywhere_llamacpp:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
-
-  # RunAnywhere SDK - Genie NPU Backend (Android/Snapdragon only)
   runanywhere_genie:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
-
-  # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
-  provider: ^6.1.0
-  flutter_markdown: ^0.6.18
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # Icons
+  tabler_icons_next: ^3.34.0
+
+  # UI
+  flutter_markdown: ^0.7.7
+  google_fonts: ^6.2.1
+
+  # Audio
   record: ^6.1.0
-  audioplayers: ^6.0.0
-  permission_handler: ^11.1.0
-  shared_preferences: ^2.2.2
-  # Secure storage (iOS Keychain, Android Keystore)
+  audioplayers: ^6.1.0
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # Storage
+  shared_preferences: ^2.5.3
   flutter_secure_storage: ^9.0.0
-  # File system access
-  path_provider: ^2.1.0
-  # UUID generation
-  uuid: ^4.0.0
-  # Device information
-  device_info_plus: ^10.0.0
-  # App package info
-  package_info_plus: ^4.2.0
-  # URL launcher
-  url_launcher: ^6.2.0
-  # HTTP client for API calls
-  http: ^1.2.0
-  # Camera access for VLM
-  camera: ^0.11.0
-  # Image picker for gallery photos
-  image_picker: ^1.0.0
-  # Image manipulation (BGRA to RGB pixel conversion)
-  image: ^4.0.0
-  # File picker for PDF/JSON document selection (RAG)
-  file_picker: ^8.0.0
-  # PDF text extraction (RAG)
-  syncfusion_flutter_pdf: ^27.1.48
+  path_provider: ^2.1.5
+
+  # Device & Package Info
+  device_info_plus: ^10.1.2
+  package_info_plus: ^8.3.0
+
+  # Utilities
+  uuid: ^4.5.1
+  url_launcher: ^6.3.1
+  http: ^1.3.0
+
+  # Camera & Media
+  camera: ^0.11.1
+  image_picker: ^1.1.2
+  image: ^4.5.3
+
+  # Documents
+  file_picker: ^10.1.9
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^6.0.0
 
-# Force all packages to use local path dependencies during development
 dependency_overrides:
   runanywhere:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere
+  runanywhere_llamacpp:
+    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
   runanywhere_genie:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
   runanywhere_onnx:
