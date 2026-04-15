@@ -465,8 +465,12 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSetPlatformAdapter(J
 
     env->DeleteLocalRef(adapterClass);
 
-    // Initialize the C adapter struct with our JNI callbacks
+    // Initialize the C adapter struct with our JNI callbacks.
     memset(&g_c_adapter, 0, sizeof(g_c_adapter));
+    // ABI version - rac_init() rejects adapters where version is 0 or
+    // > RAC_PLATFORM_ADAPTER_VERSION. Always set to the header's current
+    // version so we stay compatible across upgrades.
+    g_c_adapter.version = RAC_PLATFORM_ADAPTER_VERSION;
     g_c_adapter.log = jni_log_callback;
     g_c_adapter.file_exists = jni_file_exists_callback;
     g_c_adapter.file_read = jni_file_read_callback;

@@ -945,6 +945,10 @@ void InitBridge::registerPlatformAdapter() {
     // Reset adapter
     memset(&adapter_, 0, sizeof(adapter_));
 
+    // ABI version - rac_init() rejects adapters where version is 0 or
+    // > RAC_PLATFORM_ADAPTER_VERSION.
+    adapter_.version = RAC_PLATFORM_ADAPTER_VERSION;
+
     // File operations
     adapter_.file_exists = platformFileExistsCallback;
     adapter_.file_read = platformFileReadCallback;

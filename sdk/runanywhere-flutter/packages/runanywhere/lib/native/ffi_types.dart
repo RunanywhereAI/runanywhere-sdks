@@ -857,9 +857,14 @@ typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
 // =============================================================================
 
 /// Platform adapter struct matching rac_platform_adapter_t
-/// Note: This is a complex struct - for simplicity we use Pointer<Void> in FFI calls
-/// and manage the struct manually in Dart
+///
+/// ABI: the first field is a uint32_t `version` that rac_init() validates
+/// against [racPlatformAdapterVersion]. Callers must set it before passing
+/// this struct to racSetPlatformAdapter / rac_init.
 base class RacPlatformAdapterStruct extends Struct {
+  @Uint32()
+  external int version;
+
   external Pointer<NativeFunction<RacFileExistsCallbackNative>> fileExists;
   external Pointer<NativeFunction<RacFileReadCallbackNative>> fileRead;
   external Pointer<NativeFunction<RacFileWriteCallbackNative>> fileWrite;
@@ -877,6 +882,10 @@ base class RacPlatformAdapterStruct extends Struct {
   external Pointer<Void> extractArchive;
   external Pointer<Void> userData;
 }
+
+/// Current schema version of [RacPlatformAdapterStruct]. Bump alongside
+/// commons/include/rac/core/rac_platform_adapter.h when the struct grows.
+const int racPlatformAdapterVersion = 1;
 
 /// Memory info struct matching rac_memory_info_t
 base class RacMemoryInfoStruct extends Struct {

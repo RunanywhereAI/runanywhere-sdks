@@ -41,6 +41,12 @@ extension CppBridge {
             // Reset adapter
             adapter = rac_platform_adapter_t()
 
+            // MARK: ABI version
+            // Commons rac_init rejects any adapter whose .version is 0
+            // (or > the latest known version). Set to the version the
+            // Swift SDK was compiled against.
+            adapter.version = UInt32(RAC_PLATFORM_ADAPTER_VERSION)
+
             // MARK: Logging Callback
             adapter.log = platformLogCallback
 

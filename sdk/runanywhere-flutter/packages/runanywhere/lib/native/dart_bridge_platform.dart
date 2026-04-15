@@ -81,6 +81,11 @@ class DartBridgePlatform {
       _adapterPtr = calloc<RacPlatformAdapterStruct>();
       final adapter = _adapterPtr!;
 
+      // ABI version - rac_init() rejects adapters with version == 0 or
+      // version > RAC_PLATFORM_ADAPTER_VERSION. calloc zeroes the struct
+      // so we must set this explicitly.
+      adapter.ref.version = racPlatformAdapterVersion;
+
       // Logging callback - MUST use NativeCallable.listener for thread safety
       // This allows C++ to call the logger from any thread (including background
       // threads used by LLM generation) without crashing with:
