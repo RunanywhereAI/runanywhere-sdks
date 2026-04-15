@@ -115,7 +115,7 @@ tasks.register("setup") {
 
         // Check build mode and run native setup if needed
         val testLocal = projectDir.resolve("gradle.properties").let { f ->
-            f.exists() && f.readText().contains("runanywhere.testLocal=true")
+            f.exists() && f.readText().contains("runanywhere.useLocalNatives=true")
         }
         println("Build mode: testLocal=$testLocal")
 

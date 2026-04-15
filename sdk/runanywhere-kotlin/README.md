@@ -450,16 +450,16 @@ cd runanywhere-sdks/sdk/runanywhere-kotlin
 1. Downloads dependencies (Sherpa-ONNX, ~500MB)
 2. Builds `runanywhere-commons` for Android (arm64-v8a by default)
 3. Copies JNI libraries (`.so` files) to module `jniLibs/` directories
-4. Sets `runanywhere.testLocal=true` in `gradle.properties`
+4. Sets `runanywhere.useLocalNatives=true` in `gradle.properties`
 
 ### Understanding testLocal
 
-The SDK has two modes controlled by `runanywhere.testLocal` in `gradle.properties`:
+The SDK has two modes controlled by `runanywhere.useLocalNatives` in `gradle.properties`:
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `runanywhere.testLocal=true` | Uses JNI libs from `src/androidMain/jniLibs/` (for development) |
-| **Remote** | `runanywhere.testLocal=false` | Downloads JNI libs from GitHub releases (for end users) |
+| **Local** | `runanywhere.useLocalNatives=true` | Uses JNI libs from `src/androidMain/jniLibs/` (for development) |
+| **Remote** | `runanywhere.useLocalNatives=false` | Downloads JNI libs from GitHub releases (for end users) |
 
 When you run `--setup`, the script automatically sets `testLocal=true`.
 

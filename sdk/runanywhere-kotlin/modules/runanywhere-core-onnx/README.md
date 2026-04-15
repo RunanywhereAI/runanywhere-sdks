@@ -265,7 +265,7 @@ Native libraries are automatically downloaded from GitHub releases:
 
 ```kotlin
 // gradle.properties
-runanywhere.testLocal=false  // Downloads from releases
+runanywhere.useLocalNatives=false  // Downloads from releases
 runanywhere.coreVersion=0.1.4
 ```
 
@@ -275,7 +275,7 @@ For developing with local C++ builds:
 
 ```kotlin
 // gradle.properties
-runanywhere.testLocal=true   // Uses local jniLibs/
+runanywhere.useLocalNatives=true   // Uses local jniLibs/
 ```
 
 Then build the native libraries:

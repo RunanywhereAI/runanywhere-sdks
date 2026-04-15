@@ -614,7 +614,7 @@ The SDK has two modes:
 
 When you run `--setup`, the script automatically enables local mode via:
 - **iOS**: `.testlocal` marker files in `ios/` directories
-- **Android**: `RA_TEST_LOCAL=1` environment variable or `runanywhere.testLocal=true` in `gradle.properties`
+- **Android**: `RA_TEST_LOCAL=1` environment variable or `runanywhere.useLocalNatives=true` in `gradle.properties`
 
 ### Testing with the React Native Sample App
 

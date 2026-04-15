@@ -10,7 +10,7 @@ android.enableJetifier=false
 # RunAnywhere SDK - Local Development
 # Set to true to use locally built native libraries
 # Set to false to download from GitHub releases
-runanywhere.testLocal=true
+runanywhere.useLocalNatives=true
 
 # Gradle JVM Settings
 # Increase memory for React Native builds

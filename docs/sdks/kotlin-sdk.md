@@ -519,10 +519,10 @@ Controlled by `gradle.properties`:
 
 ```properties
 # Local development (build C++ from source)
-runanywhere.testLocal=true
+runanywhere.useLocalNatives=true
 
 # CI/Release (download pre-built from GitHub releases)
-runanywhere.testLocal=false
+runanywhere.useLocalNatives=false
 runanywhere.nativeLibVersion=0.1.4
 ```
 
