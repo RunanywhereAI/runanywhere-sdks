@@ -546,18 +546,26 @@ EOF
 EOF
     done
 
-    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a proper fat
+    # binary. See the identical block in create_backend_xcframework for the
+    # full rationale — tl;dr: third-party universal static libs contaminate
+    # per-arch builds with foreign archs, so we must lipo -thin each side
+    # before lipo -create, not blindly trust lipo -archs on the x86 binary.
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
     local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
-        local SIM_ARCHS
-        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
-        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
-            log_step "Creating fat simulator binary (arm64 + x86_64)..."
-            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
-                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        log_step "Creating fat simulator binary (arm64 + x86_64)..."
+        local SIM_ARM64_THIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}-thin-arm64.a"
+        local SIM_X86_THIN="${SIM_FAT}/${FRAMEWORK_NAME}-thin-x86_64.a"
+        if ! lipo -thin arm64 "${SIM_ARM64_BIN}" -output "${SIM_ARM64_THIN}" 2>/dev/null; then
+            cp "${SIM_ARM64_BIN}" "${SIM_ARM64_THIN}"
         fi
+        if ! lipo -thin x86_64 "${SIM_X86_BIN}" -output "${SIM_X86_THIN}" 2>/dev/null; then
+            cp "${SIM_X86_BIN}" "${SIM_X86_THIN}"
+        fi
+        lipo -create "${SIM_ARM64_THIN}" "${SIM_X86_THIN}" \
+            -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)
@@ -792,19 +800,42 @@ EOF
         return 0
     fi
 
-    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a fat binary
+    # Combine SIMULATOR (x86_64) and SIMULATORARM64 (arm64) into a proper fat
+    # binary for the simulator xcframework slice.
+    #
+    # HISTORY: the previous implementation short-circuited this step when the
+    # x86_64 framework binary already reported arm64 in `lipo -archs`. That
+    # check was unreliable: third-party universal static libs (e.g.
+    # sherpa-onnx.xcframework's libsherpa-onnx.a, which ships both archs even
+    # for the x86_64 simulator build) get mixed in during libtool bundling, so
+    # the x86_64 framework ENDS UP universal-looking even though its arm64
+    # slice only contains the third-party's arm64 objects — NOT our
+    # rac_backend_* symbols, which only exist in the x86_64 slice produced by
+    # the x86_64 simulator compile.
+    #
+    # Fix: always extract the canonical single-arch framework from each
+    # platform's build (SIMULATORARM64 → thin arm64, SIMULATOR → thin x86_64)
+    # and lipo-create a brand-new fat binary. Extracting first strips the
+    # stray archs that libtool imported from universal third-party libs and
+    # guarantees the resulting binary has our backend's symbols on BOTH archs.
     local SIM_FAT="${BUILD_DIR}/SIMULATOR"
     local SIM_ARM64_BIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     local SIM_X86_BIN="${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     if [[ -f "${SIM_ARM64_BIN}" && -f "${SIM_X86_BIN}" ]]; then
-        # Only combine if the simulator binary doesn't already contain arm64
-        local SIM_ARCHS
-        SIM_ARCHS=$(lipo -archs "${SIM_X86_BIN}" 2>/dev/null || echo "")
-        if [[ "$SIM_ARCHS" != *"arm64"* ]]; then
-            log_step "Creating fat simulator binary (arm64 + x86_64)..."
-            lipo -create "${SIM_ARM64_BIN}" "${SIM_X86_BIN}" \
-                -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
+        log_step "Creating fat simulator binary (arm64 + x86_64)..."
+        local SIM_ARM64_THIN="${BUILD_DIR}/SIMULATORARM64/${FRAMEWORK_NAME}-thin-arm64.a"
+        local SIM_X86_THIN="${SIM_FAT}/${FRAMEWORK_NAME}-thin-x86_64.a"
+        # Extract the thin slice that corresponds to the platform's TARGET
+        # arch. If the binary was already thin for that arch, `lipo -thin`
+        # fails with "input file is not a fat file" — fall back to a copy.
+        if ! lipo -thin arm64 "${SIM_ARM64_BIN}" -output "${SIM_ARM64_THIN}" 2>/dev/null; then
+            cp "${SIM_ARM64_BIN}" "${SIM_ARM64_THIN}"
         fi
+        if ! lipo -thin x86_64 "${SIM_X86_BIN}" -output "${SIM_X86_THIN}" 2>/dev/null; then
+            cp "${SIM_X86_BIN}" "${SIM_X86_THIN}"
+        fi
+        lipo -create "${SIM_ARM64_THIN}" "${SIM_X86_THIN}" \
+            -output "${SIM_FAT}/${FRAMEWORK_NAME}.framework/${FRAMEWORK_NAME}"
     fi
 
     # Create XCFramework using library format (prevents SPM from embedding static libs)

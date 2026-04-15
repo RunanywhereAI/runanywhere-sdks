@@ -60,13 +60,6 @@ RunAnywhere (root)
 ./gradlew runAndroidApp      # Build, install, and launch on device
 ```
 
-### IntelliJ Plugin
-
-```bash
-./gradlew buildIntellijPlugin  # Publish SDK + build plugin
-./gradlew runIntellijPlugin    # Publish SDK + run plugin in sandbox
-```
-
 ### Everything
 
 ```bash
@@ -114,7 +107,6 @@ To rebuild after C++ changes:
 | SDK AAR | `sdk/runanywhere-kotlin/build/outputs/aar/` |
 | SDK JVM JAR | `sdk/runanywhere-kotlin/build/libs/` |
 | Android APK | `examples/android/RunAnywhereAI/app/build/outputs/apk/` |
-| IntelliJ Plugin | `examples/intellij-plugin-demo/plugin/build/distributions/` |
 | Maven Local | `~/.m2/repository/com/runanywhere/runanywhere-sdk/` |
 
 ## Troubleshooting

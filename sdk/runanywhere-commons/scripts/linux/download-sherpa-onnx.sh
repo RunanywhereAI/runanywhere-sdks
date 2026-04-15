@@ -70,13 +70,22 @@ while [[ "$1" == --* ]]; do
 done
 
 # =============================================================================
-# Check if already downloaded
+# Check if already downloaded at the requested version
 # =============================================================================
 
+VERSION_SENTINEL="${DEST_DIR}/.version"
+
 if [ -d "${DEST_DIR}/lib" ] && [ "$FORCE_DOWNLOAD" = false ]; then
-    print_success "Sherpa-ONNX already downloaded at ${DEST_DIR}"
-    echo "Use --force to re-download"
-    exit 0
+    EXISTING=""
+    [ -f "${VERSION_SENTINEL}" ] && EXISTING=$(cat "${VERSION_SENTINEL}")
+    if [ "${EXISTING}" = "${VERSION}" ]; then
+        print_success "Sherpa-ONNX v${VERSION} already downloaded at ${DEST_DIR}"
+        echo "Use --force to re-download"
+        exit 0
+    fi
+    print_step "Sherpa-ONNX version mismatch at ${DEST_DIR}"
+    echo "   Found: ${EXISTING:-unknown}, want: ${VERSION}"
+    echo "   Clearing stale cache and re-downloading…"
 fi
 
 # =============================================================================
@@ -153,6 +162,9 @@ if [ ! -f "${DEST_DIR}/include/sherpa-onnx/c-api/c-api.h" ]; then
     print_error "C API header not found!"
     exit 1
 fi
+
+# Stamp the version so future runs can detect drift and re-download.
+echo "${VERSION}" > "${VERSION_SENTINEL}"
 
 # =============================================================================
 # Summary

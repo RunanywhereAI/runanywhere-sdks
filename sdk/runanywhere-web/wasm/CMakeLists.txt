@@ -28,7 +28,6 @@ option(RAC_WASM_DEBUG "Enable debug assertions and verbose logging" OFF)
 option(RAC_WASM_LLAMACPP "Build with llama.cpp LLM backend" OFF)
 option(RAC_WASM_VLM "Build with VLM (Vision Language Model) support via llama.cpp mtmd" OFF)
 option(RAC_WASM_WHISPERCPP "Build with whisper.cpp STT backend" OFF)
-option(RAC_WASM_ONNX "Build with sherpa-onnx TTS/VAD backend" OFF)
 option(RAC_WASM_WEBGPU "Enable WebGPU acceleration for llama.cpp (requires JSPI-capable browser)" OFF)
 
 # =============================================================================
@@ -60,7 +59,7 @@ set(RAC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
 
 # Enable backends based on options
-if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX)
+if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP)
     set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
 else()
     set(RAC_BUILD_BACKENDS OFF CACHE BOOL "" FORCE)
@@ -69,7 +68,6 @@ endif()
 # Individual backend flags
 set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
 set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
-set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
 
 # VLM support via llama.cpp mtmd (multimodal vision encoder)
 if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
@@ -85,8 +83,14 @@ endif()
 # =============================================================================
 # BACKEND-SPECIFIC CONFIGURATION
 # =============================================================================
-# IMPORTANT: These must be set BEFORE add_subdirectory() so that llama.cpp,
-# whisper.cpp, and ONNX CMake files see the correct cache variables.
+# IMPORTANT: These must be set BEFORE add_subdirectory() so that llama.cpp
+# and whisper.cpp CMake files see the correct cache variables.
+#
+# NOTE: sherpa-onnx for the web is a separate WASM module built by
+# wasm/scripts/build-sherpa-onnx.sh and loaded at runtime by
+# packages/onnx/src/Foundation/SherpaONNXBridge.ts — it is NOT linked into
+# racommons-llamacpp.wasm. The native rac_backend_onnx requires ONNX Runtime
+# headers that have no WASM distribution, so there is no embedded path here.
 
 if(RAC_WASM_LLAMACPP)
     message(STATUS "Building with llama.cpp LLM backend for WASM")
@@ -142,14 +146,6 @@ if(RAC_WASM_WHISPERCPP)
 
     # Disable CoreML for whisper.cpp on WASM
     set(WHISPER_COREML OFF CACHE BOOL "" FORCE)
-endif()
-
-if(RAC_WASM_ONNX)
-    message(STATUS "Building with sherpa-onnx TTS/VAD backend for WASM")
-
-    # ONNX Runtime Web can use WebAssembly SIMD but not CoreML/NNAPI
-    set(ORT_USE_COREML OFF CACHE BOOL "" FORCE)
-    set(ORT_USE_NNAPI OFF CACHE BOOL "" FORCE)
 endif()
 
 # Enable C++ exception handling at compile-time for ALL targets.
@@ -642,29 +638,6 @@ if(RAC_WASM_WHISPERCPP)
     )
 endif()
 
-# Add sherpa-onnx backend exports if enabled (TTS + VAD)
-if(RAC_WASM_ONNX)
-    list(APPEND RAC_EXPORTED_FUNCTIONS
-        # TTS (Piper via ONNX)
-        "_rac_tts_onnx_create"
-        "_rac_tts_onnx_synthesize"
-        "_rac_tts_onnx_get_voices"
-        "_rac_tts_onnx_stop"
-        "_rac_tts_onnx_destroy"
-        # VAD (Silero via ONNX)
-        "_rac_vad_onnx_create"
-        "_rac_vad_onnx_process"
-        "_rac_vad_onnx_start"
-        "_rac_vad_onnx_stop"
-        "_rac_vad_onnx_reset"
-        "_rac_vad_onnx_set_threshold"
-        "_rac_vad_onnx_is_speech_active"
-        "_rac_vad_onnx_destroy"
-        "_rac_backend_onnx_register"
-        "_rac_backend_onnx_unregister"
-    )
-endif()
-
 # Join into a comma-separated list for Emscripten
 string(JOIN "," RAC_EXPORTED_FUNCTIONS_STR ${RAC_EXPORTED_FUNCTIONS})
 
@@ -685,10 +658,6 @@ endif()
 
 if(RAC_WASM_WHISPERCPP)
     target_link_libraries(racommons PRIVATE rac_backend_whispercpp)
-endif()
-
-if(RAC_WASM_ONNX)
-    target_link_libraries(racommons PRIVATE rac_backend_onnx)
 endif()
 
 target_include_directories(racommons PRIVATE
@@ -717,10 +686,6 @@ endif()
 
 if(RAC_WASM_WHISPERCPP)
     target_compile_definitions(racommons PRIVATE RAC_WASM_WHISPERCPP=1)
-endif()
-
-if(RAC_WASM_ONNX)
-    target_compile_definitions(racommons PRIVATE RAC_WASM_ONNX=1)
 endif()
 
 # =============================================================================
@@ -911,7 +876,6 @@ message(STATUS "llama.cpp:    ${RAC_WASM_LLAMACPP}")
 message(STATUS "WebGPU:       ${RAC_WASM_WEBGPU}")
 message(STATUS "VLM (mtmd):   ${RAC_VLM_USE_MTMD}")
 message(STATUS "whisper.cpp:  ${RAC_WASM_WHISPERCPP}")
-message(STATUS "sherpa-onnx:  ${RAC_WASM_ONNX}")
 message(STATUS "Output name:  ${WASM_OUTPUT_NAME}")
 message(STATUS "Output dir:   ${WASM_OUTPUT_DIR}")
 message(STATUS "====================================")

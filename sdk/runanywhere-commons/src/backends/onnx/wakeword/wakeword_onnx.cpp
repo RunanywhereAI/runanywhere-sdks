@@ -23,6 +23,7 @@
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
+#include "../shared/rac_ort_env.h"
 #endif
 
 #include <algorithm>
@@ -97,8 +98,8 @@ struct WakewordOnnxBackend {
     float global_threshold = 0.5f;
 
 #ifdef RAC_HAS_ONNX
-    // ONNX Runtime
-    std::unique_ptr<Ort::Env> env;
+    // ONNX Runtime — Ort::Env comes from the process-wide shared singleton
+    // (see shared/rac_ort_env.h). No per-backend env ownership.
     std::unique_ptr<Ort::SessionOptions> session_options;
     Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(
         OrtArenaAllocator, OrtMemTypeDefault);
@@ -523,9 +524,9 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
     backend->global_threshold = backend->config.threshold;
 
     try {
-        // Initialize ONNX Runtime
-        backend->env = std::make_unique<Ort::Env>(
-            ORT_LOGGING_LEVEL_WARNING, "WakeWord");
+        // Touch the shared Ort::Env so we fail here if it couldn't be created
+        // rather than when the first Session is built.
+        (void)rac::onnx::shared_cxx_env();
 
         backend->session_options = std::make_unique<Ort::SessionOptions>(
             create_session_options(backend->config.num_threads,
@@ -541,6 +542,11 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
 
     } catch (const Ort::Exception& e) {
         RAC_LOG_ERROR(LOG_TAG, "Failed to create ONNX environment: %s", e.what());
+        delete backend;
+        return RAC_ERROR_WAKEWORD_NOT_INITIALIZED;
+    } catch (const std::runtime_error& e) {
+        // Thrown by shared_cxx_env() when the singleton couldn't initialize.
+        RAC_LOG_ERROR(LOG_TAG, "Failed to acquire shared Ort::Env: %s", e.what());
         delete backend;
         return RAC_ERROR_WAKEWORD_NOT_INITIALIZED;
     }
@@ -572,10 +578,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 #ifdef _WIN32
             std::wstring melspec_wpath = rac_to_wstring(melspec_model_path);
             backend->melspec_session = std::make_unique<Ort::Session>(
-                *backend->env, melspec_wpath.c_str(), *backend->session_options);
+                rac::onnx::shared_cxx_env(), melspec_wpath.c_str(), *backend->session_options);
 #else
             backend->melspec_session = std::make_unique<Ort::Session>(
-                *backend->env, melspec_model_path, *backend->session_options);
+                rac::onnx::shared_cxx_env(), melspec_model_path, *backend->session_options);
 #endif
 
             // Get input/output names
@@ -595,10 +601,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 #ifdef _WIN32
             std::wstring embedding_wpath = rac_to_wstring(embedding_model_path);
             backend->embedding_session = std::make_unique<Ort::Session>(
-                *backend->env, embedding_wpath.c_str(), *backend->session_options);
+                rac::onnx::shared_cxx_env(), embedding_wpath.c_str(), *backend->session_options);
 #else
             backend->embedding_session = std::make_unique<Ort::Session>(
-                *backend->env, embedding_model_path, *backend->session_options);
+                rac::onnx::shared_cxx_env(), embedding_model_path, *backend->session_options);
 #endif
 
             // Get input/output names
@@ -668,10 +674,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
 #ifdef _WIN32
         std::wstring model_wpath = rac_to_wstring(model_path);
         model.session = std::make_unique<Ort::Session>(
-            *backend->env, model_wpath.c_str(), *backend->session_options);
+            rac::onnx::shared_cxx_env(), model_wpath.c_str(), *backend->session_options);
 #else
         model.session = std::make_unique<Ort::Session>(
-            *backend->env, model_path, *backend->session_options);
+            rac::onnx::shared_cxx_env(), model_path, *backend->session_options);
 #endif
 
         // Get input/output names

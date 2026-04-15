@@ -33,10 +33,10 @@
  *
  * Current call sites to update (option A or B):
  *   - src/features/vlm/vlm_component.cpp
- *   - src/features/rag/onnx_embedding_provider.cpp
+ *   - src/backends/onnx/embeddings/onnx_embedding_provider.cpp
  *   - src/features/result_free.cpp
  *   - src/backends/onnx/onnx_backend.cpp
- *   - src/backends/onnx/wakeword_onnx.cpp
+ *   - src/backends/onnx/wakeword/wakeword_onnx.cpp
  *   - src/infrastructure/download/download_orchestrator.cpp
  *   - src/infrastructure/extraction/rac_extraction.cpp
  *   - src/infrastructure/telemetry/telemetry_json.cpp

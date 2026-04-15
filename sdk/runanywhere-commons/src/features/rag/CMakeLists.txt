@@ -65,10 +65,12 @@ set(RAG_PIPELINE_SOURCES
     rac_rag_pipeline.cpp
 )
 
-# ONNX embedding provider (onnx_embedding_provider.cpp, rac_onnx_embeddings_register.cpp)
-# is compiled into rac_backend_onnx instead of this OBJECT library to avoid a
-# shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
-# See src/backends/onnx/CMakeLists.txt for where these sources are compiled.
+# The ONNX embedding provider (onnx_embedding_provider.* +
+# rac_onnx_embeddings_register.cpp) lives under
+# src/backends/onnx/embeddings/ and is compiled into rac_backend_onnx.
+# It sits there instead of here to avoid a shared-library cycle:
+# rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+# See src/backends/onnx/CMakeLists.txt.
 
 set(RAG_PIPELINE_HEADERS
     rag_backend.h

@@ -7,7 +7,8 @@
 #include "rac/features/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_compat.h"
-#include "../../backends/onnx/onnx_backend.h"
+#include "../onnx_backend.h"
+#include "../shared/rac_ort_env.h"
 
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>
@@ -958,20 +959,16 @@ private:
     }
 
     bool initialize_onnx_runtime() {
-        const OrtApiBase* ort_api_base = OrtGetApiBase();
-        const char* ort_version = ort_api_base ? ort_api_base->GetVersionString() : "unknown";
-        ort_api_ = ort_api_base ? ort_api_base->GetApi(ORT_API_VERSION) : nullptr;
+        // Share the single process-lifetime OrtEnv with onnx_backend and wakeword.
+        ort_api_ = rac::onnx::shared_ort_api();
         if (!ort_api_) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
+            RAC_LOG_ERROR(LOG_TAG, "Failed to get ONNX Runtime API (shared)");
             return false;
         }
 
-        // Create environment
-        OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAGEmbedding", &ort_env_);
-        if (status != nullptr) {
-            const char* error_msg = ort_api_->GetErrorMessage(status);
-            RAC_LOG_ERROR(LOG_TAG,"Failed to create ORT environment: %s", error_msg);
-            ort_api_->ReleaseStatus(status);
+        ort_env_ = rac::onnx::shared_ort_env();
+        if (!ort_env_) {
+            RAC_LOG_ERROR(LOG_TAG, "Failed to acquire shared Ort::Env");
             return false;
         }
 
@@ -1049,10 +1046,10 @@ private:
             session_ = nullptr;
         }
 
-        if (ort_env_) {
-            ort_api_->ReleaseEnv(ort_env_);
-            ort_env_ = nullptr;
-        }
+        // ort_env_ is the process-wide shared singleton — clear the pointer but
+        // do NOT release. See backends/onnx/shared/rac_ort_env.h.
+        ort_env_ = nullptr;
+        ort_api_ = nullptr;
     }
 
     std::string model_path_;

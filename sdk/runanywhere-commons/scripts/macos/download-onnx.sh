@@ -34,11 +34,24 @@ echo "======================================="
 echo ""
 echo "Version: ${ONNX_VERSION}"
 
-# Check if already exists
+VERSION_SENTINEL="${ONNX_DIR}/.version"
+
+# Check if already exists at the REQUESTED version. We compare against a
+# sentinel written by this script rather than trusting the mere presence
+# of libonnxruntime.dylib — that's how we'd silently drift ORT versions
+# and miss the ABI mismatch with sherpa-onnx until the first Ort:: call.
 if [ -d "${ONNX_DIR}/lib" ] && [ -f "${ONNX_DIR}/lib/libonnxruntime.dylib" ]; then
-    echo "✅ ONNX Runtime macOS already exists at ${ONNX_DIR}"
-    echo "   To force re-download, remove: rm -rf ${ONNX_DIR}"
-    exit 0
+    EXISTING=""
+    [ -f "${VERSION_SENTINEL}" ] && EXISTING=$(cat "${VERSION_SENTINEL}")
+    if [ "${EXISTING}" = "${ONNX_VERSION}" ]; then
+        echo "✅ ONNX Runtime macOS v${ONNX_VERSION} already exists at ${ONNX_DIR}"
+        echo "   To force re-download, remove: rm -rf ${ONNX_DIR}"
+        exit 0
+    fi
+    echo "⚠️  ONNX Runtime macOS version mismatch at ${ONNX_DIR}"
+    echo "   Found: ${EXISTING:-unknown}, want: ${ONNX_VERSION}"
+    echo "   Clearing stale cache and re-downloading…"
+    rm -rf "${ONNX_DIR}"
 fi
 
 # Create temp directory for download
@@ -73,6 +86,9 @@ fi
 # Copy lib and include
 cp -R "${EXTRACTED_DIR}/lib" "${ONNX_DIR}/"
 cp -R "${EXTRACTED_DIR}/include" "${ONNX_DIR}/"
+
+# Stamp the version so future runs can detect drift.
+echo "${ONNX_VERSION}" > "${VERSION_SENTINEL}"
 
 # Clean up
 rm -rf "${TEMP_DIR}"

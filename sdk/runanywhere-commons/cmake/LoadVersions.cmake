@@ -46,6 +46,32 @@ foreach(_LINE IN LISTS _VERSIONS_LINES)
     endif()
 endforeach()
 
+# =============================================================================
+# Invariant: all ONNX_VERSION_* pins must match.
+# Sherpa-ONNX is the sole consumer of ORT; a drift here silently breaks
+# runtime symbol resolution when sherpa loads against the wrong ORT.
+# =============================================================================
+set(_ONNX_PINS
+    "${RAC_ONNX_VERSION_IOS}"
+    "${RAC_ONNX_VERSION_ANDROID}"
+    "${RAC_ONNX_VERSION_MACOS}"
+    "${RAC_ONNX_VERSION_LINUX}"
+    "${RAC_ONNX_VERSION_WINDOWS}"
+)
+set(_ONNX_CANONICAL "${RAC_ONNX_VERSION_IOS}")
+foreach(_pin IN LISTS _ONNX_PINS)
+    if(NOT "${_pin}" STREQUAL "${_ONNX_CANONICAL}")
+        message(FATAL_ERROR
+            "ONNX_VERSION_* pins in VERSIONS must all match. "
+            "Got: iOS=${RAC_ONNX_VERSION_IOS}, Android=${RAC_ONNX_VERSION_ANDROID}, "
+            "macOS=${RAC_ONNX_VERSION_MACOS}, Linux=${RAC_ONNX_VERSION_LINUX}, "
+            "Windows=${RAC_ONNX_VERSION_WINDOWS}. "
+            "Sherpa-ONNX is the single ORT source of truth — bump in lock-step.")
+    endif()
+endforeach()
+unset(_ONNX_PINS)
+unset(_ONNX_CANONICAL)
+
 # Log loaded versions
 message(STATUS "Loaded versions from ${_VERSIONS_FILE}:")
 message(STATUS "  Platform targets:")

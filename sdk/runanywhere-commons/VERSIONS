@@ -32,25 +32,26 @@ ANDROID_MIN_SDK=24
 XCODE_VERSION=15.4
 
 # =============================================================================
-# ONNX Runtime
+# ONNX Runtime — SINGLE SOURCE OF TRUTH
 # =============================================================================
-# iOS version MUST match:
-#   1. What sherpa-onnx was built against
-#   2. What's in runanywhere-swift/Binaries/onnxruntime.xcframework
-# sherpa-onnx 1.12.17+ requires ONNX Runtime >= 1.17.1
+# Sherpa-ONNX is our only sherpa-consuming backend; ORT must match what
+# Sherpa-ONNX was built against. On Android + macOS + Linux + Windows,
+# Sherpa-ONNX's prebuilt distribution already bundles a compatible
+# libonnxruntime so we consume it directly. On iOS sherpa-onnx.xcframework
+# ships with undefined ORT symbols, so we download the separate
+# pod-archive-onnxruntime-c-<version>.zip with the EXACT same version.
+#
+# If any per-platform pin below drifts from what Sherpa-ONNX requires,
+# runtime symbol resolution breaks silently (sherpa loads, first ORT call
+# hits a missing symbol). load-versions.sh (shell) and LoadVersions.cmake
+# hard-error if the ONNX_VERSION_* pins don't all match each other.
+#
+# When bumping: change ALL pins in lock-step and keep them equal.
 ONNX_VERSION_IOS=1.17.1
-
-# Android version - used by Sherpa-ONNX, must be compatible
 ONNX_VERSION_ANDROID=1.17.1
-
-# macOS version (can use latest)
-ONNX_VERSION_MACOS=1.23.2
-
-# Linux version (can use latest)
-ONNX_VERSION_LINUX=1.23.2
-
-# Windows version (can use latest)
-ONNX_VERSION_WINDOWS=1.23.2
+ONNX_VERSION_MACOS=1.17.1
+ONNX_VERSION_LINUX=1.17.1
+ONNX_VERSION_WINDOWS=1.17.1
 
 # =============================================================================
 # Sherpa-ONNX (via runanywhere-core)

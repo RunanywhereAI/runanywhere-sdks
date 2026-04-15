@@ -185,6 +185,41 @@ download_sherpa_headers() {
     echo "${SHERPA_VERSION}" > "${SHERPA_DIR}/include/.sherpa-header-version"
 }
 
+# Strip unused Sherpa-ONNX libraries from jniLibs.
+#
+# The Sherpa-ONNX Android prebuilt ships four .so files per ABI:
+#   libonnxruntime.so           — REQUIRED (also consumed by librac_backend_onnx.so)
+#   libsherpa-onnx-c-api.so     — REQUIRED (our C++ backend links against the C API)
+#   libsherpa-onnx-jni.so       — UNUSED   (Sherpa-ONNX's own Java/JNI bridge; we have
+#                                            our own JNI at librac_backend_onnx_jni.so)
+#   libsherpa-onnx-cxx-api.so   — UNUSED   (we link the C API, not the C++ API)
+#
+# Removing the two unused libraries cuts ~4.6 MB per ABI out of the AAR with
+# no runtime impact. Safe: neither library is referenced by any other .so we
+# ship, and neither is loaded via System.loadLibrary on the Kotlin side.
+strip_unused_sherpa_libs() {
+    local jni_root="${SHERPA_DIR}/jniLibs"
+    [ -d "${jni_root}" ] || return 0
+    local removed=0
+    local stripped_bytes=0
+    for lib_name in libsherpa-onnx-jni.so libsherpa-onnx-cxx-api.so; do
+        for abi_dir in "${jni_root}"/*; do
+            local target="${abi_dir}/${lib_name}"
+            if [ -f "${target}" ]; then
+                local sz
+                sz=$(stat -f%z "${target}" 2>/dev/null || stat -c%s "${target}" 2>/dev/null || echo 0)
+                stripped_bytes=$((stripped_bytes + sz))
+                rm -f "${target}"
+                removed=$((removed + 1))
+            fi
+        done
+    done
+    if [ "${removed}" -gt 0 ]; then
+        local mb=$((stripped_bytes / 1024 / 1024))
+        echo -e "${GREEN}✂️  Stripped ${removed} unused Sherpa-ONNX .so files (~${mb} MB saved)${NC}"
+    fi
+}
+
 # Function to ensure all required headers are present
 # Can be called independently of the main archive download
 ensure_headers() {
@@ -257,12 +292,18 @@ ensure_headers() {
 
 # Check if already exists
 if [ -d "${SHERPA_DIR}/jniLibs" ]; then
-    if [ -f "${SHERPA_DIR}/jniLibs/arm64-v8a/libsherpa-onnx-jni.so" ]; then
+    # Detect a complete download by the presence of the always-required ORT .so.
+    # (Previously we checked libsherpa-onnx-jni.so, but that file is now stripped
+    # by strip_unused_sherpa_libs — so a trimmed tree would have been misread as
+    # incomplete and force a re-download on every build.)
+    if [ -f "${SHERPA_DIR}/jniLibs/arm64-v8a/libonnxruntime.so" ]; then
         echo "✅ Sherpa-ONNX Android libraries already exist"
         echo "   Location: ${SHERPA_DIR}"
 
         # Ensure headers are present (may have been added after initial download)
         ensure_headers
+        # Strip unused sherpa libs if they leaked back in from a manual re-extract
+        strip_unused_sherpa_libs
 
         echo ""
         echo "To force re-download, remove the directory first:"
@@ -333,6 +374,9 @@ if [ "${HTTP_CODE}" = "200" ] && [ -f "${TEMP_ARCHIVE}" ] && [ -s "${TEMP_ARCHIV
 
     # Ensure all headers are present (Sherpa-ONNX + ONNX Runtime)
     ensure_headers
+    # Drop libsherpa-onnx-jni.so and libsherpa-onnx-cxx-api.so — our backend
+    # doesn't use them (~4.6 MB per ABI saved in the final AAR).
+    strip_unused_sherpa_libs
 
     echo ""
     echo "✅ Sherpa-ONNX Android libraries downloaded to ${SHERPA_DIR}"

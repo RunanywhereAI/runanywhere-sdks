@@ -515,8 +515,10 @@ copy_android_jnilibs() {
             log_info "ONNX: libonnxruntime.so (from Sherpa-ONNX)"
         fi
 
-        # Copy Sherpa-ONNX libraries - try dist first, then third_party
-        for lib in libsherpa-onnx-c-api.so libsherpa-onnx-cxx-api.so libsherpa-onnx-jni.so; do
+        # Copy Sherpa-ONNX C API only (the sherpa JNI and C++ API variants are
+        # intentionally stripped — our backend links the C API through
+        # librac_backend_onnx.so and our JNI is librac_backend_onnx_jni.so).
+        for lib in libsherpa-onnx-c-api.so; do
             if [[ -f "${COMMONS_DIST}/onnx/${ABI}/${lib}" ]]; then
                 cp "${COMMONS_DIST}/onnx/${ABI}/${lib}" "${ONNX_ANDROID_JNILIBS}/${ABI}/"
                 log_info "ONNX: ${lib}"

@@ -1,6 +1,21 @@
 # FetchONNXRuntime.cmake
-# Downloads and configures ONNX Runtime pre-built binaries
-
+# -----------------------------------------------------------------------------
+# Locates ONNX Runtime for each native platform. Sherpa-ONNX is our only
+# ORT-consuming backend, so the version must match what sherpa was built
+# against — LoadVersions.cmake enforces ONNX_VERSION_* pin parity.
+#
+# Per-platform strategy:
+#   Android         : consume libonnxruntime.so bundled in sherpa-onnx prebuilt
+#                     (no separate ORT fetch — single source of truth)
+#   WASM            : interface-only target; sherpa-onnx is built from source
+#                     and supplies ORT via its build tree
+#   iOS             : download pod-archive-onnxruntime-c-<version>.zip
+#                     (sherpa-onnx.xcframework leaves ORT symbols undefined)
+#   macOS/Linux/Win : fetch ORT at the sherpa-pinned version
+#                     (sherpa-onnx-{macos,linux,windows} ships libonnxruntime.a
+#                      bundled but we keep the separate fetch for dynamic-
+#                      linking + header availability — the VERSION is the
+#                      invariant that matters)
 include(FetchContent)
 
 # Load versions from centralized VERSIONS file (SINGLE SOURCE OF TRUTH)
@@ -178,9 +193,9 @@ elseif(ANDROID)
     endif()
 
 elseif(APPLE)
-    # macOS: Use local ONNX Runtime from third_party if available, otherwise download
-    # Downloaded by: ./scripts/macos/download-onnx.sh
-
+    # macOS: Use local ONNX Runtime from third_party if available, otherwise download.
+    # ONNX_VERSION_MACOS is pinned equal to ONNX_VERSION_IOS (sherpa-onnx's
+    # expected ORT) by the load-time invariant check in LoadVersions.cmake.
     set(ONNX_MACOS_VERSION "${ONNX_VERSION_MACOS}")
     set(ONNX_MACOS_DIR "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-macos")
 

@@ -17,10 +17,6 @@
 //   ./gradlew buildAndroidApp    - Build Android example app
 //   ./gradlew runAndroidApp      - Build, install, and launch Android app
 //
-//   IntelliJ Plugin:
-//   ./gradlew buildIntellijPlugin - Build IntelliJ plugin
-//   ./gradlew runIntellijPlugin  - Run IntelliJ plugin in sandbox
-//
 //   Utility:
 //   ./gradlew buildAll           - Build everything
 //   ./gradlew cleanAll           - Clean everything
@@ -262,41 +258,6 @@ tasks.register("runAndroidApp") {
     }
 }
 
-// IntelliJ plugin tasks (SDK consumed via Maven Local)
-
-tasks.register("buildIntellijPlugin") {
-    group = "intellij"
-    description = "Publish SDK + build IntelliJ plugin"
-
-    doLast {
-        exec {
-            workingDir = projectDir
-            commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "buildPlugin")
-        }
-        println("IntelliJ plugin built: examples/intellij-plugin-demo/plugin/build/distributions/")
-    }
-}
-
-tasks.register("runIntellijPlugin") {
-    group = "intellij"
-    description = "Publish SDK + run IntelliJ plugin in sandbox"
-
-    doLast {
-        exec {
-            workingDir = projectDir
-            commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "runIde")
-        }
-    }
-}
-
 // Convenience tasks
 
 tasks.register("buildAll") {
@@ -317,14 +278,10 @@ tasks.register("buildAll") {
             commandLine("./gradlew", "assembleDebug")
         }
 
-        // Publish SDK to Maven Local + build IntelliJ plugin
+        // Publish SDK to Maven Local (for downstream consumers)
         exec {
             workingDir = projectDir
             commandLine("./gradlew", ":runanywhere-kotlin:publishToMavenLocal")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
-            commandLine("./gradlew", "buildPlugin")
         }
 
         println()
@@ -332,7 +289,6 @@ tasks.register("buildAll") {
         println("  SDK AAR:          sdk/runanywhere-kotlin/build/outputs/aar/")
         println("  Maven Local:      ~/.m2/repository/com/runanywhere/runanywhere-sdk/")
         println("  Android APK:      examples/android/RunAnywhereAI/app/build/outputs/apk/")
-        println("  IntelliJ Plugin:  examples/intellij-plugin-demo/plugin/build/distributions/")
     }
 }
 
@@ -346,10 +302,6 @@ tasks.register("cleanAll") {
 
         exec {
             workingDir = file("examples/android/RunAnywhereAI")
-            commandLine("./gradlew", "clean")
-        }
-        exec {
-            workingDir = file("examples/intellij-plugin-demo/plugin")
             commandLine("./gradlew", "clean")
         }
         println("All projects cleaned")

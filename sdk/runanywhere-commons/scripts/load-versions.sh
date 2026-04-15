@@ -49,6 +49,29 @@ while IFS='=' read -r key value; do
     export "$key"="$value"
 done < "${VERSIONS_FILE}"
 
+# =============================================================================
+# Invariant: all ONNX_VERSION_* pins must match.
+# Sherpa-ONNX is the sole consumer of ORT; a drift here silently breaks
+# runtime symbol resolution when sherpa loads against the wrong ORT.
+# =============================================================================
+_ONNX_PINS=(
+    "${ONNX_VERSION_IOS:-}"
+    "${ONNX_VERSION_ANDROID:-}"
+    "${ONNX_VERSION_MACOS:-}"
+    "${ONNX_VERSION_LINUX:-}"
+    "${ONNX_VERSION_WINDOWS:-}"
+)
+_ONNX_CANONICAL="${ONNX_VERSION_IOS:-}"
+for _pin in "${_ONNX_PINS[@]}"; do
+    if [ -z "${_pin}" ] || [ "${_pin}" != "${_ONNX_CANONICAL}" ]; then
+        echo "ERROR: ONNX_VERSION_* pins in VERSIONS must all match (found mix: ${_ONNX_PINS[*]})." >&2
+        echo "       Sherpa-ONNX is the single ORT source of truth — bump them in lock-step." >&2
+        unset _ONNX_PINS _ONNX_CANONICAL _pin
+        return 1 2>/dev/null || exit 1
+    fi
+done
+unset _ONNX_PINS _ONNX_CANONICAL _pin
+
 # Print loaded versions if VERBOSE is set
 if [ "${VERBOSE:-}" = "1" ]; then
     echo "Loaded versions from ${VERSIONS_FILE}:"

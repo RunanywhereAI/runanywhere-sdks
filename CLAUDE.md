@@ -36,7 +36,6 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
 - **Web Demo** (`examples/web/RunAnywhereAI/`) - Sample web app demonstrating SDK usage
-- **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
 
@@ -225,7 +224,7 @@ cd sdk/runanywhere-web/
 ./scripts/build-web.sh
 
 # Build WASM with specific backends
-./scripts/build-web.sh --build-wasm --llamacpp --onnx
+./scripts/build-web.sh --build-wasm --llamacpp
 ./scripts/build-web.sh --build-wasm --all-backends
 ./scripts/build-web.sh --build-wasm --llamacpp --vlm --webgpu
 

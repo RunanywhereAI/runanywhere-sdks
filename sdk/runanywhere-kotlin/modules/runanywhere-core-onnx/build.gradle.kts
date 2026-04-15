@@ -1,21 +1,24 @@
 /**
  * RunAnywhere Core ONNX Module
  *
- * This module provides the ONNX Runtime backend for STT, TTS, and VAD.
- * It is SELF-CONTAINED with its own native libraries.
+ * This module provides the ONNX Runtime backend for STT, TTS, VAD, wake-word,
+ * and RAG embeddings. It is SELF-CONTAINED with its own native libraries.
  *
  * Architecture (mirrors iOS RABackendONNX.xcframework):
  *   iOS:     ONNXRuntime.swift -> RABackendONNX.xcframework + onnxruntime.xcframework
- *   Android: ONNX.kt -> librunanywhere_onnx.so + libonnxruntime.so + libsherpa-onnx-*.so
+ *   Android: ONNX.kt -> librac_backend_onnx.so + libonnxruntime.so + libsherpa-onnx-c-api.so
  *
- * Native Libraries Included (~25MB total):
- *   - librunanywhere_onnx.so - ONNX backend wrapper
- *   - libonnxruntime.so (~15MB) - ONNX Runtime
- *   - libsherpa-onnx-c-api.so - Sherpa-ONNX C API
- *   - libsherpa-onnx-cxx-api.so - Sherpa-ONNX C++ API
- *   - libsherpa-onnx-jni.so - Sherpa-ONNX JNI (STT/TTS/VAD)
+ * Native Libraries Shipped (~21 MB per ABI, 3 ABIs):
+ *   - librac_backend_onnx.so      - Our ONNX backend (sherpa STT/TTS/VAD + raw-ORT wake-word + embeddings)
+ *   - librac_backend_onnx_jni.so  - JNI bridge for Kotlin
+ *   - libonnxruntime.so (~15 MB)  - ONNX Runtime, sourced from Sherpa-ONNX prebuilt
+ *   - libsherpa-onnx-c-api.so     - Sherpa-ONNX C API (linked by our backend)
  *
- * This module is OPTIONAL - only include it if your app needs STT/TTS/VAD capabilities.
+ * Explicitly NOT shipped (stripped by download-sherpa-onnx.sh + packagingOptions below):
+ *   - libsherpa-onnx-jni.so       - Sherpa's own JNI bridge; we use our own
+ *   - libsherpa-onnx-cxx-api.so   - Sherpa's C++ API; we link the C API
+ *
+ * This module is OPTIONAL - only include it if your app needs STT/TTS/VAD/wake-word/embeddings.
  */
 
 plugins {
@@ -152,9 +155,71 @@ android {
         }
     }
 
-    // Native libs: librac_backend_onnx.so, librac_backend_onnx_jni.so,
-    // libonnxruntime.so, libsherpa-onnx-c-api.so, libsherpa-onnx-cxx-api.so, libsherpa-onnx-jni.so
+    // Native libs shipped: librac_backend_onnx.so, librac_backend_onnx_jni.so,
+    // libonnxruntime.so, libsherpa-onnx-c-api.so.
     // Downloaded from RABackendONNX-android GitHub release assets, or built locally.
+}
+
+// =============================================================================
+// Strip Sherpa's own JNI bridge and C++ API wrapper from the AAR's jniLibs tree.
+//
+// Sherpa-ONNX's Android prebuilt ships four .so files per ABI but we only need
+// two (libonnxruntime.so + libsherpa-onnx-c-api.so). The other two —
+// libsherpa-onnx-jni.so and libsherpa-onnx-cxx-api.so — are:
+//
+//   * libsherpa-onnx-jni.so   → sherpa's own Java/JNI bridge. Never loaded via
+//                                System.loadLibrary from our Kotlin code.
+//   * libsherpa-onnx-cxx-api.so → sherpa's C++ API shim. Our backend uses the
+//                                C API directly, not this wrapper.
+//
+// packaging.jniLibs.excludes (the idiomatic knob) would've been cleaner, but it
+// only takes effect when a downstream APP packages this AAR — it does NOT strip
+// from the AAR itself during assembleRelease. The AAR is built from whatever's
+// in src/androidMain/jniLibs/, so we delete the unwanted files from that tree
+// BEFORE any packaging task runs.
+//
+// Runs for both testLocal modes:
+//   * testLocal=false: downloadJniLibs's whitelist already filtered them out at
+//                      copy time — this task becomes a no-op, but guards against
+//                      stale files from an earlier testLocal=true build.
+//   * testLocal=true:  build-kotlin.sh's copy loop may have brought them in from
+//                      commons/dist/android/onnx/<abi>/ — strip them here.
+// =============================================================================
+val unshippedSherpaSoPatterns = listOf(
+    "libsherpa-onnx-jni.so",
+    "libsherpa-onnx-cxx-api.so",
+)
+
+tasks.register<Delete>("stripUnshippedSherpaLibs") {
+    group = "runanywhere"
+    description = "Remove Sherpa-ONNX's own JNI + C++ API .so files from jniLibs/ (we don't ship them)"
+    val jniRoot = file("src/androidMain/jniLibs")
+    delete(
+        fileTree(jniRoot) {
+            unshippedSherpaSoPatterns.forEach { include("**/$it") }
+        },
+    )
+    doLast {
+        logger.lifecycle(
+            "ONNX: stripped ${unshippedSherpaSoPatterns.joinToString(", ")} " +
+                "from src/androidMain/jniLibs (see module KDoc for rationale).",
+        )
+    }
+}
+
+// Wire stripUnshippedSherpaLibs so it runs after downloadJniLibs completes (so
+// freshly-downloaded files also get filtered) and before any merge/bundle step
+// that would otherwise shovel them into the AAR.
+tasks.matching { it.name == "downloadJniLibs" }.configureEach {
+    finalizedBy("stripUnshippedSherpaLibs")
+}
+tasks.matching {
+    it.name.contains("merge") && it.name.contains("JniLibFolders")
+}.configureEach {
+    dependsOn("stripUnshippedSherpaLibs")
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn("stripUnshippedSherpaLibs")
 }
 
 // Native lib version for downloads
@@ -177,13 +242,15 @@ tasks.register("downloadJniLibs") {
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
     val packageType = "RABackendONNX-android"
 
+    // Only copy the .so files we actually ship. libsherpa-onnx-jni.so and
+    // libsherpa-onnx-cxx-api.so are intentionally excluded — see class-level
+    // KDoc. The packagingOptions.jniLibs.excludes block above is the belt-and-
+    // braces guard; this filter saves download bandwidth / extraction time.
     val onnxLibs = setOf(
         "librac_backend_onnx.so",
         "librac_backend_onnx_jni.so",
         "libonnxruntime.so",
         "libsherpa-onnx-c-api.so",
-        "libsherpa-onnx-cxx-api.so",
-        "libsherpa-onnx-jni.so",
     )
 
     outputs.dir(outputDir)
