@@ -397,9 +397,18 @@ jobs:
       - uses: ./.github/actions/setup-toolchain
         with:
           platform: sdk-only
+      - name: Enable Corepack (for yarn@3.6.1 declared in packageManager)
+        run: corepack enable
       - name: Install RN workspace
         working-directory: sdk/runanywhere-react-native
-        run: npm install --legacy-peer-deps || yarn install
+        run: |
+          # The RN SDK uses yarn workspaces + yarn@3.6.1 via Corepack; fall
+          # back to npm install only as a last resort for older checkouts.
+          if [ -f yarn.lock ] || grep -q '"packageManager": "yarn@' package.json 2>/dev/null; then
+            yarn install --immutable || yarn install
+          else
+            npm install --legacy-peer-deps
+          fi
       - name: Typecheck packages
         working-directory: sdk/runanywhere-react-native
         run: |
