@@ -103,6 +103,27 @@ rac_result_t rac_init(const rac_config_t* config) {
         return RAC_ERROR_ADAPTER_NOT_SET;
     }
 
+    // Adapter ABI version check. Catches callers that forgot to set the
+    // .version field (they'll typically leave it at 0 via {0}-init) AND
+    // callers that were compiled against a FUTURE version of the struct
+    // (newer callbacks we don't know how to call).
+    //
+    // We accept 0 as a soft-deprecated value for backwards compat during
+    // this release cycle (it was the effective value before
+    // RAC_PLATFORM_ADAPTER_VERSION existed). Callers will get a warning
+    // log; in a future release we'll tighten to require version >= 1.
+    if (config->platform_adapter->version == 0) {
+        internal_log(RAC_LOG_WARNING,
+                     "Platform adapter .version is 0. Set .version = "
+                     "RAC_PLATFORM_ADAPTER_VERSION. Accepting for now; this will "
+                     "be rejected in a future release.");
+    } else if (config->platform_adapter->version > RAC_PLATFORM_ADAPTER_VERSION) {
+        rac_error_set_details(
+            "Platform adapter version is newer than this runtime supports. "
+            "Upgrade runanywhere-commons or set .version to a supported value.");
+        return RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION;
+    }
+
     // Store configuration
     s_platform_adapter = config->platform_adapter;
     s_log_level = config->log_level;

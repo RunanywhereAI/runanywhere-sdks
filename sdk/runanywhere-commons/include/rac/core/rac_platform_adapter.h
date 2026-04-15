@@ -21,6 +21,30 @@ extern "C" {
 #endif
 
 // =============================================================================
+// ADAPTER ABI VERSIONING
+// =============================================================================
+//
+// Callers MUST set `rac_platform_adapter_t::version = RAC_PLATFORM_ADAPTER_VERSION`
+// before passing the struct to rac_init(). The runtime validates this and
+// refuses adapters whose version is 0 (uninitialised) or greater than the
+// latest version it knows about.
+//
+// When new callbacks are appended to the struct in a future release:
+//   1. Bump this constant.
+//   2. Document the new version (and the callback it added) in the
+//      version history block below.
+//   3. Keep all existing fields in place and in the same order.
+//   4. The runtime reads callbacks by offset; older callers that were
+//      compiled against version N still work on a runtime at version N+M
+//      so long as the runtime only touches offsets <= N.
+//
+// Version history:
+//   v1 - initial schema: file_*, http_*, extract_*, secure_*, time,
+//        random_bytes, etc. (~13 callbacks)
+// =============================================================================
+#define RAC_PLATFORM_ADAPTER_VERSION ((uint32_t)1)
+
+// =============================================================================
 // CALLBACK TYPES (defined outside struct for C compatibility)
 // =============================================================================
 
@@ -59,9 +83,30 @@ typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_
  * Platform adapter structure.
  *
  * Implements platform-specific operations via callbacks.
- * The SDK layer (Swift/Kotlin) provides these implementations.
+ * The SDK layer (Swift/Kotlin/RN/Flutter/WASM) provides these
+ * implementations.
+ *
+ * ABI stability:
+ *   The first field is a `version` set by the caller to
+ *   RAC_PLATFORM_ADAPTER_VERSION. rac_init() validates this; an adapter
+ *   whose version is 0 or greater than what the runtime knows about is
+ *   rejected with a clear error instead of being silently misinterpreted.
+ *
+ *   When new callbacks are appended here, bump RAC_PLATFORM_ADAPTER_VERSION
+ *   and bump RAC_PLATFORM_ADAPTER_VERSION_LATEST. Older consumers continue
+ *   to work by setting their `version` to the version they were compiled
+ *   against; the runtime only reads callbacks through that version.
+ *
+ *   The trailing `_reserved[4]` is zero-initialized padding so adding
+ *   small fields in a future version doesn't change sizeof() - callers
+ *   using `= {0}` or `= RAC_PLATFORM_ADAPTER_DEFAULTS` stay correct.
  */
 typedef struct rac_platform_adapter {
+    // -------------------------------------------------------------------------
+    // Version (set by caller; validated by rac_init)
+    // -------------------------------------------------------------------------
+    uint32_t version;  // Must equal RAC_PLATFORM_ADAPTER_VERSION.
+
     // -------------------------------------------------------------------------
     // File System Operations
     // -------------------------------------------------------------------------
