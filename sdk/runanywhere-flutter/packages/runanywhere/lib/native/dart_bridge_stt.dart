@@ -175,8 +175,9 @@ class DartBridgeSTT {
         'Transcribing ${audioData.length} bytes at $sampleRate Hz in background isolate...');
 
     // Run transcription in background isolate
+    final handleAddress = handle.address;
     final result = await Isolate.run(() => _transcribeInIsolate(
-          handle.address,
+          handleAddress,
           audioData,
           sampleRate,
         ));

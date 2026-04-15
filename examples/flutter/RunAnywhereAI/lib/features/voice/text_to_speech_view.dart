@@ -7,7 +7,9 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/services/audio_player_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -44,8 +46,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
-  // ignore: unused_field - kept for future TTS implementation
-  bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
   double _playbackProgress = 0.0;
@@ -121,40 +121,39 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.tts,
         onModelSelected: (model) async {
-          await _loadModel(model);
+          await _refreshModelState(model);
         },
       ),
     ));
   }
 
-  /// Load TTS model using RunAnywhere SDK
-  Future<void> _loadModel(ModelInfo model) async {
+  Future<void> _refreshModelState(ModelInfo model) async {
+    if (model.preferredFramework == LLMFramework.systemTTS) {
+      if (!mounted) return;
+      setState(() {
+        _selectedFramework = LLMFramework.systemTTS;
+        _selectedModelName = model.name;
+        _isSystemTTS = true;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    final currentVoice = await sdk.RunAnywhere.currentTTSVoice();
+    if (!mounted) return;
+
     setState(() {
-      _isGenerating = true;
+      _selectedFramework = currentVoice == null
+          ? LLMFramework.unknown
+          : switch (currentVoice.framework) {
+              sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
+              sdk.InferenceFramework.systemTTS => LLMFramework.systemTTS,
+              _ => LLMFramework.unknown,
+            };
+      _selectedModelName = currentVoice?.name;
+      _isSystemTTS = currentVoice?.framework == sdk.InferenceFramework.systemTTS;
       _errorMessage = null;
     });
-
-    try {
-      debugPrint('🔄 Loading TTS voice: ${model.name}');
-
-      // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSVoice(model.id);
-
-      setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
-        _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
-        _isGenerating = false;
-      });
-
-      debugPrint('✅ TTS model loaded: ${model.name}');
-    } catch (e) {
-      debugPrint('❌ Failed to load TTS model: $e');
-      setState(() {
-        _errorMessage = 'Failed to load model: $e';
-        _isGenerating = false;
-      });
-    }
   }
 
   /// Generate speech using RunAnywhere SDK
@@ -169,7 +168,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
-      _hasAudio = false;
       _metadata = null;
     });
 
@@ -195,7 +193,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = result.samples.isNotEmpty;
         _duration = result.durationSeconds;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
@@ -246,31 +243,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     }
   }
 
-  /// Play audio using the audio player service (for Int16 PCM data)
-  // ignore: unused_element - kept for alternative audio formats
-  Future<void> _playAudio(List<int> audioData) async {
-    try {
-      // Convert List<int> to Uint8List
-      final audioBytes = Uint8List.fromList(audioData);
-
-      // The TTS component returns PCM16 data at 22050 Hz mono
-      // We need to pass the sample rate so the audio player can create proper WAV headers
-      await _playerService.playFromBytes(
-        audioBytes,
-        volume: 1.0, // Use full volume (pitch controls are in TTS synthesis)
-        rate: _speechRate,
-        sampleRate: 22050, // Piper TTS default sample rate
-        numChannels: 1, // Mono audio
-      );
-      debugPrint('🔊 Playing audio...');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
-      });
-    }
-  }
-
   Future<void> _togglePlayback() async {
     if (_isPlaying) {
       await _stopPlayback();
@@ -299,6 +271,19 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   @override
   Widget build(BuildContext context) {
+    final capability = PlatformCapabilityService.shared;
+    if (!capability.supportsTextToSpeech) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Text to Speech'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Text-to-Speech Unavailable',
+          message: capability.unsupportedMessage('Text-to-Speech'),
+        ),
+      );
+    }
+
     final characterCount = _textController.text.length;
 
     return Scaffold(

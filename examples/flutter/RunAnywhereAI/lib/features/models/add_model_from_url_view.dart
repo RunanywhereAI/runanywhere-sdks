@@ -182,7 +182,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
         ),
         const SizedBox(height: AppSpacing.mediumLarge),
         DropdownButtonFormField<LLMFramework>(
-          initialValue: _selectedFramework,
+          value: _selectedFramework,
           decoration: const InputDecoration(
             labelText: 'Target Framework',
             border: OutlineInputBorder(),

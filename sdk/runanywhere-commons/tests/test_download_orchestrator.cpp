@@ -213,6 +213,37 @@ static TestResult test_find_model_nested_gguf() {
     return r;
 }
 
+static TestResult test_find_model_prefers_primary_gguf_over_mmproj() {
+    TestResult r;
+    r.test_name = "find_model_prefers_primary_gguf_over_mmproj";
+
+    std::string dir = create_temp_dir("vlm_primary");
+    ASSERT_TRUE(!dir.empty(), "Failed to create temp dir");
+
+    // Multimodal llama.cpp packages include both the main model and an mmproj
+    // auxiliary projector. Generic LLM path resolution must pick the primary
+    // model file instead of the mmproj artifact.
+    write_dummy_file(dir + "/mmproj-SmolVLM-500M-Instruct-Q8_0.gguf");
+    write_dummy_file(dir + "/SmolVLM-500M-Instruct-Q8_0.gguf");
+
+    char out_path[4096];
+    rac_result_t result = rac_find_model_path_after_extraction(
+        dir.c_str(), RAC_ARCHIVE_STRUCTURE_UNKNOWN, RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+        out_path, sizeof(out_path));
+
+    ASSERT_TRUE(result == RAC_SUCCESS, "Should find llama.cpp model path");
+
+    std::string found(out_path);
+    ASSERT_TRUE(found.find("SmolVLM-500M-Instruct-Q8_0.gguf") != std::string::npos,
+                "Should resolve the primary .gguf model");
+    ASSERT_TRUE(found.find("mmproj-") == std::string::npos,
+                "Should not resolve the mmproj auxiliary file");
+
+    remove_dir(dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_find_model_nested_directory() {
     TestResult r;
     r.test_name = "find_model_nested_directory";
@@ -467,6 +498,8 @@ int main(int argc, char** argv) {
     // rac_find_model_path_after_extraction
     suite.add("find_model_single_gguf", test_find_model_single_gguf);
     suite.add("find_model_nested_gguf", test_find_model_nested_gguf);
+    suite.add("find_model_prefers_primary_gguf_over_mmproj",
+              test_find_model_prefers_primary_gguf_over_mmproj);
     suite.add("find_model_nested_directory", test_find_model_nested_directory);
     suite.add("find_model_directory_based_onnx", test_find_model_directory_based_onnx);
     suite.add("find_model_skips_hidden_files", test_find_model_skips_hidden_files);

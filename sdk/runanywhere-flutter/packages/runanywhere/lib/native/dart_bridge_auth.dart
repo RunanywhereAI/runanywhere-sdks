@@ -3,9 +3,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
-import 'dart:io' show Platform;
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
@@ -21,6 +21,36 @@ import 'package:runanywhere/public/configuration/sdk_environment.dart';
 // =============================================================================
 
 const int _exceptionalReturnInt = -1;
+
+int _copyUtf8StringToBuffer(
+  String value,
+  Pointer<Utf8> outValue,
+  int bufferSize,
+) {
+  final bytes = utf8.encode(value);
+  final maxLen = bufferSize - 1; // Leave room for null terminator
+
+  if (bytes.length > maxLen) {
+    return -1; // Buffer too small
+  }
+
+  final outPtr = outValue.cast<Uint8>();
+  for (var i = 0; i < bytes.length; i++) {
+    outPtr[i] = bytes[i];
+  }
+  outPtr[bytes.length] = 0; // Null terminator
+
+  return bytes.length;
+}
+
+@visibleForTesting
+int copyUtf8StringToBufferForTesting(
+  String value,
+  Pointer<Utf8> outValue,
+  int bufferSize,
+) {
+  return _copyUtf8StringToBuffer(value, outValue, bufferSize);
+}
 
 // =============================================================================
 // Auth Manager Bridge
@@ -46,6 +76,61 @@ class DartBridgeAuth {
   static bool _isInitialized = false;
   static String? _baseURL;
   static SDKEnvironment _environment = SDKEnvironment.development;
+
+  static int _environmentToNativeValue(SDKEnvironment environment) {
+    switch (environment) {
+      case SDKEnvironment.development:
+        return 0;
+      case SDKEnvironment.staging:
+        return 1;
+      case SDKEnvironment.production:
+        return 2;
+    }
+  }
+
+  static Map<String, dynamic> _authRequestLogMetadata(
+    Uri url,
+    String requestJson,
+  ) {
+    return {
+      'host': url.host,
+      'path': url.path,
+      'bodyLength': requestJson.length,
+    };
+  }
+
+  static Map<String, dynamic> _authResponseLogMetadata(
+    Uri url,
+    http.Response response,
+  ) {
+    return {
+      'host': url.host,
+      'path': url.path,
+      'bodyLength': response.body.length,
+      'statusCode': response.statusCode,
+    };
+  }
+
+  @visibleForTesting
+  static int environmentToNativeValueForTesting(SDKEnvironment environment) {
+    return _environmentToNativeValue(environment);
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> authRequestLogMetadataForTesting(
+    Uri url,
+    String requestJson,
+  ) {
+    return _authRequestLogMetadata(url, requestJson);
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> authResponseLogMetadataForTesting(
+    Uri url,
+    http.Response response,
+  ) {
+    return _authResponseLogMetadata(url, response);
+  }
 
   /// Secure storage callbacks pointer
   static Pointer<RacSecureStorageCallbacksStruct>? _storagePtr;
@@ -105,8 +190,8 @@ class DartBridgeAuth {
   static void reset() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final resetFn =
-          lib.lookupFunction<Void Function(), void Function()>('rac_auth_reset');
+      final resetFn = lib
+          .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
       resetFn();
     } catch (e) {
       _logger.debug('rac_auth_reset not available: $e');
@@ -141,8 +226,10 @@ class DartBridgeAuth {
       final baseURL = _baseURL ?? _getDefaultBaseURL();
       final url = Uri.parse('$baseURL$endpoint');
 
-      _logger.debug('Auth POST to: $url');
-      _logger.debug('Auth body: $requestJson');
+      _logger.debug(
+        'Auth request prepared',
+        metadata: _authRequestLogMetadata(url, requestJson),
+      );
 
       final response = await http.post(
         url,
@@ -154,7 +241,10 @@ class DartBridgeAuth {
       );
 
       _logger.debug('Auth response status: ${response.statusCode}');
-      _logger.debug('Auth response body: ${response.body}');
+      _logger.debug(
+        'Auth response received',
+        metadata: _authResponseLogMetadata(url, response),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Parse response and store tokens
@@ -204,7 +294,8 @@ class DartBridgeAuth {
         try {
           const storage = FlutterSecureStorage(
             aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+            iOptions:
+                IOSOptions(accessibility: KeychainAccessibility.first_unlock),
           );
           deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
           if (deviceId != null && deviceId.isNotEmpty) {
@@ -244,7 +335,8 @@ class DartBridgeAuth {
         'Accept': 'application/json',
       };
 
-      final response = await http.post(url, headers: headers, body: requestJson);
+      final response =
+          await http.post(url, headers: headers, body: requestJson);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final authData = _parseAuthResponse(response.body);
@@ -285,7 +377,8 @@ class DartBridgeAuth {
       _logger.debug('Token needs refresh');
       final result = await refreshToken();
       if (!result.isSuccess) {
-        _logger.warning('Token refresh failed', metadata: {'error': result.error});
+        _logger
+            .warning('Token refresh failed', metadata: {'error': result.error});
         // Return cached token anyway, server will reject if invalid
         return cachedToken ?? getAccessToken();
       }
@@ -300,8 +393,8 @@ class DartBridgeAuth {
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
-      final clearFn =
-          lib.lookupFunction<Void Function(), void Function()>('rac_auth_clear');
+      final clearFn = lib
+          .lookupFunction<Void Function(), void Function()>('rac_auth_clear');
       clearFn();
 
       // Also clear via state bridge
@@ -331,8 +424,9 @@ class DartBridgeAuth {
   bool needsRefresh() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final needsRefreshFn = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_auth_needs_refresh');
+      final needsRefreshFn =
+          lib.lookupFunction<Int32 Function(), int Function()>(
+              'rac_auth_needs_refresh');
       return needsRefreshFn() != 0;
     } catch (e) {
       return false;
@@ -412,19 +506,23 @@ class DartBridgeAuth {
     try {
       final lib = PlatformLoader.loadCommons();
       final buildRequest = lib.lookupFunction<
-          Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>),
-          Pointer<Utf8> Function(
-              Pointer<RacSdkConfigStruct>)>('rac_auth_build_authenticate_request');
+              Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>),
+              Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>)>(
+          'rac_auth_build_authenticate_request');
 
       final config = calloc<RacSdkConfigStruct>();
       final apiKeyPtr = apiKey.toNativeUtf8();
       final deviceIdPtr = deviceId.toNativeUtf8();
-      final buildTokenPtr = buildToken?.toNativeUtf8() ?? nullptr;
+      final platformPtr = SDKConstants.platform.toNativeUtf8();
+      final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
 
       try {
+        config.ref.environment = _environmentToNativeValue(_environment);
         config.ref.apiKey = apiKeyPtr;
+        config.ref.baseURL = nullptr;
         config.ref.deviceId = deviceIdPtr;
-        config.ref.buildToken = buildTokenPtr.cast<Utf8>();
+        config.ref.platform = platformPtr;
+        config.ref.sdkVersion = sdkVersionPtr;
 
         final result = buildRequest(config);
         if (result == nullptr) return null;
@@ -440,18 +538,18 @@ class DartBridgeAuth {
       } finally {
         calloc.free(apiKeyPtr);
         calloc.free(deviceIdPtr);
-        if (buildTokenPtr != nullptr) calloc.free(buildTokenPtr);
+        calloc.free(platformPtr);
+        calloc.free(sdkVersionPtr);
         calloc.free(config);
       }
     } catch (e) {
       _logger.debug('rac_auth_build_authenticate_request error: $e');
       // Fallback: build JSON manually (must match C++ rac_auth_request_to_json format)
       // Backend expects snake_case keys: api_key, device_id, platform, sdk_version
-      final platform = Platform.isAndroid ? 'android' : 'ios';
       final json = {
         'api_key': apiKey,
         'device_id': deviceId,
-        'platform': platform,
+        'platform': SDKConstants.platform,
         'sdk_version': SDKConstants.version,
       };
       _logger.debug('Auth request JSON: $json');
@@ -564,17 +662,17 @@ class DartBridgeAuth {
           data['access_token'] as String? ?? data['accessToken'] as String?;
       final refreshToken =
           data['refresh_token'] as String? ?? data['refreshToken'] as String?;
-      final deviceId = data['device_id'] as String? ?? data['deviceId'] as String?;
+      final deviceId =
+          data['device_id'] as String? ?? data['deviceId'] as String?;
       final userId = data['user_id'] as String? ?? data['userId'] as String?;
-      final organizationId =
-          data['organization_id'] as String? ?? data['organizationId'] as String?;
+      final organizationId = data['organization_id'] as String? ??
+          data['organizationId'] as String?;
 
       // Parse expiry - API returns expires_in (seconds until expiry)
       int? expiresAt;
       final expiresIn = data['expires_in'] as int?;
       if (expiresIn != null) {
-        expiresAt =
-            DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
+        expiresAt = DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
       } else {
         expiresAt = data['expires_at'] as int? ?? data['expiresAt'] as int?;
       }
@@ -623,17 +721,22 @@ class DartBridgeAuth {
 
       if (authData.accessToken != null && authData.accessToken!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.accessToken', value: authData.accessToken);
+            key: 'com.runanywhere.sdk.accessToken',
+            value: authData.accessToken);
         _secureCache['com.runanywhere.sdk.accessToken'] = authData.accessToken!;
         storedCount++;
-        _logger.debug('Stored access token (${authData.accessToken!.length} chars)');
+        _logger.debug(
+            'Stored access token (${authData.accessToken!.length} chars)');
       }
       if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.refreshToken', value: authData.refreshToken);
-        _secureCache['com.runanywhere.sdk.refreshToken'] = authData.refreshToken!;
+            key: 'com.runanywhere.sdk.refreshToken',
+            value: authData.refreshToken);
+        _secureCache['com.runanywhere.sdk.refreshToken'] =
+            authData.refreshToken!;
         storedCount++;
-        _logger.debug('Stored refresh token (${authData.refreshToken!.length} chars)');
+        _logger.debug(
+            'Stored refresh token (${authData.refreshToken!.length} chars)');
       }
       if (authData.deviceId != null && authData.deviceId!.isNotEmpty) {
         await storage.write(
@@ -643,19 +746,23 @@ class DartBridgeAuth {
         _logger.debug('Stored device ID: ${authData.deviceId}');
       }
       if (authData.userId != null && authData.userId!.isNotEmpty) {
-        await storage.write(key: 'com.runanywhere.sdk.userId', value: authData.userId);
+        await storage.write(
+            key: 'com.runanywhere.sdk.userId', value: authData.userId);
         _secureCache['com.runanywhere.sdk.userId'] = authData.userId!;
         storedCount++;
       }
-      if (authData.organizationId != null && authData.organizationId!.isNotEmpty) {
+      if (authData.organizationId != null &&
+          authData.organizationId!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.organizationId', value: authData.organizationId);
+            key: 'com.runanywhere.sdk.organizationId',
+            value: authData.organizationId);
         _secureCache['com.runanywhere.sdk.organizationId'] =
             authData.organizationId!;
         storedCount++;
       }
 
-      _logger.debug('Auth tokens stored in secure storage ($storedCount items)');
+      _logger
+          .debug('Auth tokens stored in secure storage ($storedCount items)');
     } catch (e) {
       _logger.debug('Failed to store auth tokens: $e');
     }
@@ -680,11 +787,14 @@ class DartBridgeAuth {
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
       );
 
-      final accessToken = await storage.read(key: 'com.runanywhere.sdk.accessToken');
-      final refreshToken = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
+      final accessToken =
+          await storage.read(key: 'com.runanywhere.sdk.accessToken');
+      final refreshToken =
+          await storage.read(key: 'com.runanywhere.sdk.refreshToken');
       final deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
       final userId = await storage.read(key: 'com.runanywhere.sdk.userId');
-      final organizationId = await storage.read(key: 'com.runanywhere.sdk.organizationId');
+      final organizationId =
+          await storage.read(key: 'com.runanywhere.sdk.organizationId');
 
       if (accessToken != null) {
         _secureCache['com.runanywhere.sdk.accessToken'] = accessToken;
@@ -761,8 +871,8 @@ int _secureStoreCallback(
 }
 
 /// Retrieve callback
-int _secureRetrieveCallback(
-    Pointer<Utf8> key, Pointer<Utf8> outValue, int bufferSize, Pointer<Void> context) {
+int _secureRetrieveCallback(Pointer<Utf8> key, Pointer<Utf8> outValue,
+    int bufferSize, Pointer<Void> context) {
   if (key == nullptr || outValue == nullptr) return -1;
 
   try {
@@ -771,21 +881,7 @@ int _secureRetrieveCallback(
 
     if (value == null) return -1;
 
-    // Copy to output buffer
-    final bytes = value.codeUnits;
-    final maxLen = bufferSize - 1; // Leave room for null terminator
-
-    if (bytes.length > maxLen) {
-      return -1; // Buffer too small
-    }
-
-    final outPtr = outValue.cast<Uint8>();
-    for (var i = 0; i < bytes.length; i++) {
-      outPtr[i] = bytes[i];
-    }
-    outPtr[bytes.length] = 0; // Null terminator
-
-    return bytes.length;
+    return _copyUtf8StringToBuffer(value, outValue, bufferSize);
   } catch (e) {
     return -1;
   }
@@ -845,8 +941,8 @@ typedef RacSecureStoreCallbackNative = Int32 Function(
     Pointer<Utf8> key, Pointer<Utf8> value, Pointer<Void> context);
 
 /// Secure storage retrieve callback
-typedef RacSecureRetrieveCallbackNative = Int32 Function(
-    Pointer<Utf8> key, Pointer<Utf8> outValue, IntPtr bufferSize, Pointer<Void> context);
+typedef RacSecureRetrieveCallbackNative = Int32 Function(Pointer<Utf8> key,
+    Pointer<Utf8> outValue, IntPtr bufferSize, Pointer<Void> context);
 
 /// Secure storage delete callback
 typedef RacSecureDeleteCallbackNative = Int32 Function(
@@ -861,10 +957,16 @@ base class RacSecureStorageCallbacksStruct extends Struct {
 }
 
 /// SDK config struct for auth requests
+/// Must exactly match C++ `rac_sdk_config_t`.
 base class RacSdkConfigStruct extends Struct {
+  @Int32()
+  external int environment;
+
   external Pointer<Utf8> apiKey;
+  external Pointer<Utf8> baseURL;
   external Pointer<Utf8> deviceId;
-  external Pointer<Utf8> buildToken;
+  external Pointer<Utf8> platform;
+  external Pointer<Utf8> sdkVersion;
 }
 
 // =============================================================================

@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
@@ -12,6 +13,53 @@ import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
+
+typedef DownloadHttpClientFactory = Future<http.Client> Function(Uri url);
+
+int _estimatePerFileDownloadSize(int? totalModelBytes, int totalFiles) {
+  if (totalModelBytes == null || totalModelBytes <= 0 || totalFiles <= 0) {
+    return 0;
+  }
+  return (totalModelBytes / totalFiles).ceil();
+}
+
+double _calculateOverallMultiFileDownloadProgress({
+  required int completedFiles,
+  required int totalFiles,
+  required int downloadedBytesForCurrentFile,
+  required int totalBytesForCurrentFile,
+}) {
+  if (totalFiles <= 0) return 0;
+
+  final fileProgress = totalBytesForCurrentFile > 0
+      ? (downloadedBytesForCurrentFile / totalBytesForCurrentFile)
+          .clamp(0.0, 1.0)
+      : 0.0;
+  return (completedFiles + fileProgress) / totalFiles;
+}
+
+@visibleForTesting
+int estimatePerFileDownloadSizeForTesting({
+  required int? totalModelBytes,
+  required int totalFiles,
+}) {
+  return _estimatePerFileDownloadSize(totalModelBytes, totalFiles);
+}
+
+@visibleForTesting
+double calculateOverallMultiFileDownloadProgressForTesting({
+  required int completedFiles,
+  required int totalFiles,
+  required int downloadedBytesForCurrentFile,
+  required int totalBytesForCurrentFile,
+}) {
+  return _calculateOverallMultiFileDownloadProgress(
+    completedFiles: completedFiles,
+    totalFiles: totalFiles,
+    downloadedBytesForCurrentFile: downloadedBytesForCurrentFile,
+    totalBytesForCurrentFile: totalBytesForCurrentFile,
+  );
+}
 
 /// Download progress information
 class ModelDownloadProgress {
@@ -102,6 +150,18 @@ class ModelDownloadService {
 
   final _logger = SDKLogger('ModelDownloadService');
   final Map<String, http.Client> _activeDownloads = {};
+  DownloadHttpClientFactory? _clientFactory;
+
+  void configureClientFactory(DownloadHttpClientFactory? factory) {
+    _clientFactory = factory;
+  }
+
+  Future<http.Client> _createClient(Uri url) async {
+    if (_clientFactory != null) {
+      return _clientFactory!(url);
+    }
+    return http.Client();
+  }
 
   /// Download a model by ID
   ///
@@ -138,67 +198,88 @@ class ModelDownloadService {
       // Handle multi-file models (e.g. embedding model + vocab.txt)
       if (model.artifactType is MultiFileArtifact) {
         final multiFile = model.artifactType as MultiFileArtifact;
-        final client = http.Client();
-        _activeDownloads[modelId] = client;
 
         try {
           final totalFiles = multiFile.files.length;
+          final totalModelBytes = model.downloadSize ?? 0;
+          var cumulativeDownloaded = 0;
           _logger.info('Multi-file model: downloading $totalFiles files');
-          yield ModelDownloadProgress.started(modelId, model.downloadSize ?? 0);
+          yield ModelDownloadProgress.started(modelId, totalModelBytes);
 
           for (var i = 0; i < multiFile.files.length; i++) {
             final descriptor = multiFile.files[i];
             final fileUrl = descriptor.url;
             if (fileUrl == null) {
-              _logger.warning('No URL for file descriptor: ${descriptor.destinationPath}');
+              _logger.warning(
+                  'No URL for file descriptor: ${descriptor.destinationPath}');
               continue;
             }
 
             final destPath = p.join(destDir.path, descriptor.destinationPath);
-            _logger.info('Downloading file ${i + 1}/$totalFiles: ${descriptor.destinationPath}');
+            _logger.info(
+                'Downloading file ${i + 1}/$totalFiles: ${descriptor.destinationPath}');
 
+            final client = await _createClient(fileUrl);
+            _activeDownloads[modelId] = client;
             final request = http.Request('GET', fileUrl);
-            final response = await client.send(request);
+            try {
+              final response = await client.send(request);
+              final currentFileTotalBytes =
+                  response.contentLength != null && response.contentLength! > 0
+                      ? response.contentLength!
+                      : _estimatePerFileDownloadSize(
+                          model.downloadSize, totalFiles);
 
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              throw Exception('HTTP ${response.statusCode} for ${descriptor.destinationPath}');
+              if (response.statusCode < 200 || response.statusCode >= 300) {
+                throw Exception(
+                    'HTTP ${response.statusCode} for ${descriptor.destinationPath}');
+              }
+
+              final file = File(destPath);
+              await file.create(recursive: true);
+              final sink = file.openWrite();
+              var downloaded = 0;
+
+              await for (final chunk in response.stream) {
+                sink.add(chunk);
+                downloaded += chunk.length;
+
+                final overallProgress =
+                    _calculateOverallMultiFileDownloadProgress(
+                  completedFiles: i,
+                  totalFiles: totalFiles,
+                  downloadedBytesForCurrentFile: downloaded,
+                  totalBytesForCurrentFile: currentFileTotalBytes,
+                );
+                yield ModelDownloadProgress(
+                  modelId: modelId,
+                  bytesDownloaded: cumulativeDownloaded + downloaded,
+                  totalBytes: totalModelBytes,
+                  stage: ModelDownloadStage.downloading,
+                  overallProgress: overallProgress * 0.9,
+                );
+              }
+
+              await sink.flush();
+              await sink.close();
+              cumulativeDownloaded += downloaded;
+              _logger.info('Downloaded: ${descriptor.destinationPath}');
+            } finally {
+              client.close();
+              _activeDownloads.remove(modelId);
             }
-
-            final file = File(destPath);
-            await file.create(recursive: true);
-            final sink = file.openWrite();
-            var downloaded = 0;
-
-            await for (final chunk in response.stream) {
-              sink.add(chunk);
-              downloaded += chunk.length;
-
-              // Report progress proportionally across all files
-              final fileProgress = downloaded.toDouble() / (model.downloadSize ?? 1);
-              final overallProgress = (i + fileProgress) / totalFiles;
-              yield ModelDownloadProgress(
-                modelId: modelId,
-                bytesDownloaded: downloaded,
-                totalBytes: model.downloadSize ?? 0,
-                stage: ModelDownloadStage.downloading,
-                overallProgress: overallProgress * 0.9,
-              );
-            }
-
-            await sink.flush();
-            await sink.close();
-            _logger.info('Downloaded: ${descriptor.destinationPath}');
           }
         } finally {
-          client.close();
           _activeDownloads.remove(modelId);
         }
 
         // Local path is the directory containing all files
         await _updateModelLocalPath(model, destDir.path);
-        EventBus.shared.publish(SDKModelEvent.downloadCompleted(modelId: modelId));
+        EventBus.shared
+            .publish(SDKModelEvent.downloadCompleted(modelId: modelId));
         yield ModelDownloadProgress.completed(modelId);
-        _logger.info('Multi-file model download completed: $modelId -> ${destDir.path}');
+        _logger.info(
+            'Multi-file model download completed: $modelId -> ${destDir.path}');
         return;
       }
 
@@ -213,7 +294,7 @@ class ModelDownloadService {
       final downloadPath = p.join(destDir.path, fileName);
 
       // Create HTTP client
-      final client = http.Client();
+      final client = await _createClient(downloadUrl);
       _activeDownloads[modelId] = client;
 
       try {
@@ -350,8 +431,8 @@ class ModelDownloadService {
     final extractFn = lib.lookupFunction<
         Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
             Pointer<Void>, Pointer<Void>, Pointer<Void>),
-        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>,
-            Pointer<Void>, Pointer<Void>, Pointer<Void>)>(
+        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Void>, Pointer<Void>,
+            Pointer<Void>, Pointer<Void>)>(
       'rac_extract_archive_native',
     );
 
@@ -403,9 +484,8 @@ class ModelDownloadService {
 
     // Find new items created by extraction
     final currentItems = await destDirectory.list().toList();
-    final newItems = currentItems
-        .where((e) => !itemsBefore.contains(e.path))
-        .toList();
+    final newItems =
+        currentItems.where((e) => !itemsBefore.contains(e.path)).toList();
     final newDirs = newItems.whereType<Directory>().toList();
     final newFiles = newItems.whereType<File>().toList();
 
@@ -446,7 +526,8 @@ class ModelDownloadService {
 
     // Files already at destDir root (flat archive or direct match) — use as-is
     if (newItems.isNotEmpty) {
-      _logger.info('Extracted ${newItems.length} items directly into: $destDir');
+      _logger
+          .info('Extracted ${newItems.length} items directly into: $destDir');
       return destDir;
     }
 

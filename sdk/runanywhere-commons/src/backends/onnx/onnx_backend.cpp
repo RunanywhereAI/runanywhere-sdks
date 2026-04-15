@@ -862,10 +862,14 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
             RAC_LOG_INFO("ONNX.TTS", "=== Model directory contents: %s ===", model_path.c_str());
             struct dirent* diag_entry;
             while ((diag_entry = readdir(diag_dir)) != nullptr) {
-                if (diag_entry->d_name[0] == '.')
-                    continue;
-                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s", diag_entry->d_type == DT_DIR ? "DIR" : "FILE",
-                             diag_entry->d_name);
+                if (diag_entry->d_name[0] == '.') continue;
+                const std::string diag_path = model_path + "/" + diag_entry->d_name;
+                struct stat diag_stat;
+                const bool is_dir =
+                    stat(diag_path.c_str(), &diag_stat) == 0 && S_ISDIR(diag_stat.st_mode);
+                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s",
+                    is_dir ? "DIR" : "FILE",
+                    diag_entry->d_name);
             }
             closedir(diag_dir);
             RAC_LOG_INFO("ONNX.TTS", "=== End directory listing ===");

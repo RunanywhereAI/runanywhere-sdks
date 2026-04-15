@@ -6,7 +6,9 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
@@ -112,42 +114,27 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.stt,
         onModelSelected: (model) async {
-          await _loadModel(model);
+          await _refreshModelState();
         },
       ),
     ));
   }
 
-  /// Load STT model using RunAnywhere SDK directly (matches Swift STTViewModel pattern)
-  Future<void> _loadModel(ModelInfo model) async {
+  Future<void> _refreshModelState() async {
+    final currentModel = await sdk.RunAnywhere.currentSTTModel();
+    if (!mounted) return;
+
     setState(() {
-      _isProcessing = true;
+      _selectedFramework = currentModel == null
+          ? LLMFramework.unknown
+          : switch (currentModel.framework) {
+              sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
+              _ => LLMFramework.unknown,
+            };
+      _selectedModelName = currentModel?.name;
+      _supportsLiveMode = false;
       _errorMessage = null;
     });
-
-    try {
-      debugPrint('🔄 Loading STT model: ${model.name}');
-
-      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
-      await sdk.RunAnywhere.loadSTTModel(model.id);
-
-      setState(() {
-        _selectedFramework =
-            model.preferredFramework ?? LLMFramework.whisperKit;
-        _selectedModelName = model.name;
-        // WhisperKit supports live mode, ONNX may have limitations
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
-        _isProcessing = false;
-      });
-
-      debugPrint('✅ STT model loaded: ${model.name}');
-    } catch (e) {
-      debugPrint('❌ Failed to load STT model: $e');
-      setState(() {
-        _errorMessage = 'Failed to load model: $e';
-        _isProcessing = false;
-      });
-    }
   }
 
   Future<void> _toggleRecording() async {
@@ -277,6 +264,19 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   Widget build(BuildContext context) {
+    final capability = PlatformCapabilityService.shared;
+    if (!capability.supportsSpeechToText) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Speech to Text'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Speech-to-Text Unavailable',
+          message: capability.unsupportedMessage('Speech-to-Text'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Speech to Text'),

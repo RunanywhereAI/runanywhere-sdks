@@ -16,6 +16,8 @@ import 'package:runanywhere/public/types/rag_types.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 import 'package:runanywhere_ai/features/rag/rag_view_model.dart';
@@ -218,6 +220,19 @@ class _RagDemoViewState extends State<RagDemoView> {
 
   @override
   Widget build(BuildContext context) {
+    final capability = PlatformCapabilityService.shared;
+    if (!capability.supportsRag) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Document Q&A'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Document Q&A Unavailable',
+          message: capability.unsupportedMessage('Document Q&A'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Document Q&A'),
