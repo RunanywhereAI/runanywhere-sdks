@@ -2,16 +2,24 @@
 // BINARY CONFIGURATION FOR RUNANYWHERE FLUTTER SDK - ANDROID (Core Package)
 // =============================================================================
 // This file controls whether to use local or remote native libraries (.so files).
-// Similar to Swift Package.swift's testLocal flag.
+// Matches Swift Package.swift's `useLocalNatives` and Kotlin gradle property
+// `runanywhere.useLocalNatives` — same semantics across all 5 SDKs.
 //
 // Set to `true` to use local binaries from android/src/main/jniLibs/
 // Set to `false` to download binaries from GitHub releases (production mode)
+//
+// Legacy name `testLocal` is still accepted as an alias.
 // =============================================================================
 
 ext {
-    // Set this to true for local development/testing
-    // Set to false for production builds (downloads from GitHub releases)
-    testLocal = false
+    // Canonical name (matches Swift/Kotlin/RN).
+    // Set this to true for local development/testing.
+    // Set to false for production builds (downloads from GitHub releases).
+    useLocalNatives = false
+
+    // Legacy alias — kept so existing code reading `testLocal` keeps working.
+    // Prefer `useLocalNatives`.
+    testLocal = useLocalNatives
 
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)

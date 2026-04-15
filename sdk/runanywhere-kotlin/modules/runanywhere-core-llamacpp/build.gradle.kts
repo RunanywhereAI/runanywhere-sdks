@@ -24,12 +24,20 @@ plugins {
     signing
 }
 
-val testLocal: Boolean =
+// `useLocalNatives` is the canonical property name (matches Swift/Flutter/RN);
+// `testLocal` still works as a legacy fallback.
+val useLocalNatives: Boolean = run {
+    val newValue = rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+    if (newValue != null) return@run newValue
     rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
         ?: false
+}
+// Alias kept so existing references in this file keep working.
+val testLocal: Boolean = useLocalNatives
 
-logger.lifecycle("LlamaCPP Module: testLocal=$testLocal")
+logger.lifecycle("LlamaCPP Module: useLocalNatives=$useLocalNatives")
 
 // Detekt
 detekt {

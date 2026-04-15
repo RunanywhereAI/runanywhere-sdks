@@ -25,32 +25,35 @@ import Foundation
 // BINARY TARGET CONFIGURATION
 // =============================================================================
 //
-// useLocalBinaries = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
-//                            For local development. Run first-time setup:
-//                              cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+// useLocalNatives = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
+//                           For local development. Run first-time setup:
+//                             cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
 //
-// useLocalBinaries = false → Download XCFrameworks from GitHub releases (PRODUCTION)
-//                            For external users via SPM. No setup needed.
+// useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION)
+//                           For external users via SPM. No setup needed.
 //
 // To toggle this value, use:
-//   ./scripts/build-swift.sh --set-local   (sets useLocalBinaries = true)
-//   ./scripts/build-swift.sh --set-remote  (sets useLocalBinaries = false)
+//   ./scripts/build-swift.sh --set-local   (sets useLocalNatives = true)
+//   ./scripts/build-swift.sh --set-remote  (sets useLocalNatives = false)
 //
+// Historical name: this used to be called `useLocalBinaries`. The concept is
+// the same — it's been renamed to `useLocalNatives` for consistency with the
+// equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalBinaries = false //  Toggle: true for local dev, false for release
+let useLocalNatives = false //  Toggle: true for local dev, false for release
 
-// Version for remote XCFrameworks (used when testLocal = false)
+// Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases
 let sdkVersion = "0.19.7"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip
 // has been published. When `false`, the MetalRT product/targets are only
-// exposed under `useLocalBinaries = true`, so SPM resolution will not fail
+// exposed under `useLocalNatives = true`, so SPM resolution will not fail
 // for external consumers due to a placeholder checksum.
 let metalrtRemoteBinaryAvailable = false
 
-let includeMetalRT = useLocalBinaries || metalrtRemoteBinaryAvailable
+let includeMetalRT = useLocalNatives || metalrtRemoteBinaryAvailable
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -241,7 +244,7 @@ let package = Package(
 // with a real checksum. To avoid SPM resolution failures for external
 // consumers due to a placeholder zero-checksum binary target, the MetalRT
 // product and its dependent targets are only included when:
-//   - `useLocalBinaries == true` (local dev with a checked-out xcframework), or
+//   - `useLocalNatives == true` (local dev with a checked-out xcframework), or
 //   - `metalrtRemoteBinaryAvailable == true` (once a real checksum is wired in).
 func metalRTProducts() -> [Product] {
     guard includeMetalRT else { return [] }
@@ -290,9 +293,9 @@ func metalRTTargets() -> [Target] {
 // =============================================================================
 // BINARY TARGET SELECTION
 // =============================================================================
-// Returns local or remote binary targets based on useLocalBinaries setting
+// Returns local or remote binary targets based on useLocalNatives setting
 func binaryTargets() -> [Target] {
-    if useLocalBinaries {
+    if useLocalNatives {
         // =====================================================================
         // LOCAL DEVELOPMENT MODE
         // Use XCFrameworks from sdk/runanywhere-swift/Binaries/

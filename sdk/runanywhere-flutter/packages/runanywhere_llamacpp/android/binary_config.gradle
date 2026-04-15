@@ -11,7 +11,8 @@
 ext {
     // Set this to true for local development/testing
     // Set to false for production builds (downloads from GitHub releases)
-    testLocal = false
+    useLocalNatives = false
+    testLocal = useLocalNatives  // legacy alias
 
     // =============================================================================
     // Version Configuration (MUST match Swift Package.swift and Kotlin build.gradle.kts)

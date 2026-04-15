@@ -94,9 +94,10 @@ def githubOrg = "RunanywhereAI"
 def commonsRepo = "runanywhere-sdks"
 
 // =============================================================================
-// testLocal Toggle
+// useLocalNatives Toggle (canonical name; testLocal kept as legacy alias)
 // =============================================================================
-def useLocalBuild = project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
+def useLocalBuild = project.findProperty("runanywhere.useLocalNatives")?.toBoolean() ?:
+                    project.findProperty("runanywhere.testLocal")?.toBoolean() ?:
                     System.getenv("RA_TEST_LOCAL") == "1" ?: false
 
 // Native libraries directory

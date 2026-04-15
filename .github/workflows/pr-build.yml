@@ -354,8 +354,15 @@ jobs:
         run: npm run typecheck
 
   sdk_flutter:
-    needs: detect
-    if: needs.detect.outputs.sdk_flutter == 'true'
+    # Flutter consumes BOTH iOS and Android natives, so fire whenever either
+    # native-build job succeeded on this run, OR when Flutter SDK paths changed.
+    needs: [detect, native_ios, native_android]
+    if: |
+      always() && (
+        needs.detect.outputs.sdk_flutter == 'true' ||
+        needs.native_ios.result == 'success' ||
+        needs.native_android.result == 'success'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -374,8 +381,15 @@ jobs:
           done
 
   sdk_react_native:
-    needs: detect
-    if: needs.detect.outputs.sdk_react_native == 'true'
+    # React Native consumes BOTH iOS and Android natives, so fire whenever either
+    # native-build job succeeded on this run, OR when RN SDK paths changed.
+    needs: [detect, native_ios, native_android]
+    if: |
+      always() && (
+        needs.detect.outputs.sdk_react_native == 'true' ||
+        needs.native_ios.result == 'success' ||
+        needs.native_android.result == 'success'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:

@@ -23,8 +23,8 @@
 #   --clean             Clean build artifacts before building
 #   --release           Build in release mode (default: debug)
 #   --skip-build        Skip swift build (only setup frameworks)
-#   --set-local         Set testLocal = true in Package.swift
-#   --set-remote        Set testLocal = false in Package.swift
+#   --set-local         Set useLocalNatives = true in Package.swift
+#   --set-remote        Set useLocalNatives = false in Package.swift
 #   --help              Show this help message
 #
 # EXAMPLES:
@@ -173,26 +173,26 @@ set_package_mode() {
     fi
 
     if [[ "$mode" == "local" ]]; then
-        log_step "Setting useLocalBinaries = true in Package.swift"
-        if grep -q 'let useLocalBinaries = true' "$PACKAGE_FILE"; then
+        log_step "Setting useLocalNatives = true in Package.swift"
+        if grep -q 'let useLocalNatives = true' "$PACKAGE_FILE"; then
             log_info "Already in local mode"
             return 0
         fi
-        sed -i '' 's/let useLocalBinaries = false/let useLocalBinaries = true/' "$PACKAGE_FILE"
-        if grep -q 'let useLocalBinaries = true' "$PACKAGE_FILE"; then
+        sed -i '' 's/let useLocalNatives = false/let useLocalNatives = true/' "$PACKAGE_FILE"
+        if grep -q 'let useLocalNatives = true' "$PACKAGE_FILE"; then
             log_info "✓ Local mode enabled"
         else
             log_error "Failed to enable local mode"
             exit 1
         fi
     elif [[ "$mode" == "remote" ]]; then
-        log_step "Setting useLocalBinaries = false in Package.swift"
-        if grep -q 'let useLocalBinaries = false' "$PACKAGE_FILE"; then
+        log_step "Setting useLocalNatives = false in Package.swift"
+        if grep -q 'let useLocalNatives = false' "$PACKAGE_FILE"; then
             log_info "Already in remote mode"
             return 0
         fi
-        sed -i '' 's/let useLocalBinaries = true/let useLocalBinaries = false/' "$PACKAGE_FILE"
-        if grep -q 'let useLocalBinaries = false' "$PACKAGE_FILE"; then
+        sed -i '' 's/let useLocalNatives = true/let useLocalNatives = false/' "$PACKAGE_FILE"
+        if grep -q 'let useLocalNatives = false' "$PACKAGE_FILE"; then
             log_info "✓ Remote mode enabled"
         else
             log_error "Failed to enable remote mode"
@@ -421,10 +421,10 @@ main() {
             echo "     (all xcframeworks will include macOS arm64 slices)"
             echo "  5. Create combined ONNX Runtime xcframework (iOS + macOS)"
             echo "  6. Copy frameworks to Binaries/"
-            echo "  7. Set useLocalBinaries = true in Package.swift"
+            echo "  7. Set useLocalNatives = true in Package.swift"
         else
             echo "  5. Copy frameworks to Binaries/"
-            echo "  6. Set useLocalBinaries = true in Package.swift"
+            echo "  6. Set useLocalNatives = true in Package.swift"
         fi
         echo ""
         if [[ "$INCLUDE_MACOS" == true ]]; then
@@ -486,7 +486,7 @@ main() {
     fi
 
     echo ""
-    echo "Package.swift: $(grep 'let useLocalBinaries' "$PACKAGE_FILE" | head -1 | xargs)"
+    echo "Package.swift: $(grep 'let useLocalNatives' "$PACKAGE_FILE" | head -1 | xargs)"
     echo ""
 
     if $SETUP_MODE; then
