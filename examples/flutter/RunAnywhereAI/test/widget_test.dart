@@ -10,8 +10,10 @@ void main() {
     await tester.pumpWidget(const RunAnywhereAIApp());
 
     // Verify that the app renders without errors.
-    // The app should show the main navigation view.
-    await tester.pumpAndSettle();
+    // Avoid pumpAndSettle here because app startup may keep scheduling frames
+    // (for example, animations/tickers), which can cause test timeouts.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     // Basic check that something rendered
     expect(find.byType(RunAnywhereAIApp), findsOneWidget);

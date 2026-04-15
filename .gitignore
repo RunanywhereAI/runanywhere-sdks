@@ -78,6 +78,9 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
+# Git worktrees
+.worktrees/
+
 # IDE - IntelliJ IDEA / Android Studio
 # User-specific stuff
 .idea/workspace.xml

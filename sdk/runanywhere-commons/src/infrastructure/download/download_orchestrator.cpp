@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -147,11 +148,30 @@ static bool is_model_extension(const char* ext) {
 }
 
 /**
+ * Check if a discovered model file is an auxiliary artifact rather than a
+ * primary load target.
+ *
+ * Multimodal llama.cpp packages often ship an `mmproj*.gguf` projector file
+ * alongside the actual language model. Generic LLM resolution must skip that
+ * auxiliary file and keep searching for the primary model weights.
+ */
+static bool is_auxiliary_model_file(const std::string& filename) {
+    std::string lower(filename);
+    for (auto& c : lower) c = static_cast<char>(tolower(c));
+    return lower.find("mmproj") != std::string::npos;
+}
+
+/**
  * Check if a directory exists.
  */
 static bool dir_exists(const char* path) {
+#if defined(_WIN32)
+    std::error_code ec;
+    return path && std::filesystem::is_directory(std::filesystem::path(path), ec);
+#else
     struct stat st;
     return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+#endif
 }
 
 /**
@@ -211,6 +231,32 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
     if (depth >= max_depth)
         return false;
 
+#if defined(_WIN32)
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
+        const auto name = entry.path().filename().string();
+        if (name == "." || name == "..") continue;
+        if (!name.empty() && name[0] == '.') continue;
+
+        const auto full_path = entry.path().string();
+        if (entry.is_regular_file(ec)) {
+            const char* dot = strrchr(name.c_str(), '.');
+            if (dot && is_model_extension(dot + 1)) {
+                if (is_auxiliary_model_file(name)) {
+                    continue;
+                }
+                snprintf(out_path, path_size, "%s", full_path.c_str());
+                return true;
+            }
+        } else if (entry.is_directory(ec)) {
+            if (find_single_model_file(full_path.c_str(), depth + 1, max_depth, out_path,
+                                       path_size)) {
+                return true;
+            }
+        }
+    }
+    return false;
+#else
     DIR* dir = opendir(directory);
     if (!dir)
         return false;
@@ -237,6 +283,9 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
             // Check if this is a model file
             const char* dot = strrchr(entry->d_name, '.');
             if (dot && is_model_extension(dot + 1)) {
+                if (is_auxiliary_model_file(entry->d_name)) {
+                    continue;
+                }
                 found_model = full_path;
                 break;  // Found it
             }
@@ -259,6 +308,7 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
     }
 
     return false;
+#endif
 }
 
 /**
@@ -269,12 +319,48 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
  * e.g., sherpa-onnx archives extract to: extractedDir/vits-xxx/
  */
 static std::string find_nested_directory(const char* extracted_dir) {
+#if defined(_WIN32)
+    std::error_code ec;
+    std::vector<std::string> visible_dirs;
+    bool has_visible_files = false;
+
+    for (const auto& entry : std::filesystem::directory_iterator(extracted_dir, ec)) {
+        const auto name = entry.path().filename().string();
+        if (name == "." || name == "..") continue;
+        if (!name.empty() && name[0] == '.') continue;
+        if (name.rfind("._", 0) == 0) continue;
+
+        if (entry.is_directory(ec)) {
+            visible_dirs.push_back(entry.path().string());
+        } else if (entry.is_regular_file(ec)) {
+            has_visible_files = true;
+        }
+    }
+
+    // Only treat a single subdirectory as the extracted model root when the
+    // archive root does not also contain visible files. Whisper STT archives
+    // keep model files at the root and add a single test_wavs/ subdirectory,
+    // so blindly choosing the only directory would return the wrong path.
+    if (!has_visible_files && visible_dirs.size() == 1) {
+        return visible_dirs[0];
+    }
+
+    if (visible_dirs.size() > 1) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "find_nested_directory: found %zu subdirectories in '%s', "
+                        "falling back to root (expected exactly 1)",
+                        visible_dirs.size(), extracted_dir);
+    }
+
+    return extracted_dir;
+#else
     DIR* dir = opendir(extracted_dir);
     if (!dir)
         return extracted_dir;
 
     struct dirent* entry;
     std::vector<std::string> visible_dirs;
+    bool has_visible_files = false;
 
     while ((entry = readdir(dir)) != nullptr) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
@@ -290,12 +376,14 @@ static std::string find_nested_directory(const char* extracted_dir) {
         struct stat st;
         if (stat(full_path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
             visible_dirs.push_back(full_path);
+        } else if (stat(full_path.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            has_visible_files = true;
         }
     }
     closedir(dir);
 
     // If there's exactly one visible subdirectory, return it
-    if (visible_dirs.size() == 1) {
+    if (!has_visible_files && visible_dirs.size() == 1) {
         return visible_dirs[0];
     }
 
@@ -307,6 +395,7 @@ static std::string find_nested_directory(const char* extracted_dir) {
     }
 
     return extracted_dir;
+#endif
 }
 
 // =============================================================================

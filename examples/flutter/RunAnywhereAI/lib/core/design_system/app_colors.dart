@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+extension ColorCompatibility on Color {
+  Color withValues({double? alpha}) {
+    if (alpha != null) {
+      return withOpacity(alpha.clamp(0.0, 1.0));
+    }
+    return this;
+  }
+}
+
 /// App Colors (mirroring iOS AppColors.swift)
 class AppColors {
   // MARK: - Semantic Colors
@@ -26,7 +35,7 @@ class AppColors {
   static Color backgroundTertiary(BuildContext context) =>
       Theme.of(context).colorScheme.surface;
   static Color backgroundGrouped(BuildContext context) =>
-      Theme.of(context).colorScheme.surfaceContainerHighest;
+      Theme.of(context).colorScheme.surfaceVariant;
   static Color backgroundGray5(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
           ? Colors.grey.shade800

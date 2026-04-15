@@ -87,6 +87,11 @@ class LlamaCppBindings {
       );
     }
 
+    if (Platform.isWindows) {
+      PlatformLoader.loadCommons();
+      return PlatformLoader.loadLibrary('rac_backend_llamacpp');
+    }
+
     // On iOS/macOS, everything is statically linked
     return PlatformLoader.loadCommons();
   }

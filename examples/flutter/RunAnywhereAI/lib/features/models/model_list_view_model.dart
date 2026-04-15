@@ -207,6 +207,7 @@ class ModelListViewModel extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Failed to load model: $e';
       notifyListeners();
+      rethrow;
     }
   }
 

@@ -2,11 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:runanywhere/core/types/npu_chip.dart';
+import 'package:runanywhere/public/extensions/runanywhere_device.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/models/proxy_settings.dart';
+import 'package:runanywhere_ai/core/services/example_http_service.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
@@ -116,6 +120,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
           '🔧 Environment: ${RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown"}');
       debugPrint('📱 Services will initialize on first API call');
 
+      RunAnywhere.configureDownloadHttpClientFactory((uri) async {
+        return ExampleHttpService.shared.createScopedHttpPackageClient(
+          ProxyScope.download,
+          uri,
+        );
+      });
+
       // Refresh model manager state (runs model discovery)
       await ModelManager.shared.refresh();
 
@@ -213,13 +224,37 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         // Models with per-chip availability
         const genieModels = [
           // Qwen3 4B — Gen 5 only
-          (slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'qwen3-4b',
+            name: 'Qwen3 4B',
+            mem: 2800000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8EliteGen5}
+          ),
           // Llama 3.2 1B Instruct — both chips
-          (slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1200000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'llama3.2-1b-instruct',
+            name: 'Llama 3.2 1B Instruct',
+            mem: 1200000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
+          ),
           // SEA-LION v3.5 8B Instruct — both chips
-          (slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4800000000, quant: 'w4a16', chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}),
+          (
+            slug: 'sea-lion3.5-8b-instruct',
+            name: 'SEA-LION v3.5 8B Instruct',
+            mem: 4800000000,
+            quant: 'w4a16',
+            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
+          ),
           // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
-          (slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4200000000, quant: 'w8a16', chips: {NPUChip.snapdragon8Elite}),
+          (
+            slug: 'qwen2.5-7b-instruct',
+            name: 'Qwen 2.5 7B Instruct',
+            mem: 4200000000,
+            quant: 'w8a16',
+            chips: {NPUChip.snapdragon8Elite}
+          ),
         ];
         for (final m in genieModels) {
           if (m.chips.contains(chip)) {
@@ -261,7 +296,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhere.registerModel(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
       framework: InferenceFramework.onnx,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 75000000,
@@ -270,7 +306,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhere.registerModel(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
       framework: InferenceFramework.onnx,
       modality: ModelCategory.speechRecognition,
       memoryRequirement: 250000000,
@@ -280,7 +317,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhere.registerModel(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
       framework: InferenceFramework.onnx,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
@@ -289,7 +327,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     RunAnywhere.registerModel(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
-      url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
+      url: Uri.parse(
+          'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
       framework: InferenceFramework.onnx,
       modality: ModelCategory.speechSynthesis,
       memoryRequirement: 65000000,
@@ -325,9 +364,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // --- ONNX BACKEND (required for embeddings used by RAG) ---
     try {
       await Onnx.register();
-      debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
+      debugPrint('✅ ONNX backend registered (Windows optional)');
     } catch (e) {
-      debugPrint('⚠️ ONNX backend not available: $e');
+      debugPrint('⚠️ ONNX backend not available on this Windows build: $e');
     }
 
     // --- RAG BACKEND ---
@@ -335,7 +374,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       await RAGModule.register();
       debugPrint('✅ RAG backend registered');
     } catch (e) {
-      debugPrint('⚠️ RAG backend not available (RAG features disabled): $e');
+      debugPrint('⚠️ RAG backend not available on this Windows build: $e');
     }
 
     debugPrint('🎉 All modules and models registered');
