@@ -24,6 +24,23 @@ namespace rac {
 namespace wakeword {
 
 // =============================================================================
+// PROVIDER REGISTRY
+// =============================================================================
+//
+// Holds the currently-registered provider vtable. Set once at startup by the
+// chosen wakeword backend (typically the ONNX backend) via
+// rac_wakeword_provider_set(). See rac_wakeword_service.h for design notes.
+//
+// Reads on the hot path (rac_wakeword_process) are lock-free via atomic;
+// writes go through rac_wakeword_provider_set which is expected to run at
+// SDK init before any service is live.
+// =============================================================================
+
+namespace {
+std::atomic<const rac_wakeword_provider_ops_t*> g_provider{nullptr};
+}  // namespace
+
+// =============================================================================
 // INTERNAL TYPES
 // =============================================================================
 
@@ -141,6 +158,35 @@ RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
     // Reserve audio buffer
     service->audio_buffer.reserve(service->samples_per_frame * 2);
 
+    // Create the backend handle via the registered provider, if any. If no
+    // provider is registered the service still initializes successfully;
+    // process() will become a no-op until a provider is wired in.
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    if (provider && provider->create) {
+        rac_handle_t backend_handle = nullptr;
+        rac_result_t rc =
+            provider->create(&service->config, &backend_handle, provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_ERROR("WakeWord",
+                          "Provider create failed: %d. Service will be inert until "
+                          "a new provider is registered or the config is fixed.",
+                          rc);
+            // Intentionally continue - we still mark initialized so the
+            // rest of the API (start/stop/load_model-with-no-backend) works
+            // in a degraded mode. load_model calls will surface the error
+            // at provider dispatch time.
+        } else {
+            service->backend_handle = backend_handle;
+            RAC_LOG_INFO("WakeWord", "Provider backend handle created");
+        }
+    } else {
+        RAC_LOG_WARNING("WakeWord",
+                        "No wake-word provider registered. Service will accept "
+                        "load_model() but rac_wakeword_process() will not fire "
+                        "detections until a backend registers via "
+                        "rac_wakeword_provider_set().");
+    }
+
     service->initialized = true;
     service->stream_start_time = get_timestamp_ms();
 
@@ -159,13 +205,18 @@ RAC_API void rac_wakeword_destroy(rac_handle_t handle) {
 
     // Stop if running
     if (service->listening) {
-        rac_wakeword_stop(handle);
+        (void)rac_wakeword_stop(handle);
     }
 
-    // TODO: Destroy backend handle when implemented
-    // if (service->backend_handle) {
-    //     rac_wakeword_onnx_destroy(service->backend_handle);
-    // }
+    // Tear down the backend handle via the registered provider, if any.
+    if (service->backend_handle) {
+        const auto* provider =
+            g_provider.load(std::memory_order_acquire);
+        if (provider && provider->destroy) {
+            provider->destroy(service->backend_handle, provider->user_data);
+        }
+        service->backend_handle = nullptr;
+    }
 
     delete service;
 }
@@ -202,16 +253,42 @@ RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
         }
     }
 
-    // Add model entry
+    // Dispatch the load to the registered provider backend before we commit
+    // the model to the in-memory roster. If there's no backend or the backend
+    // refuses the model, we surface the error; we don't want the service to
+    // look like it has a loaded model when the backend actually doesn't.
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    bool actually_loaded = false;
+    if (provider && provider->load_model) {
+        if (!service->backend_handle) {
+            RAC_LOG_ERROR("WakeWord",
+                          "load_model: provider is registered but no backend "
+                          "handle exists (create() must have failed at init).");
+            return RAC_ERROR_BACKEND_NOT_READY;
+        }
+        rac_result_t rc = provider->load_model(service->backend_handle, model_path,
+                                               model_id, wake_word, provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_ERROR("WakeWord", "Provider load_model(%s) failed: %d",
+                          model_id, rc);
+            return rc;
+        }
+        actually_loaded = true;
+    }
+    // If no provider is registered we still record the model entry so the
+    // service layer's bookkeeping remains consistent with the user's API
+    // calls; the entry will simply be unable to fire detections.
+
     LoadedModel model;
     model.model_id = model_id;
     model.wake_word = wake_word;
     model.model_path = model_path;
-    model.is_loaded = true;  // TODO: Actually load via backend
+    model.is_loaded = actually_loaded;
 
     service->models.push_back(model);
 
-    RAC_LOG_INFO("WakeWord", "Loaded model: %s ('%s')", model_id, wake_word);
+    RAC_LOG_INFO("WakeWord", "Loaded model: %s ('%s'), backend_loaded=%s",
+                 model_id, wake_word, actually_loaded ? "true" : "false");
 
     return RAC_SUCCESS;
 }
@@ -229,10 +306,29 @@ RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
         return RAC_ERROR_WAKEWORD_NOT_INITIALIZED;
     }
 
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    if (provider && provider->load_vad) {
+        if (!service->backend_handle) {
+            RAC_LOG_ERROR("WakeWord", "load_vad: no backend handle (create failed?)");
+            return RAC_ERROR_BACKEND_NOT_READY;
+        }
+        rac_result_t rc = provider->load_vad(service->backend_handle, vad_model_path,
+                                             provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_ERROR("WakeWord", "Provider load_vad failed: %d", rc);
+            return rc;
+        }
+        service->vad_loaded = true;
+    } else {
+        // No provider or provider doesn't implement VAD: record the path so
+        // a later rac_wakeword_provider_set() can pick it up if needed, but
+        // flag not-loaded so the process loop knows not to expect VAD input.
+        service->vad_loaded = false;
+    }
     service->vad_model_path = vad_model_path;
-    service->vad_loaded = true;  // TODO: Actually load via backend
 
-    RAC_LOG_INFO("WakeWord", "Loaded VAD model: %s", vad_model_path);
+    RAC_LOG_INFO("WakeWord", "Loaded VAD model: %s (backend_loaded=%s)",
+                 vad_model_path, service->vad_loaded ? "true" : "false");
 
     return RAC_SUCCESS;
 }
@@ -253,6 +349,21 @@ RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
 
     if (it == service->models.end()) {
         return RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND;
+    }
+
+    // Let the provider drop its reference to the model first (frees ORT
+    // session / mem pools). Do this before erasing the model from our
+    // roster so in-flight diagnostics can still name the model.
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    if (provider && provider->unload_model && service->backend_handle) {
+        rac_result_t rc = provider->unload_model(service->backend_handle, model_id,
+                                                 provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_WARNING("WakeWord",
+                            "Provider unload_model(%s) returned %d (proceeding with "
+                            "service-layer unload anyway).",
+                            model_id, rc);
+        }
     }
 
     service->models.erase(it);
@@ -416,7 +527,17 @@ RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle) {
     service->audio_buffer.clear();
     service->last_detection_time = 0;
 
-    // TODO: Reset backend state
+    // Forward the reset to the provider so sliding windows / KV caches /
+    // VAD state get cleared too. Failure here is non-fatal for the service
+    // layer - the audio buffer has already been reset locally.
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    if (provider && provider->reset && service->backend_handle) {
+        rac_result_t rc =
+            provider->reset(service->backend_handle, provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_WARNING("WakeWord", "Provider reset returned %d (non-fatal)", rc);
+        }
+    }
 
     return RAC_SUCCESS;
 }
@@ -474,28 +595,58 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
             service->audio_buffer.begin() + service->samples_per_frame
         );
 
-        // TODO: Process through ONNX backend
-        // For now, simulate with placeholder
+        // Defaults: no detection, "speech" = true (so that processing
+        // proceeds when no VAD is configured). These get overwritten by
+        // the provider if one is registered.
         bool detected = false;
         int32_t keyword_index = -1;
         float confidence = 0.0f;
-        bool vad_speech = true;  // Assume speech if no VAD
+        rac_bool_t vad_speech_rac = RAC_TRUE;
         float vad_prob = 1.0f;
 
-        // VAD pre-filtering (would call backend)
-        if (service->config.use_vad_filter && service->vad_loaded) {
-            // TODO: Run VAD inference
-            // vad_speech = rac_wakeword_onnx_vad_process(...)
+        const auto* provider = g_provider.load(std::memory_order_acquire);
+        if (provider && provider->process && service->backend_handle) {
+            int32_t det_idx = -1;
+            float det_conf = 0.0f;
+            rac_bool_t vad_flag = RAC_TRUE;
+            float vad_conf = 1.0f;
+            rac_result_t rc = provider->process(
+                service->backend_handle,
+                frame.data(), frame.size(),
+                &det_idx, &det_conf,
+                &vad_flag, &vad_conf,
+                provider->user_data);
+            if (rc == RAC_SUCCESS) {
+                detected = (det_idx >= 0);
+                keyword_index = det_idx;
+                confidence = det_conf;
+                vad_speech_rac = vad_flag;
+                vad_prob = vad_conf;
+            } else {
+                // Rate-limit this warning: a provider that's briefly unhealthy
+                // shouldn't spam the log once per 80ms frame. Log at debug
+                // level only; the caller sees the error via reduced detection
+                // rate.
+                RAC_LOG_DEBUG("WakeWord",
+                              "Provider process returned %d; dropping frame", rc);
+            }
         }
+        // else: no provider -> the frame is accumulated but inference
+        // doesn't fire. Callers can detect this via rac_wakeword_has_provider().
+
+        const bool vad_speech = (vad_speech_rac == RAC_TRUE);
 
         // Copy VAD callback under lock to invoke outside lock (avoid deadlock)
         auto vad_cb = service->vad_callback;
         auto vad_ud = service->vad_user_data;
 
-        // Only run wake word detection if VAD detects speech
-        if (!service->config.use_vad_filter || vad_speech) {
-            // TODO: Run wake word inference for each model
-            // detected = rac_wakeword_onnx_process(...)
+        // Filtering: if VAD is enabled but no speech detected, suppress
+        // the wake-word detection. If VAD is disabled or no provider
+        // supports it, we treat every frame as speech.
+        if (service->config.use_vad_filter && service->vad_loaded && !vad_speech) {
+            detected = false;
+            keyword_index = -1;
+            confidence = 0.0f;
         }
 
         // Update result
@@ -603,6 +754,18 @@ RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle, float thres
 
     service->config.threshold = threshold;
 
+    // Propagate to the backend if one is registered.
+    const auto* provider = g_provider.load(std::memory_order_acquire);
+    if (provider && provider->set_threshold && service->backend_handle) {
+        rac_result_t rc = provider->set_threshold(service->backend_handle, threshold,
+                                                  provider->user_data);
+        if (rc != RAC_SUCCESS) {
+            RAC_LOG_WARNING("WakeWord",
+                            "Provider set_threshold returned %d; service-level "
+                            "threshold cache is updated regardless.", rc);
+        }
+    }
+
     return RAC_SUCCESS;
 }
 
@@ -680,6 +843,26 @@ RAC_API rac_bool_t rac_wakeword_is_listening(rac_handle_t handle) {
         return RAC_FALSE;
     }
     return get_service(handle)->listening ? RAC_TRUE : RAC_FALSE;
+}
+
+// =============================================================================
+// PROVIDER REGISTRATION
+// =============================================================================
+
+RAC_API rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops) {
+    // Intentionally memory_order_release: services that later call
+    // g_provider.load(acquire) will see the fully-initialized ops struct.
+    g_provider.store(ops, std::memory_order_release);
+    if (ops) {
+        RAC_LOG_INFO("WakeWord", "Provider registered");
+    } else {
+        RAC_LOG_INFO("WakeWord", "Provider cleared");
+    }
+    return RAC_SUCCESS;
+}
+
+RAC_API rac_bool_t rac_wakeword_has_provider(void) {
+    return (g_provider.load(std::memory_order_acquire) != nullptr) ? RAC_TRUE : RAC_FALSE;
 }
 
 } // extern "C"

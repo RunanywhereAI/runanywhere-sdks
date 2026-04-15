@@ -322,6 +322,114 @@ RAC_API rac_bool_t rac_wakeword_is_ready(rac_handle_t handle);
  */
 RAC_API rac_bool_t rac_wakeword_is_listening(rac_handle_t handle);
 
+// =============================================================================
+// PROVIDER REGISTRATION (backend hook)
+// =============================================================================
+//
+// The wake-word service layer lives in rac_commons and therefore cannot
+// directly link against any concrete inference backend. Instead, any backend
+// that wants to serve wake-word detection (today: the ONNX wake-word backend
+// in src/backends/onnx/wakeword_onnx.cpp, and any future backends such as
+// MetalRT) registers a vtable of function pointers via
+// rac_wakeword_provider_set(). The service layer then dispatches every
+// model-load / audio-process / reset / destroy call through that vtable.
+//
+// If no provider has registered, all service operations still succeed
+// structurally (the service can be created, started, stopped) but
+// rac_wakeword_process() becomes a no-op - detections never fire. Callers
+// can detect this via rac_wakeword_has_provider() or by observing zero
+// detections on known-positive audio.
+//
+// Lifetime: the callbacks struct passed to rac_wakeword_provider_set() must
+// outlive every wake-word service instance. Typically this is a static
+// global inside the provider backend's translation unit. The caller retains
+// ownership; the service layer does not copy or free the struct.
+//
+// Thread-safety: rac_wakeword_provider_set() is expected to be called once
+// at SDK startup, before any wake-word services exist. Calling it
+// concurrently with live service instances is undefined.
+// =============================================================================
+
+/**
+ * @brief Callback vtable a wake-word inference backend must implement to
+ *        serve as the wake-word provider for rac_wakeword_* services.
+ *
+ * All function pointers may be NULL if the provider does not support that
+ * operation; the service layer checks each before calling. The `user_data`
+ * pointer is stored and passed back into every callback so providers can
+ * associate each `backend_handle` with their own state.
+ */
+typedef struct rac_wakeword_provider_ops {
+    /** Create a backend-specific handle. Called once per wake-word service
+     *  during rac_wakeword_initialize(). Must return a handle suitable for
+     *  passing to every other vtable method (and to `destroy`). */
+    rac_result_t (*create)(const rac_wakeword_config_t* config,
+                           rac_handle_t* out_backend_handle,
+                           void* user_data);
+
+    /** Load a wake-word classification model (ONNX, etc.). */
+    rac_result_t (*load_model)(rac_handle_t backend_handle,
+                               const char* model_path,
+                               const char* model_id,
+                               const char* wake_word,
+                               void* user_data);
+
+    /** Unload a wake-word model previously loaded with load_model. */
+    rac_result_t (*unload_model)(rac_handle_t backend_handle,
+                                 const char* model_id,
+                                 void* user_data);
+
+    /** Load a VAD pre-filter model (Silero). Optional. */
+    rac_result_t (*load_vad)(rac_handle_t backend_handle,
+                             const char* vad_model_path,
+                             void* user_data);
+
+    /** Run one frame of audio through inference + optional VAD.
+     *  out_detected_index is set to >= 0 if a wake word fires (index into
+     *  the provider's loaded-models list) or -1 otherwise. */
+    rac_result_t (*process)(rac_handle_t backend_handle,
+                            const float* samples, size_t num_samples,
+                            int32_t* out_detected_index,
+                            float* out_confidence,
+                            rac_bool_t* out_vad_speech,
+                            float* out_vad_confidence,
+                            void* user_data);
+
+    /** Reset internal state (KV cache, sliding window, etc.). */
+    rac_result_t (*reset)(rac_handle_t backend_handle, void* user_data);
+
+    /** Adjust detection threshold at runtime. */
+    rac_result_t (*set_threshold)(rac_handle_t backend_handle,
+                                  float threshold,
+                                  void* user_data);
+
+    /** Tear down the backend handle. */
+    void (*destroy)(rac_handle_t backend_handle, void* user_data);
+
+    /** Opaque user-data passed through to every callback. */
+    void* user_data;
+} rac_wakeword_provider_ops_t;
+
+/**
+ * @brief Register a wake-word inference provider.
+ *
+ * Called once at SDK startup by the concrete backend
+ * (e.g. rac_backend_wakeword_onnx_register() wires up the ONNX provider).
+ *
+ * @param ops Provider vtable. Must outlive all wake-word services.
+ *            Pass NULL to clear the registration.
+ * @return RAC_SUCCESS always.
+ */
+RAC_API rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops);
+
+/**
+ * @brief Query whether a wake-word provider is currently registered.
+ *
+ * @return RAC_TRUE if a provider has been set via rac_wakeword_provider_set(),
+ *         RAC_FALSE otherwise. Useful for test code and graceful degradation.
+ */
+RAC_API rac_bool_t rac_wakeword_has_provider(void);
+
 #ifdef __cplusplus
 }
 #endif
