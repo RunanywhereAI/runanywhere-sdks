@@ -38,7 +38,7 @@ export type { TTSVoiceConfig } from './Extensions/RunAnywhere+TTS';
 export { VAD } from './Extensions/RunAnywhere+VAD';
 export type { VADModelConfig } from './Extensions/RunAnywhere+VAD';
 
-// Wake-word detection (via onnxruntime-web, scaffolded — feed() not yet implemented)
+// Wake-word detection (via onnxruntime-web — full openWakeWord pipeline)
 export { WakeWord, WakeWordService } from './Extensions/RunAnywhere+WakeWord';
 export type {
   WakeWordConfig,
@@ -48,7 +48,7 @@ export type {
   WakeWordCallback,
 } from './Extensions/WakeWordTypes';
 
-// Text embeddings for RAG (via onnxruntime-web, scaffolded — embed() not yet implemented)
+// Text embeddings for RAG (via onnxruntime-web — BERT encoder + WordPiece tokenizer)
 export { Embeddings, EmbeddingsService } from './Extensions/RunAnywhere+Embeddings';
 export type {
   EmbeddingsModelConfig,
@@ -69,3 +69,8 @@ export { SpeechActivity } from '@runanywhere/web';
 export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
 export { ORTRuntimeBridge } from './Foundation/ORTRuntimeBridge';
 export type { ORTRuntimeInitOptions } from './Foundation/ORTRuntimeBridge';
+export { WordPieceTokenizer } from './Foundation/WordPieceTokenizer';
+export type {
+  TokenizerOptions,
+  EncodeResult,
+} from './Foundation/WordPieceTokenizer';

@@ -112,13 +112,22 @@ export class ORTRuntimeBridge {
   /**
    * Convenience: create an InferenceSession from model bytes or URL.
    * Uses the shared ort.env configured at initialize() time.
+   *
+   * onnxruntime-web's overloads are narrow — URL strings and byte buffers
+   * hit different signatures — so we branch here rather than passing the
+   * union through.
    */
   static async createSession(
     modelSource: ArrayBuffer | Uint8Array | string,
     sessionOptions?: ort.InferenceSession.SessionOptions,
   ): Promise<ort.InferenceSession> {
     const ortMod = await this.initialize();
-    return ortMod.InferenceSession.create(modelSource, sessionOptions);
+    if (typeof modelSource === 'string') {
+      return ortMod.InferenceSession.create(modelSource, sessionOptions);
+    }
+    const bytes =
+      modelSource instanceof Uint8Array ? modelSource : new Uint8Array(modelSource);
+    return ortMod.InferenceSession.create(bytes, sessionOptions);
   }
 
   /** Reset the singleton. Intended for tests; do not call in production. */
