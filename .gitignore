@@ -124,7 +124,6 @@ gradle.properties
 !gradle.properties.example
 
 # Also ignore .idea folders in subdirectories
-examples/intellij-plugin-demo/plugin/.idea/
 sdk/runanywhere-kotlin/.idea/
 
 # Other IDE files

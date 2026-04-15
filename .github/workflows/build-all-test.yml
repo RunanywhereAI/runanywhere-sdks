@@ -61,11 +61,6 @@ on:
         required: false
         default: true
         type: boolean
-      build_intellij_plugin:
-        description: 'IntelliJ Plugin'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: read
@@ -470,42 +465,6 @@ jobs:
         continue-on-error: true
 
   # ===========================================================================
-  # IntelliJ Plugin
-  # ===========================================================================
-  intellij-plugin:
-    name: IntelliJ Plugin
-    if: ${{ inputs.build_intellij_plugin }}
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup local.properties
-        run: echo "sdk.dir=${ANDROID_SDK_ROOT}" > sdk/runanywhere-kotlin/local.properties
-
-      - name: Publish SDK to Maven Local
-        working-directory: sdk/runanywhere-kotlin
-        run: |
-          chmod +x gradlew
-          ./gradlew publishToMavenLocal -Prunanywhere.testLocal=false
-
-      - name: Build IntelliJ Plugin
-        working-directory: examples/intellij-plugin-demo/plugin
-        run: |
-          chmod +x gradlew
-          ./gradlew buildPlugin
-
-  # ===========================================================================
   # Build Summary
   # ===========================================================================
   summary:
@@ -519,7 +478,6 @@ jobs:
       - flutter-sdk
       - react-native-sdk
       - android-apps
-      - intellij-plugin
     if: always()
     runs-on: ubuntu-latest
 
@@ -550,7 +508,6 @@ jobs:
           echo "| Flutter SDK (Dart) | $(status '${{ needs.flutter-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| React Native SDK | $(status '${{ needs.react-native-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Android Example Apps | $(status '${{ needs.android-apps.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| IntelliJ Plugin | $(status '${{ needs.intellij-plugin.result }}') |" >> $GITHUB_STEP_SUMMARY
 
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
