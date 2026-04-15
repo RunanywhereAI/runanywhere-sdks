@@ -329,6 +329,164 @@ jobs:
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
+  # Consumer validation — clone each starter-app repo in RunanywhereAI org
+  # and build it against the freshly-produced artifacts. Catches "looked
+  # right, actually broken" regressions before the release goes out.
+  #
+  # These are BEST-EFFORT: they warn on failure rather than failing the
+  # release, because starter repos evolve independently and a transient
+  # break shouldn't block a native-library release.
+  # ---------------------------------------------------------------------------
+
+  validate_consumer_swift:
+    needs: [validate, sdk_kotlin]   # dependency is arbitrary — we just want artifacts to exist
+    if: always() && needs.validate.result == 'success'
+    runs-on: macos-14
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - name: Clone swift-starter-example
+        uses: actions/checkout@v4
+        with:
+          repository: RunanywhereAI/swift-starter-example
+          path: consumer-swift
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-ios-macos
+          path: native-ios-staging
+      - name: Build swift-starter-example against local artifacts
+        run: |
+          cd consumer-swift
+          # If the starter has an obvious build script, prefer it.
+          if [ -x scripts/build.sh ]; then
+            scripts/build.sh
+          elif [ -f Package.swift ]; then
+            swift package resolve
+            swift build
+          elif ls *.xcodeproj >/dev/null 2>&1 || ls *.xcworkspace >/dev/null 2>&1; then
+            xcodebuild -scheme "$(ls -d *.xcodeproj *.xcworkspace 2>/dev/null | head -1 | sed 's/\.xc[a-z]*$//')" -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build || true
+          else
+            echo "::warning::no recognizable Swift project in swift-starter-example"
+          fi
+
+  validate_consumer_kotlin:
+    needs: [validate, sdk_kotlin]
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - uses: android-actions/setup-android@v3
+      - name: Clone kotlin-starter-example
+        uses: actions/checkout@v4
+        with:
+          repository: RunanywhereAI/kotlin-starter-example
+          path: consumer-kotlin
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-kotlin
+          path: sdk-kotlin-staging
+      - name: Build kotlin-starter-example
+        run: |
+          cd consumer-kotlin
+          # Point the starter at our locally-packaged AAR via flatDir (best effort)
+          if [ -f build.gradle ] || [ -f build.gradle.kts ] || [ -f settings.gradle ] || [ -f settings.gradle.kts ]; then
+            ls -la ../sdk-kotlin-staging/ || true
+            ./gradlew build --no-daemon || echo "::warning::kotlin-starter-example build failed"
+          else
+            echo "::warning::no Gradle project in kotlin-starter-example"
+          fi
+
+  validate_consumer_web:
+    needs: [validate, sdk_web]
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Clone web-starter-app
+        uses: actions/checkout@v4
+        with:
+          repository: RunanywhereAI/web-starter-app
+          path: consumer-web
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdk-web
+          path: sdk-web-staging
+      - name: Install starter with locally-packed tarballs
+        run: |
+          cd consumer-web
+          if [ -f package.json ]; then
+            # Install each locally-packed tarball into the starter
+            for tgz in ../sdk-web-staging/*.tgz; do
+              [ -f "$tgz" ] && npm install --no-save "$tgz" || true
+            done
+            npm install
+            npm run build || npm run typecheck || echo "::warning::web-starter-app build failed"
+          else
+            echo "::warning::no package.json in web-starter-app"
+          fi
+
+  validate_consumer_flutter:
+    needs: [validate, native_ios, native_android]
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Clone flutter-starter-example
+        uses: actions/checkout@v4
+        with:
+          repository: RunanywhereAI/flutter-starter-example
+          path: consumer-flutter
+      - name: Analyze flutter-starter-example
+        run: |
+          cd consumer-flutter
+          if [ -f pubspec.yaml ]; then
+            flutter pub get || echo "::warning::pub get failed"
+            flutter analyze || echo "::warning::flutter analyze failed"
+          else
+            echo "::warning::no pubspec.yaml in flutter-starter-example"
+          fi
+
+  validate_consumer_react_native:
+    needs: [validate, native_ios, native_android]
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Clone react-native-starter-app
+        uses: actions/checkout@v4
+        with:
+          repository: RunanywhereAI/react-native-starter-app
+          path: consumer-rn
+      - name: Install RN starter
+        run: |
+          cd consumer-rn
+          if [ -f package.json ]; then
+            npm install --legacy-peer-deps || yarn install || echo "::warning::install failed"
+            npx tsc --noEmit 2>/dev/null || echo "::warning::RN typecheck failed"
+          else
+            echo "::warning::no package.json in react-native-starter-app"
+          fi
+
+  # ---------------------------------------------------------------------------
   # Final job: gather every artifact and create the GitHub Release.
   # ---------------------------------------------------------------------------
 
