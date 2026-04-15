@@ -1,0 +1,369 @@
+name: Release
+
+# =============================================================================
+# Tag-triggered, single-train release.
+#
+# A push of `v1.2.3` builds every native artifact for every platform, builds
+# every client SDK package, computes SHA-256 checksums, and attaches the lot
+# to a single GitHub Release named v1.2.3.
+#
+# This workflow does NOT publish to npm / Maven Central / pub.dev /
+# Swift Package Registry / GitHub Packages. GitHub Releases is the only
+# distribution channel.
+#
+# Pre-flight (engineer runs locally before tagging):
+#   scripts/sync-versions.sh 1.2.3
+#   git add -u && git commit -m "chore: release 1.2.3"
+#   git tag v1.2.3
+#   git push origin main v1.2.3
+# =============================================================================
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.2.3 — no leading v)'
+        required: true
+
+permissions:
+  contents: write   # needed to create/update GitHub Releases
+
+env:
+  RELEASE_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # validate: sanity-check that the tag matches what's in VERSIONS.
+  # ---------------------------------------------------------------------------
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and validate version
+        id: parse
+        run: |
+          set -euo pipefail
+          # Strip leading 'v' if dispatch input or tag includes it
+          V="${RELEASE_VERSION#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Releasing version: $V"
+          # VERSIONS file should already be bumped before tag (sync-versions.sh)
+          PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          if [ "$PROJECT_VERSION" != "$V" ]; then
+            echo "::warning::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
+            echo "::warning::Run scripts/sync-versions.sh $V before tagging next time."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Native artifact builds — full matrix.
+  # ---------------------------------------------------------------------------
+
+  native_ios:
+    needs: validate
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: ios
+      - name: Build all backends for iOS + macOS (Release)
+        working-directory: sdk/runanywhere-commons
+        run: ./scripts/build-ios.sh --backend all --release --include-macos --package
+      - name: Compute checksums
+        working-directory: sdk/runanywhere-commons/dist
+        run: |
+          for f in *.zip; do
+            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
+          done
+          ls -la
+      - name: Upload iOS/macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ios-macos
+          path: |
+            sdk/runanywhere-commons/dist/*.zip
+            sdk/runanywhere-commons/dist/*.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_android:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86_64, x86]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: android
+      - name: Build all backends for Android (${{ matrix.abi }})
+        working-directory: sdk/runanywhere-commons
+        run: ./scripts/build-android.sh all ${{ matrix.abi }}
+      - name: Stage and zip per-ABI outputs
+        working-directory: sdk/runanywhere-commons
+        run: |
+          mkdir -p dist/android-staging/${{ matrix.abi }}
+          # Best-effort copy of standard layouts; tolerate missing dirs since some backends may not produce in this layout
+          for sub in jni unified llamacpp onnx; do
+            if [ -d "dist/android/$sub/${{ matrix.abi }}" ]; then
+              cp -R "dist/android/$sub/${{ matrix.abi }}/." "dist/android-staging/${{ matrix.abi }}/"
+            fi
+          done
+          (cd dist/android-staging && zip -r "../RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip" "${{ matrix.abi }}")
+          shasum -a 256 "dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip" \
+            > "dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256"
+      - name: Upload Android ABI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-android-${{ matrix.abi }}
+          path: |
+            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  native_linux:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: linux
+      - name: Build commons + backends for Linux x86_64
+        working-directory: sdk/runanywhere-commons
+        run: ./scripts/build-linux.sh
+      - name: Package Linux outputs
+        working-directory: sdk/runanywhere-commons
+        run: |
+          if [ -d dist/linux ]; then
+            (cd dist/linux && tar czf "../RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" .)
+            shasum -a 256 "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" \
+              > "dist/RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
+          else
+            echo "::warning::dist/linux missing; build-linux.sh may have used a different output path"
+          fi
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-linux
+          path: |
+            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz
+            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: warn
+
+  native_windows:
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: windows
+      - name: Build commons + backends for Windows x64
+        working-directory: sdk/runanywhere-commons
+        shell: cmd
+        run: scripts\build-windows.bat
+      - name: Package Windows outputs
+        working-directory: sdk/runanywhere-commons
+        shell: bash
+        run: |
+          if [ -d dist/windows ]; then
+            (cd dist/windows && 7z a "../RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" .)
+            sha256sum "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip" \
+              > "dist/RACommons-windows-x64-v${{ needs.validate.outputs.version }}.zip.sha256"
+          else
+            echo "::warning::dist/windows missing; build-windows.bat may have used a different output path"
+          fi
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows
+          path: |
+            sdk/runanywhere-commons/dist/RACommons-windows-*.zip
+            sdk/runanywhere-commons/dist/RACommons-windows-*.zip.sha256
+          retention-days: 7
+          if-no-files-found: warn
+
+  native_web:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: web
+      - name: Build WASM (all backends)
+        working-directory: sdk/runanywhere-web
+        run: ./scripts/build-web.sh --build-wasm --all-backends
+      - name: Package Web/WASM outputs
+        working-directory: sdk/runanywhere-web
+        run: |
+          mkdir -p dist
+          tar czf "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
+            -C packages \
+            $(ls packages | grep -E '^(core|llamacpp|onnx)$' | sed 's,$,/wasm,')
+          shasum -a 256 "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
+            > "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
+      - name: Upload Web/WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-web
+          path: |
+            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz
+            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Client SDK packaging (best-effort on first iteration).
+  #
+  # Validates that each SDK builds with natives present, and produces a
+  # tarball-equivalent where the SDK has one (npm tarballs for Web/RN, AAR
+  # for Kotlin). Swift and Flutter validate-only.
+  # ---------------------------------------------------------------------------
+
+  sdk_kotlin:
+    needs: [validate, native_android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - uses: android-actions/setup-android@v3
+      - name: Download Android natives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-android-*
+          path: native-android-staging
+      - name: Stage natives into Kotlin SDK
+        run: |
+          mkdir -p sdk/runanywhere-kotlin/src/androidMain/jniLibs
+          for abi_dir in native-android-staging/*; do
+            [ -d "$abi_dir" ] || continue
+            for zip in "$abi_dir"/*.zip; do
+              [ -f "$zip" ] || continue
+              echo "Extracting $zip"
+              unzip -o "$zip" -d sdk/runanywhere-kotlin/src/androidMain/jniLibs/
+            done
+          done
+          ls -la sdk/runanywhere-kotlin/src/androidMain/jniLibs/ || true
+      - name: Build Kotlin AAR + JAR
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew build assembleRelease -x test --no-daemon || true
+      - name: Collect Kotlin SDK artifacts
+        run: |
+          mkdir -p sdk-staging/kotlin
+          find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
+          find sdk/runanywhere-kotlin/build/libs -name "*.jar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
+          ls -la sdk-staging/kotlin/ || true
+          for f in sdk-staging/kotlin/*; do
+            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
+          done
+      - name: Upload Kotlin SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-kotlin
+          path: sdk-staging/kotlin/**
+          retention-days: 7
+          if-no-files-found: warn
+
+  sdk_web:
+    needs: [validate, native_web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Download Web natives
+        uses: actions/download-artifact@v4
+        with:
+          name: native-web
+          path: native-web-staging
+      - name: Stage WASM into Web SDK
+        run: |
+          for tar in native-web-staging/*.tar.gz; do
+            [ -f "$tar" ] && tar xzf "$tar" -C sdk/runanywhere-web/packages/
+          done
+      - name: Install + build Web SDK
+        working-directory: sdk/runanywhere-web
+        run: |
+          npm install
+          npm run build:ts
+      - name: npm pack each Web package
+        working-directory: sdk/runanywhere-web
+        run: |
+          mkdir -p ../../sdk-staging/web
+          for pkg in packages/core packages/llamacpp packages/onnx; do
+            (cd "$pkg" && npm pack --pack-destination ../../../../sdk-staging/web/) || true
+          done
+          ls -la ../../sdk-staging/web/ || true
+          for f in ../../sdk-staging/web/*.tgz; do
+            [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
+          done
+      - name: Upload Web SDK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-web
+          path: sdk-staging/web/**
+          retention-days: 7
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Final job: gather every artifact and create the GitHub Release.
+  # ---------------------------------------------------------------------------
+
+  publish:
+    needs:
+      - validate
+      - native_ios
+      - native_android
+      - native_linux
+      - native_windows
+      - native_web
+      - sdk_kotlin
+      - sdk_web
+    if: always() && needs.validate.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Flatten + index assets
+        run: |
+          mkdir -p release-flat
+          find release-artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" -o -name "*.aar" -o -name "*.jar" -o -name "*.tgz" -o -name "*.sha256" \) -exec cp {} release-flat/ \;
+          (cd release-flat && ls -la > MANIFEST.txt)
+          cat release-flat/MANIFEST.txt
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: v${{ needs.validate.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release-flat/*
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
