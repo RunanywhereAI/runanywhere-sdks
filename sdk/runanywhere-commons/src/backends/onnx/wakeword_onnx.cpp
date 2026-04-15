@@ -19,7 +19,7 @@
 #include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
+#include "internal/rac_platform_compat.h"
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>

@@ -246,6 +246,13 @@ target_include_directories(rac_backend_onnx PUBLIC
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
 )
 
+# Internal-only shared headers (e.g. internal/rac_platform_compat.h used by
+# onnx_backend.cpp and wakeword_onnx.cpp). Not PUBLIC - the internal/ dir must
+# never leak into consumers' include paths.
+target_include_directories(rac_backend_onnx PRIVATE
+    ${RAC_COMMONS_ROOT_DIR}/src
+)
+
 # RAG embedding provider headers (onnx_embedding_provider.h lives in features/rag/)
 if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
     target_include_directories(rac_backend_onnx PRIVATE ${RAG_DIR})

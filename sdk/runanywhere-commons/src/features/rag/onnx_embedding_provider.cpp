@@ -6,7 +6,7 @@
 #include "onnx_embedding_provider.h"
 #include "rac/features/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
+#include "internal/rac_platform_compat.h"
 #include "../../backends/onnx/onnx_backend.h"
 
 #include <nlohmann/json.hpp>
