@@ -205,32 +205,43 @@ elseif(RAC_PLATFORM_WINDOWS)
 endif()
 
 # =============================================================================
-# ONNX Backend Library (STT, TTS, VAD only)
+# ONNX Backend Library — organized by capability
 # =============================================================================
+#   sherpa-backed (STT / TTS / VAD)   → onnx_backend.cpp, rac_onnx.cpp
+#   wake-word     (raw ORT)           → wakeword/wakeword_onnx.cpp
+#   embeddings    (raw ORT, for RAG)  → embeddings/*.cpp
+#   shared        (one OrtEnv)        → shared/rac_ort_env.cpp
+#
+# The embedding provider lives here (not under src/features/rag/) so we
+# avoid the shared-library cycle: rac_commons → rac_backend_rag →
+# rac_backend_onnx → rac_commons. RAG is an OBJECT lib that calls into
+# rac_backend_onnx via the embeddings-service vtable.
 # Diffusion is Apple CoreML-only; no ONNX diffusion in this backend.
 
 set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
-    wakeword_onnx.cpp
+    wakeword/wakeword_onnx.cpp
     shared/rac_ort_env.cpp
 )
 
-# ONNX embedding provider lives in src/features/rag/ but is compiled here
-# to avoid a shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
-set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../features/rag")
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
+# Embedding provider is gated on RAC_BACKEND_RAG because it has no callers
+# unless RAG is enabled.
+if(RAC_BACKEND_RAG)
     list(APPEND ONNX_BACKEND_SOURCES
-        ${RAG_DIR}/onnx_embedding_provider.cpp
-        ${RAG_DIR}/rac_onnx_embeddings_register.cpp
+        embeddings/onnx_embedding_provider.cpp
+        embeddings/rac_onnx_embeddings_register.cpp
     )
-    message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
+    message(STATUS "  ONNX embedding provider: enabled (RAC_BACKEND_RAG=ON)")
 endif()
 
 set(ONNX_BACKEND_HEADERS
     onnx_backend.h
 )
+if(RAC_BACKEND_RAG)
+    list(APPEND ONNX_BACKEND_HEADERS embeddings/onnx_embedding_provider.h)
+endif()
 
 if(RAC_BUILD_SHARED)
     add_library(rac_backend_onnx SHARED ${ONNX_BACKEND_SOURCES} ${ONNX_BACKEND_HEADERS})
@@ -247,9 +258,11 @@ target_include_directories(rac_backend_onnx PUBLIC
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
 )
 
-# RAG embedding provider headers (onnx_embedding_provider.h lives in features/rag/)
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
-    target_include_directories(rac_backend_onnx PRIVATE ${RAG_DIR})
+# Embedding provider source and header live under embeddings/ — add that
+# directory to the include path so rac_onnx_embeddings_register.cpp's
+# `#include "onnx_embedding_provider.h"` resolves.
+if(RAC_BACKEND_RAG)
+    target_include_directories(rac_backend_onnx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/embeddings)
 endif()
 
 # Define RAC_ONNX_BUILDING to export symbols with visibility("default")

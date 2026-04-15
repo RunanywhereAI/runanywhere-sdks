@@ -5,7 +5,7 @@
  * `onnxruntime-web`.
  *
  * Mirrors the native provider in
- * `sdk/runanywhere-commons/src/features/rag/onnx_embedding_provider.cpp`,
+ * `sdk/runanywhere-commons/src/backends/onnx/embeddings/onnx_embedding_provider.cpp`,
  * but uses a proper WordPiece tokenizer (see WordPieceTokenizer.ts) rather
  * than the native SimpleTokenizer — accuracy parity with HuggingFace
  * reference implementations of `all-MiniLM-L6-v2`, `bge-small-en`, etc.

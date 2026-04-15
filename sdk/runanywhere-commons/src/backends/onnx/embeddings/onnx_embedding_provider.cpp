@@ -7,8 +7,8 @@
 #include "rac/features/rag/ort_guards.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_compat.h"
-#include "../../backends/onnx/onnx_backend.h"
-#include "../../backends/onnx/shared/rac_ort_env.h"
+#include "../onnx_backend.h"
+#include "../shared/rac_ort_env.h"
 
 #include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>

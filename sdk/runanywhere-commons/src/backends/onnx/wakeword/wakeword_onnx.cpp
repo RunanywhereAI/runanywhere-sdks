@@ -23,7 +23,7 @@
 
 #ifdef RAC_HAS_ONNX
 #include <onnxruntime_cxx_api.h>
-#include "shared/rac_ort_env.h"
+#include "../shared/rac_ort_env.h"
 #endif
 
 #include <algorithm>

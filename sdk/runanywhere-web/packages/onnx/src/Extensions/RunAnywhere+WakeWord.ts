@@ -4,7 +4,7 @@
  * Web implementation of wake-word detection via `onnxruntime-web`.
  *
  * Full TypeScript port of the openWakeWord 3-stage pipeline from
- * `sdk/runanywhere-commons/src/backends/onnx/wakeword_onnx.cpp`:
+ * `sdk/runanywhere-commons/src/backends/onnx/wakeword/wakeword_onnx.cpp`:
  *
  *   Stage 1: melspectrogram.onnx          audio (1280 samples, 80ms @16kHz)
  *                                          → mel-spectrogram (32 bins/frame)
