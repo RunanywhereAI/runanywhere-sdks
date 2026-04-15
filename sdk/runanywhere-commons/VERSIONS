@@ -31,6 +31,24 @@ ANDROID_MIN_SDK=24
 # Xcode version for CI/CD builds
 XCODE_VERSION=15.4
 
+# Android NDK (matches what scripts/build-android.sh and Kotlin SDK expect)
+NDK_VERSION=27.0.12077973
+
+# Emscripten SDK (used by sdk/runanywhere-web/wasm/scripts/build.sh)
+EMSCRIPTEN_VERSION=3.1.51
+
+# Node (Web SDK + React Native SDK builds)
+NODE_VERSION=20
+
+# JDK (Kotlin SDK + Android builds)
+JAVA_VERSION=17
+
+# Gradle wrapper version baseline
+GRADLE_VERSION=8.11.1
+
+# CMake minimum version (matches sdk/runanywhere-commons/CMakeLists.txt:1)
+CMAKE_VERSION=3.22
+
 # =============================================================================
 # ONNX Runtime
 # =============================================================================

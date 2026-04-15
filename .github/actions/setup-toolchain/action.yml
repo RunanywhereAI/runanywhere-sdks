@@ -1,0 +1,104 @@
+name: Setup Toolchain
+description: |
+  Loads sdk/runanywhere-commons/VERSIONS into $GITHUB_ENV and installs the
+  per-platform toolchain (Xcode, NDK, JDK, Node, Emscripten, CMake) at the
+  versions pinned in VERSIONS. Single source of truth for tool versions.
+
+inputs:
+  platform:
+    required: true
+    description: 'ios | macos | android | linux | windows | web | sdk-only'
+
+runs:
+  using: composite
+  steps:
+    # ----------------------------------------------------------------------
+    # 1. Load VERSIONS into $GITHUB_ENV so subsequent steps see the values.
+    # ----------------------------------------------------------------------
+    - name: Load VERSIONS into env
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSIONS_FILE="${GITHUB_WORKSPACE}/sdk/runanywhere-commons/VERSIONS"
+        if [ ! -f "$VERSIONS_FILE" ]; then
+          echo "::error::VERSIONS file not found at $VERSIONS_FILE"
+          exit 1
+        fi
+        # Strip comments + blank lines, keep KEY=VALUE only
+        grep -E '^[A-Z_][A-Z0-9_]*=' "$VERSIONS_FILE" | while IFS='=' read -r k v; do
+          # Trim surrounding whitespace (xargs handles this)
+          k="$(echo "$k" | xargs)"
+          v="$(echo "$v" | xargs)"
+          echo "$k=$v" >> "$GITHUB_ENV"
+        done
+        echo "::group::Loaded versions"
+        cat "$VERSIONS_FILE" | grep -E '^[A-Z_][A-Z0-9_]*='
+        echo "::endgroup::"
+
+    # ----------------------------------------------------------------------
+    # 2. Per-platform toolchain installation (uses env vars from step 1).
+    # ----------------------------------------------------------------------
+    - name: Setup Xcode (iOS/macOS)
+      if: inputs.platform == 'ios' || inputs.platform == 'macos'
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: ${{ env.XCODE_VERSION }}
+
+    - name: Setup JDK (Android/SDK)
+      if: inputs.platform == 'android' || inputs.platform == 'sdk-only'
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ env.JAVA_VERSION }}
+
+    - name: Setup Android SDK + NDK (Android)
+      if: inputs.platform == 'android'
+      uses: android-actions/setup-android@v3
+
+    - name: Install pinned Android NDK
+      if: inputs.platform == 'android'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "y" | sdkmanager --install "ndk;${NDK_VERSION}" >/dev/null
+        echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+        echo "ANDROID_NDK_ROOT=${ANDROID_HOME}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+    - name: Setup Node (Web/RN/SDK)
+      if: inputs.platform == 'web' || inputs.platform == 'sdk-only'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup Emscripten (Web)
+      if: inputs.platform == 'web'
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: ${{ env.EMSCRIPTEN_VERSION }}
+        actions-cache-folder: emsdk-cache
+
+    - name: Setup CMake (Linux/Windows native)
+      if: inputs.platform == 'linux' || inputs.platform == 'windows'
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: ${{ env.CMAKE_VERSION }}
+
+    - name: Install Linux build deps
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends \
+          build-essential ninja-build pkg-config
+
+    - name: Print toolchain summary
+      shell: bash
+      run: |
+        echo "::group::Toolchain summary for platform=${{ inputs.platform }}"
+        command -v xcodebuild >/dev/null 2>&1 && xcodebuild -version || true
+        command -v javac >/dev/null 2>&1 && javac -version || true
+        command -v node >/dev/null 2>&1 && node --version || true
+        command -v emcc >/dev/null 2>&1 && emcc --version | head -1 || true
+        command -v cmake >/dev/null 2>&1 && cmake --version | head -1 || true
+        echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-unset}"
+        echo "::endgroup::"
