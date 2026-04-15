@@ -416,8 +416,22 @@ typedef struct rac_wakeword_provider_ops {
  * Called once at SDK startup by the concrete backend
  * (e.g. rac_backend_wakeword_onnx_register() wires up the ONNX provider).
  *
+ * THREADING CONTRACT:
+ *   - Callers MUST call this exactly once at SDK initialisation, BEFORE
+ *     any wake-word service instance has been created via rac_wakeword_create.
+ *   - `ops` must point to memory that outlives every wake-word service. In
+ *     practice this means the provider struct must be a file-scope `static`
+ *     constant in the backend module (see g_onnx_wakeword_provider_ops in
+ *     wakeword_onnx.cpp for the canonical example).
+ *   - Re-registering (i.e. calling this with different `ops` while services
+ *     are alive) is UNDEFINED BEHAVIOUR. Services retain a raw pointer to
+ *     the ops struct they were created under; swapping the provider while
+ *     the old services are still dispatching is a use-after-free.
+ *   - Passing NULL is only legal after all services have been destroyed.
+ *     It's provided for teardown in tests and shutdown paths.
+ *
  * @param ops Provider vtable. Must outlive all wake-word services.
- *            Pass NULL to clear the registration.
+ *            Pass NULL only during teardown.
  * @return RAC_SUCCESS always.
  */
 RAC_API RAC_NODISCARD rac_result_t rac_wakeword_provider_set(const rac_wakeword_provider_ops_t* ops);

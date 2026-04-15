@@ -16,6 +16,7 @@
 // =============================================================================
 
 #include "rac_types.h"
+#include "rac_attrs.h"      // RAC_NODISCARD, RAC_NONNULL, RAC_DEPRECATED macros
 #include "rac_error.h"
 #include "rac_structured_error.h"
 #include "rac_logger.h"
@@ -23,6 +24,7 @@
 #include "rac_platform_adapter.h"
 #include "rac_component_types.h"
 #include "rac_audio_utils.h"
+#include "rac_hardware.h"   // rac_hardware_query_capabilities + rac_hardware_report_t
 
 // Lifecycle management
 #include "rac_lifecycle.h"
