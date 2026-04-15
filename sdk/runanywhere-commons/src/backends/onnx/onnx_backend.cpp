@@ -14,6 +14,7 @@
 
 #include "onnx_backend.h"
 
+#include "shared/rac_ort_env.h"
 #include "rac/core/rac_platform_compat.h"
 
 #ifdef _WIN32
@@ -75,10 +76,12 @@ void ONNXBackendNew::cleanup() {
     tts_.reset();
     vad_.reset();
 
-    if (ort_env_) {
-        ort_api_->ReleaseEnv(ort_env_);
-        ort_env_ = nullptr;
-    }
+    // ort_env_ points at the process-lifetime shared env (see
+    // shared/rac_ort_env.{h,cpp}). Clearing the pointer here — we do NOT
+    // call ReleaseEnv; the singleton outlives every backend instance and
+    // is leaked on purpose.
+    ort_env_ = nullptr;
+    ort_api_ = nullptr;
 
     initialized_ = false;
 }
@@ -96,17 +99,15 @@ void ONNXBackendNew::set_telemetry_callback(TelemetryCallback callback) {
 }
 
 bool ONNXBackendNew::initialize_ort() {
-    ort_api_ = OrtGetApiBase()->GetApi(ORT_API_VERSION);
+    ort_api_ = rac::onnx::shared_ort_api();
     if (!ort_api_) {
-        RAC_LOG_ERROR("ONNX", "Failed to get ONNX Runtime API");
+        RAC_LOG_ERROR("ONNX", "Failed to get ONNX Runtime API (shared)");
         return false;
     }
 
-    OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "runanywhere", &ort_env_);
-    if (status) {
-        RAC_LOG_ERROR("ONNX", "Failed to create ONNX Runtime environment: %s",
-                     ort_api_->GetErrorMessage(status));
-        ort_api_->ReleaseStatus(status);
+    ort_env_ = rac::onnx::shared_ort_env();
+    if (!ort_env_) {
+        RAC_LOG_ERROR("ONNX", "Failed to acquire shared Ort::Env");
         return false;
     }
 

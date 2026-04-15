@@ -214,6 +214,7 @@ set(ONNX_BACKEND_SOURCES
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
     wakeword_onnx.cpp
+    shared/rac_ort_env.cpp
 )
 
 # ONNX embedding provider lives in src/features/rag/ but is compiled here
