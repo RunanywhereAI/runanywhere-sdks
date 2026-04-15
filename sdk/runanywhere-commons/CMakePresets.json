@@ -63,6 +63,80 @@
         "RAC_BUILD_PLATFORM": "OFF",
         "RAC_BUILD_TESTS": "ON"
       }
+    },
+    {
+      "name": "dev-asan",
+      "displayName": "Development with AddressSanitizer + UBSan",
+      "description": "Core + tests with ASan + UBSan enabled. Catches heap/stack/global overflows, use-after-free, double-free, signed overflow, null-deref, alignment errors. Recommended for local development.",
+      "binaryDir": "${sourceDir}/build/dev-asan",
+      "cacheVariables": {
+        "RAC_BUILD_JNI": "OFF",
+        "RAC_BUILD_BACKENDS": "ON",
+        "RAC_BACKEND_LLAMACPP": "ON",
+        "RAC_BACKEND_ONNX": "ON",
+        "RAC_BACKEND_WHISPERCPP": "OFF",
+        "RAC_BUILD_TESTS": "ON",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENABLE_ASAN": "ON",
+        "ENABLE_UBSAN": "ON"
+      },
+      "environment": {
+        "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1:strict_string_checks=1",
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "dev-ubsan",
+      "displayName": "Development with UBSan only",
+      "description": "UndefinedBehaviorSanitizer only. Faster than ASan; catches UB that doesn't need heap instrumentation.",
+      "binaryDir": "${sourceDir}/build/dev-ubsan",
+      "cacheVariables": {
+        "RAC_BUILD_TESTS": "ON",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENABLE_UBSAN": "ON"
+      },
+      "environment": {
+        "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1"
+      }
+    },
+    {
+      "name": "dev-tsan",
+      "displayName": "Development with ThreadSanitizer",
+      "description": "ThreadSanitizer for data-race detection. Runs slower and has false-positive potential; used specifically when debugging threading issues (download manager, event bus, wakeword audio callbacks).",
+      "binaryDir": "${sourceDir}/build/dev-tsan",
+      "cacheVariables": {
+        "RAC_BUILD_TESTS": "ON",
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "ENABLE_TSAN": "ON"
+      },
+      "environment": {
+        "TSAN_OPTIONS": "halt_on_error=1:second_deadlock_stack=1"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev-asan",
+      "configurePreset": "dev-asan"
+    },
+    {
+      "name": "dev-ubsan",
+      "configurePreset": "dev-ubsan"
+    },
+    {
+      "name": "dev-tsan",
+      "configurePreset": "dev-tsan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev-asan",
+      "configurePreset": "dev-asan",
+      "output": {"outputOnFailure": true},
+      "execution": {"stopOnFailure": false}
     }
   ]
 }
