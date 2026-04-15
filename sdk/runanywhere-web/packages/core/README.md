@@ -411,8 +411,10 @@ source ~/emsdk/emsdk_env.sh
 # Individual backends
 ./wasm/scripts/build.sh --llamacpp          # LLM only (llama.cpp)
 ./wasm/scripts/build.sh --whispercpp        # STT only (whisper.cpp)
-./wasm/scripts/build.sh --onnx              # TTS/VAD only (sherpa-onnx)
 ./wasm/scripts/build.sh --llamacpp --vlm    # LLM + VLM (llama.cpp + mtmd)
+
+# Sherpa-ONNX (STT/TTS/VAD) is a SEPARATE WASM module, not embedded in racommons.wasm:
+./scripts/build-web.sh --build-sherpa       # Build sherpa-onnx.wasm alongside racommons
 
 # WebGPU-accelerated build
 ./wasm/scripts/build.sh --webgpu

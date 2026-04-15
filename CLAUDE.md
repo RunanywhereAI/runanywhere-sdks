@@ -225,7 +225,7 @@ cd sdk/runanywhere-web/
 ./scripts/build-web.sh
 
 # Build WASM with specific backends
-./scripts/build-web.sh --build-wasm --llamacpp --onnx
+./scripts/build-web.sh --build-wasm --llamacpp
 ./scripts/build-web.sh --build-wasm --all-backends
 ./scripts/build-web.sh --build-wasm --llamacpp --vlm --webgpu
 

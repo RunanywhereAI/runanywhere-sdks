@@ -31,7 +31,6 @@ DEBUG="OFF"
 LLAMACPP="OFF"
 VLM="OFF"
 WHISPERCPP="OFF"
-ONNX="OFF"
 WEBGPU="OFF"
 CLEAN=false
 
@@ -60,10 +59,6 @@ while [[ $# -gt 0 ]]; do
             WHISPERCPP="ON"
             shift
             ;;
-        --onnx)
-            ONNX="ON"
-            shift
-            ;;
         --webgpu)
             WEBGPU="ON"
             LLAMACPP="ON"  # WebGPU accelerates llama.cpp
@@ -73,8 +68,9 @@ while [[ $# -gt 0 ]]; do
             LLAMACPP="ON"
             VLM="ON"
             # WhisperCPP excluded: v1.8.2 GGML API is incompatible with llama.cpp b8011+.
-            # STT is handled by sherpa-onnx (separate WASM module via --build-sherpa).
-            # ONNX excluded: requires native ONNX Runtime headers (not available for WASM).
+            # STT/TTS/VAD are handled by sherpa-onnx as a separate WASM module,
+            # built by wasm/scripts/build-sherpa-onnx.sh (see --build-sherpa in
+            # scripts/build-web.sh).
             shift
             ;;
         --clean)
@@ -90,7 +86,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --llamacpp       Include llama.cpp LLM backend"
             echo "  --vlm            Include VLM (Vision Language Model) via llama.cpp mtmd"
             echo "  --whispercpp     Include whisper.cpp STT backend"
-            echo "  --onnx           Include sherpa-onnx TTS/VAD backend"
             echo "  --webgpu         Enable WebGPU GPU acceleration (produces racommons-webgpu variant)"
             echo "  --all-backends   Enable WASM-compatible backends (llama.cpp + VLM)"
             echo "  --clean          Clean build directory before building"
@@ -128,7 +123,6 @@ echo " llama.cpp:    ${LLAMACPP}"
 echo " VLM (mtmd):   ${VLM}"
 echo " WebGPU:       ${WEBGPU}"
 echo " whisper.cpp:  ${WHISPERCPP}"
-echo " sherpa-onnx:  ${ONNX}"
 echo " Debug:        ${DEBUG}"
 echo " Build dir:    ${BUILD_DIR}"
 echo " Output dir:   ${OUTPUT_DIR}"
@@ -155,7 +149,6 @@ emcmake cmake \
     -DRAC_WASM_LLAMACPP="${LLAMACPP}" \
     -DRAC_WASM_VLM="${VLM}" \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
-    -DRAC_WASM_ONNX="${ONNX}" \
     -DRAC_WASM_WEBGPU="${WEBGPU}"
 
 # Build

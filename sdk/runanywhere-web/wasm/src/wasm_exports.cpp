@@ -45,10 +45,10 @@
 #include "rac/backends/rac_stt_whispercpp.h"
 #endif
 
-#ifdef RAC_WASM_ONNX
-#include "rac/backends/rac_tts_onnx.h"
-#include "rac/backends/rac_vad_onnx.h"
-#endif
+// NOTE: sherpa-onnx (STT/TTS/VAD) is NOT embedded in this WASM module.
+// It ships as a separate sherpa-onnx.wasm built by
+// wasm/scripts/build-sherpa-onnx.sh and loaded at runtime via
+// packages/onnx/src/Foundation/SherpaONNXBridge.ts.
 
 // Features
 #include "rac/features/llm/rac_llm_service.h"
