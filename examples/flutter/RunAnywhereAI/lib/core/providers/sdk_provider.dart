@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
+import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/npu_chip.dart';
 
@@ -21,6 +22,10 @@ Future<void> initializeSDK(ProgressCallback onProgress) async {
 
   onProgress(0.40, 'Checking NPU availability...');
   await _registerGenieModels();
+
+  onProgress(0.50, 'Registering ONNX backend...');
+  await Onnx.register();
+  await Future<void>.delayed(Duration.zero);
 
   onProgress(0.55, 'Registering vision models...');
   _registerVLMModels();

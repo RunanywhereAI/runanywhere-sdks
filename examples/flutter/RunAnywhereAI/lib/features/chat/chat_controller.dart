@@ -10,7 +10,7 @@ final chatControllerProvider =
 class ChatController extends Notifier<ChatState> {
   @override
   ChatState build() {
-    _syncModelState();
+    Future.microtask(_syncModelState);
     return const ChatState();
   }
 

@@ -19,14 +19,16 @@ class VisionController extends Notifier<VisionState> {
   @override
   VisionState build() {
     ref.onDispose(_cleanup);
-    _syncModelState();
+    Future.microtask(_syncModelState);
     return const VisionState();
   }
 
-  Future<void> _syncModelState() async {
+  void _syncModelState() {
     final loaded = sdk.RunAnywhere.isVLMModelLoaded;
     state = state.copyWith(isModelLoaded: loaded);
   }
+
+  void refreshModelState() => _syncModelState();
 
   Future<void> initCamera() async {
     final cameras = await availableCameras();

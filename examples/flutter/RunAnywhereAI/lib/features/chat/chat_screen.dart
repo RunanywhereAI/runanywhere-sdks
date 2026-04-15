@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:runanywhere_ai/core/theme/app_spacing.dart';
+import 'package:runanywhere_ai/core/types/model_selection_context.dart';
+import 'package:runanywhere_ai/core/widgets/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/chat/chat_controller.dart';
 import 'package:runanywhere_ai/features/chat/widgets/chat_input_bar.dart';
 import 'package:runanywhere_ai/features/chat/widgets/message_bubble.dart';
@@ -64,6 +66,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ModelStatusBanner(
             modelName: chatState.loadedModelName,
             framework: chatState.loadedFramework,
+            onSelectModel: () async {
+              final model = await showModelSelectionSheet(
+                context,
+                ref,
+                selectionContext: ModelSelectionContext.llm,
+              );
+              if (model != null) {
+                ref.read(chatControllerProvider.notifier).refreshModelState();
+              }
+            },
           ),
           if (chatState.errorMessage != null)
             _ErrorBanner(

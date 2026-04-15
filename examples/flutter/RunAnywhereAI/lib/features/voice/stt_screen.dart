@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:runanywhere_ai/core/theme/app_colors.dart';
 import 'package:runanywhere_ai/core/theme/app_spacing.dart';
 import 'package:runanywhere_ai/core/theme/app_typography.dart';
+import 'package:runanywhere_ai/core/types/model_selection_context.dart';
+import 'package:runanywhere_ai/core/widgets/model_selection_sheet.dart';
+import 'package:runanywhere_ai/features/chat/widgets/model_status_banner.dart';
 import 'package:runanywhere_ai/features/voice/stt_controller.dart';
 
 class SttScreen extends ConsumerWidget {
@@ -40,19 +43,19 @@ class SttScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg,
-              vertical: AppSpacing.sm,
-            ),
-            child: SegmentedButton<SttMode>(
-              segments: const [
-                ButtonSegment(value: SttMode.batch, label: Text('Batch')),
-                ButtonSegment(value: SttMode.live, label: Text('Live')),
-              ],
-              selected: {sttState.mode},
-              onSelectionChanged: (s) => controller.setMode(s.first),
-            ),
+          ModelStatusBanner(
+            modelName: sttState.isModelLoaded ? (sttState.modelName ?? 'STT Model') : null,
+            framework: sttState.isModelLoaded ? 'STT' : null,
+            onSelectModel: () async {
+              final model = await showModelSelectionSheet(
+                context,
+                ref,
+                selectionContext: ModelSelectionContext.stt,
+              );
+              if (model != null) {
+                controller.refreshModelState();
+              }
+            },
           ),
           Expanded(
             child: Container(

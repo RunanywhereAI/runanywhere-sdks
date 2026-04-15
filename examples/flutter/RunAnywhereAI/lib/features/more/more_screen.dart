@@ -62,6 +62,12 @@ class MoreScreen extends StatelessWidget {
             subtitle: 'Generate JSON responses with schema templates',
             onTap: () => context.go('/home/chat/structured-output'),
           ),
+          _FeatureTile(
+            icon: tabler.Tool(color: theme.colorScheme.secondary),
+            title: 'Tool Calling',
+            subtitle: 'LLM with weather, calculator, and time tools',
+            onTap: () => context.go('/home/more/tools'),
+          ),
         ],
       ),
     );

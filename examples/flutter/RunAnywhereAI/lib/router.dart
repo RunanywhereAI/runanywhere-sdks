@@ -8,6 +8,7 @@ import 'package:runanywhere_ai/features/more/more_screen.dart';
 import 'package:runanywhere_ai/features/rag/rag_screen.dart';
 import 'package:runanywhere_ai/features/settings/settings_screen.dart';
 import 'package:runanywhere_ai/features/structured_output/structured_output_screen.dart';
+import 'package:runanywhere_ai/features/tools/tools_screen.dart';
 import 'package:runanywhere_ai/features/vision/vision_screen.dart';
 import 'package:runanywhere_ai/features/voice/stt_screen.dart';
 import 'package:runanywhere_ai/features/voice/tts_screen.dart';
@@ -61,6 +62,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'models',
                 builder: (context, state) => const ModelsScreen(),
+              ),
+              GoRoute(
+                path: 'tools',
+                builder: (context, state) => const ToolsScreen(),
               ),
             ],
           ),

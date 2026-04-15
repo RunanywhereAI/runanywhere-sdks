@@ -164,11 +164,22 @@ class DartBridgeModelPaths {
   // MARK: - Model File Resolution
 
   /// Resolve the actual model file path for loading.
-  /// Delegates to C++ rac_find_model_path_after_extraction() which handles
-  /// all model types: ONNX directories, LlamaCpp .gguf files, nested structures.
+  ///
+  /// For ONNX models (directory-based STT/TTS/Embedding), uses Dart-side
+  /// resolution matching Swift's `resolveONNXModelPath`. The C++ auto-detect
+  /// can misidentify subdirectories (e.g. test_wavs/) for directory-based
+  /// archives.
+  ///
+  /// For single-file models (LlamaCpp .gguf), delegates to C++
+  /// `rac_find_model_path_after_extraction()`.
   Future<String?> resolveModelFilePath(ModelInfo model) async {
     final modelFolder = getModelFolder(model.id, model.framework);
     if (modelFolder == null) return null;
+
+    // ONNX models are directory-based — match Swift resolveONNXModelPath()
+    if (model.framework == InferenceFramework.onnx) {
+      return _resolveONNXModelPath(modelFolder, model.id);
+    }
 
     // Use C++ to find the actual model path (handles all frameworks/formats)
     final resolved = DartBridgeDownload.findModelPathAfterExtraction(
@@ -179,6 +190,57 @@ class DartBridgeModelPaths {
     );
 
     return resolved ?? modelFolder;
+  }
+
+  /// Resolve ONNX model directory path (handles nested archive extraction).
+  /// Matches Swift: `resolveONNXModelPath(modelFolder:modelId:)`
+  String _resolveONNXModelPath(String modelFolder, String modelId) {
+    // Check nested folder with model name (from archive extraction)
+    final nestedFolder = '$modelFolder/$modelId';
+    final nestedDir = Directory(nestedFolder);
+    if (nestedDir.existsSync() && _hasONNXModelFiles(nestedFolder)) {
+      _logger.info('Found ONNX model at nested path: $modelId');
+      return nestedFolder;
+    }
+
+    // Check if model files exist directly in the model folder
+    if (_hasONNXModelFiles(modelFolder)) {
+      _logger.info('Found ONNX model at folder: $modelFolder');
+      return modelFolder;
+    }
+
+    // Scan subdirectories for ONNX model files
+    final dir = Directory(modelFolder);
+    if (dir.existsSync()) {
+      for (final entity in dir.listSync()) {
+        if (entity is Directory && _hasONNXModelFiles(entity.path)) {
+          _logger.info(
+              'Found ONNX model in subdirectory: ${entity.path}');
+          return entity.path;
+        }
+      }
+    }
+
+    // Fallback to model folder
+    _logger.warning('No ONNX model files found, falling back to: $modelFolder');
+    return modelFolder;
+  }
+
+  /// Check if a directory contains ONNX model files.
+  /// Matches Swift: `hasONNXModelFiles(at:)`
+  bool _hasONNXModelFiles(String directoryPath) {
+    final dir = Directory(directoryPath);
+    if (!dir.existsSync()) return false;
+
+    try {
+      for (final entity in dir.listSync()) {
+        if (entity is! File) continue;
+        final name = entity.uri.pathSegments.last.toLowerCase();
+        if (name.endsWith('.onnx')) return true;
+        if (name.contains('tokens')) return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   // MARK: - Path Analysis

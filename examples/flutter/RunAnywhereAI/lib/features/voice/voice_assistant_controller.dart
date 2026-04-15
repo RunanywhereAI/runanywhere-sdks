@@ -82,7 +82,7 @@ class VoiceAssistantController extends Notifier<VoiceAssistantState> {
   @override
   VoiceAssistantState build() {
     ref.onDispose(_cleanup);
-    _syncModels();
+    Future.microtask(_syncModels);
     return const VoiceAssistantState();
   }
 
@@ -93,6 +93,8 @@ class VoiceAssistantController extends Notifier<VoiceAssistantState> {
       ttsReady: sdk.RunAnywhere.isTTSVoiceLoaded,
     );
   }
+
+  void refreshModels() => _syncModels();
 
   Future<void> toggleSession() async {
     if (state.isActive) {

@@ -8,6 +8,33 @@ import 'package:runanywhere_ai/features/models/models_controller.dart';
 class ModelsScreen extends ConsumerWidget {
   const ModelsScreen({super.key});
 
+  void _confirmDelete(
+    BuildContext context,
+    ModelsController controller,
+    ModelInfo model,
+  ) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Model'),
+        content: Text('Delete "${model.name}"? You can re-download it later.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              controller.deleteModel(model);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final modelsState = ref.watch(modelsControllerProvider);
@@ -67,6 +94,10 @@ class ModelsScreen extends ConsumerWidget {
                                   modelsState.loadingModelId == model.id,
                               download: download,
                               onTap: () => controller.loadModel(model),
+                              onDelete: model.isDownloaded
+                                  ? () => _confirmDelete(
+                                        context, controller, model)
+                                  : null,
                               theme: theme,
                             );
                           },
@@ -85,6 +116,7 @@ class _ModelCard extends StatelessWidget {
     required this.isLoading,
     required this.download,
     required this.onTap,
+    required this.onDelete,
     required this.theme,
   });
 
@@ -92,6 +124,7 @@ class _ModelCard extends StatelessWidget {
   final bool isLoading;
   final ModelDownloadInfo? download;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
   final ThemeData theme;
 
   String get _categoryLabel => switch (model.category) {
@@ -192,9 +225,27 @@ class _ModelCard extends StatelessWidget {
       );
     }
     if (model.isDownloaded) {
-      return FilledButton.tonal(
-        onPressed: onTap,
-        child: const Text('Load'),
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onDelete != null)
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline,
+                size: 20,
+                color: theme.colorScheme.error,
+              ),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            onPressed: onTap,
+            child: const Text('Load'),
+          ),
+        ],
       );
     }
     return OutlinedButton(

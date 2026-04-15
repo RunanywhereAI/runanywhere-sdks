@@ -131,6 +131,15 @@ class ModelsController extends Notifier<ModelsState> {
     }
   }
 
+  Future<void> deleteModel(ModelInfo model) async {
+    try {
+      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      await _loadModels();
+    } on Exception catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    }
+  }
+
   Future<void> loadModel(ModelInfo model) async {
     if (!model.isDownloaded) {
       await downloadModel(model);

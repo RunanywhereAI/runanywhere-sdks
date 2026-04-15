@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:runanywhere_ai/core/theme/app_colors.dart';
 import 'package:runanywhere_ai/core/theme/app_spacing.dart';
 import 'package:runanywhere_ai/core/theme/app_typography.dart';
+import 'package:runanywhere_ai/core/types/model_selection_context.dart';
+import 'package:runanywhere_ai/core/widgets/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/vision/vision_controller.dart';
 import 'package:runanywhere_ai/features/vision/vision_state.dart';
 
@@ -69,7 +71,19 @@ class _VisionScreenState extends ConsumerState<VisionScreen> {
         ],
       ),
       body: !visionState.isModelLoaded
-          ? _NoModelView(theme: theme)
+          ? _NoModelView(
+              theme: theme,
+              onSelectModel: () async {
+                final model = await showModelSelectionSheet(
+                  context,
+                  ref,
+                  selectionContext: ModelSelectionContext.vlm,
+                );
+                if (model != null) {
+                  ref.read(visionControllerProvider.notifier).refreshModelState();
+                }
+              },
+            )
           : Column(
               children: [
                 Expanded(
@@ -97,9 +111,10 @@ class _VisionScreenState extends ConsumerState<VisionScreen> {
 }
 
 class _NoModelView extends StatelessWidget {
-  const _NoModelView({required this.theme});
+  const _NoModelView({required this.theme, required this.onSelectModel});
 
   final ThemeData theme;
+  final VoidCallback onSelectModel;
 
   @override
   Widget build(BuildContext context) {
@@ -121,10 +136,16 @@ class _NoModelView extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Load a vision model from Settings',
+            'Select a vision model to start',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          FilledButton.icon(
+            onPressed: onSelectModel,
+            icon: const Icon(Icons.view_in_ar),
+            label: const Text('Select Model'),
           ),
         ],
       ),

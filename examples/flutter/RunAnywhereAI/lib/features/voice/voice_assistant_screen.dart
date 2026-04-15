@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:runanywhere_ai/core/theme/app_colors.dart';
 import 'package:runanywhere_ai/core/theme/app_spacing.dart';
 import 'package:runanywhere_ai/core/theme/app_typography.dart';
+import 'package:runanywhere_ai/core/types/model_selection_context.dart';
+import 'package:runanywhere_ai/core/widgets/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/voice/voice_assistant_controller.dart';
 
 class VoiceAssistantScreen extends ConsumerWidget {
@@ -19,7 +21,34 @@ class VoiceAssistantScreen extends ConsumerWidget {
       body: Column(
         children: [
           if (!vaState.allModelsReady)
-            _ModelSetupBanner(state: vaState, theme: theme),
+            _ModelSetupBanner(
+              state: vaState,
+              theme: theme,
+              onSelectSTT: () async {
+                final model = await showModelSelectionSheet(
+                  context,
+                  ref,
+                  selectionContext: ModelSelectionContext.stt,
+                );
+                if (model != null) controller.refreshModels();
+              },
+              onSelectLLM: () async {
+                final model = await showModelSelectionSheet(
+                  context,
+                  ref,
+                  selectionContext: ModelSelectionContext.llm,
+                );
+                if (model != null) controller.refreshModels();
+              },
+              onSelectTTS: () async {
+                final model = await showModelSelectionSheet(
+                  context,
+                  ref,
+                  selectionContext: ModelSelectionContext.tts,
+                );
+                if (model != null) controller.refreshModels();
+              },
+            ),
           if (vaState.errorMessage != null)
             Container(
               width: double.infinity,
@@ -76,10 +105,19 @@ class VoiceAssistantScreen extends ConsumerWidget {
 }
 
 class _ModelSetupBanner extends StatelessWidget {
-  const _ModelSetupBanner({required this.state, required this.theme});
+  const _ModelSetupBanner({
+    required this.state,
+    required this.theme,
+    required this.onSelectSTT,
+    required this.onSelectLLM,
+    required this.onSelectTTS,
+  });
 
   final VoiceAssistantState state;
   final ThemeData theme;
+  final VoidCallback onSelectSTT;
+  final VoidCallback onSelectLLM;
+  final VoidCallback onSelectTTS;
 
   @override
   Widget build(BuildContext context) {
@@ -91,36 +129,52 @@ class _ModelSetupBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Models required:',
+            'Tap to select required models:',
             style: AppTypography.labelLarge.copyWith(
               color: theme.colorScheme.onTertiaryContainer,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          _modelRow('STT', state.sttReady),
-          _modelRow('LLM', state.llmReady),
-          _modelRow('TTS', state.ttsReady),
+          _modelRow('STT (Speech to Text)', state.sttReady, onSelectSTT),
+          _modelRow('LLM (Language Model)', state.llmReady, onSelectLLM),
+          _modelRow('TTS (Text to Speech)', state.ttsReady, onSelectTTS),
         ],
       ),
     );
   }
 
-  Widget _modelRow(String name, bool ready) {
-    return Row(
-      children: [
-        Icon(
-          ready ? Icons.check_circle : Icons.circle_outlined,
-          size: 16,
-          color: ready ? AppColors.success : theme.colorScheme.onTertiaryContainer,
+  Widget _modelRow(String name, bool ready, VoidCallback onTap) {
+    return InkWell(
+      onTap: ready ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(
+          children: [
+            Icon(
+              ready ? Icons.check_circle : Icons.circle_outlined,
+              size: 16,
+              color: ready
+                  ? AppColors.success
+                  : theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                name,
+                style: AppTypography.bodySmall.copyWith(
+                  color: theme.colorScheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+            if (!ready)
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Text(
-          name,
-          style: AppTypography.bodySmall.copyWith(
-            color: theme.colorScheme.onTertiaryContainer,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

@@ -5,13 +5,10 @@ import 'package:record/record.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:path_provider/path_provider.dart';
 
-enum SttMode { batch, live }
-
 enum RecordingState { idle, recording, transcribing }
 
 class SttState {
   const SttState({
-    this.mode = SttMode.batch,
     this.recordingState = RecordingState.idle,
     this.transcription = '',
     this.isModelLoaded = false,
@@ -19,7 +16,6 @@ class SttState {
     this.errorMessage,
   });
 
-  final SttMode mode;
   final RecordingState recordingState;
   final String transcription;
   final bool isModelLoaded;
@@ -30,7 +26,6 @@ class SttState {
   bool get isTranscribing => recordingState == RecordingState.transcribing;
 
   SttState copyWith({
-    SttMode? mode,
     RecordingState? recordingState,
     String? transcription,
     bool? isModelLoaded,
@@ -39,7 +34,6 @@ class SttState {
     bool clearError = false,
   }) {
     return SttState(
-      mode: mode ?? this.mode,
       recordingState: recordingState ?? this.recordingState,
       transcription: transcription ?? this.transcription,
       isModelLoaded: isModelLoaded ?? this.isModelLoaded,
@@ -58,16 +52,16 @@ class SttController extends Notifier<SttState> {
   @override
   SttState build() {
     ref.onDispose(_recorder.dispose);
-    _syncModelState();
+    Future.microtask(_syncModelState);
     return const SttState();
   }
 
-  Future<void> _syncModelState() async {
+  void _syncModelState() {
     final loaded = sdk.RunAnywhere.isSTTModelLoaded;
     state = state.copyWith(isModelLoaded: loaded);
   }
 
-  void setMode(SttMode mode) => state = state.copyWith(mode: mode);
+  void refreshModelState() => _syncModelState();
 
   void clearTranscription() => state = state.copyWith(transcription: '');
 
@@ -87,7 +81,12 @@ class SttController extends Notifier<SttState> {
       final path = '${dir.path}/stt_recording.wav';
 
       await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.wav),
+        const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+          bitRate: 128000,
+        ),
         path: path,
       );
       state = state.copyWith(
@@ -106,8 +105,12 @@ class SttController extends Notifier<SttState> {
 
       state = state.copyWith(recordingState: RecordingState.transcribing);
 
-      final bytes = await File(path).readAsBytes();
+      final file = File(path);
+      final bytes = await file.readAsBytes();
       final text = await sdk.RunAnywhere.transcribe(Uint8List.fromList(bytes));
+
+      // Clean up temp file
+      try { await file.delete(); } on Exception catch (_) {}
 
       state = state.copyWith(
         recordingState: RecordingState.idle,

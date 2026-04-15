@@ -64,19 +64,23 @@ class TtsController extends Notifier<TtsState> {
   @override
   TtsState build() {
     ref.onDispose(_player.dispose);
-    _player.onPlayerStateChanged.listen((playerState) {
-      state = state.copyWith(
-        isPlaying: playerState == PlayerState.playing,
-      );
+    Future.microtask(() {
+      _player.onPlayerStateChanged.listen((playerState) {
+        state = state.copyWith(
+          isPlaying: playerState == PlayerState.playing,
+        );
+      });
+      _syncModelState();
     });
-    _syncModelState();
     return const TtsState();
   }
 
-  Future<void> _syncModelState() async {
+  void _syncModelState() {
     final loaded = sdk.RunAnywhere.isTTSVoiceLoaded;
     state = state.copyWith(isModelLoaded: loaded);
   }
+
+  void refreshModelState() => _syncModelState();
 
   void setSpeechRate(double rate) => state = state.copyWith(speechRate: rate);
 

@@ -62,6 +62,7 @@ dependencies:
 
   # Documents
   file_picker: ^10.1.9
+  syncfusion_flutter_pdf: ^28.2.8
 
 dev_dependencies:
   flutter_test:
