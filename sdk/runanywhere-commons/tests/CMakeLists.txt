@@ -16,6 +16,11 @@ function(rac_link_archive_deps target)
     if(TARGET bz2_bundled)
         target_link_libraries(${target} PRIVATE bz2_bundled)
     endif()
+    # If sanitizers are enabled at the global level, test executables must link
+    # their runtime too (otherwise you get `__asan_after_dynamic_init` unresolved
+    # symbols coming from rac_commons's instrumentation). This is a no-op when
+    # no sanitizer is enabled.
+    target_enable_sanitizers(${target})
 endfunction()
 
 # --- test_core: Always built (no backend dependency) ---

@@ -367,6 +367,17 @@ extern "C" {
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
 /** Backend unavailable: backend compiled as stub, engine binary not installed */
 #define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
+/** Backend runtime ABI is incompatible with the version the SDK was compiled
+ *  against. Typically means the prebuilt third_party binary (sherpa-onnx,
+ *  ONNX Runtime, etc.) was produced from a different major/minor version
+ *  than the headers; struct layouts may not match, so we refuse to proceed.
+ *  Fix: align third_party binaries with the VERSIONS file entries, or
+ *  upgrade the commons SDK. */
+#define RAC_ERROR_BACKEND_INCOMPATIBLE_VERSION ((rac_result_t) - 605)
+/** JNI call from a Kotlin/Java callback left a pending Java exception on
+ *  the JNIEnv - caught by JniScope, logged, and cleared. Returned from C
+ *  to signal that the operation must be retried or abandoned. */
+#define RAC_ERROR_JNI_EXCEPTION ((rac_result_t) - 606)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 
