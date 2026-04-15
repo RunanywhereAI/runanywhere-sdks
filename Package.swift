@@ -18,6 +18,27 @@ import Foundation
 //
 // =============================================================================
 
+// =============================================================================
+// ONNX RUNTIME COEXISTENCE
+// =============================================================================
+// RABackendONNX.xcframework + onnxruntime-{ios,macos}.xcframework must ship
+// TOGETHER because:
+//
+//   1. RABackendONNX statically embeds sherpa-onnx's C API symbols
+//      (STT/Zipformer/Whisper decoders, Piper TTS phonemizer, Silero VAD).
+//   2. Sherpa-onnx.xcframework leaves ONNX Runtime symbols UNDEFINED —
+//      they're resolved at final app-link time against the separate
+//      onnxruntime-{ios,macos}.xcframework.
+//   3. Our own rac_backend_onnx code ALSO calls raw Ort::* directly for
+//      wake-word detection (openWakeWord) and RAG embeddings (BERT), so
+//      we'd need the ORT xcframework even if sherpa disappeared.
+//
+// The ORT version (sdk/runanywhere-commons/VERSIONS → ONNX_VERSION_*) is
+// pinned to whatever sherpa-onnx was built against. LoadVersions.cmake
+// hard-errors if the per-platform pins drift apart. Do not bump the
+// onnxruntime-{ios,macos}-v<X>.zip artifacts independently of
+// SHERPA_ONNX_VERSION_*.
+//
 // Combined ONNX Runtime xcframework (local dev) is created by:
 //   cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
 
