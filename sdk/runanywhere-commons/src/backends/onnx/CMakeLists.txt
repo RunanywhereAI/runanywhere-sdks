@@ -316,6 +316,9 @@ elseif(RAC_PLATFORM_MACOS)
     target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_COREML=1)
     message(STATUS "ONNX Backend: CoreML EP enabled for macOS")
 
+elseif(RAC_PLATFORM_WINDOWS)
+    message(STATUS "ONNX Backend: Windows build path available when ONNX dependencies are configured")
+
 elseif(RAC_PLATFORM_LINUX)
     target_link_libraries(rac_backend_onnx PUBLIC pthread dl)
 

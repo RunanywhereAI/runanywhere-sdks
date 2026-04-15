@@ -4,8 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:runanywhere_ai/core/services/example_http_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
@@ -131,13 +130,16 @@ class ToolSettingsViewModel extends ChangeNotifier {
         'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=5&language=en&format=json',
       );
 
-      final geocodeResponse = await http.get(geocodeUrl);
+      final geocodeResponse = await ExampleHttpService.shared.getJson(
+        geocodeUrl,
+      );
       if (geocodeResponse.statusCode != 200) {
-        throw Exception('Geocoding failed');
+        throw Exception(
+          'Geocoding failed with status ${geocodeResponse.statusCode}',
+        );
       }
 
-      final geocodeData =
-          jsonDecode(geocodeResponse.body) as Map<String, dynamic>;
+      final geocodeData = geocodeResponse.decodeJson();
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
@@ -156,13 +158,16 @@ class ToolSettingsViewModel extends ChangeNotifier {
         'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph',
       );
 
-      final weatherResponse = await http.get(weatherUrl);
+      final weatherResponse = await ExampleHttpService.shared.getJson(
+        weatherUrl,
+      );
       if (weatherResponse.statusCode != 200) {
-        throw Exception('Weather fetch failed');
+        throw Exception(
+          'Weather fetch failed with status ${weatherResponse.statusCode}',
+        );
       }
 
-      final weatherData =
-          jsonDecode(weatherResponse.body) as Map<String, dynamic>;
+      final weatherData = weatherResponse.decodeJson();
       final current = weatherData['current'] as Map<String, dynamic>;
       final temp = current['temperature_2m'] as num? ?? 0;
       final humidity = current['relative_humidity_2m'] as num? ?? 0;
@@ -347,7 +352,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     // Handle simple operations
     if (expr.contains('+')) {
       final parts = expr.split('+');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a + b);
+      return parts.map(double.parse).reduce((a, b) => a + b);
     } else if (expr.contains('-') && !expr.startsWith('-')) {
       final parts = expr.split('-');
       var result = double.parse(parts[0]);
@@ -357,7 +362,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
       return result;
     } else if (expr.contains('*')) {
       final parts = expr.split('*');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a * b);
+      return parts.map(double.parse).reduce((a, b) => a * b);
     } else if (expr.contains('/')) {
       final parts = expr.split('/');
       var result = double.parse(parts[0]);

@@ -16,6 +16,10 @@ if(NOT DEFINED LLAMACPP_VERSION)
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
+if(NOT RAC_BUILD_VLM)
+    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+endif()
+
 FetchContent_Declare(
     llamacpp
     GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
@@ -73,6 +77,16 @@ elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
     set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
+elseif(RAC_PLATFORM_WINDOWS)
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+    set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+    set(GGML_RPC OFF CACHE BOOL "" FORCE)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 elseif(RAC_PLATFORM_LINUX)
     # Disable GPU backends not typically available on Linux ARM
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
@@ -105,6 +119,19 @@ endif()
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
 
 FetchContent_MakeAvailable(llamacpp)
+
+if(RAC_PLATFORM_WINDOWS)
+    if(TARGET llama)
+        target_compile_options(llama PRIVATE /Zc:char8_t-)
+    endif()
+    if(TARGET common)
+        set_target_properties(common PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+        )
+    endif()
+endif()
 
 # Android: map POSIX_MADV_* to MADV_* to avoid missing constants
 if(RAC_PLATFORM_ANDROID)
@@ -254,6 +281,11 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework Metal"
         "-framework MetalKit"
     )
+
+elseif(RAC_PLATFORM_WINDOWS)
+    message(STATUS "Configuring LlamaCPP backend for Windows")
+    target_compile_definitions(rac_backend_llamacpp PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(rac_backend_llamacpp PUBLIC ws2_32)
 
 elseif(RAC_PLATFORM_LINUX)
     message(STATUS "Configuring LlamaCPP backend for Linux")

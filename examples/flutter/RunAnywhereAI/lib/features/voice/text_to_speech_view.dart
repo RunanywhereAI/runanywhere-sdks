@@ -7,7 +7,9 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/services/audio_player_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -299,6 +301,19 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   @override
   Widget build(BuildContext context) {
+    final capability = PlatformCapabilityService.shared;
+    if (!capability.supportsTextToSpeech) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Text to Speech'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Text-to-Speech Unavailable',
+          message: capability.unsupportedMessage('Text-to-Speech'),
+        ),
+      );
+    }
+
     final characterCount = _textController.text.length;
 
     return Scaffold(

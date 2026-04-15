@@ -1,0 +1,30 @@
+name: flutter_secure_storage_windows_example
+description: Demonstrates how to use the flutter_secure_storage_windows plugin.
+publish_to: 'none'
+
+environment:
+  sdk: '>=2.12.0 <3.0.0'
+  flutter: ">=2.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage_platform_interface:
+  flutter_secure_storage_windows:
+    path: ../
+  path: ^1.8.0
+  path_provider: ^2.0.0
+
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+
+dependency_overrides:
+  flutter_secure_storage_platform_interface:
+    path: ../../flutter_secure_storage_platform_interface
+
+flutter:
+  uses-material-design: true

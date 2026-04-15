@@ -235,7 +235,9 @@ class PlatformLoader {
   /// Load on Windows.
   static DynamicLibrary _loadWindows(String libraryName) {
     final dllName = '$libraryName.dll';
+    final executableDir = File(Platform.resolvedExecutable).parent.path;
     final paths = [
+      '$executableDir\\$dllName',
       dllName,
       './$dllName',
     ];

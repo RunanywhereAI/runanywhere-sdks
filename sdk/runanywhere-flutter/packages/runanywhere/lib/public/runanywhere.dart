@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
@@ -17,11 +18,13 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
-import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_rag.dart';
+import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
@@ -218,6 +221,7 @@ class RunAnywhere {
 
   /// Authenticate with backend for production/staging environments.
   /// Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+  // ignore: unused_element
   static Future<void> _authenticateWithBackend(
     SDKInitParams params,
     SDKLogger logger,
@@ -2271,6 +2275,15 @@ class RunAnywhere {
       case ModelDownloadStage.cancelled:
         return DownloadProgressState.cancelled;
     }
+  }
+
+  /// Configure a custom HTTP client factory for model downloads only.
+  ///
+  /// This does not affect SDK API traffic such as telemetry, auth, or device registration.
+  static void configureDownloadHttpClientFactory(
+    Future<http.Client> Function(Uri url)? factory,
+  ) {
+    ModelDownloadService.shared.configureClientFactory(factory);
   }
 
   /// Delete a stored model

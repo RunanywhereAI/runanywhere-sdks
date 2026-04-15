@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/vision/vlm_camera_view.dart';
 
 /// VisionHubView (mirroring iOS VisionHubView)
@@ -14,6 +16,19 @@ class VisionHubView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final capability = PlatformCapabilityService.shared;
+    if (!capability.supportsVision) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Vision'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Vision Unavailable',
+          message: capability.unsupportedMessage('Vision'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vision'),

@@ -27,7 +27,7 @@ dependencies:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
-  record: ^6.1.0
+  record: ^5.2.0
   audioplayers: ^6.0.0
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
@@ -69,6 +69,8 @@ dependency_overrides:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
   runanywhere_onnx:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+  flutter_secure_storage_windows:
+    path: vendor/flutter_secure_storage_windows
 
 flutter:
   uses-material-design: true

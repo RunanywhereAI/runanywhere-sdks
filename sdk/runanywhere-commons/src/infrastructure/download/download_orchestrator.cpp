@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -134,8 +135,13 @@ static bool is_model_extension(const char* ext) {
  * Check if a directory exists.
  */
 static bool dir_exists(const char* path) {
+#if defined(_WIN32)
+    std::error_code ec;
+    return path && std::filesystem::is_directory(std::filesystem::path(path), ec);
+#else
     struct stat st;
     return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+#endif
 }
 
 /**
@@ -143,7 +149,6 @@ static bool dir_exists(const char* path) {
  */
 static bool mkdir_p(const char* path) {
     if (dir_exists(path)) return true;
-
     std::string s(path);
     std::string::size_type pos = 0;
 
@@ -193,6 +198,29 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
                                    size_t path_size) {
     if (depth >= max_depth) return false;
 
+#if defined(_WIN32)
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
+        const auto name = entry.path().filename().string();
+        if (name == "." || name == "..") continue;
+        if (!name.empty() && name[0] == '.') continue;
+
+        const auto full_path = entry.path().string();
+        if (entry.is_regular_file(ec)) {
+            const char* dot = strrchr(name.c_str(), '.');
+            if (dot && is_model_extension(dot + 1)) {
+                snprintf(out_path, path_size, "%s", full_path.c_str());
+                return true;
+            }
+        } else if (entry.is_directory(ec)) {
+            if (find_single_model_file(full_path.c_str(), depth + 1, max_depth, out_path,
+                                       path_size)) {
+                return true;
+            }
+        }
+    }
+    return false;
+#else
     DIR* dir = opendir(directory);
     if (!dir) return false;
 
@@ -237,6 +265,7 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
     }
 
     return false;
+#endif
 }
 
 /**
@@ -247,6 +276,34 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
  * e.g., sherpa-onnx archives extract to: extractedDir/vits-xxx/
  */
 static std::string find_nested_directory(const char* extracted_dir) {
+#if defined(_WIN32)
+    std::error_code ec;
+    std::vector<std::string> visible_dirs;
+
+    for (const auto& entry : std::filesystem::directory_iterator(extracted_dir, ec)) {
+        const auto name = entry.path().filename().string();
+        if (name == "." || name == "..") continue;
+        if (!name.empty() && name[0] == '.') continue;
+        if (name.rfind("._", 0) == 0) continue;
+
+        if (entry.is_directory(ec)) {
+            visible_dirs.push_back(entry.path().string());
+        }
+    }
+
+    if (visible_dirs.size() == 1) {
+        return visible_dirs[0];
+    }
+
+    if (visible_dirs.size() > 1) {
+        RAC_LOG_WARNING(LOG_TAG,
+                        "find_nested_directory: found %zu subdirectories in '%s', "
+                        "falling back to root (expected exactly 1)",
+                        visible_dirs.size(), extracted_dir);
+    }
+
+    return extracted_dir;
+#else
     DIR* dir = opendir(extracted_dir);
     if (!dir) return extracted_dir;
 
@@ -281,6 +338,7 @@ static std::string find_nested_directory(const char* extracted_dir) {
     }
 
     return extracted_dir;
+#endif
 }
 
 // =============================================================================

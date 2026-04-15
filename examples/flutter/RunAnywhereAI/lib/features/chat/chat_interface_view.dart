@@ -10,6 +10,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
@@ -458,6 +459,18 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           IconButton(
             icon: const Icon(Icons.article_outlined),
             onPressed: () {
+              if (!PlatformCapabilityService.shared.supportsRag) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      PlatformCapabilityService.shared.unsupportedMessage(
+                        'Document Q&A',
+                      ),
+                    ),
+                  ),
+                );
+                return;
+              }
               Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(
                   builder: (context) => const RagDemoView(),

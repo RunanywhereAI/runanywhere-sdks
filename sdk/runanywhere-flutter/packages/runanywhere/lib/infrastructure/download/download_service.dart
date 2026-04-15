@@ -15,6 +15,8 @@ import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
 
+typedef DownloadHttpClientFactory = Future<http.Client> Function(Uri url);
+
 /// Download progress information
 class ModelDownloadProgress {
   final String modelId;
@@ -104,6 +106,18 @@ class ModelDownloadService {
 
   final _logger = SDKLogger('ModelDownloadService');
   final Map<String, http.Client> _activeDownloads = {};
+  DownloadHttpClientFactory? _clientFactory;
+
+  void configureClientFactory(DownloadHttpClientFactory? factory) {
+    _clientFactory = factory;
+  }
+
+  Future<http.Client> _createClient(Uri url) async {
+    if (_clientFactory != null) {
+      return _clientFactory!(url);
+    }
+    return http.Client();
+  }
 
   /// Download a model by ID
   ///
@@ -140,8 +154,6 @@ class ModelDownloadService {
       // Handle multi-file models (e.g. embedding model + vocab.txt)
       if (model.artifactType is MultiFileArtifact) {
         final multiFile = model.artifactType as MultiFileArtifact;
-        final client = http.Client();
-        _activeDownloads[modelId] = client;
 
         try {
           final totalFiles = multiFile.files.length;
@@ -159,40 +171,46 @@ class ModelDownloadService {
             final destPath = p.join(destDir.path, descriptor.destinationPath);
             _logger.info('Downloading file ${i + 1}/$totalFiles: ${descriptor.destinationPath}');
 
+            final client = await _createClient(fileUrl);
+            _activeDownloads[modelId] = client;
             final request = http.Request('GET', fileUrl);
-            final response = await client.send(request);
+            try {
+              final response = await client.send(request);
 
-            if (response.statusCode < 200 || response.statusCode >= 300) {
-              throw Exception('HTTP ${response.statusCode} for ${descriptor.destinationPath}');
+              if (response.statusCode < 200 || response.statusCode >= 300) {
+                throw Exception('HTTP ${response.statusCode} for ${descriptor.destinationPath}');
+              }
+
+              final file = File(destPath);
+              await file.create(recursive: true);
+              final sink = file.openWrite();
+              var downloaded = 0;
+
+              await for (final chunk in response.stream) {
+                sink.add(chunk);
+                downloaded += chunk.length;
+
+                // Report progress proportionally across all files
+                final fileProgress = downloaded.toDouble() / (model.downloadSize ?? 1);
+                final overallProgress = (i + fileProgress) / totalFiles;
+                yield ModelDownloadProgress(
+                  modelId: modelId,
+                  bytesDownloaded: downloaded,
+                  totalBytes: model.downloadSize ?? 0,
+                  stage: ModelDownloadStage.downloading,
+                  overallProgress: overallProgress * 0.9,
+                );
+              }
+
+              await sink.flush();
+              await sink.close();
+              _logger.info('Downloaded: ${descriptor.destinationPath}');
+            } finally {
+              client.close();
+              _activeDownloads.remove(modelId);
             }
-
-            final file = File(destPath);
-            await file.create(recursive: true);
-            final sink = file.openWrite();
-            var downloaded = 0;
-
-            await for (final chunk in response.stream) {
-              sink.add(chunk);
-              downloaded += chunk.length;
-
-              // Report progress proportionally across all files
-              final fileProgress = downloaded.toDouble() / (model.downloadSize ?? 1);
-              final overallProgress = (i + fileProgress) / totalFiles;
-              yield ModelDownloadProgress(
-                modelId: modelId,
-                bytesDownloaded: downloaded,
-                totalBytes: model.downloadSize ?? 0,
-                stage: ModelDownloadStage.downloading,
-                overallProgress: overallProgress * 0.9,
-              );
-            }
-
-            await sink.flush();
-            await sink.close();
-            _logger.info('Downloaded: ${descriptor.destinationPath}');
           }
         } finally {
-          client.close();
           _activeDownloads.remove(modelId);
         }
 
@@ -215,7 +233,7 @@ class ModelDownloadService {
       final downloadPath = p.join(destDir.path, fileName);
 
       // Create HTTP client
-      final client = http.Client();
+      final client = await _createClient(downloadUrl);
       _activeDownloads[modelId] = client;
 
       try {

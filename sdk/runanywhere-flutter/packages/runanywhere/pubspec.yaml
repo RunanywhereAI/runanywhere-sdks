@@ -65,3 +65,5 @@ flutter:
         pluginClass: RunAnywherePlugin
       ios:
         pluginClass: RunAnywherePlugin
+      windows:
+        pluginClass: RunanywherePluginCApi

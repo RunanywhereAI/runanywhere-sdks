@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
+import 'package:runanywhere_ai/core/models/proxy_settings.dart';
+import 'package:runanywhere_ai/core/services/example_http_service.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
@@ -118,6 +120,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint(
           '🔧 Environment: ${RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown"}');
       debugPrint('📱 Services will initialize on first API call');
+
+      RunAnywhere.configureDownloadHttpClientFactory((uri) async {
+        return ExampleHttpService.shared.createScopedHttpPackageClient(
+          ProxyScope.download,
+          uri,
+        );
+      });
 
       // Refresh model manager state (runs model discovery)
       await ModelManager.shared.refresh();
@@ -328,9 +337,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // --- ONNX BACKEND (required for embeddings used by RAG) ---
     try {
       await Onnx.register();
-      debugPrint('✅ ONNX backend registered (STT + TTS + VAD + Embeddings)');
+      debugPrint('✅ ONNX backend registered (Windows optional)');
     } catch (e) {
-      debugPrint('⚠️ ONNX backend not available: $e');
+      debugPrint('⚠️ ONNX backend not available on this Windows build: $e');
     }
 
     // --- RAG BACKEND ---
@@ -338,7 +347,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       await RAGModule.register();
       debugPrint('✅ RAG backend registered');
     } catch (e) {
-      debugPrint('⚠️ RAG backend not available (RAG features disabled): $e');
+      debugPrint('⚠️ RAG backend not available on this Windows build: $e');
     }
 
     debugPrint('🎉 All modules and models registered');

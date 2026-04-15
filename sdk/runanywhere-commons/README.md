@@ -259,6 +259,20 @@ rac_shutdown();
 ./scripts/build-android.sh --check             # Verify 16KB alignment
 ```
 
+#### Windows (MSVC)
+```bat
+scripts\build-windows.bat llamacpp --clean
+```
+
+Artifacts:
+- `dist/windows/x64/rac_commons.dll`
+- `dist/windows/x64/rac_backend_llamacpp.dll`
+
+Current Windows v1 notes:
+- Uses `Visual Studio 2022` + `MSVC` via CMake
+- Prioritizes direct-file model workflows such as `.gguf`
+- Native archive extraction is currently disabled in the Windows vertical slice
+
 ### Build Outputs
 
 #### iOS/macOS

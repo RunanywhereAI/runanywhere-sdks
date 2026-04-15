@@ -18,7 +18,7 @@
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
-#if !defined(RAC_PLATFORM_ANDROID)
+#if defined(RAC_PLATFORM_IOS) || defined(RAC_PLATFORM_MACOS)
 #include "rac/features/diffusion/rac_diffusion_model_registry.h"
 #endif
 
@@ -112,7 +112,7 @@ rac_result_t rac_init(const rac_config_t* config) {
 
     s_initialized.store(true);
 
-#if !defined(RAC_PLATFORM_ANDROID)
+#if defined(RAC_PLATFORM_IOS) || defined(RAC_PLATFORM_MACOS)
     // Initialize diffusion model registry (iOS/Apple only; extensible model definitions)
     rac_diffusion_model_registry_init();
 #endif
@@ -131,7 +131,7 @@ void rac_shutdown(void) {
 
     internal_log(RAC_LOG_INFO, "RunAnywhere Commons shutting down");
 
-#if !defined(RAC_PLATFORM_ANDROID)
+#if defined(RAC_PLATFORM_IOS) || defined(RAC_PLATFORM_MACOS)
     // Cleanup diffusion model registry (iOS/Apple only)
     rac_diffusion_model_registry_cleanup();
 #endif
