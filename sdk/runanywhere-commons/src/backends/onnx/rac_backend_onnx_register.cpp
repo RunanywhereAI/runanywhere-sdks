@@ -25,6 +25,7 @@ namespace fs = std::filesystem;
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
@@ -243,6 +244,12 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
 
     const char* path = request->identifier;
     RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
+
+    struct stat st;
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: directory path exists -> TRUE");
+        return RAC_TRUE;
+    }
 
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
         strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
