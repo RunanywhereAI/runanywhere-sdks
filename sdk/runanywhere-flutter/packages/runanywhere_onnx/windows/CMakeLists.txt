@@ -32,33 +32,61 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
 get_filename_component(PACKAGE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 get_filename_component(REPO_ROOT_FROM_APP "${CMAKE_SOURCE_DIR}/../../../../" ABSOLUTE)
-
-set(ONNX_BACKEND_DLL_CANDIDATES
-  "${REPO_ROOT_FROM_APP}/sdk/runanywhere-commons/dist/windows/x64/rac_backend_onnx.dll"
-  "${PACKAGE_ROOT}/../../../runanywhere-commons/dist/windows/x64/rac_backend_onnx.dll"
+set(ONNX_DIST_DIR_CANDIDATES
+  "${REPO_ROOT_FROM_APP}/sdk/runanywhere-commons/dist/windows/x64"
+  "${PACKAGE_ROOT}/../../../runanywhere-commons/dist/windows/x64"
 )
 
-set(ONNX_BACKEND_DLL "")
-foreach(candidate ${ONNX_BACKEND_DLL_CANDIDATES})
+set(ONNX_DIST_DIR "")
+foreach(candidate ${ONNX_DIST_DIR_CANDIDATES})
   if(EXISTS "${candidate}")
-    set(ONNX_BACKEND_DLL "${candidate}")
+    set(ONNX_DIST_DIR "${candidate}")
     break()
   endif()
 endforeach()
 
-if(EXISTS "${ONNX_BACKEND_DLL}")
-  add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    "${ONNX_BACKEND_DLL}"
-    "$<TARGET_FILE_DIR:${PLUGIN_NAME}>/rac_backend_onnx.dll"
-  )
-  set(runanywhere_onnx_bundled_libraries
-    "${ONNX_BACKEND_DLL}"
-    PARENT_SCOPE
-  )
+if(EXISTS "${ONNX_DIST_DIR}")
+  file(GLOB ONNX_DIST_DLLS "${ONNX_DIST_DIR}/*.dll")
+  set(ONNX_RUNTIME_DLLS "")
+
+  foreach(candidate ${ONNX_DIST_DLLS})
+    get_filename_component(candidate_name "${candidate}" NAME)
+    if(candidate_name STREQUAL "rac_backend_onnx.dll")
+      list(APPEND ONNX_RUNTIME_DLLS "${candidate}")
+    elseif(candidate_name MATCHES "^onnxruntime.*\\.dll$")
+      list(APPEND ONNX_RUNTIME_DLLS "${candidate}")
+    elseif(candidate_name MATCHES "^sherpa-onnx.*\\.dll$")
+      list(APPEND ONNX_RUNTIME_DLLS "${candidate}")
+    elseif(candidate_name STREQUAL "cargs.dll")
+      list(APPEND ONNX_RUNTIME_DLLS "${candidate}")
+    endif()
+  endforeach()
+
+  if(ONNX_RUNTIME_DLLS)
+    foreach(runtime_dll ${ONNX_RUNTIME_DLLS})
+      add_custom_command(TARGET ${PLUGIN_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${runtime_dll}"
+        "$<TARGET_FILE_DIR:${PLUGIN_NAME}>"
+      )
+    endforeach()
+
+    set(runanywhere_onnx_bundled_libraries
+      ${ONNX_RUNTIME_DLLS}
+      PARENT_SCOPE
+    )
+  else()
+    message(WARNING
+      "No ONNX runtime DLLs found in ${ONNX_DIST_DIR}. "
+      "Windows builds will continue without ONNX support.")
+    set(runanywhere_onnx_bundled_libraries
+      ""
+      PARENT_SCOPE
+    )
+  endif()
 else()
   message(WARNING
-    "rac_backend_onnx.dll not found. Tried: ${ONNX_BACKEND_DLL_CANDIDATES}. "
+    "ONNX dist directory not found. Tried: ${ONNX_DIST_DIR_CANDIDATES}. "
     "Windows builds will continue without ONNX support.")
   set(runanywhere_onnx_bundled_libraries
     ""
