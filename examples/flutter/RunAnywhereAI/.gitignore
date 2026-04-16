@@ -27,12 +27,11 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
-.flutter-plugins
 .flutter-plugins-dependencies
-.packages
 .pub-cache/
 .pub/
 /build/
+/coverage/
 
 # Symbolication related
 app.*.symbols
@@ -44,24 +43,3 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# Generated files
-.metadata
-ios/Flutter/Generated.xcconfig
-ios/Flutter/flutter_export_environment.sh
-ios/Pods/
-ios/Podfile.lock
-
-# Platforms not supported (mobile-only app)
-linux/
-macos/
-windows/
-web/
-
-# Duplicate Kotlin DSL build files (using Groovy .gradle)
-android/build.gradle.kts
-android/app/build.gradle.kts
-android/settings.gradle.kts
-
-# Generated plugin registrant files
-**/GeneratedPluginRegistrant.*

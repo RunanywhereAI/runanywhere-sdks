@@ -1,166 +1,94 @@
-/**
- * TabNavigator - Bottom Tab Navigation
- *
- * Reference: iOS ContentView.swift with 6 tabs:
- * - Chat (LLM)
- * - STT (Speech-to-Text)
- * - TTS (Text-to-Speech)
- * - Voice (Voice Assistant - STT + LLM + TTS)
- * - Vision (VLM only; image generation is Swift sample app only)
- * - Settings (includes Tool Settings)
- */
-
-import React from 'react';
+import React, { useMemo } from 'react';
+import { StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../theme/colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  Eye,
+  LayoutGrid,
+  MessageCircle,
+  Settings as SettingsIcon,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
+import { useTheme } from '../theme';
 import { Typography } from '../theme/typography';
-import type { RootTabParamList, VisionStackParamList } from '../types';
+import type { RootTabParamList } from '../types';
 
-// Screens
 import ChatScreen from '../screens/ChatScreen';
-import STTScreen from '../screens/STTScreen';
-import TTSScreen from '../screens/TTSScreen';
-import VoiceAssistantScreen from '../screens/VoiceAssistantScreen';
-import RAGScreen from '../screens/RAGScreen';
-import VisionHubScreen from '../screens/VisionHubScreen';
 import VLMScreen from '../screens/VLMScreen';
+import MoreStackNavigator from './MoreStackNavigator';
 import SettingsScreen from '../screens/SettingsScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
-const VisionStack = createNativeStackNavigator<VisionStackParamList>();
 
-/**
- * Tab icon mapping - matching Swift sample app (ContentView.swift)
- */
-const tabIcons: Record<
-  keyof RootTabParamList,
-  { focused: string; unfocused: string }
-> = {
-  Chat: { focused: 'chatbubble', unfocused: 'chatbubble-outline' },
-  STT: { focused: 'pulse', unfocused: 'pulse-outline' }, // waveform equivalent
-  TTS: { focused: 'volume-high', unfocused: 'volume-high-outline' }, // speaker.wave.2
-  Voice: { focused: 'mic', unfocused: 'mic-outline' }, // mic for voice assistant
-  RAG: { focused: 'search', unfocused: 'search-outline' }, // search for RAG
-  Vision: { focused: 'eye', unfocused: 'eye-outline' }, // eye for vision/VLM
-  Settings: { focused: 'settings', unfocused: 'settings-outline' },
+type TabIconPair = { inactive: LucideIcon; active: LucideIcon };
+
+const tabIcons: Record<keyof RootTabParamList, TabIconPair> = {
+  Chat: { inactive: MessageCircle, active: MessageCircle },
+  Vision: { inactive: Eye, active: Eye },
+  More: { inactive: LayoutGrid, active: LayoutGrid },
+  Settings: { inactive: SettingsIcon, active: SettingsIcon },
 };
 
-/**
- * Tab display names - matching iOS Swift sample app (ContentView.swift)
- * iOS uses: Chat, Vision, Transcribe, Speak, Voice, Settings
- */
-const tabLabels: Record<keyof RootTabParamList, string> = {
-  Chat: 'Chat',
-  STT: 'Transcribe',
-  TTS: 'Speak',
-  Voice: 'Voice',
-  RAG: 'RAG',
-  Vision: 'Vision',
-  Settings: 'Settings',
+type TabIconProps = {
+  routeName: keyof RootTabParamList;
+  focused: boolean;
+  color: string;
+  size: number;
 };
 
-/**
- * Stable tab bar icon component to avoid react/no-unstable-nested-components
- */
-const renderTabBarIcon = (
-  routeName: keyof RootTabParamList,
-  focused: boolean,
-  color: string,
-  size: number
-) => {
-  const iconName = focused
-    ? tabIcons[routeName].focused
-    : tabIcons[routeName].unfocused;
-  return <Icon name={iconName} size={size} color={color} />;
+const TabIcon: React.FC<TabIconProps> = ({ routeName, focused, color, size }) => {
+  const { active, inactive } = tabIcons[routeName];
+  const Component = focused ? active : inactive;
+  return <Component size={size} color={color} strokeWidth={focused ? 2.4 : 1.8} />;
 };
 
-export const TabNavigator: React.FC = () => {
+const TabNavigator: React.FC = () => {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const tabBarStyle = useMemo(
+    () => ({
+      backgroundColor: colors.background,
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      height: 58 + insets.bottom,
+      paddingBottom: Math.max(insets.bottom, 6),
+      paddingTop: 8,
+    }),
+    [colors.background, colors.border, insets.bottom]
+  );
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) =>
-          renderTabBarIcon(route.name, focused, color, size),
-        tabBarActiveTintColor: Colors.primaryBlue,
-        tabBarInactiveTintColor: Colors.textSecondary,
-        tabBarStyle: {
-          backgroundColor: Colors.backgroundPrimary,
-          borderTopColor: Colors.borderLight,
-        },
-        tabBarLabelStyle: {
-          ...Typography.caption2,
-        },
         headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarIcon: ({ focused, color, size }) => (
+          <TabIcon
+            routeName={route.name}
+            focused={focused}
+            color={color}
+            size={size}
+          />
+        ),
       })}
     >
-      {/* Tab 0: Chat (LLM) */}
-      <Tab.Screen
-        name="Chat"
-        component={ChatScreen}
-        options={{ tabBarLabel: tabLabels.Chat }}
-      />
-      {/* Tab 1: Speech-to-Text */}
-      <Tab.Screen
-        name="STT"
-        component={STTScreen}
-        options={{ tabBarLabel: tabLabels.STT }}
-      />
-      {/* Tab 2: Text-to-Speech */}
-      <Tab.Screen
-        name="TTS"
-        component={TTSScreen}
-        options={{ tabBarLabel: tabLabels.TTS }}
-      />
-      {/* Tab 3: Voice Assistant (STT + LLM + TTS) */}
-      <Tab.Screen
-        name="Voice"
-        component={VoiceAssistantScreen}
-        options={{ tabBarLabel: tabLabels.Voice }}
-      />
-      {/* Tab 4: RAG (Retrieval-Augmented Generation) */}
-      <Tab.Screen
-        name="RAG"
-        component={RAGScreen}
-        options={{ tabBarLabel: tabLabels.RAG }}
-      />
-      {/* Tab 5: Vision (hub -> VLM) */}
-      <Tab.Screen
-        name="Vision"
-        component={VisionStackScreen}
-        options={{ tabBarLabel: tabLabels.Vision }}
-      />
-      {/* Tab 6: Settings */}
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ tabBarLabel: tabLabels.Settings }}
-      />
+      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="Vision" component={VLMScreen} />
+      <Tab.Screen name="More" component={MoreStackNavigator} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );
 };
 
-/**
- * Vision tab: stack with Hub -> VLM
- */
-const VisionStackScreen: React.FC = () => {
-  return (
-    <VisionStack.Navigator
-      screenOptions={{ headerShown: true }}
-      initialRouteName="VisionHub"
-    >
-      <VisionStack.Screen
-        name="VisionHub"
-        component={VisionHubScreen}
-        options={{ title: 'Vision' }}
-      />
-      <VisionStack.Screen
-        name="VLM"
-        component={VLMScreen}
-        options={{ title: 'Vision Chat (VLM)' }}
-      />
-    </VisionStack.Navigator>
-  );
-};
+const styles = StyleSheet.create({
+  tabBarLabel: {
+    ...Typography.caption2,
+    marginTop: 2,
+  },
+});
 
 export default TabNavigator;

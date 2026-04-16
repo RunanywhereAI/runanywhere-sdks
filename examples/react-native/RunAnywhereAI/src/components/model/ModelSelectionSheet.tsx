@@ -22,7 +22,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { AppIcon } from '../common/AppIcon';
 import { Colors } from '../../theme/colors';
 import { Typography, FontWeight } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
@@ -75,35 +75,6 @@ const getContextTitle = (context: ModelSelectionContext): string => {
       return 'Select Embedding Model';
     case ModelSelectionContext.RagLLM:
       return 'Select LLM Model';
-  }
-};
-
-/**
- * Get relevant categories for context (kept for reference)
- */
-const _getRelevantCategories = (
-  context: ModelSelectionContext
-): Set<ModelCategory> => {
-  switch (context) {
-    case ModelSelectionContext.LLM:
-      return new Set([ModelCategory.Language, ModelCategory.Multimodal]);
-    case ModelSelectionContext.STT:
-      return new Set([ModelCategory.SpeechRecognition]);
-    case ModelSelectionContext.TTS:
-      return new Set([ModelCategory.SpeechSynthesis]);
-    case ModelSelectionContext.Voice:
-      return new Set([
-        ModelCategory.Language,
-        ModelCategory.Multimodal,
-        ModelCategory.SpeechRecognition,
-        ModelCategory.SpeechSynthesis,
-      ]);
-    case ModelSelectionContext.VLM:
-      return new Set([ModelCategory.Multimodal, ModelCategory.Vision]);
-    case ModelSelectionContext.RagEmbedding:
-      return new Set([ModelCategory.Embedding]);
-    case ModelSelectionContext.RagLLM:
-      return new Set([ModelCategory.Language]);
   }
 };
 
@@ -572,7 +543,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         <View style={styles.card}>
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
-              <Icon
+              <AppIcon
                 name="phone-portrait-outline"
                 size={18}
                 color={Colors.textSecondary}
@@ -584,7 +555,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
-              <Icon
+              <AppIcon
                 name="hardware-chip-outline"
                 size={18}
                 color={Colors.textSecondary}
@@ -596,7 +567,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
-              <Icon
+              <AppIcon
                 name="server-outline"
                 size={18}
                 color={Colors.textSecondary}
@@ -611,7 +582,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           {deviceInfo.cpuCores != null && deviceInfo.cpuCores > 0 && (
             <View style={styles.infoRow}>
               <View style={styles.infoLabel}>
-                <Icon
+                <AppIcon
                   name="speedometer-outline"
                   size={18}
                   color={Colors.textSecondary}
@@ -624,14 +595,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
-              <Icon
+              <AppIcon
                 name="cube-outline"
                 size={18}
                 color={Colors.textSecondary}
               />
               <Text style={styles.infoLabelText}>GPU</Text>
             </View>
-            <Icon
+            <AppIcon
               name={deviceInfo.hasGPU ? 'checkmark-circle' : 'close-circle'}
               size={20}
               color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed}
@@ -640,14 +611,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
-              <Icon
+              <AppIcon
                 name="flash-outline"
                 size={18}
                 color={Colors.textSecondary}
               />
               <Text style={styles.infoLabelText}>NPU/Neural Engine</Text>
             </View>
-            <Icon
+            <AppIcon
               name={
                 deviceInfo.hasNeuralEngine ? 'checkmark-circle' : 'close-circle'
               }
@@ -687,7 +658,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               { backgroundColor: info.color + '20' },
             ]}
           >
-            <Icon name={info.iconName} size={20} color={info.color} />
+            <AppIcon name={info.iconName} size={20} color={info.color} />
           </View>
 
           <View style={styles.frameworkInfo}>
@@ -697,7 +668,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             </Text>
           </View>
 
-          <Icon
+          <AppIcon
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={20}
             color={Colors.textSecondary}
@@ -751,7 +722,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             <Text style={styles.modelMetaText}>AVSpeechSynthesizer</Text>
           </View>
           <View style={styles.statusRow}>
-            <Icon
+            <AppIcon
               name="checkmark-circle"
               size={14}
               color={Colors.statusGreen}
@@ -800,7 +771,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           <View style={styles.modelMeta}>
             {model.downloadSize != null && model.downloadSize > 0 && (
               <View style={styles.sizeTag}>
-                <Icon
+                <AppIcon
                   name="server-outline"
                   size={12}
                   color={Colors.textSecondary}
@@ -840,7 +811,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               </View>
             ) : canSelect ? (
               <>
-                <Icon
+                <AppIcon
                   name="checkmark-circle"
                   size={14}
                   color={Colors.statusGreen}
@@ -853,7 +824,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               </>
             ) : (
               <>
-                <Icon
+                <AppIcon
                   name="cloud-download-outline"
                   size={14}
                   color={Colors.statusBlue}

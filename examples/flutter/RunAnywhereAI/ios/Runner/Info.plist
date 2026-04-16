@@ -27,11 +27,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>RunAnywhere AI needs access to your camera for vision language model features to analyze images.</string>
+	<string>RunAnywhere AI needs camera access for vision model features to analyze images.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs microphone access for voice assistant features.</string>
+	<string>RunAnywhere AI needs microphone access for speech-to-text and voice assistant features.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>This app needs speech recognition for voice assistant features.</string>
+	<string>RunAnywhere AI needs speech recognition for voice assistant features.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>RunAnywhere AI needs photo library access to select images for vision analysis.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

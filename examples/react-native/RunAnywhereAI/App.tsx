@@ -1,39 +1,20 @@
-/**
- * RunAnywhere AI Example App
- *
- * React Native demonstration app for the RunAnywhere on-device AI SDK.
- *
- * Architecture Pattern:
- * - Two-phase SDK initialization (matching iOS pattern)
- * - All model registration via RunAnywhere.registerModel() / RunAnywhere.registerMultiFileModel()
- * - Tab-based navigation with 5 tabs (Chat, Transcribe, Speak, Voice, Settings)
- * - Tool calling settings are in Settings tab (matching iOS)
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift
- */
-
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   ActivityIndicator,
-  TouchableOpacity,
   Platform,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import TabNavigator from './src/navigation/TabNavigator';
-import { Colors } from './src/theme/colors';
+import { AlertCircle, Cpu, RefreshCw } from 'lucide-react-native';
+import RootNavigator from './src/navigation/RootNavigator';
+import { ThemeProvider, useTheme } from './src/theme';
 import { Typography } from './src/theme/typography';
-import {
-  Spacing,
-  Padding,
-  BorderRadius,
-  IconSize,
-  ButtonHeight,
-} from './src/theme/spacing';
+import { BorderRadius, ButtonHeight, Padding, Spacing } from './src/theme/spacing';
 
 import {
   RunAnywhere,
@@ -44,20 +25,19 @@ import {
   initializeNitroModulesGlobally,
   getChip,
   getNPUDownloadUrl,
-  NPU_CHIPS,
 } from '@runanywhere/core';
-import type { NPUChip } from '@runanywhere/core';
 
-// Make LlamaCPP optional for ONNX-only builds
-let LlamaCPP: any = null;
+type LlamaCPPModule = { register: () => void } | null;
+type GenieModule = { register: () => void; isAvailable?: boolean } | null;
+
+let LlamaCPP: LlamaCPPModule = null;
 try {
   LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP;
 } catch (e) {
-  console.warn('[App] LlamaCPP backend not available - some features disabled');
+  console.warn('[App] LlamaCPP backend not available');
 }
 
-// Make Genie optional (Android/Snapdragon only)
-let Genie: any = null;
+let Genie: GenieModule = null;
 try {
   Genie = require('@runanywhere/genie').Genie;
 } catch (e) {
@@ -65,64 +45,73 @@ try {
 }
 
 import { ONNX } from '@runanywhere/onnx';
-import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
+import {
+  getStoredApiKey,
+  getStoredBaseURL,
+  hasCustomConfiguration,
+} from './src/screens/SettingsScreen';
 
 type InitState = 'loading' | 'ready' | 'error';
 
-const InitializationLoadingView: React.FC = () => (
-  <View style={styles.loadingContainer}>
-    <View style={styles.loadingContent}>
-      <View style={styles.iconContainer}>
-        <Icon
-          name="hardware-chip-outline"
-          size={48}
-          color={Colors.primaryBlue}
+const LoadingView: React.FC = () => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+      <View style={styles.centerContent}>
+        <View
+          style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}
+        >
+          <Cpu size={48} color={colors.primary} />
+        </View>
+        <Text style={[styles.title, { color: colors.text }]}>RunAnywhere AI</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Initializing SDK…
+        </Text>
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={styles.spinner}
         />
       </View>
-      <Text style={styles.loadingTitle}>RunAnywhere AI</Text>
-      <Text style={styles.loadingSubtitle}>Initializing SDK...</Text>
-      <ActivityIndicator
-        size="large"
-        color={Colors.primaryBlue}
-        style={styles.spinner}
-      />
     </View>
-  </View>
-);
+  );
+};
 
-const InitializationErrorView: React.FC<{
-  error: string;
-  onRetry: () => void;
-}> = ({ error, onRetry }) => (
-  <View style={styles.errorContainer}>
-    <View style={styles.errorContent}>
-      <View style={styles.errorIconContainer}>
-        <Icon name="alert-circle-outline" size={48} color={Colors.primaryRed} />
+const ErrorView: React.FC<{ error: string; onRetry: () => void }> = ({
+  error,
+  onRetry,
+}) => {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.centerContent, styles.errorContent]}>
+        <View style={[styles.iconCircle, { backgroundColor: colors.primarySoft }]}>
+          <AlertCircle size={48} color={colors.error} />
+        </View>
+        <Text style={[styles.errorTitle, { color: colors.text }]}>
+          Initialization Failed
+        </Text>
+        <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
+          {error}
+        </Text>
+        <TouchableOpacity
+          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          onPress={onRetry}
+          activeOpacity={0.85}
+        >
+          <RefreshCw size={20} color={colors.onPrimary} />
+          <Text style={[styles.retryButtonText, { color: colors.onPrimary }]}>
+            Retry
+          </Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.errorTitle}>Initialization Failed</Text>
-      <Text style={styles.errorMessage}>{error}</Text>
-      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-        <Icon name="refresh" size={20} color={Colors.textWhite} />
-        <Text style={styles.retryButtonText}>Retry</Text>
-      </TouchableOpacity>
     </View>
-  </View>
-);
+  );
+};
 
-/**
- * Register modules and their models.
- * Matches iOS registerModulesAndModels() in RunAnywhereAIApp.swift
- *
- * All model registration uses RunAnywhere.registerModel() / RunAnywhere.registerMultiFileModel()
- * — identical to the iOS pattern. Module-specific addModel() methods are NOT used.
- */
 async function registerModulesAndModels(): Promise<void> {
-  // =========================================================================
-  // LlamaCPP backend + LLM models
-  // =========================================================================
   if (LlamaCPP) {
     LlamaCPP.register();
-
     await Promise.all([
       RunAnywhere.registerModel({
         id: 'smollm2-360m-q8_0',
@@ -195,16 +184,8 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 1_400_000_000,
       }),
     ]);
-  } else {
-    console.warn('[App] Skipping LlamaCPP models - backend not available');
-  }
 
-  // =========================================================================
-  // VLM (Vision Language) models
-  // =========================================================================
-  if (LlamaCPP) {
     await Promise.all([
-      // SmolVLM 500M - Ultra-lightweight VLM for mobile (~500MB total)
       RunAnywhere.registerModel({
         id: 'smolvlm-500m-instruct-q8_0',
         name: 'SmolVLM 500M Instruct',
@@ -214,26 +195,35 @@ async function registerModulesAndModels(): Promise<void> {
         artifactType: ModelArtifactType.TarGzArchive,
         memoryRequirement: 600_000_000,
       }),
-      // Qwen2-VL 2B - Small but capable VLM (~1.6GB total)
-      // Uses multi-file download: main model (986MB) + mmproj (710MB)
       RunAnywhere.registerMultiFileModel({
         id: 'qwen2-vl-2b-instruct-q4_k_m',
         name: 'Qwen2-VL 2B Instruct',
         files: [
-          { url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf', filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf' },
-          { url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf', filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf' },
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+            filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+          },
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+            filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+          },
         ],
         framework: LLMFramework.LlamaCpp,
         modality: ModelCategory.Multimodal,
         memoryRequirement: 1_800_000_000,
       }),
-      // LFM2-VL 450M - LiquidAI's compact VLM, ideal for mobile (~600MB total)
       RunAnywhere.registerMultiFileModel({
         id: 'lfm2-vl-450m-q8_0',
         name: 'LFM2-VL 450M',
         files: [
-          { url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf', filename: 'LFM2-VL-450M-Q8_0.gguf' },
-          { url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf', filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf' },
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
+            filename: 'LFM2-VL-450M-Q8_0.gguf',
+          },
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
+            filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
+          },
         ],
         framework: LLMFramework.LlamaCpp,
         modality: ModelCategory.Multimodal,
@@ -242,15 +232,10 @@ async function registerModulesAndModels(): Promise<void> {
     ]);
   }
 
-  // =========================================================================
-  // Genie NPU backend + models (Android/Snapdragon only)
-  // =========================================================================
   if (Platform.OS === 'android' && Genie && Genie.isAvailable) {
     Genie.register();
-
     const chip = await getChip();
     if (chip) {
-      // Models with per-chip availability
       const genieModels: Array<{
         slug: string;
         name: string;
@@ -258,16 +243,11 @@ async function registerModulesAndModels(): Promise<void> {
         chips: string[];
         quant?: string;
       }> = [
-        // Qwen3 4B — Gen 5 only
         { slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2_800_000_000, chips: ['8elite-gen5'] },
-        // Llama 3.2 1B Instruct — both chips
         { slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1_200_000_000, chips: ['8elite', '8elite-gen5'] },
-        // SEA-LION v3.5 8B Instruct — both chips
         { slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4_800_000_000, chips: ['8elite', '8elite-gen5'] },
-        // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
         { slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4_200_000_000, chips: ['8elite'], quant: 'w8a16' },
       ];
-
       const registrations = genieModels
         .filter((m) => m.chips.includes(chip.identifier))
         .map((m) =>
@@ -277,20 +257,13 @@ async function registerModulesAndModels(): Promise<void> {
             url: getNPUDownloadUrl(chip, m.slug, m.quant),
             framework: LLMFramework.Genie,
             memoryRequirement: m.mem,
-          }),
+          })
         );
       await Promise.all(registrations);
-      console.log(`✅ Genie NPU models registered (chip: ${chip.displayName})`);
-    } else {
-      console.log('ℹ️ Genie available but no supported NPU chip detected');
     }
   }
 
-  // =========================================================================
-  // ONNX backend + STT/TTS models
-  // =========================================================================
   await ONNX.register();
-
   await Promise.all([
     RunAnywhere.registerModel({
       id: 'sherpa-onnx-whisper-tiny.en',
@@ -319,180 +292,145 @@ async function registerModulesAndModels(): Promise<void> {
       artifactType: ModelArtifactType.TarGzArchive,
       memoryRequirement: 65_000_000,
     }),
-    // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
-    // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
     RunAnywhere.registerMultiFileModel({
       id: 'all-minilm-l6-v2',
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [
-        { url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx', filename: 'model.onnx' },
-        { url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt', filename: 'vocab.txt' },
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+          filename: 'model.onnx',
+        },
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+          filename: 'vocab.txt',
+        },
       ],
       framework: LLMFramework.ONNX,
       modality: ModelCategory.Embedding,
       memoryRequirement: 25_500_000,
     }),
   ]);
-
-  console.log('[App] All models registered');
 }
 
-const App: React.FC = () => {
+const ThemedStatusBar: React.FC = () => {
+  const { scheme, colors } = useTheme();
+  return (
+    <StatusBar
+      translucent
+      backgroundColor="transparent"
+      barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+      animated
+    />
+  );
+};
+
+const AppInner: React.FC = () => {
   const [initState, setInitState] = useState<InitState>('loading');
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Initialize the SDK
-   * Matches iOS initializeSDK() in RunAnywhereAIApp.swift
-   */
   const initializeSDK = useCallback(async () => {
     setInitState('loading');
     setError(null);
-
     try {
-      const startTime = Date.now();
-
-      console.log('[App] Initializing global NitroModules...');
       await initializeNitroModulesGlobally();
-      console.log('[App] Global NitroModules initialized successfully');
 
       const customApiKey = await getStoredApiKey();
       const customBaseURL = await getStoredBaseURL();
       const hasCustomConfig = await hasCustomConfiguration();
 
       if (hasCustomConfig && customApiKey && customBaseURL) {
-        console.log('[App] Found custom API configuration');
         await RunAnywhere.initialize({
           apiKey: customApiKey,
           baseURL: customBaseURL,
           environment: SDKEnvironment.Production,
         });
-        console.log('[App] SDK initialized with custom configuration (production)');
       } else {
         await RunAnywhere.initialize({
           apiKey: '',
           baseURL: 'https://api.runanywhere.ai',
           environment: SDKEnvironment.Development,
         });
-        console.log('[App] SDK initialized in DEVELOPMENT mode');
       }
 
       await registerModulesAndModels();
-
-      const initTime = Date.now() - startTime;
-      const isInit = await RunAnywhere.isInitialized();
-      const version = await RunAnywhere.getVersion();
-      const backendInfo = await RunAnywhere.getBackendInfo();
-
-      console.log(
-        `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, env: ${JSON.stringify(backendInfo)}`
-      );
-
       setInitState('ready');
     } catch (err) {
       console.error('[App] SDK initialization failed:', err);
-      const errorMessage =
-        err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
       setInitState('error');
     }
   }, []);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      initializeSDK();
-    }, 100);
-    return () => clearTimeout(timeoutId);
+    const id = setTimeout(() => initializeSDK(), 100);
+    return () => clearTimeout(id);
   }, [initializeSDK]);
 
-  if (initState === 'loading') {
+  if (initState === 'loading') return (<><ThemedStatusBar /><LoadingView /></>);
+  if (initState === 'error')
     return (
-      <SafeAreaProvider>
-        <InitializationLoadingView />
-      </SafeAreaProvider>
+      <>
+        <ThemedStatusBar />
+        <ErrorView error={error ?? 'Failed to initialize SDK'} onRetry={initializeSDK} />
+      </>
     );
-  }
-
-  if (initState === 'error') {
-    return (
-      <SafeAreaProvider>
-        <InitializationErrorView
-          error={error || 'Failed to initialize SDK'}
-          onRetry={initializeSDK}
-        />
-      </SafeAreaProvider>
-    );
-  }
-
   return (
-    <SafeAreaProvider>
+    <>
+      <ThemedStatusBar />
       <NavigationContainer>
-        <TabNavigator />
+        <RootNavigator />
       </NavigationContainer>
-    </SafeAreaProvider>
+    </>
   );
 };
 
+const App: React.FC = () => (
+  <SafeAreaProvider>
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
+  </SafeAreaProvider>
+);
+
 const styles = StyleSheet.create({
-  loadingContainer: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingContent: {
+  centerContent: {
     alignItems: 'center',
   },
-  iconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.badgeBlue,
+  errorContent: {
+    maxWidth: 320,
+    paddingHorizontal: Padding.padding24,
+  },
+  iconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xLarge,
   },
-  loadingTitle: {
+  title: {
     ...Typography.title,
-    color: Colors.textPrimary,
     marginBottom: Spacing.small,
   },
-  loadingSubtitle: {
+  subtitle: {
     ...Typography.body,
-    color: Colors.textSecondary,
     marginBottom: Spacing.xLarge,
   },
   spinner: {
     marginTop: Spacing.large,
   },
-  errorContainer: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Padding.padding24,
-  },
-  errorContent: {
-    alignItems: 'center',
-    maxWidth: 300,
-  },
-  errorIconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.badgeRed,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xLarge,
-  },
   errorTitle: {
     ...Typography.title2,
-    color: Colors.textPrimary,
     marginBottom: Spacing.medium,
   },
   errorMessage: {
     ...Typography.body,
-    color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xLarge,
   },
@@ -501,14 +439,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.smallMedium,
-    backgroundColor: Colors.primaryBlue,
     paddingHorizontal: Padding.padding24,
     height: ButtonHeight.regular,
     borderRadius: BorderRadius.large,
   },
   retryButtonText: {
     ...Typography.headline,
-    color: Colors.textWhite,
   },
 });
 

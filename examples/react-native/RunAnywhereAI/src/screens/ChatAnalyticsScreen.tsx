@@ -1,25 +1,14 @@
-/**
- * ChatAnalyticsScreen - Chat Analytics Details
- *
- * Reference: iOS Features/Chat/ChatInterfaceView.swift (ChatDetailsView)
- *
- * Displays comprehensive analytics for a chat conversation including:
- * - Overview: Conversation summary, performance highlights
- * - Messages: Per-message analytics
- * - Performance: Models used, thinking mode analysis
- */
-
 import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   FlatList,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from '../components/common/AppIcon';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -32,9 +21,9 @@ import { MessageRole } from '../types/chat';
 type AnalyticsTab = 'overview' | 'messages' | 'performance';
 
 interface ChatAnalyticsScreenProps {
-  messages: Message[];
+  messages?: Message[];
   conversation?: Conversation;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 /**
@@ -55,7 +44,7 @@ const PerformanceCard: React.FC<PerformanceCardProps> = ({
 }) => (
   <View style={[styles.performanceCard, { borderColor: `${color}30` }]}>
     <View style={styles.performanceCardHeader}>
-      <Icon name={icon} size={18} color={color} />
+      <AppIcon name={icon} size={18} color={color} />
     </View>
     <Text style={styles.performanceCardValue}>{value}</Text>
     <Text style={styles.performanceCardTitle}>{title}</Text>
@@ -135,7 +124,7 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
           />
         )}
       {analytics.wasThinkingMode && (
-        <Icon name="bulb-outline" size={14} color={Colors.statusOrange} />
+        <AppIcon name="bulb-outline" size={14} color={Colors.statusOrange} />
       )}
     </View>
 
@@ -151,16 +140,17 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
+  const messagesData = messages ?? [];
 
   // Extract analytics from messages
   const analyticsMessages = useMemo(() => {
-    return messages
+    return messagesData
       .filter(
         (m): m is Message & { analytics: MessageAnalytics } =>
           m.analytics != null
       )
       .map((m) => ({ message: m, analytics: m.analytics }));
-  }, [messages]);
+  }, [messagesData]);
 
   // Computed metrics
   const metrics = useMemo(() => {
@@ -242,14 +232,14 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
   // Conversation summary
   const conversationSummary = useMemo(() => {
-    const userMessages = messages.filter(
+    const userMessages = messagesData.filter(
       (m) => m.role === MessageRole.User
     ).length;
-    const assistantMessages = messages.filter(
+    const assistantMessages = messagesData.filter(
       (m) => m.role === MessageRole.Assistant
     ).length;
-    return `${messages.length} messages \u2022 ${userMessages} from you, ${assistantMessages} from AI`;
-  }, [messages]);
+    return `${messagesData.length} messages \u2022 ${userMessages} from you, ${assistantMessages} from AI`;
+  }, [messagesData]);
 
   /**
    * Render tab buttons
@@ -260,7 +250,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
         onPress={() => setActiveTab('overview')}
       >
-        <Icon
+        <AppIcon
           name="stats-chart"
           size={18}
           color={
@@ -281,7 +271,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         style={[styles.tab, activeTab === 'messages' && styles.tabActive]}
         onPress={() => setActiveTab('messages')}
       >
-        <Icon
+        <AppIcon
           name="chatbubbles-outline"
           size={18}
           color={
@@ -302,7 +292,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         style={[styles.tab, activeTab === 'performance' && styles.tabActive]}
         onPress={() => setActiveTab('performance')}
       >
-        <Icon
+        <AppIcon
           name="speedometer-outline"
           size={18}
           color={
@@ -332,7 +322,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Conversation Summary</Text>
         <View style={styles.summaryRow}>
-          <Icon
+          <AppIcon
             name="chatbubble-ellipses-outline"
             size={18}
             color={Colors.primaryBlue}
@@ -341,7 +331,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         </View>
         {conversation && (
           <View style={styles.summaryRow}>
-            <Icon name="time-outline" size={18} color={Colors.primaryBlue} />
+            <AppIcon name="time-outline" size={18} color={Colors.primaryBlue} />
             <Text style={styles.summaryText}>
               Created {new Date(conversation.createdAt).toLocaleDateString()}
             </Text>
@@ -349,7 +339,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         )}
         {analyticsMessages.length > 0 && (
           <View style={styles.summaryRow}>
-            <Icon name="cube-outline" size={18} color={Colors.primaryBlue} />
+            <AppIcon name="cube-outline" size={18} color={Colors.primaryBlue} />
             <Text style={styles.summaryText}>
               {metrics.modelsUsed.size} model
               {metrics.modelsUsed.size === 1 ? '' : 's'} used
@@ -393,7 +383,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon
+          <AppIcon
             name="analytics-outline"
             size={48}
             color={Colors.textTertiary}
@@ -425,7 +415,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
         <View style={styles.emptyState}>
-          <Icon
+          <AppIcon
             name="chatbubbles-outline"
             size={48}
             color={Colors.textTertiary}
@@ -471,7 +461,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thinking Mode Analysis</Text>
           <View style={styles.thinkingAnalysis}>
-            <Icon name="bulb-outline" size={20} color={Colors.primaryPurple} />
+            <AppIcon name="bulb-outline" size={20} color={Colors.primaryPurple} />
             <Text style={styles.thinkingText}>
               Used in {metrics.thinkingModeCount} messages (
               {Math.round(metrics.thinkingModePercentage)}%)
@@ -482,7 +472,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon
+          <AppIcon
             name="speedometer-outline"
             size={48}
             color={Colors.textTertiary}
@@ -514,7 +504,10 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Chat Analytics</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={onClose ?? (() => {})}
+        >
           <Text style={styles.closeButtonText}>Done</Text>
         </TouchableOpacity>
       </View>

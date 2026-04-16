@@ -1,27 +1,14 @@
-/**
- * VoiceAssistantScreen - Tab 3: Voice Assistant
- *
- * Complete voice AI pipeline combining speech recognition, language model, and synthesis.
- * Uses the SDK's VoiceSession API which handles all the complexity internally:
- * - Audio capture with VAD (Voice Activity Detection)
- * - Automatic speech end detection
- * - STT → LLM → TTS pipeline
- * - Audio playback
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/VoiceAssistantView.swift
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from '../components/common/AppIcon';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -320,7 +307,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       activeOpacity={0.7}
     >
       <View style={[styles.modelBadgeIcon, { backgroundColor: `${color}20` }]}>
-        <Icon name={icon} size={16} color={color} />
+        <AppIcon name={icon} size={16} color={color} />
       </View>
       <View style={styles.modelBadgeContent}>
         <Text style={styles.modelBadgeLabel}>{label}</Text>
@@ -328,7 +315,7 @@ export const VoiceAssistantScreen: React.FC = () => {
           {model?.name || 'Not selected'}
         </Text>
       </View>
-      <Icon
+      <AppIcon
         name={model ? 'checkmark-circle' : 'add-circle-outline'}
         size={20}
         color={model ? Colors.primaryGreen : Colors.textTertiary}
@@ -381,7 +368,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   const renderSetupView = () => (
     <View style={styles.setupContainer}>
       <View style={styles.setupHeader}>
-        <Icon name="mic-circle-outline" size={60} color={Colors.primaryBlue} />
+        <AppIcon name="mic-circle-outline" size={60} color={Colors.primaryBlue} />
         <Text style={styles.setupTitle}>Voice Assistant Setup</Text>
         <Text style={styles.setupSubtitle}>
           Load all required models to enable voice conversations
@@ -395,7 +382,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       </View>
 
       <View style={styles.experimentalBadge}>
-        <Icon name="flask-outline" size={16} color={Colors.primaryOrange} />
+        <AppIcon name="flask-outline" size={16} color={Colors.primaryOrange} />
         <Text style={styles.experimentalText}>Experimental Feature</Text>
       </View>
     </View>
@@ -409,12 +396,12 @@ export const VoiceAssistantScreen: React.FC = () => {
         <View style={styles.headerActions}>
           {allModelsLoaded && (
             <TouchableOpacity style={styles.headerButton} onPress={() => setShowModelInfo(!showModelInfo)}>
-              <Icon name={showModelInfo ? 'information-circle' : 'information-circle-outline'} size={24} color={Colors.primaryBlue} />
+              <AppIcon name={showModelInfo ? 'information-circle' : 'information-circle-outline'} size={24} color={Colors.primaryBlue} />
             </TouchableOpacity>
           )}
           {conversation.length > 0 && (
             <TouchableOpacity style={styles.headerButton} onPress={handleClear}>
-              <Icon name="trash-outline" size={22} color={Colors.primaryRed} />
+              <AppIcon name="trash-outline" size={22} color={Colors.primaryRed} />
             </TouchableOpacity>
           )}
         </View>
@@ -441,7 +428,7 @@ export const VoiceAssistantScreen: React.FC = () => {
           <ScrollView style={styles.conversationContainer} contentContainerStyle={styles.conversationContent}>
             {conversation.length === 0 ? (
               <View style={styles.emptyConversation}>
-                <Icon name="mic-outline" size={40} color={Colors.textTertiary} />
+                <AppIcon name="mic-outline" size={40} color={Colors.textTertiary} />
                 <Text style={styles.emptyText}>Tap the microphone to start a conversation</Text>
               </View>
             ) : (
@@ -485,7 +472,7 @@ export const VoiceAssistantScreen: React.FC = () => {
               disabled={status !== VoicePipelineStatus.Idle && status !== VoicePipelineStatus.Listening}
               activeOpacity={0.8}
             >
-              <Icon name={isSessionActive ? 'stop' : 'mic'} size={36} color={Colors.textWhite} />
+              <AppIcon name={isSessionActive ? 'stop' : 'mic'} size={36} color={Colors.textWhite} />
             </TouchableOpacity>
             <Text style={styles.micLabel}>
               {isSessionActive ? 'Tap to stop (auto-detects silence)' : 'Tap to speak'}

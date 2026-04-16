@@ -1,42 +1,27 @@
-/**
- * RAGScreen - Document Q&A
- *
- * Matches iOS DocumentRAGView.swift flow:
- * 1. Select embedding model (ONNX) and LLM model (LlamaCpp) via shared ModelSelectionSheet
- * 2. Pick a document (txt/json) via system file picker
- * 3. Pipeline auto-creates on document selection, text is extracted and ingested
- * 4. Chat-based Q&A interface with user/assistant message bubbles
- *
- * Architecture:
- * - Uses @runanywhere/core RAG pipeline (compiled into RACommons)
- * - Reuses the shared ModelSelectionSheet with RagEmbedding/RagLLM contexts
- * - Document picker via @react-native-documents/picker
- */
-
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  NativeModules,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
+  View,
 } from 'react-native';
-import { NativeModules } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from '../components/common/AppIcon';
 import { pick as documentPick } from '@react-native-documents/picker';
-import { Colors } from '../theme/colors';
+import { useTheme } from '../theme';
 import { Typography, FontWeight } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { BorderRadius, Padding, Spacing } from '../theme/spacing';
+import type { ThemeColors } from '../theme/colors';
 import {
-  ModelSelectionSheet,
   ModelSelectionContext,
+  ModelSelectionSheet,
 } from '../components/model/ModelSelectionSheet';
-
 import {
   type ModelInfo as SDKModelInfo,
   initializeNitroModulesGlobally,
@@ -46,42 +31,23 @@ import {
   ragQuery,
 } from '@runanywhere/core';
 
-// MARK: - Types
-
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
 }
 
-// MARK: - Path Resolution Helpers (matching iOS DocumentRAGView)
-
 function resolveEmbeddingFilePath(localPath: string): string {
-  // Multi-file ONNX models set localPath to the folder.
-  // Return the path to model.onnx inside.
-  if (!localPath.endsWith('.onnx')) {
-    return `${localPath}/model.onnx`;
-  }
+  if (!localPath.endsWith('.onnx')) return `${localPath}/model.onnx`;
   return localPath;
 }
 
 function resolveLLMFilePath(localPath: string): string {
-  // Single-file LlamaCpp models: localPath may point to the .gguf directly,
-  // or to a directory containing it.
-  if (localPath.endsWith('.gguf') || localPath.endsWith('.bin')) {
-    return localPath;
-  }
-  // Assume directory - the SDK already resolves to the gguf path in most cases
+  if (localPath.endsWith('.gguf') || localPath.endsWith('.bin')) return localPath;
   return localPath;
 }
 
-// MARK: - Document Text Extraction
-
 const { DocumentService: NativeDocumentService } = NativeModules;
 
-/**
- * Extract text from a document using native PDFKit (for PDF) or string parsing.
- * Mirrors iOS DocumentService.swift - handles PDF, JSON, and plain text.
- */
 async function extractTextFromFile(filePath: string): Promise<string> {
   if (NativeDocumentService?.extractText) {
     return NativeDocumentService.extractText(filePath);
@@ -89,27 +55,97 @@ async function extractTextFromFile(filePath: string): Promise<string> {
   throw new Error('DocumentService native module not available');
 }
 
-// MARK: - Component
+type SetupSlotProps = {
+  iconName: Parameters<typeof AppIcon>[0]['name'];
+  label: string;
+  value: string | null;
+  placeholder: string;
+  ready: boolean;
+  onPress: () => void;
+  disabled?: boolean;
+};
+
+const SetupSlot: React.FC<SetupSlotProps> = ({
+  iconName,
+  label,
+  value,
+  placeholder,
+  ready,
+  onPress,
+  disabled,
+}) => {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+      style={[
+        slotStyles.row,
+        {
+          backgroundColor: colors.surface,
+          borderColor: ready ? colors.primary : colors.border,
+          opacity: disabled ? 0.5 : 1,
+        },
+      ]}
+    >
+      <View
+        style={[
+          slotStyles.iconWrap,
+          { backgroundColor: ready ? colors.primarySoft : colors.surfaceAlt },
+        ]}
+      >
+        <AppIcon
+          name={iconName}
+          size={18}
+          color={ready ? colors.primary : colors.textSecondary}
+        />
+      </View>
+      <View style={slotStyles.textWrap}>
+        <Text
+          style={[Typography.caption2, { color: colors.textSecondary }]}
+        >
+          {label.toUpperCase()}
+        </Text>
+        <Text
+          style={[
+            Typography.subheadline,
+            {
+              color: value ? colors.text : colors.textTertiary,
+              fontWeight: value ? FontWeight.medium : FontWeight.regular,
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {value ?? placeholder}
+        </Text>
+      </View>
+      {ready ? (
+        <AppIcon name="checkmark-circle" size={18} color={colors.primary} />
+      ) : (
+        <AppIcon name="chevron-forward" size={18} color={colors.textTertiary} />
+      )}
+    </TouchableOpacity>
+  );
+};
 
 export const RAGScreen: React.FC = () => {
-  // Nitro state
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [isNitroReady, setIsNitroReady] = useState(false);
   const [nitroError, setNitroError] = useState<string | null>(null);
 
-  // Model selection
   const [selectedEmbeddingModel, setSelectedEmbeddingModel] =
     useState<SDKModelInfo | null>(null);
-  const [selectedLLMModel, setSelectedLLMModel] =
-    useState<SDKModelInfo | null>(null);
+  const [selectedLLMModel, setSelectedLLMModel] = useState<SDKModelInfo | null>(null);
   const [showingEmbeddingPicker, setShowingEmbeddingPicker] = useState(false);
   const [showingLLMPicker, setShowingLLMPicker] = useState(false);
 
-  // Document state
   const [documentName, setDocumentName] = useState<string | null>(null);
   const [isDocumentLoaded, setIsDocumentLoaded] = useState(false);
   const [isLoadingDocument, setIsLoadingDocument] = useState(false);
 
-  // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [isQuerying, setIsQuerying] = useState(false);
@@ -122,11 +158,7 @@ export const RAGScreen: React.FC = () => {
     selectedLLMModel?.localPath != null;
 
   const canAskQuestion =
-    isDocumentLoaded &&
-    !isQuerying &&
-    currentQuestion.trim().length > 0;
-
-  // MARK: - Initialization
+    isDocumentLoaded && !isQuerying && currentQuestion.trim().length > 0;
 
   useEffect(() => {
     let mounted = true;
@@ -145,14 +177,12 @@ export const RAGScreen: React.FC = () => {
         }
       }
     }, 500);
-
     return () => {
       mounted = false;
       clearTimeout(timer);
     };
   }, []);
 
-  // Cleanup pipeline on unmount
   useEffect(() => {
     return () => {
       if (isDocumentLoaded) {
@@ -161,34 +191,22 @@ export const RAGScreen: React.FC = () => {
     };
   }, [isDocumentLoaded]);
 
-  // MARK: - Document Loading
-
   const handleSelectDocument = useCallback(async () => {
     if (!areModelsReady || !isNitroReady) return;
-
     try {
       const [result] = await documentPick({
         type: ['application/pdf', 'text/plain', 'application/json'],
       });
-
       const fileUri = result.uri;
       if (!fileUri) return;
-
       setIsLoadingDocument(true);
       setError(null);
-
-      // Extract text from the picked file
       const text = await extractTextFromFile(fileUri);
-
-      // Build RAG configuration matching iOS ragConfig computed property.
-      // With multi-file registration, vocab.txt is co-located with model.onnx,
-      // so the C++ pipeline auto-discovers it (no embeddingConfigJSON needed).
       const embeddingPath = resolveEmbeddingFilePath(
         selectedEmbeddingModel!.localPath!
       );
       const llmPath = resolveLLMFilePath(selectedLLMModel!.localPath!);
-
-      const config = {
+      await ragCreatePipeline({
         embeddingModelPath: embeddingPath,
         llmModelPath: llmPath,
         topK: 3,
@@ -196,18 +214,13 @@ export const RAGScreen: React.FC = () => {
         maxContextTokens: 2048,
         chunkSize: 180,
         chunkOverlap: 30,
-      };
-
-      // Create pipeline and ingest document (same as iOS loadDocument)
-      await ragCreatePipeline(config);
+      });
       await ragIngest(text);
-
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
-    } catch (err: any) {
-      if (err?.code === 'OPERATION_CANCELED') {
-        return; // User cancelled
-      }
+    } catch (err) {
+      const cancelErr = err as { code?: string };
+      if (cancelErr?.code === 'OPERATION_CANCELED') return;
       const msg = err instanceof Error ? err.message : 'Failed to load document';
       setError(msg);
       console.error('[RAGScreen] Document load error:', err);
@@ -223,22 +236,16 @@ export const RAGScreen: React.FC = () => {
     setMessages([]);
     setError(null);
     setCurrentQuestion('');
-
-    // Re-open document picker
     handleSelectDocument();
   }, [handleSelectDocument]);
-
-  // MARK: - Q&A
 
   const handleAskQuestion = useCallback(async () => {
     const question = currentQuestion.trim();
     if (!question || !isDocumentLoaded) return;
-
     setMessages((prev) => [...prev, { role: 'user', text: question }]);
     setCurrentQuestion('');
     setIsQuerying(true);
     setError(null);
-
     try {
       const result = await ragQuery(question, {
         maxTokens: 256,
@@ -254,42 +261,36 @@ export const RAGScreen: React.FC = () => {
     } finally {
       setIsQuerying(false);
     }
-
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
   }, [currentQuestion, isDocumentLoaded]);
 
-  // MARK: - Model Selection Callbacks
+  const handleEmbeddingModelSelected = useCallback(async (model: SDKModelInfo) => {
+    setSelectedEmbeddingModel(model);
+    setShowingEmbeddingPicker(false);
+  }, []);
 
-  const handleEmbeddingModelSelected = useCallback(
-    async (model: SDKModelInfo) => {
-      setSelectedEmbeddingModel(model);
-      setShowingEmbeddingPicker(false);
-    },
-    []
-  );
-
-  const handleLLMModelSelected = useCallback(
-    async (model: SDKModelInfo) => {
-      setSelectedLLMModel(model);
-      setShowingLLMPicker(false);
-    },
-    []
-  );
-
-  // MARK: - Error state for NitroModules
+  const handleLLMModelSelected = useCallback(async (model: SDKModelInfo) => {
+    setSelectedLLMModel(model);
+    setShowingLLMPicker(false);
+  }, []);
 
   if (nitroError) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Document Q&A</Text>
-        </View>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <View style={styles.centered}>
-          <Icon name="alert-circle-outline" size={64} color={Colors.primaryRed} />
-          <Text style={styles.errorTitle}>NitroModules Error</Text>
-          <Text style={styles.errorHintText}>{nitroError}</Text>
+          <AppIcon name="alert-circle-outline" size={64} color={colors.error} />
+          <Text style={[Typography.headline, styles.errorTitle, { color: colors.error }]}>
+            NitroModules Error
+          </Text>
+          <Text
+            style={[
+              Typography.body,
+              styles.errorHint,
+              { color: colors.textSecondary },
+            ]}
+          >
+            {nitroError}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -297,260 +298,251 @@ export const RAGScreen: React.FC = () => {
 
   if (!isNitroReady) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Document Q&A</Text>
-        </View>
+      <SafeAreaView edges={['top']} style={styles.container}>
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={Colors.primaryBlue} />
-          <Text style={styles.loadingText}>Initializing...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[Typography.body, styles.loadingText, { color: colors.textSecondary }]}>
+            Initializing…
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // MARK: - Render
+  const showDocumentPlaceholder = !isDocumentLoaded && !isLoadingDocument;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Model Setup Section */}
-        <View style={styles.modelSection}>
-          <TouchableOpacity
-            style={styles.modelRow}
-            onPress={() => setShowingEmbeddingPicker(true)}
-          >
-            <Icon name="cube-outline" size={20} color={Colors.textSecondary} />
-            <Text style={styles.modelLabel}>Embedding Model</Text>
-            <View style={styles.modelRowRight}>
-              {selectedEmbeddingModel ? (
-                <>
-                  <Text style={styles.modelName} numberOfLines={1}>
-                    {selectedEmbeddingModel.name}
-                  </Text>
-                  <Icon
-                    name="checkmark-circle"
-                    size={16}
-                    color={Colors.primaryGreen}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.modelPlaceholder}>Not selected</Text>
-                  <Icon
-                    name="chevron-forward"
-                    size={16}
-                    color={Colors.textTertiary}
-                  />
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.modelRow}
-            onPress={() => setShowingLLMPicker(true)}
-          >
-            <Icon
-              name="chatbubble-ellipses-outline"
-              size={20}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.modelLabel}>LLM Model</Text>
-            <View style={styles.modelRowRight}>
-              {selectedLLMModel ? (
-                <>
-                  <Text style={styles.modelName} numberOfLines={1}>
-                    {selectedLLMModel.name}
-                  </Text>
-                  <Icon
-                    name="checkmark-circle"
-                    size={16}
-                    color={Colors.primaryGreen}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.modelPlaceholder}>Not selected</Text>
-                  <Icon
-                    name="chevron-forward"
-                    size={16}
-                    color={Colors.textTertiary}
-                  />
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Document Status Bar */}
-        <View style={styles.documentBar}>
-          {isLoadingDocument ? (
-            <View style={styles.documentBarInner}>
-              <ActivityIndicator size="small" color={Colors.textSecondary} />
-              <Text style={styles.documentBarText}>Loading document...</Text>
-            </View>
-          ) : isDocumentLoaded && documentName ? (
-            <View style={styles.documentBarInner}>
-              <Icon
-                name="checkmark-circle"
-                size={20}
-                color={Colors.primaryGreen}
-              />
-              <Text style={styles.documentName} numberOfLines={1}>
-                {documentName}
-              </Text>
-              <TouchableOpacity onPress={handleChangeDocument}>
-                <Text style={styles.changeButton}>Change</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.selectDocButton,
-                !areModelsReady && styles.selectDocButtonDisabled,
-              ]}
-              onPress={handleSelectDocument}
-              disabled={!areModelsReady}
-            >
-              <Icon name="document-text-outline" size={20} color="#fff" />
-              <Text style={styles.selectDocButtonText}>Select Document</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Error Banner */}
-        {error && (
-          <View style={styles.errorBanner}>
-            <Icon name="alert-circle" size={16} color={Colors.primaryRed} />
-            <Text style={styles.errorBannerText} numberOfLines={2}>
-              {error}
-            </Text>
-            <TouchableOpacity onPress={() => setError(null)}>
-              <Icon name="close" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Messages Area */}
         <ScrollView
           ref={scrollViewRef}
-          style={styles.messagesArea}
-          contentContainerStyle={styles.messagesContent}
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {messages.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Icon
-                name="document-text-outline"
-                size={48}
-                color={Colors.textTertiary}
-              />
-              {isDocumentLoaded ? (
-                <>
-                  <Text style={styles.emptyTitle}>Document loaded</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Ask a question below to get started
-                  </Text>
-                </>
-              ) : !areModelsReady ? (
-                <>
-                  <Text style={styles.emptyTitle}>Select models to get started</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Choose an embedding model and an LLM model above, then pick a
-                    document
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.emptyTitle}>No document selected</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Pick a PDF, JSON, or text document to start asking questions
-                  </Text>
-                </>
-              )}
+          <View style={styles.setupGroup}>
+            <Text
+              style={[
+                Typography.caption2,
+                styles.sectionLabel,
+                { color: colors.textSecondary },
+              ]}
+            >
+              SETUP
+            </Text>
+
+            <SetupSlot
+              iconName="cube-outline"
+              label="Embedding Model"
+              value={selectedEmbeddingModel?.name ?? null}
+              placeholder="Pick an embedding model"
+              ready={selectedEmbeddingModel?.localPath != null}
+              onPress={() => setShowingEmbeddingPicker(true)}
+            />
+
+            <SetupSlot
+              iconName="chatbubble-ellipses-outline"
+              label="Language Model"
+              value={selectedLLMModel?.name ?? null}
+              placeholder="Pick a language model"
+              ready={selectedLLMModel?.localPath != null}
+              onPress={() => setShowingLLMPicker(true)}
+            />
+
+            <SetupSlot
+              iconName="document-text-outline"
+              label="Document"
+              value={documentName}
+              placeholder={
+                areModelsReady
+                  ? 'Tap to load a document'
+                  : 'Select both models first'
+              }
+              ready={isDocumentLoaded}
+              onPress={
+                isDocumentLoaded ? handleChangeDocument : handleSelectDocument
+              }
+              disabled={!areModelsReady || isLoadingDocument}
+            />
+
+            {isLoadingDocument ? (
+              <View style={styles.loadingBar}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text
+                  style={[Typography.caption, { color: colors.textSecondary }]}
+                >
+                  Extracting + ingesting document…
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {error ? (
+            <View
+              style={[
+                styles.errorBanner,
+                { backgroundColor: `${colors.error}18` },
+              ]}
+            >
+              <AppIcon name="alert-circle" size={16} color={colors.error} />
+              <Text
+                style={[Typography.caption, styles.errorText, { color: colors.error }]}
+                numberOfLines={3}
+              >
+                {error}
+              </Text>
+              <TouchableOpacity onPress={() => setError(null)} hitSlop={8}>
+                <AppIcon name="close" size={16} color={colors.error} />
+              </TouchableOpacity>
             </View>
-          ) : (
-            <>
-              {messages.map((msg, index) => (
-                <View
-                  key={index}
+          ) : null}
+
+          {messages.length === 0 && showDocumentPlaceholder ? (
+            <View style={styles.emptyState}>
+              <View
+                style={[
+                  styles.emptyIconWrap,
+                  { backgroundColor: colors.primarySoft },
+                ]}
+              >
+                <AppIcon
+                  name="document-text-outline"
+                  size={36}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={[Typography.title3, { color: colors.text }]}>
+                Ask your documents
+              </Text>
+              <Text
+                style={[
+                  Typography.body,
+                  styles.emptySubtitle,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                Pick two models and a PDF, JSON or text file to start asking
+                grounded questions.
+              </Text>
+            </View>
+          ) : null}
+
+          {messages.length === 0 && isDocumentLoaded ? (
+            <View style={styles.hintBox}>
+              <Text style={[Typography.caption, { color: colors.textSecondary }]}>
+                Try: “Summarize this document.” or “What is the main idea of
+                section 2?”
+              </Text>
+            </View>
+          ) : null}
+
+          {messages.map((msg, index) => (
+            <View
+              key={index}
+              style={[
+                styles.bubbleRow,
+                msg.role === 'user' ? styles.bubbleRowUser : styles.bubbleRowAssistant,
+              ]}
+            >
+              <View
+                style={[
+                  styles.bubble,
+                  msg.role === 'user'
+                    ? {
+                        backgroundColor: colors.userBubble,
+                        borderBottomRightRadius: 4,
+                      }
+                    : {
+                        backgroundColor: colors.assistantBubble,
+                        borderBottomLeftRadius: 4,
+                      },
+                ]}
+              >
+                <Text
                   style={[
-                    styles.messageBubbleRow,
-                    msg.role === 'user'
-                      ? styles.messageBubbleRowUser
-                      : styles.messageBubbleRowAssistant,
+                    Typography.body,
+                    {
+                      color:
+                        msg.role === 'user'
+                          ? colors.onUserBubble
+                          : colors.onAssistantBubble,
+                      lineHeight: 22,
+                    },
                   ]}
                 >
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      msg.role === 'user'
-                        ? styles.messageBubbleUser
-                        : styles.messageBubbleAssistant,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.messageBubbleText,
-                        msg.role === 'user' && styles.messageBubbleTextUser,
-                      ]}
-                    >
-                      {msg.text}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-              {isQuerying && (
-                <View style={styles.queryingRow}>
-                  <ActivityIndicator size="small" color={Colors.textSecondary} />
-                  <Text style={styles.queryingText}>Searching document...</Text>
-                </View>
-              )}
-            </>
-          )}
+                  {msg.text}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {isQuerying ? (
+            <View style={styles.queryingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[Typography.caption, { color: colors.textSecondary }]}>
+                Searching document…
+              </Text>
+            </View>
+          ) : null}
         </ScrollView>
 
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Ask a question..."
-            placeholderTextColor={Colors.textSecondary}
-            value={currentQuestion}
-            onChangeText={setCurrentQuestion}
-            editable={isDocumentLoaded && !isQuerying}
-            returnKeyType="send"
-            onSubmitEditing={handleAskQuestion}
-            multiline
-          />
-          {isQuerying ? (
-            <ActivityIndicator
-              size="small"
-              color={Colors.textSecondary}
-              style={styles.sendButton}
+        <View
+          style={[
+            styles.inputBar,
+            { backgroundColor: colors.background, borderTopColor: colors.border },
+          ]}
+        >
+          <View
+            style={[
+              styles.inputField,
+              { backgroundColor: colors.surfaceAlt, borderColor: colors.border },
+            ]}
+          >
+            <TextInput
+              style={[styles.textInput, { color: colors.text }]}
+              placeholder={
+                isDocumentLoaded
+                  ? 'Ask a question about the document…'
+                  : 'Load a document to start'
+              }
+              placeholderTextColor={colors.textTertiary}
+              value={currentQuestion}
+              onChangeText={setCurrentQuestion}
+              editable={isDocumentLoaded && !isQuerying}
+              returnKeyType="send"
+              onSubmitEditing={handleAskQuestion}
+              multiline
             />
-          ) : (
-            <TouchableOpacity
-              style={styles.sendButton}
-              onPress={handleAskQuestion}
-              disabled={!canAskQuestion}
-            >
-              <Icon
-                name="arrow-up-circle"
-                size={32}
-                color={
-                  canAskQuestion ? Colors.primaryBlue : Colors.textTertiary
-                }
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              {
+                backgroundColor: canAskQuestion
+                  ? colors.primary
+                  : colors.surfaceAlt,
+              },
+            ]}
+            onPress={handleAskQuestion}
+            disabled={!canAskQuestion || isQuerying}
+            activeOpacity={0.8}
+          >
+            {isQuerying ? (
+              <ActivityIndicator size="small" color={colors.onPrimary} />
+            ) : (
+              <AppIcon
+                name="send"
+                size={18}
+                color={canAskQuestion ? colors.onPrimary : colors.textTertiary}
               />
-            </TouchableOpacity>
-          )}
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
-      {/* Model Selection Sheets */}
       <ModelSelectionSheet
         visible={showingEmbeddingPicker}
         context={ModelSelectionContext.RagEmbedding}
@@ -567,241 +559,148 @@ export const RAGScreen: React.FC = () => {
   );
 };
 
-// MARK: - Styles
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  flex1: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-  },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Padding.padding20,
-  },
-  loadingText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.medium,
-  },
-  errorTitle: {
-    ...Typography.headline,
-    color: Colors.primaryRed,
-    marginTop: Spacing.medium,
-  },
-  errorHintText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.small,
-    textAlign: 'center',
-  },
-
-  // Model Setup Section
-  modelSection: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-  },
-  modelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.mediumLarge,
-  },
-  modelLabel: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  modelRowRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.xSmall,
-  },
-  modelName: {
-    ...Typography.subheadline,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-    maxWidth: 180,
-  },
-  modelPlaceholder: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-  },
-
-  // Document Status Bar
-  documentBar: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    alignItems: 'center',
-  },
-  documentBarInner: {
+const slotStyles = StyleSheet.create({
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.mediumLarge,
-    width: '100%',
-  },
-  documentBarText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
-  documentName: {
-    ...Typography.subheadline,
-    fontWeight: FontWeight.medium,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  changeButton: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-  },
-  selectDocButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding24,
-    paddingVertical: Padding.padding12,
     borderRadius: BorderRadius.large,
-    gap: Spacing.small,
-  },
-  selectDocButtonDisabled: {
-    backgroundColor: Colors.textTertiary,
-  },
-  selectDocButtonText: {
-    ...Typography.headline,
-    color: '#fff',
-  },
-
-  // Error Banner
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${Colors.primaryRed}15`,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.small,
-  },
-  errorBannerText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    flex: 1,
-  },
-
-  // Messages Area
-  messagesArea: {
-    flex: 1,
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  messagesContent: {
-    padding: Padding.padding16,
-    flexGrow: 1,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: Padding.padding60,
-    gap: Spacing.smallMedium,
-  },
-  emptyTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginTop: Spacing.medium,
-  },
-  emptySubtitle: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    paddingHorizontal: Padding.padding40,
-  },
-
-  // Message Bubbles
-  messageBubbleRow: {
-    marginBottom: Spacing.mediumLarge,
-  },
-  messageBubbleRowUser: {
-    alignItems: 'flex-end',
-  },
-  messageBubbleRowAssistant: {
-    alignItems: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '80%',
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Padding.padding14,
-    paddingVertical: Spacing.smallMedium,
-    borderRadius: BorderRadius.large,
+    paddingVertical: Padding.padding12,
   },
-  messageBubbleUser: {
-    backgroundColor: Colors.primaryBlue,
-    borderBottomRightRadius: 4,
-  },
-  messageBubbleAssistant: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomLeftRadius: 4,
-  },
-  messageBubbleText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 22,
-  },
-  messageBubbleTextUser: {
-    color: '#fff',
-  },
-  queryingRow: {
-    flexDirection: 'row',
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.medium,
     alignItems: 'center',
-    gap: Spacing.small,
-    paddingVertical: Spacing.small,
+    justifyContent: 'center',
   },
-  queryingText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-
-  // Input Bar
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    backgroundColor: Colors.backgroundPrimary,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderLight,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Spacing.smallMedium,
-    gap: Spacing.small,
-  },
-  textInput: {
+  textWrap: {
     flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    minHeight: 36,
-    maxHeight: 100,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: Spacing.small,
-  },
-  sendButton: {
-    paddingBottom: 2,
+    gap: 2,
   },
 });
+
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    flex1: { flex: 1 },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: Padding.padding24,
+      gap: Spacing.small,
+    },
+    loadingText: { marginTop: Spacing.small },
+    errorTitle: { marginTop: Spacing.medium },
+    errorHint: { marginTop: Spacing.small, textAlign: 'center' },
+
+    scrollArea: { flex: 1 },
+    scrollContent: {
+      paddingHorizontal: Padding.padding16,
+      paddingTop: Spacing.mediumLarge,
+      paddingBottom: Spacing.xxLarge,
+      gap: Spacing.mediumLarge,
+    },
+    sectionLabel: {
+      fontWeight: '600',
+      letterSpacing: 0.6,
+      marginBottom: Spacing.xSmall,
+    },
+    setupGroup: {
+      gap: Spacing.small,
+    },
+    loadingBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.small,
+      paddingVertical: Spacing.small,
+      paddingHorizontal: Spacing.xSmall,
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.small,
+      padding: Padding.padding12,
+      borderRadius: BorderRadius.medium,
+    },
+    errorText: { flex: 1 },
+
+    emptyState: {
+      alignItems: 'center',
+      gap: Spacing.small,
+      paddingVertical: Spacing.xxxLarge,
+    },
+    emptyIconWrap: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: Spacing.small,
+    },
+    emptySubtitle: {
+      textAlign: 'center',
+      maxWidth: 300,
+      paddingHorizontal: Padding.padding16,
+    },
+    hintBox: {
+      paddingHorizontal: Padding.padding12,
+      paddingVertical: Padding.padding8,
+    },
+
+    bubbleRow: {
+      marginTop: Spacing.small,
+    },
+    bubbleRowUser: { alignItems: 'flex-end' },
+    bubbleRowAssistant: { alignItems: 'flex-start' },
+    bubble: {
+      maxWidth: '82%',
+      paddingHorizontal: Padding.padding14,
+      paddingVertical: Spacing.smallMedium,
+      borderRadius: BorderRadius.large,
+    },
+    queryingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: Spacing.small,
+      paddingVertical: Spacing.small,
+    },
+
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: Padding.padding12,
+      paddingVertical: Spacing.smallMedium,
+      gap: Spacing.small,
+    },
+    inputField: {
+      flex: 1,
+      borderRadius: BorderRadius.xLarge,
+      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: Padding.padding14,
+      paddingVertical: Platform.OS === 'ios' ? 8 : 2,
+      minHeight: 42,
+      maxHeight: 120,
+      justifyContent: 'center',
+    },
+    textInput: {
+      ...Typography.body,
+      padding: 0,
+    },
+    sendButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
 
 export default RAGScreen;

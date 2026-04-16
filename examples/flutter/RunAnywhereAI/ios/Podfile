@@ -1,7 +1,5 @@
-# Define a global platform for your project
 platform :ios, '14.0'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -28,7 +26,7 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # Use static linkage to properly include RACommons symbols from vendored xcframeworks
+  # Static linkage required for RACommons vendored xcframeworks
   use_frameworks! :linkage => :static
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -43,21 +41,13 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
 
-      # Enable permissions for permission_handler
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
         'PERMISSION_MICROPHONE=1',
         'PERMISSION_SPEECH_RECOGNIZER=1',
         'PERMISSION_CAMERA=1',
+        'PERMISSION_PHOTOS=1',
       ]
     end
   end
-
-  # NOTE: We rely on -all_load (set in runanywhere.podspec) to include all symbols
-  # from static frameworks. The symbols will be in the binary (visible via nm)
-  # but marked as local (lowercase 't'). Flutter's DynamicLibrary.executable()
-  # can still find these symbols because it operates at a lower level than dlsym.
-  #
-  # DO NOT use -exported_symbols_list here as it breaks Flutter's debug mode
-  # by hiding the debug dylib entry point.
 end

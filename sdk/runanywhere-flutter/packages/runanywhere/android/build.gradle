@@ -45,7 +45,7 @@ android {
 
         // ABI filters for native libraries
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            abiFilters 'arm64-v8a'
         }
 
         // Consumer proguard rules
@@ -91,7 +91,7 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += ['**/libc++_shared.so']
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
         }
     }
 }

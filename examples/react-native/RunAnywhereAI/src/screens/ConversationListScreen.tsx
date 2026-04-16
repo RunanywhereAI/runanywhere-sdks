@@ -1,27 +1,16 @@
-/**
- * ConversationListScreen - Modal for managing conversations
- *
- * Reference: iOS Core/Services/ConversationStore.swift (ConversationListView)
- *
- * Features:
- * - List all conversations with search
- * - Create new conversation
- * - Delete conversation with confirmation
- * - Switch between conversations
- */
-
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   TextInput,
   Alert,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { AppIcon } from '../components/common/AppIcon';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
@@ -34,8 +23,8 @@ import {
 } from '../stores/conversationStore';
 
 interface ConversationListScreenProps {
-  onClose: () => void;
-  onSelectConversation: (conversation: Conversation) => void;
+  onClose?: () => void;
+  onSelectConversation?: (conversation: Conversation) => void;
 }
 
 /**
@@ -113,7 +102,7 @@ const ConversationRow: React.FC<ConversationRowProps> = ({
         onPress={handleDelete}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Icon name="trash-outline" size={20} color={Colors.primaryRed} />
+        <AppIcon name="trash-outline" size={20} color={Colors.primaryRed} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
@@ -124,13 +113,31 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
   onSelectConversation,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const navigation = useNavigation();
 
   const {
     conversations,
     createConversation,
     deleteConversation,
     searchConversations,
+    setCurrentConversation,
   } = useConversationStore();
+
+  const dismiss = useCallback(() => {
+    if (onClose) onClose();
+    else navigation.goBack();
+  }, [onClose, navigation]);
+
+  const selectConversation = useCallback(
+    (conversation: Conversation) => {
+      if (onSelectConversation) {
+        onSelectConversation(conversation);
+      } else {
+        setCurrentConversation(conversation);
+      }
+    },
+    [onSelectConversation, setCurrentConversation]
+  );
 
   // Filter conversations based on search
   const filteredConversations = useMemo(() => {
@@ -145,19 +152,16 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
    */
   const handleCreateConversation = useCallback(async () => {
     const newConversation = await createConversation();
-    onSelectConversation(newConversation);
-    onClose();
-  }, [createConversation, onSelectConversation, onClose]);
+    selectConversation(newConversation);
+    dismiss();
+  }, [createConversation, selectConversation, dismiss]);
 
-  /**
-   * Handle selecting a conversation
-   */
   const handleSelectConversation = useCallback(
     (conversation: Conversation) => {
-      onSelectConversation(conversation);
-      onClose();
+      selectConversation(conversation);
+      dismiss();
     },
-    [onSelectConversation, onClose]
+    [selectConversation, dismiss]
   );
 
   /**
@@ -187,7 +191,7 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIconContainer}>
-        <Icon
+        <AppIcon
           name="chatbubbles-outline"
           size={IconSize.large}
           color={Colors.textTertiary}
@@ -208,7 +212,7 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={onClose}>
+        <TouchableOpacity style={styles.headerButton} onPress={dismiss}>
           <Text style={styles.doneText}>Done</Text>
         </TouchableOpacity>
 
@@ -218,13 +222,13 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
           style={styles.headerButton}
           onPress={handleCreateConversation}
         >
-          <Icon name="add" size={28} color={Colors.primaryBlue} />
+          <AppIcon name="add" size={28} color={Colors.primaryBlue} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Icon
+        <AppIcon
           name="search"
           size={18}
           color={Colors.textTertiary}
@@ -244,7 +248,7 @@ export const ConversationListScreen: React.FC<ConversationListScreenProps> = ({
             onPress={() => setSearchQuery('')}
             style={styles.clearButton}
           >
-            <Icon name="close-circle" size={18} color={Colors.textTertiary} />
+            <AppIcon name="close-circle" size={18} color={Colors.textTertiary} />
           </TouchableOpacity>
         )}
       </View>

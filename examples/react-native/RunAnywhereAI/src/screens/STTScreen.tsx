@@ -1,31 +1,8 @@
-/**
- * STTScreen - Tab 1: Speech-to-Text
- *
- * Provides on-device speech recognition with real-time transcription.
- * Matches iOS SpeechToTextView architecture and patterns.
- *
- * Features:
- * - Batch mode: Record first, then transcribe
- * - Live mode: Real-time transcription (streaming)
- * - Model selection sheet
- * - Audio level visualization
- * - Model status banner
- *
- * Architecture:
- * - Uses native audio recording (AudioService)
- * - Model loading via RunAnywhere.loadSTTModel()
- * - Transcription via RunAnywhere.transcribeAudio()
- * - Supports ONNX-based Whisper models
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/SpeechToTextView.swift
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -34,7 +11,8 @@ import {
   PermissionsAndroid,
   Linking,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from '../components/common/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -54,7 +32,6 @@ import { STTMode } from '../types/voice';
 import { RunAnywhere, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 
 // STT Model IDs (kept for reference, uses SDK model registry)
-const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
 
 export const STTScreen: React.FC = () => {
   // State
@@ -787,7 +764,7 @@ export const STTScreen: React.FC = () => {
    */
   const renderModeDescription = () => (
     <View style={styles.modeDescription}>
-      <Icon
+      <AppIcon
         name={
           mode === STTMode.Batch ? 'document-text-outline' : 'pulse-outline'
         }
@@ -810,7 +787,7 @@ export const STTScreen: React.FC = () => {
       <Text style={styles.title}>Speech to Text</Text>
       {transcript && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-          <Icon name="close-circle" size={22} color={Colors.textSecondary} />
+          <AppIcon name="close-circle" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
       )}
     </View>
@@ -919,7 +896,7 @@ export const STTScreen: React.FC = () => {
           </>
         ) : isProcessing ? (
           <View style={styles.processingContainer}>
-            <Icon
+            <AppIcon
               name="hourglass-outline"
               size={24}
               color={Colors.textSecondary}
@@ -945,7 +922,7 @@ export const STTScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <Icon name="mic-outline" size={40} color={Colors.textTertiary} />
+            <AppIcon name="mic-outline" size={40} color={Colors.textTertiary} />
             <Text style={styles.emptyText}>Tap the microphone to start</Text>
           </View>
         )}
@@ -962,7 +939,7 @@ export const STTScreen: React.FC = () => {
           disabled={isProcessing}
           activeOpacity={0.8}
         >
-          <Icon
+          <AppIcon
             name={isRecording ? 'stop' : 'mic'}
             size={32}
             color={Colors.textWhite}

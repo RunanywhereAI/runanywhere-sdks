@@ -15,14 +15,14 @@ export class VLMService {
    */
   async loadModel(modelPath: string, mmprojPath?: string, modelName?: string): Promise<void> {
     try {
-      console.log(`[VLMService] Loading model: ${modelName}`);
+      console.warn(`[VLMService] Loading model: ${modelName}`);
       
       // Pass 'undefined' for loraPath (3rd arg) as per SDK requirement
       const success = await sdkLoadModel(modelPath, mmprojPath, undefined, modelName);
       
       if (success) {
         this._isLoaded = true;
-        console.log('[VLMService] Load success');
+        console.warn('[VLMService] Load success');
       } else {
         this._isLoaded = false;
         throw new Error('SDK returned failure for model load');
@@ -64,7 +64,7 @@ export class VLMService {
       filePath: imagePath,
     };
 
-    console.log(`[VLMService] Processing image: ${imagePath}`);
+    console.warn(`[VLMService] Processing image: ${imagePath}`);
     
     try {
       const response = await processImageStream(image, prompt, { maxTokens });
@@ -85,6 +85,6 @@ export class VLMService {
 
   release(): void {
     this._isLoaded = false;
-    console.log('[VLMService] Service state released');
+    console.warn('[VLMService] Service state released');
   }
 }

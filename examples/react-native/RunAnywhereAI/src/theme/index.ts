@@ -1,10 +1,4 @@
-/**
- * Theme System - Unified export
- *
- * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Design/
- */
-
-import { Colors, DarkColors } from './colors';
+import { Colors, DarkColors, lightColors, darkColors } from './colors';
 import { Typography } from './typography';
 import {
   Spacing,
@@ -17,8 +11,8 @@ import {
   Layout,
 } from './spacing';
 
-export { Colors, DarkColors } from './colors';
-export type { ColorKey } from './colors';
+export { Colors, DarkColors, lightColors, darkColors } from './colors';
+export type { ColorKey, ThemeColors } from './colors';
 
 export { Typography, FontWeight, fontSize } from './typography';
 export type { TypographyKey } from './typography';
@@ -35,12 +29,15 @@ export {
 } from './spacing';
 export type { SpacingKey, IconSizeKey } from './spacing';
 
-/**
- * Combined theme object for convenience
- */
+export { ThemeProvider, ThemeContext } from './ThemeProvider';
+export type { ThemeMode, ResolvedScheme } from './ThemeProvider';
+export { useTheme } from './useTheme';
+
 export const Theme = {
   colors: Colors,
   darkColors: DarkColors,
+  light: lightColors,
+  dark: darkColors,
   typography: Typography,
   spacing: Spacing,
   padding: Padding,
