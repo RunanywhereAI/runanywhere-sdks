@@ -10,9 +10,9 @@ class PlatformCapabilityService {
   bool get supportsStructuredOutput => true;
 
   bool get supportsVision => !Platform.isWindows;
-  bool get supportsSpeechToText => !Platform.isWindows;
-  bool get supportsTextToSpeech => !Platform.isWindows;
-  bool get supportsVoiceAssistant => !Platform.isWindows;
+  bool get supportsSpeechToText => true;
+  bool get supportsTextToSpeech => true;
+  bool get supportsVoiceAssistant => true;
   bool get supportsRag => !Platform.isWindows;
 
   String unsupportedMessage(String featureName) =>

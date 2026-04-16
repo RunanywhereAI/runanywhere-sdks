@@ -46,8 +46,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
   // Playback state
   bool _isGenerating = false;
   bool _isPlaying = false;
-  // ignore: unused_field - kept for future TTS implementation
-  bool _hasAudio = false;
   double _currentTime = 0.0;
   double _duration = 0.0;
   double _playbackProgress = 0.0;
@@ -171,7 +169,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     setState(() {
       _isGenerating = true;
       _errorMessage = null;
-      _hasAudio = false;
       _metadata = null;
     });
 
@@ -197,7 +194,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
       setState(() {
         _isGenerating = false;
-        _hasAudio = result.samples.isNotEmpty;
         _duration = result.durationSeconds;
         _metadata = TTSMetadata(
           durationMs: result.durationMs.toDouble(),
@@ -242,31 +238,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
           '🔊 Playing TTS audio: ${samples.length} samples at $sampleRate Hz');
     } catch (e) {
       debugPrint('❌ Failed to play TTS audio: $e');
-      setState(() {
-        _errorMessage = 'Failed to play audio: $e';
-      });
-    }
-  }
-
-  /// Play audio using the audio player service (for Int16 PCM data)
-  // ignore: unused_element - kept for alternative audio formats
-  Future<void> _playAudio(List<int> audioData) async {
-    try {
-      // Convert List<int> to Uint8List
-      final audioBytes = Uint8List.fromList(audioData);
-
-      // The TTS component returns PCM16 data at 22050 Hz mono
-      // We need to pass the sample rate so the audio player can create proper WAV headers
-      await _playerService.playFromBytes(
-        audioBytes,
-        volume: 1.0, // Use full volume (pitch controls are in TTS synthesis)
-        rate: _speechRate,
-        sampleRate: 22050, // Piper TTS default sample rate
-        numChannels: 1, // Mono audio
-      );
-      debugPrint('🔊 Playing audio...');
-    } catch (e) {
-      debugPrint('❌ Failed to play audio: $e');
       setState(() {
         _errorMessage = 'Failed to play audio: $e';
       });

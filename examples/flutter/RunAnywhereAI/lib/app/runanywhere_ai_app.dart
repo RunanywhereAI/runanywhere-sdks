@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:runanywhere/core/types/npu_chip.dart';
+import 'package:runanywhere/public/extensions/runanywhere_device.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
@@ -12,9 +14,6 @@ import 'package:runanywhere_ai/core/services/example_http_service.dart';
 import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
-import 'package:runanywhere/core/types/npu_chip.dart';
-import 'package:runanywhere/public/extensions/runanywhere_device.dart';
-import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
