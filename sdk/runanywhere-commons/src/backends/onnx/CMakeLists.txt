@@ -237,6 +237,12 @@ else()
     add_library(rac_backend_onnx STATIC ${ONNX_BACKEND_SOURCES} ${ONNX_BACKEND_HEADERS})
 endif()
 
+if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
+    target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_EMBEDDINGS_AVAILABLE=1)
+else()
+    target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_EMBEDDINGS_AVAILABLE=0)
+endif()
+
 # Resolve the runanywhere-commons root (3 levels up from src/backends/onnx/)
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 

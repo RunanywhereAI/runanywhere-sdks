@@ -85,4 +85,13 @@ if exist "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" (
   copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" "%DIST_DIR%\rac_backend_onnx.dll" >nul
 )
 
+if /I "%BUILD_ONNX%"=="ON" (
+  for %%F in ("%ROOT%\third_party\sherpa-onnx-windows\bin\*.dll") do (
+    if exist "%%~F" copy /y "%%~F" "%DIST_DIR%\" >nul
+  )
+  for %%F in ("%ROOT%\third_party\sherpa-onnx-windows\lib\*.dll") do (
+    if exist "%%~F" copy /y "%%~F" "%DIST_DIR%\" >nul
+  )
+)
+
 echo Build complete. Artifacts in %DIST_DIR%
