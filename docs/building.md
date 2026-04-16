@@ -142,3 +142,29 @@ cd sdk/runanywhere-kotlin && ./scripts/build-kotlin.sh --setup
 ```bash
 ./gradlew cleanAll && ./gradlew buildAll
 ```
+
+## Windows Voice Validation
+
+For Windows ONNX voice support, build the native backends first, then build the
+Flutter Windows example.
+
+```powershell
+cd sdk\runanywhere-commons
+cmd /c scripts\build-windows.bat all --clean
+
+cd ..\..\examples\flutter\RunAnywhereAI
+New-Item -ItemType Directory -Force -Path build\native_assets\windows | Out-Null
+fvm flutter build windows
+```
+
+Notes:
+
+- `scripts\build-windows.bat onnx` and `scripts\build-windows.bat all` will
+  automatically download Sherpa-ONNX Windows prebuilts into
+  `sdk\runanywhere-commons\third_party\sherpa-onnx-windows`.
+- The final Windows runner directory should contain:
+  - `rac_backend_onnx.dll`
+  - `onnxruntime.dll`
+  - `onnxruntime_providers_shared.dll`
+  - `sherpa-onnx-c-api.dll`
+  - companion runtime DLLs staged by the ONNX plugin
