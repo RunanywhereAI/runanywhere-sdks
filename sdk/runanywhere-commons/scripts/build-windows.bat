@@ -23,7 +23,6 @@ exit /b 0
 for %%I in ("%~dp0.") do set "SCRIPT_HOME=%%~fI"
 set "ROOT=%SCRIPT_HOME%"
 set "WINDOWS_SCRIPT_DIR=%ROOT%\scripts\windows"
-set "SHERPA_ONNX_DIR=%ROOT%\third_party\sherpa-onnx-windows"
 set "BUILD_DIR=%ROOT%\build-windows-x64"
 set "DIST_DIR=%ROOT%\dist\windows\x64"
 set "BUILD_ONNX=OFF"
