@@ -81,3 +81,6 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/app_icon.png
+    - assets/app_icon_foreground.png

@@ -91,7 +91,7 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += ['**/libc++_shared.so']
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
         }
     }
 }

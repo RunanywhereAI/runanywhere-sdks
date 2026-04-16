@@ -139,14 +139,9 @@ class _LogoSection extends StatelessWidget {
         child: child,
       ),
       child: Container(
-        width: 100,
-        height: 100,
+        width: 120,
+        height: 120,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.orangeLight, AppColors.orange],
-          ),
           borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
           boxShadow: [
             BoxShadow(
@@ -156,10 +151,12 @@ class _LogoSection extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(
-          Icons.auto_awesome,
-          size: AppSpacing.iconHuge,
-          color: theme.colorScheme.onPrimary,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
+          child: Image.asset(
+            'assets/app_icon.png',
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );
