@@ -121,40 +121,39 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.tts,
         onModelSelected: (model) async {
-          await _loadModel(model);
+          await _refreshModelState(model);
         },
       ),
     ));
   }
 
-  /// Load TTS model using RunAnywhere SDK
-  Future<void> _loadModel(ModelInfo model) async {
+  Future<void> _refreshModelState(ModelInfo model) async {
+    if (model.preferredFramework == LLMFramework.systemTTS) {
+      if (!mounted) return;
+      setState(() {
+        _selectedFramework = LLMFramework.systemTTS;
+        _selectedModelName = model.name;
+        _isSystemTTS = true;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    final currentVoice = await sdk.RunAnywhere.currentTTSVoice();
+    if (!mounted) return;
+
     setState(() {
-      _isGenerating = true;
+      _selectedFramework = currentVoice == null
+          ? LLMFramework.unknown
+          : switch (currentVoice.framework) {
+              sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
+              sdk.InferenceFramework.systemTTS => LLMFramework.systemTTS,
+              _ => LLMFramework.unknown,
+            };
+      _selectedModelName = currentVoice?.name;
+      _isSystemTTS = currentVoice?.framework == sdk.InferenceFramework.systemTTS;
       _errorMessage = null;
     });
-
-    try {
-      debugPrint('🔄 Loading TTS voice: ${model.name}');
-
-      // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSVoice(model.id);
-
-      setState(() {
-        _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
-        _selectedModelName = model.name;
-        _isSystemTTS = model.preferredFramework == LLMFramework.systemTTS;
-        _isGenerating = false;
-      });
-
-      debugPrint('✅ TTS model loaded: ${model.name}');
-    } catch (e) {
-      debugPrint('❌ Failed to load TTS model: $e');
-      setState(() {
-        _errorMessage = 'Failed to load model: $e';
-        _isGenerating = false;
-      });
-    }
   }
 
   /// Generate speech using RunAnywhere SDK

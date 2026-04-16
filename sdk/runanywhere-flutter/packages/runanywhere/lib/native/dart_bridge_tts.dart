@@ -184,8 +184,9 @@ class DartBridgeTTS {
         'Synthesizing "${text.substring(0, text.length.clamp(0, 50))}..." in background isolate');
 
     // Run synthesis in background isolate
+    final handleAddress = handle.address;
     final result = await Isolate.run(() => _synthesizeInIsolate(
-          handle.address,
+          handleAddress,
           text,
           rate,
           pitch,
