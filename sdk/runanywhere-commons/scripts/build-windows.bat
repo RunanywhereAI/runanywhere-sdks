@@ -22,6 +22,8 @@ exit /b 0
 :args_done
 for %%I in ("%~dp0.") do set "SCRIPT_HOME=%%~fI"
 set "ROOT=%SCRIPT_HOME%"
+set "WINDOWS_SCRIPT_DIR=%ROOT%\scripts\windows"
+set "SHERPA_ONNX_DIR=%ROOT%\third_party\sherpa-onnx-windows"
 set "BUILD_DIR=%ROOT%\build-windows-x64"
 set "DIST_DIR=%ROOT%\dist\windows\x64"
 set "BUILD_ONNX=OFF"
@@ -49,6 +51,12 @@ echo Root: %ROOT%
 echo Backends: %BACKENDS%
 echo Build Dir: %BUILD_DIR%
 echo Dist Dir: %DIST_DIR%
+
+if /I "%BUILD_ONNX%"=="ON" (
+  echo Preparing Sherpa-ONNX Windows dependencies...
+  call "%WINDOWS_SCRIPT_DIR%\download-sherpa-onnx.bat"
+  if errorlevel 1 exit /b 1
+)
 
 cmake -S "%ROOT%" -B "%BUILD_DIR%" -G "Visual Studio 17 2022" -A x64 ^
   -DRAC_BUILD_SHARED=ON ^

@@ -31,7 +31,7 @@ if "%~1"=="--help" goto :show_help
 if "%~1"=="-h" goto :show_help
 
 :: Check if already downloaded
-if exist "%DEST_DIR%\lib" if "%FORCE%"=="0" (
+if exist "%DEST_DIR%\lib\sherpa-onnx-c-api.lib" if exist "%DEST_DIR%\bin\sherpa-onnx-c-api.dll" if exist "%DEST_DIR%\include\sherpa-onnx\c-api\c-api.h" if "%FORCE%"=="0" (
     echo [OK] Sherpa-ONNX already downloaded at %DEST_DIR%
     echo      Use --force to re-download.
     exit /b 0
@@ -63,7 +63,7 @@ mkdir "%TEMP_DL%" 2>nul
 
 :: Download
 echo [DOWNLOAD] Downloading Sherpa-ONNX v%VERSION%...
-curl -L -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
+curl -L --retry 5 --retry-delay 2 --retry-all-errors -o "%TEMP_DL%\sherpa-onnx.tar.bz2" "%URL%"
 if errorlevel 1 (
     echo [ERROR] Download failed.
     rmdir /s /q "%TEMP_DL%" 2>nul
@@ -73,8 +73,11 @@ if errorlevel 1 (
 :: Extract
 echo [EXTRACT] Extracting archive...
 mkdir "%DEST_DIR%" 2>nul
-tar -xjf "%TEMP_DL%\sherpa-onnx.tar.bz2" -C "%TEMP_DL%"
-if errorlevel 1 (
+pushd "%TEMP_DL%" >nul
+tar --force-local -xjf "sherpa-onnx.tar.bz2"
+set "TAR_EXIT=%ERRORLEVEL%"
+popd >nul
+if not "%TAR_EXIT%"=="0" (
     echo [ERROR] Extraction failed.
     rmdir /s /q "%TEMP_DL%" 2>nul
     exit /b 1
@@ -83,6 +86,13 @@ if errorlevel 1 (
 :: Move contents (strip top-level directory)
 for /d %%d in ("%TEMP_DL%\sherpa-onnx-*") do (
     xcopy /s /y /q "%%d\*" "%DEST_DIR%\" >nul
+)
+
+:: Normalize runtime layout: some Sherpa Windows archives place the C API DLL in lib/
+:: while the build and packaging flow expects runtime DLLs under bin/.
+if exist "%DEST_DIR%\lib\sherpa-onnx-c-api.dll" if not exist "%DEST_DIR%\bin\sherpa-onnx-c-api.dll" (
+    mkdir "%DEST_DIR%\bin" 2>nul
+    copy /y "%DEST_DIR%\lib\sherpa-onnx-c-api.dll" "%DEST_DIR%\bin\sherpa-onnx-c-api.dll" >nul
 )
 
 :: Download C API headers if missing
@@ -100,8 +110,12 @@ rmdir /s /q "%TEMP_DL%" 2>nul
 echo [VERIFY] Checking installation...
 set "VERIFY_OK=1"
 
-if not exist "%DEST_DIR%\lib" (
-    echo [ERROR] lib directory not found
+if not exist "%DEST_DIR%\lib\sherpa-onnx-c-api.lib" (
+    echo [ERROR] sherpa-onnx-c-api.lib not found
+    set "VERIFY_OK=0"
+)
+if not exist "%DEST_DIR%\bin\sherpa-onnx-c-api.dll" (
+    echo [ERROR] sherpa-onnx-c-api.dll not found
     set "VERIFY_OK=0"
 )
 if not exist "%DEST_DIR%\include\sherpa-onnx\c-api\c-api.h" (

@@ -264,6 +264,17 @@ rac_shutdown();
 scripts\build-windows.bat llamacpp --clean
 ```
 
+### Windows ONNX Dependencies
+
+For Windows STT/TTS/VAD builds, use:
+
+```bat
+cmd /c scripts\build-windows.bat onnx
+cmd /c scripts\build-windows.bat all
+```
+
+These commands automatically download Sherpa-ONNX Windows prebuilts into `third_party/sherpa-onnx-windows/`.
+
 Artifacts:
 - `dist/windows/x64/rac_commons.dll`
 - `dist/windows/x64/rac_backend_llamacpp.dll`
