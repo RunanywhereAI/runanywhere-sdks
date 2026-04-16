@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { AppIcon } from '../common/AppIcon';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import {
@@ -102,8 +102,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             disabled={!canSend}
             activeOpacity={0.7}
           >
-            <Icon
-              name={isLoading ? 'stop' : 'arrow-up'}
+            <AppIcon
+              name={isLoading ? 'stop' : 'send'}
               size={20}
               color={canSend ? Colors.textWhite : Colors.textTertiary}
             />

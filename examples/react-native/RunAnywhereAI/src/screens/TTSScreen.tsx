@@ -1,39 +1,17 @@
-/**
- * TTSScreen - Tab 2: Text-to-Speech
- *
- * Provides on-device text-to-speech synthesis with voice selection.
- * Matches iOS TextToSpeechView architecture and patterns.
- *
- * Features:
- * - Text input for synthesis
- * - Voice/model selection
- * - Audio playback controls
- * - Model status banner
- * - System TTS fallback
- *
- * Architecture:
- * - Model loading via RunAnywhere.loadTTSModel()
- * - Speech synthesis via RunAnywhere.synthesizeSpeech()
- * - Audio playback via native audio player
- * - Supports ONNX-based Piper TTS models
- *
- * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Voice/TextToSpeechView.swift
- */
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
   Platform,
   NativeModules,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppIcon } from '../components/common/AppIcon';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
@@ -951,7 +929,7 @@ export const TTSScreen: React.FC = () => {
       <Text style={styles.title}>Text to Speech</Text>
       {text && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-          <Icon name="close-circle" size={22} color={Colors.textSecondary} />
+          <AppIcon name="close-circle" size={22} color={Colors.textSecondary} />
         </TouchableOpacity>
       )}
     </View>
@@ -1048,7 +1026,7 @@ export const TTSScreen: React.FC = () => {
 
             {/* Audio info */}
             <View style={styles.playbackInfo}>
-              <Icon
+              <AppIcon
                 name="musical-notes"
                 size={20}
                 color={Colors.textSecondary}
@@ -1067,7 +1045,7 @@ export const TTSScreen: React.FC = () => {
                 ]}
                 onPress={handleTogglePlayback}
               >
-                <Icon
+                <AppIcon
                   name={isPlaying ? 'pause' : 'play'}
                   size={24}
                   color={isPlaying ? Colors.textWhite : Colors.primaryBlue}
@@ -1077,7 +1055,7 @@ export const TTSScreen: React.FC = () => {
                 style={styles.controlButton}
                 onPress={handleStop}
               >
-                <Icon name="stop" size={24} color={Colors.primaryBlue} />
+                <AppIcon name="stop" size={24} color={Colors.primaryBlue} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1097,12 +1075,12 @@ export const TTSScreen: React.FC = () => {
         >
           {isGenerating ? (
             <>
-              <Icon name="hourglass" size={20} color={Colors.textWhite} />
+              <AppIcon name="hourglass" size={20} color={Colors.textWhite} />
               <Text style={styles.generateButtonText}>Generating...</Text>
             </>
           ) : (
             <>
-              <Icon name="volume-high" size={20} color={Colors.textWhite} />
+              <AppIcon name="volume-high" size={20} color={Colors.textWhite} />
               <Text style={styles.generateButtonText}>Generate Speech</Text>
             </>
           )}

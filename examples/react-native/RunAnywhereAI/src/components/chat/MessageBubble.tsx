@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   LayoutAnimation,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { AppIcon } from '../common/AppIcon';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding, Layout } from '../../theme/spacing';
@@ -84,7 +84,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           message.modelInfo &&
           message.modelInfo.frameworkDisplayName && (
             <View style={styles.modelBadge}>
-              <Icon name="cube-outline" size={10} color={Colors.primaryBlue} />
+              <AppIcon name="cube-outline" size={10} color={Colors.primaryBlue} />
               <Text style={styles.modelBadgeText}>
                 {message.modelInfo.frameworkDisplayName}
               </Text>
@@ -103,7 +103,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             onPress={toggleThinking}
             activeOpacity={0.7}
           >
-            <Icon
+            <AppIcon
               name={showThinking ? 'chevron-down' : 'chevron-forward'}
               size={14}
               color={Colors.textSecondary}

@@ -51,7 +51,9 @@ const SINGLE_CAPTURE_PROMPT = 'Describe what you see briefly.';
 const GALLERY_MAX_TOKENS = 300;
 const GALLERY_PROMPT = 'Describe this image in detail.';
 
-export function useVLMCamera(cameraRef: React.RefObject<Camera>): VLMCameraHook {
+export function useVLMCamera(
+  cameraRef: React.RefObject<Camera | null>
+): VLMCameraHook {
   // 1. CRITICAL FIX: Memoize the service so it survives re-renders
   const vlmService = useMemo(() => new VLMService(), []);
 
@@ -69,7 +71,7 @@ export function useVLMCamera(cameraRef: React.RefObject<Camera>): VLMCameraHook 
   // 2. Cleanup only when the component truly unmounts
   useEffect(() => {
     return () => {
-      console.log('[useVLMCamera] Unmounting - Cleaning up');
+      console.warn('[useVLMCamera] Unmounting - Cleaning up');
       if (autoStreamIntervalRef.current) {
         clearInterval(autoStreamIntervalRef.current);
       }

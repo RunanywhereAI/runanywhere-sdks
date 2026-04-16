@@ -27,6 +27,23 @@ export const FontWeight = {
  * Typography styles matching iOS system fonts
  */
 export const Typography = {
+  // Aliases for back-compat with older screens
+  title1: {
+    fontSize: 28,
+    fontWeight: FontWeight.bold,
+    lineHeight: 34,
+    letterSpacing: 0.36,
+    fontFamily,
+  } satisfies TextStyle,
+
+  caption1: {
+    fontSize: 12,
+    fontWeight: FontWeight.regular,
+    lineHeight: 16,
+    letterSpacing: 0,
+    fontFamily,
+  } satisfies TextStyle,
+
   // Large Title - used for primary headings
   largeTitle: {
     fontSize: 34,

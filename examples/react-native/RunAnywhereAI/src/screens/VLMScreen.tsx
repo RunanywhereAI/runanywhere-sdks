@@ -1,146 +1,116 @@
-/**
- * VLMScreen - Vision Chat (VLM) camera view
- *
- * Complete VLM camera interface with:
- * - Live camera preview (45% screen height)
- * - Description panel with streaming tokens
- * - 4-button control bar (Photos, Main, Live, Model)
- * - Processing overlay during capture
- * - Model required overlay when no VLM loaded
- * - Three modes: single capture, gallery selection, auto-streaming
- *
- * Reference: iOS VLMCameraView.swift
- */
-
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  SafeAreaView,
   ActivityIndicator,
-  useWindowDimensions,
   Linking,
-  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
-import Icon from 'react-native-vector-icons/Ionicons';
 import Clipboard from '@react-native-clipboard/clipboard';
+import { AppIcon } from '../components/common/AppIcon';
 import { useVLMCamera } from '../hooks/useVLMCamera';
 import {
-  ModelSelectionSheet,
   ModelSelectionContext,
+  ModelSelectionSheet,
 } from '../components/model/ModelSelectionSheet';
-import { FileSystem } from '@runanywhere/core';
-import { Colors } from '../theme/colors';
+import { FileSystem, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { useTheme } from '../theme';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { BorderRadius, Padding, Spacing } from '../theme/spacing';
+import type { ThemeColors } from '../theme/colors';
 
 const VLMScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { height: screenHeight } = useWindowDimensions();
   const cameraRef = useRef<Camera>(null);
   const device = useCameraDevice('back');
-
-  // VLM hook state and actions
   const vlm = useVLMCamera(cameraRef);
-
-  // Local UI state
   const [showingModelSelection, setShowingModelSelection] = useState(false);
 
-  // Request camera permission on mount
   useEffect(() => {
     vlm.requestCameraPermission();
   }, [vlm]);
 
-  // Check model status on mount
   useEffect(() => {
     vlm.checkModelStatus();
   }, [vlm]);
 
-  // Handle model selection
   const handleModelSelected = useCallback(
-  async (model: any) => {
-    // 1. Find the projector path
-    const mmprojPath = model.localPath
-      ? await FileSystem.findMmprojForModel(model.localPath)
-      : undefined;
+    async (model: SDKModelInfo) => {
+      const mmprojPath = model.localPath
+        ? await FileSystem.findMmprojForModel(model.localPath)
+        : undefined;
+      await vlm.loadModel(model.localPath ?? '', model.name, mmprojPath);
+      await vlm.checkModelStatus();
+      setShowingModelSelection(false);
+    },
+    [vlm]
+  );
 
-    // 2. Load the model FIRST
-    await vlm.loadModel(model.localPath, model.name, mmprojPath);
-    await vlm.checkModelStatus();
-    
-    // 3. Close the modal AFTER the model is safely loaded and state is stable
-    setShowingModelSelection(false); 
-  },
-  [vlm]
-);
-
-  // Copy description to clipboard
   const handleCopyDescription = useCallback(() => {
-    if (vlm.currentDescription) {
-      Clipboard.setString(vlm.currentDescription);
-    }
+    if (vlm.currentDescription) Clipboard.setString(vlm.currentDescription);
   }, [vlm.currentDescription]);
 
-  // Open system settings for camera permission
   const handleOpenSettings = useCallback(() => {
     Linking.openSettings();
   }, []);
 
-  // Main action button handler
   const handleMainAction = useCallback(() => {
-    if (vlm.isAutoStreaming) {
-      vlm.toggleAutoStreaming();
-    } else {
-      vlm.captureAndDescribe();
-    }
+    if (vlm.isAutoStreaming) vlm.toggleAutoStreaming();
+    else vlm.captureAndDescribe();
   }, [vlm]);
 
-  // Dismiss error
-  const handleDismissError = useCallback(() => {
-    // Reset error in next render to prevent flicker
-    // Since hook doesn't expose setError, we'll just let user retry
-  }, []);
-
-  // Main action button color
   const mainButtonColor = vlm.isAutoStreaming
-    ? Colors.primaryRed
+    ? colors.error
     : vlm.isProcessing
-    ? Colors.textTertiary
-    : Colors.primaryOrange;
+    ? colors.textTertiary
+    : colors.primary;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Model Required Overlay */}
-      {!vlm.isModelLoaded && (
+    <SafeAreaView
+      edges={['top', 'bottom']}
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      {!vlm.isModelLoaded ? (
         <View style={styles.modelRequiredOverlay}>
-          <Icon
-            name="scan-outline"
-            size={48}
-            color={Colors.primaryOrange}
-            style={styles.modelRequiredIcon}
-          />
-          <Text style={styles.modelRequiredTitle}>Vision AI</Text>
-          <Text style={styles.modelRequiredSubtitle}>
+          <View style={styles.modelRequiredIconWrap}>
+            <AppIcon name="scan-outline" size={48} color={colors.primary} />
+          </View>
+          <Text style={[Typography.title2, { color: colors.text, textAlign: 'center' }]}>
+            Vision AI
+          </Text>
+          <Text
+            style={[
+              Typography.body,
+              { color: colors.textSecondary, textAlign: 'center', marginTop: 8 },
+            ]}
+          >
             Load a vision-language model to describe images and scenes
           </Text>
           <TouchableOpacity
-            style={styles.selectModelButton}
+            style={[styles.selectModelButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowingModelSelection(true)}
             activeOpacity={0.8}
           >
-            <Text style={styles.selectModelButtonText}>Select Model</Text>
+            <Text style={[Typography.headline, { color: colors.onPrimary }]}>
+              Select Model
+            </Text>
           </TouchableOpacity>
         </View>
-      )}
-
-      {/* Main Content (when model loaded) */}
-      {vlm.isModelLoaded && (
+      ) : (
         <View style={styles.mainContent}>
-          {/* Camera Preview */}
-          <View style={[styles.cameraPreview, { height: screenHeight * 0.45 }]}>
+          <View
+            style={[
+              styles.cameraPreview,
+              { height: screenHeight * 0.45, backgroundColor: colors.surfaceAlt },
+            ]}
+          >
             {device && vlm.isCameraAuthorized ? (
               <Camera
                 ref={cameraRef}
@@ -151,79 +121,94 @@ const VLMScreen: React.FC = () => {
               />
             ) : !vlm.isCameraAuthorized ? (
               <View style={styles.cameraPermissionView}>
-                <Icon
-                  name="camera"
-                  size={48}
-                  color={Colors.textSecondary}
-                  style={styles.cameraPermissionIcon}
-                />
-                <Text style={styles.cameraPermissionTitle}>
+                <AppIcon name="camera" size={48} color={colors.textSecondary} />
+                <Text
+                  style={[
+                    Typography.headline,
+                    { color: colors.text, marginTop: Spacing.medium },
+                  ]}
+                >
                   Camera Access Required
                 </Text>
                 <TouchableOpacity
-                  style={styles.openSettingsButton}
+                  style={[styles.openSettingsButton, { backgroundColor: colors.primary }]}
                   onPress={handleOpenSettings}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.openSettingsButtonText}>
+                  <Text style={[Typography.body, { color: colors.onPrimary }]}>
                     Open Settings
                   </Text>
                 </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.cameraPermissionView}>
-                <Text style={styles.cameraPermissionTitle}>
+                <Text style={[Typography.headline, { color: colors.text }]}>
                   No camera available
                 </Text>
               </View>
             )}
-
-            {/* Processing Overlay */}
-            {vlm.isProcessing && (
+            {vlm.isProcessing ? (
               <View style={styles.processingOverlay}>
                 <View style={styles.processingContent}>
-                  <ActivityIndicator size="small" color={Colors.textWhite} />
-                  <Text style={styles.processingText}>Analyzing...</Text>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text
+                    style={[Typography.caption, styles.processingText]}
+                  >
+                    Analyzing…
+                  </Text>
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
 
-          {/* Description Panel */}
-          <View style={styles.descriptionPanel}>
-            {/* Header Row */}
+          <View style={[styles.descriptionPanel, { backgroundColor: colors.background }]}>
             <View style={styles.descriptionHeader}>
               <View style={styles.descriptionTitleRow}>
-                <Text style={styles.descriptionTitle}>Description</Text>
-                {vlm.isAutoStreaming && (
-                  <View style={styles.liveBadge}>
-                    <View style={styles.liveDot} />
-                    <Text style={styles.liveText}>LIVE</Text>
+                <Text style={[Typography.headline, { color: colors.text }]}>
+                  Description
+                </Text>
+                {vlm.isAutoStreaming ? (
+                  <View
+                    style={[
+                      styles.liveBadge,
+                      { backgroundColor: `${colors.error}22` },
+                    ]}
+                  >
+                    <View
+                      style={[styles.liveDot, { backgroundColor: colors.error }]}
+                    />
+                    <Text
+                      style={[
+                        Typography.caption2,
+                        styles.liveText,
+                        { color: colors.error },
+                      ]}
+                    >
+                      LIVE
+                    </Text>
                   </View>
-                )}
+                ) : null}
               </View>
-              {vlm.currentDescription && (
+              {vlm.currentDescription ? (
                 <TouchableOpacity
                   onPress={handleCopyDescription}
                   activeOpacity={0.7}
                 >
-                  <Icon
-                    name="copy-outline"
-                    size={18}
-                    color={Colors.textSecondary}
-                  />
+                  <AppIcon name="copy-outline" size={18} color={colors.textSecondary} />
                 </TouchableOpacity>
-              )}
+              ) : null}
             </View>
 
-            {/* Error Banner */}
-            {vlm.error && (
-              <View style={styles.errorBanner}>
-                <Text style={styles.errorText}>{vlm.error}</Text>
+            {vlm.error ? (
+              <View
+                style={[styles.errorBanner, { backgroundColor: `${colors.error}18` }]}
+              >
+                <Text style={[Typography.caption, { color: colors.error }]}>
+                  {vlm.error}
+                </Text>
               </View>
-            )}
+            ) : null}
 
-            {/* Description Content */}
             <ScrollView
               style={styles.descriptionScroll}
               contentContainerStyle={styles.descriptionScrollContent}
@@ -231,8 +216,13 @@ const VLMScreen: React.FC = () => {
             >
               <Text
                 style={[
-                  styles.descriptionText,
-                  !vlm.currentDescription && styles.descriptionPlaceholder,
+                  Typography.body,
+                  {
+                    color: vlm.currentDescription
+                      ? colors.text
+                      : colors.textSecondary,
+                    lineHeight: 22,
+                  },
                 ]}
               >
                 {vlm.currentDescription ||
@@ -241,73 +231,75 @@ const VLMScreen: React.FC = () => {
             </ScrollView>
           </View>
 
-          {/* Control Bar */}
-          <View style={styles.controlBar}>
-            {/* Photos Button */}
+          <View
+            style={[
+              styles.controlBar,
+              { borderTopColor: colors.border, backgroundColor: colors.background },
+            ]}
+          >
             <TouchableOpacity
               style={styles.controlButton}
               onPress={vlm.selectPhotoAndDescribe}
               disabled={vlm.isProcessing}
               activeOpacity={0.7}
             >
-              <Icon
+              <AppIcon
                 name="images-outline"
                 size={24}
-                color={vlm.isProcessing ? Colors.textTertiary : Colors.primaryBlue}
+                color={vlm.isProcessing ? colors.textTertiary : colors.text}
               />
             </TouchableOpacity>
 
-            {/* Main Action Button */}
             <TouchableOpacity
-              style={[styles.mainActionButton, { backgroundColor: mainButtonColor }]}
+              style={[
+                styles.mainActionButton,
+                { backgroundColor: mainButtonColor },
+              ]}
               onPress={handleMainAction}
               disabled={vlm.isProcessing && !vlm.isAutoStreaming}
               activeOpacity={0.8}
             >
-              <Icon
+              <AppIcon
                 name={vlm.isAutoStreaming ? 'stop' : 'camera'}
                 size={28}
-                color={Colors.textWhite}
+                color={colors.onPrimary}
               />
             </TouchableOpacity>
 
-            {/* Live Button */}
             <TouchableOpacity
               style={styles.controlButton}
               onPress={vlm.toggleAutoStreaming}
               disabled={vlm.isProcessing && !vlm.isAutoStreaming}
               activeOpacity={0.7}
             >
-              <Icon
+              <AppIcon
                 name="radio-outline"
                 size={24}
                 color={
                   vlm.isAutoStreaming
-                    ? Colors.statusGreen
+                    ? colors.success
                     : vlm.isProcessing
-                    ? Colors.textTertiary
-                    : Colors.primaryBlue
+                    ? colors.textTertiary
+                    : colors.text
                 }
               />
             </TouchableOpacity>
 
-            {/* Model Button */}
             <TouchableOpacity
               style={styles.controlButton}
               onPress={() => setShowingModelSelection(true)}
               activeOpacity={0.7}
             >
-              <Icon
+              <AppIcon
                 name="hardware-chip-outline"
                 size={24}
-                color={Colors.primaryBlue}
+                color={colors.text}
               />
             </TouchableOpacity>
           </View>
         </View>
       )}
 
-      {/* Model Selection Sheet */}
       <ModelSelectionSheet
         visible={showingModelSelection}
         context={ModelSelectionContext.VLM}
@@ -318,197 +310,128 @@ const VLMScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  mainContent: {
-    flex: 1,
-  },
-
-  // Model Required Overlay
-  modelRequiredOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.overlayMedium,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Padding.padding24,
-    zIndex: 100,
-  },
-  modelRequiredIcon: {
-    marginBottom: Spacing.large,
-  },
-  modelRequiredTitle: {
-    ...Typography.title2,
-    color: Colors.textWhite,
-    marginBottom: Spacing.small,
-    textAlign: 'center',
-  },
-  modelRequiredSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: Spacing.xLarge,
-  },
-  selectModelButton: {
-    backgroundColor: Colors.primaryOrange,
-    paddingHorizontal: Padding.padding24,
-    paddingVertical: Padding.padding12,
-    borderRadius: BorderRadius.medium,
-  },
-  selectModelButtonText: {
-    ...Typography.headline,
-    color: Colors.textWhite,
-  },
-
-  // Camera Preview
-  cameraPreview: {
-    backgroundColor: Colors.backgroundPrimary,
-    position: 'relative',
-  },
-  cameraPermissionView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  cameraPermissionIcon: {
-    marginBottom: Spacing.medium,
-  },
-  cameraPermissionTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.medium,
-  },
-  openSettingsButton: {
-    backgroundColor: Colors.primaryBlue,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding8,
-    borderRadius: BorderRadius.regular,
-  },
-  openSettingsButtonText: {
-    ...Typography.body,
-    color: Colors.textWhite,
-  },
-
-  // Processing Overlay
-  processingOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: Spacing.large,
-  },
-  processingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    borderRadius: BorderRadius.pill,
-  },
-  processingText: {
-    ...Typography.caption,
-    color: Colors.textWhite,
-    marginLeft: Spacing.smallMedium,
-  },
-
-  // Description Panel
-  descriptionPanel: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding14,
-  },
-  descriptionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.mediumLarge,
-  },
-  descriptionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  descriptionTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: `${Colors.statusGreen}20`,
-    paddingHorizontal: Spacing.smallMedium,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-    marginLeft: Spacing.small,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.statusGreen,
-    marginRight: Spacing.xSmall,
-  },
-  liveText: {
-    ...Typography.caption2,
-    color: Colors.statusGreen,
-    fontWeight: '700',
-  },
-  errorBanner: {
-    backgroundColor: Colors.badgeRed,
-    padding: Spacing.smallMedium,
-    borderRadius: BorderRadius.regular,
-    marginBottom: Spacing.medium,
-  },
-  errorText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-  },
-  descriptionScroll: {
-    flex: 1,
-  },
-  descriptionScrollContent: {
-    flexGrow: 1,
-  },
-  descriptionText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 22,
-  },
-  descriptionPlaceholder: {
-    color: Colors.textSecondary,
-  },
-
-  // Control Bar
-  controlBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundPrimary,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.borderLight,
-    paddingVertical: Spacing.large,
-    paddingHorizontal: Padding.padding16,
-  },
-  controlButton: {
-    padding: Spacing.medium,
-  },
-  mainActionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { flex: 1 },
+    mainContent: { flex: 1 },
+    modelRequiredOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Padding.padding24,
+    },
+    modelRequiredIconWrap: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: colors.primarySoft,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: Spacing.xLarge,
+    },
+    selectModelButton: {
+      paddingHorizontal: Padding.padding24,
+      paddingVertical: Padding.padding12,
+      borderRadius: BorderRadius.large,
+      marginTop: Spacing.xLarge,
+    },
+    cameraPreview: {
+      position: 'relative',
+    },
+    cameraPermissionView: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Padding.padding16,
+    },
+    openSettingsButton: {
+      paddingHorizontal: Padding.padding16,
+      paddingVertical: Padding.padding8,
+      borderRadius: BorderRadius.regular,
+      marginTop: Spacing.medium,
+    },
+    processingOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      paddingBottom: Spacing.large,
+    },
+    processingContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.66)',
+      paddingHorizontal: Padding.padding16,
+      paddingVertical: Padding.padding12,
+      borderRadius: BorderRadius.pill,
+    },
+    processingText: {
+      color: '#FFFFFF',
+      marginLeft: Spacing.smallMedium,
+    },
+    descriptionPanel: {
+      flex: 1,
+      paddingHorizontal: Padding.padding16,
+      paddingVertical: Padding.padding14,
+    },
+    descriptionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: Spacing.mediumLarge,
+    },
+    descriptionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    liveBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Spacing.smallMedium,
+      paddingVertical: Spacing.xxSmall,
+      borderRadius: BorderRadius.small,
+      marginLeft: Spacing.small,
+    },
+    liveDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: Spacing.xSmall,
+    },
+    liveText: {
+      fontWeight: '700',
+    },
+    errorBanner: {
+      padding: Spacing.smallMedium,
+      borderRadius: BorderRadius.regular,
+      marginBottom: Spacing.medium,
+    },
+    descriptionScroll: { flex: 1 },
+    descriptionScrollContent: { flexGrow: 1 },
+    controlBar: {
+      flexDirection: 'row',
+      justifyContent: 'space-evenly',
+      alignItems: 'center',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      paddingVertical: Spacing.large,
+      paddingHorizontal: Padding.padding16,
+    },
+    controlButton: {
+      padding: Spacing.medium,
+    },
+    mainActionButton: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+  });
 
 export default VLMScreen;

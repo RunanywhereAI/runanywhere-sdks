@@ -1,81 +1,53 @@
-/**
- * ModelStatusBanner Component
- *
- * Shows the current model status with options to select or change model.
- *
- * Reference: iOS ModelStatusBanner equivalent
- */
-
 import React from 'react';
 import {
-  View,
+  ActivityIndicator,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../../theme/colors';
+import { AppIcon } from './AppIcon';
+import type { AppIconName } from './AppIcon';
+import { useTheme } from '../../theme';
 import { Typography } from '../../theme/typography';
-import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
+import { BorderRadius, Padding, Spacing } from '../../theme/spacing';
+import type { ThemeColors } from '../../theme/colors';
 import { LLMFramework, FrameworkDisplayNames } from '../../types/model';
 
 interface ModelStatusBannerProps {
-  /** Model name if loaded */
   modelName?: string;
-  /** Framework being used */
   framework?: LLMFramework;
-  /** Whether model is loading */
   isLoading?: boolean;
-  /** Loading progress (0-1) */
   loadProgress?: number;
-  /** Callback when select/change button pressed */
   onSelectModel: () => void;
-  /** Placeholder text when no model */
   placeholder?: string;
 }
 
-/**
- * Get framework-specific icon name
- */
-const getFrameworkIcon = (framework: LLMFramework): string => {
-  switch (framework) {
-    case LLMFramework.LlamaCpp:
-      return 'cube-outline';
-    case LLMFramework.WhisperKit:
-      return 'mic-outline';
-    case LLMFramework.PiperTTS:
-      return 'volume-high-outline';
-    case LLMFramework.FoundationModels:
-      return 'sparkles-outline';
-    case LLMFramework.CoreML:
-      return 'hardware-chip-outline';
-    case LLMFramework.ONNX:
-      return 'git-network-outline';
-    default:
-      return 'cube-outline';
-  }
+const frameworkIconMap: Partial<Record<LLMFramework, AppIconName>> = {
+  [LLMFramework.LlamaCpp]: 'cube-outline',
+  [LLMFramework.WhisperKit]: 'mic-outline',
+  [LLMFramework.PiperTTS]: 'volume-high-outline',
+  [LLMFramework.FoundationModels]: 'sparkles-outline',
+  [LLMFramework.CoreML]: 'hardware-chip-outline',
+  [LLMFramework.ONNX]: 'cube-outline',
 };
 
-/**
- * Get framework-specific color
- */
-const getFrameworkColor = (framework: LLMFramework): string => {
+const frameworkColor = (framework: LLMFramework, c: ThemeColors): string => {
   switch (framework) {
     case LLMFramework.LlamaCpp:
-      return Colors.frameworkLlamaCpp;
+      return c.frameworkLlamaCpp;
     case LLMFramework.WhisperKit:
-      return Colors.frameworkWhisperKit;
+      return c.frameworkWhisperKit;
     case LLMFramework.PiperTTS:
-      return Colors.frameworkPiperTTS;
+      return c.frameworkPiperTTS;
     case LLMFramework.FoundationModels:
-      return Colors.frameworkFoundationModels;
+      return c.frameworkFoundationModels;
     case LLMFramework.CoreML:
-      return Colors.frameworkCoreML;
+      return c.frameworkCoreML;
     case LLMFramework.ONNX:
-      return Colors.frameworkONNX;
+      return c.frameworkONNX;
     default:
-      return Colors.primaryBlue;
+      return c.primary;
   }
 };
 
@@ -87,87 +59,116 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
   onSelectModel,
   placeholder = 'Select a model to get started',
 }) => {
-  // Loading state
+  const { colors } = useTheme();
+
   if (isLoading) {
     return (
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
         <View style={styles.loadingContent}>
-          <ActivityIndicator size="small" color={Colors.primaryBlue} />
-          <Text style={styles.loadingText}>
-            Loading model...
-            {loadProgress !== undefined &&
-              ` ${Math.round(loadProgress * 100)}%`}
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text
+            style={[Typography.subheadline, { color: colors.textSecondary }]}
+          >
+            Loading model…
+            {loadProgress !== undefined
+              ? ` ${Math.round(loadProgress * 100)}%`
+              : ''}
           </Text>
         </View>
-        {loadProgress !== undefined && (
-          <View style={styles.progressBar}>
+        {loadProgress !== undefined ? (
+          <View
+            style={[
+              styles.progressBar,
+              { backgroundColor: colors.surfaceAlt },
+            ]}
+          >
             <View
-              style={[styles.progressFill, { width: `${loadProgress * 100}%` }]}
+              style={[
+                styles.progressFill,
+                {
+                  backgroundColor: colors.primary,
+                  width: `${loadProgress * 100}%`,
+                },
+              ]}
             />
           </View>
-        )}
+        ) : null}
       </View>
     );
   }
 
-  // No model state
   if (!modelName || !framework) {
     return (
       <TouchableOpacity
-        style={[styles.container, styles.emptyContainer]}
-        onPress={onSelectModel}
         activeOpacity={0.7}
+        onPress={onSelectModel}
+        style={[
+          styles.container,
+          styles.emptyContainer,
+          {
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+          },
+        ]}
       >
         <View style={styles.emptyContent}>
-          <Icon
-            name="add-circle-outline"
-            size={20}
-            color={Colors.primaryBlue}
-          />
-          <Text style={styles.emptyText}>{placeholder}</Text>
+          <AppIcon name="add-circle-outline" size={20} color={colors.primary} />
+          <Text style={[Typography.subheadline, { color: colors.textSecondary }]}>
+            {placeholder}
+          </Text>
         </View>
         <View style={styles.selectButton}>
-          <Text style={styles.selectButtonText}>Select Model</Text>
-          <Icon name="chevron-forward" size={16} color={Colors.primaryBlue} />
+          <Text
+            style={[Typography.subheadline, styles.boldText, { color: colors.primary }]}
+          >
+            Select Model
+          </Text>
+          <AppIcon name="chevron-forward" size={16} color={colors.primary} />
         </View>
       </TouchableOpacity>
     );
   }
 
-  // Model loaded state
-  const frameworkColor = getFrameworkColor(framework);
-  const frameworkIcon = getFrameworkIcon(framework);
-  const frameworkName = FrameworkDisplayNames[framework] || framework;
+  const fwColor = frameworkColor(framework, colors);
+  const fwIcon: AppIconName = frameworkIconMap[framework] ?? 'cube-outline';
+  const fwName = FrameworkDisplayNames[framework] || framework;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+    >
       <View style={styles.loadedContent}>
-        {/* Framework Badge */}
-        <View
-          style={[
-            styles.frameworkBadge,
-            { backgroundColor: `${frameworkColor}20` },
-          ]}
-        >
-          <Icon name={frameworkIcon} size={14} color={frameworkColor} />
-          <Text style={[styles.frameworkText, { color: frameworkColor }]}>
-            {frameworkName}
+        <View style={[styles.frameworkBadge, { backgroundColor: `${fwColor}20` }]}>
+          <AppIcon name={fwIcon} size={14} color={fwColor} />
+          <Text style={[Typography.caption, styles.boldText, { color: fwColor }]}>
+            {fwName}
           </Text>
         </View>
-
-        {/* Model Name */}
-        <Text style={styles.modelName} numberOfLines={1}>
+        <Text
+          style={[Typography.subheadline, { color: colors.text, flex: 1 }]}
+          numberOfLines={1}
+        >
           {modelName}
         </Text>
       </View>
-
-      {/* Change Button */}
       <TouchableOpacity
         style={styles.changeButton}
         onPress={onSelectModel}
         activeOpacity={0.7}
       >
-        <Text style={styles.changeButtonText}>Change</Text>
+        <Text
+          style={[Typography.subheadline, styles.boldText, { color: colors.primary }]}
+        >
+          Change
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -175,38 +176,29 @@ export const ModelStatusBanner: React.FC<ModelStatusBannerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.backgroundSecondary,
     borderRadius: BorderRadius.medium,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: Padding.padding12,
     marginHorizontal: Padding.padding16,
     marginVertical: Spacing.small,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.smallMedium,
   },
   emptyContainer: {
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
     borderStyle: 'dashed',
   },
   emptyContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.smallMedium,
-  },
-  emptyText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
+    flex: 1,
   },
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xSmall,
-  },
-  selectButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
   },
   loadingContent: {
     flexDirection: 'row',
@@ -214,24 +206,18 @@ const styles = StyleSheet.create({
     gap: Spacing.smallMedium,
     flex: 1,
   },
-  loadingText: {
-    ...Typography.subheadline,
-    color: Colors.textSecondary,
-  },
   progressBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: Colors.backgroundGray5,
     borderBottomLeftRadius: BorderRadius.medium,
     borderBottomRightRadius: BorderRadius.medium,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: Colors.primaryBlue,
   },
   loadedContent: {
     flexDirection: 'row',
@@ -247,22 +233,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xSmall,
     borderRadius: BorderRadius.small,
   },
-  frameworkText: {
-    ...Typography.caption,
-    fontWeight: '600',
-  },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    flex: 1,
-  },
   changeButton: {
     paddingHorizontal: Spacing.medium,
     paddingVertical: Spacing.small,
   },
-  changeButtonText: {
-    ...Typography.subheadline,
-    color: Colors.primaryBlue,
+  boldText: {
     fontWeight: '600',
   },
 });

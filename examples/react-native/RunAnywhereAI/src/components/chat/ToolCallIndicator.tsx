@@ -15,7 +15,7 @@ import {
   ScrollView,
   SafeAreaView,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { AppIcon } from '../common/AppIcon';
 import { Colors } from '../../theme/colors';
 import { Typography } from '../../theme/typography';
 import { Spacing, BorderRadius, Padding } from '../../theme/spacing';
@@ -55,7 +55,7 @@ export const ToolCallIndicator: React.FC<ToolCallIndicatorProps> = ({
         onPress={() => setShowSheet(true)}
         activeOpacity={0.7}
       >
-        <Icon
+        <AppIcon
           name={toolCallInfo.success ? 'build-outline' : 'warning-outline'}
           size={12}
           color={iconColor}
@@ -117,7 +117,7 @@ const ToolCallDetailSheet: React.FC<ToolCallDetailSheetProps> = ({
               },
             ]}
           >
-            <Icon
+            <AppIcon
               name={
                 toolCallInfo.success
                   ? 'checkmark-circle'
@@ -217,7 +217,7 @@ export const ToolCallingBadge: React.FC<ToolCallingBadgeProps> = ({
 }) => {
   return (
     <View style={styles.toolCallingBadge}>
-      <Icon name="build-outline" size={12} color={Colors.primaryBlue} />
+      <AppIcon name="build-outline" size={12} color={Colors.primaryBlue} />
       <Text style={styles.toolCallingBadgeText}>
         Tools enabled ({toolCount})
       </Text>
