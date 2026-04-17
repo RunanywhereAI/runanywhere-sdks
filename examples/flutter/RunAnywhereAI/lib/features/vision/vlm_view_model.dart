@@ -56,6 +56,9 @@ class VLMViewModel extends ChangeNotifier {
   Future<void> initializeCamera() async {
     try {
       final devices = await _cameraBackend.listDevices();
+      if (_isDisposed) {
+        return;
+      }
       if (devices.isEmpty) {
         _hasCameraDevice = false;
         _isCameraInitialized = false;
@@ -71,13 +74,31 @@ class VLMViewModel extends ChangeNotifier {
       );
 
       await _cameraSession?.dispose();
-      _cameraSession = _cameraBackend.createSession(device);
-      await _cameraSession!.initialize();
+      if (_isDisposed) {
+        return;
+      }
+      final nextSession = _cameraBackend.createSession(device);
+      if (_isDisposed) {
+        unawaited(nextSession.dispose());
+        return;
+      }
+      _cameraSession = nextSession;
+      await nextSession.initialize();
+      if (_isDisposed) {
+        if (identical(_cameraSession, nextSession)) {
+          _cameraSession = null;
+        }
+        unawaited(nextSession.dispose());
+        return;
+      }
 
       _isCameraInitialized = true;
       _error = null;
       _safeNotifyListeners();
     } catch (e) {
+      if (_isDisposed) {
+        return;
+      }
       _isCameraInitialized = false;
       _error = 'Failed to initialize camera: $e';
       _safeNotifyListeners();
@@ -87,6 +108,9 @@ class VLMViewModel extends ChangeNotifier {
   Future<void> checkCameraAuthorization(BuildContext context) async {
     _isCameraAuthorized =
         await _permissionGateway.requestCameraPermission(context);
+    if (_isDisposed) {
+      return;
+    }
     _safeNotifyListeners();
   }
 
@@ -103,11 +127,17 @@ class VLMViewModel extends ChangeNotifier {
   ) async {
     try {
       await _vlmService.loadModel(modelId);
+      if (_isDisposed) {
+        return;
+      }
       _isModelLoaded = true;
       _loadedModelName = modelName;
       _error = null;
       _safeNotifyListeners();
     } catch (e) {
+      if (_isDisposed) {
+        return;
+      }
       _error = 'Failed to load model: $e';
       _safeNotifyListeners();
       if (context.mounted) {
@@ -119,7 +149,7 @@ class VLMViewModel extends ChangeNotifier {
   }
 
   Future<void> describeCurrentFrame() async {
-    if (_isProcessing || !_isCameraInitialized || _cameraSession == null) {
+    if (_isDisposed || _isProcessing || !_isCameraInitialized || _cameraSession == null) {
       return;
     }
 
@@ -130,6 +160,9 @@ class VLMViewModel extends ChangeNotifier {
 
     try {
       final imagePath = await _cameraSession!.captureStill();
+      if (_isDisposed) {
+        return;
+      }
       final tokens = _vlmService.processImageStream(
         imagePath,
         prompt: 'Describe what you see briefly.',
@@ -138,11 +171,17 @@ class VLMViewModel extends ChangeNotifier {
 
       final buffer = StringBuffer();
       await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
         _currentDescription = buffer.toString();
         _safeNotifyListeners();
       }
     } catch (e) {
+      if (_isDisposed) {
+        return;
+      }
       _error = e.toString();
       _safeNotifyListeners();
     } finally {
@@ -152,6 +191,9 @@ class VLMViewModel extends ChangeNotifier {
   }
 
   Future<void> describePickedImage(String imagePath) async {
+    if (_isDisposed) {
+      return;
+    }
     _isProcessing = true;
     _error = null;
     _currentDescription = '';
@@ -166,11 +208,17 @@ class VLMViewModel extends ChangeNotifier {
 
       final buffer = StringBuffer();
       await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
         _currentDescription = buffer.toString();
         _safeNotifyListeners();
       }
     } catch (e) {
+      if (_isDisposed) {
+        return;
+      }
       _error = e.toString();
       _safeNotifyListeners();
     } finally {
@@ -203,7 +251,7 @@ class VLMViewModel extends ChangeNotifier {
   }
 
   Future<void> _describeCurrentFrameForAutoStream() async {
-    if (_isProcessing || !_isCameraInitialized || _cameraSession == null) {
+    if (_isDisposed || _isProcessing || !_isCameraInitialized || _cameraSession == null) {
       return;
     }
 
@@ -212,6 +260,9 @@ class VLMViewModel extends ChangeNotifier {
 
     try {
       final imagePath = await _cameraSession!.captureStill();
+      if (_isDisposed) {
+        return;
+      }
       final tokens = _vlmService.processImageStream(
         imagePath,
         prompt: 'Describe what you see in one sentence.',
@@ -220,6 +271,9 @@ class VLMViewModel extends ChangeNotifier {
 
       final buffer = StringBuffer();
       await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
         _currentDescription = buffer.toString();
         _safeNotifyListeners();

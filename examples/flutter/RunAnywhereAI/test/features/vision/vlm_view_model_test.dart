@@ -69,9 +69,11 @@ class _FakeCameraBackend implements VisionCameraBackend {
 
   final List<VisionCameraDevice> devices;
   final VisionCameraSession? session;
+  int createSessionCount = 0;
 
   @override
   VisionCameraSession createSession(VisionCameraDevice device) {
+    createSessionCount += 1;
     return session ?? _FakeCameraSession(capturePath: 'unused.jpg');
   }
 
@@ -111,6 +113,31 @@ class _FakeVlmService implements VisionVlmService {
 
   @override
   bool get isModelLoaded => loaded;
+}
+
+class _DelayedListCameraBackend implements VisionCameraBackend {
+  _DelayedListCameraBackend({
+    required this.devices,
+    required this.listCompleter,
+    required this.sessionFactory,
+  });
+
+  final List<VisionCameraDevice> devices;
+  final Completer<void> listCompleter;
+  final VisionCameraSession Function() sessionFactory;
+  int createSessionCount = 0;
+
+  @override
+  VisionCameraSession createSession(VisionCameraDevice device) {
+    createSessionCount += 1;
+    return sessionFactory();
+  }
+
+  @override
+  Future<List<VisionCameraDevice>> listDevices() async {
+    await listCompleter.future;
+    return devices;
+  }
 }
 
 void main() {
@@ -285,5 +312,70 @@ void main() {
 
     await expectLater(inFlight, completes);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'initializeCamera dispose race does not create or initialize session after dispose',
+      (tester) async {
+    final listCompleter = Completer<void>();
+    final session = _FakeCameraSession(capturePath: 'frame.jpg');
+    final backend = _DelayedListCameraBackend(
+      listCompleter: listCompleter,
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      sessionFactory: () => session,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: _FakeVlmService(),
+    );
+
+    final inFlight = viewModel.initializeCamera();
+    viewModel.dispose();
+    listCompleter.complete();
+    await expectLater(inFlight, completes);
+
+    expect(backend.createSessionCount, 0);
+    expect(session.initialized, isFalse);
+  });
+
+  testWidgets(
+      'describeCurrentFrame dispose during capture does not start processImageStream',
+      (tester) async {
+    final captureCompleter = Completer<void>();
+    final fakeSession = _FakeCameraSession(
+      capturePath: 'frame.jpg',
+      captureCompleter: captureCompleter,
+    );
+    final fakeVlm = _FakeVlmService();
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: fakeVlm,
+    );
+
+    await viewModel.initializeCamera();
+    final inFlight = viewModel.describeCurrentFrame();
+    viewModel.dispose();
+    captureCompleter.complete();
+    await expectLater(inFlight, completes);
+
+    expect(fakeVlm.processedPaths, isEmpty);
   });
 }
