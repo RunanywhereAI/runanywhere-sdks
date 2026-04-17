@@ -16,7 +16,7 @@ class VisionHubView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final capability = PlatformCapabilityService.shared;
+    const capability = PlatformCapabilityService.shared;
     if (!capability.supportsVision) {
       return Scaffold(
         appBar: AppBar(

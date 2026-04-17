@@ -168,3 +168,17 @@ Notes:
   - `onnxruntime_providers_shared.dll`
   - `sherpa-onnx-c-api.dll`
   - companion runtime DLLs staged by the ONNX plugin
+
+## Flutter Example Windows Vision
+
+The Flutter example Vision page now supports Windows through the `camera_windows`
+plugin while continuing to use the standard `camera` API in the app code.
+
+Notes:
+
+- The project pins `camera_windows` to a Dart 3.3-compatible version because the
+  current repository workflow uses `fvm flutter` on the 3.19 line.
+- Live mode still uses repeated still captures, matching the current Flutter
+  Vision implementation rather than raw frame streaming.
+- Mobile-specific camera controls such as torch, exposure point, and focus point
+  may remain unavailable on Windows camera devices.
