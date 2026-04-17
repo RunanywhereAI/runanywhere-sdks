@@ -16,10 +16,6 @@ if(NOT DEFINED LLAMACPP_VERSION)
 endif()
 set(LLAMA_CPP_VERSION "${LLAMACPP_VERSION}")
 
-if(NOT RAC_BUILD_VLM)
-    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
-endif()
-
 FetchContent_Declare(
     llamacpp
     GIT_REPOSITORY https://github.com/ggerganov/llama.cpp.git
@@ -159,8 +155,11 @@ set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
 )
 
-# Option to enable VLM multimodal support (requires mtmd from llama.cpp)
 option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
+if(NOT RAC_BUILD_VLM)
+    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+endif()
+
 if(RAC_VLM_USE_MTMD)
     message(STATUS "VLM multimodal support enabled")
     # Add VLM Backend sources (Vision Language Model)
