@@ -20,12 +20,15 @@ class _FakeCameraSession implements VisionCameraSession {
   _FakeCameraSession({
     required this.capturePath,
     this.preview = const SizedBox(key: Key('fake-preview')),
+    this.disposeCompleter,
   });
 
   final String capturePath;
   final Widget preview;
+  final Completer<void>? disposeCompleter;
   bool initialized = false;
   bool disposed = false;
+  int disposeCount = 0;
 
   @override
   Widget buildPreview() => preview;
@@ -35,6 +38,10 @@ class _FakeCameraSession implements VisionCameraSession {
 
   @override
   Future<void> dispose() async {
+    disposeCount += 1;
+    if (disposeCompleter != null) {
+      await disposeCompleter!.future;
+    }
     disposed = true;
   }
 
@@ -169,5 +176,68 @@ void main() {
     expect(fakeVlm.processedPaths, ['frame.jpg']);
     expect(viewModel.currentDescription, 'hello windows');
     expect(viewModel.isProcessing, isFalse);
+  });
+
+  testWidgets('initializeCamera exposes cameraSession preview contract',
+      (tester) async {
+    const previewKey = Key('preview-contract');
+    final fakeSession = _FakeCameraSession(
+      capturePath: 'frame.jpg',
+      preview: const SizedBox(key: previewKey),
+    );
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: _FakeVlmService(),
+    );
+
+    await viewModel.initializeCamera();
+    final preview = viewModel.cameraSession!.buildPreview() as SizedBox;
+
+    expect(viewModel.cameraSession, same(fakeSession));
+    expect(preview.key, previewKey);
+  });
+
+  testWidgets('disposeCamera race does not double-dispose camera session',
+      (tester) async {
+    final disposeCompleter = Completer<void>();
+    final fakeSession = _FakeCameraSession(
+      capturePath: 'frame.jpg',
+      disposeCompleter: disposeCompleter,
+    );
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: _FakeVlmService(),
+    );
+
+    await viewModel.initializeCamera();
+
+    viewModel.disposeCamera();
+    viewModel.dispose();
+    disposeCompleter.complete();
+    await tester.pump();
+
+    expect(fakeSession.disposeCount, 1);
   });
 }

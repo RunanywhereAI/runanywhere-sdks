@@ -226,17 +226,20 @@ class VLMViewModel extends ChangeNotifier {
 
   Future<void> cancelGeneration() => _vlmService.cancelGeneration();
 
-  Future<void> disposeCamera() async {
-    await _cameraSession?.dispose();
+  void disposeCamera() {
+    final session = _cameraSession;
     _cameraSession = null;
     _isCameraInitialized = false;
     notifyListeners();
+    unawaited(session?.dispose());
   }
 
   @override
   void dispose() {
     _autoStreamTimer?.cancel();
-    unawaited(_cameraSession?.dispose());
+    final session = _cameraSession;
+    _cameraSession = null;
+    unawaited(session?.dispose());
     super.dispose();
   }
 }

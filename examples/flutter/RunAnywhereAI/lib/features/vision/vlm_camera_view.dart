@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -145,7 +144,7 @@ class _VLMCameraViewState extends State<VLMCameraView> {
   }
 
   Widget _buildCameraPreviewContent() {
-    if (!_viewModel.isCameraInitialized || _viewModel.cameraController == null) {
+    if (!_viewModel.isCameraInitialized || _viewModel.cameraSession == null) {
       return const Center(
         child: CircularProgressIndicator(color: Colors.white),
       );
@@ -153,7 +152,7 @@ class _VLMCameraViewState extends State<VLMCameraView> {
 
     return Container(
       color: Colors.black,
-      child: CameraPreview(_viewModel.cameraController!),
+      child: _viewModel.cameraSession!.buildPreview(),
     );
   }
 
