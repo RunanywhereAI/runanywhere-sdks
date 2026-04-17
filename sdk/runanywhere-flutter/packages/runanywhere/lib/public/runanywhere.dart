@@ -16,6 +16,7 @@ import 'package:runanywhere/foundation/dependency_injection/service_container.da
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/internal/vlm_file_resolution.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
@@ -23,11 +24,9 @@ import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
-import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -1819,51 +1818,12 @@ class RunAnywhere {
     String modelFolder,
     ModelInfo model,
   ) async {
-    // If modelFolder points to a file (e.g. .gguf), use its parent directory
-    final file = File(modelFolder);
-    final dir = await file.exists() ? file.parent : Directory(modelFolder);
-    if (!await dir.exists()) return null;
-    final dirPath = dir.path;
-
-    try {
-      // List folder contents
-      final entities = await dir.list().toList();
-      final files =
-          entities.whereType<File>().map((f) => f.path.split('/').last).toList();
-
-      // Find .gguf files that are NOT mmproj files (main model)
-      final ggufFiles = files.where((f) => f.toLowerCase().endsWith('.gguf')).toList();
-      final mainModelFiles =
-          ggufFiles.where((f) => !f.toLowerCase().contains('mmproj')).toList();
-
-      if (mainModelFiles.isNotEmpty) {
-        return '$dirPath/${mainModelFiles.first}';
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return resolveVlmMainModelPath(modelFolder);
   }
 
   /// Find mmproj file in a directory
   static Future<String?> _findMmprojFile(String modelDirPath) async {
-    final dir = Directory(modelDirPath);
-    if (!await dir.exists()) return null;
-
-    try {
-      await for (final entity in dir.list()) {
-        if (entity is File) {
-          final name = entity.path.split('/').last.toLowerCase();
-          if (name.contains('mmproj') && name.endsWith('.gguf')) {
-            return entity.path;
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return findVlmMmprojPath(modelDirPath);
   }
 
   // ============================================================================
