@@ -21,11 +21,13 @@ class _FakeCameraSession implements VisionCameraSession {
     required this.capturePath,
     this.preview = const SizedBox(key: Key('fake-preview')),
     this.disposeCompleter,
+    this.captureCompleter,
   });
 
   final String capturePath;
   final Widget preview;
   final Completer<void>? disposeCompleter;
+  final Completer<void>? captureCompleter;
   bool initialized = false;
   bool disposed = false;
   int disposeCount = 0;
@@ -34,7 +36,12 @@ class _FakeCameraSession implements VisionCameraSession {
   Widget buildPreview() => preview;
 
   @override
-  Future<String> captureStill() async => capturePath;
+  Future<String> captureStill() async {
+    if (captureCompleter != null) {
+      await captureCompleter!.future;
+    }
+    return capturePath;
+  }
 
   @override
   Future<void> dispose() async {
@@ -239,5 +246,44 @@ void main() {
     await tester.pump();
 
     expect(fakeSession.disposeCount, 1);
+  });
+
+  testWidgets('describeCurrentFrame ignores async completion after dispose',
+      (tester) async {
+    final captureCompleter = Completer<void>();
+    final tokenCompleter = Completer<void>();
+    final fakeSession = _FakeCameraSession(
+      capturePath: 'frame.jpg',
+      captureCompleter: captureCompleter,
+    );
+    final fakeVlm = _FakeVlmService()
+      ..nextStream = (() async* {
+        await tokenCompleter.future;
+        yield 'late';
+      })();
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: fakeVlm,
+    );
+
+    await viewModel.initializeCamera();
+    final inFlight = viewModel.describeCurrentFrame();
+    viewModel.dispose();
+    captureCompleter.complete();
+    tokenCompleter.complete();
+
+    await expectLater(inFlight, completes);
+    expect(tester.takeException(), isNull);
   });
 }

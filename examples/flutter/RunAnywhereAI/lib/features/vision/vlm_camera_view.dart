@@ -63,8 +63,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
   @override
   void dispose() {
     _viewModel.stopAutoStreaming();
-    _viewModel.disposeCamera();
     _viewModel.removeListener(_onViewModelChanged);
+    _viewModel.disposeCamera();
     _viewModel.dispose();
     super.dispose();
   }

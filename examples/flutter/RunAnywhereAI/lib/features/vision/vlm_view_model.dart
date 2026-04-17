@@ -30,9 +30,17 @@ class VLMViewModel extends ChangeNotifier {
   bool _isCameraInitialized = false;
   bool _isAutoStreamingEnabled = false;
   bool _hasCameraDevice = true;
+  bool _isDisposed = false;
 
   VisionCameraSession? _cameraSession;
   Timer? _autoStreamTimer;
+
+  void _safeNotifyListeners() {
+    if (_isDisposed) {
+      return;
+    }
+    notifyListeners();
+  }
 
   bool get isModelLoaded => _isModelLoaded;
   String? get loadedModelName => _loadedModelName;
@@ -52,7 +60,7 @@ class VLMViewModel extends ChangeNotifier {
         _hasCameraDevice = false;
         _isCameraInitialized = false;
         _error = 'No cameras available on this device.';
-        notifyListeners();
+        _safeNotifyListeners();
         return;
       }
 
@@ -68,24 +76,24 @@ class VLMViewModel extends ChangeNotifier {
 
       _isCameraInitialized = true;
       _error = null;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _isCameraInitialized = false;
       _error = 'Failed to initialize camera: $e';
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
   Future<void> checkCameraAuthorization(BuildContext context) async {
     _isCameraAuthorized =
         await _permissionGateway.requestCameraPermission(context);
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> checkModelStatus() async {
     _isModelLoaded = _vlmService.isModelLoaded;
     _loadedModelName = _isModelLoaded ? _vlmService.currentModelId : null;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> onModelSelected(
@@ -98,10 +106,10 @@ class VLMViewModel extends ChangeNotifier {
       _isModelLoaded = true;
       _loadedModelName = modelName;
       _error = null;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'Failed to load model: $e';
-      notifyListeners();
+      _safeNotifyListeners();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load model: $e')),
@@ -118,7 +126,7 @@ class VLMViewModel extends ChangeNotifier {
     _isProcessing = true;
     _error = null;
     _currentDescription = '';
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final imagePath = await _cameraSession!.captureStill();
@@ -132,14 +140,14 @@ class VLMViewModel extends ChangeNotifier {
       await for (final token in tokens) {
         buffer.write(token);
         _currentDescription = buffer.toString();
-        notifyListeners();
+        _safeNotifyListeners();
       }
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _safeNotifyListeners();
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -147,7 +155,7 @@ class VLMViewModel extends ChangeNotifier {
     _isProcessing = true;
     _error = null;
     _currentDescription = '';
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final tokens = _vlmService.processImageStream(
@@ -160,20 +168,20 @@ class VLMViewModel extends ChangeNotifier {
       await for (final token in tokens) {
         buffer.write(token);
         _currentDescription = buffer.toString();
-        notifyListeners();
+        _safeNotifyListeners();
       }
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _safeNotifyListeners();
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
   void toggleAutoStreaming() {
     _isAutoStreamingEnabled = !_isAutoStreamingEnabled;
-    notifyListeners();
+    _safeNotifyListeners();
 
     if (_isAutoStreamingEnabled) {
       _autoStreamTimer?.cancel();
@@ -191,7 +199,7 @@ class VLMViewModel extends ChangeNotifier {
     _autoStreamTimer?.cancel();
     _autoStreamTimer = null;
     _isAutoStreamingEnabled = false;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> _describeCurrentFrameForAutoStream() async {
@@ -200,7 +208,7 @@ class VLMViewModel extends ChangeNotifier {
     }
 
     _isProcessing = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final imagePath = await _cameraSession!.captureStill();
@@ -214,13 +222,13 @@ class VLMViewModel extends ChangeNotifier {
       await for (final token in tokens) {
         buffer.write(token);
         _currentDescription = buffer.toString();
-        notifyListeners();
+        _safeNotifyListeners();
       }
     } catch (_) {
       // Auto-stream failures stay non-blocking.
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -230,13 +238,15 @@ class VLMViewModel extends ChangeNotifier {
     final session = _cameraSession;
     _cameraSession = null;
     _isCameraInitialized = false;
-    notifyListeners();
+    _safeNotifyListeners();
     unawaited(session?.dispose());
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _autoStreamTimer?.cancel();
+    unawaited(_vlmService.cancelGeneration());
     final session = _cameraSession;
     _cameraSession = null;
     unawaited(session?.dispose());
