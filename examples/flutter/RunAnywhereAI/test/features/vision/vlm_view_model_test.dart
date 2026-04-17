@@ -22,12 +22,14 @@ class _FakeCameraSession implements VisionCameraSession {
     this.preview = const SizedBox(key: Key('fake-preview')),
     this.disposeCompleter,
     this.captureCompleter,
+    this.initializeError,
   });
 
   final String capturePath;
   final Widget preview;
   final Completer<void>? disposeCompleter;
   final Completer<void>? captureCompleter;
+  final Object? initializeError;
   bool initialized = false;
   bool disposed = false;
   int disposeCount = 0;
@@ -54,6 +56,9 @@ class _FakeCameraSession implements VisionCameraSession {
 
   @override
   Future<void> initialize() async {
+    if (initializeError != null) {
+      throw initializeError!;
+    }
     initialized = true;
   }
 
@@ -377,5 +382,36 @@ void main() {
     await expectLater(inFlight, completes);
 
     expect(fakeVlm.processedPaths, isEmpty);
+  });
+
+  testWidgets(
+      'initializeCamera disposes failed session and does not retain it',
+      (tester) async {
+    final fakeSession = _FakeCameraSession(
+      capturePath: 'frame.jpg',
+      initializeError: StateError('init failed'),
+    );
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: _FakeVlmService(),
+    );
+
+    await viewModel.initializeCamera();
+
+    expect(fakeSession.disposeCount, 1);
+    expect(viewModel.cameraSession, isNull);
+    expect(viewModel.isCameraInitialized, isFalse);
+    expect(viewModel.error, contains('init failed'));
   });
 }

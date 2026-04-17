@@ -82,15 +82,17 @@ class VLMViewModel extends ChangeNotifier {
         unawaited(nextSession.dispose());
         return;
       }
-      _cameraSession = nextSession;
-      await nextSession.initialize();
+      try {
+        await nextSession.initialize();
+      } catch (_) {
+        await nextSession.dispose();
+        rethrow;
+      }
       if (_isDisposed) {
-        if (identical(_cameraSession, nextSession)) {
-          _cameraSession = null;
-        }
         unawaited(nextSession.dispose());
         return;
       }
+      _cameraSession = nextSession;
 
       _isCameraInitialized = true;
       _error = null;
