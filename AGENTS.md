@@ -21,7 +21,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 
 - **Android SDK**: Installed at `/opt/android-sdk`. `ANDROID_HOME` and `JAVA_HOME` are set in `~/.bashrc`.
 - **JDK 17**: Required by Gradle JVM toolchain. Both JDK 17 and JDK 21 are installed.
-- **`testLocal` flag**: Set to `true` in `gradle.properties`. Pass `-Prunanywhere.useLocalNatives=false` to Gradle to avoid needing Android NDK (downloads pre-built JNI libs from GitHub releases instead of building locally).
+- **`useLocalNatives` flag**: Set to `true` in `gradle.properties`. Pass `-Prunanywhere.useLocalNatives=false` to Gradle to avoid needing Android NDK (downloads pre-built JNI libs from GitHub releases instead of building locally).
 - **C++ compiler**: Default clang on this VM lacks `libc++` headers. Use `gcc`/`g++` via `-DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`.
 - **`local.properties`**: Auto-created at root, `sdk/runanywhere-kotlin/`, and `examples/android/RunAnywhereAI/` with `sdk.dir=/opt/android-sdk`.
 - **pre-commit hooks**: Installed via `pre-commit install`. Requires `git config --unset-all core.hooksPath` first if `core.hooksPath` is set.

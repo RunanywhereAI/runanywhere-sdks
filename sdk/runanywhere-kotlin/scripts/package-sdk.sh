@@ -49,6 +49,7 @@ JNI_DIR="${KOTLIN_ROOT}/src/androidMain/jniLibs"
 if [ -n "$NATIVES_FROM" ]; then
     [ -d "$NATIVES_FROM" ] || { echo "ERROR: --natives-from not found: $NATIVES_FROM" >&2; exit 1; }
     echo ">> Staging .so files from $NATIVES_FROM → $JNI_DIR"
+    rm -rf "$JNI_DIR"
     mkdir -p "$JNI_DIR"
     for abi in arm64-v8a armeabi-v7a x86_64 x86; do
         if [ -d "$NATIVES_FROM/$abi" ]; then
@@ -102,5 +103,9 @@ done
 
 if [ -x "${REPO_ROOT}/scripts/validate-artifact.sh" ]; then
     echo ""
-    "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null || true
+    if [ "$RAC_BUILD_MODE" = "ci" ]; then
+        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null
+    else
+        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.aar "$DIST_DIR"/*.jar 2>/dev/null || true
+    fi
 fi

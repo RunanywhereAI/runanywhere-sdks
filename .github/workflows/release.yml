@@ -57,8 +57,9 @@ jobs:
           # VERSIONS file should already be bumped before tag (sync-versions.sh)
           PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
-            echo "::warning::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
-            echo "::warning::Run scripts/sync-versions.sh $V before tagging next time."
+            echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
+            echo "::error::Run scripts/sync-versions.sh $V before tagging."
+            exit 1
           fi
 
   # ---------------------------------------------------------------------------
@@ -267,7 +268,7 @@ jobs:
           ls -la sdk/runanywhere-kotlin/src/androidMain/jniLibs/ || true
       - name: Build Kotlin AAR + JAR
         working-directory: sdk/runanywhere-kotlin
-        run: ./gradlew build assembleRelease -x test --no-daemon || true
+        run: ./gradlew build assembleRelease -x test --no-daemon
       - name: Collect Kotlin SDK artifacts
         run: |
           mkdir -p sdk-staging/kotlin
@@ -314,7 +315,7 @@ jobs:
         run: |
           mkdir -p ../../sdk-staging/web
           for pkg in packages/core packages/llamacpp packages/onnx; do
-            (cd "$pkg" && npm pack --pack-destination ../../../../sdk-staging/web/) || true
+            (cd "$pkg" && npm pack --pack-destination ../../../../sdk-staging/web/)
           done
           ls -la ../../sdk-staging/web/ || true
           for f in ../../sdk-staging/web/*.tgz; do
@@ -500,7 +501,15 @@ jobs:
       - native_web
       - sdk_kotlin
       - sdk_web
-    if: always() && needs.validate.result == 'success'
+    if: >-
+      needs.validate.result == 'success' &&
+      needs.native_ios.result == 'success' &&
+      needs.native_android.result == 'success' &&
+      needs.native_linux.result != 'failure' &&
+      needs.native_windows.result != 'failure' &&
+      needs.native_web.result == 'success' &&
+      needs.sdk_kotlin.result != 'failure' &&
+      needs.sdk_web.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -543,6 +552,7 @@ jobs:
         with:
           tag_name: v${{ needs.validate.outputs.version }}
           name: v${{ needs.validate.outputs.version }}
+          draft: true
           generate_release_notes: true
           files: |
             release-flat/*

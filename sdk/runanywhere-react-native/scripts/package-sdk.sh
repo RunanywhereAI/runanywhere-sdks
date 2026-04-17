@@ -45,6 +45,7 @@ if [ -n "$NATIVES_FROM" ]; then
     for pkg_dir in "$RN_ROOT/packages"/*/; do
         pkg=$(basename "$pkg_dir")
         android_jni="$pkg_dir/android/src/main/jniLibs"
+        rm -rf "$android_jni" "$pkg_dir/ios/Frameworks"
         for abi in arm64-v8a armeabi-v7a x86_64 x86; do
             if [ -d "$NATIVES_FROM/$abi" ]; then
                 mkdir -p "$android_jni/$abi"
@@ -120,5 +121,9 @@ done
 
 if [ -x "${REPO_ROOT}/scripts/validate-artifact.sh" ]; then
     echo ""
-    "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz 2>/dev/null || true
+    if [ "$RAC_BUILD_MODE" = "ci" ]; then
+        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz 2>/dev/null
+    else
+        "${REPO_ROOT}/scripts/validate-artifact.sh" "$DIST_DIR"/*.tgz 2>/dev/null || true
+    fi
 fi

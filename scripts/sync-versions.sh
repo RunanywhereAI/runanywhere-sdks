@@ -65,7 +65,7 @@ bump_line() {
 
 bump_json_version() {
     local file="$1"
-    bump_line "$file" '"version": "[^"]+"' "\"version\": \"${NEW_VERSION}\""
+    bump_line "$file" '^  "version": "[^"]+"' "  \"version\": \"${NEW_VERSION}\""
 }
 
 bump_pubspec_version() {

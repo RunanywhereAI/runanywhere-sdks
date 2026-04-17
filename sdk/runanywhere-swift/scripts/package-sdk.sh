@@ -51,6 +51,7 @@ if [ -n "$NATIVES_FROM" ] && [ "$NATIVES_FROM" != "$BINARIES_DIR" ]; then
         exit 1
     fi
     echo ">> Staging XCFrameworks from $NATIVES_FROM → $BINARIES_DIR"
+    rm -rf "$BINARIES_DIR"
     mkdir -p "$BINARIES_DIR"
     # Handle both loose xcframeworks and zipped ones
     find "$NATIVES_FROM" -maxdepth 3 -name "*.xcframework" -type d -exec cp -R {} "$BINARIES_DIR/" \; 2>/dev/null || true
