@@ -76,7 +76,10 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       appBar: _buildAppBar(),
       body: Stack(
         children: [
-          if (_viewModel.isModelLoaded) _buildMainContent() else _buildModelRequiredContent(),
+          if (_viewModel.isModelLoaded)
+            _buildMainContent()
+          else
+            _buildModelRequiredContent(),
         ],
       ),
     );
@@ -134,7 +137,10 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       child: Stack(
         children: [
           // Camera preview or permission view
-          if (_viewModel.isCameraAuthorized) _buildCameraPreviewContent() else _buildCameraPermissionView(),
+          if (_viewModel.isCameraAuthorized)
+            _buildCameraPreviewContent()
+          else
+            _buildCameraPermissionView(),
 
           // Processing overlay
           if (_viewModel.isProcessing) _buildProcessingOverlay(),
@@ -165,7 +171,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
           const SizedBox(height: AppSpacing.mediumLarge),
           Text(
             'Camera Access Required',
-            style: AppTypography.headline(context).copyWith(color: Colors.white),
+            style:
+                AppTypography.headline(context).copyWith(color: Colors.white),
           ),
           const SizedBox(height: AppSpacing.mediumLarge),
           ElevatedButton(
@@ -178,7 +185,7 @@ class _VLMCameraViewState extends State<VLMCameraView> {
                 }),
               );
             },
-            child: const Text('Open Settings'),
+            child: const Text('Grant Camera Access'),
           ),
         ],
       ),
@@ -273,10 +280,38 @@ class _VLMCameraViewState extends State<VLMCameraView> {
           // Error text
           if (_viewModel.error != null) ...[
             const SizedBox(height: AppSpacing.mediumLarge),
-            Text(
-              _viewModel.error!,
-              style: AppTypography.caption(context).copyWith(
-                color: Colors.red,
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.12),
+                borderRadius:
+                    BorderRadius.circular(AppSpacing.cornerRadiusCard),
+                border: Border.all(
+                  color: Colors.orange.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 1),
+                    child: Icon(
+                      Icons.info_outline,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.smallMedium),
+                  Expanded(
+                    child: Text(
+                      _viewModel.error!,
+                      style: AppTypography.caption(context).copyWith(
+                        color: AppColors.textPrimary(context),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -313,14 +348,18 @@ class _VLMCameraViewState extends State<VLMCameraView> {
       icon: const Icon(Icons.copy, size: 18),
       color: AppColors.textSecondary(context),
       onPressed: () {
-        unawaited(Clipboard.setData(ClipboardData(text: _viewModel.currentDescription)));
+        unawaited(Clipboard.setData(
+            ClipboardData(text: _viewModel.currentDescription)));
         unawaited(
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Description copied to clipboard'),
-              duration: Duration(seconds: 2),
-            ),
-          ).closed.then((_) => null),
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+                const SnackBar(
+                  content: Text('Description copied to clipboard'),
+                  duration: Duration(seconds: 2),
+                ),
+              )
+              .closed
+              .then((_) => null),
         );
       },
     );
@@ -478,7 +517,8 @@ class _VLMCameraViewState extends State<VLMCameraView> {
         onModelSelected: (model) async {
           await _viewModel.onModelSelected(model.id, model.name, this.context);
           // Initialize camera if authorized after model is loaded
-          if (_viewModel.isCameraAuthorized && !_viewModel.isCameraInitialized) {
+          if (_viewModel.isCameraAuthorized &&
+              !_viewModel.isCameraInitialized) {
             unawaited(_viewModel.initializeCamera());
           }
         },

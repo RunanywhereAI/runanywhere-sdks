@@ -9,7 +9,7 @@ class PlatformCapabilityService {
   bool get supportsTools => true;
   bool get supportsStructuredOutput => true;
 
-  bool get supportsVision => !Platform.isWindows;
+  bool get supportsVision => true;
   bool get supportsSpeechToText => true;
   bool get supportsTextToSpeech => true;
   bool get supportsVoiceAssistant => true;
