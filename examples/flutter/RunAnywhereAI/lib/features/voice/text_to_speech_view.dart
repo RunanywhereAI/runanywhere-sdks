@@ -52,7 +52,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   // Voice settings
   double _speechRate = 1.0;
-  double _pitch = 1.0;
+  final double _pitch = 1.0;
 
   // Model state
   LLMFramework? _selectedFramework;

@@ -72,22 +72,23 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
         const char* reg_path = model_info->local_path ? model_info->local_path : model_id;
-        // Registry local_path is often the model directory; LlamaCPP needs the path to the .gguf file.
-        // If model_id is already a path to a .gguf file (e.g. from path lookup), use it for loading.
+        // Registry local_path is often the model directory; LlamaCPP needs the path to the .gguf
+        // file. If model_id is already a path to a .gguf file (e.g. from path lookup), use it for
+        // loading.
         if (strstr(model_id, ".gguf") != nullptr) {
             model_path = model_id;
         } else {
             model_path = reg_path;
         }
         ALOGD("Found in registry: id=%s, framework=%d, local_path=%s",
-              model_info->id ? model_info->id : "NULL",
-              static_cast<int>(framework), model_path ? model_path : "NULL");
+              model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
+              model_path ? model_path : "NULL");
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL",
-                     static_cast<int>(framework), model_path ? model_path : "NULL");
+                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
+                     model_path ? model_path : "NULL");
     } else {
-        ALOGD("NOT found in registry (result=%d), default framework=%d",
-              result, static_cast<int>(framework));
+        ALOGD("NOT found in registry (result=%d), default framework=%d", result,
+              static_cast<int>(framework));
         RAC_LOG_WARNING(LOG_CAT,
                         "Model NOT found in registry (result=%d), using default framework=%d",
                         result, static_cast<int>(framework));
@@ -100,8 +101,7 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     request.framework = framework;
     request.model_path = model_path;
 
-    ALOGD("Service request: framework=%d, model_path=%s",
-          static_cast<int>(request.framework),
+    ALOGD("Service request: framework=%d, model_path=%s", static_cast<int>(request.framework),
           request.model_path ? request.model_path : "NULL");
     RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
                  static_cast<int>(request.framework),
@@ -144,8 +144,8 @@ rac_result_t rac_llm_initialize(rac_handle_t handle, const char* model_path) {
 
 rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
                               const rac_llm_options_t* options, rac_llm_result_t* out_result) {
-    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: START handle=%p, prompt=%p, out_result=%p",
-                 handle, (void*)prompt, (void*)out_result);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: START handle=%p, prompt=%p, out_result=%p", handle,
+                 (void*)prompt, (void*)out_result);
 
     if (!handle || !prompt || !out_result) {
         RAC_LOG_ERROR(LOG_CAT, "rac_llm_generate: NULL pointer!");
@@ -154,7 +154,8 @@ rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
 
     RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: casting to service...");
     auto* service = static_cast<rac_llm_service_t*>(handle);
-    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: service=%p, ops=%p", (void*)service, (void*)service->ops);
+    RAC_LOG_INFO(LOG_CAT, "rac_llm_generate: service=%p, ops=%p", (void*)service,
+                 (void*)service->ops);
 
     if (!service->ops || !service->ops->generate) {
         RAC_LOG_ERROR(LOG_CAT, "rac_llm_generate: ops or generate is NULL!");
@@ -306,10 +307,9 @@ rac_result_t rac_llm_append_context(rac_handle_t handle, const char* text) {
     return service->ops->append_context(service->impl, text);
 }
 
-
 rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
-                                            const rac_llm_options_t* options,
-                                            rac_llm_result_t* out_result) {
+                                           const rac_llm_options_t* options,
+                                           rac_llm_result_t* out_result) {
     if (!handle || !query || !out_result)
         return RAC_ERROR_NULL_POINTER;
 

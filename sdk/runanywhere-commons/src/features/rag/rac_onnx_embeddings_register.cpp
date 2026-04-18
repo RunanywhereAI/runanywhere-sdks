@@ -6,7 +6,7 @@
  * vtable and registers with the service registry for RAC_CAPABILITY_EMBEDDINGS.
  */
 
-#include "rac/backends/rac_embeddings_onnx.h"
+#include "onnx_embedding_provider.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -16,8 +16,7 @@
 #include <string>
 #include <vector>
 
-#include "onnx_embedding_provider.h"
-
+#include "rac/backends/rac_embeddings_onnx.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -46,8 +45,8 @@ static rac_result_t onnx_embed_vtable_initialize(void* impl, const char* model_p
 }
 
 static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
-                                             const rac_embeddings_options_t* options,
-                                             rac_embeddings_result_t* out_result) {
+                                            const rac_embeddings_options_t* options,
+                                            rac_embeddings_result_t* out_result) {
     (void)options;
     if (!impl || !text || !out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -65,8 +64,8 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
         out_result->processing_time_ms = 0;
         out_result->total_tokens = 0;
 
-        out_result->embeddings = static_cast<rac_embedding_vector_t*>(
-            malloc(sizeof(rac_embedding_vector_t)));
+        out_result->embeddings =
+            static_cast<rac_embedding_vector_t*>(malloc(sizeof(rac_embedding_vector_t)));
         if (!out_result->embeddings)
             return RAC_ERROR_OUT_OF_MEMORY;
 
@@ -87,9 +86,9 @@ static rac_result_t onnx_embed_vtable_embed(void* impl, const char* text,
 }
 
 static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const* texts,
-                                                    size_t num_texts,
-                                                    const rac_embeddings_options_t* options,
-                                                    rac_embeddings_result_t* out_result) {
+                                                  size_t num_texts,
+                                                  const rac_embeddings_options_t* options,
+                                                  rac_embeddings_result_t* out_result) {
     (void)options;
     if (!impl || !texts || !out_result)
         return RAC_ERROR_NULL_POINTER;
@@ -118,20 +117,22 @@ static rac_result_t onnx_embed_vtable_embed_batch(void* impl, const char* const*
         out_result->processing_time_ms = 0;
         out_result->total_tokens = 0;
 
-        out_result->embeddings = static_cast<rac_embedding_vector_t*>(
-            calloc(num_texts, sizeof(rac_embedding_vector_t)));
+        out_result->embeddings =
+            static_cast<rac_embedding_vector_t*>(calloc(num_texts, sizeof(rac_embedding_vector_t)));
         if (!out_result->embeddings)
             return RAC_ERROR_OUT_OF_MEMORY;
 
         for (size_t i = 0; i < num_texts; ++i) {
             const auto& embedding = batch_results[i];
             out_result->embeddings[i].dimension = embedding.size();
-            out_result->embeddings[i].data = static_cast<float*>(malloc(embedding.size() * sizeof(float)));
+            out_result->embeddings[i].data =
+                static_cast<float*>(malloc(embedding.size() * sizeof(float)));
             if (!out_result->embeddings[i].data) {
                 rac_embeddings_result_free(out_result);
                 return RAC_ERROR_OUT_OF_MEMORY;
             }
-            memcpy(out_result->embeddings[i].data, embedding.data(), embedding.size() * sizeof(float));
+            memcpy(out_result->embeddings[i].data, embedding.data(),
+                   embedding.size() * sizeof(float));
         }
 
         return RAC_SUCCESS;
@@ -226,8 +227,7 @@ rac_bool_t onnx_embeddings_can_handle(const rac_service_request_t* request, void
     return RAC_FALSE;
 }
 
-rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request,
-                                             void* user_data) {
+rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
     if (!request)
@@ -244,7 +244,8 @@ rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request
     try {
         auto* handle = new onnx_embeddings_handle();
         const char* cfg = request->config_json ? request->config_json : "";
-        handle->provider = std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_path, cfg);
+        handle->provider =
+            std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_path, cfg);
 
         if (!handle->provider->is_ready()) {
             RAC_LOG_ERROR(LOG_CAT, "ONNX embedding provider not ready after init");
@@ -252,8 +253,8 @@ rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request
             return nullptr;
         }
 
-        auto* service = static_cast<rac_embeddings_service_t*>(
-            malloc(sizeof(rac_embeddings_service_t)));
+        auto* service =
+            static_cast<rac_embeddings_service_t*>(malloc(sizeof(rac_embeddings_service_t)));
         if (!service) {
             delete handle;
             return nullptr;

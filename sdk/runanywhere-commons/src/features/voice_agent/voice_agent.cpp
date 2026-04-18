@@ -583,8 +583,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     RAC_LOG_DEBUG("VoiceAgent", "Step 1: Transcribing audio");
     rac_stt_result_t stt_result = {};
     rac_result_t result;
-    result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
-                                          nullptr, &stt_result);
+    result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
+                                          &stt_result);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "STT transcription failed");
@@ -602,8 +602,7 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     // Step 2: Generate LLM response
     RAC_LOG_DEBUG("VoiceAgent", "Step 2: Generating LLM response");
     rac_llm_result_t llm_result = {};
-    result = rac_llm_component_generate(handle->llm_handle, stt_result.text,
-                                        nullptr, &llm_result);
+    result = rac_llm_component_generate(handle->llm_handle, stt_result.text, nullptr, &llm_result);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "LLM generation failed");
@@ -616,8 +615,8 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
     // Step 3: Synthesize speech
     RAC_LOG_DEBUG("VoiceAgent", "Step 3: Synthesizing speech");
     rac_tts_result_t tts_result = {};
-    result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text,
-                                          nullptr, &tts_result);
+    result =
+        rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("VoiceAgent", "TTS synthesis failed");
@@ -625,7 +624,6 @@ rac_result_t rac_voice_agent_process_voice_turn(rac_voice_agent_handle_t handle,
         rac_llm_result_free(&llm_result);
         return result;
     }
-
 
     // Step 4: Convert Float32 PCM to WAV format — no lock needed (pure computation)
     void* wav_data = nullptr;
@@ -699,8 +697,8 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     // Step 1: Transcribe
     rac_stt_result_t stt_result = {};
     rac_result_t result;
-    result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size,
-                                          nullptr, &stt_result);
+    result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
+                                          &stt_result);
 
     if (result != RAC_SUCCESS) {
         rac_voice_agent_event_t error_event = {};
@@ -737,7 +735,8 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
 
     // Step 3: Synthesize
     rac_tts_result_t tts_result = {};
-    result = rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
+    result =
+        rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
 
     if (result != RAC_SUCCESS) {
         rac_stt_result_free(&stt_result);
@@ -769,7 +768,6 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
             return result;
         }
     }
-
 
     // Emit audio synthesized event
     rac_voice_agent_event_t audio_event = {};

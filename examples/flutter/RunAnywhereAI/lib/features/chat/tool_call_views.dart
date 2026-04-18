@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -47,10 +49,10 @@ class ToolCallIndicator extends StatelessWidget {
           vertical: 6,
         ),
         decoration: BoxDecoration(
-          color: accentColor.withOpacity(0.1),
+          color: accentColor.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: accentColor.withOpacity(0.3),
+            color: accentColor.withValues(alpha: 0.3),
             width: 0.5,
           ),
         ),
@@ -197,7 +199,7 @@ class ToolCallDetailSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
+        color: statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -296,7 +298,8 @@ class _ToolCallingActiveIndicatorState extends State<ToolCallingActiveIndicator>
     _controller = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
-    )..repeat();
+    );
+    unawaited(_controller.repeat());
   }
 
   @override
@@ -313,7 +316,7 @@ class _ToolCallingActiveIndicatorState extends State<ToolCallingActiveIndicator>
         vertical: 6,
       ),
       decoration: BoxDecoration(
-        color: AppColors.primaryAccent.withOpacity(0.1),
+        color: AppColors.primaryAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -359,7 +362,7 @@ class ToolCallingBadge extends StatelessWidget {
         vertical: 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.primaryAccent.withOpacity(0.1),
+        color: AppColors.primaryAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(

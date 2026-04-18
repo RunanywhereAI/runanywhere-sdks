@@ -52,7 +52,7 @@
 #ifndef RAC_WAKEWORD_H
 #define RAC_WAKEWORD_H
 
-#include "rac/features/wakeword/rac_wakeword_types.h"
 #include "rac/features/wakeword/rac_wakeword_service.h"
+#include "rac/features/wakeword/rac_wakeword_types.h"
 
 #endif /* RAC_WAKEWORD_H */

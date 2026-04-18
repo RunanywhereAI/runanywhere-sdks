@@ -8,13 +8,14 @@
  * Class: ONNXBridge
  */
 
-#include <jni.h>
-#include <string>
-#include <cstring>
-
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
+
+#include <jni.h>
+
+#include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -47,8 +48,8 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 // Backend Registration
 // =============================================================================
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegister(JNIEnv* env, jclass clazz) {
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegister(JNIEnv* env,
+                                                                                    jclass clazz) {
     (void)env;
     (void)clazz;
     LOGi("ONNX nativeRegister called");
@@ -62,8 +63,10 @@ Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegister(JNIEnv* env, jclass
 
     const char** provider_names = nullptr;
     size_t provider_count = 0;
-    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("After ONNX registration - STT providers: count=%zu, result=%d", provider_count, list_result);
+    rac_result_t list_result =
+        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
+    LOGi("After ONNX registration - STT providers: count=%zu, result=%d", provider_count,
+         list_result);
 
     LOGi("ONNX backend registered successfully (STT + TTS + VAD)");
     return RAC_SUCCESS;
@@ -94,7 +97,8 @@ Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeIsRegistered(JNIEnv* env, jc
     const char** provider_names = nullptr;
     size_t provider_count = 0;
 
-    rac_result_t result = rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
+    rac_result_t result =
+        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
 
     if (result == RAC_SUCCESS && provider_names && provider_count > 0) {
         for (size_t i = 0; i < provider_count; i++) {

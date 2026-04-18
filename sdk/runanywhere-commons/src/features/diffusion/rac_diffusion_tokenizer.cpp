@@ -7,11 +7,11 @@
 
 #include "rac/features/diffusion/rac_diffusion_tokenizer.h"
 
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <mutex>
-#include <condition_variable>
 #include <string>
 
 #include "rac/core/rac_error.h"
@@ -65,10 +65,10 @@ extern "C" const char* rac_diffusion_tokenizer_get_base_url(rac_diffusion_tokeni
     }
 }
 
-extern "C" rac_result_t rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
-                                                             const char* custom_url,
-                                                             const char* filename, char* out_url,
-                                                             size_t out_url_size) {
+extern "C" rac_result_t
+rac_diffusion_tokenizer_get_file_url(rac_diffusion_tokenizer_source_t source,
+                                     const char* custom_url, const char* filename, char* out_url,
+                                     size_t out_url_size) {
     if (!filename || !out_url || out_url_size == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -133,9 +133,8 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
 
         bool root_has_files =
             (access(root_vocab.c_str(), F_OK) == 0) || (access(root_merges.c_str(), F_OK) == 0);
-        bool tokenizer_has_files =
-            (access(tokenizer_vocab.c_str(), F_OK) == 0) ||
-            (access(tokenizer_merges.c_str(), F_OK) == 0);
+        bool tokenizer_has_files = (access(tokenizer_vocab.c_str(), F_OK) == 0) ||
+                                   (access(tokenizer_merges.c_str(), F_OK) == 0);
         bool tokenizer_exists = access(tokenizer_dir.c_str(), F_OK) == 0;
 
         if (tokenizer_has_files || (!root_has_files && tokenizer_exists)) {
@@ -184,9 +183,8 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
 
     if (has_vocab != RAC_TRUE) {
         std::string vocab_path = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_VOCAB_FILE;
-        result = rac_diffusion_tokenizer_download_file(config->source, custom_url,
-                                                       RAC_DIFFUSION_TOKENIZER_VOCAB_FILE,
-                                                       vocab_path.c_str());
+        result = rac_diffusion_tokenizer_download_file(
+            config->source, custom_url, RAC_DIFFUSION_TOKENIZER_VOCAB_FILE, vocab_path.c_str());
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("Diffusion.Tokenizer", "Failed to download %s: %d",
                           RAC_DIFFUSION_TOKENIZER_VOCAB_FILE, result);
@@ -196,9 +194,8 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
 
     if (has_merges != RAC_TRUE) {
         std::string merges_path = tokenizer_dir + "/" + RAC_DIFFUSION_TOKENIZER_MERGES_FILE;
-        result = rac_diffusion_tokenizer_download_file(config->source, custom_url,
-                                                       RAC_DIFFUSION_TOKENIZER_MERGES_FILE,
-                                                       merges_path.c_str());
+        result = rac_diffusion_tokenizer_download_file(
+            config->source, custom_url, RAC_DIFFUSION_TOKENIZER_MERGES_FILE, merges_path.c_str());
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR("Diffusion.Tokenizer", "Failed to download %s: %d",
                           RAC_DIFFUSION_TOKENIZER_MERGES_FILE, result);
@@ -210,10 +207,10 @@ rac_diffusion_tokenizer_ensure_files(const char* model_dir,
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
-                                                              const char* custom_url,
-                                                              const char* filename,
-                                                              const char* output_path) {
+extern "C" rac_result_t
+rac_diffusion_tokenizer_download_file(rac_diffusion_tokenizer_source_t source,
+                                      const char* custom_url, const char* filename,
+                                      const char* output_path) {
     if (!filename || !output_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -237,8 +234,7 @@ extern "C" rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_toke
 
     auto progress_cb = [](int64_t /*downloaded*/, int64_t /*total*/, void* /*user_data*/) {};
 
-    auto complete_cb = [](rac_result_t result, const char* /*downloaded_path*/,
-                          void* user_data) {
+    auto complete_cb = [](rac_result_t result, const char* /*downloaded_path*/, void* user_data) {
         auto* ctx = static_cast<download_context*>(user_data);
         if (!ctx) {
             return;
@@ -254,8 +250,8 @@ extern "C" rac_result_t rac_diffusion_tokenizer_download_file(rac_diffusion_toke
     download_context ctx;
     char* task_id = nullptr;
 
-    rac_result_t start_result = rac_http_download(url, output_path, progress_cb, complete_cb,
-                                                  &ctx, &task_id);
+    rac_result_t start_result =
+        rac_http_download(url, output_path, progress_cb, complete_cb, &ctx, &task_id);
     if (start_result != RAC_SUCCESS) {
         if (task_id) {
             rac_free(task_id);

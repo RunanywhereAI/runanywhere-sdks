@@ -18,7 +18,12 @@
 // Global NitroModules Initialization (MUST be first!)
 // =============================================================================
 
-export { initializeNitroModulesGlobally, getNitroModulesProxySync, isNitroModulesInitialized } from './native/NitroModulesGlobalInit';
+export {
+  initializeNitroModulesGlobally,
+  getNitroModulesProxySync,
+  isNitroModulesInitialized,
+  type NitroProxy,
+} from './native/NitroModulesGlobalInit';
 
 // =============================================================================
 // Main SDK

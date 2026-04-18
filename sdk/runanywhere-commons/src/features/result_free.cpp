@@ -8,10 +8,10 @@
 
 #include <cstdlib>
 
+#include "rac/features/embeddings/rac_embeddings_types.h"
 #include "rac/features/llm/rac_llm_types.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_types.h"
-#include "rac/features/embeddings/rac_embeddings_types.h"
 
 // MSVC does not support __attribute__((weak)). On MSVC this whole file is
 // excluded from the build via CMakeLists.txt, and each service translation

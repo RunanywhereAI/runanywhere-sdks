@@ -6,10 +6,10 @@
  */
 
 import type { RunAnywhereLlama } from '../specs/RunAnywhereLlama.nitro';
-import { getNitroModulesProxySync } from '@runanywhere/core';
+import { getNitroModulesProxySync, type NitroProxy } from '@runanywhere/core';
 
 // Use the global NitroModules initialization
-function getNitroModulesProxy(): any {
+function getNitroModulesProxy(): NitroProxy | null {
   return getNitroModulesProxySync();
 }
 

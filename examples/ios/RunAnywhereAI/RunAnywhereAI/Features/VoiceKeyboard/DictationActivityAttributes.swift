@@ -19,7 +19,6 @@ import Foundation
 #if os(iOS)
 @available(iOS 16.1, *)
 struct DictationActivityAttributes: ActivityAttributes {
-
     /// The dynamic / live state updated throughout the session.
     struct ContentState: Codable, Hashable {
         /// Current phase: "ready" | "listening" | "transcribing" | "done"

@@ -41,11 +41,16 @@ typedef enum rac_openai_role {
  */
 static inline const char* rac_openai_role_to_string(rac_openai_role_t role) {
     switch (role) {
-        case RAC_OPENAI_ROLE_SYSTEM: return "system";
-        case RAC_OPENAI_ROLE_USER: return "user";
-        case RAC_OPENAI_ROLE_ASSISTANT: return "assistant";
-        case RAC_OPENAI_ROLE_TOOL: return "tool";
-        default: return "unknown";
+        case RAC_OPENAI_ROLE_SYSTEM:
+            return "system";
+        case RAC_OPENAI_ROLE_USER:
+            return "user";
+        case RAC_OPENAI_ROLE_ASSISTANT:
+            return "assistant";
+        case RAC_OPENAI_ROLE_TOOL:
+            return "tool";
+        default:
+            return "unknown";
     }
 }
 
@@ -217,8 +222,7 @@ static const rac_openai_chat_request_t RAC_OPENAI_CHAT_REQUEST_DEFAULT = {
     .tools = RAC_NULL,
     .num_tools = 0,
     .tool_choice = RAC_NULL,
-    .user = RAC_NULL
-};
+    .user = RAC_NULL};
 
 // =============================================================================
 // CHAT COMPLETION RESPONSE
@@ -240,11 +244,16 @@ typedef enum rac_openai_finish_reason {
  */
 static inline const char* rac_openai_finish_reason_to_string(rac_openai_finish_reason_t reason) {
     switch (reason) {
-        case RAC_OPENAI_FINISH_STOP: return "stop";
-        case RAC_OPENAI_FINISH_LENGTH: return "length";
-        case RAC_OPENAI_FINISH_TOOL_CALLS: return "tool_calls";
-        case RAC_OPENAI_FINISH_ERROR: return "error";
-        default: return RAC_NULL;
+        case RAC_OPENAI_FINISH_STOP:
+            return "stop";
+        case RAC_OPENAI_FINISH_LENGTH:
+            return "length";
+        case RAC_OPENAI_FINISH_TOOL_CALLS:
+            return "tool_calls";
+        case RAC_OPENAI_FINISH_ERROR:
+            return "error";
+        default:
+            return RAC_NULL;
     }
 }
 

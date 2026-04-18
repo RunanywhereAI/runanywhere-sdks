@@ -133,8 +133,17 @@ class DiffusionViewModel: ObservableObject {
             let variant: DiffusionModelVariant = .sd15
             currentModelVariant = variant
 
-            let config = DiffusionConfiguration(modelVariant: variant, enableSafetyChecker: true, reduceMemory: true)
-            try await RunAnywhere.loadDiffusionModel(modelPath: path.path, modelId: model.id, modelName: model.name, configuration: config)
+            let config = DiffusionConfiguration(
+                modelVariant: variant,
+                enableSafetyChecker: true,
+                reduceMemory: true
+            )
+            try await RunAnywhere.loadDiffusionModel(
+                modelPath: path.path,
+                modelId: model.id,
+                modelName: model.name,
+                configuration: config
+            )
             isModelLoaded = true
             currentModelName = model.name
             currentBackend = model.framework.displayName
@@ -151,6 +160,7 @@ class DiffusionViewModel: ObservableObject {
 
     // MARK: - Generation
 
+    // swiftlint:disable:next function_body_length
     func generateImage() async {
         guard canGenerate else {
             errorMessage = "Enter a prompt"
@@ -235,13 +245,17 @@ class DiffusionViewModel: ObservableObject {
 
         guard let provider = CGDataProvider(data: data as CFData),
               let cgImage = CGImage(
-                  width: width, height: height,
-                  bitsPerComponent: 8, bitsPerPixel: 32,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bitsPerPixel: 32,
                   bytesPerRow: width * 4,
                   space: CGColorSpaceCreateDeviceRGB(),
                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                  provider: provider, decode: nil,
-                  shouldInterpolate: true, intent: .defaultIntent
+                  provider: provider,
+                  decode: nil,
+                  shouldInterpolate: true,
+                  intent: .defaultIntent
               ) else { return nil }
 
         return UIImage(cgImage: cgImage)
@@ -253,13 +267,17 @@ class DiffusionViewModel: ObservableObject {
 
         guard let provider = CGDataProvider(data: data as CFData),
               let cgImage = CGImage(
-                  width: width, height: height,
-                  bitsPerComponent: 8, bitsPerPixel: 32,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bitsPerPixel: 32,
                   bytesPerRow: width * 4,
                   space: CGColorSpaceCreateDeviceRGB(),
                   bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
-                  provider: provider, decode: nil,
-                  shouldInterpolate: true, intent: .defaultIntent
+                  provider: provider,
+                  decode: nil,
+                  shouldInterpolate: true,
+                  intent: .defaultIntent
               ) else { return nil }
 
         return NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))

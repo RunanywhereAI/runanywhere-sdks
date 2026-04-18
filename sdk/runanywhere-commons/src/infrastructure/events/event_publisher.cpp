@@ -111,14 +111,13 @@ void rac_event_unsubscribe(uint64_t subscription_id) {
     std::lock_guard<std::mutex> lock(g_event_mutex);
 
     auto remove_from = [subscription_id](std::vector<Subscription>& subs) {
-        auto it =
-            std::remove_if(subs.begin(), subs.end(), [subscription_id](Subscription& s) {
-                if (s.id == subscription_id) {
-                    s.alive->store(false);
-                    return true;
-                }
-                return false;
-            });
+        auto it = std::remove_if(subs.begin(), subs.end(), [subscription_id](Subscription& s) {
+            if (s.id == subscription_id) {
+                s.alive->store(false);
+                return true;
+            }
+            return false;
+        });
         if (it != subs.end()) {
             subs.erase(it, subs.end());
             return true;

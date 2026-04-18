@@ -45,8 +45,8 @@ extension CppBridge {
             let cFile = strdup(entry.filename)
             let cCompatIds = entry.compatibleModelIds.map { strdup($0) }
             defer {
-                [cId, cName, cDesc, cUrl, cFile].forEach { if let p = $0 { free(p) } }
-                cCompatIds.forEach { if let p = $0 { free(p) } }
+                [cId, cName, cDesc, cUrl, cFile].forEach { if let ptr = $0 { free(ptr) } }
+                cCompatIds.forEach { if let ptr = $0 { free(ptr) } }
             }
 
             var mutableCompatIds = cCompatIds

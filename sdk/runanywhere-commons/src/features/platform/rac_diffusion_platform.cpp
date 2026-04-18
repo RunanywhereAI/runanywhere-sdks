@@ -35,8 +35,8 @@ bool g_callbacks_set = false;
 
 extern "C" {
 
-rac_result_t rac_platform_diffusion_set_callbacks(
-    const rac_platform_diffusion_callbacks_t* callbacks) {
+rac_result_t
+rac_platform_diffusion_set_callbacks(const rac_platform_diffusion_callbacks_t* callbacks) {
     if (callbacks == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }

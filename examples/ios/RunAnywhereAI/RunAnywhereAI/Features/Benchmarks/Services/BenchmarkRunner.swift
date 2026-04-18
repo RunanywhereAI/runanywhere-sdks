@@ -44,10 +44,18 @@ struct BenchmarkPreflightResult: Sendable {
     let totalWorkItems: Int
 }
 
+// MARK: - Work Item
+
+/// One scenario/model pair to execute in a single benchmark category.
+struct BenchmarkWorkItem: Sendable {
+    let category: BenchmarkCategory
+    let model: ModelInfo
+    let scenario: BenchmarkScenario
+}
+
 // MARK: - Runner
 
 final class BenchmarkRunner {
-
     private let providers: [BenchmarkCategory: BenchmarkScenarioProvider]
 
     init() {
@@ -57,7 +65,7 @@ final class BenchmarkRunner {
             STTBenchmarkProvider(),
             TTSBenchmarkProvider(),
             VLMBenchmarkProvider(),
-            DiffusionBenchmarkProvider(),
+            DiffusionBenchmarkProvider()
         ]
         for provider in all {
             map[provider.category] = provider
@@ -110,6 +118,7 @@ final class BenchmarkRunner {
 
     // MARK: - Run
 
+    // swiftlint:disable:next function_body_length
     func runBenchmarks(
         categories: Set<BenchmarkCategory>,
         modelIds: Set<String>? = nil,
@@ -124,53 +133,45 @@ final class BenchmarkRunner {
             )
         }
 
-        // Build work list: (category, model, scenario)
-        var workItems: [(BenchmarkCategory, ModelInfo, BenchmarkScenario)] = []
-
-        for category in BenchmarkCategory.allCases where categories.contains(category) {
-            guard let provider = providers[category],
-                  let models = preflight.availableCategories[category] else { continue }
-            let filteredModels = modelIds == nil ? models : models.filter { modelIds!.contains($0.id) }
-            let scenarioList = provider.scenarios()
-            for model in filteredModels {
-                for scenario in scenarioList {
-                    workItems.append((category, model, scenario))
-                }
-            }
-        }
+        let workItems = buildWorkItems(
+            categories: categories,
+            modelIds: modelIds,
+            preflight: preflight
+        )
 
         let total = workItems.count
         var results: [BenchmarkResult] = []
 
-        for (index, (category, model, scenario)) in workItems.enumerated() {
+        for (index, item) in workItems.enumerated() {
             try Task.checkCancellation()
 
             onProgress(BenchmarkProgressUpdate(
                 completedCount: index,
                 totalCount: total,
-                currentScenario: scenario.name,
-                currentModel: model.name
+                currentScenario: item.scenario.name,
+                currentModel: item.model.name
             ))
 
             let metrics: BenchmarkMetrics
             do {
-                guard let provider = providers[category] else { continue }
+                guard let provider = providers[item.category] else { continue }
                 metrics = try await provider.execute(
-                    scenario: scenario,
-                    model: model
+                    scenario: item.scenario,
+                    model: item.model
                 )
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 var errorMetrics = BenchmarkMetrics()
-                errorMetrics.errorMessage = "\(category.displayName) [\(model.name)]: \(error.localizedDescription)"
+                let prefix = "\(item.category.displayName) [\(item.model.name)]"
+                errorMetrics.errorMessage = "\(prefix): \(error.localizedDescription)"
                 metrics = errorMetrics
             }
 
             results.append(BenchmarkResult(
-                category: category,
-                scenario: scenario,
-                modelInfo: ComponentModelInfo(from: model),
+                category: item.category,
+                scenario: item.scenario,
+                modelInfo: ComponentModelInfo(from: item.model),
                 metrics: metrics
             ))
         }
@@ -187,5 +188,35 @@ final class BenchmarkRunner {
             results: results,
             skippedCategories: preflight.skippedCategories
         )
+    }
+
+    /// Expand `(category × model × scenario)` into a flat list of work items.
+    private func buildWorkItems(
+        categories: Set<BenchmarkCategory>,
+        modelIds: Set<String>?,
+        preflight: BenchmarkPreflightResult
+    ) -> [BenchmarkWorkItem] {
+        var workItems: [BenchmarkWorkItem] = []
+        for category in BenchmarkCategory.allCases where categories.contains(category) {
+            guard let provider = providers[category],
+                  let models = preflight.availableCategories[category] else { continue }
+            let filteredModels: [ModelInfo]
+            if let modelIds {
+                filteredModels = models.filter { modelIds.contains($0.id) }
+            } else {
+                filteredModels = models
+            }
+            let scenarioList = provider.scenarios()
+            for model in filteredModels {
+                for scenario in scenarioList {
+                    workItems.append(BenchmarkWorkItem(
+                        category: category,
+                        model: model,
+                        scenario: scenario
+                    ))
+                }
+            }
+        }
+        return workItems
     }
 }

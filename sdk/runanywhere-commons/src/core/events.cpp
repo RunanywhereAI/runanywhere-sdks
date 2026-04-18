@@ -131,7 +131,7 @@ rac_bool_t rac_analytics_events_has_public_callback(void) {
 // =============================================================================
 
 void rac_analytics_emit_stt_model_load_completed(const char* model_id, const char* model_name,
-                                                  double duration_ms, int32_t framework) {
+                                                 double duration_ms, int32_t framework) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_STT_MODEL_LOAD_COMPLETED;
     event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
@@ -144,7 +144,7 @@ void rac_analytics_emit_stt_model_load_completed(const char* model_id, const cha
 }
 
 void rac_analytics_emit_stt_model_load_failed(const char* model_id, int32_t error_code,
-                                               const char* error_message) {
+                                              const char* error_message) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_STT_MODEL_LOAD_FAILED;
     event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
@@ -176,9 +176,8 @@ void rac_analytics_emit_stt_transcription_completed(
     rac_analytics_event_emit(RAC_EVENT_STT_TRANSCRIPTION_COMPLETED, &event);
 }
 
-void rac_analytics_emit_stt_transcription_failed(const char* transcription_id,
-                                                  const char* model_id, int32_t error_code,
-                                                  const char* error_message) {
+void rac_analytics_emit_stt_transcription_failed(const char* transcription_id, const char* model_id,
+                                                 int32_t error_code, const char* error_message) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_STT_TRANSCRIPTION_FAILED;
     event.data.stt_transcription = RAC_ANALYTICS_STT_TRANSCRIPTION_DEFAULT;
@@ -190,7 +189,7 @@ void rac_analytics_emit_stt_transcription_failed(const char* transcription_id,
 }
 
 void rac_analytics_emit_tts_voice_load_completed(const char* model_id, const char* model_name,
-                                                  double duration_ms, int32_t framework) {
+                                                 double duration_ms, int32_t framework) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_TTS_VOICE_LOAD_COMPLETED;
     event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
@@ -203,7 +202,7 @@ void rac_analytics_emit_tts_voice_load_completed(const char* model_id, const cha
 }
 
 void rac_analytics_emit_tts_voice_load_failed(const char* model_id, int32_t error_code,
-                                               const char* error_message) {
+                                              const char* error_message) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_TTS_VOICE_LOAD_FAILED;
     event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
@@ -213,10 +212,12 @@ void rac_analytics_emit_tts_voice_load_failed(const char* model_id, int32_t erro
     rac_analytics_event_emit(RAC_EVENT_TTS_VOICE_LOAD_FAILED, &event);
 }
 
-void rac_analytics_emit_tts_synthesis_completed(
-    const char* synthesis_id, const char* model_id, int32_t character_count,
-    double audio_duration_ms, int32_t audio_size_bytes, double processing_duration_ms,
-    double characters_per_second, int32_t sample_rate, int32_t framework) {
+void rac_analytics_emit_tts_synthesis_completed(const char* synthesis_id, const char* model_id,
+                                                int32_t character_count, double audio_duration_ms,
+                                                int32_t audio_size_bytes,
+                                                double processing_duration_ms,
+                                                double characters_per_second, int32_t sample_rate,
+                                                int32_t framework) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_TTS_SYNTHESIS_COMPLETED;
     event.data.tts_synthesis.synthesis_id = synthesis_id;
@@ -233,7 +234,7 @@ void rac_analytics_emit_tts_synthesis_completed(
 }
 
 void rac_analytics_emit_tts_synthesis_failed(const char* synthesis_id, const char* model_id,
-                                              int32_t error_code, const char* error_message) {
+                                             int32_t error_code, const char* error_message) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_TTS_SYNTHESIS_FAILED;
     event.data.tts_synthesis = RAC_ANALYTICS_TTS_SYNTHESIS_DEFAULT;
@@ -268,7 +269,7 @@ void rac_analytics_emit_model_download_started(const char* model_id) {
 }
 
 void rac_analytics_emit_model_download_completed(const char* model_id, int64_t file_size_bytes,
-                                                  double duration_ms) {
+                                                 double duration_ms) {
     rac_analytics_event_data_t event = {};
     event.type = RAC_EVENT_MODEL_DOWNLOAD_COMPLETED;
     event.data.model_download = RAC_ANALYTICS_MODEL_DOWNLOAD_DEFAULT;

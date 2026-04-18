@@ -47,7 +47,8 @@ struct rac_diffusion_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    /** Cancellation flag (atomic for thread-safe access from cancel() while generate holds mutex) */
+    /** Cancellation flag (atomic for thread-safe access from cancel() while generate holds mutex)
+     */
     std::atomic<bool> cancel_requested;
 
     rac_diffusion_component() : lifecycle(nullptr), cancel_requested(false) {
@@ -68,8 +69,8 @@ struct rac_diffusion_component {
  * where 0.0 is valid for CFG-free models like SDXS/SDXL Turbo - use negative to skip).
  * Pointer fields are copied if non-null. Enums are always copied.
  */
-static rac_diffusion_options_t merge_diffusion_options(
-    const rac_diffusion_options_t& defaults, const rac_diffusion_options_t* options) {
+static rac_diffusion_options_t merge_diffusion_options(const rac_diffusion_options_t& defaults,
+                                                       const rac_diffusion_options_t* options) {
     rac_diffusion_options_t effective = defaults;
 
     effective.prompt = options->prompt;
@@ -142,25 +143,23 @@ static rac_result_t diffusion_create_service(const char* model_id, void* user_da
         rac_result_t ensure_result =
             rac_diffusion_tokenizer_ensure_files(model_id, &component->config.tokenizer);
         if (ensure_result != RAC_SUCCESS) {
-            RAC_LOG_ERROR("Diffusion.Component",
-                          "Failed to ensure tokenizer files for %s: %d",
+            RAC_LOG_ERROR("Diffusion.Component", "Failed to ensure tokenizer files for %s: %d",
                           model_id, ensure_result);
             return ensure_result;
         }
     }
 
     // Create diffusion service
-    rac_result_t result =
-        rac_diffusion_create_with_config(model_id, component ? &component->config : nullptr,
-                                         out_service);
+    rac_result_t result = rac_diffusion_create_with_config(
+        model_id, component ? &component->config : nullptr, out_service);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Failed to create diffusion service: %d", result);
         return result;
     }
 
     // Initialize with model path and config
-    result = rac_diffusion_initialize(*out_service, model_id,
-                                      component ? &component->config : nullptr);
+    result =
+        rac_diffusion_initialize(*out_service, model_id, component ? &component->config : nullptr);
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR("Diffusion.Component", "Failed to initialize diffusion service: %d", result);
         rac_diffusion_destroy(*out_service);
@@ -526,8 +525,8 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
 
     // Perform generation with progress (outside lock)
     rac_diffusion_result_t gen_result = {};
-    rac_result_t result = rac_diffusion_generate_with_progress(service, &effective_options,
-                                                               diffusion_progress_wrapper, &ctx, &gen_result);
+    rac_result_t result = rac_diffusion_generate_with_progress(
+        service, &effective_options, diffusion_progress_wrapper, &ctx, &gen_result);
 
     // Release pinned service in all exit paths
     rac_lifecycle_release_service(component->lifecycle);
@@ -536,16 +535,17 @@ extern "C" rac_result_t rac_diffusion_component_generate_with_callbacks(
         RAC_LOG_ERROR("Diffusion.Component", "Generation failed: %d", result);
         rac_lifecycle_track_error(component->lifecycle, result, "generateWithCallbacks");
         if (error_callback) {
-            error_callback(result, gen_result.error_message ? gen_result.error_message
-                                                           : "Generation failed",
-                           user_data);
+            error_callback(
+                result, gen_result.error_message ? gen_result.error_message : "Generation failed",
+                user_data);
         }
         rac_diffusion_result_free(&gen_result);
         return result;
     }
 
     auto end_time = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - ctx.start_time);
+    auto duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - ctx.start_time);
     gen_result.generation_time_ms = duration.count();
 
     RAC_LOG_INFO("Diffusion.Component", "Generation completed in %lld ms",

@@ -53,7 +53,9 @@ final class DarwinNotificationCenter: @unchecked Sendable {
         CFNotificationCenterPostNotification(
             CFNotificationCenterGetDarwinNotifyCenter(),
             CFNotificationName(name as CFString),
-            nil, nil, true
+            nil,
+            nil,
+            true
         )
     }
 

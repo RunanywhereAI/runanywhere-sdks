@@ -68,9 +68,8 @@ static rac_result_t whispercpp_stt_vtable_transcribe_stream(void* impl, const vo
     // Fall back to batch transcription
     rac_stt_result_t result = {};
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
-    rac_result_t status =
-        rac_stt_whispercpp_transcribe(impl, float_samples.data(), float_samples.size(), options,
-                                      &result);
+    rac_result_t status = rac_stt_whispercpp_transcribe(impl, float_samples.data(),
+                                                        float_samples.size(), options, &result);
     if (status == RAC_SUCCESS && callback && result.text) {
         callback(result.text, RAC_TRUE, user_data);
     }
@@ -80,7 +79,8 @@ static rac_result_t whispercpp_stt_vtable_transcribe_stream(void* impl, const vo
 
 // Get info
 static rac_result_t whispercpp_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
 
     out_info->is_ready = rac_stt_whispercpp_is_ready(impl);
     out_info->supports_streaming = RAC_FALSE;  // WhisperCPP streaming is limited

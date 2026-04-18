@@ -5,20 +5,20 @@
  * Provides JSON parsing and serialization wrappers over the typed C API.
  */
 
-#include "rac/features/diffusion/rac_diffusion_component.h"
-
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
 #include "rac/core/rac_types.h"
+#include "rac/features/diffusion/rac_diffusion_component.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 namespace {
 
 static const char* skip_ws(const char* p) {
-    if (!p) return nullptr;
+    if (!p)
+        return nullptr;
     while (*p && std::isspace(static_cast<unsigned char>(*p))) {
         ++p;
     }
@@ -26,40 +26,62 @@ static const char* skip_ws(const char* p) {
 }
 
 static const char* find_key(const char* json, const char* key) {
-    if (!json || !key) return nullptr;
+    if (!json || !key)
+        return nullptr;
     std::string needle = "\"";
     needle += key;
     needle += "\"";
     const char* pos = std::strstr(json, needle.c_str());
-    if (!pos) return nullptr;
+    if (!pos)
+        return nullptr;
     pos += needle.size();
     while (*pos && *pos != ':') {
         ++pos;
     }
-    if (*pos != ':') return nullptr;
+    if (*pos != ':')
+        return nullptr;
     pos = skip_ws(pos + 1);
     return pos;
 }
 
 static bool json_read_string(const char* json, const char* key, std::string* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     const char* p = find_key(json, key);
-    if (!p || *p != '"') return false;
+    if (!p || *p != '"')
+        return false;
     ++p;
     std::string result;
     while (*p) {
         if (*p == '\\') {
             ++p;
-            if (!*p) break;
+            if (!*p)
+                break;
             switch (*p) {
-                case '"': result.push_back('"'); break;
-                case '\\': result.push_back('\\'); break;
-                case 'n': result.push_back('\n'); break;
-                case 'r': result.push_back('\r'); break;
-                case 't': result.push_back('\t'); break;
-                case 'b': result.push_back('\b'); break;
-                case 'f': result.push_back('\f'); break;
-                default: result.push_back(*p); break;
+                case '"':
+                    result.push_back('"');
+                    break;
+                case '\\':
+                    result.push_back('\\');
+                    break;
+                case 'n':
+                    result.push_back('\n');
+                    break;
+                case 'r':
+                    result.push_back('\r');
+                    break;
+                case 't':
+                    result.push_back('\t');
+                    break;
+                case 'b':
+                    result.push_back('\b');
+                    break;
+                case 'f':
+                    result.push_back('\f');
+                    break;
+                default:
+                    result.push_back(*p);
+                    break;
             }
             ++p;
             continue;
@@ -74,9 +96,11 @@ static bool json_read_string(const char* json, const char* key, std::string* out
 }
 
 static bool json_read_bool(const char* json, const char* key, bool* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     const char* p = find_key(json, key);
-    if (!p) return false;
+    if (!p)
+        return false;
     if (std::strncmp(p, "true", 4) == 0) {
         *out = true;
         return true;
@@ -89,23 +113,29 @@ static bool json_read_bool(const char* json, const char* key, bool* out) {
 }
 
 static bool json_read_number(const char* json, const char* key, double* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     const char* p = find_key(json, key);
-    if (!p) return false;
+    if (!p)
+        return false;
     char* end = nullptr;
     double val = std::strtod(p, &end);
-    if (end == p) return false;
+    if (end == p)
+        return false;
     *out = val;
     return true;
 }
 
 static bool json_read_int64(const char* json, const char* key, int64_t* out) {
-    if (!out) return false;
+    if (!out)
+        return false;
     const char* p = find_key(json, key);
-    if (!p) return false;
+    if (!p)
+        return false;
     char* end = nullptr;
     long long val = std::strtoll(p, &end, 10);
-    if (end == p) return false;
+    if (end == p)
+        return false;
     *out = static_cast<int64_t>(val);
     return true;
 }
@@ -122,14 +152,22 @@ static rac_diffusion_scheduler_t parse_scheduler(const char* json,
         return fallback;
     }
 
-    if (val == "dpm++_2m_karras") return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
-    if (val == "dpm++_2m") return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M;
-    if (val == "dpm++_2m_sde") return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_SDE;
-    if (val == "ddim") return RAC_DIFFUSION_SCHEDULER_DDIM;
-    if (val == "euler") return RAC_DIFFUSION_SCHEDULER_EULER;
-    if (val == "euler_a") return RAC_DIFFUSION_SCHEDULER_EULER_ANCESTRAL;
-    if (val == "pndm") return RAC_DIFFUSION_SCHEDULER_PNDM;
-    if (val == "lms") return RAC_DIFFUSION_SCHEDULER_LMS;
+    if (val == "dpm++_2m_karras")
+        return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_KARRAS;
+    if (val == "dpm++_2m")
+        return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M;
+    if (val == "dpm++_2m_sde")
+        return RAC_DIFFUSION_SCHEDULER_DPM_PP_2M_SDE;
+    if (val == "ddim")
+        return RAC_DIFFUSION_SCHEDULER_DDIM;
+    if (val == "euler")
+        return RAC_DIFFUSION_SCHEDULER_EULER;
+    if (val == "euler_a")
+        return RAC_DIFFUSION_SCHEDULER_EULER_ANCESTRAL;
+    if (val == "pndm")
+        return RAC_DIFFUSION_SCHEDULER_PNDM;
+    if (val == "lms")
+        return RAC_DIFFUSION_SCHEDULER_LMS;
     return fallback;
 }
 
@@ -144,9 +182,12 @@ static rac_diffusion_mode_t parse_mode(const char* json, rac_diffusion_mode_t fa
         return fallback;
     }
 
-    if (val == "txt2img") return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
-    if (val == "img2img") return RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE;
-    if (val == "inpainting") return RAC_DIFFUSION_MODE_INPAINTING;
+    if (val == "txt2img")
+        return RAC_DIFFUSION_MODE_TEXT_TO_IMAGE;
+    if (val == "img2img")
+        return RAC_DIFFUSION_MODE_IMAGE_TO_IMAGE;
+    if (val == "inpainting")
+        return RAC_DIFFUSION_MODE_INPAINTING;
     return fallback;
 }
 
@@ -162,17 +203,23 @@ static rac_diffusion_model_variant_t parse_variant(const char* json,
         return fallback;
     }
 
-    if (val == "sd15") return RAC_DIFFUSION_MODEL_SD_1_5;
-    if (val == "sd21") return RAC_DIFFUSION_MODEL_SD_2_1;
-    if (val == "sdxl") return RAC_DIFFUSION_MODEL_SDXL;
-    if (val == "sdxl_turbo") return RAC_DIFFUSION_MODEL_SDXL_TURBO;
-    if (val == "sdxs") return RAC_DIFFUSION_MODEL_SDXS;
-    if (val == "lcm") return RAC_DIFFUSION_MODEL_LCM;
+    if (val == "sd15")
+        return RAC_DIFFUSION_MODEL_SD_1_5;
+    if (val == "sd21")
+        return RAC_DIFFUSION_MODEL_SD_2_1;
+    if (val == "sdxl")
+        return RAC_DIFFUSION_MODEL_SDXL;
+    if (val == "sdxl_turbo")
+        return RAC_DIFFUSION_MODEL_SDXL_TURBO;
+    if (val == "sdxs")
+        return RAC_DIFFUSION_MODEL_SDXS;
+    if (val == "lcm")
+        return RAC_DIFFUSION_MODEL_LCM;
     return fallback;
 }
 
-static rac_diffusion_tokenizer_source_t parse_tokenizer_source(
-    const char* json, rac_diffusion_tokenizer_source_t fallback) {
+static rac_diffusion_tokenizer_source_t
+parse_tokenizer_source(const char* json, rac_diffusion_tokenizer_source_t fallback) {
     double num = 0.0;
     if (json_read_number(json, "tokenizer_source", &num)) {
         return static_cast<rac_diffusion_tokenizer_source_t>(static_cast<int>(num));
@@ -183,15 +230,19 @@ static rac_diffusion_tokenizer_source_t parse_tokenizer_source(
         return fallback;
     }
 
-    if (val == "sd15") return RAC_DIFFUSION_TOKENIZER_SD_1_5;
-    if (val == "sd2") return RAC_DIFFUSION_TOKENIZER_SD_2_X;
-    if (val == "sdxl") return RAC_DIFFUSION_TOKENIZER_SDXL;
-    if (val == "custom") return RAC_DIFFUSION_TOKENIZER_CUSTOM;
+    if (val == "sd15")
+        return RAC_DIFFUSION_TOKENIZER_SD_1_5;
+    if (val == "sd2")
+        return RAC_DIFFUSION_TOKENIZER_SD_2_X;
+    if (val == "sdxl")
+        return RAC_DIFFUSION_TOKENIZER_SDXL;
+    if (val == "custom")
+        return RAC_DIFFUSION_TOKENIZER_CUSTOM;
     return fallback;
 }
 
-static rac_inference_framework_t parse_preferred_framework(
-    const char* json, rac_inference_framework_t fallback) {
+static rac_inference_framework_t parse_preferred_framework(const char* json,
+                                                           rac_inference_framework_t fallback) {
     double num = 0.0;
     if (json_read_number(json, "preferred_framework", &num)) {
         return static_cast<rac_inference_framework_t>(static_cast<int>(num));
@@ -206,25 +257,34 @@ static rac_inference_framework_t parse_preferred_framework(
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
 
-    if (val == "onnx") return RAC_FRAMEWORK_ONNX;
-    if (val == "llamacpp" || val == "llama_cpp") return RAC_FRAMEWORK_LLAMACPP;
+    if (val == "onnx")
+        return RAC_FRAMEWORK_ONNX;
+    if (val == "llamacpp" || val == "llama_cpp")
+        return RAC_FRAMEWORK_LLAMACPP;
     if (val == "foundationmodels" || val == "foundation_models")
         return RAC_FRAMEWORK_FOUNDATION_MODELS;
-    if (val == "systemtts" || val == "system_tts") return RAC_FRAMEWORK_SYSTEM_TTS;
-    if (val == "fluidaudio" || val == "fluid_audio") return RAC_FRAMEWORK_FLUID_AUDIO;
-    if (val == "builtin" || val == "built_in") return RAC_FRAMEWORK_BUILTIN;
-    if (val == "none") return RAC_FRAMEWORK_NONE;
-    if (val == "mlx") return RAC_FRAMEWORK_MLX;
-    if (val == "coreml" || val == "core_ml") return RAC_FRAMEWORK_COREML;
-    if (val == "genie" || val == "qnn_genie") return RAC_FRAMEWORK_GENIE;
-    if (val == "unknown") return RAC_FRAMEWORK_UNKNOWN;
+    if (val == "systemtts" || val == "system_tts")
+        return RAC_FRAMEWORK_SYSTEM_TTS;
+    if (val == "fluidaudio" || val == "fluid_audio")
+        return RAC_FRAMEWORK_FLUID_AUDIO;
+    if (val == "builtin" || val == "built_in")
+        return RAC_FRAMEWORK_BUILTIN;
+    if (val == "none")
+        return RAC_FRAMEWORK_NONE;
+    if (val == "mlx")
+        return RAC_FRAMEWORK_MLX;
+    if (val == "coreml" || val == "core_ml")
+        return RAC_FRAMEWORK_COREML;
+    if (val == "genie" || val == "qnn_genie")
+        return RAC_FRAMEWORK_GENIE;
+    if (val == "unknown")
+        return RAC_FRAMEWORK_UNKNOWN;
 
     return fallback;
 }
 
 static std::string base64_encode(const uint8_t* data, size_t len) {
-    static const char table[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     std::string out;
     out.reserve(((len + 2) / 3) * 4);
@@ -252,12 +312,24 @@ static std::string json_escape(const std::string& input) {
     out.reserve(input.size() + 16);
     for (char c : input) {
         switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default: out += c; break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out += c;
+                break;
         }
     }
     return out;
@@ -283,9 +355,8 @@ rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle, const c
         config.reduce_memory = bool_val ? RAC_TRUE : RAC_FALSE;
     }
 
-    config.preferred_framework = static_cast<int32_t>(
-        parse_preferred_framework(config_json,
-                                  static_cast<rac_inference_framework_t>(config.preferred_framework)));
+    config.preferred_framework = static_cast<int32_t>(parse_preferred_framework(
+        config_json, static_cast<rac_inference_framework_t>(config.preferred_framework)));
 
     config.tokenizer.source = parse_tokenizer_source(config_json, config.tokenizer.source);
 
@@ -295,17 +366,18 @@ rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle, const c
     }
 
     std::string custom_url;
-    if (json_read_string(config_json, "tokenizer_custom_url", &custom_url) &&
-        !custom_url.empty()) {
+    if (json_read_string(config_json, "tokenizer_custom_url", &custom_url) && !custom_url.empty()) {
         config.tokenizer.custom_base_url = custom_url.c_str();
     }
 
     return rac_diffusion_component_configure(handle, &config);
 }
 
-rac_result_t rac_diffusion_component_generate_json(
-    rac_handle_t handle, const char* options_json, const uint8_t* input_image_data,
-    size_t input_image_size, const uint8_t* mask_data, size_t mask_size, char** out_json) {
+rac_result_t rac_diffusion_component_generate_json(rac_handle_t handle, const char* options_json,
+                                                   const uint8_t* input_image_data,
+                                                   size_t input_image_size,
+                                                   const uint8_t* mask_data, size_t mask_size,
+                                                   char** out_json) {
     if (!handle || !options_json || !out_json) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -421,8 +493,8 @@ rac_result_t rac_diffusion_component_get_info_json(rac_handle_t handle, char** o
             std::string(info.supports_text_to_image ? "true" : "false") + ",";
     json += "\"supports_image_to_image\":" +
             std::string(info.supports_image_to_image ? "true" : "false") + ",";
-    json += "\"supports_inpainting\":" +
-            std::string(info.supports_inpainting ? "true" : "false") + ",";
+    json +=
+        "\"supports_inpainting\":" + std::string(info.supports_inpainting ? "true" : "false") + ",";
     json += "\"safety_checker_enabled\":" +
             std::string(info.safety_checker_enabled ? "true" : "false") + ",";
     json += "\"max_width\":" + std::to_string(info.max_width) + ",";

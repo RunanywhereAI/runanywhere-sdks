@@ -62,8 +62,8 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : model_id;
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL",
-                     static_cast<int>(framework), model_path ? model_path : "NULL");
+                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
+                     model_path ? model_path : "NULL");
     } else {
         RAC_LOG_WARNING(LOG_CAT,
                         "Model NOT found in registry (result=%d), using default framework=%d",

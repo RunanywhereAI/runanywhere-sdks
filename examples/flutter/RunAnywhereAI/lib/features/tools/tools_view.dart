@@ -4,9 +4,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -335,7 +335,7 @@ class _ToolsViewState extends State<ToolsView> {
     // Handle simple operations
     if (expr.contains('+')) {
       final parts = expr.split('+');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a + b);
+      return parts.map(double.parse).reduce((a, b) => a + b);
     } else if (expr.contains('-')) {
       final parts = expr.split('-');
       var result = double.parse(parts[0]);
@@ -345,7 +345,7 @@ class _ToolsViewState extends State<ToolsView> {
       return result;
     } else if (expr.contains('*')) {
       final parts = expr.split('*');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a * b);
+      return parts.map(double.parse).reduce((a, b) => a * b);
     } else if (expr.contains('/')) {
       final parts = expr.split('/');
       var result = double.parse(parts[0]);
@@ -688,17 +688,17 @@ class _ToolsViewState extends State<ToolsView> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.padding16),
       decoration: BoxDecoration(
-        color: AppColors.primaryRed.withOpacity(0.1),
+        color: AppColors.primaryRed.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: AppColors.primaryRed),
+          const Icon(Icons.error_outline, color: AppColors.primaryRed),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: AppColors.primaryRed),
+              style: const TextStyle(color: AppColors.primaryRed),
             ),
           ),
         ],
@@ -751,10 +751,10 @@ class _ToolsViewState extends State<ToolsView> {
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.padding16),
           decoration: BoxDecoration(
-            color: AppColors.primaryAccent.withOpacity(0.1),
+            color: AppColors.primaryAccent.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.primaryAccent.withOpacity(0.3),
+              color: AppColors.primaryAccent.withValues(alpha: 0.3),
             ),
           ),
           child: Text(
@@ -767,15 +767,17 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   void _showModelSelection(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => ModelSelectionSheet(
-        onModelSelected: (model) async {
-          // ModelSelectionSheet handles closing itself, so just sync state
-          unawaited(_syncModelState());
-        },
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) => ModelSelectionSheet(
+          onModelSelected: (model) async {
+            // ModelSelectionSheet handles closing itself, so just sync state
+            unawaited(_syncModelState());
+          },
+        ),
       ),
     );
   }

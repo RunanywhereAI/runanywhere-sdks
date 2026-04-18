@@ -13,10 +13,9 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_benchmark.h"
 
@@ -196,8 +195,9 @@ class LlamaCppTextGeneration {
     bool recreate_context();
     bool apply_lora_adapters();
     std::string build_prompt(const TextGenerationRequest& request);
-    std::string apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
-                                    const std::string& system_prompt, bool add_assistant_token);
+    std::string
+    apply_chat_template(const std::vector<std::pair<std::string, std::string>>& messages,
+                        const std::string& system_prompt, bool add_assistant_token);
 
     LlamaCppBackend* backend_;
     llama_model* model_ = nullptr;

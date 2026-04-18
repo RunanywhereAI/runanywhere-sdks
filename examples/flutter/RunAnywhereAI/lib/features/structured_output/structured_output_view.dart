@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -34,11 +35,12 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   Map<String, dynamic>? _structuredData;
 
   // Examples with both schema and prompt templates
-  final List<StructuredOutputExample> _examples = [
+  static const List<StructuredOutputExample> _examples = [
     StructuredOutputExample(
       name: 'Recipe',
       typeName: 'Recipe',
-      schema: '''{
+      schema: '''
+{
         "type": "object",
         "properties": {
           "name": { "type": "string" },
@@ -57,7 +59,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     StructuredOutputExample(
       name: 'User Profile',
       typeName: 'User',
-      schema: '''{
+      schema: '''
+{
         "type": "object",
         "properties": {
           "name": { "type": "string" },
@@ -76,7 +79,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     StructuredOutputExample(
       name: 'Weather',
       typeName: 'WeatherResponse',
-      schema: '''{
+      schema: '''
+{
         "type": "object",
         "properties": {
           "temperature": { "type": "number" },
@@ -95,7 +99,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     StructuredOutputExample(
       name: 'Product List',
       typeName: 'ProductList',
-      schema: '''{
+      schema: '''
+{
         "type": "array",
         "items": {
           "type": "object",
@@ -115,7 +120,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     StructuredOutputExample(
       name: 'Book Summary',
       typeName: 'BookSummary',
-      schema: '''{
+      schema: '''
+{
         "type": "object",
         "properties": {
           "title": { "type": "string" },
@@ -135,7 +141,8 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     StructuredOutputExample(
       name: 'Task',
       typeName: 'Task',
-      schema: '''{
+      schema: '''
+{
         "type": "object",
         "properties": {
           "id": { "type": "string" },
@@ -274,7 +281,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
   }
 
   void _copyToClipboard(String text) {
-    Clipboard.setData(ClipboardData(text: text));
+    unawaited(Clipboard.setData(ClipboardData(text: text)));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Copied to clipboard')),
     );
@@ -360,7 +367,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       child: DropdownButtonFormField<int>(
-        value: _selectedExampleIndex,
+        initialValue: _selectedExampleIndex,
         decoration: InputDecoration(
           labelText: 'Example',
           border: OutlineInputBorder(

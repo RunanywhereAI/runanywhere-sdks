@@ -27,11 +27,12 @@ extension String {
         let displayName = self.modelNameFromID()
 
         // Remove content in parentheses
-        var cleaned = displayName.replacingOccurrences(
+        let withoutParens = displayName.replacingOccurrences(
             of: "\\s*\\([^)]*\\)",
             with: "",
             options: .regularExpression
-        ).trimmingCharacters(in: .whitespaces)
+        )
+        var cleaned = withoutParens.trimmingCharacters(in: .whitespaces)
 
         // If still too long, truncate and add ellipsis
         if cleaned.count > maxLength {
@@ -41,8 +42,9 @@ extension String {
         return cleaned
     }
 
-    /// Remove markdown formatting for clean text-to-speech
-    /// Removes: **, *, _, `, ##, code blocks, etc.
+    // Remove markdown formatting for clean text-to-speech.
+    // Removes: **, *, _, `, ##, code blocks, etc.
+    // swiftlint:disable:next function_body_length
     func strippingMarkdown() -> String {
         var text = self
 

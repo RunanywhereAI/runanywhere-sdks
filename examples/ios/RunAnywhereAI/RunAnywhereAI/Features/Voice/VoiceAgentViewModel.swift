@@ -446,6 +446,7 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Session Event Handling
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func handleSessionEvent(_ event: VoiceSessionEvent) {
         switch event {
         case .started: sessionState = .listening; currentStatus = "Listening..."

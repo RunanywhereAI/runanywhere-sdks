@@ -85,11 +85,11 @@
 /* ---- dirent.h (minimal implementation) ---------------------------------- */
 /* Provides opendir / readdir / closedir using Win32 FindFirstFile API.       */
 
-#include <io.h>
-#include <windows.h>
-#include <string.h>
-#include <stdlib.h>
 #include <errno.h>
+#include <io.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
 
 #ifndef NAME_MAX
 #define NAME_MAX 260
@@ -100,19 +100,25 @@ struct dirent {
 };
 
 typedef struct DIR {
-    HANDLE           hFind;
+    HANDLE hFind;
     WIN32_FIND_DATAA fdata;
-    struct dirent    entry;
-    int              first;   /* 1 = first call to readdir */
+    struct dirent entry;
+    int first; /* 1 = first call to readdir */
 } DIR;
 
 static inline DIR* opendir(const char* path) {
-    if (!path || !*path) { errno = ENOENT; return NULL; }
+    if (!path || !*path) {
+        errno = ENOENT;
+        return NULL;
+    }
 
     size_t len = strlen(path);
     /* Build search pattern: path\* */
     char* pattern = (char*)malloc(len + 3);
-    if (!pattern) { errno = ENOMEM; return NULL; }
+    if (!pattern) {
+        errno = ENOMEM;
+        return NULL;
+    }
     memcpy(pattern, path, len);
     if (path[len - 1] != '\\' && path[len - 1] != '/') {
         pattern[len++] = '\\';
@@ -121,7 +127,11 @@ static inline DIR* opendir(const char* path) {
     pattern[len] = '\0';
 
     DIR* dir = (DIR*)malloc(sizeof(DIR));
-    if (!dir) { free(pattern); errno = ENOMEM; return NULL; }
+    if (!dir) {
+        free(pattern);
+        errno = ENOMEM;
+        return NULL;
+    }
 
     dir->hFind = FindFirstFileA(pattern, &dir->fdata);
     free(pattern);
@@ -136,12 +146,14 @@ static inline DIR* opendir(const char* path) {
 }
 
 static inline struct dirent* readdir(DIR* dir) {
-    if (!dir) return NULL;
+    if (!dir)
+        return NULL;
 
     if (dir->first) {
         dir->first = 0;
     } else {
-        if (!FindNextFileA(dir->hFind, &dir->fdata)) return NULL;
+        if (!FindNextFileA(dir->hFind, &dir->fdata))
+            return NULL;
     }
     strncpy(dir->entry.d_name, dir->fdata.cFileName, NAME_MAX);
     dir->entry.d_name[NAME_MAX] = '\0';
@@ -149,7 +161,8 @@ static inline struct dirent* readdir(DIR* dir) {
 }
 
 static inline int closedir(DIR* dir) {
-    if (!dir) return -1;
+    if (!dir)
+        return -1;
     FindClose(dir->hFind);
     free(dir);
     return 0;
@@ -158,6 +171,7 @@ static inline int closedir(DIR* dir) {
 #else /* !_WIN32 */
 
 #include <dirent.h>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -175,17 +189,18 @@ static inline int closedir(DIR* dir) {
  * sequences. Used by ONNX Runtime session creation which requires wchar_t*.
  */
 inline std::wstring rac_to_wstring(const std::string& s) {
-    if (s.empty()) return {};
-    int size = MultiByteToWideChar(CP_UTF8, 0, s.data(),
-                                   static_cast<int>(s.size()), nullptr, 0);
-    if (size <= 0) return {};
+    if (s.empty())
+        return {};
+    int size = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
+    if (size <= 0)
+        return {};
     std::wstring out(static_cast<size_t>(size), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()),
-                        &out[0], size);
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), &out[0], size);
     return out;
 }
 inline std::wstring rac_to_wstring(const char* s) {
-    if (!s || !*s) return {};
+    if (!s || !*s)
+        return {};
     return rac_to_wstring(std::string(s));
 }
 #endif

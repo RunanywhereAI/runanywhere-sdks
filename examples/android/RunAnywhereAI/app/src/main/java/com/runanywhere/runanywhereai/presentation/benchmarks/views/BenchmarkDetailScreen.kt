@@ -56,12 +56,11 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.viewmodel.Benchmark
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppSpacing
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-private val dateFormat: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a").withZone(ZoneId.systemDefault())
+private val dateFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
 
 /**
  * Shows details of a single benchmark run with export actions.
@@ -166,8 +165,8 @@ private fun RunInfoSection(run: BenchmarkRun) {
         Column(modifier = Modifier.padding(AppSpacing.large)) {
             Text("Run Info", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(AppSpacing.small))
-            DetailRow("Started", dateFormat.format(Instant.ofEpochMilli(run.startedAt)))
-            run.completedAt?.let { DetailRow("Completed", dateFormat.format(Instant.ofEpochMilli(it))) }
+            DetailRow("Started", dateFormat.format(Date(run.startedAt)))
+            run.completedAt?.let { DetailRow("Completed", dateFormat.format(Date(it))) }
             run.durationSeconds?.let { DetailRow("Duration", "${"%.1f".format(it)}s") }
             Row(
                 modifier =

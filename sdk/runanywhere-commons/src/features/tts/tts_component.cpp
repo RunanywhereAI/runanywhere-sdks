@@ -240,10 +240,10 @@ extern "C" rac_result_t rac_tts_component_load_voice(rac_handle_t handle, const 
     rac_result_t result =
         rac_lifecycle_load(component->lifecycle, voice_path, voice_id, voice_name, &service);
 
-    double load_duration_ms = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
-                                                              load_start)
-            .count());
+    double load_duration_ms =
+        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - load_start)
+                                .count());
 
     if (result != RAC_SUCCESS) {
         rac_analytics_event_data_t event = {};
@@ -493,7 +493,8 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
 
     auto start_time = std::chrono::steady_clock::now();
 
-    rac_result_t result = rac_tts_synthesize_stream(service, text, &local_options, callback, user_data);
+    rac_result_t result =
+        rac_tts_synthesize_stream(service, text, &local_options, callback, user_data);
 
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);

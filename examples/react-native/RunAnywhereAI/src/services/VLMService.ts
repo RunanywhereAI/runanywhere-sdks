@@ -19,6 +19,7 @@ export class VLMService {
     modelName?: string
   ): Promise<void> {
     try {
+      // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
       console.log(`[VLMService] Loading model: ${modelName}`);
 
       // Pass 'undefined' for loraPath (3rd arg) as per SDK requirement
@@ -31,6 +32,7 @@ export class VLMService {
 
       if (success) {
         this._isLoaded = true;
+        // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
         console.log('[VLMService] Load success');
       } else {
         this._isLoaded = false;
@@ -50,7 +52,7 @@ export class VLMService {
     if (!this._isLoaded) return false;
     try {
       return await sdkCheckLoaded();
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -73,6 +75,7 @@ export class VLMService {
       filePath: imagePath,
     };
 
+    // eslint-disable-next-line no-console -- demo VLM inference diagnostic
     console.log(`[VLMService] Processing image: ${imagePath}`);
 
     try {
@@ -94,6 +97,7 @@ export class VLMService {
 
   release(): void {
     this._isLoaded = false;
+    // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
     console.log('[VLMService] Service state released');
   }
 }

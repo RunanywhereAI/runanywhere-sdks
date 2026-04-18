@@ -75,6 +75,7 @@ export function useVLMCamera(
   // 2. Cleanup only when the component truly unmounts
   useEffect(() => {
     return () => {
+      // eslint-disable-next-line no-console -- demo camera lifecycle diagnostic
       console.log('[useVLMCamera] Unmounting - Cleaning up');
       if (autoStreamIntervalRef.current) {
         clearInterval(autoStreamIntervalRef.current);
@@ -120,7 +121,7 @@ export function useVLMCamera(
         setIsModelLoaded(true);
         setLoadedModelName(modelName);
         setError(null);
-      } catch (err: any) {
+      } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Failed to load model';
         setError(msg);
         setIsModelLoaded(false);

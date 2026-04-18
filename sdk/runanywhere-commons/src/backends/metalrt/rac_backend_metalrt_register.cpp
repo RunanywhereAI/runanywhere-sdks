@@ -14,9 +14,10 @@
 #include "rac_tts_metalrt.h"
 #include "rac_vlm_metalrt.h"
 
+#include <dirent.h>
+
 #include <cstdlib>
 #include <cstring>
-#include <dirent.h>
 #include <mutex>
 #include <string>
 #include <sys/stat.h>
@@ -36,7 +37,8 @@ static const char* LOG_CAT = "MetalRT";
 // =============================================================================
 
 static std::string resolve_metalrt_model_path(const char* base_path) {
-    if (!base_path || base_path[0] == '\0') return {};
+    if (!base_path || base_path[0] == '\0')
+        return {};
 
     struct stat st;
     std::string config_at_root = std::string(base_path) + "/config.json";
@@ -45,19 +47,23 @@ static std::string resolve_metalrt_model_path(const char* base_path) {
     }
 
     DIR* dir = opendir(base_path);
-    if (!dir) return std::string(base_path);
+    if (!dir)
+        return std::string(base_path);
 
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
-        if (entry->d_name[0] == '.') continue;
+        if (entry->d_name[0] == '.')
+            continue;
 #ifdef _DIRENT_HAVE_D_TYPE
-        if (entry->d_type != DT_DIR && entry->d_type != DT_UNKNOWN) continue;
+        if (entry->d_type != DT_DIR && entry->d_type != DT_UNKNOWN)
+            continue;
 #endif
         std::string nested_config = std::string(base_path) + "/" + entry->d_name + "/config.json";
         if (stat(nested_config.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
             std::string resolved = std::string(base_path) + "/" + entry->d_name;
             closedir(dir);
-            RAC_LOG_INFO(LOG_CAT, "Resolved nested model dir: %s -> %s", base_path, resolved.c_str());
+            RAC_LOG_INFO(LOG_CAT, "Resolved nested model dir: %s -> %s", base_path,
+                         resolved.c_str());
             return resolved;
         }
     }
@@ -80,12 +86,13 @@ static rac_result_t llm_vtable_initialize(void* impl, const char* model_path) {
 }
 
 static rac_result_t llm_vtable_generate(void* impl, const char* prompt,
-                                         const rac_llm_options_t* options,
-                                         rac_llm_result_t* out_result) {
+                                        const rac_llm_options_t* options,
+                                        rac_llm_result_t* out_result) {
     return rac_llm_metalrt_generate(impl, prompt, options, out_result);
 }
 
-// Stream adapter: bridge RAC's callback (token, user_data) to MetalRT's (token, is_final, user_data)
+// Stream adapter: bridge RAC's callback (token, user_data) to MetalRT's (token, is_final,
+// user_data)
 struct LLMStreamAdapter {
     rac_llm_stream_callback_fn callback;
     void* user_data;
@@ -101,15 +108,16 @@ static rac_bool_t llm_stream_adapter_cb(const char* token, rac_bool_t is_final, 
 }
 
 static rac_result_t llm_vtable_generate_stream(void* impl, const char* prompt,
-                                                const rac_llm_options_t* options,
-                                                rac_llm_stream_callback_fn callback,
-                                                void* user_data) {
+                                               const rac_llm_options_t* options,
+                                               rac_llm_stream_callback_fn callback,
+                                               void* user_data) {
     LLMStreamAdapter adapter = {callback, user_data};
     return rac_llm_metalrt_generate_stream(impl, prompt, options, llm_stream_adapter_cb, &adapter);
 }
 
 static rac_result_t llm_vtable_get_info(void* impl, rac_llm_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
     out_info->is_ready = rac_llm_metalrt_is_loaded(impl);
     out_info->supports_streaming = RAC_TRUE;
     out_info->current_model = nullptr;
@@ -139,8 +147,8 @@ static rac_result_t llm_vtable_append_context(void* impl, const char* text) {
 }
 
 static rac_result_t llm_vtable_generate_from_context(void* impl, const char* query,
-                                                      const rac_llm_options_t* options,
-                                                      rac_llm_result_t* out_result) {
+                                                     const rac_llm_options_t* options,
+                                                     rac_llm_result_t* out_result) {
     return rac_llm_metalrt_generate_from_context(impl, query, options, out_result);
 }
 
@@ -177,13 +185,14 @@ static rac_result_t stt_vtable_initialize(void* impl, const char* model_path) {
 }
 
 static rac_result_t stt_vtable_transcribe(void* impl, const void* audio_data, size_t audio_size,
-                                           const rac_stt_options_t* options,
-                                           rac_stt_result_t* out_result) {
+                                          const rac_stt_options_t* options,
+                                          rac_stt_result_t* out_result) {
     return rac_stt_metalrt_transcribe(impl, audio_data, audio_size, options, out_result);
 }
 
 static rac_result_t stt_vtable_get_info(void* /*impl*/, rac_stt_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
     out_info->is_ready = RAC_TRUE;
     out_info->supports_streaming = RAC_FALSE;
     return RAC_SUCCESS;
@@ -215,8 +224,8 @@ static rac_result_t tts_vtable_initialize(void* /*impl*/) {
 }
 
 static rac_result_t tts_vtable_synthesize(void* impl, const char* text,
-                                           const rac_tts_options_t* options,
-                                           rac_tts_result_t* out_result) {
+                                          const rac_tts_options_t* options,
+                                          rac_tts_result_t* out_result) {
     return rac_tts_metalrt_synthesize(impl, text, options, out_result);
 }
 
@@ -225,7 +234,8 @@ static rac_result_t tts_vtable_stop(void* /*impl*/) {
 }
 
 static rac_result_t tts_vtable_get_info(void* /*impl*/, rac_tts_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
     out_info->is_ready = RAC_TRUE;
     out_info->is_synthesizing = RAC_FALSE;
     out_info->available_voices = nullptr;
@@ -256,29 +266,29 @@ static const rac_tts_service_ops_t g_metalrt_tts_ops = {
 // =============================================================================
 
 static rac_result_t vlm_vtable_initialize(void* impl, const char* model_path,
-                                           const char* mmproj_path) {
+                                          const char* mmproj_path) {
     (void)impl;
     (void)model_path;
     (void)mmproj_path;
     return RAC_SUCCESS;
 }
 
-static rac_result_t vlm_vtable_process(void* impl, const rac_vlm_image_t* image,
-                                        const char* prompt, const rac_vlm_options_t* options,
-                                        rac_vlm_result_t* out_result) {
+static rac_result_t vlm_vtable_process(void* impl, const rac_vlm_image_t* image, const char* prompt,
+                                       const rac_vlm_options_t* options,
+                                       rac_vlm_result_t* out_result) {
     return rac_vlm_metalrt_process(impl, image, prompt, options, out_result);
 }
 
 static rac_result_t vlm_vtable_process_stream(void* impl, const rac_vlm_image_t* image,
-                                               const char* prompt,
-                                               const rac_vlm_options_t* options,
-                                               rac_vlm_stream_callback_fn callback,
-                                               void* user_data) {
+                                              const char* prompt, const rac_vlm_options_t* options,
+                                              rac_vlm_stream_callback_fn callback,
+                                              void* user_data) {
     return rac_vlm_metalrt_process_stream(impl, image, prompt, options, callback, user_data);
 }
 
 static rac_result_t vlm_vtable_get_info(void* /*impl*/, rac_vlm_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
     out_info->is_ready = RAC_TRUE;
     out_info->supports_streaming = RAC_TRUE;
     out_info->supports_multiple_images = RAC_FALSE;
@@ -335,15 +345,15 @@ MetalRTRegistryState& get_state() {
 // =============================================================================
 
 rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request) return RAC_FALSE;
+    if (!request)
+        return RAC_FALSE;
 
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
     // Stub build: the private MetalRT engine binary is not linked. Refuse to
     // handle any request so the service registry surfaces BACKEND_NOT_FOUND
     // at the loadModel call site instead of silently dispatching to stubs.
     (void)request;
-    RAC_LOG_DEBUG(LOG_CAT,
-                  "can_handle: NO (MetalRT engine not available — stub build)");
+    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (MetalRT engine not available — stub build)");
     return RAC_FALSE;
 #else
     if (request->framework == RAC_FRAMEWORK_METALRT) {
@@ -362,7 +372,8 @@ rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user
 // =============================================================================
 
 rac_handle_t metalrt_llm_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request) return nullptr;
+    if (!request)
+        return nullptr;
 
     const char* raw_path = request->model_path ? request->model_path : request->identifier;
     if (!raw_path || raw_path[0] == '\0') {
@@ -393,7 +404,8 @@ rac_handle_t metalrt_llm_create(const rac_service_request_t* request, void* /*us
 }
 
 rac_handle_t metalrt_stt_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request) return nullptr;
+    if (!request)
+        return nullptr;
 
     const char* raw_path = request->model_path ? request->model_path : request->identifier;
     if (!raw_path || raw_path[0] == '\0') {
@@ -423,7 +435,8 @@ rac_handle_t metalrt_stt_create(const rac_service_request_t* request, void* /*us
 }
 
 rac_handle_t metalrt_tts_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request) return nullptr;
+    if (!request)
+        return nullptr;
 
     const char* raw_path = request->model_path ? request->model_path : request->identifier;
     if (!raw_path || raw_path[0] == '\0') {
@@ -453,7 +466,8 @@ rac_handle_t metalrt_tts_create(const rac_service_request_t* request, void* /*us
 }
 
 rac_handle_t metalrt_vlm_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request) return nullptr;
+    if (!request)
+        return nullptr;
 
     const char* raw_path = request->model_path ? request->model_path : request->identifier;
     if (!raw_path || raw_path[0] == '\0') {
@@ -515,7 +529,8 @@ rac_result_t rac_backend_metalrt_register(void) {
     module_info.id = state.module_id;
     module_info.name = "MetalRT";
     module_info.version = "1.0.0";
-    module_info.description = "High-performance inference using custom Metal GPU kernels (Apple only)";
+    module_info.description =
+        "High-performance inference using custom Metal GPU kernels (Apple only)";
 
     rac_capability_t capabilities[] = {
         RAC_CAPABILITY_TEXT_GENERATION,

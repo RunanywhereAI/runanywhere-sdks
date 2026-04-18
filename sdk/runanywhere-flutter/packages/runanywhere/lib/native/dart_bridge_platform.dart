@@ -569,8 +569,8 @@ int _platformHttpDownloadCallback(
 }
 
 int _platformHttpDownloadCancelCallback(
-  Pointer<Utf8> _taskId,
-  Pointer<Void> _userData,
+  Pointer<Utf8> taskId,
+  Pointer<Void> userData,
 ) {
   return RacResultCode.errorNotSupported;
 }
@@ -666,8 +666,8 @@ Future<void> _performHttpDownloadIsolate(
 
     if (result != RacResultCode.success && tempFile != null) {
       try {
-        if (await tempFile!.exists()) {
-          await tempFile!.delete();
+        if (await tempFile.exists()) {
+          await tempFile.delete();
         }
       } catch (_) {
         // Ignore cleanup errors
@@ -676,7 +676,7 @@ Future<void> _performHttpDownloadIsolate(
 
     if (completeCallback != null) {
       if (finalPath != null) {
-        final pathPtr = finalPath!.toNativeUtf8();
+        final pathPtr = finalPath.toNativeUtf8();
         completeCallback(
           result,
           pathPtr,
@@ -694,6 +694,7 @@ Future<void> _performHttpDownloadIsolate(
   }
 }
 
+// ignore: avoid_void_async - required signature for Isolate.spawn entry point
 void _httpDownloadIsolateEntry(List<dynamic> args) async {
   final url = args[0] as String;
   final destinationPath = args[1] as String;

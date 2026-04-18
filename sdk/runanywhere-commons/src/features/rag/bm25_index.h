@@ -19,7 +19,7 @@ namespace runanywhere {
 namespace rag {
 
 class BM25Index {
-public:
+   public:
     void add_chunk(const std::string& chunk_id, const std::string& text);
     void add_chunks_batch(const std::vector<std::pair<std::string, std::string>>& chunks);
     void remove_chunk(const std::string& chunk_id);
@@ -29,7 +29,7 @@ public:
     /// Returns (chunk_id, bm25_score) sorted descending by score
     std::vector<std::pair<std::string, float>> search(const std::string& query, size_t top_k) const;
 
-private:
+   private:
     static constexpr float k1_ = 1.2f;
     static constexpr float b_ = 0.75f;
 
@@ -47,7 +47,7 @@ private:
     mutable std::mutex mutex_;
 };
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_BM25_INDEX_H
+#endif  // RUNANYWHERE_BM25_INDEX_H

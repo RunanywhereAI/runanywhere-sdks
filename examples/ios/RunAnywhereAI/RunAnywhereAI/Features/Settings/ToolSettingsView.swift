@@ -8,61 +8,6 @@
 import SwiftUI
 import RunAnywhere
 
-// MARK: - Math Expression Validation
-
-/// Strict syntactic validation for math expressions before evaluation.
-/// `NSExpression(format:)` can raise uncatchable ObjC exceptions on malformed
-/// input that passes a simple character whitelist (e.g., "2*/3", "(", "1+").
-/// This routine rejects the common unsafe patterns.
-fileprivate func isValidMathExpression(_ expr: String) -> Bool {
-    let trimmed = expr.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return false }
-
-    let operators: Set<Character> = ["+", "-", "*", "/"]
-    // Chars after which a unary "-" is acceptable.
-    let unaryMinusContext: Set<Character> = ["(", "+", "-", "*", "/"]
-
-    var parenDepth = 0
-    var prevNonSpace: Character? = nil
-    var prevWasDot = false
-
-    for ch in trimmed {
-        if ch == " " { continue }
-
-        if ch == "(" {
-            parenDepth += 1
-        } else if ch == ")" {
-            parenDepth -= 1
-            if parenDepth < 0 { return false }
-        }
-
-        // Consecutive decimal dots (e.g., "1..2").
-        if ch == "." {
-            if prevWasDot { return false }
-            prevWasDot = true
-        } else {
-            prevWasDot = false
-        }
-
-        // Consecutive operators (allow unary "-" after operators or "(").
-        if operators.contains(ch), let prev = prevNonSpace, operators.contains(prev) {
-            if !(ch == "-" && unaryMinusContext.contains(prev)) {
-                return false
-            }
-        }
-
-        prevNonSpace = ch
-    }
-
-    // Balanced parentheses.
-    guard parenDepth == 0 else { return false }
-
-    // No trailing operator.
-    if let last = prevNonSpace, operators.contains(last) { return false }
-
-    return true
-}
-
 // MARK: - Tool Settings View Model
 
 @MainActor
@@ -144,14 +89,14 @@ class ToolSettingsViewModel: ObservableObject {
                         let keys = ["expression", "input", "expr"]
                         for key in keys {
                             if let val = args[key] {
-                                if let s = val.stringValue { return s }
-                                if let n = val.numberValue { return "\(n)" }
+                                if let str = val.stringValue { return str }
+                                if let num = val.numberValue { return "\(num)" }
                             }
                         }
                         // Fallback: try any value in the dict
                         for val in args.values {
-                            if let s = val.stringValue { return s }
-                            if let n = val.numberValue { return "\(n)" }
+                            if let str = val.stringValue { return str }
+                            if let num = val.numberValue { return "\(num)" }
                         }
                         return nil
                     }()
@@ -251,8 +196,11 @@ struct ToolSettingsSection: View {
         } header: {
             Text("Tool Calling")
         } footer: {
-            Text("Allow the LLM to use registered tools to perform actions like getting weather, time, or calculations.")
-                .font(AppTypography.caption)
+            Text(
+                "Allow the LLM to use registered tools to perform actions like "
+                + "getting weather, time, or calculations."
+            )
+            .font(AppTypography.caption)
         }
     }
 }
@@ -313,9 +261,12 @@ struct ToolSettingsCard: View {
                     }
                 }
 
-                Text("Allow the LLM to use registered tools to perform actions like getting weather, time, or calculations.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
+                Text(
+                    "Allow the LLM to use registered tools to perform actions like "
+                    + "getting weather, time, or calculations."
+                )
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
             }
             .padding(AppSpacing.large)
             .background(AppColors.backgroundSecondary)
@@ -390,7 +341,14 @@ enum WeatherService {
         )
     }
 
-    private static func geocodeLocation(_ location: String) async throws -> (latitude: Double, longitude: Double, name: String)? {
+    /// Resolved geocoding coordinates plus the canonical place name.
+    struct GeocodedLocation {
+        let latitude: Double
+        let longitude: Double
+        let name: String
+    }
+
+    private static func geocodeLocation(_ location: String) async throws -> GeocodedLocation? {
         guard let encodedLocation = location.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "\(geocodingURL)?name=\(encodedLocation)&count=1&language=en&format=json") else {
             return nil
@@ -407,7 +365,7 @@ enum WeatherService {
         }
 
         let name = first["name"] as? String ?? location
-        return (latitude, longitude, name)
+        return GeocodedLocation(latitude: latitude, longitude: longitude, name: name)
     }
 
     private static func fetchWeatherForCoordinates(
@@ -445,7 +403,8 @@ enum WeatherService {
         ]
     }
 
-    /// Convert WMO weather code to human-readable condition
+    // Convert WMO weather code to human-readable condition.
+    // swiftlint:disable:next cyclomatic_complexity
     private static func weatherCodeToCondition(_ code: Int) -> String {
         switch code {
         case 0: return "Clear sky"

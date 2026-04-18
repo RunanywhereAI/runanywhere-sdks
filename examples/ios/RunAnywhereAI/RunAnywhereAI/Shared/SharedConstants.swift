@@ -18,14 +18,17 @@ enum SharedConstants {
 
     // App Group UserDefaults keys
     enum Keys {
-        static let sessionState        = "sessionState"          // FlowSessionPhase raw value
-        static let transcribedText     = "transcribedText"       // Final transcription result
-        static let returnToAppScheme   = "returnToAppScheme"     // Host app URL scheme for bounce-back
-        static let preferredSTTModelId = "preferredSTTModelId"   // User's chosen STT model
-        static let dictationHistory    = "dictationHistory"      // JSON-encoded [DictationEntry]
-        static let audioLevel          = "audioLevel"            // Float 0–1, updated ~10×/s during listening
-        static let lastInsertedText    = "lastInsertedText"      // String, for undo button after insertion
-        static let lastHeartbeat       = "lastHeartbeat"         // Double unix timestamp, written every 1s while session is active
+        static let sessionState = "sessionState"                // FlowSessionPhase raw value
+        static let transcribedText = "transcribedText"          // Final transcription result
+        static let returnToAppScheme = "returnToAppScheme"      // Host app URL scheme for bounce-back
+        static let preferredSTTModelId = "preferredSTTModelId"  // User's chosen STT model
+        static let dictationHistory = "dictationHistory"        // JSON-encoded [DictationEntry]
+        // Float 0–1, updated ~10×/s during listening
+        static let audioLevel = "audioLevel"
+        // String, for undo button after insertion
+        static let lastInsertedText = "lastInsertedText"
+        // Double unix timestamp, written every 1s while session is active
+        static let lastHeartbeat = "lastHeartbeat"
     }
 
     // Darwin inter-process notification names (CFNotificationCenter)
@@ -33,27 +36,27 @@ enum SharedConstants {
     enum DarwinNotifications {
         // app → keyboard
         static let transcriptionReady = "com.runanywhere.keyboard.transcriptionReady"
-        static let sessionReady       = "com.runanywhere.session.ready"
+        static let sessionReady = "com.runanywhere.session.ready"
         // keyboard → app
-        static let startListening     = "com.runanywhere.keyboard.startListening"
-        static let stopListening      = "com.runanywhere.keyboard.stopListening"
-        static let cancelListening    = "com.runanywhere.keyboard.cancelListening"
-        static let endSession         = "com.runanywhere.session.end"
+        static let startListening = "com.runanywhere.keyboard.startListening"
+        static let stopListening = "com.runanywhere.keyboard.stopListening"
+        static let cancelListening = "com.runanywhere.keyboard.cancelListening"
+        static let endSession = "com.runanywhere.session.end"
     }
 
     // Curated map of host app bundle IDs → URL schemes for bounce-back (WisprFlow approach).
     // For apps not in this list the user must switch back manually — this is a known iOS constraint.
     static let knownAppSchemes: [String: String] = [
-        "com.apple.MobileSMS":             "sms://",
-        "com.apple.mobilesafari":          "https://www.google.com",
-        "com.apple.mobilemail":            "message://",
-        "com.apple.Notes":                 "mobilenotes://",
-        "com.apple.reminders":             "x-apple-reminder://",
-        "com.google.Gmail":                "googlegmail://",
-        "com.google.chrome.app":           "googlechrome://",
-        "com.atebits.Tweetie2":            "twitter://",
-        "com.burbn.instagram":             "instagram://",
-        "com.hammerandchisel.discord":     "discord://",
-        "com.tinyspeck.chatlyio":          "slack://"
+        "com.apple.MobileSMS": "sms://",
+        "com.apple.mobilesafari": "https://www.google.com",
+        "com.apple.mobilemail": "message://",
+        "com.apple.Notes": "mobilenotes://",
+        "com.apple.reminders": "x-apple-reminder://",
+        "com.google.Gmail": "googlegmail://",
+        "com.google.chrome.app": "googlechrome://",
+        "com.atebits.Tweetie2": "twitter://",
+        "com.burbn.instagram": "instagram://",
+        "com.hammerandchisel.discord": "discord://",
+        "com.tinyspeck.chatlyio": "slack://"
     ]
 }

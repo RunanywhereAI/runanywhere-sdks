@@ -169,9 +169,8 @@ RAC_API rac_result_t rac_diffusion_component_configure_json(rac_handle_t handle,
  *   "steps": 28,
  *   "guidance_scale": 7.5,
  *   "seed": -1,
- *   "scheduler": 0 | "dpm++_2m_karras" | "dpm++_2m" | "dpm++_2m_sde" | "ddim" | "euler" | "euler_a" | "pndm" | "lms",
- *   "mode": 0 | "txt2img" | "img2img" | "inpainting",
- *   "denoise_strength": 0.75,
+ *   "scheduler": 0 | "dpm++_2m_karras" | "dpm++_2m" | "dpm++_2m_sde" | "ddim" | "euler" | "euler_a"
+ * | "pndm" | "lms", "mode": 0 | "txt2img" | "img2img" | "inpainting", "denoise_strength": 0.75,
  *   "report_intermediate_images": false,
  *   "progress_stride": 1
  * }

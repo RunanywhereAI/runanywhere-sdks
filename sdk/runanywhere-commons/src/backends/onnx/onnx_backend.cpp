@@ -105,7 +105,7 @@ bool ONNXBackendNew::initialize_ort() {
     OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "runanywhere", &ort_env_);
     if (status) {
         RAC_LOG_ERROR("ONNX", "Failed to create ONNX Runtime environment: %s",
-                     ort_api_->GetErrorMessage(status));
+                      ort_api_->GetErrorMessage(status));
         ort_api_->ReleaseStatus(status);
         return false;
     }
@@ -184,11 +184,11 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
                 encoder_path = full_path;
                 RAC_LOG_DEBUG("ONNX.STT", "Found encoder: %s", encoder_path.c_str());
             } else if (filename.find("decoder") != std::string::npos && filename.size() > 5 &&
-                     filename.substr(filename.size() - 5) == ".onnx") {
+                       filename.substr(filename.size() - 5) == ".onnx") {
                 decoder_path = full_path;
                 RAC_LOG_DEBUG("ONNX.STT", "Found decoder: %s", decoder_path.c_str());
             } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
-                                                  filename.find(".txt") != std::string::npos)) {
+                                                    filename.find(".txt") != std::string::npos)) {
                 tokens_path = full_path;
                 RAC_LOG_DEBUG("ONNX.STT", "Found tokens: %s", tokens_path.c_str());
             } else if ((filename == "model.int8.onnx" || filename == "model.onnx") &&
@@ -196,7 +196,8 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
                 // Single-file model (NeMo CTC, etc.) - prefer int8 if both exist
                 if (filename == "model.int8.onnx" || nemo_ctc_model_path.empty()) {
                     nemo_ctc_model_path = full_path;
-                    RAC_LOG_DEBUG("ONNX.STT", "Found single-file model: %s", nemo_ctc_model_path.c_str());
+                    RAC_LOG_DEBUG("ONNX.STT", "Found single-file model: %s",
+                                  nemo_ctc_model_path.c_str());
                 }
             }
         }
@@ -258,7 +259,8 @@ bool ONNXSTT::load_model(const std::string& model_path, STTModelType model_type,
     if (is_nemo_ctc) {
         // NeMo CTC: single model file + tokens
         if (nemo_ctc_model_path.empty()) {
-            RAC_LOG_ERROR("ONNX.STT", "NeMo CTC model file not found (model.int8.onnx or model.onnx) in: %s",
+            RAC_LOG_ERROR("ONNX.STT",
+                          "NeMo CTC model file not found (model.int8.onnx or model.onnx) in: %s",
                           model_path.c_str());
             return false;
         }
@@ -441,7 +443,7 @@ STTResult ONNXSTT::transcribe(const STTRequest& request) {
     }
 
     RAC_LOG_INFO("ONNX.STT", "Transcribing %zu samples at %d Hz", request.audio_samples.size(),
-                request.sample_rate);
+                 request.sample_rate);
 
     const SherpaOnnxOfflineStream* stream = SherpaOnnxCreateOfflineStream(sherpa_recognizer_);
     if (!stream) {
@@ -669,11 +671,14 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
     std::string lang_dir = espeak_data_dir + "/lang";
     std::string voices_dir = espeak_data_dir + "/voices";
 
-    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] lang_dir=%s, voices_dir=%s", lang_dir.c_str(), voices_dir.c_str());
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] lang_dir=%s, voices_dir=%s", lang_dir.c_str(),
+                 voices_dir.c_str());
 
     struct stat st;
     if (stat(lang_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
-        RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] lang/ directory NOT FOUND or not a dir: %s (errno=%d)", lang_dir.c_str(), errno);
+        RAC_LOG_ERROR("ONNX.TTS",
+                      "[ensure_voices] lang/ directory NOT FOUND or not a dir: %s (errno=%d)",
+                      lang_dir.c_str(), errno);
         return;
     }
 
@@ -683,7 +688,8 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
 #else
         int mk = mkdir(voices_dir.c_str(), 0755);
 #endif
-        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk, errno);
+        RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Created voices/ dir: result=%d errno=%d", mk,
+                     errno);
     } else {
         RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] voices/ dir already exists");
     }
@@ -699,18 +705,24 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
     int errors = 0;
     struct dirent* family_entry;
     while ((family_entry = readdir(lang_root)) != nullptr) {
-        if (family_entry->d_name[0] == '.') continue;
+        if (family_entry->d_name[0] == '.')
+            continue;
 
         std::string family_path = lang_dir + "/" + family_entry->d_name;
-        if (stat(family_path.c_str(), &st) != 0) continue;
+        if (stat(family_path.c_str(), &st) != 0)
+            continue;
 
         if (S_ISREG(st.st_mode)) {
             std::string basename = family_entry->d_name;
             std::string lowercase_name;
-            for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
+            for (char c : basename)
+                lowercase_name += (char)tolower((unsigned char)c);
 
             std::string dest = voices_dir + "/" + lowercase_name;
-            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+            if (stat(dest.c_str(), &st) == 0) {
+                skipped++;
+                continue;
+            }
 
             FILE* src_f = fopen(family_path.c_str(), "rb");
             FILE* dst_f = fopen(dest.c_str(), "wb");
@@ -721,36 +733,48 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
                     fwrite(buf, 1, n, dst_f);
                 }
                 copied++;
-                RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Copied: %s -> %s", family_path.c_str(), dest.c_str());
+                RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Copied: %s -> %s", family_path.c_str(),
+                              dest.c_str());
             } else {
                 errors++;
-                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED to copy %s -> %s (src=%p dst=%p errno=%d)",
-                    family_path.c_str(), dest.c_str(), (void*)src_f, (void*)dst_f, errno);
+                RAC_LOG_ERROR("ONNX.TTS",
+                              "[ensure_voices] FAILED to copy %s -> %s (src=%p dst=%p errno=%d)",
+                              family_path.c_str(), dest.c_str(), (void*)src_f, (void*)dst_f, errno);
             }
-            if (src_f) fclose(src_f);
-            if (dst_f) fclose(dst_f);
+            if (src_f)
+                fclose(src_f);
+            if (dst_f)
+                fclose(dst_f);
             continue;
         }
 
-        if (!S_ISDIR(st.st_mode)) continue;
+        if (!S_ISDIR(st.st_mode))
+            continue;
 
         RAC_LOG_DEBUG("ONNX.TTS", "[ensure_voices] Scanning family dir: %s", family_entry->d_name);
         DIR* family_dir = opendir(family_path.c_str());
-        if (!family_dir) continue;
+        if (!family_dir)
+            continue;
 
         struct dirent* voice_entry;
         while ((voice_entry = readdir(family_dir)) != nullptr) {
-            if (voice_entry->d_name[0] == '.') continue;
+            if (voice_entry->d_name[0] == '.')
+                continue;
 
             std::string voice_path = family_path + "/" + voice_entry->d_name;
-            if (stat(voice_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
+            if (stat(voice_path.c_str(), &st) != 0 || !S_ISREG(st.st_mode))
+                continue;
 
             std::string basename = voice_entry->d_name;
             std::string lowercase_name;
-            for (char c : basename) lowercase_name += (char)tolower((unsigned char)c);
+            for (char c : basename)
+                lowercase_name += (char)tolower((unsigned char)c);
 
             std::string dest = voices_dir + "/" + lowercase_name;
-            if (stat(dest.c_str(), &st) == 0) { skipped++; continue; }
+            if (stat(dest.c_str(), &st) == 0) {
+                skipped++;
+                continue;
+            }
 
             FILE* src_f = fopen(voice_path.c_str(), "rb");
             FILE* dst_f = fopen(dest.c_str(), "wb");
@@ -761,20 +785,25 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
                     fwrite(buf, 1, n, dst_f);
                 }
                 copied++;
-                RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Copied: %s -> voices/%s", voice_entry->d_name, lowercase_name.c_str());
+                RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Copied: %s -> voices/%s",
+                             voice_entry->d_name, lowercase_name.c_str());
             } else {
                 errors++;
-                RAC_LOG_ERROR("ONNX.TTS", "[ensure_voices] FAILED: %s -> voices/%s (src=%p dst=%p errno=%d)",
+                RAC_LOG_ERROR(
+                    "ONNX.TTS", "[ensure_voices] FAILED: %s -> voices/%s (src=%p dst=%p errno=%d)",
                     voice_entry->d_name, lowercase_name.c_str(), (void*)src_f, (void*)dst_f, errno);
             }
-            if (src_f) fclose(src_f);
-            if (dst_f) fclose(dst_f);
+            if (src_f)
+                fclose(src_f);
+            if (dst_f)
+                fclose(dst_f);
         }
         closedir(family_dir);
     }
     closedir(lang_root);
 
-    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Done: copied=%d skipped=%d errors=%d", copied, skipped, errors);
+    RAC_LOG_INFO("ONNX.TTS", "[ensure_voices] Done: copied=%d skipped=%d errors=%d", copied,
+                 skipped, errors);
 
     // Dump voices/ directory contents for verification
     DIR* vdir = opendir(voices_dir.c_str());
@@ -783,12 +812,13 @@ static void ensure_espeak_voice_files(const std::string& espeak_data_dir) {
         struct dirent* ve;
         int count = 0;
         while ((ve = readdir(vdir)) != nullptr) {
-            if (ve->d_name[0] == '.') continue;
+            if (ve->d_name[0] == '.')
+                continue;
             std::string vpath = voices_dir + "/" + ve->d_name;
             struct stat vs;
             stat(vpath.c_str(), &vs);
             RAC_LOG_INFO("ONNX.TTS", "[ensure_voices]   [%s] %s (%lld bytes)",
-                S_ISDIR(vs.st_mode) ? "DIR" : "FILE", ve->d_name, (long long)vs.st_size);
+                         S_ISDIR(vs.st_mode) ? "DIR" : "FILE", ve->d_name, (long long)vs.st_size);
             count++;
         }
         closedir(vdir);
@@ -832,10 +862,10 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
             RAC_LOG_INFO("ONNX.TTS", "=== Model directory contents: %s ===", model_path.c_str());
             struct dirent* diag_entry;
             while ((diag_entry = readdir(diag_dir)) != nullptr) {
-                if (diag_entry->d_name[0] == '.') continue;
-                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s",
-                    diag_entry->d_type == DT_DIR ? "DIR" : "FILE",
-                    diag_entry->d_name);
+                if (diag_entry->d_name[0] == '.')
+                    continue;
+                RAC_LOG_INFO("ONNX.TTS", "  [%s] %s", diag_entry->d_type == DT_DIR ? "DIR" : "FILE",
+                             diag_entry->d_name);
             }
             closedir(diag_dir);
             RAC_LOG_INFO("ONNX.TTS", "=== End directory listing ===");
@@ -923,7 +953,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         std::string lang_gmw_dir = espeak_data_dir + "/lang/gmw";
         std::string en_us_voice = lang_gmw_dir + "/en-US";
         RAC_LOG_INFO("ONNX.TTS", "Checking lang/gmw/en-US: %s",
-            stat(en_us_voice.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
+                     stat(en_us_voice.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
 
         // Ensure voice files are accessible directly from voices/
         ensure_espeak_voice_files(espeak_data_dir);
@@ -931,7 +961,7 @@ bool ONNXTTS::load_model(const std::string& model_path, TTSModelType model_type,
         // Verify voices/en-us now exists
         std::string voices_en_us = espeak_data_dir + "/voices/en-us";
         RAC_LOG_INFO("ONNX.TTS", "voices/en-us after ensure: %s",
-            stat(voices_en_us.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
+                     stat(voices_en_us.c_str(), &path_stat) == 0 ? "EXISTS" : "MISSING");
     }
 
     SherpaOnnxOfflineTtsConfig tts_config;
@@ -1026,8 +1056,8 @@ bool ONNXTTS::unload_model() {
 
     if (active_synthesis_count_ > 0) {
         RAC_LOG_WARNING("ONNX.TTS",
-                       "Unloading model while %d synthesis operation(s) may be in progress",
-                       active_synthesis_count_.load());
+                        "Unloading model while %d synthesis operation(s) may be in progress",
+                        active_synthesis_count_.load());
     }
 
     voices_.clear();
@@ -1089,9 +1119,8 @@ TTSResult ONNXTTS::synthesize(const TTSRequest& request) {
         audio = SherpaOnnxOfflineTtsGenerate(tts_ptr, request.text.c_str(), speaker_id, speed);
     } catch (const std::exception& e) {
         RAC_LOG_ERROR("ONNX.TTS", "Exception during TTS synthesis: %s", e.what());
-        RAC_LOG_ERROR("ONNX.TTS", "Model dir: %s, espeak data was: %s",
-                     model_dir_.c_str(),
-                     espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
+        RAC_LOG_ERROR("ONNX.TTS", "Model dir: %s, espeak data was: %s", model_dir_.c_str(),
+                      espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
         return result;
     } catch (...) {
         RAC_LOG_ERROR("ONNX.TTS", "Unknown exception during TTS synthesis");
@@ -1099,9 +1128,10 @@ TTSResult ONNXTTS::synthesize(const TTSRequest& request) {
     }
 
     if (!audio || audio->n <= 0) {
-        RAC_LOG_ERROR("ONNX.TTS", "Synthesis returned null/empty audio. Model dir: %s, espeak data: %s",
-                     model_dir_.c_str(),
-                     espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
+        RAC_LOG_ERROR("ONNX.TTS",
+                      "Synthesis returned null/empty audio. Model dir: %s, espeak data: %s",
+                      model_dir_.c_str(),
+                      espeak_data_dir_.empty() ? "<EMPTY/NOT SET>" : espeak_data_dir_.c_str());
         return result;
     }
 
@@ -1178,8 +1208,7 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
             struct dirent* entry;
             while ((entry = readdir(dir)) != nullptr) {
                 std::string filename = entry->d_name;
-                if (filename.size() > 5 &&
-                    filename.substr(filename.size() - 5) == ".onnx") {
+                if (filename.size() > 5 && filename.substr(filename.size() - 5) == ".onnx") {
                     candidates.push_back(std::move(filename));
                 }
             }
@@ -1218,7 +1247,8 @@ bool ONNXVAD::load_model(const std::string& model_path, VADModelType model_type,
 
     sherpa_vad_ = SherpaOnnxCreateVoiceActivityDetector(&vad_config, 30.0f);
     if (!sherpa_vad_) {
-        RAC_LOG_ERROR("ONNX.VAD", "Failed to create Silero VAD detector from: %s", model_path.c_str());
+        RAC_LOG_ERROR("ONNX.VAD", "Failed to create Silero VAD detector from: %s",
+                      model_path.c_str());
         return false;
     }
 

@@ -8,9 +8,9 @@
  * rac_embeddings_create() can discover it via the service registry.
  */
 
-#include "rac/features/rag/rac_rag.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/features/rag/rac_rag.h"
 #include "rac/features/rag/rac_rag_pipeline.h"
 
 #ifdef RAG_HAS_ONNX_PROVIDER
@@ -26,7 +26,8 @@
 static const char* MODULE_ID = "rag";
 static const char* MODULE_NAME = "RAG Pipeline";
 static const char* MODULE_VERSION = "2.0.0";
-static const char* MODULE_DESC = "Retrieval-Augmented Generation pipeline (orchestrates LLM + Embeddings services)";
+static const char* MODULE_DESC =
+    "Retrieval-Augmented Generation pipeline (orchestrates LLM + Embeddings services)";
 
 extern "C" {
 
@@ -37,14 +38,12 @@ rac_result_t rac_backend_rag_register(void) {
         RAC_CAPABILITY_EMBEDDINGS,
     };
 
-    rac_module_info_t module_info = {
-        .id = MODULE_ID,
-        .name = MODULE_NAME,
-        .version = MODULE_VERSION,
-        .description = MODULE_DESC,
-        .capabilities = capabilities,
-        .num_capabilities = 1
-    };
+    rac_module_info_t module_info = {.id = MODULE_ID,
+                                     .name = MODULE_NAME,
+                                     .version = MODULE_VERSION,
+                                     .description = MODULE_DESC,
+                                     .capabilities = capabilities,
+                                     .num_capabilities = 1};
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
@@ -82,4 +81,4 @@ rac_result_t rac_backend_rag_unregister(void) {
     return RAC_SUCCESS;
 }
 
-} // extern "C"
+}  // extern "C"

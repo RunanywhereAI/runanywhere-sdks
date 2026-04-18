@@ -13,10 +13,11 @@
 #ifndef RAC_OPENAI_TRANSLATION_H
 #define RAC_OPENAI_TRANSLATION_H
 
-#include "rac/features/llm/rac_tool_calling.h"
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
+
+#include "rac/features/llm/rac_tool_calling.h"
 
 namespace rac {
 namespace server {
@@ -54,9 +55,8 @@ std::string openaiToolsToCommonsJson(const Json& openaiTools);
  * @param options Tool calling options (can be nullptr)
  * @return Formatted prompt string for LLM
  */
-std::string buildPromptFromOpenAI(const Json& messages,
-                                   const Json& tools,
-                                   const rac_tool_calling_options_t* options = nullptr);
+std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
+                                  const rac_tool_calling_options_t* options = nullptr);
 
 // =============================================================================
 // Commons Format -> OpenAI RESPONSE
@@ -105,8 +105,8 @@ std::string extractLastUserMessage(const Json& messages);
  */
 std::string buildSimplePrompt(const Json& messages);
 
-} // namespace translation
-} // namespace server
-} // namespace rac
+}  // namespace translation
+}  // namespace server
+}  // namespace rac
 
-#endif // RAC_OPENAI_TRANSLATION_H
+#endif  // RAC_OPENAI_TRANSLATION_H

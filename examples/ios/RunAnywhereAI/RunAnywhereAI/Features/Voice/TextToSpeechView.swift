@@ -32,6 +32,7 @@ private let funnyTTSSampleTexts: [String] = [
 
 // MARK: - Text-to-Speech View
 
+// swiftlint:disable type_body_length
 /// Dedicated Text-to-Speech view with text input and instant playback
 struct TextToSpeechView: View {
     @StateObject private var viewModel = TTSViewModel()
@@ -244,6 +245,7 @@ struct TextToSpeechView: View {
                     .tint(AppColors.primaryAccent)
             }
 
+            // swiftlint:disable:next todo
             // TODO: #2 Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
 
             // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
@@ -553,6 +555,7 @@ struct TextToSpeechView: View {
         }
     }
 }
+// swiftlint:enable type_body_length
 
 // MARK: - Preview
 

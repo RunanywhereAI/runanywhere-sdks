@@ -11,7 +11,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
-
 #include <nlohmann/json.hpp>
 
 #include "rac/core/rac_core.h"
@@ -65,15 +64,12 @@ static rac_result_t llamacpp_vtable_generate_stream(void* impl, const char* prom
 }
 
 // Generate stream with benchmark timing
-static rac_result_t llamacpp_vtable_generate_stream_with_timing(void* impl, const char* prompt,
-                                                                const rac_llm_options_t* options,
-                                                                rac_llm_stream_callback_fn callback,
-                                                                void* user_data,
-                                                                rac_benchmark_timing_t* timing_out) {
+static rac_result_t llamacpp_vtable_generate_stream_with_timing(
+    void* impl, const char* prompt, const rac_llm_options_t* options,
+    rac_llm_stream_callback_fn callback, void* user_data, rac_benchmark_timing_t* timing_out) {
     StreamAdapter adapter = {callback, user_data};
-    return rac_llm_llamacpp_generate_stream_with_timing(impl, prompt, options,
-                                                        stream_adapter_callback, &adapter,
-                                                        timing_out);
+    return rac_llm_llamacpp_generate_stream_with_timing(
+        impl, prompt, options, stream_adapter_callback, &adapter, timing_out);
 }
 
 // Get info
@@ -147,7 +143,6 @@ static rac_result_t llamacpp_vtable_append_context(void* impl, const char* text)
     return rac_llm_llamacpp_append_context(impl, text);
 }
 
-
 static rac_result_t llamacpp_vtable_generate_from_context(void* impl, const char* query,
                                                           const rac_llm_options_t* options,
                                                           rac_llm_result_t* out_result) {
@@ -174,7 +169,7 @@ static const rac_llm_service_ops_t g_llamacpp_ops = {
     .get_lora_info = llamacpp_vtable_get_lora_info,
     .inject_system_prompt = llamacpp_vtable_inject_system_prompt,
     .append_context = llamacpp_vtable_append_context,
-.generate_from_context = llamacpp_vtable_generate_from_context,
+    .generate_from_context = llamacpp_vtable_generate_from_context,
     .clear_context = llamacpp_vtable_clear_context,
 };
 
@@ -219,9 +214,10 @@ rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_
 
     // If framework is explicitly set to something else, don't handle
     if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
-        RAC_LOG_DEBUG(LOG_CAT,
-                      "can_handle: NO (framework mismatch, expected LLAMACPP=%d or UNKNOWN=%d, got %d)",
-                      RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_UNKNOWN, static_cast<int>(request->framework));
+        RAC_LOG_DEBUG(
+            LOG_CAT,
+            "can_handle: NO (framework mismatch, expected LLAMACPP=%d or UNKNOWN=%d, got %d)",
+            RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_UNKNOWN, static_cast<int>(request->framework));
         return RAC_FALSE;
     }
 

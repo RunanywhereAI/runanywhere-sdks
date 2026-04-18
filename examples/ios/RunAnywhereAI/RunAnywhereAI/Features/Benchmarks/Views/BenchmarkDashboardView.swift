@@ -238,9 +238,10 @@ struct BenchmarkDashboardView: View {
                 currentScenario: viewModel.currentScenario,
                 currentModel: viewModel.currentModel,
                 completedCount: viewModel.completedCount,
-                totalCount: viewModel.totalCount,
-                onCancel: { viewModel.cancel() }
-            )
+                totalCount: viewModel.totalCount
+            ) {
+                viewModel.cancel()
+            }
             .interactiveDismissDisabled()
         }
         .task {
@@ -300,7 +301,10 @@ private struct CategoryChip: View {
                 .cornerRadius(AppSpacing.cornerRadiusLarge)
                 .overlay(
                     RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
-                        .stroke(isSelected ? AppColors.primaryAccent.opacity(0.5) : Color.clear, lineWidth: AppSpacing.strokeRegular)
+                        .stroke(
+                            isSelected ? AppColors.primaryAccent.opacity(0.5) : Color.clear,
+                            lineWidth: AppSpacing.strokeRegular
+                        )
                 )
         }
         .buttonStyle(.plain)

@@ -9,17 +9,17 @@ import Foundation
 import RunAnywhere
 
 struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .llm
 
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Short (50 tokens)", category: .llm, parameters: ["maxTokens": "50"]),
             BenchmarkScenario(name: "Medium (256 tokens)", category: .llm, parameters: ["maxTokens": "256"]),
-            BenchmarkScenario(name: "Long (512 tokens)", category: .llm, parameters: ["maxTokens": "512"]),
+            BenchmarkScenario(name: "Long (512 tokens)", category: .llm, parameters: ["maxTokens": "512"])
         ]
     }
 
+    // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
         model: ModelInfo

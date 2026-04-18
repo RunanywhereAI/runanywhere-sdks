@@ -125,10 +125,11 @@ rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, r
     csv.reserve(256);
 
     if (header) {
-        csv = "t0_request_start_ms,t2_prefill_start_ms,t3_prefill_end_ms,"
-              "t4_first_token_ms,t5_last_token_ms,t6_request_end_ms,"
-              "prompt_tokens,output_tokens,status,error_code,"
-              "ttft_ms,prefill_ms,decode_ms,e2e_ms,decode_tps";
+        csv =
+            "t0_request_start_ms,t2_prefill_start_ms,t3_prefill_end_ms,"
+            "t4_first_token_ms,t5_last_token_ms,t6_request_end_ms,"
+            "prompt_tokens,output_tokens,status,error_code,"
+            "ttft_ms,prefill_ms,decode_ms,e2e_ms,decode_tps";
     } else {
         if (timing == nullptr) {
             return RAC_ERROR_NULL_POINTER;
@@ -142,8 +143,8 @@ rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing, r
 
         char buf[512];
         snprintf(buf, sizeof(buf),
-                 "%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64
-                 ",%" PRId32 ",%" PRId32 ",%" PRId32 ",%" PRId32 ",%.2f,%.2f,%.2f,%.2f,%.2f",
+                 "%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId64 ",%" PRId32
+                 ",%" PRId32 ",%" PRId32 ",%" PRId32 ",%.2f,%.2f,%.2f,%.2f,%.2f",
                  timing->t0_request_start_ms, timing->t2_prefill_start_ms,
                  timing->t3_prefill_end_ms, timing->t4_first_token_ms, timing->t5_last_token_ms,
                  timing->t6_request_end_ms, timing->prompt_tokens, timing->output_tokens,

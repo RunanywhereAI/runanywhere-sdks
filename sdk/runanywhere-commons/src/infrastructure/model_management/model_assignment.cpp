@@ -356,8 +356,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
         return RAC_ERROR_NULL_POINTER;
     }
 
-    snprintf(msg, sizeof(msg), "force_refresh=%d, cache_valid=%d, cached_count=%zu",
-             force_refresh, is_cache_valid() ? 1 : 0, g_cached_models.size());
+    snprintf(msg, sizeof(msg), "force_refresh=%d, cache_valid=%d, cached_count=%zu", force_refresh,
+             is_cache_valid() ? 1 : 0, g_cached_models.size());
     RAC_LOG_INFO(LOG_CAT, msg);
 
     // Check cache first
@@ -386,7 +386,8 @@ rac_result_t rac_model_assignment_fetch(rac_bool_t force_refresh, rac_model_info
     rac_result_t result =
         g_callbacks.http_get(endpoint, RAC_TRUE, &response, g_callbacks.user_data);
 
-    snprintf(msg, sizeof(msg), "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
+    snprintf(msg, sizeof(msg),
+             "<<< http_get returned: result=%d, response.result=%d, status=%d, body_len=%zu",
              result, response.result, response.status_code, response.response_length);
     RAC_LOG_INFO(LOG_CAT, msg);
 

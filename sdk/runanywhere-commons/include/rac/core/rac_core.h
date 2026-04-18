@@ -11,8 +11,8 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
+#include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/network/rac_environment.h"
 
 #ifdef __cplusplus
@@ -334,7 +334,8 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+RAC_API rac_result_t rac_get_model_by_path(const char* local_path,
+                                           struct rac_model_info** out_model);
 
 // =============================================================================
 // GLOBAL LORA REGISTRY API
@@ -359,13 +360,14 @@ RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
 /**
  * @brief Query the global registry for adapters compatible with a model
  * @param model_id Model ID to match
- * @param out_entries Output: array of matching entries (caller must free with rac_lora_entry_array_free)
+ * @param out_entries Output: array of matching entries (caller must free with
+ * rac_lora_entry_array_free)
  * @param out_count Output: number of matching entries
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
-                                             struct rac_lora_entry*** out_entries,
-                                             size_t* out_count);
+                                            struct rac_lora_entry*** out_entries,
+                                            size_t* out_count);
 
 #ifdef __cplusplus
 }

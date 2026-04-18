@@ -48,10 +48,7 @@ export const ToolCallIndicator: React.FC<ToolCallIndicatorProps> = ({
   return (
     <>
       <TouchableOpacity
-        style={[
-          styles.badge,
-          { backgroundColor, borderColor, borderWidth: 0.5 },
-        ]}
+        style={[styles.badge, { backgroundColor, borderColor }]}
         onPress={() => setShowSheet(true)}
         activeOpacity={0.7}
       >
@@ -224,6 +221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 0.5,
     marginBottom: Spacing.small,
     alignSelf: 'flex-start',
   },

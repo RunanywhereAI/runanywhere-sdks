@@ -89,8 +89,7 @@ RAC_API rac_result_t rac_benchmark_timing_to_json(const rac_benchmark_timing_t* 
  *         RAC_ERROR_OUT_OF_MEMORY if allocation fails
  */
 RAC_API rac_result_t rac_benchmark_timing_to_csv(const rac_benchmark_timing_t* timing,
-                                                 rac_bool_t header,
-                                                 char** out_csv);
+                                                 rac_bool_t header, char** out_csv);
 
 // =============================================================================
 // LOGGING

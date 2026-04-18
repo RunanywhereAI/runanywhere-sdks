@@ -15,7 +15,6 @@ import SwiftUI
 import RunAnywhere
 
 struct VoiceDictationManagementView: View {
-
     @StateObject private var viewModel = VoiceDictationManagementViewModel()
     @EnvironmentObject private var flowSession: FlowSessionManager
 
@@ -147,7 +146,8 @@ struct VoiceDictationManagementView: View {
             SetupStep(
                 number: 2,
                 title: "Grant Full Access",
-                detail: "Tap RunAnywhereKeyboard → enable 'Allow Full Access' (required for App Group IPC and mic prompt)."
+                detail: "Tap RunAnywhereKeyboard → enable 'Allow Full Access' "
+                    + "(required for App Group IPC and mic prompt)."
             )
             SetupStep(
                 number: 3,

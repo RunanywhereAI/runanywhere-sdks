@@ -68,10 +68,12 @@ extension CppBridge {
             let result = modelId.withCString { mid in
                 downloadURL.absoluteString.withCString { urlStr in
                     rac_download_compute_destination(
-                        mid, urlStr,
+                        mid,
+                        urlStr,
                         framework.toC(),
                         format.toC(),
-                        &outPath, outPath.count,
+                        &outPath,
+                        outPath.count,
                         &needsExtraction
                     )
                 }

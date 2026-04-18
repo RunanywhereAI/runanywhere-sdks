@@ -106,7 +106,8 @@ rac_result_t rac_streaming_metrics_create(const char* model_id, const char* gene
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    rac_streaming_metrics_collector* collector = new (std::nothrow) rac_streaming_metrics_collector();
+    rac_streaming_metrics_collector* collector =
+        new (std::nothrow) rac_streaming_metrics_collector();
     if (!collector) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }

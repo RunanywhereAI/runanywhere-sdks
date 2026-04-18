@@ -20,14 +20,45 @@ import type {
 
 const logger = new SDKLogger('RunAnywhere.VLM');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _vlmModule: any = null;
+/**
+ * Minimal structural interface for the `@runanywhere/llamacpp` module surface
+ * used by this VLM extension. Keeps the dynamic-require typed without pulling
+ * the full backend package into the core type graph (it is an optional dep).
+ */
+interface VLMModule {
+  registerVLMBackend(): boolean | Promise<boolean>;
+  loadVLMModel(
+    modelPath: string,
+    mmprojPath?: string,
+    modelId?: string,
+    modelName?: string
+  ): boolean | Promise<boolean>;
+  isVLMModelLoaded(): boolean | Promise<boolean>;
+  unloadVLMModel(): boolean | Promise<boolean>;
+  describeImage(image: VLMImage, prompt?: string): string | Promise<string>;
+  askAboutImage(question: string, image: VLMImage): string | Promise<string>;
+  processImage(
+    image: VLMImage,
+    prompt: string,
+    options?: VLMGenerationOptions
+  ): VLMResult | Promise<VLMResult>;
+  processImageStream(
+    image: VLMImage,
+    prompt: string,
+    options?: VLMGenerationOptions
+  ): VLMStreamingResult | Promise<VLMStreamingResult>;
+  cancelVLMGeneration(): void;
+}
 
-async function getVLMModule(): Promise<any> {
+let _vlmModule: VLMModule | null = null;
+
+async function getVLMModule(): Promise<VLMModule> {
   if (_vlmModule) return _vlmModule;
   try {
-    _vlmModule = require('@runanywhere/llamacpp');
-    return _vlmModule!;
+    // Optional peer dep: loaded dynamically so core doesn't require it.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _vlmModule = require('@runanywhere/llamacpp') as VLMModule;
+    return _vlmModule;
   } catch {
     throw new Error(
       'VLM requires @runanywhere/llamacpp package. Install it to use VLM features.'
@@ -174,7 +205,8 @@ export async function processImageStream(
  */
 export function cancelVLMGeneration(): void {
   try {
-    const vlm = require('@runanywhere/llamacpp');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const vlm = require('@runanywhere/llamacpp') as VLMModule;
     vlm.cancelVLMGeneration();
   } catch {
     // Silently ignore if llamacpp not available

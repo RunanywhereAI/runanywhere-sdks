@@ -200,7 +200,8 @@ class SettingsViewModel: ObservableObject {
         maxTokens = savedMaxTokens > 0 ? savedMaxTokens : 10000
 
         // Load system prompt — fall back to the default when the key has never been set
-        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? "You are a helpful, concise AI assistant."
+        let defaultPrompt = "You are a helpful, concise AI assistant."
+        systemPrompt = UserDefaults.standard.string(forKey: systemPromptDefaultsKey) ?? defaultPrompt
         // Persist the default so that other ViewModels reading UserDefaults directly always find a value
         if UserDefaults.standard.string(forKey: systemPromptDefaultsKey) == nil {
             UserDefaults.standard.set(systemPrompt, forKey: systemPromptDefaultsKey)

@@ -12,11 +12,11 @@
 #include <mutex>
 #include <random>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
 
 #include "rac/core/capabilities/rac_lifecycle.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -173,9 +173,11 @@ extern "C" rac_result_t rac_vlm_resolve_model_files(const char* model_dir, char*
         const size_t name_len = strlen(name);
 
         // Must end with .gguf (case-insensitive)
-        if (name_len < 5) continue;
+        if (name_len < 5)
+            continue;
         const char* ext = name + name_len - 5;
-        if (strcasecmp(ext, ".gguf") != 0) continue;
+        if (strcasecmp(ext, ".gguf") != 0)
+            continue;
 
         // Check if this is an mmproj file
         bool is_mmproj = false;
@@ -400,7 +402,7 @@ extern "C" rac_result_t rac_vlm_component_cleanup(rac_handle_t handle) {
 }
 
 extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
-                                                          const char* model_id) {
+                                                           const char* model_id) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!model_id)
@@ -453,13 +455,14 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
             rac_model_info_free(model_info);
             return RAC_ERROR_NOT_FOUND;
         }
-        RAC_LOG_INFO(LOG_CAT, "Loading directory-based VLM model by ID: %s (dir=%s)", model_id, model_folder);
+        RAC_LOG_INFO(LOG_CAT, "Loading directory-based VLM model by ID: %s (dir=%s)", model_id,
+                     model_folder);
         result = rac_vlm_component_load_model(handle, model_folder, nullptr, model_id, name);
     } else {
         char model_path[1024] = {};
         char mmproj_path[1024] = {};
-        result = rac_vlm_resolve_model_files(model_folder, model_path, sizeof(model_path), mmproj_path,
-                                             sizeof(mmproj_path));
+        result = rac_vlm_resolve_model_files(model_folder, model_path, sizeof(model_path),
+                                             mmproj_path, sizeof(mmproj_path));
         if (result != RAC_SUCCESS) {
             RAC_LOG_ERROR(LOG_CAT, "Failed to resolve model files in: %s", model_folder);
             rac_model_info_free(model_info);
@@ -467,8 +470,8 @@ extern "C" rac_result_t rac_vlm_component_load_model_by_id(rac_handle_t handle,
         }
 
         const char* mmproj = mmproj_path[0] != '\0' ? mmproj_path : nullptr;
-        RAC_LOG_INFO(LOG_CAT, "Loading VLM model by ID: %s (model=%s, mmproj=%s)", model_id, model_path,
-                     mmproj ? mmproj : "none");
+        RAC_LOG_INFO(LOG_CAT, "Loading VLM model by ID: %s (model=%s, mmproj=%s)", model_id,
+                     model_path, mmproj ? mmproj : "none");
         result = rac_vlm_component_load_model(handle, model_path, mmproj, model_id, name);
     }
 
@@ -588,7 +591,8 @@ struct vlm_stream_context {
 static rac_bool_t vlm_stream_token_callback(const char* token, void* user_data) {
     auto* ctx = reinterpret_cast<vlm_stream_context*>(user_data);
 
-    if (!token) return RAC_TRUE;
+    if (!token)
+        return RAC_TRUE;
 
     // Strip special tokens from the model output
     char cleaned[512];

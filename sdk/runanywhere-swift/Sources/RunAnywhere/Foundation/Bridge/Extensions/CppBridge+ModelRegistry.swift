@@ -16,6 +16,31 @@ public struct ModelDiscoveryResult {
     public let unregisteredCount: Int
 }
 
+// Top-level helper so it can be referenced from a C function pointer (no `Self` capture).
+private func racIsModelFile(ext: String, filename: String, framework: rac_inference_framework_t) -> rac_bool_t {
+    switch framework {
+    case RAC_FRAMEWORK_LLAMACPP:
+        return (ext == "gguf" || ext == "bin") ? RAC_TRUE : RAC_FALSE
+    case RAC_FRAMEWORK_ONNX:
+        return (ext == "onnx" || ext == "ort") ? RAC_TRUE : RAC_FALSE
+    case RAC_FRAMEWORK_COREML:
+        if ext == "mlmodelc" || ext == "mlpackage" || ext == "mlmodel" {
+            return RAC_TRUE
+        }
+        if filename.contains("unet") || filename.contains("textencoder") ||
+           filename.contains("vaeencoder") || filename.contains("vaedecoder") {
+            return RAC_TRUE
+        }
+        return RAC_FALSE
+    case RAC_FRAMEWORK_METALRT:
+        return (ext == "safetensors" || ext == "json") ? RAC_TRUE : RAC_FALSE
+    case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
+        return RAC_TRUE
+    default:
+        return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
+    }
+}
+
 // MARK: - ModelRegistry Bridge
 
 extension CppBridge {
@@ -225,7 +250,6 @@ extension CppBridge {
         // Discover downloaded models on the file system.
         // Scans the models directory and updates registry for models found on disk.
         // This is called automatically during SDK initialization.
-        // swiftlint:disable:next cyclomatic_complexity
         public func discoverDownloadedModels() -> ModelDiscoveryResult {
             guard let handle = handle else {
                 logger.warning("Discovery: Registry not initialized")
@@ -234,11 +258,30 @@ extension CppBridge {
 
             logger.info("Starting model discovery scan...")
 
-            // Create callbacks struct
+            var callbacks = makeDiscoveryCallbacks()
+
+            // Call C++ discovery
+            var result = rac_discovery_result_t()
+            let status = rac_model_registry_discover_downloaded(handle, &callbacks, &result)
+            defer { rac_discovery_result_free(&result) }
+
+            if status != RAC_SUCCESS {
+                logger.warning("Discovery failed with status: \(status)")
+                return ModelDiscoveryResult(discoveredCount: 0, unregisteredCount: 0)
+            }
+
+            logger.info("Discovery complete: \(result.discovered_count) models found, \(result.unregistered_count) unregistered folders")
+            return ModelDiscoveryResult(
+                discoveredCount: Int(result.discovered_count),
+                unregisteredCount: Int(result.unregistered_count)
+            )
+        }
+
+        // MARK: - Discovery Callbacks
+
+        private func makeDiscoveryCallbacks() -> rac_discovery_callbacks_t {
             var callbacks = rac_discovery_callbacks_t()
             callbacks.user_data = nil
-
-            // List directory callback
             callbacks.list_directory = { path, outEntries, outCount, _ -> rac_result_t in
                 guard let path = path else { return RAC_ERROR_INVALID_ARGUMENT }
 
@@ -259,18 +302,15 @@ extension CppBridge {
                     return RAC_SUCCESS
                 }
 
-                // Allocate array of strings
                 let entries = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: count)
                 for (i, item) in contents.enumerated() {
-                    let name = item.lastPathComponent
-                    entries[i] = strdup(name)
+                    entries[i] = strdup(item.lastPathComponent)
                 }
 
                 outEntries?.pointee = entries
                 return RAC_SUCCESS
             }
 
-            // Free entries callback
             callbacks.free_entries = { entries, count, _ in
                 guard let entries = entries else { return }
                 for i in 0..<count {
@@ -281,7 +321,6 @@ extension CppBridge {
                 entries.deallocate()
             }
 
-            // Is directory callback
             callbacks.is_directory = { path, _ -> rac_bool_t in
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
@@ -292,63 +331,21 @@ extension CppBridge {
                 return RAC_FALSE
             }
 
-            // Path exists callback
             callbacks.path_exists = { path, _ -> rac_bool_t in
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
                 return Foundation.FileManager.default.fileExists(atPath: pathStr) ? RAC_TRUE : RAC_FALSE
             }
 
-            // Is model file callback - checks for known model extensions
             callbacks.is_model_file = { path, framework, _ -> rac_bool_t in
                 guard let path = path else { return RAC_FALSE }
                 let pathStr = String(cString: path)
                 let ext = (pathStr as NSString).pathExtension.lowercased()
                 let filename = (pathStr as NSString).lastPathComponent.lowercased()
-
-                // Check based on framework
-                switch framework {
-                case RAC_FRAMEWORK_LLAMACPP:
-                    return (ext == "gguf" || ext == "bin") ? RAC_TRUE : RAC_FALSE
-                case RAC_FRAMEWORK_ONNX:
-                    return (ext == "onnx" || ext == "ort") ? RAC_TRUE : RAC_FALSE
-                case RAC_FRAMEWORK_COREML:
-                    // CoreML compiled models have .mlmodelc extension (actually a directory)
-                    // Also check for .mlpackage and common CoreML diffusion model files
-                    if ext == "mlmodelc" || ext == "mlpackage" || ext == "mlmodel" {
-                        return RAC_TRUE
-                    }
-                    // For CoreML diffusion models, check for Unet.mlmodelc or similar
-                    if filename.contains("unet") || filename.contains("textencoder") ||
-                       filename.contains("vaeencoder") || filename.contains("vaedecoder") {
-                        return RAC_TRUE
-                    }
-                    return RAC_FALSE
-                case RAC_FRAMEWORK_METALRT:
-                    return (ext == "safetensors" || ext == "json") ? RAC_TRUE : RAC_FALSE
-                case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
-                    // Built-in models don't need file check
-                    return RAC_TRUE
-                default:
-                    return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
-                }
+                return racIsModelFile(ext: ext, filename: filename, framework: framework)
             }
 
-            // Call C++ discovery
-            var result = rac_discovery_result_t()
-            let status = rac_model_registry_discover_downloaded(handle, &callbacks, &result)
-            defer { rac_discovery_result_free(&result) }
-
-            if status != RAC_SUCCESS {
-                logger.warning("Discovery failed with status: \(status)")
-                return ModelDiscoveryResult(discoveredCount: 0, unregisteredCount: 0)
-            }
-
-            logger.info("Discovery complete: \(result.discovered_count) models found, \(result.unregistered_count) unregistered folders")
-            return ModelDiscoveryResult(
-                discoveredCount: Int(result.discovered_count),
-                unregisteredCount: Int(result.unregistered_count)
-            )
+            return callbacks
         }
 
         // MARK: - Helper: Convert ModelInfo to C struct

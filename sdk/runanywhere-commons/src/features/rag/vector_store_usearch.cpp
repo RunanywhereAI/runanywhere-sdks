@@ -10,19 +10,19 @@
 // Define f16_native_t based on platform capabilities
 // USearch expects this type to be defined when FP16LIB and SIMSIMD are disabled
 #if defined(__ARM_ARCH) || defined(__aarch64__) || defined(_M_ARM64)
-    // Try to use native ARM FP16 if available (device builds)
-    #if __has_include(<arm_fp16.h>) && (!defined(__APPLE__) || (defined(__APPLE__) && !TARGET_OS_SIMULATOR))
-        #include <arm_fp16.h>
-        using f16_native_t = __fp16;
-    #else
-        // Fallback for ARM without native FP16 (e.g., iOS Simulator on Apple Silicon)
-        #include <cstdint>
-        using f16_native_t = uint16_t;  // Use binary16 representation
-    #endif
+// Try to use native ARM FP16 if available (device builds)
+#if __has_include(<arm_fp16.h>) && (!defined(__APPLE__) || (defined(__APPLE__) && !TARGET_OS_SIMULATOR))
+#include <arm_fp16.h>
+using f16_native_t = __fp16;
 #else
-    // Non-ARM platforms (x86, x86_64)
-    #include <cstdint>
-    using f16_native_t = uint16_t;  // Use binary16 representation
+// Fallback for ARM without native FP16 (e.g., iOS Simulator on Apple Silicon)
+#include <cstdint>
+using f16_native_t = uint16_t;  // Use binary16 representation
+#endif
+#else
+// Non-ARM platforms (x86, x86_64)
+#include <cstdint>
+using f16_native_t = uint16_t;  // Use binary16 representation
 #endif
 
 #include "vector_store_usearch.h"
@@ -38,7 +38,6 @@
 #define LOGW(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 
-
 namespace runanywhere {
 namespace rag {
 
@@ -49,7 +48,7 @@ using namespace unum::usearch;
 // =============================================================================
 
 class VectorStoreUSearch::Impl {
-public:
+   public:
     explicit Impl(const VectorStoreConfig& config) : config_(config) {
         // Configure USearch index
         index_dense_config_t usearch_config;
@@ -57,17 +56,15 @@ public:
         usearch_config.expansion_add = config.expansion_add;
         usearch_config.expansion_search = config.expansion_search;
 
-        // Create metric for cosine similarity. Quantize further for RAM, switch to f32 for precision
-        metric_punned_t metric(
-            static_cast<std::size_t>(config.dimension),
-            metric_kind_t::cos_k,
-            scalar_kind_t::f16_k
-        );
+        // Create metric for cosine similarity. Quantize further for RAM, switch to f32 for
+        // precision
+        metric_punned_t metric(static_cast<std::size_t>(config.dimension), metric_kind_t::cos_k,
+                               scalar_kind_t::f16_k);
 
         // Create index
         auto result = index_dense_t::make(metric, usearch_config);
         if (!result) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to create USearch index: %s", result.error.what());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to create USearch index: %s", result.error.what());
             throw std::runtime_error("Failed to create USearch index");
         }
         index_ = std::move(result.index);
@@ -82,14 +79,14 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (chunk.embedding.size() != config_.dimension) {
-            RAC_LOG_ERROR(LOG_TAG,"Invalid embedding dimension: %zu (expected %zu)",
-                 chunk.embedding.size(), config_.dimension);
+            RAC_LOG_ERROR(LOG_TAG, "Invalid embedding dimension: %zu (expected %zu)",
+                          chunk.embedding.size(), config_.dimension);
             return false;
         }
 
         // Check for duplicate ID
         if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
-            RAC_LOG_ERROR(LOG_TAG,"Duplicate chunk ID: %s", chunk.id.c_str());
+            RAC_LOG_ERROR(LOG_TAG, "Duplicate chunk ID: %s", chunk.id.c_str());
             return false;
         }
 
@@ -99,7 +96,7 @@ public:
         // Add to USearch index
         auto add_result = index_.add(key, chunk.embedding.data());
         if (!add_result) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to add chunk to index: %s", add_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to add chunk to index: %s", add_result.error.what());
             return false;
         }
 
@@ -119,13 +116,13 @@ public:
 
         for (const auto& chunk : chunks) {
             if (chunk.embedding.size() != config_.dimension) {
-                RAC_LOG_ERROR(LOG_TAG,"Invalid embedding dimension in batch");
+                RAC_LOG_ERROR(LOG_TAG, "Invalid embedding dimension in batch");
                 continue;
             }
 
             // Check for duplicate ID
             if (id_to_key_.find(chunk.id) != id_to_key_.end()) {
-                RAC_LOG_ERROR(LOG_TAG,"Duplicate chunk ID in batch: %s", chunk.id.c_str());
+                RAC_LOG_ERROR(LOG_TAG, "Duplicate chunk ID in batch: %s", chunk.id.c_str());
                 continue;
             }
 
@@ -133,7 +130,7 @@ public:
             std::size_t key = next_key_++;
             auto add_result = index_.add(key, chunk.embedding.data());
             if (!add_result) {
-                RAC_LOG_ERROR(LOG_TAG,"Failed to add chunk to batch: %s", add_result.error.what());
+                RAC_LOG_ERROR(LOG_TAG, "Failed to add chunk to batch: %s", add_result.error.what());
                 continue;
             }
             // Store metadata
@@ -148,15 +145,12 @@ public:
         return any_added;
     }
 
-    std::vector<SearchResult> search(
-        const std::vector<float>& query_embedding,
-        size_t top_k,
-        float threshold
-    ) const {
+    std::vector<SearchResult> search(const std::vector<float>& query_embedding, size_t top_k,
+                                     float threshold) const {
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (query_embedding.size() != config_.dimension) {
-            RAC_LOG_ERROR(LOG_TAG,"Invalid query embedding dimension");
+            RAC_LOG_ERROR(LOG_TAG, "Invalid query embedding dimension");
             return {};
         }
 
@@ -167,12 +161,15 @@ public:
         // Search for the closest K matches
         auto matches = index_.search(query_embedding.data(), top_k);
 
-        RAC_LOG_INFO(LOG_TAG,"USearch returned %zu matches from %zu total vectors", 
-             matches.size(), index_.size());
+        RAC_LOG_INFO(LOG_TAG, "USearch returned %zu matches from %zu total vectors", matches.size(),
+                     index_.size());
 
         float effective_threshold = threshold;
         if (threshold > 0.5f) {
-            LOGW("Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely exceed 0.3-0.5", threshold);
+            LOGW(
+                "Similarity threshold %.2f is high — dense embeddings (e.g. all-MiniLM) rarely "
+                "exceed 0.3-0.5",
+                threshold);
         }
 
         std::vector<SearchResult> results;
@@ -192,7 +189,7 @@ public:
 
             auto it = chunks_.find(key);
             if (it == chunks_.end()) {
-                RAC_LOG_ERROR(LOG_TAG,"Chunk key %zu not found in metadata map", key);
+                RAC_LOG_ERROR(LOG_TAG, "Chunk key %zu not found in metadata map", key);
                 continue;
             }
 
@@ -236,7 +233,8 @@ public:
         std::size_t key = it->second;
         auto remove_result = index_.remove(key);
         if (!remove_result) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to remove chunk from index: %s", remove_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to remove chunk from index: %s",
+                          remove_result.error.what());
             return false;
         }
         chunks_.erase(key);
@@ -251,7 +249,7 @@ public:
         chunks_.clear();
         id_to_key_.clear();
         next_key_ = 0;  // Reset counter
-        RAC_LOG_INFO(LOG_TAG,"Cleared vector store");
+        RAC_LOG_INFO(LOG_TAG, "Cleared vector store");
     }
 
     size_t size() const {
@@ -266,32 +264,32 @@ public:
 
     nlohmann::json get_statistics() const {
         std::lock_guard<std::mutex> lock(mutex_);
-        
+
         nlohmann::json stats;
         stats["num_chunks"] = index_.size();
         stats["dimension"] = config_.dimension;
         stats["memory_bytes"] = index_.memory_usage();
         stats["connectivity"] = config_.connectivity;
         stats["max_elements"] = config_.max_elements;
-        
+
         return stats;
     }
 
     bool save(const std::string& path) const {
         std::lock_guard<std::mutex> lock(mutex_);
-        
+
         // Save USearch index
         auto save_result = index_.save(path.c_str());
         if (!save_result) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to save USearch index: %s", save_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to save USearch index: %s", save_result.error.what());
             return false;
         }
-        
+
         // Save metadata to JSON file
         nlohmann::json metadata;
         metadata["next_key"] = next_key_;
         metadata["chunks"] = nlohmann::json::array();
-        
+
         for (const auto& [key, chunk] : chunks_) {
             nlohmann::json chunk_json;
             chunk_json["key"] = key;
@@ -300,38 +298,38 @@ public:
             chunk_json["metadata"] = chunk.metadata;
             metadata["chunks"].push_back(chunk_json);
         }
-        
+
         std::string metadata_path = path + ".metadata.json";
         std::ofstream metadata_file(metadata_path);
         if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to open metadata file: %s", metadata_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
             return false;
         }
         metadata_file << metadata.dump();
         metadata_file.close();
-        
-        RAC_LOG_INFO(LOG_TAG,"Saved index and metadata to %s", path.c_str());
+
+        RAC_LOG_INFO(LOG_TAG, "Saved index and metadata to %s", path.c_str());
         return true;
     }
 
     bool load(const std::string& path) {
         std::lock_guard<std::mutex> lock(mutex_);
-        
+
         // Load USearch index
         auto load_result = index_.load(path.c_str());
         if (!load_result) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to load USearch index: %s", load_result.error.what());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to load USearch index: %s", load_result.error.what());
             return false;
         }
-        
+
         // Load metadata from JSON file
         std::string metadata_path = path + ".metadata.json";
         std::ifstream metadata_file(metadata_path);
         if (!metadata_file) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to open metadata file: %s", metadata_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to open metadata file: %s", metadata_path.c_str());
             return false;
         }
-        
+
         nlohmann::json metadata;
         try {
             metadata_file >> metadata;
@@ -362,17 +360,17 @@ public:
             chunks_ = std::move(new_chunks);
             id_to_key_ = std::move(new_id_to_key);
         } catch (const std::exception& e) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to parse metadata JSON: %s", e.what());
-            index_.clear(); // Revert to consistent empty state
+            RAC_LOG_ERROR(LOG_TAG, "Failed to parse metadata JSON: %s", e.what());
+            index_.clear();  // Revert to consistent empty state
             return false;
         }
-        
-        RAC_LOG_INFO(LOG_TAG,"Loaded index and metadata from %s (next_key=%zu, chunks=%zu)", 
-             path.c_str(), next_key_, chunks_.size());
+
+        RAC_LOG_INFO(LOG_TAG, "Loaded index and metadata from %s (next_key=%zu, chunks=%zu)",
+                     path.c_str(), next_key_, chunks_.size());
         return true;
     }
 
-private:
+   private:
     VectorStoreConfig config_;
     index_dense_t index_;
     std::unordered_map<std::size_t, DocumentChunk> chunks_;
@@ -386,8 +384,7 @@ private:
 // =============================================================================
 
 VectorStoreUSearch::VectorStoreUSearch(const VectorStoreConfig& config)
-    : impl_(std::make_unique<Impl>(config)) {
-}
+    : impl_(std::make_unique<Impl>(config)) {}
 
 VectorStoreUSearch::~VectorStoreUSearch() = default;
 
@@ -399,18 +396,15 @@ bool VectorStoreUSearch::add_chunks_batch(const std::vector<DocumentChunk>& chun
     return impl_->add_chunks_batch(chunks);
 }
 
-std::vector<SearchResult> VectorStoreUSearch::search(
-    const std::vector<float>& query_embedding,
-    size_t top_k,
-    float threshold
-) const noexcept {
+std::vector<SearchResult> VectorStoreUSearch::search(const std::vector<float>& query_embedding,
+                                                     size_t top_k, float threshold) const noexcept {
     try {
         return impl_->search(query_embedding, top_k, threshold);
     } catch (const std::exception& e) {
-        RAC_LOG_ERROR(LOG_TAG,"search() exception: %s", e.what());
+        RAC_LOG_ERROR(LOG_TAG, "search() exception: %s", e.what());
         return {};
     } catch (...) {
-        RAC_LOG_ERROR(LOG_TAG,"search() unknown exception");
+        RAC_LOG_ERROR(LOG_TAG, "search() unknown exception");
         return {};
     }
 }
@@ -447,5 +441,5 @@ bool VectorStoreUSearch::load(const std::string& path) {
     return impl_->load(path);
 }
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere

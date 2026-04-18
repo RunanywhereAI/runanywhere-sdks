@@ -4,12 +4,14 @@
  */
 
 #include "http_server.h"
-#include "openai_handler.h"
-#include "rac/core/rac_logger.h"
-#include "rac/backends/rac_llm_llamacpp.h"
 
-#include <filesystem>
+#include "openai_handler.h"
+
 #include <algorithm>
+#include <filesystem>
+
+#include "rac/backends/rac_llm_llamacpp.h"
+#include "rac/core/rac_logger.h"
 
 namespace rac {
 namespace server {
@@ -21,15 +23,15 @@ namespace server {
 std::string generateRequestId() {
     static std::atomic<uint64_t> counter{0};
     std::ostringstream ss;
-    ss << "req-" << std::hex << std::chrono::steady_clock::now().time_since_epoch().count()
-       << "-" << counter++;
+    ss << "req-" << std::hex << std::chrono::steady_clock::now().time_since_epoch().count() << "-"
+       << counter++;
     return ss.str();
 }
 
 int64_t getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
 }
 
 std::string extractModelIdFromPath(const std::string& path) {
@@ -117,8 +119,8 @@ rac_result_t HttpServer::start(const rac_server_config_t& config) {
     for (int i = 0; i < SERVER_START_POLL_ITERATIONS; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(SERVER_START_POLL_MS));
         if (running_) {
-            RAC_LOG_INFO("Server", "RunAnywhere Server started on http://%s:%d",
-                         host_.c_str(), config_.port);
+            RAC_LOG_INFO("Server", "RunAnywhere Server started on http://%s:%d", host_.c_str(),
+                         config_.port);
             RAC_LOG_INFO("Server", "Model: %s", modelId_.c_str());
             return RAC_SUCCESS;
         }
@@ -221,19 +223,21 @@ void HttpServer::setupRoutes() {
     auto handler = std::make_shared<OpenAIHandler>(llmHandle_, modelId_);
 
     // GET /v1/models
-    server_->Get("/v1/models", [this, handler](const httplib::Request& req, httplib::Response& res) {
-        totalRequests_++;
-        {
-            std::lock_guard<std::mutex> lock(callback_mutex_);
-            if (requestCallback_) {
-                requestCallback_("GET", "/v1/models", requestCallbackUserData_);
-            }
-        }
-        handler->handleModels(req, res);
-    });
+    server_->Get("/v1/models",
+                 [this, handler](const httplib::Request& req, httplib::Response& res) {
+                     totalRequests_++;
+                     {
+                         std::lock_guard<std::mutex> lock(callback_mutex_);
+                         if (requestCallback_) {
+                             requestCallback_("GET", "/v1/models", requestCallbackUserData_);
+                         }
+                     }
+                     handler->handleModels(req, res);
+                 });
 
     // POST /v1/chat/completions
-    server_->Post("/v1/chat/completions", [this, handler](const httplib::Request& req, httplib::Response& res) {
+    server_->Post("/v1/chat/completions", [this, handler](const httplib::Request& req,
+                                                          httplib::Response& res) {
         totalRequests_++;
         activeRequests_++;
 
@@ -251,11 +255,13 @@ void HttpServer::setupRoutes() {
             {
                 std::lock_guard<std::mutex> lock(callback_mutex_);
                 if (errorCallback_) {
-                    errorCallback_("/v1/chat/completions", RAC_ERROR_UNKNOWN, e.what(), errorCallbackUserData_);
+                    errorCallback_("/v1/chat/completions", RAC_ERROR_UNKNOWN, e.what(),
+                                   errorCallbackUserData_);
                 }
             }
             res.status = 500;
-            res.set_content("{\"error\": {\"message\": \"Internal server error\"}}", "application/json");
+            res.set_content("{\"error\": {\"message\": \"Internal server error\"}}",
+                            "application/json");
         }
 
         activeRequests_--;
@@ -273,11 +279,7 @@ void HttpServer::setupRoutes() {
         info["name"] = "RunAnywhere Server";
         info["version"] = "1.0.0";
         info["model"] = modelId_;
-        info["endpoints"] = {
-            "GET  /v1/models",
-            "POST /v1/chat/completions",
-            "GET  /health"
-        };
+        info["endpoints"] = {"GET  /v1/models", "POST /v1/chat/completions", "GET  /health"};
         res.set_content(info.dump(2), "application/json");
     });
 }
@@ -285,19 +287,20 @@ void HttpServer::setupRoutes() {
 void HttpServer::setupCors() {
     std::string origins = config_.cors_origins ? config_.cors_origins : "*";
 
-    server_->set_pre_routing_handler([origins](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", origins);
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    server_->set_pre_routing_handler(
+        [origins](const httplib::Request& req, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin", origins);
+            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-        // Handle preflight
-        if (req.method == "OPTIONS") {
-            res.status = 204;
-            return httplib::Server::HandlerResponse::Handled;
-        }
+            // Handle preflight
+            if (req.method == "OPTIONS") {
+                res.status = 204;
+                return httplib::Server::HandlerResponse::Handled;
+            }
 
-        return httplib::Server::HandlerResponse::Unhandled;
-    });
+            return httplib::Server::HandlerResponse::Unhandled;
+        });
 }
 
 rac_result_t HttpServer::loadModel(const std::string& modelPath) {
@@ -360,8 +363,8 @@ void HttpServer::serverThread() {
     RAC_LOG_DEBUG("Server", "Server thread exiting");
 }
 
-} // namespace server
-} // namespace rac
+}  // namespace server
+}  // namespace rac
 
 // =============================================================================
 // C API IMPLEMENTATION
@@ -426,18 +429,18 @@ RAC_API int rac_server_wait(void) {
 }
 
 RAC_API void rac_server_set_request_callback(rac_server_request_callback_fn callback,
-                                              void* user_data) {
+                                             void* user_data) {
     rac::server::HttpServer::instance().setRequestCallback(callback, user_data);
 }
 
-RAC_API void rac_server_set_error_callback(rac_server_error_callback_fn callback,
-                                            void* user_data) {
+RAC_API void rac_server_set_error_callback(rac_server_error_callback_fn callback, void* user_data) {
     rac::server::HttpServer::instance().setErrorCallback(callback, user_data);
 }
 
 // Memory management for OpenAI types
 RAC_API void rac_openai_chat_response_free(rac_openai_chat_response_t* response) {
-    if (!response) return;
+    if (!response)
+        return;
 
     if (response->id) {
         rac_free(response->id);
@@ -453,9 +456,12 @@ RAC_API void rac_openai_chat_response_free(rac_openai_chat_response_t* response)
             if (choice.message.tool_calls) {
                 for (size_t j = 0; j < choice.message.num_tool_calls; ++j) {
                     auto& tc = choice.message.tool_calls[j];
-                    if (tc.id) rac_free(const_cast<char*>(tc.id));
-                    if (tc.function_name) rac_free(const_cast<char*>(tc.function_name));
-                    if (tc.function_arguments) rac_free(const_cast<char*>(tc.function_arguments));
+                    if (tc.id)
+                        rac_free(const_cast<char*>(tc.id));
+                    if (tc.function_name)
+                        rac_free(const_cast<char*>(tc.function_name));
+                    if (tc.function_arguments)
+                        rac_free(const_cast<char*>(tc.function_arguments));
                 }
                 rac_free(choice.message.tool_calls);
             }
@@ -466,7 +472,8 @@ RAC_API void rac_openai_chat_response_free(rac_openai_chat_response_t* response)
 }
 
 RAC_API void rac_openai_models_response_free(rac_openai_models_response_t* response) {
-    if (!response) return;
+    if (!response)
+        return;
 
     if (response->data) {
         rac_free(response->data);
@@ -474,4 +481,4 @@ RAC_API void rac_openai_models_response_free(rac_openai_models_response_t* respo
     }
 }
 
-} // extern "C"
+}  // extern "C"

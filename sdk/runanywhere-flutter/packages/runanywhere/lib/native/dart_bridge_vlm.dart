@@ -384,29 +384,31 @@ class DartBridgeVLM {
         '[PARAMS] processImageStream: temperature=$temperature, maxTokens=$maxTokens, format=$imageFormat, useGpu=$useGpu');
 
     // Start streaming processing in a background isolate
-    _startBackgroundStreaming(
-      handle.address,
-      prompt,
-      imageFormat,
-      filePath,
-      pixelData,
-      width,
-      height,
-      base64Data,
-      maxTokens,
-      temperature,
-      topP,
-      useGpu,
-      controller,
-      systemPrompt,
-      maxImageSize,
-      nThreads,
-    ).catchError((Object e) {
-      if (!controller.isClosed) {
-        controller.addError(e);
-        controller.close();
-      }
-    });
+    unawaited(
+      _startBackgroundStreaming(
+        handle.address,
+        prompt,
+        imageFormat,
+        filePath,
+        pixelData,
+        width,
+        height,
+        base64Data,
+        maxTokens,
+        temperature,
+        topP,
+        useGpu,
+        controller,
+        systemPrompt,
+        maxImageSize,
+        nThreads,
+      ).catchError((Object e) {
+        if (!controller.isClosed) {
+          controller.addError(e);
+          unawaited(controller.close());
+        }
+      }),
+    );
 
     return controller.stream;
   }
@@ -442,11 +444,11 @@ class DartBridgeVLM {
         controller.add(message);
       } else if (message is _VlmStreamingMessage) {
         if (message.isComplete) {
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         } else if (message.error != null) {
           controller.addError(StateError(message.error!));
-          controller.close();
+          unawaited(controller.close());
           receivePort.close();
         }
       }
@@ -579,29 +581,30 @@ VlmBridgeResult _processInIsolate(
 
     if (imageFormat == RacVlmImageFormat.filePath && filePath != null) {
       filePathPtr = filePath.toNativeUtf8();
-      imagePtr.ref.filePath = filePathPtr!;
+      imagePtr.ref.filePath = filePathPtr;
       imagePtr.ref.pixelData = nullptr;
       imagePtr.ref.base64Data = nullptr;
       imagePtr.ref.dataSize = 0;
     } else if (imageFormat == RacVlmImageFormat.rgbPixels &&
         pixelData != null) {
       // Allocate native memory for pixel data
-      pixelDataPtr = calloc<Uint8>(pixelData.length);
+      final pixelPtr = calloc<Uint8>(pixelData.length);
+      pixelDataPtr = pixelPtr;
       for (int i = 0; i < pixelData.length; i++) {
-        pixelDataPtr![i] = pixelData[i];
+        pixelPtr[i] = pixelData[i];
       }
       imagePtr.ref.filePath = nullptr;
-      imagePtr.ref.pixelData = pixelDataPtr!;
+      imagePtr.ref.pixelData = pixelPtr;
       imagePtr.ref.base64Data = nullptr;
       imagePtr.ref.dataSize = pixelData.length;
     } else if (imageFormat == RacVlmImageFormat.base64 && base64Data != null) {
       base64DataPtr = base64Data.toNativeUtf8();
       imagePtr.ref.filePath = nullptr;
       imagePtr.ref.pixelData = nullptr;
-      imagePtr.ref.base64Data = base64DataPtr!;
+      imagePtr.ref.base64Data = base64DataPtr;
       imagePtr.ref.dataSize = base64Data.length;
     } else {
-      return VlmBridgeResult(
+      return const VlmBridgeResult(
         text: '',
         error: 'Invalid image format or missing image data',
       );
@@ -751,28 +754,31 @@ void _vlmStreamingIsolateEntry(_VlmStreamingIsolateParams params) {
     if (params.imageFormat == RacVlmImageFormat.filePath &&
         params.filePath != null) {
       filePathPtr = params.filePath!.toNativeUtf8();
-      imagePtr.ref.filePath = filePathPtr!;
+      imagePtr.ref.filePath = filePathPtr;
       imagePtr.ref.pixelData = nullptr;
       imagePtr.ref.base64Data = nullptr;
       imagePtr.ref.dataSize = 0;
     } else if (params.imageFormat == RacVlmImageFormat.rgbPixels &&
         params.pixelData != null) {
+      final pixels = params.pixelData!;
       // Allocate native memory for pixel data
-      pixelDataPtr = calloc<Uint8>(params.pixelData!.length);
-      for (int i = 0; i < params.pixelData!.length; i++) {
-        pixelDataPtr![i] = params.pixelData![i];
+      final pixelPtr = calloc<Uint8>(pixels.length);
+      pixelDataPtr = pixelPtr;
+      for (int i = 0; i < pixels.length; i++) {
+        pixelPtr[i] = pixels[i];
       }
       imagePtr.ref.filePath = nullptr;
-      imagePtr.ref.pixelData = pixelDataPtr!;
+      imagePtr.ref.pixelData = pixelPtr;
       imagePtr.ref.base64Data = nullptr;
-      imagePtr.ref.dataSize = params.pixelData!.length;
+      imagePtr.ref.dataSize = pixels.length;
     } else if (params.imageFormat == RacVlmImageFormat.base64 &&
         params.base64Data != null) {
-      base64DataPtr = params.base64Data!.toNativeUtf8();
+      final b64 = params.base64Data!;
+      base64DataPtr = b64.toNativeUtf8();
       imagePtr.ref.filePath = nullptr;
       imagePtr.ref.pixelData = nullptr;
-      imagePtr.ref.base64Data = base64DataPtr!;
-      imagePtr.ref.dataSize = params.base64Data!.length;
+      imagePtr.ref.base64Data = base64DataPtr;
+      imagePtr.ref.dataSize = b64.length;
     } else {
       params.sendPort.send(
         _VlmStreamingMessage(error: 'Invalid image format or missing data'),

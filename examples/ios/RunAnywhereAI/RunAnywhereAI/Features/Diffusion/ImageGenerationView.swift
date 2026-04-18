@@ -234,7 +234,8 @@ struct DiffusionModelPickerView: View {
     @ObservedObject var viewModel: DiffusionViewModel
     @Binding var isPresented: Bool
 
-    private static let firstLoadBannerText = "First load may take 1–2 minutes depending on model size and device performance."
+    private static let firstLoadBannerText = "First load may take 1–2 minutes "
+        + "depending on model size and device performance."
 
     var body: some View {
         NavigationView {

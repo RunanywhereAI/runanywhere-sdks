@@ -8,14 +8,13 @@
 #ifndef RUNANYWHERE_VECTOR_STORE_USEARCH_H
 #define RUNANYWHERE_VECTOR_STORE_USEARCH_H
 
-#include <string>
-#include <vector>
+#include <algorithm>
 #include <memory>
 #include <mutex>
-#include <optional>
-#include <algorithm>
-
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace runanywhere {
 namespace rag {
@@ -40,8 +39,8 @@ struct SearchResult {
     std::string id;           // Primary chunk identifier
     std::string chunk_id;     // Alias for id (kept for bridge compatibility)
     std::string text;         // Chunk text content
-    float score = 0.0f;      // Primary similarity score (0.0-1.0)
-    float similarity = 0.0f; // Alias for score (kept for bridge compatibility)
+    float score = 0.0f;       // Primary similarity score (0.0-1.0)
+    float similarity = 0.0f;  // Alias for score (kept for bridge compatibility)
     nlohmann::json metadata;  // Additional metadata
 };
 
@@ -49,18 +48,18 @@ struct SearchResult {
  * @brief Vector store configuration
  */
 struct VectorStoreConfig {
-    size_t dimension = 384;              // Embedding dimension
-    size_t max_elements = 100000;        // Max capacity
-    size_t connectivity = 16;            // HNSW connectivity (M)
-    size_t expansion_add = 40;           // Construction search depth
-    size_t expansion_search = 30;        // Query search depth
+    size_t dimension = 384;        // Embedding dimension
+    size_t max_elements = 100000;  // Max capacity
+    size_t connectivity = 16;      // HNSW connectivity (M)
+    size_t expansion_add = 40;     // Construction search depth
+    size_t expansion_search = 30;  // Query search depth
 };
 
 /**
  * @brief USearch-based vector store for efficient similarity search
  */
 class VectorStoreUSearch {
-public:
+   public:
     explicit VectorStoreUSearch(const VectorStoreConfig& config);
     ~VectorStoreUSearch();
 
@@ -86,11 +85,8 @@ public:
      * @param threshold Minimum similarity (0.0-1.0)
      * @return Vector of search results sorted by similarity
      */
-    std::vector<SearchResult> search(
-        const std::vector<float>& query_embedding,
-        size_t top_k,
-        float threshold = 0.0f
-    ) const noexcept;
+    std::vector<SearchResult> search(const std::vector<float>& query_embedding, size_t top_k,
+                                     float threshold = 0.0f) const noexcept;
 
     /**
      * @brief Look up a chunk by ID (text + metadata, no embedding)
@@ -132,13 +128,13 @@ public:
      */
     bool load(const std::string& path);
 
-private:
+   private:
     class Impl;
     std::unique_ptr<Impl> impl_;
     mutable std::mutex mutex_;
 };
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_VECTOR_STORE_USEARCH_H
+#endif  // RUNANYWHERE_VECTOR_STORE_USEARCH_H

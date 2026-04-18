@@ -9,13 +9,12 @@ import Foundation
 import RunAnywhere
 
 struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .tts
 
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Short Text", category: .tts, parameters: ["length": "short"]),
-            BenchmarkScenario(name: "Medium Text", category: .tts, parameters: ["length": "medium"]),
+            BenchmarkScenario(name: "Medium Text", category: .tts, parameters: ["length": "medium"])
         ]
     }
 

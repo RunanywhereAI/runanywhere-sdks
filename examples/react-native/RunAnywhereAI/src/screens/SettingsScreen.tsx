@@ -119,7 +119,10 @@ const formatBytes = (bytes: number): string => {
 
 export const SettingsScreen: React.FC = () => {
   // Settings state
-  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
+  // NOTE: several state hooks below are intentionally retained for upcoming
+  // settings UI (routing policy, capability flags, etc.). Prefixed with `_`
+  // to silence unused-vars warnings until the UI consumes them.
+  const [_routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
     RoutingPolicy.Automatic
   );
   const [temperature, setTemperature] = useState(0.7);
@@ -138,14 +141,14 @@ export const SettingsScreen: React.FC = () => {
   const [_isRefreshing, setIsRefreshing] = useState(false);
   const [sdkVersion, setSdkVersion] = useState('0.1.0'); // SDK State
 
-  const [capabilities, setCapabilities] = useState<number[]>([]);
-  const [backendInfoData, setBackendInfoData] = useState<
+  const [_capabilities, setCapabilities] = useState<number[]>([]);
+  const [_backendInfoData, setBackendInfoData] = useState<
     Record<string, unknown>
   >({});
-  const [isSTTLoaded, setIsSTTLoaded] = useState(false);
-  const [isTTSLoaded, setIsTTSLoaded] = useState(false);
-  const [isTextLoaded, setIsTextLoaded] = useState(false);
-  const [isVADLoaded, setIsVADLoaded] = useState(false);
+  const [_isSTTLoaded, setIsSTTLoaded] = useState(false);
+  const [_isTTSLoaded, setIsTTSLoaded] = useState(false);
+  const [_isTextLoaded, setIsTextLoaded] = useState(false);
+  const [_isVADLoaded, setIsVADLoaded] = useState(false);
   const [_memoryUsage, _setMemoryUsage] = useState(0); // Model catalog state
 
   const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
@@ -163,7 +166,8 @@ export const SettingsScreen: React.FC = () => {
     }>
   >([]); // Capability names mapping
 
-  const capabilityNames: Record<number, string> = {
+  // Kept for reference; not yet rendered in the capabilities grid below.
+  const _capabilityNames: Record<number, string> = {
     0: 'STT (Speech-to-Text)',
     1: 'TTS (Text-to-Speech)',
     2: 'Text Generation',
@@ -210,13 +214,14 @@ export const SettingsScreen: React.FC = () => {
         GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT
       );
 
-      const temperature = tempStr !== null ? parseFloat(tempStr) : 0.7;
-      setTemperature(temperature);
+      const loadedTemperature = tempStr !== null ? parseFloat(tempStr) : 0.7;
+      setTemperature(loadedTemperature);
       if (maxStr) setMaxTokens(parseInt(maxStr, 10));
       if (sysStr) setSystemPrompt(sysStr);
 
+      // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Loaded generation settings:', {
-        temperature,
+        temperature: loadedTemperature,
         maxTokens,
         systemPrompt: systemPrompt ? 'set' : 'empty',
       });
@@ -242,6 +247,7 @@ export const SettingsScreen: React.FC = () => {
         systemPrompt
       );
 
+      // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Saved generation settings:', {
         temperature,
         maxTokens,
@@ -480,9 +486,11 @@ export const SettingsScreen: React.FC = () => {
       setSdkVersion(version); // Check if SDK is initialized first
 
       const isInit = await RunAnywhere.isInitialized();
+      // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] SDK isInitialized:', isInit); // Get backend info for storage data
 
       const backendInfo = await RunAnywhere.getBackendInfo();
+      // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] Backend info:', backendInfo); // Override name with actual init status
 
       const updatedBackendInfo = {
@@ -557,7 +565,8 @@ export const SettingsScreen: React.FC = () => {
    * Handle routing policy change
    */
 
-  const handleRoutingPolicyChange = useCallback(() => {
+  // Kept for upcoming routing-policy UI; not rendered yet in the settings screen.
+  const _handleRoutingPolicyChange = useCallback(() => {
     const policies = Object.values(RoutingPolicy);
     Alert.alert(
       'Routing Policy',
@@ -739,7 +748,8 @@ export const SettingsScreen: React.FC = () => {
    * Render setting row
    */
 
-  const renderSettingRow = (
+  // Reusable row renderer kept for future settings UI; currently not invoked.
+  const _renderSettingRow = (
     icon: string,
     title: string,
     value: string,

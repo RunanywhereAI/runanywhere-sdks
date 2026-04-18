@@ -46,21 +46,31 @@ import {
   getNPUDownloadUrl,
 } from '@runanywhere/core';
 
+/**
+ * Minimal structural type for optional backend modules.
+ * Each backend exposes a `register()` entry point and an optional `isAvailable`
+ * flag. Typed here to avoid `any` while keeping the dynamic-require pattern.
+ */
+type OptionalBackend = {
+  register: () => void | Promise<void>;
+  isAvailable?: boolean;
+};
+
 // Make LlamaCPP optional for ONNX-only builds
-let LlamaCPP: any = null;
+let LlamaCPP: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP;
-} catch (e) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
+  LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP as OptionalBackend;
+} catch {
   console.warn('[App] LlamaCPP backend not available - some features disabled');
 }
 
 // Make Genie optional (Android/Snapdragon only)
-let Genie: any = null;
+let Genie: OptionalBackend | null = null;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  Genie = require('@runanywhere/genie').Genie;
-} catch (e) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires -- optional peer dep, runtime presence check
+  Genie = require('@runanywhere/genie').Genie as OptionalBackend;
+} catch {
   console.warn('[App] Genie NPU backend not available');
 }
 
@@ -317,8 +327,10 @@ async function registerModulesAndModels(): Promise<void> {
           })
         );
       await Promise.all(registrations);
+      // eslint-disable-next-line no-console -- demo app bootstrap diagnostic
       console.log(`✅ Genie NPU models registered (chip: ${chip.displayName})`);
     } else {
+      // eslint-disable-next-line no-console -- demo app bootstrap diagnostic
       console.log('ℹ️ Genie available but no supported NPU chip detected');
     }
   }
@@ -377,6 +389,7 @@ async function registerModulesAndModels(): Promise<void> {
     }),
   ]);
 
+  // eslint-disable-next-line no-console -- demo app bootstrap diagnostic
   console.log('[App] All models registered');
 }
 
@@ -395,6 +408,7 @@ const App: React.FC = () => {
     try {
       const startTime = Date.now();
 
+      /* eslint-disable no-console -- demo app bootstrap diagnostics */
       console.log('[App] Initializing global NitroModules...');
       await initializeNitroModulesGlobally();
       console.log('[App] Global NitroModules initialized successfully');
@@ -432,6 +446,7 @@ const App: React.FC = () => {
       console.log(
         `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, env: ${JSON.stringify(backendInfo)}`
       );
+      /* eslint-enable no-console */
 
       setInitState('ready');
     } catch (err) {

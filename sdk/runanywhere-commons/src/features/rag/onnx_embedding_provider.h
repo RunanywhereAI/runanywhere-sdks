@@ -23,11 +23,9 @@ namespace rag {
  * Thread-safe after initialization.
  */
 class ONNXEmbeddingProvider {
-public:
-    explicit ONNXEmbeddingProvider(
-        const std::string& model_path,
-        const std::string& config_json = ""
-    );
+   public:
+    explicit ONNXEmbeddingProvider(const std::string& model_path,
+                                   const std::string& config_json = "");
 
     ~ONNXEmbeddingProvider();
 
@@ -42,12 +40,12 @@ public:
     bool is_ready() const noexcept;
     const char* name() const noexcept;
 
-private:
+   private:
     class Impl;
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H
+#endif  // RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H

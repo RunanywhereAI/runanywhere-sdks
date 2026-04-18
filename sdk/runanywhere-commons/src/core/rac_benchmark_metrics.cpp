@@ -59,7 +59,7 @@ void rac_benchmark_extended_metrics_init(rac_benchmark_extended_metrics_t* metri
 }
 
 void rac_benchmark_set_metrics_provider(rac_benchmark_metrics_provider_fn provider,
-                                         void* user_data) {
+                                        void* user_data) {
     if (provider == nullptr) {
         store_provider(nullptr);
         return;

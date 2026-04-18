@@ -221,7 +221,7 @@ class DartBridgeAuth {
           _secureCache['com.runanywhere.sdk.deviceId'] = deviceId;
         }
       }
-      if (deviceId == null || deviceId.isEmpty) {
+      if (deviceId.isEmpty) {
         _logger.debug('No device ID available');
         return AuthResult.failure('No device ID available');
       }

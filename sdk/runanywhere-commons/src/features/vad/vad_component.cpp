@@ -398,10 +398,8 @@ extern "C" rac_result_t rac_vad_component_reset(rac_handle_t handle) {
 // MODEL LOADING API
 // =============================================================================
 
-extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle,
-                                                     const char* model_path,
-                                                     const char* model_id,
-                                                     const char* model_name) {
+extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const char* model_path,
+                                                     const char* model_id, const char* model_name) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!model_path)
@@ -526,14 +524,14 @@ extern "C" rac_result_t rac_vad_component_process(rac_handle_t handle, const flo
     rac_result_t result;
 
     // Dispatch through model service if loaded (e.g., Silero via ONNX)
-    if (component->is_model_loaded && component->model_service &&
-        component->model_service->ops && component->model_service->ops->process) {
-        result = component->model_service->ops->process(
-            component->model_service->impl, samples, num_samples, &has_voice);
+    if (component->is_model_loaded && component->model_service && component->model_service->ops &&
+        component->model_service->ops->process) {
+        result = component->model_service->ops->process(component->model_service->impl, samples,
+                                                        num_samples, &has_voice);
     } else if (component->is_initialized && component->vad_service) {
         // Fall back to energy-based VAD
-        result = rac_energy_vad_process_audio(
-            component->vad_service, samples, num_samples, &has_voice);
+        result =
+            rac_energy_vad_process_audio(component->vad_service, samples, num_samples, &has_voice);
     } else {
         return RAC_ERROR_NOT_INITIALIZED;
     }

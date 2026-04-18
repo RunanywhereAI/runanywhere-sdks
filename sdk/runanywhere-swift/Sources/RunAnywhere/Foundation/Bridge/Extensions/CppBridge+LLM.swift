@@ -8,6 +8,15 @@
 import CRACommons
 import Foundation
 
+// MARK: - Decodable JSON Entries
+
+/// Decoded entry from `rac_llm_component_get_lora_info` JSON payload.
+private struct LoRAInfoJSONEntry: Decodable {
+    let path: String
+    let scale: Double
+    let applied: Bool
+}
+
 // MARK: - LLM Component Bridge
 
 extension CppBridge {
@@ -157,16 +166,13 @@ extension CppBridge {
 
             let jsonString = String(cString: ptr)
             guard let data = jsonString.data(using: .utf8),
-                  let array = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                  let entries = try? JSONDecoder().decode([LoRAInfoJSONEntry].self, from: data) else {
                 logger.error("Failed to parse LoRA info JSON")
                 return []
             }
 
-            return array.compactMap { dict in
-                guard let path = dict["path"] as? String,
-                      let scale = dict["scale"] as? Double,
-                      let applied = dict["applied"] as? Bool else { return nil }
-                return LoRAAdapterInfo(path: path, scale: Float(scale), applied: applied)
+            return entries.map { entry in
+                LoRAAdapterInfo(path: entry.path, scale: Float(entry.scale), applied: entry.applied)
             }
         }
 

@@ -9,12 +9,13 @@
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
-#include "rac/backends/rac_embeddings_onnx.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+
+#include "rac/backends/rac_embeddings_onnx.h"
 
 // std::filesystem is not available on Emscripten/WASM
 #ifndef __EMSCRIPTEN__
@@ -111,14 +112,16 @@ static rac_result_t onnx_stt_vtable_transcribe_stream(void* impl, const void* au
     }
 
     rac_stt_onnx_destroy_stream(impl, stream);
-    if (text) free(text);
+    if (text)
+        free(text);
 
     return result;
 }
 
 // Get info
 static rac_result_t onnx_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
 
     out_info->is_ready = RAC_TRUE;
     out_info->supports_streaming = rac_stt_onnx_supports_streaming(impl);
@@ -185,7 +188,8 @@ static rac_result_t onnx_tts_vtable_stop(void* impl) {
 
 static rac_result_t onnx_tts_vtable_get_info(void* impl, rac_tts_info_t* out_info) {
     (void)impl;
-    if (!out_info) return RAC_ERROR_NULL_POINTER;
+    if (!out_info)
+        return RAC_ERROR_NULL_POINTER;
 
     out_info->is_ready = RAC_TRUE;
     out_info->is_synthesizing = RAC_FALSE;
@@ -337,8 +341,8 @@ rac_handle_t onnx_tts_create(const rac_service_request_t* request, void* user_da
 // VAD VTABLE OPERATIONS
 // =============================================================================
 
-static rac_result_t onnx_vad_vtable_process(void* impl, const float* samples,
-                                             size_t num_samples, rac_bool_t* out_is_speech) {
+static rac_result_t onnx_vad_vtable_process(void* impl, const float* samples, size_t num_samples,
+                                            rac_bool_t* out_is_speech) {
     return rac_vad_onnx_process(static_cast<rac_handle_t>(impl), samples, num_samples,
                                 out_is_speech);
 }

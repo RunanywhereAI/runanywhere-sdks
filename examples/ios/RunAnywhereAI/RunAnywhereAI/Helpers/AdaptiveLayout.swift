@@ -510,7 +510,7 @@ struct AdaptiveMicButton: View {
         Group {
             if #available(iOS 26.0, macOS 26.0, *) {
                 micContent
-                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
                     .onTapGesture(perform: action)
                     .glassEffect(.regular.interactive())
                     .accessibilityAddTraits(.isButton)
@@ -524,7 +524,7 @@ struct AdaptiveMicButton: View {
                     .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             } else {
                 micContent
-                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
                     .onTapGesture(perform: action)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Microphone")

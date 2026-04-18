@@ -16,7 +16,7 @@ import 'package:runanywhere/public/runanywhere.dart';
 
 /// Extension methods for NPU chip detection
 extension RunAnywhereDevice on RunAnywhere {
-  static final _channel = MethodChannel('runanywhere');
+  static const _channel = MethodChannel('runanywhere');
 
   /// Detect the device's NPU chipset for Genie model compatibility.
   ///

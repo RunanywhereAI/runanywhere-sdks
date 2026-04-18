@@ -258,10 +258,10 @@ extern "C" rac_result_t rac_stt_component_load_model(rac_handle_t handle, const 
     rac_result_t result =
         rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
 
-    double load_duration_ms = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
-                                                              load_start)
-            .count());
+    double load_duration_ms =
+        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - load_start)
+                                .count());
 
     if (result != RAC_SUCCESS) {
         rac_analytics_event_data_t event = {};
@@ -388,7 +388,8 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
 
     auto start_time = std::chrono::steady_clock::now();
 
-    rac_result_t result = rac_stt_transcribe(service, audio_data, audio_size, &local_options, out_result);
+    rac_result_t result =
+        rac_stt_transcribe(service, audio_data, audio_size, &local_options, out_result);
 
     if (result != RAC_SUCCESS) {
         log_error("STT.Component", "Transcription failed");

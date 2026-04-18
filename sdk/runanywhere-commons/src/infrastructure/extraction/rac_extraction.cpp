@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+
 #include "rac/core/rac_platform_compat.h"
 
 #ifdef _WIN32
@@ -34,13 +35,16 @@ static const char* kLogTag = "Extraction";
  * Rejects absolute paths and paths containing ".." components.
  */
 static bool is_path_safe(const char* pathname) {
-    if (!pathname || pathname[0] == '\0') return false;
+    if (!pathname || pathname[0] == '\0')
+        return false;
 
     // Reject absolute paths (Unix)
-    if (pathname[0] == '/') return false;
+    if (pathname[0] == '/')
+        return false;
 
     // Reject Windows UNC paths (\\server\share)
-    if (pathname[0] == '\\' && pathname[1] == '\\') return false;
+    if (pathname[0] == '\\' && pathname[1] == '\\')
+        return false;
 
     // Reject Windows drive letters (C:, D:, etc.)
     if (((pathname[0] >= 'A' && pathname[0] <= 'Z') ||
@@ -68,16 +72,19 @@ static bool is_path_safe(const char* pathname) {
  * Check if an entry should be skipped (macOS resource forks, etc.).
  */
 static bool should_skip_entry(const char* pathname, rac_bool_t skip_macos) {
-    if (!pathname || pathname[0] == '\0') return true;
+    if (!pathname || pathname[0] == '\0')
+        return true;
 
     if (skip_macos) {
         // Skip __MACOSX/ directory and its contents
-        if (strstr(pathname, "__MACOSX") != nullptr) return true;
+        if (strstr(pathname, "__MACOSX") != nullptr)
+            return true;
 
         // Skip ._ resource fork files
         const char* basename = strrchr(pathname, '/');
         basename = basename ? basename + 1 : pathname;
-        if (basename[0] == '.' && basename[1] == '_') return true;
+        if (basename[0] == '.' && basename[1] == '_')
+            return true;
     }
     return false;
 }
@@ -87,13 +94,15 @@ static bool should_skip_entry(const char* pathname, rac_bool_t skip_macos) {
  * Equivalent to `mkdir -p`.
  */
 static rac_result_t create_directories(const std::string& path) {
-    if (path.empty()) return RAC_SUCCESS;
+    if (path.empty())
+        return RAC_SUCCESS;
 
     std::string current;
     for (size_t i = 0; i < path.size(); i++) {
         current += path[i];
         if (path[i] == '/' || i == path.size() - 1) {
-            if (current == "/") continue;
+            if (current == "/")
+                continue;
 #ifdef _WIN32
             int ret = _mkdir(current.c_str());
 #else
@@ -115,7 +124,8 @@ static rac_result_t create_directories(const std::string& path) {
  * Ensure trailing slash on directory path.
  */
 static std::string ensure_trailing_slash(const std::string& path) {
-    if (path.empty() || path.back() == '/') return path;
+    if (path.empty() || path.back() == '/')
+        return path;
     return path + '/';
 }
 
@@ -124,9 +134,9 @@ static std::string ensure_trailing_slash(const std::string& path) {
 // =============================================================================
 
 rac_result_t rac_extract_archive_native(const char* archive_path, const char* destination_dir,
-                                         const rac_extraction_options_t* options,
-                                         rac_extraction_progress_fn progress_callback,
-                                         void* user_data, rac_extraction_result_t* out_result) {
+                                        const rac_extraction_options_t* options,
+                                        rac_extraction_progress_fn progress_callback,
+                                        void* user_data, rac_extraction_result_t* out_result) {
     if (!archive_path || !destination_dir) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -139,8 +149,7 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
     }
 
     // Use defaults if no options provided
-    rac_extraction_options_t opts =
-        options ? *options : RAC_EXTRACTION_OPTIONS_DEFAULT;
+    rac_extraction_options_t opts = options ? *options : RAC_EXTRACTION_OPTIONS_DEFAULT;
 
     // Create destination directory
     rac_result_t dir_result = create_directories(destination_dir);
@@ -194,7 +203,8 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 
     while (true) {
         r = archive_read_next_header(a, &entry);
-        if (r == ARCHIVE_EOF) break;
+        if (r == ARCHIVE_EOF)
+            break;
 
         if (r != ARCHIVE_OK && r != ARCHIVE_WARN) {
             const char* err = archive_error_string(a);
@@ -280,7 +290,8 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
             bool data_error = false;
             while (true) {
                 r = archive_read_data_block(a, &buff, &size, &offset);
-                if (r == ARCHIVE_EOF) break;
+                if (r == ARCHIVE_EOF)
+                    break;
                 if (r != ARCHIVE_OK) {
                     const char* err = archive_error_string(a);
                     RAC_LOG_ERROR(kLogTag, "Error reading data for: %s (%s)", pathname,
@@ -344,16 +355,19 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 // =============================================================================
 
 rac_bool_t rac_detect_archive_type(const char* file_path, rac_archive_type_t* out_type) {
-    if (!file_path || !out_type) return RAC_FALSE;
+    if (!file_path || !out_type)
+        return RAC_FALSE;
 
     FILE* f = fopen(file_path, "rb");
-    if (!f) return RAC_FALSE;
+    if (!f)
+        return RAC_FALSE;
 
     unsigned char magic[6] = {0};
     size_t bytes_read = fread(magic, 1, sizeof(magic), f);
     fclose(f);
 
-    if (bytes_read < 2) return RAC_FALSE;
+    if (bytes_read < 2)
+        return RAC_FALSE;
 
     // ZIP: PK\x03\x04
     if (bytes_read >= 4 && magic[0] == 0x50 && magic[1] == 0x4B && magic[2] == 0x03 &&

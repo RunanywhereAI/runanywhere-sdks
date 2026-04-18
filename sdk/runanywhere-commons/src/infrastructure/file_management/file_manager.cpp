@@ -7,12 +7,11 @@
  * Business logic (recursive traversal, path computation, threshold checks) lives here.
  */
 
-#include "rac/infrastructure/file_management/rac_file_manager.h"
-
 #include <cstring>
 #include <string>
 
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 
 // =============================================================================
@@ -60,7 +59,7 @@ static std::string join_path(const char* parent, const char* child) {
  *   2. For each entry: if directory → recurse, else → add file size
  */
 static rac_result_t calculate_dir_size_recursive(const rac_file_callbacks_t* cb, const char* path,
-                                                  int64_t* out_size) {
+                                                 int64_t* out_size) {
     char** entries = nullptr;
     size_t count = 0;
 
@@ -180,9 +179,9 @@ rac_result_t rac_file_manager_create_directory_structure(const rac_file_callback
 // =============================================================================
 
 rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
-                                                   const char* model_id,
-                                                   rac_inference_framework_t framework,
-                                                   char* out_path, size_t path_size) {
+                                                  const char* model_id,
+                                                  rac_inference_framework_t framework,
+                                                  char* out_path, size_t path_size) {
     if (model_id == nullptr || out_path == nullptr || path_size == 0) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -209,10 +208,10 @@ rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb
 }
 
 rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb,
-                                                   const char* model_id,
-                                                   rac_inference_framework_t framework,
-                                                   rac_bool_t* out_exists,
-                                                   rac_bool_t* out_has_contents) {
+                                                  const char* model_id,
+                                                  rac_inference_framework_t framework,
+                                                  rac_bool_t* out_exists,
+                                                  rac_bool_t* out_has_contents) {
     if (model_id == nullptr || out_exists == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -224,7 +223,8 @@ rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb
 
     // Get model folder path
     char folder_path[1024];
-    result = rac_model_paths_get_model_folder(model_id, framework, folder_path, sizeof(folder_path));
+    result =
+        rac_model_paths_get_model_folder(model_id, framework, folder_path, sizeof(folder_path));
     if (RAC_FAILED(result)) {
         *out_exists = RAC_FALSE;
         if (out_has_contents != nullptr) {
@@ -263,7 +263,7 @@ rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb
 }
 
 rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const char* model_id,
-                                            rac_inference_framework_t framework) {
+                                           rac_inference_framework_t framework) {
     if (model_id == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -275,7 +275,8 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
 
     // Get model folder path
     char folder_path[1024];
-    result = rac_model_paths_get_model_folder(model_id, framework, folder_path, sizeof(folder_path));
+    result =
+        rac_model_paths_get_model_folder(model_id, framework, folder_path, sizeof(folder_path));
     if (RAC_FAILED(result)) {
         return result;
     }
@@ -304,7 +305,7 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
 // =============================================================================
 
 rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb, const char* path,
-                                                  int64_t* out_size) {
+                                                 int64_t* out_size) {
     if (path == nullptr || out_size == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -336,7 +337,7 @@ rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb,
 }
 
 rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
-                                                   int64_t* out_size) {
+                                                  int64_t* out_size) {
     if (out_size == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -423,7 +424,7 @@ rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb, int64_t
 // =============================================================================
 
 rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
-                                                rac_file_manager_storage_info_t* out_info) {
+                                               rac_file_manager_storage_info_t* out_info) {
     if (out_info == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -468,9 +469,8 @@ rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb,
-                                             int64_t required_bytes,
-                                             rac_storage_availability_t* out_availability) {
+rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb, int64_t required_bytes,
+                                            rac_storage_availability_t* out_availability) {
     if (out_availability == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -500,9 +500,9 @@ rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb,
         int64_t remaining = available_space - required_bytes;
         if (remaining < STORAGE_WARNING_THRESHOLD) {
             out_availability->has_warning = RAC_TRUE;
-            out_availability->recommendation =
-                rac_strdup("Low storage warning: less than 1 GB will remain after this download. "
-                           "Consider freeing space by removing unused models.");
+            out_availability->recommendation = rac_strdup(
+                "Low storage warning: less than 1 GB will remain after this download. "
+                "Consider freeing space by removing unused models.");
         } else {
             out_availability->has_warning = RAC_FALSE;
             out_availability->recommendation = nullptr;
@@ -510,9 +510,9 @@ rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb,
     } else {
         out_availability->is_available = RAC_FALSE;
         out_availability->has_warning = RAC_TRUE;
-        out_availability->recommendation =
-            rac_strdup("Insufficient storage space for this download. "
-                       "Please free space by removing unused models or clearing the cache.");
+        out_availability->recommendation = rac_strdup(
+            "Insufficient storage space for this download. "
+            "Please free space by removing unused models or clearing the cache.");
     }
 
     return RAC_SUCCESS;

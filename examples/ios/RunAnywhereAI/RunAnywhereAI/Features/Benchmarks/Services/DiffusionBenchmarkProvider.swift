@@ -9,12 +9,11 @@ import Foundation
 import RunAnywhere
 
 struct DiffusionBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .diffusion
 
     func scenarios() -> [BenchmarkScenario] {
         [
-            BenchmarkScenario(name: "Simple Prompt (10 steps)", category: .diffusion),
+            BenchmarkScenario(name: "Simple Prompt (10 steps)", category: .diffusion)
         ]
     }
 

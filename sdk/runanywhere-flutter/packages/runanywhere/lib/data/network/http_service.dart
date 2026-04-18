@@ -8,7 +8,6 @@ import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
-import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 /// HTTP Service - Core network implementation using dart:http
 ///
@@ -530,7 +529,7 @@ class HTTPService {
   ) {
     final text = response.body;
     if (text.isEmpty) {
-      return {} as T;
+      return <String, Object?>{} as T;
     }
     try {
       final decoded = json.decode(text);

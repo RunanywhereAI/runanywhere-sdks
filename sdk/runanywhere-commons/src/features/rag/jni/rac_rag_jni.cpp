@@ -9,9 +9,10 @@
  */
 
 #include <jni.h>
-#include <string>
-#include <cstring>
+
 #include <cstdio>
+#include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
@@ -33,29 +34,44 @@ extern "C" rac_result_t rac_backend_rag_unregister(void);
 // =============================================================================
 
 static std::string json_escape(const char* s) {
-    if (!s) return "";
+    if (!s)
+        return "";
     std::string out;
     out.reserve(strlen(s) + 8);
     for (const char* p = s; *p; ++p) {
         switch (*p) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:   out += *p;     break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\\':
+                out += "\\\\";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out += *p;
+                break;
         }
     }
     return out;
 }
 
 static const char* get_string(JNIEnv* env, jstring jstr) {
-    if (!jstr) return nullptr;
+    if (!jstr)
+        return nullptr;
     return env->GetStringUTFChars(jstr, nullptr);
 }
 
 static void release_string(JNIEnv* env, jstring jstr, const char* str) {
-    if (jstr && str) env->ReleaseStringUTFChars(jstr, str);
+    if (jstr && str)
+        env->ReleaseStringUTFChars(jstr, str);
 }
 
 extern "C" {
@@ -75,8 +91,8 @@ JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 // Backend Registration
 // =============================================================================
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeRegister(JNIEnv* env, jclass clazz) {
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeRegister(JNIEnv* env,
+                                                                             jclass clazz) {
     (void)env;
     (void)clazz;
     LOGi("RAG nativeRegister called");
@@ -92,8 +108,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeRegister(JNIEnv* env, jclass clazz)
     return RAC_SUCCESS;
 }
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeUnregister(JNIEnv* env, jclass clazz) {
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeUnregister(JNIEnv* env,
+                                                                               jclass clazz) {
     (void)env;
     (void)clazz;
     LOGi("RAG nativeUnregister called");
@@ -109,8 +125,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeUnregister(JNIEnv* env, jclass claz
     return static_cast<jint>(result);
 }
 
-JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeIsRegistered(JNIEnv* env, jclass clazz) {
+JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeIsRegistered(JNIEnv* env,
+                                                                                     jclass clazz) {
     (void)env;
     (void)clazz;
 
@@ -119,8 +135,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeIsRegistered(JNIEnv* env, jclass cl
     return (result == RAC_SUCCESS && info != nullptr) ? JNI_TRUE : JNI_FALSE;
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeGetVersion(JNIEnv* env, jclass clazz) {
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeGetVersion(JNIEnv* env,
+                                                                                  jclass clazz) {
     (void)clazz;
     return env->NewStringUTF("1.0.0");
 }
@@ -129,28 +145,18 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeGetVersion(JNIEnv* env, jclass claz
 // Pipeline Operations
 // =============================================================================
 
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipeline(
-    JNIEnv* env, jclass clazz,
-    jstring embeddingModelPath,
-    jstring llmModelPath,
-    jint embeddingDimension,
-    jint topK,
-    jfloat similarityThreshold,
-    jint maxContextTokens,
-    jint chunkSize,
-    jint chunkOverlap,
-    jstring promptTemplate,
-    jstring embeddingConfigJson,
-    jstring llmConfigJson)
-{
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipeline(
+    JNIEnv* env, jclass clazz, jstring embeddingModelPath, jstring llmModelPath,
+    jint embeddingDimension, jint topK, jfloat similarityThreshold, jint maxContextTokens,
+    jint chunkSize, jint chunkOverlap, jstring promptTemplate, jstring embeddingConfigJson,
+    jstring llmConfigJson) {
     (void)clazz;
 
-    const char* embPath  = get_string(env, embeddingModelPath);
-    const char* llmPath  = get_string(env, llmModelPath);
-    const char* tmpl     = get_string(env, promptTemplate);
-    const char* embCfg   = get_string(env, embeddingConfigJson);
-    const char* llmCfg   = get_string(env, llmConfigJson);
+    const char* embPath = get_string(env, embeddingModelPath);
+    const char* llmPath = get_string(env, llmModelPath);
+    const char* tmpl = get_string(env, promptTemplate);
+    const char* embCfg = get_string(env, embeddingConfigJson);
+    const char* llmCfg = get_string(env, llmConfigJson);
 
     if (!embPath) {
         LOGe("nativeCreatePipeline: embedding model path is required");
@@ -161,21 +167,24 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipeline(
         return 0;
     }
 
-    LOGi("nativeCreatePipeline: emb=%s, llm=%s, dim=%d, topK=%d",
-         embPath, llmPath ? llmPath : "(none)", embeddingDimension, topK);
+    LOGi("nativeCreatePipeline: emb=%s, llm=%s, dim=%d, topK=%d", embPath,
+         llmPath ? llmPath : "(none)", embeddingDimension, topK);
 
     rac_rag_config_t config = rac_rag_config_default();
-    config.embedding_model_path  = embPath;
-    config.llm_model_path        = llmPath;
-    config.embedding_dimension   = static_cast<size_t>(embeddingDimension);
-    config.top_k                 = static_cast<size_t>(topK);
-    config.similarity_threshold  = similarityThreshold;
-    config.max_context_tokens    = static_cast<size_t>(maxContextTokens);
-    config.chunk_size            = static_cast<size_t>(chunkSize);
-    config.chunk_overlap         = static_cast<size_t>(chunkOverlap);
-    if (tmpl)   config.prompt_template       = tmpl;
-    if (embCfg) config.embedding_config_json = embCfg;
-    if (llmCfg) config.llm_config_json       = llmCfg;
+    config.embedding_model_path = embPath;
+    config.llm_model_path = llmPath;
+    config.embedding_dimension = static_cast<size_t>(embeddingDimension);
+    config.top_k = static_cast<size_t>(topK);
+    config.similarity_threshold = similarityThreshold;
+    config.max_context_tokens = static_cast<size_t>(maxContextTokens);
+    config.chunk_size = static_cast<size_t>(chunkSize);
+    config.chunk_overlap = static_cast<size_t>(chunkOverlap);
+    if (tmpl)
+        config.prompt_template = tmpl;
+    if (embCfg)
+        config.embedding_config_json = embCfg;
+    if (llmCfg)
+        config.llm_config_json = llmCfg;
 
     rac_rag_pipeline_t* pipeline = nullptr;
     rac_result_t result = rac_rag_pipeline_create_standalone(&config, &pipeline);
@@ -195,27 +204,21 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipeline(
     return reinterpret_cast<jlong>(pipeline);
 }
 
-JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeDestroyPipeline(
-    JNIEnv* env, jclass clazz, jlong pipelineHandle)
-{
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeDestroyPipeline(
+    JNIEnv* env, jclass clazz, jlong pipelineHandle) {
     (void)env;
     (void)clazz;
 
-    if (pipelineHandle == 0) return;
+    if (pipelineHandle == 0)
+        return;
 
     auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(pipelineHandle);
     LOGi("nativeDestroyPipeline: handle=%p", static_cast<void*>(pipeline));
     rac_rag_pipeline_destroy(pipeline);
 }
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeAddDocument(
-    JNIEnv* env, jclass clazz,
-    jlong pipelineHandle,
-    jstring text,
-    jstring metadataJson)
-{
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeAddDocument(
+    JNIEnv* env, jclass clazz, jlong pipelineHandle, jstring text, jstring metadataJson) {
     (void)clazz;
 
     if (pipelineHandle == 0) {
@@ -225,7 +228,7 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeAddDocument(
 
     auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(pipelineHandle);
 
-    const char* docText  = get_string(env, text);
+    const char* docText = get_string(env, text);
     const char* metadata = get_string(env, metadataJson);
 
     if (!docText) {
@@ -248,17 +251,9 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeAddDocument(
     return static_cast<jint>(result);
 }
 
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
-    JNIEnv* env, jclass clazz,
-    jlong pipelineHandle,
-    jstring question,
-    jstring systemPrompt,
-    jint maxTokens,
-    jfloat temperature,
-    jfloat topP,
-    jint topK)
-{
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
+    JNIEnv* env, jclass clazz, jlong pipelineHandle, jstring question, jstring systemPrompt,
+    jint maxTokens, jfloat temperature, jfloat topP, jint topK) {
     (void)clazz;
 
     if (pipelineHandle == 0) {
@@ -269,7 +264,7 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
     auto* pipeline = reinterpret_cast<rac_rag_pipeline_t*>(pipelineHandle);
 
     const char* questionStr = get_string(env, question);
-    const char* sysPrompt   = get_string(env, systemPrompt);
+    const char* sysPrompt = get_string(env, systemPrompt);
 
     if (!questionStr) {
         LOGe("nativeQuery: question is required");
@@ -277,16 +272,16 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
         return env->NewStringUTF("");
     }
 
-    LOGi("nativeQuery: question_len=%zu, maxTokens=%d, temp=%.2f",
-         strlen(questionStr), maxTokens, temperature);
+    LOGi("nativeQuery: question_len=%zu, maxTokens=%d, temp=%.2f", strlen(questionStr), maxTokens,
+         temperature);
 
     rac_rag_query_t query = {};
-    query.question    = questionStr;
+    query.question = questionStr;
     query.system_prompt = sysPrompt;
-    query.max_tokens  = maxTokens;
+    query.max_tokens = maxTokens;
     query.temperature = temperature;
-    query.top_p       = topP;
-    query.top_k       = topK;
+    query.top_p = topP;
+    query.top_k = topK;
 
     rac_rag_result_t result = {};
     rac_result_t status = rac_rag_query(pipeline, &query, &result);
@@ -310,7 +305,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
     json += ",\"total_time_ms\":" + std::to_string(result.total_time_ms);
     json += ",\"retrieved_chunks\":[";
     for (size_t i = 0; i < result.num_chunks; ++i) {
-        if (i > 0) json += ",";
+        if (i > 0)
+            json += ",";
         const auto& chunk = result.retrieved_chunks[i];
         json += "{";
         json += "\"chunk_id\":\"" + json_escape(chunk.chunk_id) + "\"";
@@ -331,10 +327,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeQuery(
     return env->NewStringUTF(json.c_str());
 }
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeClearDocuments(
-    JNIEnv* env, jclass clazz, jlong pipelineHandle)
-{
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeClearDocuments(
+    JNIEnv* env, jclass clazz, jlong pipelineHandle) {
     (void)env;
     (void)clazz;
 
@@ -355,10 +349,8 @@ Java_com_runanywhere_sdk_rag_RAGBridge_nativeClearDocuments(
     return static_cast<jint>(result);
 }
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_rag_RAGBridge_nativeGetDocumentCount(
-    JNIEnv* env, jclass clazz, jlong pipelineHandle)
-{
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeGetDocumentCount(
+    JNIEnv* env, jclass clazz, jlong pipelineHandle) {
     (void)env;
     (void)clazz;
 

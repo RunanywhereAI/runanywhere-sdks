@@ -32,7 +32,8 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
         while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i]))) {
             ++i;
         }
-        if (i >= text.size()) break;
+        if (i >= text.size())
+            break;
 
         // Collect non-whitespace run
         size_t start = i;
@@ -52,14 +53,14 @@ std::vector<std::string> BM25Index::tokenize(const std::string& text) const {
             --tok_end;
         }
 
-        if (tok_start >= tok_end) continue;
+        if (tok_start >= tok_end)
+            continue;
 
         // Lowercase
         std::string token;
         token.reserve(tok_end - tok_start);
         for (size_t j = tok_start; j < tok_end; ++j) {
-            token.push_back(static_cast<char>(
-                std::tolower(static_cast<unsigned char>(text[j]))));
+            token.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(text[j]))));
         }
 
         tokens.push_back(std::move(token));
@@ -81,7 +82,8 @@ void BM25Index::add_chunk(const std::string& chunk_id, const std::string& text) 
     }
 
     auto tokens = tokenize(text);
-    if (tokens.empty()) return;
+    if (tokens.empty())
+        return;
 
     // Compute term frequencies
     std::unordered_map<std::string, size_t> tf;
@@ -102,9 +104,7 @@ void BM25Index::add_chunk(const std::string& chunk_id, const std::string& text) 
     avg_chunk_length_ = static_cast<double>(total_length_) / static_cast<double>(total_chunks_);
 }
 
-void BM25Index::add_chunks_batch(
-    const std::vector<std::pair<std::string, std::string>>& chunks
-) {
+void BM25Index::add_chunks_batch(const std::vector<std::pair<std::string, std::string>>& chunks) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     for (const auto& [chunk_id, text] : chunks) {
@@ -114,7 +114,8 @@ void BM25Index::add_chunks_batch(
         }
 
         auto tokens = tokenize(text);
-        if (tokens.empty()) continue;
+        if (tokens.empty())
+            continue;
 
         std::unordered_map<std::string, size_t> tf;
         for (const auto& token : tokens) {
@@ -142,7 +143,8 @@ void BM25Index::remove_chunk(const std::string& chunk_id) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     auto tf_it = chunk_term_freqs_.find(chunk_id);
-    if (tf_it == chunk_term_freqs_.end()) return;
+    if (tf_it == chunk_term_freqs_.end())
+        return;
 
     // Remove from inverted index
     for (const auto& [term, _] : tf_it->second) {
@@ -165,9 +167,9 @@ void BM25Index::remove_chunk(const std::string& chunk_id) {
     }
     --total_chunks_;
 
-    avg_chunk_length_ = (total_chunks_ > 0)
-        ? static_cast<double>(total_length_) / static_cast<double>(total_chunks_)
-        : 0.0;
+    avg_chunk_length_ = (total_chunks_ > 0) ? static_cast<double>(total_length_) /
+                                                  static_cast<double>(total_chunks_)
+                                            : 0.0;
 }
 
 void BM25Index::clear() {
@@ -190,15 +192,16 @@ size_t BM25Index::size() const {
 // Search — standard BM25 scoring
 // =============================================================================
 
-std::vector<std::pair<std::string, float>> BM25Index::search(
-    const std::string& query, size_t top_k
-) const {
+std::vector<std::pair<std::string, float>> BM25Index::search(const std::string& query,
+                                                             size_t top_k) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (total_chunks_ == 0) return {};
+    if (total_chunks_ == 0)
+        return {};
 
     auto query_tokens = tokenize(query);
-    if (query_tokens.empty()) return {};
+    if (query_tokens.empty())
+        return {};
 
     // Collect candidate chunk IDs from inverted index
     std::unordered_set<std::string> candidate_ids;
@@ -211,7 +214,8 @@ std::vector<std::pair<std::string, float>> BM25Index::search(
         }
     }
 
-    if (candidate_ids.empty()) return {};
+    if (candidate_ids.empty())
+        return {};
 
     double N = static_cast<double>(total_chunks_);
 
@@ -224,14 +228,16 @@ std::vector<std::pair<std::string, float>> BM25Index::search(
 
         auto tf_it = chunk_term_freqs_.find(chunk_id);
         auto len_it = chunk_lengths_.find(chunk_id);
-        if (tf_it == chunk_term_freqs_.end() || len_it == chunk_lengths_.end()) continue;
+        if (tf_it == chunk_term_freqs_.end() || len_it == chunk_lengths_.end())
+            continue;
 
         double doc_len = static_cast<double>(len_it->second);
 
         for (const auto& token : query_tokens) {
             // Document frequency
             auto inv_it = inverted_index_.find(token);
-            if (inv_it == inverted_index_.end()) continue;
+            if (inv_it == inverted_index_.end())
+                continue;
             double df = static_cast<double>(inv_it->second.size());
 
             // IDF: ln((N - df + 0.5) / (df + 0.5) + 1)
@@ -239,14 +245,15 @@ std::vector<std::pair<std::string, float>> BM25Index::search(
 
             // Term frequency in this document
             auto term_it = tf_it->second.find(token);
-            if (term_it == tf_it->second.end()) continue;
+            if (term_it == tf_it->second.end())
+                continue;
             double tf = static_cast<double>(term_it->second);
 
             // BM25 term score
             double numerator = tf * (static_cast<double>(k1_) + 1.0);
             double denominator = tf + static_cast<double>(k1_) *
-                (1.0 - static_cast<double>(b_) +
-                 static_cast<double>(b_) * doc_len / avg_chunk_length_);
+                                          (1.0 - static_cast<double>(b_) +
+                                           static_cast<double>(b_) * doc_len / avg_chunk_length_);
 
             score += idf * (numerator / denominator);
         }
@@ -268,5 +275,5 @@ std::vector<std::pair<std::string, float>> BM25Index::search(
     return scored;
 }
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere

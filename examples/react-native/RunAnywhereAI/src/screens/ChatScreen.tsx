@@ -97,6 +97,7 @@ const registerChatTools = () => {
     async (args) => {
       // Handle both 'location' and 'city' parameter names (models vary)
       const location = (args.location || args.city) as string;
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] get_weather called for:', location);
 
       try {
@@ -137,6 +138,7 @@ const registerChatTools = () => {
       parameters: [],
     },
     async () => {
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] get_current_time called');
       const now = new Date();
       return {
@@ -164,6 +166,7 @@ const registerChatTools = () => {
     },
     async (args) => {
       const expression = (args.expression || args.input) as string;
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] calculate called for:', expression);
       try {
         // Safe math evaluation using recursive descent parser
@@ -179,6 +182,7 @@ const registerChatTools = () => {
     }
   );
 
+  // eslint-disable-next-line no-console -- demo setup diagnostic
   console.log(
     '[ChatScreen] Tools registered: get_weather, get_current_time, calculate'
   );
@@ -301,6 +305,7 @@ export const ChatScreen: React.FC = () => {
     const maxTokens = maxStr ? parseInt(maxStr, 10) : 1000;
     const systemPrompt = sysStr && sysStr.trim() !== '' ? sysStr : undefined;
 
+    // eslint-disable-next-line no-console -- demo settings diagnostic
     console.log(
       `[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`
     );
@@ -487,6 +492,7 @@ export const ChatScreen: React.FC = () => {
     try {
       // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
       const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
+      // eslint-disable-next-line no-console -- demo generation diagnostic
       console.log(
         '[ChatScreen] Starting generation with tools for:',
         prompt,
@@ -512,11 +518,13 @@ export const ChatScreen: React.FC = () => {
 
       // Log tool usage for debugging
       if (result.toolCalls.length > 0) {
+        /* eslint-disable no-console -- demo tool-use diagnostic */
         console.log(
           '[ChatScreen] Tools used:',
           result.toolCalls.map((t) => t.toolName)
         );
         console.log('[ChatScreen] Tool results:', result.toolResults);
+        /* eslint-enable no-console */
       }
 
       // Build final message content
@@ -539,6 +547,7 @@ export const ChatScreen: React.FC = () => {
           error: lastToolResult?.error,
         };
 
+        // eslint-disable-next-line no-console -- demo tool-use diagnostic
         console.log(
           '[ChatScreen] Created toolCallInfo:',
           toolCallInfo.toolName,

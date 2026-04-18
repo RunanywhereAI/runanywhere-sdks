@@ -8,20 +8,20 @@
  */
 
 #include "rac/features/rag/rac_rag_pipeline.h"
+
 #include "rag_backend.h"
 
 #include <algorithm>
-#include <memory>
-#include <cstring>
 #include <chrono>
-
+#include <cstring>
+#include <memory>
 #include <nlohmann/json.hpp>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
-#include "rac/core/rac_error.h"
-#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/features/llm/rac_llm_service.h"
 
 #define LOG_TAG "RAG.Pipeline"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -43,15 +43,21 @@ struct rac_rag_pipeline {
 
 static RAGBackendConfig build_backend_config(const rac_rag_pipeline_config_t* config) {
     RAGBackendConfig bc;
-    if (!config) return bc;
+    if (!config)
+        return bc;
 
-    if (config->embedding_dimension > 0)  bc.embedding_dimension = config->embedding_dimension;
-    if (config->top_k > 0)                bc.top_k = config->top_k;
+    if (config->embedding_dimension > 0)
+        bc.embedding_dimension = config->embedding_dimension;
+    if (config->top_k > 0)
+        bc.top_k = config->top_k;
     bc.similarity_threshold = config->similarity_threshold;
-    if (config->max_context_tokens > 0)   bc.max_context_tokens = config->max_context_tokens;
-    if (config->chunk_size > 0)           bc.chunk_size = config->chunk_size;
+    if (config->max_context_tokens > 0)
+        bc.max_context_tokens = config->max_context_tokens;
+    if (config->chunk_size > 0)
+        bc.chunk_size = config->chunk_size;
     bc.chunk_overlap = config->chunk_overlap;
-    if (config->prompt_template)          bc.prompt_template = config->prompt_template;
+    if (config->prompt_template)
+        bc.prompt_template = config->prompt_template;
 
     return bc;
 }
@@ -62,12 +68,9 @@ static RAGBackendConfig build_backend_config(const rac_rag_pipeline_config_t* co
 
 extern "C" {
 
-rac_result_t rac_rag_pipeline_create(
-    rac_handle_t llm_service,
-    rac_handle_t embeddings_service,
-    const rac_rag_pipeline_config_t* config,
-    rac_rag_pipeline_t** out_pipeline
-) {
+rac_result_t rac_rag_pipeline_create(rac_handle_t llm_service, rac_handle_t embeddings_service,
+                                     const rac_rag_pipeline_config_t* config,
+                                     rac_rag_pipeline_t** out_pipeline) {
     if (!llm_service || !embeddings_service || !out_pipeline) {
         LOGE("Null pointer in rac_rag_pipeline_create");
         return RAC_ERROR_NULL_POINTER;
@@ -79,8 +82,8 @@ rac_result_t rac_rag_pipeline_create(
         auto bc = build_backend_config(config);
 
         auto pipeline = std::make_unique<rac_rag_pipeline>();
-        pipeline->backend = std::make_unique<RAGBackend>(
-            bc, llm_service, embeddings_service, false);
+        pipeline->backend =
+            std::make_unique<RAGBackend>(bc, llm_service, embeddings_service, false);
 
         if (!pipeline->backend->is_initialized()) {
             LOGE("RAG pipeline failed to initialize");
@@ -101,10 +104,8 @@ rac_result_t rac_rag_pipeline_create(
 // PUBLIC API — Standalone creation (creates services via registry)
 // =============================================================================
 
-rac_result_t rac_rag_pipeline_create_standalone(
-    const rac_rag_config_t* config,
-    rac_rag_pipeline_t** out_pipeline
-) {
+rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* config,
+                                                rac_rag_pipeline_t** out_pipeline) {
     if (!config || !out_pipeline) {
         LOGE("Null pointer in rac_rag_pipeline_create_standalone");
         return RAC_ERROR_NULL_POINTER;
@@ -152,8 +153,7 @@ rac_result_t rac_rag_pipeline_create_standalone(
         auto bc = build_backend_config(&pc);
 
         auto pipeline = std::make_unique<rac_rag_pipeline>();
-        pipeline->backend = std::make_unique<RAGBackend>(
-            bc, llm_handle, embed_handle, true);
+        pipeline->backend = std::make_unique<RAGBackend>(bc, llm_handle, embed_handle, true);
 
         if (!pipeline->backend->is_initialized()) {
             LOGE("RAG pipeline failed to initialize");
@@ -167,8 +167,10 @@ rac_result_t rac_rag_pipeline_create_standalone(
 
     } catch (const std::exception& e) {
         LOGE("Exception creating standalone pipeline: %s", e.what());
-        if (llm_handle) rac_llm_destroy(llm_handle);
-        if (embed_handle) rac_embeddings_destroy(embed_handle);
+        if (llm_handle)
+            rac_llm_destroy(llm_handle);
+        if (embed_handle)
+            rac_embeddings_destroy(embed_handle);
         return RAC_ERROR_INITIALIZATION_FAILED;
     }
 }
@@ -177,32 +179,29 @@ rac_result_t rac_rag_pipeline_create_standalone(
 // Document operations (unchanged)
 // =============================================================================
 
-rac_result_t rac_rag_add_document(
-    rac_rag_pipeline_t* pipeline,
-    const char* document_text,
-    const char* metadata_json
-) {
-    if (!pipeline || !document_text) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_rag_add_document(rac_rag_pipeline_t* pipeline, const char* document_text,
+                                  const char* metadata_json) {
+    if (!pipeline || !document_text)
+        return RAC_ERROR_NULL_POINTER;
 
     try {
         nlohmann::json metadata;
-        if (metadata_json) metadata = nlohmann::json::parse(metadata_json);
+        if (metadata_json)
+            metadata = nlohmann::json::parse(metadata_json);
 
         return pipeline->backend->add_document(document_text, metadata)
-            ? RAC_SUCCESS : RAC_ERROR_PROCESSING_FAILED;
+                   ? RAC_SUCCESS
+                   : RAC_ERROR_PROCESSING_FAILED;
     } catch (const std::exception& e) {
         LOGE("Exception adding document: %s", e.what());
         return RAC_ERROR_PROCESSING_FAILED;
     }
 }
 
-rac_result_t rac_rag_add_documents_batch(
-    rac_rag_pipeline_t* pipeline,
-    const char** documents,
-    const char** metadata_array,
-    size_t count
-) {
-    if (!pipeline || !documents) return RAC_ERROR_NULL_POINTER;
+rac_result_t rac_rag_add_documents_batch(rac_rag_pipeline_t* pipeline, const char** documents,
+                                         const char** metadata_array, size_t count) {
+    if (!pipeline || !documents)
+        return RAC_ERROR_NULL_POINTER;
 
     size_t failed_count = 0;
     for (size_t i = 0; i < count; ++i) {
@@ -225,13 +224,12 @@ rac_result_t rac_rag_add_documents_batch(
 // Query — delegates to RAGBackend which calls through vtables
 // =============================================================================
 
-rac_result_t rac_rag_query(
-    rac_rag_pipeline_t* pipeline,
-    const rac_rag_query_t* query,
-    rac_rag_result_t* out_result
-) {
-    if (!pipeline || !query || !out_result) return RAC_ERROR_NULL_POINTER;
-    if (!query->question) return RAC_ERROR_INVALID_ARGUMENT;
+rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
+                           rac_rag_result_t* out_result) {
+    if (!pipeline || !query || !out_result)
+        return RAC_ERROR_NULL_POINTER;
+    if (!query->question)
+        return RAC_ERROR_INVALID_ARGUMENT;
 
     try {
         rac_llm_options_t opts = {};
@@ -245,8 +243,8 @@ rac_result_t rac_rag_query(
         rac_llm_result_t llm_result = {};
         nlohmann::json metadata;
 
-        rac_result_t status = pipeline->backend->query(
-            query->question, &opts, &llm_result, metadata);
+        rac_result_t status =
+            pipeline->backend->query(query->question, &opts, &llm_result, metadata);
 
         auto end = std::chrono::high_resolution_clock::now();
         double total_ms = std::chrono::duration<double, std::milli>(end - start).count();
@@ -261,8 +259,8 @@ rac_result_t rac_rag_query(
         out_result->retrieved_chunks = nullptr;
 
         if (metadata.contains("context_used") && metadata["context_used"].is_string()) {
-            out_result->context_used = rac_strdup(
-                metadata["context_used"].get<std::string>().c_str());
+            out_result->context_used =
+                rac_strdup(metadata["context_used"].get<std::string>().c_str());
         } else {
             out_result->context_used = nullptr;
         }
@@ -271,8 +269,8 @@ rac_result_t rac_rag_query(
             auto& sources = metadata["sources"];
             size_t n = sources.size();
             if (n > 0) {
-                out_result->retrieved_chunks = static_cast<rac_search_result_t*>(
-                    rac_alloc(sizeof(rac_search_result_t) * n));
+                out_result->retrieved_chunks =
+                    static_cast<rac_search_result_t*>(rac_alloc(sizeof(rac_search_result_t) * n));
                 if (out_result->retrieved_chunks) {
                     out_result->num_chunks = n;
                     for (size_t i = 0; i < n; ++i) {
@@ -281,8 +279,8 @@ rac_result_t rac_rag_query(
                         c.chunk_id = rac_strdup(s["id"].get<std::string>().c_str());
                         c.similarity_score = s["score"].get<float>();
                         c.text = (s.contains("text") && s["text"].is_string())
-                            ? rac_strdup(s["text"].get<std::string>().c_str())
-                            : nullptr;
+                                     ? rac_strdup(s["text"].get<std::string>().c_str())
+                                     : nullptr;
                         c.metadata_json = nullptr;
                         if (s.contains("source"))
                             c.metadata_json = rac_strdup(s["source"].get<std::string>().c_str());
@@ -309,18 +307,21 @@ rac_result_t rac_rag_query(
 // =============================================================================
 
 rac_result_t rac_rag_clear_documents(rac_rag_pipeline_t* pipeline) {
-    if (!pipeline) return RAC_ERROR_NULL_POINTER;
+    if (!pipeline)
+        return RAC_ERROR_NULL_POINTER;
     pipeline->backend->clear();
     return RAC_SUCCESS;
 }
 
 size_t rac_rag_get_document_count(rac_rag_pipeline_t* pipeline) {
-    if (!pipeline) return 0;
+    if (!pipeline)
+        return 0;
     return pipeline->backend->document_count();
 }
 
 rac_result_t rac_rag_get_statistics(rac_rag_pipeline_t* pipeline, char** out_stats_json) {
-    if (!pipeline || !out_stats_json) return RAC_ERROR_NULL_POINTER;
+    if (!pipeline || !out_stats_json)
+        return RAC_ERROR_NULL_POINTER;
 
     try {
         auto stats = pipeline->backend->get_statistics();
@@ -334,7 +335,8 @@ rac_result_t rac_rag_get_statistics(rac_rag_pipeline_t* pipeline, char** out_sta
 }
 
 void rac_rag_result_free(rac_rag_result_t* result) {
-    if (!result) return;
+    if (!result)
+        return;
 
     rac_free(result->answer);
     rac_free(result->context_used);
@@ -352,9 +354,10 @@ void rac_rag_result_free(rac_rag_result_t* result) {
 }
 
 void rac_rag_pipeline_destroy(rac_rag_pipeline_t* pipeline) {
-    if (!pipeline) return;
+    if (!pipeline)
+        return;
     LOGI("Destroying RAG pipeline");
     delete pipeline;
 }
 
-} // extern "C"
+}  // extern "C"

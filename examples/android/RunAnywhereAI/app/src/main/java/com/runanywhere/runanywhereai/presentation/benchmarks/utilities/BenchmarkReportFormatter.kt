@@ -7,9 +7,9 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // -- Export Format --
 
@@ -29,8 +29,7 @@ object BenchmarkReportFormatter {
             encodeDefaults = true
         }
 
-    private val dateFormat: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a").withZone(ZoneId.systemDefault())
+    private val dateFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
 
     // -- Clipboard String --
 
@@ -57,7 +56,7 @@ object BenchmarkReportFormatter {
         lines.add("**Chip:** ${run.deviceInfo.chipName}")
         lines.add("**RAM:** ${Formatter.formatFileSize(context, run.deviceInfo.totalMemoryBytes)}")
         lines.add("**OS:** ${run.deviceInfo.osVersion}")
-        lines.add("**Date:** ${dateFormat.format(Instant.ofEpochMilli(run.startedAt))}")
+        lines.add("**Date:** ${dateFormat.format(Date(run.startedAt))}")
         run.durationSeconds?.let {
             lines.add("**Duration:** ${"%.1f".format(it)}s")
         }

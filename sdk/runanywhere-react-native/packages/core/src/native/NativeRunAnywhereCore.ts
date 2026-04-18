@@ -13,10 +13,13 @@ import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';
 import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
 import type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 import { SDKLogger } from '../Foundation/Logging';
-import { initializeNitroModulesGlobally, getNitroModulesProxySync } from './NitroModulesGlobalInit';
+import {
+  getNitroModulesProxySync,
+  type NitroProxy,
+} from './NitroModulesGlobalInit';
 
 // Use the global NitroModules initialization
-function getNitroModulesProxy(): any {
+function getNitroModulesProxy(): NitroProxy | null {
   return getNitroModulesProxySync();
 }
 

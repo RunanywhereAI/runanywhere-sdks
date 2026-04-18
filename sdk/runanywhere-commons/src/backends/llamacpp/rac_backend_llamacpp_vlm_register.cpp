@@ -6,12 +6,11 @@
  * Provides vtable implementation for the generic VLM service interface.
  */
 
-#include "rac/backends/rac_vlm_llamacpp.h"
-
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
 
+#include "rac/backends/rac_vlm_llamacpp.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -61,8 +60,8 @@ static rac_result_t llamacpp_vlm_vtable_process_stream(void* impl, const rac_vlm
                                                        rac_vlm_stream_callback_fn callback,
                                                        void* user_data) {
     VLMStreamAdapter adapter = {callback, user_data};
-    return rac_vlm_llamacpp_process_stream(impl, image, prompt, options, vlm_stream_adapter_callback,
-                                           &adapter);
+    return rac_vlm_llamacpp_process_stream(impl, image, prompt, options,
+                                           vlm_stream_adapter_callback, &adapter);
 }
 
 // Get info

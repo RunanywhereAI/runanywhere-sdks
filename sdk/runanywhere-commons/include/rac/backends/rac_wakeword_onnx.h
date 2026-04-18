@@ -81,8 +81,7 @@ static const rac_wakeword_onnx_config_t RAC_WAKEWORD_ONNX_CONFIG_DEFAULT = {
     .frame_length = 1280,  // 80ms @ 16kHz
     .enable_optimization = RAC_TRUE,
     .embedding_model_path = NULL,
-    .melspec_model_path = NULL
-};
+    .melspec_model_path = NULL};
 
 // =============================================================================
 // ONNX WAKE WORD API
@@ -95,9 +94,8 @@ static const rac_wakeword_onnx_config_t RAC_WAKEWORD_ONNX_CONFIG_DEFAULT = {
  * @param[out] out_handle Output: Detector handle
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
-    const rac_wakeword_onnx_config_t* config,
-    rac_handle_t* out_handle);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(const rac_wakeword_onnx_config_t* config,
+                                                   rac_handle_t* out_handle);
 
 /**
  * @brief Initialize shared models (embedding + melspec)
@@ -110,10 +108,9 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
  * @param melspec_model_path Path to melspectrogram model ONNX file (optional)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
-    rac_handle_t handle,
-    const char* embedding_model_path,
-    const char* melspec_model_path);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(rac_handle_t handle,
+                                                               const char* embedding_model_path,
+                                                               const char* melspec_model_path);
 
 /**
  * @brief Load a wake word classification model
@@ -124,11 +121,8 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
  * @param wake_word Human-readable wake word
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
-    rac_handle_t handle,
-    const char* model_path,
-    const char* model_id,
-    const char* wake_word);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(rac_handle_t handle, const char* model_path,
+                                                       const char* model_id, const char* wake_word);
 
 /**
  * @brief Load Silero VAD model
@@ -137,9 +131,8 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
  * @param vad_model_path Path to Silero VAD ONNX model
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
-    rac_handle_t handle,
-    const char* vad_model_path);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(rac_handle_t handle,
+                                                     const char* vad_model_path);
 
 /**
  * @brief Process audio frame
@@ -151,12 +144,9 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
  * @param[out] out_confidence Detection confidence (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    int32_t* out_detected,
-    float* out_confidence);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(rac_handle_t handle, const float* samples,
+                                                    size_t num_samples, int32_t* out_detected,
+                                                    float* out_confidence);
 
 /**
  * @brief Process audio frame with VAD result
@@ -171,13 +161,8 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(
  * @return RAC_SUCCESS or error code
  */
 RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    int32_t* out_detected,
-    float* out_confidence,
-    rac_bool_t* out_vad_speech,
-    float* out_vad_confidence);
+    rac_handle_t handle, const float* samples, size_t num_samples, int32_t* out_detected,
+    float* out_confidence, rac_bool_t* out_vad_speech, float* out_vad_confidence);
 
 /**
  * @brief Set detection threshold
@@ -186,9 +171,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
  * @param threshold New threshold (0.0 - 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(
-    rac_handle_t handle,
-    float threshold);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(rac_handle_t handle, float threshold);
 
 /**
  * @brief Reset detector state
@@ -205,9 +188,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle);
  * @param model_id Model identifier to unload
  * @return RAC_SUCCESS or error code
  */
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(
-    rac_handle_t handle,
-    const char* model_id);
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(rac_handle_t handle, const char* model_id);
 
 /**
  * @brief Destroy ONNX wake word detector

@@ -7,11 +7,10 @@
  * inference on Apple Neural Engine.
  */
 
-#include "rac/backends/rac_stt_whisperkit_coreml.h"
-
 #include <cstdlib>
 #include <cstring>
 
+#include "rac/backends/rac_stt_whisperkit_coreml.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
@@ -105,8 +104,7 @@ static const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
 const char* const MODULE_ID = "whisperkit_coreml";
 const char* const STT_PROVIDER_NAME = "WhisperKitCoreMLSTTService";
 
-rac_bool_t whisperkit_coreml_stt_can_handle(const rac_service_request_t* request,
-                                            void* user_data) {
+rac_bool_t whisperkit_coreml_stt_can_handle(const rac_service_request_t* request, void* user_data) {
     (void)user_data;
 
     if (request == nullptr)

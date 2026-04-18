@@ -16,8 +16,8 @@
  * - Frame size: 1280 samples (80ms) for optimal processing
  */
 
-#include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/backends/rac_vad_onnx.h"
+#include "rac/backends/rac_wakeword_onnx.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_compat.h"
 
@@ -46,19 +46,19 @@ static const char* LOG_TAG = "WakeWordONNX";
 
 // Audio parameters
 static constexpr int SAMPLE_RATE = 16000;
-static constexpr int FRAME_SIZE = 1280;              // 80ms @ 16kHz (required by openWakeWord)
+static constexpr int FRAME_SIZE = 1280;  // 80ms @ 16kHz (required by openWakeWord)
 
 // Melspectrogram parameters
-static constexpr int MELSPEC_BINS = 32;              // Number of mel frequency bins
-static constexpr int MELSPEC_WINDOW_SIZE = 76;       // Frames needed for one embedding
-static constexpr int MELSPEC_STRIDE = 8;             // Stride between embedding windows
+static constexpr int MELSPEC_BINS = 32;         // Number of mel frequency bins
+static constexpr int MELSPEC_WINDOW_SIZE = 76;  // Frames needed for one embedding
+static constexpr int MELSPEC_STRIDE = 8;        // Stride between embedding windows
 
 // Embedding parameters
-static constexpr int EMBEDDING_DIM = 96;             // Output dimension of embedding model
+static constexpr int EMBEDDING_DIM = 96;  // Output dimension of embedding model
 
 // Buffer limits
-static constexpr size_t MAX_MELSPEC_FRAMES = 970;    // ~10 seconds of audio
-static constexpr size_t MAX_EMBEDDING_HISTORY = 120; // ~10 seconds of embeddings
+static constexpr size_t MAX_MELSPEC_FRAMES = 970;            // ~10 seconds of audio
+static constexpr size_t MAX_EMBEDDING_HISTORY = 120;         // ~10 seconds of embeddings
 static constexpr size_t DEFAULT_CLASSIFIER_EMBEDDINGS = 16;  // Typical wake word model input
 
 // Audio context overlap (CRITICAL: required for proper melspectrogram computation)
@@ -100,8 +100,7 @@ struct WakewordOnnxBackend {
     // ONNX Runtime
     std::unique_ptr<Ort::Env> env;
     std::unique_ptr<Ort::SessionOptions> session_options;
-    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(
-        OrtArenaAllocator, OrtMemTypeDefault);
+    Ort::MemoryInfo memory_info = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     Ort::AllocatorWithDefaultOptions allocator;
 
     // Stage 1: Melspectrogram model
@@ -123,12 +122,12 @@ struct WakewordOnnxBackend {
     std::vector<WakewordModel> models;
 
     // Streaming buffers
-    std::vector<float> audio_buffer;                      // Accumulate to FRAME_SIZE
-    std::vector<float> audio_context_buffer;              // Keep last MELSPEC_CONTEXT_SAMPLES for overlap
-    std::deque<std::vector<float>> melspec_buffer;        // Each entry is [MELSPEC_BINS]
-    std::deque<std::vector<float>> embedding_buffer;      // Each entry is [EMBEDDING_DIM]
-    size_t last_melspec_embedding_index = 0;              // Track which melspec frames we've embedded
-    bool buffers_initialized = false;                     // Track if buffers have been pre-filled
+    std::vector<float> audio_buffer;                // Accumulate to FRAME_SIZE
+    std::vector<float> audio_context_buffer;        // Keep last MELSPEC_CONTEXT_SAMPLES for overlap
+    std::deque<std::vector<float>> melspec_buffer;  // Each entry is [MELSPEC_BINS]
+    std::deque<std::vector<float>> embedding_buffer;  // Each entry is [EMBEDDING_DIM]
+    size_t last_melspec_embedding_index = 0;          // Track which melspec frames we've embedded
+    bool buffers_initialized = false;                 // Track if buffers have been pre-filled
 
     // Thread safety
     std::mutex mutex;
@@ -206,8 +205,7 @@ static void initialize_streaming_buffers(WakewordOnnxBackend* backend) {
  * Input: [1, N] raw audio samples
  * Output: [num_frames, 32] mel spectrogram with transform applied
  */
-static bool compute_melspectrogram(WakewordOnnxBackend* backend,
-                                   const std::vector<float>& audio,
+static bool compute_melspectrogram(WakewordOnnxBackend* backend, const std::vector<float>& audio,
                                    std::vector<std::vector<float>>& out_melspec) {
     if (!backend->melspec_session || audio.empty()) {
         return false;
@@ -217,22 +215,15 @@ static bool compute_melspectrogram(WakewordOnnxBackend* backend,
         // Input shape: [1, num_samples]
         std::vector<int64_t> input_shape = {1, static_cast<int64_t>(audio.size())};
 
-        Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-            backend->memory_info,
-            const_cast<float*>(audio.data()),
-            audio.size(),
-            input_shape.data(),
-            input_shape.size()
-        );
+        Ort::Value input_tensor =
+            Ort::Value::CreateTensor<float>(backend->memory_info, const_cast<float*>(audio.data()),
+                                            audio.size(), input_shape.data(), input_shape.size());
 
         const char* input_names[] = {backend->melspec_input_name.c_str()};
         const char* output_names[] = {backend->melspec_output_name.c_str()};
 
-        auto outputs = backend->melspec_session->Run(
-            Ort::RunOptions{nullptr},
-            input_names, &input_tensor, 1,
-            output_names, 1
-        );
+        auto outputs = backend->melspec_session->Run(Ort::RunOptions{nullptr}, input_names,
+                                                     &input_tensor, 1, output_names, 1);
 
         // Get output shape and data
         auto& output_tensor = outputs[0];
@@ -288,8 +279,7 @@ static bool compute_melspectrogram(WakewordOnnxBackend* backend,
  * Input: [1, 76, 32, 1] melspectrogram window
  * Output: [96] embedding vector
  */
-static bool compute_single_embedding(WakewordOnnxBackend* backend,
-                                     const float* melspec_window,
+static bool compute_single_embedding(WakewordOnnxBackend* backend, const float* melspec_window,
                                      std::vector<float>& out_embedding) {
     if (!backend->embedding_session) {
         return false;
@@ -301,21 +291,14 @@ static bool compute_single_embedding(WakewordOnnxBackend* backend,
         size_t input_size = MELSPEC_WINDOW_SIZE * MELSPEC_BINS;
 
         Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-            backend->memory_info,
-            const_cast<float*>(melspec_window),
-            input_size,
-            input_shape.data(),
-            input_shape.size()
-        );
+            backend->memory_info, const_cast<float*>(melspec_window), input_size,
+            input_shape.data(), input_shape.size());
 
         const char* input_names[] = {backend->embedding_input_name.c_str()};
         const char* output_names[] = {backend->embedding_output_name.c_str()};
 
-        auto outputs = backend->embedding_session->Run(
-            Ort::RunOptions{nullptr},
-            input_names, &input_tensor, 1,
-            output_names, 1
-        );
+        auto outputs = backend->embedding_session->Run(Ort::RunOptions{nullptr}, input_names,
+                                                       &input_tensor, 1, output_names, 1);
 
         // Get output (typically [1, 96] or [96])
         auto& output_tensor = outputs[0];
@@ -400,8 +383,7 @@ static void generate_embeddings_from_melspec(WakewordOnnxBackend* backend) {
  * Input: [1, num_embeddings, 96]
  * Output: probability score [0.0, 1.0]
  */
-static float run_classifier(WakewordOnnxBackend* backend,
-                            WakewordModel& model) {
+static float run_classifier(WakewordOnnxBackend* backend, WakewordModel& model) {
     if (!model.session || backend->embedding_buffer.empty()) {
         return 0.0f;
     }
@@ -429,29 +411,21 @@ static float run_classifier(WakewordOnnxBackend* backend,
         std::vector<int64_t> input_shape = {1, static_cast<int64_t>(num_embeddings), EMBEDDING_DIM};
 
         Ort::Value input_tensor = Ort::Value::CreateTensor<float>(
-            backend->memory_info,
-            input_data.data(),
-            input_data.size(),
-            input_shape.data(),
-            input_shape.size()
-        );
+            backend->memory_info, input_data.data(), input_data.size(), input_shape.data(),
+            input_shape.size());
 
         const char* input_names[] = {model.input_name.c_str()};
         const char* output_names[] = {model.output_name.c_str()};
 
-        auto outputs = model.session->Run(
-            Ort::RunOptions{nullptr},
-            input_names, &input_tensor, 1,
-            output_names, 1
-        );
+        auto outputs = model.session->Run(Ort::RunOptions{nullptr}, input_names, &input_tensor, 1,
+                                          output_names, 1);
 
         // Output is typically [1, 1, 1] or [1, 1] - take first value
         const float* score = outputs[0].GetTensorData<float>();
         return *score;
 
     } catch (const Ort::Exception& e) {
-        RAC_LOG_ERROR(LOG_TAG, "Classifier error for %s: %s",
-                      model.model_id.c_str(), e.what());
+        RAC_LOG_ERROR(LOG_TAG, "Classifier error for %s: %s", model.model_id.c_str(), e.what());
         return 0.0f;
     }
 }
@@ -460,9 +434,7 @@ static float run_classifier(WakewordOnnxBackend* backend,
 // VAD INTEGRATION
 // =============================================================================
 
-static bool run_vad(WakewordOnnxBackend* backend,
-                    const float* samples,
-                    size_t num_samples,
+static bool run_vad(WakewordOnnxBackend* backend, const float* samples, size_t num_samples,
                     bool* out_is_speech) {
     if (!backend->vad_handle || !backend->vad_loaded) {
         *out_is_speech = true;  // Assume speech if no VAD
@@ -471,11 +443,7 @@ static bool run_vad(WakewordOnnxBackend* backend,
 
     rac_bool_t is_speech = RAC_TRUE;
     rac_result_t result = rac_vad_onnx_process(
-        backend->vad_handle,
-        samples,
-        std::min(num_samples, (size_t)VAD_FRAME_SAMPLES),
-        &is_speech
-    );
+        backend->vad_handle, samples, std::min(num_samples, (size_t)VAD_FRAME_SAMPLES), &is_speech);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_TAG, "VAD process error: %d", result);
@@ -487,7 +455,7 @@ static bool run_vad(WakewordOnnxBackend* backend,
     return true;
 }
 
-#endif // RAC_HAS_ONNX
+#endif  // RAC_HAS_ONNX
 
 // =============================================================================
 // PUBLIC API IMPLEMENTATION
@@ -495,10 +463,8 @@ static bool run_vad(WakewordOnnxBackend* backend,
 
 extern "C" {
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
-    const rac_wakeword_onnx_config_t* config,
-    rac_handle_t* out_handle) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(const rac_wakeword_onnx_config_t* config,
+                                                   rac_handle_t* out_handle) {
     if (!out_handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -524,12 +490,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
 
     try {
         // Initialize ONNX Runtime
-        backend->env = std::make_unique<Ort::Env>(
-            ORT_LOGGING_LEVEL_WARNING, "WakeWord");
+        backend->env = std::make_unique<Ort::Env>(ORT_LOGGING_LEVEL_WARNING, "WakeWord");
 
-        backend->session_options = std::make_unique<Ort::SessionOptions>(
-            create_session_options(backend->config.num_threads,
-                                   backend->config.enable_optimization == RAC_TRUE));
+        backend->session_options = std::make_unique<Ort::SessionOptions>(create_session_options(
+            backend->config.num_threads, backend->config.enable_optimization == RAC_TRUE));
 
         backend->initialized = true;
         *out_handle = static_cast<rac_handle_t>(backend);
@@ -548,11 +512,9 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_create(
 #endif
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
-    rac_handle_t handle,
-    const char* embedding_model_path,
-    const char* melspec_model_path) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(rac_handle_t handle,
+                                                               const char* embedding_model_path,
+                                                               const char* melspec_model_path) {
 #ifndef RAC_HAS_ONNX
     return RAC_ERROR_NOT_IMPLEMENTED;
 #else
@@ -579,14 +541,15 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 #endif
 
             // Get input/output names
-            auto input_name = backend->melspec_session->GetInputNameAllocated(0, backend->allocator);
-            auto output_name = backend->melspec_session->GetOutputNameAllocated(0, backend->allocator);
+            auto input_name =
+                backend->melspec_session->GetInputNameAllocated(0, backend->allocator);
+            auto output_name =
+                backend->melspec_session->GetOutputNameAllocated(0, backend->allocator);
             backend->melspec_input_name = input_name.get();
             backend->melspec_output_name = output_name.get();
 
             RAC_LOG_INFO(LOG_TAG, "Loaded melspectrogram model: %s (input='%s', output='%s')",
-                         melspec_model_path,
-                         backend->melspec_input_name.c_str(),
+                         melspec_model_path, backend->melspec_input_name.c_str(),
                          backend->melspec_output_name.c_str());
         }
 
@@ -602,8 +565,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 #endif
 
             // Get input/output names
-            auto input_name = backend->embedding_session->GetInputNameAllocated(0, backend->allocator);
-            auto output_name = backend->embedding_session->GetOutputNameAllocated(0, backend->allocator);
+            auto input_name =
+                backend->embedding_session->GetInputNameAllocated(0, backend->allocator);
+            auto output_name =
+                backend->embedding_session->GetOutputNameAllocated(0, backend->allocator);
             backend->embedding_input_name = input_name.get();
             backend->embedding_output_name = output_name.get();
 
@@ -612,15 +577,14 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
             auto shape = input_info.GetTensorTypeAndShapeInfo().GetShape();
             std::string shape_str;
             for (size_t i = 0; i < shape.size(); ++i) {
-                if (i > 0) shape_str += "x";
+                if (i > 0)
+                    shape_str += "x";
                 shape_str += std::to_string(shape[i]);
             }
 
             RAC_LOG_INFO(LOG_TAG, "Loaded embedding model: %s (input='%s' shape=[%s], output='%s')",
-                         embedding_model_path,
-                         backend->embedding_input_name.c_str(),
-                         shape_str.c_str(),
-                         backend->embedding_output_name.c_str());
+                         embedding_model_path, backend->embedding_input_name.c_str(),
+                         shape_str.c_str(), backend->embedding_output_name.c_str());
         }
 
         return RAC_SUCCESS;
@@ -633,12 +597,9 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_init_shared_models(
 #endif
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
-    rac_handle_t handle,
-    const char* model_path,
-    const char* model_id,
-    const char* wake_word) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(rac_handle_t handle, const char* model_path,
+                                                       const char* model_id,
+                                                       const char* wake_word) {
 #ifndef RAC_HAS_ONNX
     return RAC_ERROR_NOT_IMPLEMENTED;
 #else
@@ -667,11 +628,11 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
 
 #ifdef _WIN32
         std::wstring model_wpath = rac_to_wstring(model_path);
-        model.session = std::make_unique<Ort::Session>(
-            *backend->env, model_wpath.c_str(), *backend->session_options);
+        model.session = std::make_unique<Ort::Session>(*backend->env, model_wpath.c_str(),
+                                                       *backend->session_options);
 #else
-        model.session = std::make_unique<Ort::Session>(
-            *backend->env, model_path, *backend->session_options);
+        model.session =
+            std::make_unique<Ort::Session>(*backend->env, model_path, *backend->session_options);
 #endif
 
         // Get input/output names
@@ -705,10 +666,8 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_model(
 #endif
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
-    rac_handle_t handle,
-    const char* vad_model_path) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(rac_handle_t handle,
+                                                     const char* vad_model_path) {
     if (!is_valid_handle(handle) || !vad_model_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -728,11 +687,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
     vad_config.sample_rate = backend->config.sample_rate;
     vad_config.energy_threshold = VAD_THRESHOLD;
 
-    rac_result_t result = rac_vad_onnx_create(
-        vad_model_path,
-        &vad_config,
-        &backend->vad_handle
-    );
+    rac_result_t result = rac_vad_onnx_create(vad_model_path, &vad_config, &backend->vad_handle);
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_TAG, "Failed to create VAD: %d", result);
@@ -745,31 +700,19 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(
     return RAC_SUCCESS;
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    int32_t* out_detected,
-    float* out_confidence) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_process(rac_handle_t handle, const float* samples,
+                                                    size_t num_samples, int32_t* out_detected,
+                                                    float* out_confidence) {
     rac_bool_t vad_speech;
     float vad_conf;
 
-    return rac_wakeword_onnx_process_with_vad(
-        handle, samples, num_samples,
-        out_detected, out_confidence,
-        &vad_speech, &vad_conf);
+    return rac_wakeword_onnx_process_with_vad(handle, samples, num_samples, out_detected,
+                                              out_confidence, &vad_speech, &vad_conf);
 }
 
 RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
-    rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    int32_t* out_detected,
-    float* out_confidence,
-    rac_bool_t* out_vad_speech,
-    float* out_vad_confidence) {
-
+    rac_handle_t handle, const float* samples, size_t num_samples, int32_t* out_detected,
+    float* out_confidence, rac_bool_t* out_vad_speech, float* out_vad_confidence) {
 #ifndef RAC_HAS_ONNX
     return RAC_ERROR_NOT_IMPLEMENTED;
 #else
@@ -782,10 +725,14 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     // Initialize outputs
-    if (out_detected) *out_detected = -1;
-    if (out_confidence) *out_confidence = 0.0f;
-    if (out_vad_speech) *out_vad_speech = RAC_TRUE;
-    if (out_vad_confidence) *out_vad_confidence = 1.0f;
+    if (out_detected)
+        *out_detected = -1;
+    if (out_confidence)
+        *out_confidence = 0.0f;
+    if (out_vad_speech)
+        *out_vad_speech = RAC_TRUE;
+    if (out_vad_confidence)
+        *out_vad_confidence = 1.0f;
 
     // Check if we have the required models
     if (!backend->melspec_session || !backend->embedding_session) {
@@ -808,8 +755,10 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
     bool is_speech = true;
     if (backend->vad_loaded && backend->vad_handle) {
         run_vad(backend, samples, num_samples, &is_speech);
-        if (out_vad_speech) *out_vad_speech = is_speech ? RAC_TRUE : RAC_FALSE;
-        if (out_vad_confidence) *out_vad_confidence = is_speech ? 1.0f : 0.0f;
+        if (out_vad_speech)
+            *out_vad_speech = is_speech ? RAC_TRUE : RAC_FALSE;
+        if (out_vad_confidence)
+            *out_vad_confidence = is_speech ? 1.0f : 0.0f;
 
         // Skip detection if no speech (but still accumulate audio)
         if (!is_speech) {
@@ -831,29 +780,27 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
         // Add context from previous frame (if available)
         if (!backend->audio_context_buffer.empty()) {
             frame_with_context.insert(frame_with_context.end(),
-                                     backend->audio_context_buffer.begin(),
-                                     backend->audio_context_buffer.end());
+                                      backend->audio_context_buffer.begin(),
+                                      backend->audio_context_buffer.end());
         }
 
         // Add current frame samples
-        frame_with_context.insert(frame_with_context.end(),
-                                 backend->audio_buffer.begin(),
-                                 backend->audio_buffer.begin() + FRAME_SIZE);
+        frame_with_context.insert(frame_with_context.end(), backend->audio_buffer.begin(),
+                                  backend->audio_buffer.begin() + FRAME_SIZE);
 
         // Update context buffer with last MELSPEC_CONTEXT_SAMPLES of current frame
         // This will be used as context for the NEXT frame
         backend->audio_context_buffer.clear();
         if (FRAME_SIZE >= MELSPEC_CONTEXT_SAMPLES) {
-            backend->audio_context_buffer.insert(
-                backend->audio_context_buffer.end(),
-                backend->audio_buffer.begin() + (FRAME_SIZE - MELSPEC_CONTEXT_SAMPLES),
-                backend->audio_buffer.begin() + FRAME_SIZE);
+            backend->audio_context_buffer.insert(backend->audio_context_buffer.end(),
+                                                 backend->audio_buffer.begin() +
+                                                     (FRAME_SIZE - MELSPEC_CONTEXT_SAMPLES),
+                                                 backend->audio_buffer.begin() + FRAME_SIZE);
         } else {
             // Frame is smaller than context size - use all of it
-            backend->audio_context_buffer.insert(
-                backend->audio_context_buffer.end(),
-                backend->audio_buffer.begin(),
-                backend->audio_buffer.begin() + FRAME_SIZE);
+            backend->audio_context_buffer.insert(backend->audio_context_buffer.end(),
+                                                 backend->audio_buffer.begin(),
+                                                 backend->audio_buffer.begin() + FRAME_SIZE);
         }
 
         // Remove processed samples from audio buffer
@@ -906,13 +853,14 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
         }
     }
 
-    if (out_detected) *out_detected = detected_index;
-    if (out_confidence) *out_confidence = max_confidence;
+    if (out_detected)
+        *out_detected = detected_index;
+    if (out_confidence)
+        *out_confidence = max_confidence;
 
     if (detected_index >= 0) {
         RAC_LOG_INFO(LOG_TAG, "DETECTED: '%s' (confidence=%.3f, threshold=%.3f)",
-                     backend->models[detected_index].wake_word.c_str(),
-                     max_confidence,
+                     backend->models[detected_index].wake_word.c_str(), max_confidence,
                      backend->models[detected_index].threshold);
     }
 
@@ -921,10 +869,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_process_with_vad(
 #endif
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(
-    rac_handle_t handle,
-    float threshold) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_set_threshold(rac_handle_t handle, float threshold) {
     if (!is_valid_handle(handle)) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -976,10 +921,8 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_reset(rac_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(
-    rac_handle_t handle,
-    const char* model_id) {
-
+RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(rac_handle_t handle,
+                                                         const char* model_id) {
     if (!is_valid_handle(handle) || !model_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -989,9 +932,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_unload_model(
     std::lock_guard<std::mutex> lock(backend->mutex);
 
     auto it = std::find_if(backend->models.begin(), backend->models.end(),
-                           [model_id](const WakewordModel& m) {
-                               return m.model_id == model_id;
-                           });
+                           [model_id](const WakewordModel& m) { return m.model_id == model_id; });
 
     if (it == backend->models.end()) {
         return RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND;
@@ -1049,8 +990,8 @@ RAC_ONNX_API rac_result_t rac_backend_wakeword_onnx_unregister(void) {
     return RAC_SUCCESS;
 }
 
-} // extern "C"
+}  // extern "C"
 
-} // namespace onnx
-} // namespace backends
-} // namespace rac
+}  // namespace onnx
+}  // namespace backends
+}  // namespace rac

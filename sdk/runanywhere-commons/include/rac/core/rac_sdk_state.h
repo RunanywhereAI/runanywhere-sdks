@@ -283,7 +283,7 @@ typedef const char* (*rac_load_callback_t)(const char* key, void* user_data);
  * @param user_data Context passed to callbacks
  */
 RAC_API void rac_state_set_persistence_callbacks(rac_persist_callback_t persist,
-                                                  rac_load_callback_t load, void* user_data);
+                                                 rac_load_callback_t load, void* user_data);
 
 #ifdef __cplusplus
 }

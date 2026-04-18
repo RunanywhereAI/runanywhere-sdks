@@ -167,6 +167,12 @@ export const RAGScreen: React.FC = () => {
   const handleSelectDocument = useCallback(async () => {
     if (!areModelsReady || !isNitroReady) return;
 
+    // areModelsReady already verifies both localPath values are non-null,
+    // but narrow explicitly so the type system agrees (avoids non-null assertions).
+    const embeddingLocalPath = selectedEmbeddingModel?.localPath;
+    const llmLocalPath = selectedLLMModel?.localPath;
+    if (!embeddingLocalPath || !llmLocalPath) return;
+
     try {
       const [result] = await documentPick({
         type: ['application/pdf', 'text/plain', 'application/json'],
@@ -184,10 +190,8 @@ export const RAGScreen: React.FC = () => {
       // Build RAG configuration matching iOS ragConfig computed property.
       // With multi-file registration, vocab.txt is co-located with model.onnx,
       // so the C++ pipeline auto-discovers it (no embeddingConfigJSON needed).
-      const embeddingPath = resolveEmbeddingFilePath(
-        selectedEmbeddingModel!.localPath!
-      );
-      const llmPath = resolveLLMFilePath(selectedLLMModel!.localPath!);
+      const embeddingPath = resolveEmbeddingFilePath(embeddingLocalPath);
+      const llmPath = resolveLLMFilePath(llmLocalPath);
 
       const config = {
         embeddingModelPath: embeddingPath,
@@ -205,8 +209,14 @@ export const RAGScreen: React.FC = () => {
 
       setDocumentName(result.name || 'Document');
       setIsDocumentLoaded(true);
-    } catch (err: any) {
-      if (err?.code === 'OPERATION_CANCELED') {
+    } catch (err: unknown) {
+      // Document picker reports user cancellation via a stable error code.
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code?: unknown }).code === 'OPERATION_CANCELED'
+      ) {
         return; // User cancelled
       }
       const msg =

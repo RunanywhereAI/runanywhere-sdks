@@ -16,7 +16,7 @@ struct SpeechToTextView: View {
     }
 
     private var statusMessage: String {
-            return ""
+        ""
     }
 
     private var waveHeights: [CGFloat] {
@@ -257,7 +257,9 @@ struct SpeechToTextView: View {
                                 isPulsing: false,
                                 isLoading: viewModel.isProcessing || viewModel.isTranscribing,
                                 activeColor: AppColors.statusRed,
-                                inactiveColor: viewModel.isTranscribing ? AppColors.statusOrange : AppColors.primaryAccent,
+                                inactiveColor: viewModel.isTranscribing
+                                    ? AppColors.statusOrange
+                                    : AppColors.primaryAccent,
                                 icon: viewModel.isRecording ? "stop.fill" : "mic.fill"
                             ) {
                                 Task {
@@ -299,7 +301,7 @@ struct SpeechToTextView: View {
                         modality: .stt
                     ) { showModelPicker = true }
                 }
-            }
+                }
             .navigationTitle(hasModelSelected ? "Speech to Text" : "")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -318,7 +320,7 @@ struct SpeechToTextView: View {
                     #endif
                 }
             }
-        }
+            }
         #if os(iOS)
         .navigationViewStyle(.stack)
         #endif
@@ -337,7 +339,7 @@ struct SpeechToTextView: View {
         .onDisappear {
             viewModel.cleanup()
         }
-    }
+        }
     }
 
     // MARK: - View Components

@@ -47,23 +47,26 @@ sealed class ToolValue {
   bool get isNull => this is NullToolValue;
 
   /// Convert to JSON-compatible dynamic value
-  dynamic toJson() => switch (this) {
-        StringToolValue(value: var v) => v,
-        NumberToolValue(value: var v) => v,
-        BoolToolValue(value: var v) => v,
-        ArrayToolValue(value: var v) => v.map((e) => e.toJson()).toList(),
-        ObjectToolValue(value: var v) => v.map((k, val) => MapEntry(k, val.toJson())),
+  Object? toJson() => switch (this) {
+        StringToolValue(value: final v) => v,
+        NumberToolValue(value: final v) => v,
+        BoolToolValue(value: final v) => v,
+        ArrayToolValue(value: final v) => v.map((e) => e.toJson()).toList(),
+        ObjectToolValue(value: final v) =>
+          v.map((k, val) => MapEntry(k, val.toJson())),
         NullToolValue() => null,
       };
 
   /// Create from any JSON-compatible value
-  static ToolValue from(dynamic value) => switch (value) {
+  static ToolValue from(Object? value) => switch (value) {
         null => const NullToolValue(),
-        String s => StringToolValue(s),
-        num n => NumberToolValue(n.toDouble()),
-        bool b => BoolToolValue(b),
-        List l => ArrayToolValue(l.map(from).toList()),
-        Map m => ObjectToolValue(m.map((k, v) => MapEntry(k.toString(), from(v)))),
+        final String s => StringToolValue(s),
+        final num n => NumberToolValue(n.toDouble()),
+        final bool b => BoolToolValue(b),
+        final List<Object?> l => ArrayToolValue(l.map(from).toList()),
+        final Map<Object?, Object?> m => ObjectToolValue(
+            m.map((k, v) => MapEntry(k.toString(), from(v))),
+          ),
         _ => StringToolValue(value.toString()),
       };
 }

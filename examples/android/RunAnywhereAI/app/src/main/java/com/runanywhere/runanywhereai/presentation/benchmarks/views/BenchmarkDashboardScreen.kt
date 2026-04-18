@@ -58,9 +58,9 @@ import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppSpacing
 import com.runanywhere.sdk.models.DeviceInfo
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Main benchmarking screen: device info, category filters, run controls, and history.
@@ -413,8 +413,7 @@ private fun SkippedWarning(message: String) {
 
 // -- Run Row --
 
-private val dateFormat: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault())
+private val dateFormat = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
 
 @Composable
 private fun RunRow(
@@ -438,7 +437,7 @@ private fun RunRow(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        dateFormat.format(Instant.ofEpochMilli(run.startedAt)),
+                        dateFormat.format(Date(run.startedAt)),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                     )

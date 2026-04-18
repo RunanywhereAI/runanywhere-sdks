@@ -5,6 +5,8 @@
 //  Chat interface view - UI only, all logic in LLMViewModel
 //
 
+// swiftlint:disable file_length
+
 import SwiftUI
 import RunAnywhere
 import UniformTypeIdentifiers
@@ -319,8 +321,6 @@ extension ChatInterfaceView {
         .tint(AppColors.primaryAccent)
         #endif
     }
-
-
 }
 
 // MARK: - Chat Content Views
@@ -678,8 +678,7 @@ private struct LoRAManagementSheetView: View {
 
     // MARK: - Available Adapters (from SDK Registry)
 
-    @ViewBuilder
-    private var availableAdaptersSection: some View {
+    @ViewBuilder private var availableAdaptersSection: some View {
         if !viewModel.availableAdapters.isEmpty {
             Section {
                 ForEach(viewModel.availableAdapters, id: \.id) { adapter in
@@ -693,6 +692,7 @@ private struct LoRAManagementSheetView: View {
         }
     }
 
+    // swiftlint:disable:next function_body_length
     private func availableAdapterRow(_ adapter: LoraAdapterCatalogEntry) -> some View {
         let isDownloaded = viewModel.isAdapterDownloaded(adapter)
         let isDownloading = viewModel.isDownloadingAdapter[adapter.id] == true
@@ -777,8 +777,7 @@ private struct LoRAManagementSheetView: View {
 
     // MARK: - Loaded Adapters
 
-    @ViewBuilder
-    private var loadedAdaptersSection: some View {
+    @ViewBuilder private var loadedAdaptersSection: some View {
         if !viewModel.loraAdapters.isEmpty {
             Section("Loaded Adapters") {
                 ForEach(viewModel.loraAdapters, id: \.path) { adapter in

@@ -46,7 +46,7 @@ Remember: Output ONLY the JSON object, nothing else.
       return originalPrompt;
     }
 
-    final instructions = '''
+    const instructions = '''
 CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is allowed.
 
 RULES:

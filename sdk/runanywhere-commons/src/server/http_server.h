@@ -9,19 +9,19 @@
 #ifndef RAC_HTTP_SERVER_INTERNAL_H
 #define RAC_HTTP_SERVER_INTERNAL_H
 
-#include "rac/server/rac_server.h"
-#include "rac/server/rac_openai_types.h"
-#include "rac/features/llm/rac_llm_service.h"
-
 #include <httplib.h>
-#include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <thread>
-#include <chrono>
+
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/server/rac_openai_types.h"
+#include "rac/server/rac_server.h"
 
 namespace rac {
 namespace server {
@@ -33,7 +33,7 @@ namespace server {
  * routes requests to the appropriate handlers.
  */
 class HttpServer {
-public:
+   public:
     /**
      * @brief Get the singleton instance
      */
@@ -89,7 +89,7 @@ public:
     HttpServer(HttpServer&&) = delete;
     HttpServer& operator=(HttpServer&&) = delete;
 
-private:
+   private:
     HttpServer();
     ~HttpServer();
 
@@ -165,7 +165,7 @@ int64_t getCurrentTimestamp();
  */
 std::string extractModelIdFromPath(const std::string& path);
 
-} // namespace server
-} // namespace rac
+}  // namespace server
+}  // namespace rac
 
-#endif // RAC_HTTP_SERVER_INTERNAL_H
+#endif  // RAC_HTTP_SERVER_INTERNAL_H

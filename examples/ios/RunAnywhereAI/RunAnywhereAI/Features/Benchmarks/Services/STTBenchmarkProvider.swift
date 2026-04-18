@@ -9,13 +9,12 @@ import Foundation
 import RunAnywhere
 
 struct STTBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .stt
 
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Silent 2s", category: .stt, parameters: ["type": "silent"]),
-            BenchmarkScenario(name: "Sine Tone 3s", category: .stt, parameters: ["type": "sine"]),
+            BenchmarkScenario(name: "Sine Tone 3s", category: .stt, parameters: ["type": "sine"])
         ]
     }
 

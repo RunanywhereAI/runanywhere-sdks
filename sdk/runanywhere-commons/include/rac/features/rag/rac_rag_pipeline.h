@@ -11,8 +11,8 @@
 #ifndef RAC_RAG_PIPELINE_H
 #define RAC_RAG_PIPELINE_H
 
-#include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,19 +32,19 @@ typedef struct rac_rag_pipeline rac_rag_pipeline_t;
  * @brief Document chunk with metadata
  */
 typedef struct rac_document_chunk {
-    const char* id;              /**< Unique chunk ID */
-    const char* text;            /**< Chunk text content */
-    const char* metadata_json;   /**< JSON metadata (optional) */
+    const char* id;            /**< Unique chunk ID */
+    const char* text;          /**< Chunk text content */
+    const char* metadata_json; /**< JSON metadata (optional) */
 } rac_document_chunk_t;
 
 /**
  * @brief Search result from vector retrieval
  */
 typedef struct rac_search_result {
-    char* chunk_id;              /**< Chunk ID (caller must free) */
-    char* text;                  /**< Chunk text (caller must free) */
-    float similarity_score;      /**< Cosine similarity (0.0-1.0) */
-    char* metadata_json;         /**< Metadata JSON (caller must free) */
+    char* chunk_id;         /**< Chunk ID (caller must free) */
+    char* text;             /**< Chunk text (caller must free) */
+    float similarity_score; /**< Cosine similarity (0.0-1.0) */
+    char* metadata_json;    /**< Metadata JSON (caller must free) */
 } rac_search_result_t;
 
 // =============================================================================
@@ -139,25 +139,25 @@ static inline rac_rag_config_t rac_rag_config_default(void) {
  * @brief RAG query parameters
  */
 typedef struct rac_rag_query {
-    const char* question;        /**< User question */
-    const char* system_prompt;   /**< Optional system prompt override */
-    int max_tokens;              /**< Max tokens to generate (default 512) */
-    float temperature;           /**< Sampling temperature (default 0.7) */
-    float top_p;                 /**< Nucleus sampling (default 0.9) */
-    int top_k;                   /**< Top-k sampling (default 40) */
+    const char* question;      /**< User question */
+    const char* system_prompt; /**< Optional system prompt override */
+    int max_tokens;            /**< Max tokens to generate (default 512) */
+    float temperature;         /**< Sampling temperature (default 0.7) */
+    float top_p;               /**< Nucleus sampling (default 0.9) */
+    int top_k;                 /**< Top-k sampling (default 40) */
 } rac_rag_query_t;
 
 /**
  * @brief RAG result with answer and context
  */
 typedef struct rac_rag_result {
-    char* answer;                        /**< Generated answer (caller must free) */
-    rac_search_result_t* retrieved_chunks;  /**< Retrieved chunks (caller must free) */
-    size_t num_chunks;                   /**< Number of chunks retrieved */
-    char* context_used;                  /**< Full context sent to LLM (caller must free) */
-    double retrieval_time_ms;            /**< Time for retrieval phase */
-    double generation_time_ms;           /**< Time for LLM generation */
-    double total_time_ms;                /**< Total query time */
+    char* answer;                          /**< Generated answer (caller must free) */
+    rac_search_result_t* retrieved_chunks; /**< Retrieved chunks (caller must free) */
+    size_t num_chunks;                     /**< Number of chunks retrieved */
+    char* context_used;                    /**< Full context sent to LLM (caller must free) */
+    double retrieval_time_ms;              /**< Time for retrieval phase */
+    double generation_time_ms;             /**< Time for LLM generation */
+    double total_time_ms;                  /**< Total query time */
 } rac_rag_result_t;
 
 // =============================================================================
@@ -176,12 +176,10 @@ typedef struct rac_rag_result {
  * @param out_pipeline Pointer to receive pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_pipeline_create(
-    rac_handle_t llm_service,
-    rac_handle_t embeddings_service,
-    const rac_rag_pipeline_config_t* config,
-    rac_rag_pipeline_t** out_pipeline
-);
+RAC_API rac_result_t rac_rag_pipeline_create(rac_handle_t llm_service,
+                                             rac_handle_t embeddings_service,
+                                             const rac_rag_pipeline_config_t* config,
+                                             rac_rag_pipeline_t** out_pipeline);
 
 /**
  * @brief Create a standalone RAG pipeline that creates its own services
@@ -194,10 +192,8 @@ RAC_API rac_result_t rac_rag_pipeline_create(
  * @param out_pipeline Pointer to receive pipeline handle
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_pipeline_create_standalone(
-    const rac_rag_config_t* config,
-    rac_rag_pipeline_t** out_pipeline
-);
+RAC_API rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* config,
+                                                        rac_rag_pipeline_t** out_pipeline);
 
 /**
  * @brief Add a document to the RAG pipeline
@@ -209,11 +205,8 @@ RAC_API rac_result_t rac_rag_pipeline_create_standalone(
  * @param metadata_json Optional JSON metadata
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_add_document(
-    rac_rag_pipeline_t* pipeline,
-    const char* document_text,
-    const char* metadata_json
-);
+RAC_API rac_result_t rac_rag_add_document(rac_rag_pipeline_t* pipeline, const char* document_text,
+                                          const char* metadata_json);
 
 /**
  * @brief Add multiple documents in batch
@@ -226,12 +219,9 @@ RAC_API rac_result_t rac_rag_add_document(
  * @param count Number of documents
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_add_documents_batch(
-    rac_rag_pipeline_t* pipeline,
-    const char** documents,
-    const char** metadata_array,
-    size_t count
-);
+RAC_API rac_result_t rac_rag_add_documents_batch(rac_rag_pipeline_t* pipeline,
+                                                 const char** documents,
+                                                 const char** metadata_array, size_t count);
 
 /**
  * @brief Query the RAG pipeline
@@ -243,11 +233,8 @@ RAC_API rac_result_t rac_rag_add_documents_batch(
  * @param out_result Pointer to receive result (caller must free with rac_rag_result_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_query(
-    rac_rag_pipeline_t* pipeline,
-    const rac_rag_query_t* query,
-    rac_rag_result_t* out_result
-);
+RAC_API rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_query_t* query,
+                                   rac_rag_result_t* out_result);
 
 /**
  * @brief Clear all documents from the pipeline
@@ -272,10 +259,7 @@ RAC_API size_t rac_rag_get_document_count(rac_rag_pipeline_t* pipeline);
  * @param out_stats_json Pointer to receive JSON stats string (caller must free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_rag_get_statistics(
-    rac_rag_pipeline_t* pipeline,
-    char** out_stats_json
-);
+RAC_API rac_result_t rac_rag_get_statistics(rac_rag_pipeline_t* pipeline, char** out_stats_json);
 
 /**
  * @brief Free RAG result resources
@@ -295,4 +279,4 @@ RAC_API void rac_rag_pipeline_destroy(rac_rag_pipeline_t* pipeline);
 }
 #endif
 
-#endif // RAC_RAG_PIPELINE_H
+#endif  // RAC_RAG_PIPELINE_H

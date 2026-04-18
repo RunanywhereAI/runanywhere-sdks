@@ -175,8 +175,8 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         // This prevents registerModel() (which always passes localPath=nil) from
         // overwriting a localPath that was set by download completion or discovery.
         const char* existing_local_path = it->second->local_path;
-        bool should_preserve_path = existing_local_path && strlen(existing_local_path) > 0
-                                    && (!model->local_path || strlen(model->local_path) == 0);
+        bool should_preserve_path = existing_local_path && strlen(existing_local_path) > 0 &&
+                                    (!model->local_path || strlen(model->local_path) == 0);
 
         // Store a deep copy of the incoming model
         rac_model_info_t* copy = deep_copy_model(model);
@@ -185,7 +185,8 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         }
 
         if (should_preserve_path) {
-            if (copy->local_path) free(copy->local_path);
+            if (copy->local_path)
+                free(copy->local_path);
             copy->local_path = rac_strdup(existing_local_path);
         }
 
@@ -227,8 +228,7 @@ rac_result_t rac_model_registry_get(rac_model_registry_handle_t handle, const ch
 }
 
 rac_result_t rac_model_registry_get_by_path(rac_model_registry_handle_t handle,
-                                            const char* local_path,
-                                            rac_model_info_t** out_model) {
+                                            const char* local_path, rac_model_info_t** out_model) {
     if (!handle || !local_path || !out_model) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -616,12 +616,13 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
     // Frameworks to scan - include all frameworks that can have downloaded models
     // Note: RAC_FRAMEWORK_UNKNOWN is included to recover models that were incorrectly
     // stored in the "Unknown" directory due to missing framework mappings
-    rac_inference_framework_t frameworks[] = {RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
-                                              RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
-                                              RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
-                                              RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
-                                              RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
-                                              RAC_FRAMEWORK_UNKNOWN};
+    rac_inference_framework_t frameworks[] = {
+        RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
+        RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
+        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
+        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
+        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
+        RAC_FRAMEWORK_UNKNOWN};
     size_t framework_count = sizeof(frameworks) / sizeof(frameworks[0]);
 
     // Collect discovered models

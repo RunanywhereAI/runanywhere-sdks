@@ -136,8 +136,8 @@ class ConversationStore: ObservableObject {
         }
 
         // Get the fallback title to compare
-        let fallbackTitle = conversation.messages.first(where: { $0.role == .user })
-            .map { generateTitle(from: $0.content) } ?? "New Chat"
+        let firstUserMessage = conversation.messages.first { $0.role == .user }
+        let fallbackTitle = firstUserMessage.map { generateTitle(from: $0.content) } ?? "New Chat"
 
         // Only generate if title is still the default or fallback
         let currentTitle = conversation.title
@@ -149,9 +149,12 @@ class ConversationStore: ObservableObject {
         guard SystemLanguageModel.default.isAvailable else { return }
 
         // Create conversation text from first few messages
-        let conversationText = conversation.messages.prefix(4).map { msg in
-            "\(msg.role == .user ? "User" : "Assistant"): \(msg.content.prefix(200))"
-        }.joined(separator: "\n")
+        let conversationText = conversation.messages
+            .prefix(4)
+            .map { msg in
+                "\(msg.role == .user ? "User" : "Assistant"): \(msg.content.prefix(200))"
+            }
+            .joined(separator: "\n")
 
         do {
             let titleSession = LanguageModelSession(
@@ -521,10 +524,9 @@ struct ConversationRow: View {
         }
 
         // Search in messages
-        for message in conversation.messages {
-            if message.content.localizedCaseInsensitiveContains(searchQuery) {
-                return createPreview(from: message.content, searchText: searchQuery)
-            }
+        for message in conversation.messages
+        where message.content.localizedCaseInsensitiveContains(searchQuery) {
+            return createPreview(from: message.content, searchText: searchQuery)
         }
 
         return nil

@@ -127,7 +127,7 @@ RAC_API void rac_benchmark_stats_destroy(rac_benchmark_stats_handle_t handle);
  * @param timing Timing struct to record
  */
 RAC_API void rac_benchmark_stats_record(rac_benchmark_stats_handle_t handle,
-                                         const rac_benchmark_timing_t* timing);
+                                        const rac_benchmark_timing_t* timing);
 
 /**
  * Resets the collector, discarding all recorded observations.
@@ -152,7 +152,7 @@ RAC_API int32_t rac_benchmark_stats_count(rac_benchmark_stats_handle_t handle);
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, or RAC_ERROR_INVALID_STATE (no data)
  */
 RAC_API rac_result_t rac_benchmark_stats_get_summary(rac_benchmark_stats_handle_t handle,
-                                                      rac_benchmark_summary_t* out_summary);
+                                                     rac_benchmark_summary_t* out_summary);
 
 /**
  * Serializes a summary struct as a JSON string.

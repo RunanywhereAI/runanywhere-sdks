@@ -132,22 +132,23 @@ struct DocumentRAGView: View {
 // MARK: - Model Setup Section
 
 extension DocumentRAGView {
-    @ViewBuilder
-    private var modelSetupSection: some View {
+    @ViewBuilder private var modelSetupSection: some View {
         VStack(spacing: 0) {
             VStack(spacing: AppSpacing.smallMedium) {
                 modelPickerRow(
                     label: "Embedding Model",
                     systemImage: "brain",
-                    model: selectedEmbeddingModel,
-                    action: { isShowingEmbeddingModelPicker = true }
-                )
+                    model: selectedEmbeddingModel
+                ) {
+                    isShowingEmbeddingModelPicker = true
+                }
                 modelPickerRow(
                     label: "LLM Model",
                     systemImage: "text.bubble",
-                    model: selectedLLMModel,
-                    action: { isShowingLLMModelPicker = true }
-                )
+                    model: selectedLLMModel
+                ) {
+                    isShowingLLMModelPicker = true
+                }
             }
             .padding(.horizontal, AppSpacing.large)
             .padding(.vertical, AppSpacing.mediumLarge)
@@ -203,8 +204,7 @@ extension DocumentRAGView {
 // MARK: - Document Status Bar
 
 extension DocumentRAGView {
-    @ViewBuilder
-    private var documentStatusBar: some View {
+    @ViewBuilder private var documentStatusBar: some View {
         VStack(spacing: 0) {
             if viewModel.isLoadingDocument {
                 loadingStatusView
@@ -283,8 +283,7 @@ extension DocumentRAGView {
 // MARK: - Error Banner
 
 extension DocumentRAGView {
-    @ViewBuilder
-    private var errorBanner: some View {
+    @ViewBuilder private var errorBanner: some View {
         if isErrorBannerVisible, let error = viewModel.error {
             HStack(spacing: AppSpacing.mediumLarge) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -336,8 +335,7 @@ extension DocumentRAGView {
         }
     }
 
-    @ViewBuilder
-    private var emptyStateView: some View {
+    @ViewBuilder private var emptyStateView: some View {
         VStack(spacing: AppSpacing.large) {
             Spacer(minLength: AppSpacing.xxxLarge)
             Image(systemName: "doc.text.magnifyingglass")

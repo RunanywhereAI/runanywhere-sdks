@@ -218,7 +218,7 @@ final class SphereRenderer: NSObject, MTKViewDelegate {
     var touchPoint: SIMD2<Float> = .zero
     var isDarkMode: Bool = true
     // Vibrant logo orange - brighter and more saturated
-    var baseColor: SIMD3<Float> = SIMD3<Float>(1.0, 0.5, 0.15) // Bright vivid orange
+    var baseColor = SIMD3<Float>(1.0, 0.5, 0.15) // Bright vivid orange
     private var aspectRatio: Float = 1.0
 
     init?(device: MTLDevice) {
@@ -277,8 +277,8 @@ final class SphereRenderer: NSObject, MTKViewDelegate {
         let angleIncrement = Float.pi * 2.0 * Float(goldenRatio)
 
         for i in 0..<particleCount {
-            let t = Float(i) / Float(particleCount - 1)
-            let inclination = acos(1.0 - 2.0 * t)
+            let time = Float(i) / Float(particleCount - 1)
+            let inclination = acos(1.0 - 2.0 * time)
             let azimuth = angleIncrement * Float(i)
 
             let x = sin(inclination) * cos(azimuth)
@@ -433,7 +433,8 @@ struct VoiceAssistantParticleView: NSViewRepresentable {
 
 // MARK: - Preview
 struct VoiceAssistantMainPreview: View {
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorScheme)
+    var colorScheme
     @State private var amplitude: Float = 0.0
     @State private var isListening = false
     @State private var morphProgress: Float = 0.0
@@ -501,8 +502,12 @@ struct VoiceAssistantMainPreview: View {
                         RadialGradient(
                             colors: [
                                 Color.clear,
-                                Color(red: 1.0, green: 0.6, blue: 0.5).opacity(colorScheme == .dark ? Double(0.02 + morphProgress * 0.03) : 0.01),
-                                Color(red: 0.95, green: 0.5, blue: 0.4).opacity(colorScheme == .dark ? 0.015 : 0.008),
+                                Color(red: 1.0, green: 0.6, blue: 0.5).opacity(
+                                    colorScheme == .dark ? Double(0.02 + morphProgress * 0.03) : 0.01
+                                ),
+                                Color(red: 0.95, green: 0.5, blue: 0.4).opacity(
+                                    colorScheme == .dark ? 0.015 : 0.008
+                                ),
                                 Color.clear
                             ],
                             center: .center,
@@ -536,8 +541,13 @@ struct VoiceAssistantMainPreview: View {
                             let frameCenterY = geometry.size.height / 2
 
                             // Position relative to frame center, normalized to -1...1
-                            let normalizedX = Float((value.location.x - frameCenterX) / (frameSize / 2)) * 0.85
-                            let normalizedY = Float((value.location.y - frameCenterY) / (frameSize / 2)) * -0.85 // Flip Y, apply scale
+                            let normalizedX = Float(
+                                (value.location.x - frameCenterX) / (frameSize / 2)
+                            ) * 0.85
+                            // Flip Y, apply scale
+                            let normalizedY = Float(
+                                (value.location.y - frameCenterY) / (frameSize / 2)
+                            ) * -0.85
 
                             touchPoint = SIMD2<Float>(normalizedX, normalizedY)
                             scatterAmount = 1.0
@@ -556,9 +566,9 @@ struct VoiceAssistantMainPreview: View {
                         .foregroundColor(.gray)
                         .padding(.bottom, 16)
 
-                    Button(action: {
+                    Button {
                         isListening.toggle()
-                    }) {
+                    } label: {
                         ZStack {
                             if isListening {
                                 Circle()

@@ -25,9 +25,8 @@ static const char* LOG_CAT = "Embeddings.Service";
 
 extern "C" {
 
-static rac_result_t embeddings_create_internal(const char* model_id,
-                                                const char* config_json,
-                                                rac_handle_t* out_handle) {
+static rac_result_t embeddings_create_internal(const char* model_id, const char* config_json,
+                                               rac_handle_t* out_handle) {
     if (!model_id || !out_handle) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -53,8 +52,8 @@ static rac_result_t embeddings_create_internal(const char* model_id,
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : model_id;
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL",
-                     static_cast<int>(framework), model_path ? model_path : "NULL");
+                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
+                     model_path ? model_path : "NULL");
     } else {
         // Model not in registry — infer framework from file extension
         // so the correct service provider handles it (ONNX for .onnx files).
@@ -80,8 +79,7 @@ static rac_result_t embeddings_create_internal(const char* model_id,
 
     RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s, has_config=%s",
                  static_cast<int>(request.framework),
-                 request.model_path ? request.model_path : "NULL",
-                 config_json ? "yes" : "no");
+                 request.model_path ? request.model_path : "NULL", config_json ? "yes" : "no");
 
     // Service registry returns an rac_embeddings_service_t* with vtable already set
     result = rac_service_create(RAC_CAPABILITY_EMBEDDINGS, &request, out_handle);
@@ -103,9 +101,8 @@ rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* out_handl
     return embeddings_create_internal(model_id, nullptr, out_handle);
 }
 
-rac_result_t rac_embeddings_create_with_config(const char* model_id,
-                                                const char* config_json,
-                                                rac_handle_t* out_handle) {
+rac_result_t rac_embeddings_create_with_config(const char* model_id, const char* config_json,
+                                               rac_handle_t* out_handle) {
     return embeddings_create_internal(model_id, config_json, out_handle);
 }
 
@@ -126,8 +123,8 @@ rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* model_pa
 }
 
 rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
-                                   const rac_embeddings_options_t* options,
-                                   rac_embeddings_result_t* out_result) {
+                                  const rac_embeddings_options_t* options,
+                                  rac_embeddings_result_t* out_result) {
     if (!handle || !text || !out_result)
         return RAC_ERROR_NULL_POINTER;
 
@@ -140,9 +137,8 @@ rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
 }
 
 rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char* const* texts,
-                                         size_t num_texts,
-                                         const rac_embeddings_options_t* options,
-                                         rac_embeddings_result_t* out_result) {
+                                        size_t num_texts, const rac_embeddings_options_t* options,
+                                        rac_embeddings_result_t* out_result) {
     if (!handle || !texts || !out_result)
         return RAC_ERROR_NULL_POINTER;
 

@@ -152,7 +152,10 @@ final class AudioCaptureManagerTests: XCTestCase {
 
         XCTAssertNotNil(first)
         XCTAssertNotNil(second)
-        XCTAssertEqual(first?.frameLength ?? 0, second?.frameLength ?? 0,
-                       "Two separate convert calls with same buffer should yield same length (no shared state)")
+        XCTAssertEqual(
+            first?.frameLength ?? 0,
+            second?.frameLength ?? 0,
+            "Two separate convert calls with same buffer should yield same length (no shared state)"
+        )
     }
 }

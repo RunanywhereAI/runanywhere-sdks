@@ -266,9 +266,8 @@ RAC_API rac_result_t rac_llm_component_get_metrics(rac_handle_t handle,
  * @param scale Adapter scale factor (0.0-1.0, default 1.0)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
-                                                  const char* adapter_path,
-                                                  float scale);
+RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle, const char* adapter_path,
+                                                 float scale);
 
 /**
  * @brief Remove a specific LoRA adapter by path
@@ -277,8 +276,7 @@ RAC_API rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
  * @param adapter_path Path used when loading the adapter
  * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
  */
-RAC_API rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
-                                                    const char* adapter_path);
+RAC_API rac_result_t rac_llm_component_remove_lora(rac_handle_t handle, const char* adapter_path);
 
 /**
  * @brief Remove all LoRA adapters
@@ -297,8 +295,7 @@ RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
-                                                      char** out_json);
+RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle, char** out_json);
 
 /**
  * @brief Check if the current backend supports LoRA adapters
@@ -308,12 +305,13 @@ RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
  *
  * @param handle Component handle
  * @param adapter_path Path to the LoRA adapter GGUF file (must be non-empty)
- * @param out_error Output: error message if incompatible (caller must free with rac_free), NULL if compatible
+ * @param out_error Output: error message if incompatible (caller must free with rac_free), NULL if
+ * compatible
  * @return RAC_SUCCESS if the backend supports LoRA, error code otherwise
  */
 RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
-                                                           const char* adapter_path,
-                                                           char** out_error);
+                                                         const char* adapter_path,
+                                                         char** out_error);
 
 // =============================================================================
 // DESTRUCTION

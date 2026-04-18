@@ -310,7 +310,8 @@ static rac_result_t platform_diffusion_vtable_generate(void* impl,
     auto handle = static_cast<rac_diffusion_platform_handle_t>(impl);
     rac_diffusion_platform_result_t platform_result = {};
 
-    rac_result_t result = rac_diffusion_platform_generate(handle, &platform_options, &platform_result);
+    rac_result_t result =
+        rac_diffusion_platform_generate(handle, &platform_options, &platform_result);
 
     if (result == RAC_SUCCESS) {
         // Copy result
@@ -632,7 +633,7 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
     (void)user_data;
 
     RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: ENTRY");
-    
+
     if (request == nullptr) {
         RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: null request -> FALSE");
         return RAC_FALSE;
@@ -640,15 +641,15 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
 
     // Get the model path - prefer model_path over identifier
     const char* path_str = request->model_path ? request->model_path : request->identifier;
-    
-    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d", 
-                  path_str ? path_str : "NULL", request->framework);
+
+    RAC_LOG_INFO(LOG_CAT, "CoreMLDiffusion can_handle: path=%s, framework=%d",
+                 path_str ? path_str : "NULL", request->framework);
 
     // CRITICAL: Check for CoreML model files FIRST, before framework hint
     // This prevents incorrectly handling ONNX models when registry lookup fails
     if (path_str != nullptr) {
         fs::path model_path(path_str);
-        
+
         // Check if the path itself is a .mlmodelc or .mlpackage
         std::string extension = model_path.extension().string();
         if (extension == ".mlmodelc" || extension == ".mlpackage") {
@@ -657,16 +658,16 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
                 return RAC_TRUE;
             }
         }
-        
+
         // Check if directory contains CoreML model subdirectories (Unet.mlmodelc, etc.)
         if (fs::exists(model_path) && fs::is_directory(model_path)) {
             try {
                 bool has_coreml_files = false;
                 bool has_onnx_files = false;
-                
+
                 for (const auto& entry : fs::directory_iterator(model_path)) {
                     std::string name = entry.path().filename().string();
-                    
+
                     // Check for CoreML model directories
                     if (entry.is_directory()) {
                         if (name.find(".mlmodelc") != std::string::npos ||
@@ -674,12 +675,12 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
                             has_coreml_files = true;
                         }
                     }
-                    
+
                     // Check for ONNX files - if present, this is NOT a CoreML model
                     if (entry.path().extension() == ".onnx") {
                         has_onnx_files = true;
                     }
-                    
+
                     // Check subdirectories for ONNX files (unet/, text_encoder/, etc.)
                     if (entry.is_directory() && !has_onnx_files) {
                         try {
@@ -694,15 +695,18 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
                         }
                     }
                 }
-                
+
                 // If we found ONNX files, this is NOT a CoreML model - let ONNX backend handle it
                 if (has_onnx_files) {
-                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found .onnx files, deferring to ONNX backend -> false");
+                    RAC_LOG_DEBUG(LOG_CAT,
+                                  "Diffusion can_handle: found .onnx files, deferring to ONNX "
+                                  "backend -> false");
                     return RAC_FALSE;
                 }
-                
+
                 if (has_coreml_files) {
-                    RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: found CoreML model in directory -> true");
+                    RAC_LOG_DEBUG(LOG_CAT,
+                                  "Diffusion can_handle: found CoreML model in directory -> true");
                     return RAC_TRUE;
                 }
             } catch (const fs::filesystem_error&) {
@@ -720,7 +724,8 @@ rac_bool_t platform_diffusion_can_handle(const rac_service_request_t* request, v
 
     // If framework explicitly set to something other than CoreML or Unknown, don't handle
     if (request->framework != RAC_FRAMEWORK_UNKNOWN && request->framework != RAC_FRAMEWORK_COREML) {
-        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework mismatch (%d) -> false", request->framework);
+        RAC_LOG_DEBUG(LOG_CAT, "Diffusion can_handle: framework mismatch (%d) -> false",
+                      request->framework);
         return RAC_FALSE;
     }
 
@@ -774,7 +779,8 @@ rac_handle_t platform_diffusion_create(const rac_service_request_t* request, voi
     // Allocate service struct with vtable
     auto* service = static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
     if (!service) {
-        rac_diffusion_platform_destroy(static_cast<rac_diffusion_platform_handle_t>(backend_handle));
+        rac_diffusion_platform_destroy(
+            static_cast<rac_diffusion_platform_handle_t>(backend_handle));
         return nullptr;
     }
 

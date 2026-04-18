@@ -12,12 +12,11 @@ import UIKit
 #endif
 
 struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .vlm
 
     func scenarios() -> [BenchmarkScenario] {
         [
-            BenchmarkScenario(name: "Image Description", category: .vlm, parameters: ["type": "gradient"]),
+            BenchmarkScenario(name: "Image Description", category: .vlm, parameters: ["type": "gradient"])
         ]
     }
 

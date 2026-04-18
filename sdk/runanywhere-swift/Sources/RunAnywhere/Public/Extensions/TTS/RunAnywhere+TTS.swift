@@ -310,7 +310,7 @@ public extension RunAnywhere {
 
 private final class TTSStreamContext: @unchecked Sendable {
     let onChunk: (Data) -> Void
-    var totalData: Data = Data()
+    var totalData = Data()
 
     init(onChunk: @escaping (Data) -> Void) {
         self.onChunk = onChunk

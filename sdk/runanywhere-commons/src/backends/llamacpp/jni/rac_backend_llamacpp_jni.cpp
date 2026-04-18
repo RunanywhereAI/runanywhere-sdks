@@ -12,8 +12,9 @@
  */
 
 #include <jni.h>
-#include <string>
+
 #include <cstring>
+#include <string>
 
 // Include LlamaCPP backend header (direct API)
 #include "rac_llm_llamacpp.h"
@@ -141,8 +142,8 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeRegisterVlm(JNIEnv* e
 /**
  * Unregister the LlamaCPP VLM backend from the C++ service registry.
  */
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeUnregisterVlm(JNIEnv* env, jclass clazz) {
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeUnregisterVlm(
+    JNIEnv* env, jclass clazz) {
     (void)env;
     (void)clazz;
     LOGi("LlamaCPP nativeUnregisterVlm called");
@@ -165,10 +166,9 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeUnregisterVlm(JNIEnv*
 /**
  * Create a LlamaCPP instance and load a model
  */
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCreate(
-    JNIEnv* env, jclass clazz,
-    jstring modelPath, jint contextSize, jint numThreads, jint gpuLayers) {
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCreate(
+    JNIEnv* env, jclass clazz, jstring modelPath, jint contextSize, jint numThreads,
+    jint gpuLayers) {
     (void)clazz;
 
     const char* path = env->GetStringUTFChars(modelPath, nullptr);
@@ -177,7 +177,8 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCreate(
         return 0;
     }
 
-    LOGi("nativeCreate: model=%s, ctx=%d, threads=%d, gpu=%d", path, contextSize, numThreads, gpuLayers);
+    LOGi("nativeCreate: model=%s, ctx=%d, threads=%d, gpu=%d", path, contextSize, numThreads,
+         gpuLayers);
 
     rac_llm_llamacpp_config_t config = RAC_LLM_LLAMACPP_CONFIG_DEFAULT;
     config.context_size = contextSize;
@@ -201,13 +202,13 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCreate(
 /**
  * Destroy a LlamaCPP instance
  */
-JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeDestroy(
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeDestroy(
     JNIEnv* env, jclass clazz, jlong handle) {
     (void)env;
     (void)clazz;
 
-    if (handle == 0) return;
+    if (handle == 0)
+        return;
 
     LOGi("nativeDestroy: handle=%p", reinterpret_cast<void*>(handle));
     rac_llm_llamacpp_destroy(reinterpret_cast<rac_handle_t>(handle));
@@ -216,10 +217,8 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeDestroy(
 /**
  * Generate text (blocking)
  */
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
-    JNIEnv* env, jclass clazz,
-    jlong handle, jstring prompt, jint maxTokens, jfloat temperature) {
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
+    JNIEnv* env, jclass clazz, jlong handle, jstring prompt, jint maxTokens, jfloat temperature) {
     (void)clazz;
 
     if (handle == 0) {
@@ -233,17 +232,16 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
         return nullptr;
     }
 
-    LOGi("nativeGenerate: prompt_len=%zu, max_tokens=%d, temp=%.2f",
-         strlen(promptStr), maxTokens, temperature);
+    LOGi("nativeGenerate: prompt_len=%zu, max_tokens=%d, temp=%.2f", strlen(promptStr), maxTokens,
+         temperature);
 
     rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
     options.max_tokens = maxTokens;
     options.temperature = temperature;
 
     rac_llm_result_t result = {};
-    rac_result_t status = rac_llm_llamacpp_generate(
-        reinterpret_cast<rac_handle_t>(handle),
-        promptStr, &options, &result);
+    rac_result_t status = rac_llm_llamacpp_generate(reinterpret_cast<rac_handle_t>(handle),
+                                                    promptStr, &options, &result);
 
     env->ReleaseStringUTFChars(prompt, promptStr);
 
@@ -266,13 +264,13 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGenerate(
 /**
  * Cancel ongoing generation
  */
-JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCancel(
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCancel(
     JNIEnv* env, jclass clazz, jlong handle) {
     (void)env;
     (void)clazz;
 
-    if (handle == 0) return;
+    if (handle == 0)
+        return;
 
     LOGi("nativeCancel: handle=%p", reinterpret_cast<void*>(handle));
     rac_llm_llamacpp_cancel(reinterpret_cast<rac_handle_t>(handle));
@@ -281,16 +279,16 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeCancel(
 /**
  * Get model info as JSON
  */
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGetModelInfo(
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGetModelInfo(
     JNIEnv* env, jclass clazz, jlong handle) {
     (void)clazz;
 
-    if (handle == 0) return nullptr;
+    if (handle == 0)
+        return nullptr;
 
     char* json = nullptr;
-    rac_result_t status = rac_llm_llamacpp_get_model_info(
-        reinterpret_cast<rac_handle_t>(handle), &json);
+    rac_result_t status =
+        rac_llm_llamacpp_get_model_info(reinterpret_cast<rac_handle_t>(handle), &json);
 
     if (status != RAC_SUCCESS || !json) {
         return nullptr;
@@ -302,4 +300,4 @@ Java_com_runanywhere_sdk_llm_llamacpp_LlamaCPPBridge_nativeGetModelInfo(
     return result;
 }
 
-} // extern "C"
+}  // extern "C"

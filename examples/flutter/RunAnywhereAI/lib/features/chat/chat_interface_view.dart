@@ -3,9 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -15,8 +15,8 @@ import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
-import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:runanywhere_ai/features/rag/rag_demo_view.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:runanywhere_ai/features/structured_output/structured_output_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -44,7 +44,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool _isGenerating = false;
   bool _useStreaming = true;
   String? _errorMessage;
-  bool _isLoading = false;
+  final bool _isLoading = false;
 
   // Model state (from SDK - matches Swift pattern)
   String? _loadedModelName;
@@ -287,7 +287,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     if (value is BoolToolValue) return value.value;
     if (value is NullToolValue) return null;
     if (value is ArrayToolValue) {
-      return value.value.map((v) => _toolValueToJson(v)).toList();
+      return value.value.map(_toolValueToJson).toList();
     }
     if (value is ObjectToolValue) {
       final result = <String, dynamic>{};
@@ -458,9 +458,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           IconButton(
             icon: const Icon(Icons.article_outlined),
             onPressed: () {
-              Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (context) => const RagDemoView(),
+              unawaited(
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (context) => const RagDemoView(),
+                  ),
                 ),
               );
             },
@@ -469,9 +471,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           IconButton(
             icon: const Icon(Icons.data_object),
             onPressed: () {
-              Navigator.of(context).push<void>(
-                MaterialPageRoute<void>(
-                  builder: (context) => const StructuredOutputView(),
+              unawaited(
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (context) => const StructuredOutputView(),
+                  ),
                 ),
               );
             },
@@ -854,16 +858,18 @@ class _MessageBubbleState extends State<_MessageBubble> {
   }
 
   void _showToolCallDetails(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (context, scrollController) =>
-            ToolCallDetailSheet(toolCallInfo: widget.message.toolCallInfo!),
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) =>
+              ToolCallDetailSheet(toolCallInfo: widget.message.toolCallInfo!),
+        ),
       ),
     );
   }
