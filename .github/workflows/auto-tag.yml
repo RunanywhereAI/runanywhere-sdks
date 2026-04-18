@@ -1,0 +1,152 @@
+name: Auto-Tag Release
+
+# =============================================================================
+# Label-driven release triggering.
+#
+# When a PR is merged to main with one of these labels:
+#   release:patch   — v0.19.7 → v0.19.8
+#   release:minor   — v0.19.7 → v0.20.0
+#   release:major   — v0.19.7 → v1.0.0
+#
+# this workflow:
+#   1. Determines the current PROJECT_VERSION from sdk/runanywhere-commons/VERSIONS
+#   2. Bumps it according to the label
+#   3. Runs scripts/sync-versions.sh to propagate the new version across all manifests
+#   4. Commits the bump to main and pushes tag v{new-version}
+#   5. The tag push then triggers release.yml → builds everything → draft GH Release
+#
+# If no release label is present, the workflow is a no-op. Merges without a label
+# just land the code on main as normal — releases are explicit opt-in.
+#
+# Alternative (manual): engineer can still run this flow manually:
+#   scripts/sync-versions.sh 0.20.0
+#   git tag v0.20.0 && git push origin v0.20.0
+# Both paths converge on release.yml.
+# =============================================================================
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write    # needed to commit version bump + push tag
+
+jobs:
+  auto-tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect release label on merged PR
+        id: label
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+          # Extract just the label names
+          NAMES=$(echo "$PR_LABELS" | jq -r '.[].name')
+          echo "PR labels: $NAMES"
+
+          BUMP=""
+          for name in $NAMES; do
+            case "$name" in
+              release:patch) BUMP="patch" ;;
+              release:minor) BUMP="minor" ;;
+              release:major) BUMP="major" ;;
+            esac
+          done
+
+          if [ -z "$BUMP" ]; then
+            echo "No release:* label — nothing to do."
+            echo "should-release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Release label found: release:$BUMP"
+            echo "should-release=true" >> "$GITHUB_OUTPUT"
+            echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout main
+        if: steps.label.outputs.should-release == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute next version
+        if: steps.label.outputs.should-release == 'true'
+        id: version
+        env:
+          BUMP: ${{ steps.label.outputs.bump }}
+        run: |
+          set -euo pipefail
+          CURRENT=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          # Strip any pre-release suffix for bumping
+          BASE="${CURRENT%%-*}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"
+
+          case "$BUMP" in
+            patch) PATCH=$((PATCH + 1)) ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+          esac
+
+          NEW="${MAJOR}.${MINOR}.${PATCH}"
+          echo "Current: $CURRENT"
+          echo "Bump:    $BUMP"
+          echo "New:     $NEW"
+          echo "new-version=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Sanity-check tag doesn't already exist
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse "v${NEW_VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${NEW_VERSION} already exists."
+            exit 1
+          fi
+
+      - name: Run sync-versions.sh
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/sync-versions.sh
+          ./scripts/sync-versions.sh "${NEW_VERSION}"
+
+      - name: Configure git identity
+        if: steps.label.outputs.should-release == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit version bump + push tag
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+          BUMP: ${{ steps.label.outputs.bump }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git add -u
+          if git diff --cached --quiet; then
+            echo "No manifest changes from sync-versions.sh — unexpected; aborting"
+            exit 1
+          fi
+          git commit -m "chore: release v${NEW_VERSION} (${BUMP} bump from PR #${PR_NUMBER})"
+          git tag "v${NEW_VERSION}"
+          git push origin main
+          git push origin "v${NEW_VERSION}"
+          echo "::notice::Pushed tag v${NEW_VERSION} — release.yml will now build and create a draft release"
+
+      - name: Comment on merged PR
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "🚀 Auto-tagged **v${NEW_VERSION}** — release.yml is now building artifacts. The GitHub Release will be created as a draft; publish it after reviewing the assets."
