@@ -519,11 +519,8 @@ jobs:
           # instead of the published version on pub.dev (which lags behind).
           for pkg in packages/runanywhere_genie packages/runanywhere_llamacpp packages/runanywhere_onnx; do
             if [ -f "$pkg/pubspec.yaml" ]; then
-              cat > "$pkg/pubspec_overrides.yaml" <<'OVERRIDES'
-dependency_overrides:
-  runanywhere:
-    path: ../runanywhere
-OVERRIDES
+              printf 'dependency_overrides:\n  runanywhere:\n    path: ../runanywhere\n' \
+                > "$pkg/pubspec_overrides.yaml"
             fi
           done
           for pkg in packages/runanywhere packages/runanywhere_genie packages/runanywhere_llamacpp packages/runanywhere_onnx; do
