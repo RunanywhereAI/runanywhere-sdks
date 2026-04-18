@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
@@ -347,7 +347,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     // Handle simple operations
     if (expr.contains('+')) {
       final parts = expr.split('+');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a + b);
+      return parts.map(double.parse).reduce((a, b) => a + b);
     } else if (expr.contains('-') && !expr.startsWith('-')) {
       final parts = expr.split('-');
       var result = double.parse(parts[0]);
@@ -357,7 +357,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
       return result;
     } else if (expr.contains('*')) {
       final parts = expr.split('*');
-      return parts.map((p) => double.parse(p)).reduce((a, b) => a * b);
+      return parts.map(double.parse).reduce((a, b) => a * b);
     } else if (expr.contains('/')) {
       final parts = expr.split('/');
       var result = double.parse(parts[0]);

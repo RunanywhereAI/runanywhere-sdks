@@ -1,10 +1,10 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.models
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.ModelInfo
@@ -16,45 +16,62 @@ import java.util.UUID
 
 @Serializable
 enum class BenchmarkCategory(val value: String) {
-    @SerialName("llm") LLM("llm"),
-    @SerialName("stt") STT("stt"),
-    @SerialName("tts") TTS("tts"),
-    @SerialName("vlm") VLM("vlm"),
+    @SerialName("llm")
+    LLM("llm"),
+
+    @SerialName("stt")
+    STT("stt"),
+
+    @SerialName("tts")
+    TTS("tts"),
+
+    @SerialName("vlm")
+    VLM("vlm"),
     ;
 
     val displayName: String
-        get() = when (this) {
-            LLM -> "LLM"
-            STT -> "STT"
-            TTS -> "TTS"
-            VLM -> "VLM"
-        }
+        get() =
+            when (this) {
+                LLM -> "LLM"
+                STT -> "STT"
+                TTS -> "TTS"
+                VLM -> "VLM"
+            }
 
     val icon: ImageVector
-        get() = when (this) {
-            LLM -> Icons.Filled.ChatBubble
-            STT -> Icons.Filled.GraphicEq
-            TTS -> Icons.AutoMirrored.Filled.VolumeUp
-            VLM -> Icons.Filled.Visibility
-        }
+        get() =
+            when (this) {
+                LLM -> Icons.Filled.ChatBubble
+                STT -> Icons.Filled.GraphicEq
+                TTS -> Icons.AutoMirrored.Filled.VolumeUp
+                VLM -> Icons.Filled.Visibility
+            }
 
     val modelCategory: ModelCategory
-        get() = when (this) {
-            LLM -> ModelCategory.LANGUAGE
-            STT -> ModelCategory.SPEECH_RECOGNITION
-            TTS -> ModelCategory.SPEECH_SYNTHESIS
-            VLM -> ModelCategory.MULTIMODAL
-        }
+        get() =
+            when (this) {
+                LLM -> ModelCategory.LANGUAGE
+                STT -> ModelCategory.SPEECH_RECOGNITION
+                TTS -> ModelCategory.SPEECH_SYNTHESIS
+                VLM -> ModelCategory.MULTIMODAL
+            }
 }
 
 // -- Benchmark Run Status --
 
 @Serializable
 enum class BenchmarkRunStatus(val value: String) {
-    @SerialName("running") RUNNING("running"),
-    @SerialName("completed") COMPLETED("completed"),
-    @SerialName("failed") FAILED("failed"),
-    @SerialName("cancelled") CANCELLED("cancelled"),
+    @SerialName("running")
+    RUNNING("running"),
+
+    @SerialName("completed")
+    COMPLETED("completed"),
+
+    @SerialName("failed")
+    FAILED("failed"),
+
+    @SerialName("cancelled")
+    CANCELLED("cancelled"),
 }
 
 // -- Benchmark Scenario --
@@ -77,12 +94,13 @@ data class ComponentModelInfo(
     val category: String,
 ) {
     companion object {
-        fun from(model: ModelInfo): ComponentModelInfo = ComponentModelInfo(
-            id = model.id,
-            name = model.name,
-            framework = model.framework.displayName,
-            category = model.category.value,
-        )
+        fun from(model: ModelInfo): ComponentModelInfo =
+            ComponentModelInfo(
+                id = model.id,
+                name = model.name,
+                framework = model.framework.displayName,
+                category = model.category.value,
+            )
     }
 }
 
@@ -106,25 +124,20 @@ data class BenchmarkMetrics(
     val loadTimeMs: Double = 0.0,
     val warmupTimeMs: Double = 0.0,
     val memoryDeltaBytes: Long = 0,
-
     // LLM-specific
     val ttftMs: Double? = null,
     val tokensPerSecond: Double? = null,
     val inputTokens: Int? = null,
     val outputTokens: Int? = null,
-
     // STT-specific
     val audioLengthSeconds: Double? = null,
     val realTimeFactor: Double? = null,
-
     // TTS-specific
     val audioDurationSeconds: Double? = null,
     val charactersProcessed: Int? = null,
-
     // VLM-specific
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
-
     // Error info
     val errorMessage: String? = null,
 ) {

@@ -136,16 +136,17 @@ actual fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry
     return CppBridgeLoraRegistry.getAll().map { it.toCatalogEntry() }
 }
 
-private fun CppBridgeLoraRegistry.LoraEntry.toCatalogEntry() = LoraAdapterCatalogEntry(
-    id = id,
-    name = name,
-    description = description,
-    downloadUrl = downloadUrl,
-    filename = filename,
-    compatibleModelIds = compatibleModelIds,
-    fileSize = fileSize,
-    defaultScale = defaultScale,
-)
+private fun CppBridgeLoraRegistry.LoraEntry.toCatalogEntry() =
+    LoraAdapterCatalogEntry(
+        id = id,
+        name = name,
+        description = description,
+        downloadUrl = downloadUrl,
+        filename = filename,
+        compatibleModelIds = compatibleModelIds,
+        fileSize = fileSize,
+        defaultScale = defaultScale,
+    )
 
 // MARK: - LoRA Adapter Downloads
 
@@ -153,125 +154,153 @@ private fun CppBridgeLoraRegistry.LoraEntry.toCatalogEntry() = LoraAdapterCatalo
 private fun getLoraDownloadDir(): File =
     File(CppBridgeModelPaths.getBaseDirectory(), "lora_adapters").also { it.mkdirs() }
 
-actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress> = flow {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
+actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress> =
+    flow {
+        if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
 
-    val entry = CppBridgeLoraRegistry.getAll()
-        .find { it.id == adapterId }
-        ?: throw SDKError.download("LoRA adapter '$adapterId' not found in registry")
+        val entry =
+            CppBridgeLoraRegistry
+                .getAll()
+                .find { it.id == adapterId }
+                ?: throw SDKError.download("LoRA adapter '$adapterId' not found in registry")
 
-    val uri = try { URI(entry.downloadUrl) } catch (e: Exception) {
-        throw SDKError.download("Invalid download URL for adapter '$adapterId': ${e.message}")
-    }
-    if (uri.scheme?.lowercase() != "https") {
-        throw SDKError.download("Only HTTPS download URLs are allowed")
-    }
-
-    val (isNetworkAvailable, _) = CppBridgeDownload.checkNetworkStatus()
-    if (!isNetworkAvailable) {
-        throw SDKError.networkUnavailable(IllegalStateException("No internet connection"))
-    }
-
-    val loraDir = getLoraDownloadDir()
-    val destFile = File(loraDir, entry.filename)
-    val tmpFile = File(loraDir, "${entry.filename}.tmp")
-
-    if (!destFile.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
-        throw SDKError.download("Invalid adapter filename (path traversal): ${entry.filename}")
-    }
-
-    // Already downloaded — emit COMPLETED and return
-    if (destFile.exists() && destFile.length() > 0) {
-        loraLogger.info("LoRA adapter already downloaded: ${destFile.absolutePath}")
-        emit(DownloadProgress(
-            modelId = adapterId, progress = 1f,
-            bytesDownloaded = destFile.length(), totalBytes = destFile.length(),
-            state = DownloadState.COMPLETED,
-        ))
-        return@flow
-    }
-
-    emit(DownloadProgress(
-        modelId = adapterId, progress = 0f,
-        bytesDownloaded = 0, totalBytes = entry.fileSize,
-        state = DownloadState.PENDING,
-    ))
-
-    loraLogger.info("Starting LoRA download: ${entry.name} from ${entry.downloadUrl}")
-
-    val connection = uri.toURL().openConnection() as HttpURLConnection
-    connection.connectTimeout = 30_000
-    connection.readTimeout = 120_000
-    connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
-
-    try {
-        val responseCode = connection.responseCode
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            throw SDKError.download("HTTP $responseCode downloading LoRA adapter '${entry.filename}'")
+        val uri =
+            try {
+                URI(entry.downloadUrl)
+            } catch (e: Exception) {
+                throw SDKError.download("Invalid download URL for adapter '$adapterId': ${e.message}")
+            }
+        if (uri.scheme?.lowercase() != "https") {
+            throw SDKError.download("Only HTTPS download URLs are allowed")
         }
 
-        val totalSize = connection.contentLengthLong.takeIf { it > 0 } ?: entry.fileSize
-        var downloaded = 0L
-        var lastEmitTime = 0L
-        val buffer = ByteArray(8192)
+        val (isNetworkAvailable, _) = CppBridgeDownload.checkNetworkStatus()
+        if (!isNetworkAvailable) {
+            throw SDKError.networkUnavailable(IllegalStateException("No internet connection"))
+        }
 
-        connection.inputStream.buffered().use { input ->
-            tmpFile.outputStream().buffered().use { output ->
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    coroutineContext.ensureActive()
-                    output.write(buffer, 0, bytesRead)
-                    downloaded += bytesRead
+        val loraDir = getLoraDownloadDir()
+        val destFile = File(loraDir, entry.filename)
+        val tmpFile = File(loraDir, "${entry.filename}.tmp")
 
-                    val now = System.currentTimeMillis()
-                    if (now - lastEmitTime >= 200) {
-                        lastEmitTime = now
-                        val progress = if (totalSize > 0)
-                            (downloaded.toFloat() / totalSize).coerceIn(0f, 1f) else 0f
-                        emit(DownloadProgress(
-                            modelId = adapterId, progress = progress,
-                            bytesDownloaded = downloaded, totalBytes = totalSize,
-                            state = DownloadState.DOWNLOADING,
-                        ))
+        if (!destFile.canonicalPath.startsWith(loraDir.canonicalPath + File.separator)) {
+            throw SDKError.download("Invalid adapter filename (path traversal): ${entry.filename}")
+        }
+
+        // Already downloaded — emit COMPLETED and return
+        if (destFile.exists() && destFile.length() > 0) {
+            loraLogger.info("LoRA adapter already downloaded: ${destFile.absolutePath}")
+            emit(
+                DownloadProgress(
+                    modelId = adapterId,
+                    progress = 1f,
+                    bytesDownloaded = destFile.length(),
+                    totalBytes = destFile.length(),
+                    state = DownloadState.COMPLETED,
+                ),
+            )
+            return@flow
+        }
+
+        emit(
+            DownloadProgress(
+                modelId = adapterId,
+                progress = 0f,
+                bytesDownloaded = 0,
+                totalBytes = entry.fileSize,
+                state = DownloadState.PENDING,
+            ),
+        )
+
+        loraLogger.info("Starting LoRA download: ${entry.name} from ${entry.downloadUrl}")
+
+        val connection = uri.toURL().openConnection() as HttpURLConnection
+        connection.connectTimeout = 30_000
+        connection.readTimeout = 120_000
+        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
+
+        try {
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw SDKError.download("HTTP $responseCode downloading LoRA adapter '${entry.filename}'")
+            }
+
+            val totalSize = connection.contentLengthLong.takeIf { it > 0 } ?: entry.fileSize
+            var downloaded = 0L
+            var lastEmitTime = 0L
+            val buffer = ByteArray(8192)
+
+            connection.inputStream.buffered().use { input ->
+                tmpFile.outputStream().buffered().use { output ->
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        coroutineContext.ensureActive()
+                        output.write(buffer, 0, bytesRead)
+                        downloaded += bytesRead
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmitTime >= 200) {
+                            lastEmitTime = now
+                            val progress =
+                                if (totalSize > 0) {
+                                    (downloaded.toFloat() / totalSize).coerceIn(0f, 1f)
+                                } else {
+                                    0f
+                                }
+                            emit(
+                                DownloadProgress(
+                                    modelId = adapterId,
+                                    progress = progress,
+                                    bytesDownloaded = downloaded,
+                                    totalBytes = totalSize,
+                                    state = DownloadState.DOWNLOADING,
+                                ),
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        destFile.delete()
-        if (!tmpFile.renameTo(destFile)) {
-            tmpFile.copyTo(destFile, overwrite = true)
+            destFile.delete()
+            if (!tmpFile.renameTo(destFile)) {
+                tmpFile.copyTo(destFile, overwrite = true)
+                tmpFile.delete()
+            }
+        } catch (e: Exception) {
             tmpFile.delete()
+            throw e
+        } finally {
+            connection.disconnect()
         }
-    } catch (e: Exception) {
-        tmpFile.delete()
-        throw e
-    } finally {
-        connection.disconnect()
-    }
 
-    // Validate GGUF magic bytes (matches iOS validation)
-    val isValidGguf = destFile.inputStream().use { stream ->
-        val bytes = ByteArray(4)
-        if (stream.read(bytes) != 4) return@use false
-        val magic = (bytes[0].toUInt() and 0xFFu) or
-            ((bytes[1].toUInt() and 0xFFu) shl 8) or
-            ((bytes[2].toUInt() and 0xFFu) shl 16) or
-            ((bytes[3].toUInt() and 0xFFu) shl 24)
-        magic == 0x46554747u  // "GGUF" in little-endian
-    }
-    if (!isValidGguf) {
-        destFile.delete()
-        throw SDKError.download("Downloaded LoRA adapter is not a valid GGUF file: ${entry.filename}")
-    }
+        // Validate GGUF magic bytes (matches iOS validation)
+        val isValidGguf =
+            destFile.inputStream().use { stream ->
+                val bytes = ByteArray(4)
+                if (stream.read(bytes) != 4) return@use false
+                val magic =
+                    (bytes[0].toUInt() and 0xFFu) or
+                        ((bytes[1].toUInt() and 0xFFu) shl 8) or
+                        ((bytes[2].toUInt() and 0xFFu) shl 16) or
+                        ((bytes[3].toUInt() and 0xFFu) shl 24)
+                magic == 0x46554747u // "GGUF" in little-endian
+            }
+        if (!isValidGguf) {
+            destFile.delete()
+            throw SDKError.download("Downloaded LoRA adapter is not a valid GGUF file: ${entry.filename}")
+        }
 
-    loraLogger.info("LoRA download completed: ${destFile.absolutePath}")
-    emit(DownloadProgress(
-        modelId = adapterId, progress = 1f,
-        bytesDownloaded = destFile.length(), totalBytes = destFile.length(),
-        state = DownloadState.COMPLETED,
-    ))
-}.flowOn(Dispatchers.IO)
+        loraLogger.info("LoRA download completed: ${destFile.absolutePath}")
+        emit(
+            DownloadProgress(
+                modelId = adapterId,
+                progress = 1f,
+                bytesDownloaded = destFile.length(),
+                totalBytes = destFile.length(),
+                state = DownloadState.COMPLETED,
+            ),
+        )
+    }.flowOn(Dispatchers.IO)
 
 actual fun RunAnywhere.loraAdapterLocalPath(adapterId: String): String? {
     if (!isInitialized) return null

@@ -348,7 +348,10 @@ class DartBridgeDevice {
   /// This ensures the device will retry on next app launch.
   static void _rollBackRegistration(SDKLogger logger) {
     logger.debug('Rolling back device registration for retry on next launch');
-    _prefs?.setBool(_keyIsRegistered, false);
+    final prefs = _prefs;
+    if (prefs != null) {
+      unawaited(prefs.setBool(_keyIsRegistered, false));
+    }
   }
 
   /// Check if device is registered with backend

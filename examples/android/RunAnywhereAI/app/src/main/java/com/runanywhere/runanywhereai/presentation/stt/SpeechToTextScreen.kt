@@ -6,14 +6,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,16 +27,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -107,12 +104,13 @@ fun SpeechToTextScreen(
                     STTModelChip(
                         modelName = uiState.selectedModelName,
                         mode = uiState.mode,
-                        modifier = Modifier.padding(
-                            start = 6.dp,
-                            end = 12.dp,
-                            top = 6.dp,
-                            bottom = 6.dp,
-                        ),
+                        modifier =
+                            Modifier.padding(
+                                start = 6.dp,
+                                end = 12.dp,
+                                top = 6.dp,
+                                bottom = 6.dp,
+                            ),
                     )
                 }
             }
@@ -231,6 +229,7 @@ fun SpeechToTextScreen(
  * Mode Description text
  * iOS Reference: Mode description under segmented control
  */
+@Suppress("UnusedPrivateMember")
 @Composable
 private fun ModeDescription(
     mode: STTMode,
@@ -286,10 +285,11 @@ private fun ReadyStateSTT(mode: STTMode) {
     val breathing by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(800),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "breathing",
     )
     val baseHeights = listOf(16, 24, 20, 28, 18)
@@ -305,18 +305,20 @@ private fun ReadyStateSTT(mode: STTMode) {
             baseHeights.forEachIndexed { index, base ->
                 val h = base + (breathingHeights[index] - base) * breathing
                 Box(
-                    modifier = Modifier
-                        .width(6.dp)
-                        .height(h.toInt().dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    AppColors.primaryAccent.copy(alpha = 0.8f),
-                                    AppColors.primaryAccent.copy(alpha = 0.4f),
+                    modifier =
+                        Modifier
+                            .width(6.dp)
+                            .height(h.toInt().dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    colors =
+                                        listOf(
+                                            AppColors.primaryAccent.copy(alpha = 0.8f),
+                                            AppColors.primaryAccent.copy(alpha = 0.4f),
+                                        ),
                                 ),
                             ),
-                        ),
                 )
             }
         }
@@ -746,9 +748,10 @@ private fun STTModelChip(
     ) {
         if (modelName != null) {
             Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(6.dp)),
+                modifier =
+                    Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(6.dp)),
             ) {
                 Image(
                     painter = painterResource(id = getModelLogoResIdForName(modelName)),
@@ -780,10 +783,11 @@ private fun STTModelChip(
                     )
                     Text(
                         text = if (mode == STTMode.LIVE) "Streaming" else "Batch",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
+                        style =
+                            MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
                         color = if (mode == STTMode.LIVE) AppColors.primaryGreen else AppColors.primaryOrange,
                     )
                 }
@@ -805,7 +809,10 @@ private fun STTModelChip(
     }
 }
 
-private fun shortModelNameSTT(name: String, maxLength: Int = 15): String {
+private fun shortModelNameSTT(
+    name: String,
+    maxLength: Int = 15,
+): String {
     val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
     return if (cleaned.length > maxLength) cleaned.take(maxLength - 1) + "\u2026" else cleaned
 }
@@ -813,6 +820,7 @@ private fun shortModelNameSTT(name: String, maxLength: Int = 15): String {
 /**
  * Model Status Banner for STT (kept for reference; not used when app bar shows model)
  */
+@Suppress("UnusedPrivateMember")
 @Composable
 private fun ModelStatusBannerSTT(
     framework: String?,
@@ -931,8 +939,11 @@ private fun STTModeSelector(
                 border =
                     androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (isSelected) AppColors.primaryAccent.copy(alpha = 0.3f)
-                        else AppColors.statusGray.copy(alpha = 0.2f),
+                        if (isSelected) {
+                            AppColors.primaryAccent.copy(alpha = 0.3f)
+                        } else {
+                            AppColors.statusGray.copy(alpha = 0.2f)
+                        },
                     ),
             ) {
                 Column(
@@ -941,19 +952,21 @@ private fun STTModeSelector(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = when (mode) {
-                            STTMode.BATCH -> "Batch"
-                            STTMode.LIVE -> "Live"
-                        },
+                        text =
+                            when (mode) {
+                                STTMode.BATCH -> "Batch"
+                                STTMode.LIVE -> "Live"
+                            },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         color = if (isSelected) AppColors.primaryAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        text = when (mode) {
-                            STTMode.BATCH -> "Record then transcribe"
-                            STTMode.LIVE -> "Real-time transcription"
-                        },
+                        text =
+                            when (mode) {
+                                STTMode.BATCH -> "Record then transcribe"
+                                STTMode.LIVE -> "Real-time transcription"
+                            },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     )

@@ -22,8 +22,8 @@ public extension RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Download")
         let models = try await availableModels()
         logger.info("Available models count: \(models.count)")
-        for m in models where m.id == modelId {
-            logger.info("Found model \(m.id) with framework: \(m.framework.rawValue) (\(m.framework.displayName))")
+        for candidate in models where candidate.id == modelId {
+            logger.info("Found model \(candidate.id) with framework: \(candidate.framework.rawValue) (\(candidate.framework.displayName))")
         }
         guard let model = models.first(where: { $0.id == modelId }) else {
             throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")

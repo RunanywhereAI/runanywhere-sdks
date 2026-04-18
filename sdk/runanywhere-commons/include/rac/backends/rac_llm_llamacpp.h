@@ -232,8 +232,7 @@ RAC_LLAMACPP_API void rac_llm_llamacpp_destroy(rac_handle_t handle);
  * @return RAC_SUCCESS or error code
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
-                                                          const char* adapter_path,
-                                                          float scale);
+                                                         const char* adapter_path, float scale);
 
 /**
  * Remove a specific LoRA adapter by path.
@@ -244,7 +243,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
  * @return RAC_SUCCESS or RAC_ERROR_NOT_FOUND
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
-                                                            const char* adapter_path);
+                                                           const char* adapter_path);
 
 /**
  * Remove all LoRA adapters from the context.
@@ -264,8 +263,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_clear_lora(rac_handle_t handle);
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle,
-                                                              char** out_json);
+RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle, char** out_json);
 
 // =============================================================================
 // ADAPTIVE CONTEXT API (for RAG pipelines)
@@ -280,7 +278,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_get_lora_info(rac_handle_t handle
  * @return RAC_SUCCESS or error code
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t handle,
-                                                                     const char* prompt);
+                                                                    const char* prompt);
 
 /**
  * Append text to the KV cache after current content.
@@ -291,7 +289,7 @@ RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_inject_system_prompt(rac_handle_t
  * @return RAC_SUCCESS or error code
  */
 RAC_LLAMACPP_API rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle,
-                                                               const char* text);
+                                                              const char* text);
 
 /**
  * Generate response from accumulated KV cache state.

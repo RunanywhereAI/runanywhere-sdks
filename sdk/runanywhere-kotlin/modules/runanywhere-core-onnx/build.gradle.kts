@@ -28,12 +28,22 @@ plugins {
     signing
 }
 
-val testLocal: Boolean =
-    rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        ?: false
+// `useLocalNatives` is the canonical property name (matches Swift/Flutter/RN);
+// `testLocal` still works as a legacy fallback.
+val useLocalNatives: Boolean =
+    run {
+        val newValue =
+            rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+                ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        if (newValue != null) return@run newValue
+        rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+            ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+            ?: false
+    }
+// Alias kept so existing references in this file keep working.
+val testLocal: Boolean = useLocalNatives
 
-logger.lifecycle("ONNX Module: testLocal=$testLocal")
+logger.lifecycle("ONNX Module: useLocalNatives=$useLocalNatives")
 
 // Detekt
 detekt {
@@ -177,14 +187,15 @@ tasks.register("downloadJniLibs") {
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
     val packageType = "RABackendONNX-android"
 
-    val onnxLibs = setOf(
-        "librac_backend_onnx.so",
-        "librac_backend_onnx_jni.so",
-        "libonnxruntime.so",
-        "libsherpa-onnx-c-api.so",
-        "libsherpa-onnx-cxx-api.so",
-        "libsherpa-onnx-jni.so",
-    )
+    val onnxLibs =
+        setOf(
+            "librac_backend_onnx.so",
+            "librac_backend_onnx_jni.so",
+            "libonnxruntime.so",
+            "libsherpa-onnx-c-api.so",
+            "libsherpa-onnx-cxx-api.so",
+            "libsherpa-onnx-jni.so",
+        )
 
     outputs.dir(outputDir)
 

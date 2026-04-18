@@ -30,12 +30,11 @@
 static constexpr size_t CACHE_LINE_SIZE = 64;
 
 struct rac_energy_vad {
-
     // === Group 1: Hot processing data (read/written every frame) ===
     // Kept together on their own cache line(s) for spatial locality
 
     float energy_threshold;
-    float energy_threshold_sq;   // energy_threshold², for sqrt-free comparison in hot path
+    float energy_threshold_sq;  // energy_threshold², for sqrt-free comparison in hot path
     float base_energy_threshold;
 
     int32_t consecutive_silent_frames;
@@ -220,7 +219,8 @@ static void handle_calibration_frame(rac_energy_vad* vad, const float energy) {
         vad->ambient_noise_level = percentile_90;
 
         // Calculate dynamic threshold (mirrors Swift logic)
-        const float minimum_threshold = std::max(vad->ambient_noise_level * 2.0f, RAC_VAD_MIN_THRESHOLD);
+        const float minimum_threshold =
+            std::max(vad->ambient_noise_level * 2.0f, RAC_VAD_MIN_THRESHOLD);
         const float calculated_threshold = vad->ambient_noise_level * vad->calibration_multiplier;
 
         // Apply threshold with sensible bounds
@@ -244,14 +244,14 @@ static void handle_calibration_frame(rac_energy_vad* vad, const float energy) {
 
 /**
  * Update debug statistics
- * Mirrors Swift's updateDebugStatistics(energy:) 
- * Optimised to use ring buffer 
+ * Mirrors Swift's updateDebugStatistics(energy:)
+ * Optimised to use ring buffer
  */
 static void update_debug_statistics(rac_energy_vad* vad, const float energy) {
     if (vad->recent_energy_values.empty()) {
         return;
     }
-    
+
     vad->recent_energy_values[vad->ring_buffer_write_index] = energy;
 
     vad->ring_buffer_write_index++;
@@ -442,8 +442,9 @@ rac_result_t rac_energy_vad_reset(rac_energy_vad_handle_t handle) {
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle, const float* __restrict audio_data,
-                                          size_t sample_count, rac_bool_t* out_has_voice) {
+rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle,
+                                          const float* __restrict audio_data, size_t sample_count,
+                                          rac_bool_t* out_has_voice) {
     if (!handle || !audio_data || sample_count == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -545,8 +546,7 @@ rac_result_t rac_energy_vad_process_audio(rac_energy_vad_handle_t handle, const 
     return RAC_SUCCESS;
 }
 
-float rac_energy_vad_calculate_rms(const float* __restrict audio_data,
-                                  size_t sample_count) {
+float rac_energy_vad_calculate_rms(const float* __restrict audio_data, size_t sample_count) {
     if (sample_count == 0 || audio_data == nullptr) {
         return 0.0f;
     }
@@ -829,7 +829,6 @@ rac_result_t rac_energy_vad_get_statistics(rac_energy_vad_handle_t handle,
 
     size_t count = handle->ring_buffer_count;
     if (count > 0) {
-
         size_t last_idx = (handle->ring_buffer_write_index == 0)
                               ? (handle->recent_energy_values.size() - 1)
                               : (handle->ring_buffer_write_index - 1);

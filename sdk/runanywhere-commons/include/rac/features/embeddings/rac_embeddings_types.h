@@ -22,9 +22,9 @@ extern "C" {
 // CONSTANTS
 // =============================================================================
 
-#define RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE     512
-#define RAC_EMBEDDINGS_MAX_BATCH_SIZE         8192
-#define RAC_EMBEDDINGS_DEFAULT_MAX_TOKENS     512
+#define RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE 512
+#define RAC_EMBEDDINGS_MAX_BATCH_SIZE 8192
+#define RAC_EMBEDDINGS_DEFAULT_MAX_TOKENS 512
 
 // =============================================================================
 // ENUMS
@@ -34,17 +34,18 @@ extern "C" {
  * @brief Embedding normalization mode
  */
 typedef enum rac_embeddings_normalize {
-    RAC_EMBEDDINGS_NORMALIZE_NONE = 0,  /**< No normalization */
-    RAC_EMBEDDINGS_NORMALIZE_L2 = 1,    /**< L2 normalization (unit vectors, recommended for cosine similarity) */
+    RAC_EMBEDDINGS_NORMALIZE_NONE = 0, /**< No normalization */
+    RAC_EMBEDDINGS_NORMALIZE_L2 =
+        1, /**< L2 normalization (unit vectors, recommended for cosine similarity) */
 } rac_embeddings_normalize_t;
 
 /**
  * @brief Embedding pooling strategy
  */
 typedef enum rac_embeddings_pooling {
-    RAC_EMBEDDINGS_POOLING_MEAN = 0,  /**< Mean pooling over all token embeddings */
-    RAC_EMBEDDINGS_POOLING_CLS = 1,   /**< Use CLS token embedding */
-    RAC_EMBEDDINGS_POOLING_LAST = 2,  /**< Use last token embedding */
+    RAC_EMBEDDINGS_POOLING_MEAN = 0, /**< Mean pooling over all token embeddings */
+    RAC_EMBEDDINGS_POOLING_CLS = 1,  /**< Use CLS token embedding */
+    RAC_EMBEDDINGS_POOLING_LAST = 2, /**< Use last token embedding */
 } rac_embeddings_pooling_t;
 
 // =============================================================================
@@ -79,8 +80,7 @@ static const rac_embeddings_config_t RAC_EMBEDDINGS_CONFIG_DEFAULT = {
     .preferred_framework = -1,
     .max_tokens = RAC_EMBEDDINGS_DEFAULT_MAX_TOKENS,
     .normalize = RAC_EMBEDDINGS_NORMALIZE_L2,
-    .pooling = RAC_EMBEDDINGS_POOLING_MEAN
-};
+    .pooling = RAC_EMBEDDINGS_POOLING_MEAN};
 
 // =============================================================================
 // OPTIONS
@@ -104,10 +104,7 @@ typedef struct rac_embeddings_options {
  * @brief Default embedding options
  */
 static const rac_embeddings_options_t RAC_EMBEDDINGS_OPTIONS_DEFAULT = {
-    .normalize = -1,
-    .pooling = -1,
-    .n_threads = 0
-};
+    .normalize = -1, .pooling = -1, .n_threads = 0};
 
 // =============================================================================
 // RESULT

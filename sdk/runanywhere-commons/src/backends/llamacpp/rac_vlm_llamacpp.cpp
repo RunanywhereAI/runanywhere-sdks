@@ -10,6 +10,8 @@
 
 #include "rac/backends/rac_vlm_llamacpp.h"
 
+#include <llama.h>
+
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -20,13 +22,11 @@
 #include <thread>
 #include <vector>
 
-#include <llama.h>
-
 // llama.cpp multimodal support (mtmd)
 #ifdef RAC_VLM_USE_MTMD
 #include "clip.h"
-#include "mtmd.h"
 #include "mtmd-helper.h"
+#include "mtmd.h"
 #endif
 
 #include "rac/core/rac_logger.h"
@@ -79,7 +79,7 @@ struct LlamaCppVLMBackend {
     llama_pos n_past = 0;
 
     // Detected model type for chat template
-    VLMModelType model_type = static_cast<VLMModelType>(0); // Unknown
+    VLMModelType model_type = static_cast<VLMModelType>(0);  // Unknown
 
     // Cached sampler parameters to avoid unnecessary rebuilds
     float cached_temperature = -1.0f;
@@ -114,17 +114,18 @@ int get_num_threads(const int config_threads) {
  */
 enum class VLMModelType {
     Unknown,
-    SmolVLM,    // SmolVLM uses "User:" / "Assistant:" format
-    Qwen2VL,    // Qwen2-VL uses chatml with <|im_start|>user format
-    LLaVA,      // LLaVA uses "USER:" / "ASSISTANT:" format
-    Generic     // Generic chatml fallback
+    SmolVLM,  // SmolVLM uses "User:" / "Assistant:" format
+    Qwen2VL,  // Qwen2-VL uses chatml with <|im_start|>user format
+    LLaVA,    // LLaVA uses "USER:" / "ASSISTANT:" format
+    Generic   // Generic chatml fallback
 };
 
 /**
  * Detect VLM model type from model name metadata.
  */
 VLMModelType detect_vlm_model_type(llama_model* model) {
-    if (!model) return VLMModelType::Generic;
+    if (!model)
+        return VLMModelType::Generic;
 
     // Try to get model name from metadata
     char name_buf[256] = {0};
@@ -136,12 +137,12 @@ VLMModelType detect_vlm_model_type(llama_model* model) {
     if (len > 0) {
         std::string name(name_buf);
         // Convert to lowercase for comparison
-        for (auto& c : name) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        for (auto& c : name)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
         RAC_LOG_DEBUG(LOG_CAT, "Model name from metadata: %s", name.c_str());
 
-        if (name.find("smolvlm") != std::string::npos ||
-            name.find("smol") != std::string::npos) {
+        if (name.find("smolvlm") != std::string::npos || name.find("smol") != std::string::npos) {
             RAC_LOG_DEBUG(LOG_CAT, "Detected SmolVLM model type");
             return VLMModelType::SmolVLM;
         }
@@ -190,7 +191,8 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
     }
 
     // Resolve system prompt: use explicit value, or inject a default for Qwen2-VL
-    const char* effective_system = (system_prompt && system_prompt[0] != '\0') ? system_prompt : nullptr;
+    const char* effective_system =
+        (system_prompt && system_prompt[0] != '\0') ? system_prompt : nullptr;
     if (!effective_system && model_type == VLMModelType::Qwen2VL) {
         effective_system = "You are a helpful assistant.";
     }
@@ -212,7 +214,8 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
             int32_t size = llama_chat_apply_template(tmpl, messages, 2, true, nullptr, 0);
             if (size > 0) {
                 std::vector<char> buf(size + 1);
-                int32_t result = llama_chat_apply_template(tmpl, messages, 2, true, buf.data(), buf.size());
+                int32_t result =
+                    llama_chat_apply_template(tmpl, messages, 2, true, buf.data(), buf.size());
                 if (result > 0) {
                     std::string formatted(buf.data(), result);
                     RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt with system (%d chars): %s",
@@ -221,9 +224,14 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
                 }
             }
             if (effective_system) {
-                RAC_LOG_WARNING(LOG_CAT, "Template with system failed (size=%d); falling back to manual to preserve explicit system prompt", size);
+                RAC_LOG_WARNING(LOG_CAT,
+                                "Template with system failed (size=%d); falling back to manual to "
+                                "preserve explicit system prompt",
+                                size);
             } else {
-                RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template with system failed (size=%d), trying without", size);
+                RAC_LOG_WARNING(
+                    LOG_CAT,
+                    "llama_chat_apply_template with system failed (size=%d), trying without", size);
             }
             // If the caller passed an explicit system prompt, skip user-only
             // template to avoid silently dropping it -- go straight to manual.
@@ -240,7 +248,8 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
             int32_t size = llama_chat_apply_template(tmpl, messages, 1, true, nullptr, 0);
             if (size > 0) {
                 std::vector<char> buf(size + 1);
-                int32_t result = llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
+                int32_t result =
+                    llama_chat_apply_template(tmpl, messages, 1, true, buf.data(), buf.size());
                 if (result > 0) {
                     std::string formatted(buf.data(), result);
                     RAC_LOG_DEBUG(LOG_CAT, "Template-formatted prompt (%d chars): %s",
@@ -248,7 +257,9 @@ std::string format_vlm_prompt_with_template(llama_model* model, const std::strin
                     return formatted;
                 }
             }
-            RAC_LOG_WARNING(LOG_CAT, "llama_chat_apply_template failed (size=%d), falling back to manual", size);
+            RAC_LOG_WARNING(LOG_CAT,
+                            "llama_chat_apply_template failed (size=%d), falling back to manual",
+                            size);
         }
     } else {
         RAC_LOG_DEBUG(LOG_CAT, "No chat template in model, using manual formatting");
@@ -266,8 +277,8 @@ manual_fallback:
     formatted += user_content;
     formatted += "<|im_end|>\n<|im_start|>assistant\n";
 
-    RAC_LOG_DEBUG(LOG_CAT, "Manual-formatted prompt (%d chars): %s",
-                  (int)formatted.length(), formatted.c_str());
+    RAC_LOG_DEBUG(LOG_CAT, "Manual-formatted prompt (%d chars): %s", (int)formatted.length(),
+                  formatted.c_str());
     return formatted;
 }
 
@@ -304,8 +315,7 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
     }
 
     // Skip rebuild if params haven't changed and sampler already exists
-    if (backend->sampler &&
-        backend->cached_temperature == temperature &&
+    if (backend->sampler && backend->cached_temperature == temperature &&
         backend->cached_top_p == top_p) {
         return;
     }
@@ -325,15 +335,16 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
 
     if (temperature > 0.0f) {
         // Token-level repetition penalty + frequency/presence penalties
-        llama_sampler_chain_add(backend->sampler, llama_sampler_init_penalties(256, 1.3f, 0.1f, 0.1f));
+        llama_sampler_chain_add(backend->sampler,
+                                llama_sampler_init_penalties(256, 1.3f, 0.1f, 0.1f));
 
         // DRY sampler: catches n-gram (sequence) repetition like "gó gó gó" where individual
         // tokens may alternate. Multiplier=0.8, base=1.75, allowed_length=2, last_n=256.
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
-        static const char* dry_breakers[] = { "\n", ":", "\"", "*" };
-        llama_sampler_chain_add(backend->sampler, llama_sampler_init_dry(
-            vocab, llama_model_n_ctx_train(backend->model),
-            0.8f, 1.75f, 2, 256, dry_breakers, 4));
+        static const char* dry_breakers[] = {"\n", ":", "\"", "*"};
+        llama_sampler_chain_add(
+            backend->sampler, llama_sampler_init_dry(vocab, llama_model_n_ctx_train(backend->model),
+                                                     0.8f, 1.75f, 2, 256, dry_breakers, 4));
 
         llama_sampler_chain_add(backend->sampler, llama_sampler_init_top_p(top_p, 1));
         llama_sampler_chain_add(backend->sampler, llama_sampler_init_min_p(0.1f, 1));
@@ -347,7 +358,9 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
     backend->cached_temperature = temperature;
     backend->cached_top_p = top_p;
 
-    RAC_LOG_INFO(LOG_CAT, "[v3] Sampler: temp=%.2f top_p=%.2f repeat=1.3 freq=0.1 pres=0.1 DRY=0.8 min_p=0.1 + repeat_guard=4",
+    RAC_LOG_INFO(LOG_CAT,
+                 "[v3] Sampler: temp=%.2f top_p=%.2f repeat=1.3 freq=0.1 pres=0.1 DRY=0.8 "
+                 "min_p=0.1 + repeat_guard=4",
                  temperature, top_p);
 }
 
@@ -355,13 +368,17 @@ void configure_sampler(LlamaCppVLMBackend* backend, const rac_vlm_options_t* opt
  * Resolve the effective VLM model type from options override or auto-detected default.
  */
 static VLMModelType resolve_effective_model_type(VLMModelType detected,
-                                                  const rac_vlm_options_t* options) {
+                                                 const rac_vlm_options_t* options) {
     if (options && options->model_family != RAC_VLM_MODEL_FAMILY_AUTO) {
         switch (options->model_family) {
-            case RAC_VLM_MODEL_FAMILY_QWEN2_VL: return VLMModelType::Qwen2VL;
-            case RAC_VLM_MODEL_FAMILY_SMOLVLM:  return VLMModelType::SmolVLM;
-            case RAC_VLM_MODEL_FAMILY_LLAVA:     return VLMModelType::LLaVA;
-            default:                             return VLMModelType::Generic;
+            case RAC_VLM_MODEL_FAMILY_QWEN2_VL:
+                return VLMModelType::Qwen2VL;
+            case RAC_VLM_MODEL_FAMILY_SMOLVLM:
+                return VLMModelType::SmolVLM;
+            case RAC_VLM_MODEL_FAMILY_LLAVA:
+                return VLMModelType::LLaVA;
+            default:
+                return VLMModelType::Generic;
         }
     }
     return detected;
@@ -375,10 +392,8 @@ static VLMModelType resolve_effective_model_type(VLMModelType detected,
  * Shared between rac_vlm_llamacpp_process() and rac_vlm_llamacpp_process_stream()
  * to eliminate code duplication (~100 lines of identical prompt prep logic).
  */
-rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
-                                  const rac_vlm_image_t* image,
-                                  const char* prompt,
-                                  const rac_vlm_options_t* options) {
+rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend, const rac_vlm_image_t* image,
+                                 const char* prompt, const rac_vlm_options_t* options) {
     backend->cancel_requested = false;
     configure_sampler(backend, options);
 
@@ -391,7 +406,8 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
 
     // Resolve effective model type: options override > auto-detected at load time
     VLMModelType effective_model_type = resolve_effective_model_type(backend->model_type, options);
-    const char* system_prompt = (options && options->system_prompt) ? options->system_prompt : nullptr;
+    const char* system_prompt =
+        (options && options->system_prompt) ? options->system_prompt : nullptr;
 
     // Build prompt with image handling
     std::string full_prompt;
@@ -432,7 +448,7 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
         text.add_special = true;
         text.parse_special = true;
 
-        const mtmd_bitmap* bitmaps[] = { bitmap };
+        const mtmd_bitmap* bitmaps[] = {bitmap};
         int32_t tokenize_result = mtmd_tokenize(backend->mtmd_ctx, chunks, &text, bitmaps, 1);
 
         if (tokenize_result != 0) {
@@ -444,11 +460,9 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
 
         llama_pos new_n_past = 0;
         int32_t eval_result = mtmd_helper_eval_chunks(
-            backend->mtmd_ctx, backend->ctx, chunks,
-            0, 0,
-            backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize,
-            true, &new_n_past
-        );
+            backend->mtmd_ctx, backend->ctx, chunks, 0, 0,
+            backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize, true,
+            &new_n_past);
 
         mtmd_bitmap_free(bitmap);
         mtmd_input_chunks_free(chunks);
@@ -468,12 +482,12 @@ rac_result_t prepare_vlm_context(LlamaCppVLMBackend* backend,
 
         const llama_vocab* vocab = llama_model_get_vocab(backend->model);
         std::vector<llama_token> tokens(full_prompt.size() + 16);
-        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
+        int n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(), tokens.data(),
+                                      tokens.size(), true, true);
         if (n_tokens < 0) {
             tokens.resize(-n_tokens);
-            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(),
-                                      tokens.data(), tokens.size(), true, true);
+            n_tokens = llama_tokenize(vocab, full_prompt.c_str(), full_prompt.size(), tokens.data(),
+                                      tokens.size(), true, true);
         }
         tokens.resize(n_tokens);
 
@@ -595,7 +609,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
 
 #ifdef RAC_VLM_USE_MTMD
     if (backend->model_type == VLMModelType::Qwen2VL && gpu_layers != 0) {
-        RAC_LOG_WARNING(LOG_CAT, "Qwen2-VL uses M-RoPE which is incompatible with WebGPU "
+        RAC_LOG_WARNING(LOG_CAT,
+                        "Qwen2-VL uses M-RoPE which is incompatible with WebGPU "
                         "(gpu_layers=%d) — reloading with n_gpu_layers=0 for CPU execution",
                         gpu_layers);
         llama_model_free(backend->model);
@@ -616,7 +631,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     int ctx_size = backend->config.context_size;
     if (ctx_size <= 0) {
         ctx_size = llama_model_n_ctx_train(backend->model);
-        if (ctx_size > kDefaultMaxContextSize) ctx_size = kDefaultMaxContextSize;  // Cap for mobile
+        if (ctx_size > kDefaultMaxContextSize)
+            ctx_size = kDefaultMaxContextSize;  // Cap for mobile
     }
     backend->context_size = ctx_size;
 
@@ -624,7 +640,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     int n_threads = get_num_threads(backend->config.num_threads);
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = ctx_size;
-    ctx_params.n_batch = backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize;
+    ctx_params.n_batch =
+        backend->config.batch_size > 0 ? backend->config.batch_size : kDefaultBatchSize;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
@@ -667,7 +684,8 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
     backend->model_loaded = true;
     backend->n_past = 0;
 
-    RAC_LOG_INFO(LOG_CAT, "VLM model loaded (ctx=%d, threads=%d, gpu_layers=%d%s) [build:v4-cpu-mrope]",
+    RAC_LOG_INFO(LOG_CAT,
+                 "VLM model loaded (ctx=%d, threads=%d, gpu_layers=%d%s) [build:v4-cpu-mrope]",
                  ctx_size, n_threads, gpu_layers, force_cpu ? ", forced-cpu" : "");
     return RAC_SUCCESS;
 }
@@ -709,13 +727,15 @@ rac_result_t rac_vlm_llamacpp_unload_model(rac_handle_t handle) {
 }
 
 rac_bool_t rac_vlm_llamacpp_is_model_loaded(rac_handle_t handle) {
-    if (!handle) return RAC_FALSE;
+    if (!handle)
+        return RAC_FALSE;
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
     return backend->model_loaded ? RAC_TRUE : RAC_FALSE;
 }
 
 void rac_vlm_llamacpp_destroy(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
 
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
 
@@ -752,7 +772,8 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
     }
 
     // Generate response (batch mode — accumulate all tokens)
-    const int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
+    const int max_tokens =
+        (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
     std::string response;
     response.reserve(kDefaultMaxTokens);  // Typical VLM responses are a few hundred tokens
     int tokens_generated = 0;
@@ -779,29 +800,41 @@ rac_result_t rac_vlm_llamacpp_process(rac_handle_t handle, const rac_vlm_image_t
                 int nan_count = 0;
                 int inf_count = 0;
                 for (int v = 0; v < n_vocab; v++) {
-                    if (logits[v] != logits[v]) nan_count++;       // NaN check
-                    if (logits[v] > 1e30f || logits[v] < -1e30f) inf_count++;
-                    if (logits[v] > max_logit) { max_logit = logits[v]; max_idx = v; }
+                    if (logits[v] != logits[v])
+                        nan_count++;  // NaN check
+                    if (logits[v] > 1e30f || logits[v] < -1e30f)
+                        inf_count++;
+                    if (logits[v] > max_logit) {
+                        max_logit = logits[v];
+                        max_idx = v;
+                    }
                 }
-                RAC_LOG_DEBUG(LOG_CAT, "[v3-diag] Logits: n_vocab=%d, max_logit=%.4f at token %d, NaN=%d, Inf=%d",
-                              n_vocab, max_logit, max_idx, nan_count, inf_count);
+                RAC_LOG_DEBUG(
+                    LOG_CAT,
+                    "[v3-diag] Logits: n_vocab=%d, max_logit=%.4f at token %d, NaN=%d, Inf=%d",
+                    n_vocab, max_logit, max_idx, nan_count, inf_count);
                 // Log top 5 logits
                 float top5_val[5] = {-1e30f, -1e30f, -1e30f, -1e30f, -1e30f};
-                int   top5_idx[5] = {0, 0, 0, 0, 0};
+                int top5_idx[5] = {0, 0, 0, 0, 0};
                 for (int v = 0; v < n_vocab; v++) {
-                    if (logits[v] != logits[v]) continue; // skip NaN
+                    if (logits[v] != logits[v])
+                        continue;  // skip NaN
                     for (int k = 0; k < 5; k++) {
                         if (logits[v] > top5_val[k]) {
-                            for (int j = 4; j > k; j--) { top5_val[j] = top5_val[j-1]; top5_idx[j] = top5_idx[j-1]; }
-                            top5_val[k] = logits[v]; top5_idx[k] = v;
+                            for (int j = 4; j > k; j--) {
+                                top5_val[j] = top5_val[j - 1];
+                                top5_idx[j] = top5_idx[j - 1];
+                            }
+                            top5_val[k] = logits[v];
+                            top5_idx[k] = v;
                             break;
                         }
                     }
                 }
-                RAC_LOG_DEBUG(LOG_CAT, "[v3-diag] Top5: [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f",
-                              top5_idx[0], top5_val[0], top5_idx[1], top5_val[1],
-                              top5_idx[2], top5_val[2], top5_idx[3], top5_val[3],
-                              top5_idx[4], top5_val[4]);
+                RAC_LOG_DEBUG(LOG_CAT,
+                              "[v3-diag] Top5: [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f [%d]=%.2f",
+                              top5_idx[0], top5_val[0], top5_idx[1], top5_val[1], top5_idx[2],
+                              top5_val[2], top5_idx[3], top5_val[3], top5_idx[4], top5_val[4]);
             }
         }
 #endif
@@ -885,7 +918,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
     }
 
     // Generate response (streaming mode — callback per token)
-    const int max_tokens = (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
+    const int max_tokens =
+        (options && options->max_tokens > 0) ? options->max_tokens : kDefaultMaxTokens;
 
     llama_batch batch = llama_batch_init(1, 0, 1);
     const llama_vocab* const vocab = llama_model_get_vocab(backend->model);
@@ -906,8 +940,9 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
             if (token == prev_token) {
                 repeat_run++;
                 if (repeat_run >= MAX_CONSECUTIVE_REPEATS) {
-                    RAC_LOG_WARNING(LOG_CAT, "Repetition guard: token %d repeated %d times, stopping",
-                                    token, repeat_run + 1);
+                    RAC_LOG_WARNING(LOG_CAT,
+                                    "Repetition guard: token %d repeated %d times, stopping", token,
+                                    repeat_run + 1);
                     callback("", RAC_TRUE, user_data);
                     break;
                 }
@@ -948,7 +983,8 @@ rac_result_t rac_vlm_llamacpp_process_stream(rac_handle_t handle, const rac_vlm_
 }
 
 void rac_vlm_llamacpp_cancel(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* backend = static_cast<LlamaCppVLMBackend*>(handle);
     backend->cancel_requested = true;
 }
@@ -968,8 +1004,7 @@ rac_result_t rac_vlm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
     // Build simple JSON info
     char buffer[1024];
     snprintf(buffer, sizeof(buffer),
-             "{\"context_size\":%d,\"model_path\":\"%s\",\"has_vision\":%s}",
-             backend->context_size,
+             "{\"context_size\":%d,\"model_path\":\"%s\",\"has_vision\":%s}", backend->context_size,
              backend->model_path.c_str(),
 #ifdef RAC_VLM_USE_MTMD
              backend->mtmd_ctx ? "true" : "false"

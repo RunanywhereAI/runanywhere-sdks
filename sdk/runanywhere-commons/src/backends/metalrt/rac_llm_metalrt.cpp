@@ -5,10 +5,10 @@
 
 #include "rac_llm_metalrt.h"
 
+#include "metalrt_c_api.h"
+
 #include <cstdlib>
 #include <cstring>
-
-#include "metalrt_c_api.h"
 
 #include "rac/core/rac_logger.h"
 
@@ -62,7 +62,8 @@ rac_result_t rac_llm_metalrt_create(const char* model_path, rac_handle_t* out_ha
 }
 
 void rac_llm_metalrt_destroy(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_destroy(impl->handle);
@@ -71,17 +72,20 @@ void rac_llm_metalrt_destroy(rac_handle_t handle) {
 }
 
 rac_bool_t rac_llm_metalrt_is_loaded(rac_handle_t handle) {
-    if (!handle) return RAC_FALSE;
+    if (!handle)
+        return RAC_FALSE;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
     return impl->loaded ? RAC_TRUE : RAC_FALSE;
 }
 
 rac_result_t rac_llm_metalrt_generate(rac_handle_t handle, const char* prompt,
-                                       const rac_llm_options_t* options,
-                                       rac_llm_result_t* out_result) {
-    if (!handle || !prompt || !out_result) return RAC_ERROR_NULL_POINTER;
+                                      const rac_llm_options_t* options,
+                                      rac_llm_result_t* out_result) {
+    if (!handle || !prompt || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTOptions opts = {};
     opts.max_tokens = options ? options->max_tokens : 100;
@@ -117,7 +121,8 @@ struct MetalRTStreamCtx {
 
 static bool metalrt_stream_bridge(const char* piece, void* ctx) {
     auto* adapter = static_cast<MetalRTStreamCtx*>(ctx);
-    if (!adapter || !adapter->callback) return false;
+    if (!adapter || !adapter->callback)
+        return false;
     if (adapter->max_tokens > 0 && adapter->emitted_tokens >= adapter->max_tokens) {
         return false;
     }
@@ -130,12 +135,13 @@ static bool metalrt_stream_bridge(const char* piece, void* ctx) {
 }
 
 rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* prompt,
-                                              const rac_llm_options_t* options,
-                                              rac_llm_metalrt_stream_cb callback,
-                                              void* user_data) {
-    if (!handle || !prompt || !callback) return RAC_ERROR_NULL_POINTER;
+                                             const rac_llm_options_t* options,
+                                             rac_llm_metalrt_stream_cb callback, void* user_data) {
+    if (!handle || !prompt || !callback)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     int32_t max_tok = options ? options->max_tokens : 100;
 
@@ -148,8 +154,8 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
     opts.ignore_eos = false;
 
     MetalRTStreamCtx ctx = {callback, user_data, max_tok, 0, false};
-    struct MetalRTResult result = metalrt_generate_stream(
-        impl->handle, prompt, metalrt_stream_bridge, &ctx, &opts);
+    struct MetalRTResult result =
+        metalrt_generate_stream(impl->handle, prompt, metalrt_stream_bridge, &ctx, &opts);
 
     // Send final token only if client did not cancel.
     if (!ctx.client_cancelled) {
@@ -161,27 +167,33 @@ rac_result_t rac_llm_metalrt_generate_stream(rac_handle_t handle, const char* pr
 }
 
 rac_result_t rac_llm_metalrt_inject_system_prompt(rac_handle_t handle, const char* prompt) {
-    if (!handle || !prompt) return RAC_ERROR_NULL_POINTER;
+    if (!handle || !prompt)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
     metalrt_set_system_prompt(impl->handle, prompt);
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_llm_metalrt_append_context(rac_handle_t handle, const char* text) {
-    if (!handle || !text) return RAC_ERROR_NULL_POINTER;
+    if (!handle || !text)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
     metalrt_cache_prompt(impl->handle, text);
     return RAC_SUCCESS;
 }
 
 rac_result_t rac_llm_metalrt_generate_from_context(rac_handle_t handle, const char* query,
-                                                    const rac_llm_options_t* options,
-                                                    rac_llm_result_t* out_result) {
-    if (!handle || !query || !out_result) return RAC_ERROR_NULL_POINTER;
+                                                   const rac_llm_options_t* options,
+                                                   rac_llm_result_t* out_result) {
+    if (!handle || !query || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTOptions opts = {};
     opts.max_tokens = options ? options->max_tokens : 100;
@@ -206,15 +218,18 @@ rac_result_t rac_llm_metalrt_generate_from_context(rac_handle_t handle, const ch
 }
 
 rac_result_t rac_llm_metalrt_clear_context(rac_handle_t handle) {
-    if (!handle) return RAC_ERROR_NULL_POINTER;
+    if (!handle)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
     metalrt_clear_kv(impl->handle);
     return RAC_SUCCESS;
 }
 
 void rac_llm_metalrt_reset(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_reset(impl->handle);
@@ -222,16 +237,20 @@ void rac_llm_metalrt_reset(rac_handle_t handle) {
 }
 
 int rac_llm_metalrt_context_size(rac_handle_t handle) {
-    if (!handle) return 0;
+    if (!handle)
+        return 0;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->handle) return 0;
+    if (!impl->handle)
+        return 0;
     return metalrt_context_size(impl->handle);
 }
 
 const char* rac_llm_metalrt_model_name(rac_handle_t handle) {
-    if (!handle) return nullptr;
+    if (!handle)
+        return nullptr;
     auto* impl = static_cast<rac_llm_metalrt_impl*>(handle);
-    if (!impl->handle) return nullptr;
+    if (!impl->handle)
+        return nullptr;
     return metalrt_model_name(impl->handle);
 }
 

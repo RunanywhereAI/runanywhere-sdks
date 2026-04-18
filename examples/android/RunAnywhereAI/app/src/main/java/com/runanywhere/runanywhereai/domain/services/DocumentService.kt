@@ -20,7 +20,8 @@ import org.json.JSONTokener
 enum class DocumentType {
     PDF,
     JSON,
-    UNSUPPORTED;
+    UNSUPPORTED,
+    ;
 
     companion object {
         /**
@@ -76,7 +77,6 @@ sealed class DocumentServiceError(override val message: String) : Exception(mess
  * Mirrors iOS DocumentService (static struct) exactly.
  */
 object DocumentService {
-
     /**
      * Extract plain text from a file identified by a content URI.
      *
@@ -89,7 +89,10 @@ object DocumentService {
      * @throws DocumentServiceError for unsupported formats, extraction failures, or read errors
      */
     @Throws(DocumentServiceError::class)
-    fun extractText(context: Context, uri: Uri): String {
+    fun extractText(
+        context: Context,
+        uri: Uri,
+    ): String {
         val fileName = getFileName(context, uri) ?: ""
         val documentType = DocumentType.from(fileName)
 
@@ -105,25 +108,30 @@ object DocumentService {
 
     // MARK: - Private Helpers
 
-    private fun extractPdfText(context: Context, uri: Uri): String {
+    private fun extractPdfText(
+        context: Context,
+        uri: Uri,
+    ): String {
         // Initialize PDFBox Android resources (no-op if already initialized)
         PDFBoxResourceLoader.init(context.applicationContext)
 
-        val inputStream = try {
-            context.contentResolver.openInputStream(uri)
-                ?: throw DocumentServiceError.PdfExtractionFailed
-        } catch (e: DocumentServiceError) {
-            throw e
-        } catch (e: Exception) {
-            throw DocumentServiceError.FileReadFailed(e.message ?: "Cannot open URI")
-        }
+        val inputStream =
+            try {
+                context.contentResolver.openInputStream(uri)
+                    ?: throw DocumentServiceError.PdfExtractionFailed
+            } catch (e: DocumentServiceError) {
+                throw e
+            } catch (e: Exception) {
+                throw DocumentServiceError.FileReadFailed(e.message ?: "Cannot open URI")
+            }
 
         return inputStream.use { stream ->
-            val document: PDDocument = try {
-                PDDocument.load(stream)
-            } catch (e: Exception) {
-                throw DocumentServiceError.PdfExtractionFailed
-            }
+            val document: PDDocument =
+                try {
+                    PDDocument.load(stream)
+                } catch (e: Exception) {
+                    throw DocumentServiceError.PdfExtractionFailed
+                }
 
             document.use { doc ->
                 if (doc.numberOfPages == 0) {
@@ -131,11 +139,12 @@ object DocumentService {
                 }
 
                 val stripper = PDFTextStripper()
-                val text = try {
-                    stripper.getText(doc)
-                } catch (e: Exception) {
-                    throw DocumentServiceError.PdfExtractionFailed
-                }
+                val text =
+                    try {
+                        stripper.getText(doc)
+                    } catch (e: Exception) {
+                        throw DocumentServiceError.PdfExtractionFailed
+                    }
 
                 if (text.isBlank()) {
                     throw DocumentServiceError.PdfExtractionFailed
@@ -146,22 +155,27 @@ object DocumentService {
         }
     }
 
-    private fun extractJsonText(context: Context, uri: Uri): String {
-        val raw = try {
-            context.contentResolver.openInputStream(uri)?.use { stream ->
-                stream.bufferedReader().readText()
-            } ?: throw DocumentServiceError.FileReadFailed("Cannot open URI")
-        } catch (e: DocumentServiceError) {
-            throw e
-        } catch (e: Exception) {
-            throw DocumentServiceError.FileReadFailed(e.message ?: "Read failed")
-        }
+    private fun extractJsonText(
+        context: Context,
+        uri: Uri,
+    ): String {
+        val raw =
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.bufferedReader().readText()
+                } ?: throw DocumentServiceError.FileReadFailed("Cannot open URI")
+            } catch (e: DocumentServiceError) {
+                throw e
+            } catch (e: Exception) {
+                throw DocumentServiceError.FileReadFailed(e.message ?: "Read failed")
+            }
 
-        val parsed: Any = try {
-            JSONTokener(raw).nextValue()
-        } catch (e: JSONException) {
-            throw DocumentServiceError.JsonExtractionFailed(e.message ?: "Invalid JSON")
-        }
+        val parsed: Any =
+            try {
+                JSONTokener(raw).nextValue()
+            } catch (e: JSONException) {
+                throw DocumentServiceError.JsonExtractionFailed(e.message ?: "Invalid JSON")
+            }
 
         val strings = mutableListOf<String>()
         extractStrings(parsed, strings)
@@ -172,7 +186,10 @@ object DocumentService {
      * Recursively extract all string values from a parsed JSON object or array.
      * Mirrors iOS `DocumentService.extractStrings(from:into:)` exactly.
      */
-    private fun extractStrings(value: Any, result: MutableList<String>) {
+    private fun extractStrings(
+        value: Any,
+        result: MutableList<String>,
+    ) {
         when (value) {
             is String -> result.add(value)
             is JSONObject -> {
@@ -195,7 +212,10 @@ object DocumentService {
      * Query the ContentResolver for the display name of a content URI.
      * Used to determine the document type from its file extension.
      */
-    fun getFileName(context: Context, uri: Uri): String? {
+    fun getFileName(
+        context: Context,
+        uri: Uri,
+    ): String? {
         return context.contentResolver.query(
             uri,
             arrayOf(OpenableColumns.DISPLAY_NAME),

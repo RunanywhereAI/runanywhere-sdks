@@ -10,20 +10,19 @@
 #ifndef RUNANYWHERE_RAG_BACKEND_H
 #define RUNANYWHERE_RAG_BACKEND_H
 
+#include "bm25_index.h"
+#include "rag_chunker.h"
+#include "vector_store_usearch.h"
+
 #include <memory>
+#include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-#include <mutex>
-
-#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_types.h"
-#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
-
-#include "vector_store_usearch.h"
-#include "rag_chunker.h"
-#include "bm25_index.h"
+#include "rac/features/llm/rac_llm_service.h"
 
 namespace runanywhere {
 namespace rag {
@@ -49,7 +48,7 @@ struct RAGBackendConfig {
 // header. No visibility attribute is needed (and asymmetric visibility on
 // non-MSVC vs MSVC previously caused inconsistent ABI behavior).
 class RAGBackend {
-public:
+   public:
     /**
      * @brief Construct RAG pipeline with service handles
      *
@@ -58,12 +57,8 @@ public:
      * @param embeddings_service Handle to embeddings service (from rac_embeddings_create)
      * @param owns_services If true, pipeline will destroy services on cleanup
      */
-    explicit RAGBackend(
-        const RAGBackendConfig& config,
-        rac_handle_t llm_service,
-        rac_handle_t embeddings_service,
-        bool owns_services
-    );
+    explicit RAGBackend(const RAGBackendConfig& config, rac_handle_t llm_service,
+                        rac_handle_t embeddings_service, bool owns_services);
 
     ~RAGBackend();
 
@@ -79,12 +74,8 @@ public:
     /**
      * @brief End-to-end RAG query with adaptive context accumulation
      */
-    rac_result_t query(
-        const std::string& question,
-        const rac_llm_options_t* options,
-        rac_llm_result_t* out_result,
-        nlohmann::json& out_metadata
-    );
+    rac_result_t query(const std::string& question, const rac_llm_options_t* options,
+                       rac_llm_result_t* out_result, nlohmann::json& out_metadata);
 
     std::string build_context(const std::vector<SearchResult>& results) const;
     std::string format_prompt(const std::string& query, const std::string& context) const;
@@ -93,22 +84,18 @@ public:
     nlohmann::json get_statistics() const;
     size_t document_count() const;
 
-private:
+   private:
     std::vector<float> embed_text(const std::string& text) const;
     std::vector<std::vector<float>> embed_texts_batch(const std::vector<std::string>& texts) const;
 
-    std::vector<SearchResult> search_with_embedding(
-        const std::string& query_text,
-        size_t top_k,
-        size_t embedding_dimension,
-        float similarity_threshold
-    ) const;
+    std::vector<SearchResult> search_with_embedding(const std::string& query_text, size_t top_k,
+                                                    size_t embedding_dimension,
+                                                    float similarity_threshold) const;
 
-    std::vector<SearchResult> fuse_results(
-        const std::vector<SearchResult>& dense_results,
-        const std::vector<std::pair<std::string, float>>& bm25_results,
-        size_t top_k
-    ) const;
+    std::vector<SearchResult>
+    fuse_results(const std::vector<SearchResult>& dense_results,
+                 const std::vector<std::pair<std::string, float>>& bm25_results,
+                 size_t top_k) const;
 
     RAGBackendConfig config_;
     std::unique_ptr<VectorStoreUSearch> vector_store_;
@@ -124,7 +111,7 @@ private:
     size_t next_chunk_id_ = 0;
 };
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere
 
-#endif // RUNANYWHERE_RAG_BACKEND_H
+#endif  // RUNANYWHERE_RAG_BACKEND_H

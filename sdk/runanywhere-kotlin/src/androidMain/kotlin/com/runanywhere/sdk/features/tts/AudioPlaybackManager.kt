@@ -82,8 +82,14 @@ class AudioPlaybackManager {
 
         fun cleanup(track: AudioTrack?) {
             isPlaying = false
-            try { track?.stop() } catch (_: Exception) {}
-            try { track?.release() } catch (_: Exception) {}
+            try {
+                track?.stop()
+            } catch (_: Exception) {
+            }
+            try {
+                track?.release()
+            } catch (_: Exception) {
+            }
             if (audioTrack === track) audioTrack = null
             interruptPlayback = null
         }

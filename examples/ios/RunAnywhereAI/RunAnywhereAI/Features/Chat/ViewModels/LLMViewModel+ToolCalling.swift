@@ -9,7 +9,6 @@ import Foundation
 import RunAnywhere
 
 extension LLMViewModel {
-
     // MARK: - Tool Calling Format Detection
 
     /// Determines the optimal tool calling format based on the model name/ID.

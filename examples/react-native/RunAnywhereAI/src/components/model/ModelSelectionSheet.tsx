@@ -419,7 +419,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
     const frameworkCounts = new Map<LLMFramework, number>();
 
-    availableModels.forEach((model: SDKModelInfo, index: number) => {
+    availableModels.forEach((model: SDKModelInfo, _index: number) => {
       // Determine framework from model - use preferredFramework or first compatibleFramework
       const frameworkValue =
         model.preferredFramework || model.compatibleFrameworks?.[0];

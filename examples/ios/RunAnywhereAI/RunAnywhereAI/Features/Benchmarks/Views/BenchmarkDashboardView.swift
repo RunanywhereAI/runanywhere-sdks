@@ -23,15 +23,28 @@ struct BenchmarkDashboardView: View {
                 Section("Device") {
                     LabeledContent("Model", value: info.modelName)
                     LabeledContent("Chip", value: info.chipName)
-                    LabeledContent("RAM", value: ByteCountFormatter.string(fromByteCount: info.totalMemory, countStyle: .memory))
-                    LabeledContent("Available", value: ByteCountFormatter.string(fromByteCount: SyntheticInputGenerator.availableMemoryBytes(), countStyle: .memory))
+                    LabeledContent(
+                        "RAM",
+                        value: ByteCountFormatter.string(fromByteCount: info.totalMemory, countStyle: .memory)
+                    )
+                    LabeledContent(
+                        "Available",
+                        value: ByteCountFormatter.string(
+                            fromByteCount: SyntheticInputGenerator.availableMemoryBytes(),
+                            countStyle: .memory
+                        )
+                    )
                 }
             }
 
             // Benchmark Suite Info
             Section {
                 VStack(alignment: .leading, spacing: AppSpacing.small) {
-                    Text("Each category runs deterministic scenarios against every downloaded model of that type. Synthetic inputs (silent audio, sine waves, gradient images) ensure reproducible results.")
+                    Text(
+                        "Each category runs deterministic scenarios against every downloaded model "
+                        + "of that type. Synthetic inputs (silent audio, sine waves, gradient images) "
+                        + "ensure reproducible results."
+                    )
                         .font(AppTypography.caption)
                         .foregroundColor(AppColors.textSecondary)
                 }
@@ -225,9 +238,10 @@ struct BenchmarkDashboardView: View {
                 currentScenario: viewModel.currentScenario,
                 currentModel: viewModel.currentModel,
                 completedCount: viewModel.completedCount,
-                totalCount: viewModel.totalCount,
-                onCancel: { viewModel.cancel() }
-            )
+                totalCount: viewModel.totalCount
+            ) {
+                viewModel.cancel()
+            }
             .interactiveDismissDisabled()
         }
         .task {
@@ -287,7 +301,10 @@ private struct CategoryChip: View {
                 .cornerRadius(AppSpacing.cornerRadiusLarge)
                 .overlay(
                     RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusLarge)
-                        .stroke(isSelected ? AppColors.primaryAccent.opacity(0.5) : Color.clear, lineWidth: AppSpacing.strokeRegular)
+                        .stroke(
+                            isSelected ? AppColors.primaryAccent.opacity(0.5) : Color.clear,
+                            lineWidth: AppSpacing.strokeRegular
+                        )
                 )
         }
         .buttonStyle(.plain)

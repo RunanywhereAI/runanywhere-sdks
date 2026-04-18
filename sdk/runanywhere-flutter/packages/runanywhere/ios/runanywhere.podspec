@@ -24,7 +24,7 @@ GITHUB_ORG = "RunanywhereAI"
 COMMONS_REPO = "runanywhere-sdks"
 
 # =============================================================================
-# testLocal Toggle
+# useLocalNatives Toggle (canonical name; testLocal kept as legacy alias)
 # Set RA_TEST_LOCAL=1 or create .testlocal file to use local binaries
 # =============================================================================
 TEST_LOCAL = ENV['RA_TEST_LOCAL'] == '1' || File.exist?(File.join(__dir__, '.testlocal'))

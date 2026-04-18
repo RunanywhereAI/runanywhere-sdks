@@ -8,8 +8,6 @@
 
 #include "rac/core/rac_benchmark_stats.h"
 
-#include "rac/core/rac_error.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -17,6 +15,8 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include "rac/core/rac_error.h"
 
 namespace {
 
@@ -56,8 +56,8 @@ class BenchmarkStatsCollector {
             double decode_ms =
                 static_cast<double>(timing->t5_last_token_ms - timing->t3_prefill_end_ms);
             if (decode_ms > 0.0) {
-                decode_tps_values_.push_back(
-                    static_cast<double>(timing->output_tokens) / decode_ms * 1000.0);
+                decode_tps_values_.push_back(static_cast<double>(timing->output_tokens) /
+                                             decode_ms * 1000.0);
             }
         }
 
@@ -240,7 +240,7 @@ void rac_benchmark_stats_destroy(rac_benchmark_stats_handle_t handle) {
 }
 
 void rac_benchmark_stats_record(rac_benchmark_stats_handle_t handle,
-                                 const rac_benchmark_timing_t* timing) {
+                                const rac_benchmark_timing_t* timing) {
     if (handle == nullptr || timing == nullptr) {
         return;
     }
@@ -262,7 +262,7 @@ int32_t rac_benchmark_stats_count(rac_benchmark_stats_handle_t handle) {
 }
 
 rac_result_t rac_benchmark_stats_get_summary(rac_benchmark_stats_handle_t handle,
-                                              rac_benchmark_summary_t* out_summary) {
+                                             rac_benchmark_summary_t* out_summary) {
     if (handle == nullptr || out_summary == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

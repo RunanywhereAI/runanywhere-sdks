@@ -36,34 +36,34 @@ extern "C" {
 // =============================================================================
 
 struct MetalRTOptions {
-    int  max_tokens;
+    int max_tokens;
     float temperature;
-    int  top_k;
+    int top_k;
     bool think;
     bool reset_cache;
     bool ignore_eos;
 };
 
 struct MetalRTResult {
-    const char* text;          // engine-owned, freed by metalrt_free_result
-    int   prompt_tokens;
-    int   generated_tokens;
+    const char* text;  // engine-owned, freed by metalrt_free_result
+    int prompt_tokens;
+    int generated_tokens;
     double prefill_ms;
     double decode_ms;
     double tps;
 };
 
 struct MetalRTVisionOptions {
-    int  max_tokens;
+    int max_tokens;
     float temperature;
-    int  top_k;
+    int top_k;
     bool think;
 };
 
 struct MetalRTVisionResult {
-    const char* text;          // engine-owned, freed by metalrt_vision_free_result
-    int   prompt_tokens;
-    int   generated_tokens;
+    const char* text;  // engine-owned, freed by metalrt_vision_free_result
+    int prompt_tokens;
+    int generated_tokens;
     double prefill_ms;
     double decode_ms;
     double vision_encode_ms;
@@ -71,10 +71,10 @@ struct MetalRTVisionResult {
 };
 
 struct MetalRTAudio {
-    float*  samples;           // engine-owned, freed by metalrt_tts_free_audio
-    int     num_samples;
-    int     sample_rate;
-    double  synthesis_ms;
+    float* samples;  // engine-owned, freed by metalrt_tts_free_audio
+    int num_samples;
+    int sample_rate;
+    double synthesis_ms;
 };
 
 // Stream callback: returns `true` to continue, `false` to cancel.
@@ -85,15 +85,14 @@ typedef bool (*metalrt_stream_cb)(const char* piece, void* user_data);
 // =============================================================================
 
 void* metalrt_create(void);
-bool  metalrt_load(void* handle, const char* model_path);
-void  metalrt_destroy(void* handle);
+bool metalrt_load(void* handle, const char* model_path);
+void metalrt_destroy(void* handle);
 
 struct MetalRTResult metalrt_generate(void* handle, const char* prompt,
                                       const struct MetalRTOptions* options);
 
-struct MetalRTResult metalrt_generate_stream(void* handle, const char* prompt,
-                                             metalrt_stream_cb cb, void* user_data,
-                                             const struct MetalRTOptions* options);
+struct MetalRTResult metalrt_generate_stream(void* handle, const char* prompt, metalrt_stream_cb cb,
+                                             void* user_data, const struct MetalRTOptions* options);
 
 struct MetalRTResult metalrt_generate_raw_continue(void* handle, const char* query,
                                                    const struct MetalRTOptions* options);
@@ -105,7 +104,7 @@ void metalrt_set_system_prompt(void* handle, const char* prompt);
 void metalrt_clear_kv(void* handle);
 void metalrt_reset(void* handle);
 
-int         metalrt_context_size(void* handle);
+int metalrt_context_size(void* handle);
 const char* metalrt_model_name(void* handle);
 
 // =============================================================================
@@ -113,14 +112,14 @@ const char* metalrt_model_name(void* handle);
 // =============================================================================
 
 void* metalrt_whisper_create(void);
-bool  metalrt_whisper_load(void* handle, const char* model_path);
-void  metalrt_whisper_destroy(void* handle);
+bool metalrt_whisper_load(void* handle, const char* model_path);
+void metalrt_whisper_destroy(void* handle);
 
 // Returns engine-owned string; free via metalrt_whisper_free_text.
-const char* metalrt_whisper_transcribe(void* handle, const float* samples,
-                                       int n_samples, int sample_rate);
+const char* metalrt_whisper_transcribe(void* handle, const float* samples, int n_samples,
+                                       int sample_rate);
 
-void   metalrt_whisper_free_text(const char* text);
+void metalrt_whisper_free_text(const char* text);
 double metalrt_whisper_last_encode_ms(void* handle);
 double metalrt_whisper_last_decode_ms(void* handle);
 
@@ -129,11 +128,11 @@ double metalrt_whisper_last_decode_ms(void* handle);
 // =============================================================================
 
 void* metalrt_tts_create(void);
-bool  metalrt_tts_load(void* handle, const char* model_path);
-void  metalrt_tts_destroy(void* handle);
+bool metalrt_tts_load(void* handle, const char* model_path);
+void metalrt_tts_destroy(void* handle);
 
-struct MetalRTAudio metalrt_tts_synthesize(void* handle, const char* text,
-                                           const char* voice, float speed);
+struct MetalRTAudio metalrt_tts_synthesize(void* handle, const char* text, const char* voice,
+                                           float speed);
 
 void metalrt_tts_free_audio(struct MetalRTAudio audio);
 
@@ -142,31 +141,27 @@ void metalrt_tts_free_audio(struct MetalRTAudio audio);
 // =============================================================================
 
 void* metalrt_vision_create(void);
-bool  metalrt_vision_load(void* handle, const char* model_path);
-void  metalrt_vision_destroy(void* handle);
-void  metalrt_vision_reset(void* handle);
+bool metalrt_vision_load(void* handle, const char* model_path);
+void metalrt_vision_destroy(void* handle);
+void metalrt_vision_reset(void* handle);
 
 struct MetalRTVisionResult metalrt_vision_analyze(void* handle, const char* image_path,
                                                   const char* prompt,
                                                   const struct MetalRTVisionOptions* options);
 
-struct MetalRTVisionResult metalrt_vision_analyze_pixels(void* handle,
-                                                         const uint8_t* rgba_pixels,
-                                                         int width, int height,
-                                                         const char* prompt,
-                                                         const struct MetalRTVisionOptions* options);
+struct MetalRTVisionResult
+metalrt_vision_analyze_pixels(void* handle, const uint8_t* rgba_pixels, int width, int height,
+                              const char* prompt, const struct MetalRTVisionOptions* options);
 
-struct MetalRTVisionResult metalrt_vision_analyze_stream(void* handle, const char* image_path,
-                                                         const char* prompt,
-                                                         metalrt_stream_cb cb, void* user_data,
-                                                         const struct MetalRTVisionOptions* options);
+struct MetalRTVisionResult
+metalrt_vision_analyze_stream(void* handle, const char* image_path, const char* prompt,
+                              metalrt_stream_cb cb, void* user_data,
+                              const struct MetalRTVisionOptions* options);
 
-struct MetalRTVisionResult metalrt_vision_analyze_pixels_stream(void* handle,
-                                                                const uint8_t* rgba_pixels,
-                                                                int width, int height,
-                                                                const char* prompt,
-                                                                metalrt_stream_cb cb, void* user_data,
-                                                                const struct MetalRTVisionOptions* options);
+struct MetalRTVisionResult
+metalrt_vision_analyze_pixels_stream(void* handle, const uint8_t* rgba_pixels, int width,
+                                     int height, const char* prompt, metalrt_stream_cb cb,
+                                     void* user_data, const struct MetalRTVisionOptions* options);
 
 void metalrt_vision_free_result(struct MetalRTVisionResult result);
 

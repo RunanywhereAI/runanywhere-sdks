@@ -54,7 +54,6 @@ struct RAGMessage: Identifiable {
 @MainActor
 @Observable
 final class RAGViewModel {
-
     // MARK: - Document State
 
     private(set) var documentName: String?

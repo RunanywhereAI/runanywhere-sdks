@@ -15,11 +15,10 @@
 #include <chrono>
 #include <functional>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 // Sherpa-ONNX C API for TTS/STT
 #if SHERPA_ONNX_AVAILABLE
@@ -51,14 +50,7 @@ struct DeviceInfo {
 // STT TYPES
 // =============================================================================
 
-enum class STTModelType {
-    WHISPER,
-    ZIPFORMER,
-    TRANSDUCER,
-    PARAFORMER,
-    NEMO_CTC,
-    CUSTOM
-};
+enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, NEMO_CTC, CUSTOM };
 
 struct AudioSegment {
     std::string text;
@@ -90,13 +82,7 @@ struct STTResult {
 // TTS TYPES
 // =============================================================================
 
-enum class TTSModelType {
-    PIPER,
-    COQUI,
-    BARK,
-    ESPEAK,
-    CUSTOM
-};
+enum class TTSModelType { PIPER, COQUI, BARK, ESPEAK, CUSTOM };
 
 struct VoiceInfo {
     std::string id;
@@ -127,12 +113,7 @@ struct TTSResult {
 // VAD TYPES
 // =============================================================================
 
-enum class VADModelType {
-    SILERO,
-    WEBRTC,
-    SHERPA,
-    CUSTOM
-};
+enum class VADModelType { SILERO, WEBRTC, SHERPA, CUSTOM };
 
 struct SpeechSegment {
     double start_time_ms = 0.0;
@@ -255,7 +236,8 @@ class ONNXSTT {
     bool supports_streaming() const;
 
     std::string create_stream(const nlohmann::json& config = {});
-    bool feed_audio(const std::string& stream_id, const std::vector<float>& samples, int sample_rate);
+    bool feed_audio(const std::string& stream_id, const std::vector<float>& samples,
+                    int sample_rate);
     bool is_stream_ready(const std::string& stream_id);
     STTResult decode(const std::string& stream_id);
     bool is_endpoint(const std::string& stream_id);
@@ -348,10 +330,12 @@ class ONNXVAD {
 
     bool configure_vad(const VADConfig& config);
     VADResult process(const std::vector<float>& audio_samples, int sample_rate);
-    std::vector<SpeechSegment> detect_segments(const std::vector<float>& audio_samples, int sample_rate);
+    std::vector<SpeechSegment> detect_segments(const std::vector<float>& audio_samples,
+                                               int sample_rate);
 
     std::string create_stream(const VADConfig& config = {});
-    VADResult feed_audio(const std::string& stream_id, const std::vector<float>& samples, int sample_rate);
+    VADResult feed_audio(const std::string& stream_id, const std::vector<float>& samples,
+                         int sample_rate);
     void destroy_stream(const std::string& stream_id);
 
     void reset();

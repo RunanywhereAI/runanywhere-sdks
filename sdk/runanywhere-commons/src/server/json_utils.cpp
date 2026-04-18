@@ -7,6 +7,7 @@
  */
 
 #include "json_utils.h"
+
 #include <sstream>
 
 namespace rac {
@@ -201,6 +202,6 @@ std::string formatSSEDone() {
     return "data: [DONE]\n\n";
 }
 
-} // namespace json
-} // namespace server
-} // namespace rac
+}  // namespace json
+}  // namespace server
+}  // namespace rac

@@ -116,7 +116,10 @@ struct FlowActivationView: View {
                     }
 
                 // MARK: Explanation Text
-                Text("We wish you didn't have to switch apps to use RunAnywhere, but Apple requires this step to activate the microphone.")
+                Text(
+                    "We wish you didn't have to switch apps to use RunAnywhere, "
+                    + "but Apple requires this step to activate the microphone."
+                )
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.4))
                     .multilineTextAlignment(.center)

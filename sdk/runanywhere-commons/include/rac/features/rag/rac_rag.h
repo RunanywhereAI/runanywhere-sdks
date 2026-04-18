@@ -36,4 +36,4 @@ RAC_API rac_result_t rac_backend_rag_unregister(void);
 }
 #endif
 
-#endif // RAC_RAG_H
+#endif  // RAC_RAG_H

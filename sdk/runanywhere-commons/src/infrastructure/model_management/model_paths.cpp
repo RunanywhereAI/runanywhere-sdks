@@ -230,10 +230,11 @@ rac_result_t rac_model_paths_get_model_file_path(const char* model_id,
     if (!extension) {
         // Unknown format - return just the model folder path
         // The caller should search for model files in this folder
-        RAC_LOG_WARNING("ModelPaths", "Unknown model format (%d) for model '%s', returning folder path",
+        RAC_LOG_WARNING("ModelPaths",
+                        "Unknown model format (%d) for model '%s', returning folder path",
                         static_cast<int>(format), model_id);
-        std::string path = g_base_dir + "/RunAnywhere/Models/" + rac_framework_raw_value(framework) +
-                           "/" + model_id;
+        std::string path = g_base_dir + "/RunAnywhere/Models/" +
+                           rac_framework_raw_value(framework) + "/" + model_id;
         return copy_string_to_buffer(path, out_path, path_size);
     }
 
@@ -352,11 +353,10 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
 
     // Check if next component is a framework name
     bool isFramework = false;
-    const char* frameworks[] = {"ONNX",             "LlamaCpp",         "FoundationModels",
-                                "SystemTTS",        "FluidAudio",       "BuiltIn",
-                                "CoreML",           "MLX",              "WhisperKitCoreML",
-                                "MetalRT",          "Genie",            "None",
-                                "Unknown"};
+    const char* frameworks[] = {
+        "ONNX",   "LlamaCpp", "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
+        "CoreML", "MLX",      "WhisperKitCoreML", "MetalRT",   "Genie",      "None",
+        "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;

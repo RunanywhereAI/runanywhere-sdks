@@ -234,14 +234,14 @@ class STTViewModel: ObservableObject {
                     self?.audioBuffer.append(audioData)
                 }
             }
-            
+
             isRecording = true
-            
+
             if selectedMode == .live {
                 // Live mode: Start VAD monitoring for auto-transcription
                 startVADMonitoring()
             }
-            
+
             logger.info("Recording started in \(self.selectedMode.rawValue) mode")
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
@@ -255,10 +255,10 @@ class STTViewModel: ObservableObject {
         // Stop VAD monitoring if active
         silenceCheckTask?.cancel()
         silenceCheckTask = nil
-        
+
         // Stop audio capture
         audioCapture.stopRecording()
-        
+
         // Perform final transcription if we have audio
         if !audioBuffer.isEmpty {
             await performBatchTranscription()
@@ -299,23 +299,23 @@ class STTViewModel: ObservableObject {
     /// Automatically transcribes when silence is detected after speech
     private func startVADMonitoring() {
         logger.info("Starting VAD monitoring for live transcription")
-        
+
         silenceCheckTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self = self, await self.isRecording else { break }
-                
+
                 let level = await self.audioLevel
                 await self.checkSpeechState(level: level)
-                
+
                 try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
             }
         }
     }
-    
+
     /// Check speech state and auto-transcribe on silence
     private func checkSpeechState(level: Float) async {
         guard isRecording, selectedMode == .live else { return }
-        
+
         if level > speechThreshold {
             // Speech detected
             if !isSpeechActive {
@@ -325,11 +325,11 @@ class STTViewModel: ObservableObject {
             lastSpeechTime = Date()
         } else if isSpeechActive {
             // Check for silence duration
-            if let lastSpeech = lastSpeechTime, 
+            if let lastSpeech = lastSpeechTime,
                Date().timeIntervalSince(lastSpeech) > silenceDuration {
                 logger.debug("Silence detected - auto-transcribing")
                 isSpeechActive = false
-                
+
                 // Only transcribe if we have enough audio (~0.5s at 16kHz)
                 if audioBuffer.count > 16000 {
                     await performLiveTranscription()
@@ -339,17 +339,17 @@ class STTViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// Perform transcription for live mode (keeps recording going)
     private func performLiveTranscription() async {
         let audio = audioBuffer
         audioBuffer = Data()  // Clear buffer for next utterance
-        
+
         guard !audio.isEmpty else { return }
-        
+
         logger.info("Live transcription of \(audio.count) bytes")
         isTranscribing = true
-        
+
         do {
             let result = try await RunAnywhere.transcribe(audio)
             // Append to existing transcription with newline
@@ -362,7 +362,7 @@ class STTViewModel: ObservableObject {
             logger.error("Live transcription failed: \(error.localizedDescription)")
             errorMessage = "Transcription failed: \(error.localizedDescription)"
         }
-        
+
         isTranscribing = false
     }
 

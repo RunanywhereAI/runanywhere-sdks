@@ -64,8 +64,7 @@ extern "C" {
 RAC_API rac_result_t rac_download_orchestrate(
     rac_download_manager_handle_t dm_handle, const char* model_id, const char* download_url,
     rac_inference_framework_t framework, rac_model_format_t format,
-    rac_archive_structure_t archive_structure,
-    rac_download_progress_callback_fn progress_callback,
+    rac_archive_structure_t archive_structure, rac_download_progress_callback_fn progress_callback,
     rac_download_complete_callback_fn complete_callback, void* user_data, char** out_task_id);
 
 /**
@@ -118,10 +117,11 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
  * @param path_size Size of output buffer
  * @return RAC_SUCCESS if model path found, RAC_ERROR_NOT_FOUND if no model file found
  */
-RAC_API rac_result_t rac_find_model_path_after_extraction(
-    const char* extracted_dir, rac_archive_structure_t structure,
-    rac_inference_framework_t framework, rac_model_format_t format, char* out_path,
-    size_t path_size);
+RAC_API rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
+                                                          rac_archive_structure_t structure,
+                                                          rac_inference_framework_t framework,
+                                                          rac_model_format_t format, char* out_path,
+                                                          size_t path_size);
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -142,12 +142,9 @@ RAC_API rac_result_t rac_find_model_path_after_extraction(
  * @param out_needs_extraction Output: RAC_TRUE if download needs extraction
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_download_compute_destination(const char* model_id,
-                                                       const char* download_url,
-                                                       rac_inference_framework_t framework,
-                                                       rac_model_format_t format, char* out_path,
-                                                       size_t path_size,
-                                                       rac_bool_t* out_needs_extraction);
+RAC_API rac_result_t rac_download_compute_destination(
+    const char* model_id, const char* download_url, rac_inference_framework_t framework,
+    rac_model_format_t format, char* out_path, size_t path_size, rac_bool_t* out_needs_extraction);
 
 /**
  * @brief Check if a download URL requires extraction.

@@ -9,8 +9,8 @@
 #ifndef RAC_EMBEDDINGS_ONNX_H
 #define RAC_EMBEDDINGS_ONNX_H
 
-#include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {

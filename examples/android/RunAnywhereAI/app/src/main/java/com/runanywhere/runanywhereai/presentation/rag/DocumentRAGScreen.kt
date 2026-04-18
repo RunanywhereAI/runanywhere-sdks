@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.rag
 
-import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -72,67 +71,69 @@ fun DocumentRAGScreen(
     }
 
     // File picker launcher — accepts PDF and JSON
-    val documentPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val config = buildRAGConfiguration(selectedEmbeddingModel, selectedLLMModel)
-            if (config != null) {
-                viewModel.loadDocument(context, uri, config)
+    val documentPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            if (uri != null) {
+                val config = buildRAGConfiguration(selectedEmbeddingModel, selectedLLMModel)
+                if (config != null) {
+                    viewModel.loadDocument(context, uri, config)
+                }
             }
         }
-    }
 
     ConfigureTopBar(title = "Document Q&A", showBack = true, onBack = onBack)
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppColors.backgroundGrouped),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(AppColors.backgroundGrouped),
     ) {
-            // 1. Model Setup Section
-            ModelSetupSection(
-                selectedEmbeddingModel = selectedEmbeddingModel,
-                selectedLLMModel = selectedLLMModel,
-                onEmbeddingPickerTap = { showEmbeddingPicker = true },
-                onLLMPickerTap = { showLLMPicker = true },
-            )
+        // 1. Model Setup Section
+        ModelSetupSection(
+            selectedEmbeddingModel = selectedEmbeddingModel,
+            selectedLLMModel = selectedLLMModel,
+            onEmbeddingPickerTap = { showEmbeddingPicker = true },
+            onLLMPickerTap = { showLLMPicker = true },
+        )
 
-            // 2. Document Status Bar
-            DocumentStatusBar(
-                uiState = uiState,
-                areModelsReady = areModelsReady,
-                onSelectDocument = { documentPickerLauncher.launch(arrayOf("application/pdf", "application/json")) },
-                onChangeDocument = {
-                    viewModel.clearDocument()
-                    documentPickerLauncher.launch(arrayOf("application/pdf", "application/json"))
-                },
-            )
+        // 2. Document Status Bar
+        DocumentStatusBar(
+            uiState = uiState,
+            areModelsReady = areModelsReady,
+            onSelectDocument = { documentPickerLauncher.launch(arrayOf("application/pdf", "application/json")) },
+            onChangeDocument = {
+                viewModel.clearDocument()
+                documentPickerLauncher.launch(arrayOf("application/pdf", "application/json"))
+            },
+        )
 
-            // 3. Error Banner
-            if (isErrorBannerVisible && uiState.error != null) {
-                ErrorBanner(
-                    errorMessage = uiState.error!!,
-                    onDismiss = { isErrorBannerVisible = false },
-                )
-            }
-
-            // 4. Messages Area (takes remaining space)
-            MessagesArea(
-                uiState = uiState,
-                areModelsReady = areModelsReady,
-                modifier = Modifier.weight(1f),
+        // 3. Error Banner
+        if (isErrorBannerVisible && uiState.error != null) {
+            ErrorBanner(
+                errorMessage = uiState.error!!,
+                onDismiss = { isErrorBannerVisible = false },
             )
+        }
 
-            // 5. Input Bar
-            InputBar(
-                currentQuestion = uiState.currentQuestion,
-                canAskQuestion = uiState.canAskQuestion,
-                isQuerying = uiState.isQuerying,
-                isDocumentLoaded = uiState.isDocumentLoaded,
-                onQuestionChange = viewModel::updateQuestion,
-                onSend = viewModel::askQuestion,
-            )
+        // 4. Messages Area (takes remaining space)
+        MessagesArea(
+            uiState = uiState,
+            areModelsReady = areModelsReady,
+            modifier = Modifier.weight(1f),
+        )
+
+        // 5. Input Bar
+        InputBar(
+            currentQuestion = uiState.currentQuestion,
+            canAskQuestion = uiState.canAskQuestion,
+            isQuerying = uiState.isQuerying,
+            isDocumentLoaded = uiState.isDocumentLoaded,
+            onQuestionChange = viewModel::updateQuestion,
+            onSend = viewModel::askQuestion,
+        )
     }
 
     // Embedding model picker sheet
@@ -177,10 +178,11 @@ private fun ModelSetupSection(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(
-                modifier = Modifier.padding(
-                    horizontal = Dimensions.large,
-                    vertical = Dimensions.mediumLarge,
-                ),
+                modifier =
+                    Modifier.padding(
+                        horizontal = Dimensions.large,
+                        vertical = Dimensions.mediumLarge,
+                    ),
                 verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
             ) {
                 ModelPickerRow(
@@ -284,9 +286,10 @@ private fun DocumentStatusBar(
                 uiState.isLoadingDocument -> {
                     // Loading state
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimensions.large),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Dimensions.large),
                         horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -301,9 +304,10 @@ private fun DocumentStatusBar(
                 uiState.isDocumentLoaded && uiState.documentName != null -> {
                     // Loaded state
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Dimensions.large, vertical = Dimensions.mediumLarge),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = Dimensions.large, vertical = Dimensions.mediumLarge),
                         horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -334,18 +338,20 @@ private fun DocumentStatusBar(
                 else -> {
                     // No document state
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Dimensions.large),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(Dimensions.large),
                         horizontalArrangement = Arrangement.Center,
                     ) {
                         Button(
                             onClick = onSelectDocument,
                             enabled = areModelsReady,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = AppColors.primaryAccent,
-                                disabledContainerColor = AppColors.statusGray,
-                            ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = AppColors.primaryAccent,
+                                    disabledContainerColor = AppColors.statusGray,
+                                ),
                             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
                         ) {
                             Icon(
@@ -381,10 +387,11 @@ private fun ErrorBanner(
 ) {
     Column {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppColors.primaryRed.copy(alpha = 0.1f))
-                .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(AppColors.primaryRed.copy(alpha = 0.1f))
+                    .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -487,10 +494,11 @@ private fun EmptyStateView(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(AppColors.backgroundGrouped)
-            .padding(Dimensions.large),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(AppColors.backgroundGrouped)
+                .padding(Dimensions.large),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -581,10 +589,11 @@ private fun RAGMessageBubble(message: RAGMessage) {
                 text = message.text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(
-                    horizontal = Dimensions.mediumLarge,
-                    vertical = Dimensions.smallMedium,
-                ),
+                modifier =
+                    Modifier.padding(
+                        horizontal = Dimensions.mediumLarge,
+                        vertical = Dimensions.smallMedium,
+                    ),
             )
         }
 
@@ -618,9 +627,10 @@ private fun InputBar(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Dimensions.large),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(Dimensions.large),
                 horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -637,18 +647,20 @@ private fun InputBar(
                     maxLines = 4,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AppColors.primaryAccent,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    ),
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AppColors.primaryAccent,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                            disabledBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        ),
                 )
 
                 if (isQuerying) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .padding(Dimensions.smallMedium),
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .padding(Dimensions.smallMedium),
                         color = AppColors.primaryAccent,
                         strokeWidth = 2.dp,
                     )
@@ -701,21 +713,21 @@ private fun resolveEmbeddingFilePath(localPath: String): String {
  */
 private fun resolveLLMFilePath(localPath: String): String {
     val file = File(localPath)
-    
+
     // 1. If it's already a file, we are good to go
     if (!file.isDirectory) return localPath
-    
+
     val files = file.listFiles() ?: return localPath
-    
+
     // 2. Try to find a file that explicitly has the .gguf extension
     val ggufFile = files.firstOrNull { it.extension.lowercase() == "gguf" }
     if (ggufFile != null) return ggufFile.absolutePath
-    
-    // 3. THE BULLETPROOF FALLBACK: 
+
+    // 3. THE BULLETPROOF FALLBACK:
     // If the downloader stripped the extension, grab the largest file in the directory.
     // The LLM weights will always be the largest file by a massive margin.
     val largestFile = files.filter { it.isFile }.maxByOrNull { it.length() }
-    
+
     return largestFile?.absolutePath ?: localPath
 }
 
@@ -750,11 +762,12 @@ private fun buildRAGConfiguration(
     val resolvedLLMPath = resolveLLMFilePath(llmLocalPath)
     val vocabPath = resolveVocabPath(embeddingLocalPath)
 
-    val embeddingConfigJson = if (vocabPath != null) {
-        """{"vocab_path":"$vocabPath"}"""
-    } else {
-        null
-    }
+    val embeddingConfigJson =
+        if (vocabPath != null) {
+            """{"vocab_path":"$vocabPath"}"""
+        } else {
+            null
+        }
 
     return RAGConfiguration(
         embeddingModelPath = resolvedEmbeddingPath,

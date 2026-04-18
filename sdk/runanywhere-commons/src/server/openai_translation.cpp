@@ -4,9 +4,10 @@
  */
 
 #include "openai_translation.h"
+
+#include <cstdlib>
 #include <random>
 #include <sstream>
-#include <cstdlib>
 
 namespace rac {
 namespace server {
@@ -35,7 +36,7 @@ std::string openaiToolsToCommonsJson(const Json& openaiTools) {
         if (func.contains("name") && func["name"].is_string()) {
             commonsTool["name"] = func["name"];
         } else {
-            continue; // Skip invalid tool
+            continue;  // Skip invalid tool
         }
 
         // Description
@@ -81,7 +82,8 @@ std::string openaiToolsToCommonsJson(const Json& openaiTools) {
                     }
 
                     // Required
-                    bool isRequired = std::find(required.begin(), required.end(), propName) != required.end();
+                    bool isRequired =
+                        std::find(required.begin(), required.end(), propName) != required.end();
                     param["required"] = isRequired;
 
                     // Enum values
@@ -101,9 +103,8 @@ std::string openaiToolsToCommonsJson(const Json& openaiTools) {
     return commonsTools.dump();
 }
 
-std::string buildPromptFromOpenAI(const Json& messages,
-                                   const Json& tools,
-                                   const rac_tool_calling_options_t* options) {
+std::string buildPromptFromOpenAI(const Json& messages, const Json& tools,
+                                  const rac_tool_calling_options_t* options) {
     // If no tools, build simple prompt
     if (!tools.is_array() || tools.empty()) {
         return buildSimplePrompt(messages);
@@ -118,11 +119,7 @@ std::string buildPromptFromOpenAI(const Json& messages,
     // Use Commons API to build prompt
     char* prompt = nullptr;
     rac_result_t result = rac_tool_call_build_initial_prompt(
-        userMessage.c_str(),
-        commonsToolsJson.c_str(),
-        options,
-        &prompt
-    );
+        userMessage.c_str(), commonsToolsJson.c_str(), options, &prompt);
 
     if (result != RAC_SUCCESS || !prompt) {
         // Fallback to simple prompt
@@ -221,6 +218,6 @@ std::string buildSimplePrompt(const Json& messages) {
     return prompt.str();
 }
 
-} // namespace translation
-} // namespace server
-} // namespace rac
+}  // namespace translation
+}  // namespace server
+}  // namespace rac

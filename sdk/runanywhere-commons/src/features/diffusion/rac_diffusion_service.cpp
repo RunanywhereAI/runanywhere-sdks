@@ -84,11 +84,10 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
         framework = model_info->framework;
         model_path = model_info->local_path ? model_info->local_path : model_id;
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
-                     model_info->id ? model_info->id : "NULL",
-                     static_cast<int>(framework), model_path ? model_path : "NULL");
+                     model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
+                     model_path ? model_path : "NULL");
     } else {
-        RAC_LOG_WARNING(LOG_CAT,
-                        "Model NOT found in registry (result=%d), will detect from path",
+        RAC_LOG_WARNING(LOG_CAT, "Model NOT found in registry (result=%d), will detect from path",
                         result);
 
         // Try to detect framework from the model path/id
@@ -98,7 +97,8 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
             framework = RAC_FRAMEWORK_COREML;
             RAC_LOG_INFO(LOG_CAT, "Could not detect format, defaulting to CoreML (Apple only)");
         } else if (framework == RAC_FRAMEWORK_ONNX) {
-            RAC_LOG_WARNING(LOG_CAT, "ONNX diffusion is not supported; only Apple CoreML. Ignoring ONNX.");
+            RAC_LOG_WARNING(LOG_CAT,
+                            "ONNX diffusion is not supported; only Apple CoreML. Ignoring ONNX.");
             framework = RAC_FRAMEWORK_COREML;
         } else {
             RAC_LOG_INFO(LOG_CAT, "Detected framework=%d from path inspection",
@@ -106,9 +106,8 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
         }
     }
 
-    if (config &&
-        static_cast<rac_inference_framework_t>(config->preferred_framework) !=
-            RAC_FRAMEWORK_UNKNOWN) {
+    if (config && static_cast<rac_inference_framework_t>(config->preferred_framework) !=
+                      RAC_FRAMEWORK_UNKNOWN) {
         framework = static_cast<rac_inference_framework_t>(config->preferred_framework);
         RAC_LOG_INFO(LOG_CAT, "Using preferred framework override: %d",
                      static_cast<int>(framework));
@@ -123,9 +122,10 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
 
     RAC_LOG_INFO(LOG_CAT, "Diffusion service request: framework=%d (%s), model_path=%s",
                  static_cast<int>(request.framework),
-                 framework == RAC_FRAMEWORK_COREML ? "CoreML" :
-                 framework == RAC_FRAMEWORK_ONNX ? "ONNX" :
-                 framework == RAC_FRAMEWORK_UNKNOWN ? "Unknown" : "Other",
+                 framework == RAC_FRAMEWORK_COREML    ? "CoreML"
+                 : framework == RAC_FRAMEWORK_ONNX    ? "ONNX"
+                 : framework == RAC_FRAMEWORK_UNKNOWN ? "Unknown"
+                                                      : "Other",
                  request.model_path ? request.model_path : "NULL");
 
     // Service registry returns an rac_diffusion_service_t* with vtable already set
@@ -191,11 +191,10 @@ rac_result_t rac_diffusion_generate(rac_handle_t handle, const rac_diffusion_opt
     return service->ops->generate(service->impl, options, out_result);
 }
 
-rac_result_t rac_diffusion_generate_with_progress(rac_handle_t handle,
-                                                  const rac_diffusion_options_t* options,
-                                                  rac_diffusion_progress_callback_fn progress_callback,
-                                                  void* user_data,
-                                                  rac_diffusion_result_t* out_result) {
+rac_result_t
+rac_diffusion_generate_with_progress(rac_handle_t handle, const rac_diffusion_options_t* options,
+                                     rac_diffusion_progress_callback_fn progress_callback,
+                                     void* user_data, rac_diffusion_result_t* out_result) {
     if (!handle || !options || !out_result)
         return RAC_ERROR_NULL_POINTER;
 
@@ -208,8 +207,8 @@ rac_result_t rac_diffusion_generate_with_progress(rac_handle_t handle,
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
-    return service->ops->generate_with_progress(service->impl, options, progress_callback, user_data,
-                                                out_result);
+    return service->ops->generate_with_progress(service->impl, options, progress_callback,
+                                                user_data, out_result);
 }
 
 rac_result_t rac_diffusion_get_info(rac_handle_t handle, rac_diffusion_info_t* out_info) {

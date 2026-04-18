@@ -110,7 +110,7 @@ export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 
 ./gradlew clean publishAllPublicationsToMavenCentralRepository \
-  -Prunanywhere.testLocal=false \
+  -Prunanywhere.useLocalNatives=false \
   -Prunanywhere.nativeLibVersion=0.17.5 \
   --no-daemon
 ```
@@ -156,7 +156,7 @@ export MAVEN_CENTRAL_USERNAME="<USERNAME>"
 export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
 
 ./gradlew clean publishAllPublicationsToMavenCentralRepository \
-  -Prunanywhere.testLocal=true \
+  -Prunanywhere.useLocalNatives=true \
   --no-daemon
 ```
 

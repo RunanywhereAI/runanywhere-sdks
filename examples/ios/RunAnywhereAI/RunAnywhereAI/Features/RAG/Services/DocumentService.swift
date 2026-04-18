@@ -50,7 +50,6 @@ enum DocumentServiceError: LocalizedError {
 // MARK: - Document Service
 
 struct DocumentService {
-
     /// Extract plain text from a file at the given URL.
     ///
     /// Supports PDF (via PDFKit) and JSON (via JSONSerialization).

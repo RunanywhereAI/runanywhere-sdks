@@ -48,10 +48,7 @@ export const ToolCallIndicator: React.FC<ToolCallIndicatorProps> = ({
   return (
     <>
       <TouchableOpacity
-        style={[
-          styles.badge,
-          { backgroundColor, borderColor, borderWidth: 0.5 },
-        ]}
+        style={[styles.badge, { backgroundColor, borderColor }]}
         onPress={() => setShowSheet(true)}
         activeOpacity={0.7}
       >
@@ -118,11 +115,7 @@ const ToolCallDetailSheet: React.FC<ToolCallDetailSheetProps> = ({
             ]}
           >
             <Icon
-              name={
-                toolCallInfo.success
-                  ? 'checkmark-circle'
-                  : 'close-circle'
-              }
+              name={toolCallInfo.success ? 'checkmark-circle' : 'close-circle'}
               size={24}
               color={
                 toolCallInfo.success ? Colors.statusGreen : Colors.statusRed
@@ -146,11 +139,7 @@ const ToolCallDetailSheet: React.FC<ToolCallDetailSheetProps> = ({
 
           {/* Error (if available) */}
           {toolCallInfo.error && (
-            <DetailSection
-              title="Error"
-              content={toolCallInfo.error}
-              isError
-            />
+            <DetailSection title="Error" content={toolCallInfo.error} isError />
           )}
         </ScrollView>
       </SafeAreaView>
@@ -171,9 +160,7 @@ const DetailSection: React.FC<DetailSectionProps> = ({
 }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>{title}</Text>
-    <Text
-      style={[styles.sectionContent, isError && styles.errorText]}
-    >
+    <Text style={[styles.sectionContent, isError && styles.errorText]}>
       {content}
     </Text>
   </View>
@@ -234,6 +221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 0.5,
     marginBottom: Spacing.small,
     alignSelf: 'flex-start',
   },

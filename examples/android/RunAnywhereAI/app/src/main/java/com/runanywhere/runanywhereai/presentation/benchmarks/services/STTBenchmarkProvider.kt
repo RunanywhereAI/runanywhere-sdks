@@ -19,13 +19,13 @@ import kotlinx.coroutines.withContext
  * Matches iOS STTBenchmarkProvider exactly.
  */
 class STTBenchmarkProvider : BenchmarkScenarioProvider {
-
     override val category: BenchmarkCategory = BenchmarkCategory.STT
 
-    override fun scenarios(): List<BenchmarkScenario> = listOf(
-        BenchmarkScenario(name = "Silent 2s", category = BenchmarkCategory.STT),
-        BenchmarkScenario(name = "Sine Tone 3s", category = BenchmarkCategory.STT),
-    )
+    override fun scenarios(): List<BenchmarkScenario> =
+        listOf(
+            BenchmarkScenario(name = "Silent 2s", category = BenchmarkCategory.STT),
+            BenchmarkScenario(name = "Sine Tone 3s", category = BenchmarkCategory.STT),
+        )
 
     override suspend fun execute(
         scenario: BenchmarkScenario,

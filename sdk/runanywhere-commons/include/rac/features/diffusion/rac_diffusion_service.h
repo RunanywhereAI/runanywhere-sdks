@@ -135,10 +135,10 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
  * @param out_result Output: Generation result (caller must free with rac_diffusion_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_generate_with_progress(
-    rac_handle_t handle, const rac_diffusion_options_t* options,
-    rac_diffusion_progress_callback_fn progress_callback, void* user_data,
-    rac_diffusion_result_t* out_result);
+RAC_API rac_result_t
+rac_diffusion_generate_with_progress(rac_handle_t handle, const rac_diffusion_options_t* options,
+                                     rac_diffusion_progress_callback_fn progress_callback,
+                                     void* user_data, rac_diffusion_result_t* out_result);
 
 /**
  * @brief Get service information

@@ -12,7 +12,6 @@ import UIKit
 #endif
 
 enum SyntheticInputGenerator {
-
     // MARK: - Audio
 
     /// Generate silent PCM Int16 mono audio data.
@@ -28,8 +27,8 @@ enum SyntheticInputGenerator {
         data.withUnsafeMutableBytes { buffer in
             let samples = buffer.bindMemory(to: Int16.self)
             for i in 0..<sampleCount {
-                let t = Double(i) / Double(sampleRate)
-                let value = sin(2.0 * .pi * frequencyHz * t) * Double(Int16.max / 2)
+                let time = Double(i) / Double(sampleRate)
+                let value = sin(2.0 * .pi * frequencyHz * time) * Double(Int16.max / 2)
                 samples[i] = Int16(value)
             }
         }

@@ -2,15 +2,14 @@ package com.runanywhere.runanywhereai.presentation.settings
 
 import android.app.Application
 import android.content.Context
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolParameter
 import com.runanywhere.sdk.public.extensions.LLM.ToolParameterType
 import com.runanywhere.sdk.public.extensions.LLM.ToolValue
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
-import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -44,7 +44,6 @@ data class ToolSettingsUiState(
  * Mirrors iOS ToolSettingsViewModel.swift functionality.
  */
 class ToolSettingsViewModel private constructor(application: Application) : AndroidViewModel(application) {
-
     private val _uiState = MutableStateFlow(ToolSettingsUiState())
     val uiState: StateFlow<ToolSettingsUiState> = _uiState.asStateFlow()
 
@@ -56,7 +55,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     companion object {
         private const val PREFS_NAME = "tool_settings"
         private const val KEY_TOOL_CALLING_ENABLED = "tool_calling_enabled"
-        
+
         /** Timeout for weather API requests (covers geocoding + weather fetch) */
         private const val WEATHER_API_TIMEOUT_MS = 15_000L
 
@@ -104,39 +103,43 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             try {
                 // Weather Tool - Uses Open-Meteo API (free, no API key required)
                 RunAnywhereToolCalling.registerTool(
-                    definition = ToolDefinition(
-                        name = "get_weather",
-                        description = "Gets the current weather for a given location using Open-Meteo API",
-                        parameters = listOf(
-                            ToolParameter(
-                                name = "location",
-                                type = ToolParameterType.STRING,
-                                description = "City name (e.g., 'San Francisco', 'London', 'Tokyo')",
-                                required = true
-                            )
+                    definition =
+                        ToolDefinition(
+                            name = "get_weather",
+                            description = "Gets the current weather for a given location using Open-Meteo API",
+                            parameters =
+                                listOf(
+                                    ToolParameter(
+                                        name = "location",
+                                        type = ToolParameterType.STRING,
+                                        description = "City name (e.g., 'San Francisco', 'London', 'Tokyo')",
+                                        required = true,
+                                    ),
+                                ),
+                            category = "Utility",
                         ),
-                        category = "Utility"
-                    ),
                     executor = { args: Map<String, ToolValue> ->
                         fetchWeather((args["location"] as? ToolValue.StringValue)?.value ?: "San Francisco")
-                    }
+                    },
                 )
 
                 // Time Tool - Real system time with timezone
                 RunAnywhereToolCalling.registerTool(
-                    definition = ToolDefinition(
-                        name = "get_current_time",
-                        description = "Gets the current date, time, and timezone information",
-                        parameters = emptyList(),
-                        category = "Utility"
-                    ),
+                    definition =
+                        ToolDefinition(
+                            name = "get_current_time",
+                            description = "Gets the current date, time, and timezone information",
+                            parameters = emptyList(),
+                            category = "Utility",
+                        ),
                     executor = { _: Map<String, ToolValue> ->
                         val now = Date()
                         val dateFormatter = SimpleDateFormat("EEEE, MMMM d, yyyy 'at' h:mm:ss a", Locale.getDefault())
                         val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
-                        val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).apply {
-                            timeZone = TimeZone.getTimeZone("UTC")
-                        }
+                        val isoFormatter =
+                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault()).apply {
+                                timeZone = TimeZone.getTimeZone("UTC")
+                            }
                         val tz = TimeZone.getDefault()
 
                         mapOf(
@@ -144,37 +147,39 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             "time" to ToolValue.StringValue(timeFormatter.format(now)),
                             "timestamp" to ToolValue.StringValue(isoFormatter.format(now)),
                             "timezone" to ToolValue.StringValue(tz.id),
-                            "utc_offset" to ToolValue.StringValue(tz.getDisplayName(false, TimeZone.SHORT))
+                            "utc_offset" to ToolValue.StringValue(tz.getDisplayName(false, TimeZone.SHORT)),
                         )
-                    }
+                    },
                 )
 
                 // Calculator Tool - Math evaluation
                 RunAnywhereToolCalling.registerTool(
-                    definition = ToolDefinition(
-                        name = "calculate",
-                        description = "Performs math calculations. Supports +, -, *, /, and parentheses",
-                        parameters = listOf(
-                            ToolParameter(
-                                name = "expression",
-                                type = ToolParameterType.STRING,
-                                description = "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')",
-                                required = true
-                            )
+                    definition =
+                        ToolDefinition(
+                            name = "calculate",
+                            description = "Performs math calculations. Supports +, -, *, /, and parentheses",
+                            parameters =
+                                listOf(
+                                    ToolParameter(
+                                        name = "expression",
+                                        type = ToolParameterType.STRING,
+                                        description = "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')",
+                                        required = true,
+                                    ),
+                                ),
+                            category = "Utility",
                         ),
-                        category = "Utility"
-                    ),
                     executor = { args: Map<String, ToolValue> ->
-                        val expression = (args["expression"] as? ToolValue.StringValue)?.value
-                            ?: (args["input"] as? ToolValue.StringValue)?.value
-                            ?: "0"
+                        val expression =
+                            (args["expression"] as? ToolValue.StringValue)?.value
+                                ?: (args["input"] as? ToolValue.StringValue)?.value
+                                ?: "0"
                         evaluateMathExpression(expression)
-                    }
+                    },
                 )
 
                 Timber.i("✅ Demo tools registered")
                 refreshRegisteredTools()
-
             } catch (e: Exception) {
                 Timber.e(e, "Failed to register demo tools")
             } finally {
@@ -215,7 +220,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
     /**
      * Fetch weather using Open-Meteo API (free, no API key required)
-     * 
+     *
      * Uses a 15-second timeout for the entire operation (geocoding + weather fetch)
      * to ensure tool execution respects LLM timeout settings.
      */
@@ -237,7 +242,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                     if (latMatch == null || lonMatch == null) {
                         return@withTimeout mapOf(
                             "error" to ToolValue.StringValue("Location not found: $location"),
-                            "location" to ToolValue.StringValue(location)
+                            "location" to ToolValue.StringValue(location),
                         )
                     }
 
@@ -260,38 +265,39 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                     val windSpeed = windMatch?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
                     val weatherCode = codeMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
 
-                    val condition = when (weatherCode) {
-                        0 -> "Clear sky"
-                        1, 2, 3 -> "Partly cloudy"
-                        45, 48 -> "Foggy"
-                        51, 53, 55 -> "Drizzle"
-                        61, 63, 65 -> "Rain"
-                        71, 73, 75 -> "Snow"
-                        80, 81, 82 -> "Rain showers"
-                        95, 96, 99 -> "Thunderstorm"
-                        else -> "Unknown"
-                    }
+                    val condition =
+                        when (weatherCode) {
+                            0 -> "Clear sky"
+                            1, 2, 3 -> "Partly cloudy"
+                            45, 48 -> "Foggy"
+                            51, 53, 55 -> "Drizzle"
+                            61, 63, 65 -> "Rain"
+                            71, 73, 75 -> "Snow"
+                            80, 81, 82 -> "Rain showers"
+                            95, 96, 99 -> "Thunderstorm"
+                            else -> "Unknown"
+                        }
 
                     mapOf(
                         "location" to ToolValue.StringValue(resolvedName),
                         "temperature_celsius" to ToolValue.NumberValue(temperature),
-                        "temperature_fahrenheit" to ToolValue.NumberValue(temperature * 9/5 + 32),
+                        "temperature_fahrenheit" to ToolValue.NumberValue(temperature * 9 / 5 + 32),
                         "humidity_percent" to ToolValue.NumberValue(humidity.toDouble()),
                         "wind_speed_kmh" to ToolValue.NumberValue(windSpeed),
-                        "condition" to ToolValue.StringValue(condition)
+                        "condition" to ToolValue.StringValue(condition),
                     )
                 }
             } catch (e: TimeoutCancellationException) {
                 Timber.w("Weather API request timed out for location: $location")
                 mapOf(
                     "error" to ToolValue.StringValue("Weather API request timed out. Please try again."),
-                    "location" to ToolValue.StringValue(location)
+                    "location" to ToolValue.StringValue(location),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Weather fetch failed")
                 mapOf(
                     "error" to ToolValue.StringValue("Failed to fetch weather: ${e.message}"),
-                    "location" to ToolValue.StringValue(location)
+                    "location" to ToolValue.StringValue(location),
                 )
             }
         }
@@ -317,24 +323,25 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     private fun evaluateMathExpression(expression: String): Map<String, ToolValue> {
         return try {
             // Clean the expression
-            val cleaned = expression
-                .replace("=", "")
-                .replace("x", "*")
-                .replace("×", "*")
-                .replace("÷", "/")
-                .trim()
+            val cleaned =
+                expression
+                    .replace("=", "")
+                    .replace("x", "*")
+                    .replace("×", "*")
+                    .replace("÷", "/")
+                    .trim()
 
             // Simple expression evaluator (handles basic math)
             val result = evaluateSimpleExpression(cleaned)
 
             mapOf(
                 "result" to ToolValue.NumberValue(result),
-                "expression" to ToolValue.StringValue(expression)
+                "expression" to ToolValue.StringValue(expression),
             )
         } catch (e: Exception) {
             mapOf(
                 "error" to ToolValue.StringValue("Could not evaluate expression: $expression"),
-                "expression" to ToolValue.StringValue(expression)
+                "expression" to ToolValue.StringValue(expression),
             )
         }
     }

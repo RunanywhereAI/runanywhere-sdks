@@ -76,7 +76,7 @@ typedef struct rac_benchmark_extended_metrics {
  * @param user_data Platform context passed during registration
  */
 typedef void (*rac_benchmark_metrics_provider_fn)(rac_benchmark_extended_metrics_t* out,
-                                                   void* user_data);
+                                                  void* user_data);
 
 // =============================================================================
 // METRICS API
@@ -93,7 +93,7 @@ typedef void (*rac_benchmark_metrics_provider_fn)(rac_benchmark_extended_metrics
  * @param user_data Platform context passed to provider calls
  */
 RAC_API void rac_benchmark_set_metrics_provider(rac_benchmark_metrics_provider_fn provider,
-                                                 void* user_data);
+                                                void* user_data);
 
 /**
  * Captures current device metrics using the registered provider.

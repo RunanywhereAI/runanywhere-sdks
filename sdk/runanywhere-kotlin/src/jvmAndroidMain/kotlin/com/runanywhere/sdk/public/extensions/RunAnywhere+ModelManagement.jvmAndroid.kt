@@ -17,6 +17,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
@@ -31,7 +32,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -334,8 +334,9 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
     // matching iOS multi-file model download behaviour.
     val registeredModel = getRegisteredModels().find { it.id == modelId }
     if (registeredModel?.category == ModelCategory.EMBEDDING) {
-        val downloadUrl = registeredModel.downloadURL
-            ?: return flow { throw SDKError.model("Model '$modelId' has no download URL") }
+        val downloadUrl =
+            registeredModel.downloadURL
+                ?: return flow { throw SDKError.model("Model '$modelId' has no download URL") }
         val companions = getCompanionFiles(modelId) ?: emptyList()
         return flow {
             SDKLogger.download.info("EMBEDDING download: $modelId (${companions.size} companion file(s))")
@@ -431,8 +432,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     withContext(Dispatchers.IO) {
                         val url = java.net.URL(fileDescriptor.url)
                         val connection = url.openConnection() as java.net.HttpURLConnection
-                        connection.connectTimeout = 30_000  // 30s for initial connection
-                        connection.readTimeout = 300_000    // 5 min for large model file transfers
+                        connection.connectTimeout = 30_000 // 30s for initial connection
+                        connection.readTimeout = 300_000 // 5 min for large model file transfers
                         connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
 
                         try {
@@ -459,11 +460,12 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                                         if (now - lastProgressEmitTime >= 200) {
                                             lastProgressEmitTime = now
                                             // iOS pattern: offset + (fileProgress * scale)
-                                            val fileProgress = if (fileTotalBytes > 0) {
-                                                fileBytesRead.toFloat() / fileTotalBytes
-                                            } else {
-                                                0f
-                                            }
+                                            val fileProgress =
+                                                if (fileTotalBytes > 0) {
+                                                    fileBytesRead.toFloat() / fileTotalBytes
+                                                } else {
+                                                    0f
+                                                }
                                             val combinedProgress =
                                                 (index.toFloat() + fileProgress) / fileCount
 
@@ -714,26 +716,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     )
 
                     // Extract and find model path using C++ orchestrator utilities
-                    val racFramework = when (modelInfo.framework) {
-                        InferenceFramework.LLAMA_CPP -> CppBridgeModelRegistry.Framework.LLAMACPP
-                        InferenceFramework.ONNX -> CppBridgeModelRegistry.Framework.ONNX
-                        InferenceFramework.FOUNDATION_MODELS -> CppBridgeModelRegistry.Framework.FOUNDATION_MODELS
-                        InferenceFramework.SYSTEM_TTS -> CppBridgeModelRegistry.Framework.SYSTEM_TTS
-                        InferenceFramework.FLUID_AUDIO -> CppBridgeModelRegistry.Framework.FLUID_AUDIO
-                        InferenceFramework.BUILT_IN -> CppBridgeModelRegistry.Framework.BUILTIN
-                        InferenceFramework.NONE -> CppBridgeModelRegistry.Framework.NONE
-                        InferenceFramework.GENIE -> CppBridgeModelRegistry.Framework.GENIE
-                        InferenceFramework.UNKNOWN -> CppBridgeModelRegistry.Framework.UNKNOWN
-                    }
-                    val racFormat = when (modelInfo.format) {
-                        ModelFormat.GGUF -> CppBridgeModelRegistry.ModelFormat.GGUF
-                        ModelFormat.ONNX -> CppBridgeModelRegistry.ModelFormat.ONNX
-                        ModelFormat.ORT -> CppBridgeModelRegistry.ModelFormat.ORT
-                        ModelFormat.BIN -> CppBridgeModelRegistry.ModelFormat.BIN
-                        ModelFormat.QNN_CONTEXT -> CppBridgeModelRegistry.ModelFormat.QNN_CONTEXT
-                        ModelFormat.UNKNOWN -> CppBridgeModelRegistry.ModelFormat.UNKNOWN
-                    }
-                    val extractedPath = extractArchive(downloadedFile, modelId, racFramework, racFormat, downloadLogger)
+                    val extractedPath = extractArchive(downloadedFile, modelId, downloadLogger)
                     downloadLogger.info("Extraction complete: $extractedPath")
                     extractedPath
                 } else {
@@ -800,15 +783,11 @@ private fun requiresExtraction(url: String): Boolean {
  *
  * @param archiveFile The downloaded archive file (may not have extension in filename)
  * @param modelId The model ID
- * @param racFramework C++ framework constant (CppBridgeModelRegistry.Framework.*)
- * @param racFormat C++ format constant (CppBridgeModelRegistry.ModelFormat.*)
  * @param logger Logger for debug output
  */
 private suspend fun extractArchive(
     archiveFile: File,
     modelId: String,
-    racFramework: Int,
-    racFormat: Int,
     logger: SDKLogger,
 ): String =
     withContext(Dispatchers.IO) {
@@ -838,10 +817,11 @@ private suspend fun extractArchive(
 
         try {
             // Use native C++ extraction (libarchive) — auto-detects format from magic bytes
-            val result = RunAnywhereBridge.nativeExtractArchive(
-                tempArchiveFile.absolutePath,
-                parentDir.absolutePath,
-            )
+            val result =
+                RunAnywhereBridge.nativeExtractArchive(
+                    tempArchiveFile.absolutePath,
+                    parentDir.absolutePath,
+                )
             if (result != 0) {
                 throw SDKError.download("Native extraction failed with code: $result")
             }
@@ -862,9 +842,11 @@ private suspend fun extractArchive(
         // without throwing), to avoid moving a multi-GB archive file into the model directory.
         val tempArchiveName = tempArchiveFile.name
         val expectedModelDir = File(parentDir, modelId)
-        val newItems = parentDir.listFiles()
-            ?.filter { it.name !in itemsBeforeExtraction && it.name != tempArchiveName }
-            ?: emptyList()
+        val newItems =
+            parentDir
+                .listFiles()
+                ?.filter { it.name !in itemsBeforeExtraction && it.name != tempArchiveName }
+                ?: emptyList()
         val newDirs = newItems.filter { it.isDirectory }
         val newFiles = newItems.filter { it.isFile }
 

@@ -16,7 +16,8 @@
  *   await ONNX.register();
  */
 
-import { SDKEnvironment, SDKEventType, ModelCategory } from '../types/enums';
+import type { ModelCategory } from '../types/enums';
+import { SDKEnvironment, SDKEventType } from '../types/enums';
 import type { SDKInitOptions } from '../types/models';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';

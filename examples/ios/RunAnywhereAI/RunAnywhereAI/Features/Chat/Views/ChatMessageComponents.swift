@@ -116,8 +116,7 @@ struct MessageBubbleView: View {
         }
     }
 
-    @ViewBuilder
-    var toolCallSection: some View {
+    @ViewBuilder var toolCallSection: some View {
         if let toolCallInfo = message.toolCallInfo {
             ToolCallIndicator(toolCallInfo: toolCallInfo) {
                 showToolCallSheet = true
@@ -283,9 +282,7 @@ extension MessageBubbleView {
 // MARK: - MessageBubbleView Badge and Analytics
 
 extension MessageBubbleView {
-
-    @ViewBuilder
-    var timestampAndAnalyticsSection: some View {
+    @ViewBuilder var timestampAndAnalyticsSection: some View {
         // Only show timestamp for assistant messages when content exists and not generating
         if message.role == .assistant && !message.content.isEmpty && !isGenerating {
             HStack(spacing: 6) {

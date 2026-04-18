@@ -37,7 +37,12 @@ import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
-import { MessageBubble, TypingIndicator, ChatInput, ToolCallingBadge } from '../components/chat';
+import {
+  MessageBubble,
+  TypingIndicator,
+  ChatInput,
+  ToolCallingBadge,
+} from '../components/chat';
 import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
 import type { Message, Conversation, ToolCallInfo } from '../types/chat';
@@ -52,7 +57,11 @@ import {
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, type ModelInfo as SDKModelInfo, type GenerationOptions } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  type ModelInfo as SDKModelInfo,
+  type GenerationOptions,
+} from '@runanywhere/core';
 import { safeEvaluateExpression } from '../utils/mathParser';
 
 // Generate unique ID
@@ -79,7 +88,8 @@ const registerChatTools = () => {
         {
           name: 'location',
           type: 'string',
-          description: 'City name or location (e.g., "Tokyo", "New York", "London")',
+          description:
+            'City name or location (e.g., "Tokyo", "New York", "London")',
           required: true,
         },
       ],
@@ -87,6 +97,7 @@ const registerChatTools = () => {
     async (args) => {
       // Handle both 'location' and 'city' parameter names (models vary)
       const location = (args.location || args.city) as string;
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] get_weather called for:', location);
 
       try {
@@ -127,6 +138,7 @@ const registerChatTools = () => {
       parameters: [],
     },
     async () => {
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] get_current_time called');
       const now = new Date();
       return {
@@ -141,7 +153,8 @@ const registerChatTools = () => {
   RunAnywhere.registerTool(
     {
       name: 'calculate',
-      description: 'Performs math calculations. Supports +, -, *, /, and parentheses',
+      description:
+        'Performs math calculations. Supports +, -, *, /, and parentheses',
       parameters: [
         {
           name: 'expression',
@@ -153,6 +166,7 @@ const registerChatTools = () => {
     },
     async (args) => {
       const expression = (args.expression || args.input) as string;
+      // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] calculate called for:', expression);
       try {
         // Safe math evaluation using recursive descent parser
@@ -168,7 +182,10 @@ const registerChatTools = () => {
     }
   );
 
-  console.log('[ChatScreen] Tools registered: get_weather, get_current_time, calculate');
+  // eslint-disable-next-line no-console -- demo setup diagnostic
+  console.log(
+    '[ChatScreen] Tools registered: get_weather, get_current_time, calculate'
+  );
 };
 
 /**
@@ -177,7 +194,10 @@ const registerChatTools = () => {
  * * Matches iOS: LLMViewModel+ToolCalling.swift detectToolCallFormat()
  * Checks both ID and name since model might be identified by either
  */
-const detectToolCallFormat = (modelId: string | undefined, modelName: string | undefined): string => {
+const detectToolCallFormat = (
+  modelId: string | undefined,
+  modelName: string | undefined
+): string => {
   // Check model ID first (more reliable - e.g., "lfm2-1.2b-tool-q4_k_m")
   if (modelId) {
     const id = modelId.toLowerCase();
@@ -268,15 +288,27 @@ export const ChatScreen: React.FC = () => {
    * Reads user-configured temperature, maxTokens, and systemPrompt
    */
   const getGenerationOptions = async (): Promise<GenerationOptions> => {
-    const tempStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.TEMPERATURE);
-    const maxStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.MAX_TOKENS);
-    const sysStr = await AsyncStorage.getItem(GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT);
+    const tempStr = await AsyncStorage.getItem(
+      GENERATION_SETTINGS_KEYS.TEMPERATURE
+    );
+    const maxStr = await AsyncStorage.getItem(
+      GENERATION_SETTINGS_KEYS.MAX_TOKENS
+    );
+    const sysStr = await AsyncStorage.getItem(
+      GENERATION_SETTINGS_KEYS.SYSTEM_PROMPT
+    );
 
-    const temperature = tempStr !== null && !Number.isNaN(parseFloat(tempStr)) ? parseFloat(tempStr) : 0.7;
+    const temperature =
+      tempStr !== null && !Number.isNaN(parseFloat(tempStr))
+        ? parseFloat(tempStr)
+        : 0.7;
     const maxTokens = maxStr ? parseInt(maxStr, 10) : 1000;
     const systemPrompt = sysStr && sysStr.trim() !== '' ? sysStr : undefined;
 
-    console.log(`[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`);
+    // eslint-disable-next-line no-console -- demo settings diagnostic
+    console.log(
+      `[PARAMS] App getGenerationOptions: temperature=${temperature}, maxTokens=${maxTokens}, systemPrompt=${systemPrompt ? `set(${systemPrompt.length} chars)` : 'nil'}`
+    );
 
     return { temperature, maxTokens, systemPrompt };
   };
@@ -329,7 +361,9 @@ export const ChatScreen: React.FC = () => {
         registerChatTools();
         const tools = RunAnywhere.getRegisteredTools();
         setRegisteredToolCount(tools.length);
-        console.warn('[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.');
+        console.warn(
+          '[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.'
+        );
       }
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
@@ -375,23 +409,28 @@ export const ChatScreen: React.FC = () => {
 
       if (success) {
         // Set the model info preserving the actual framework from the SDK model
-        const fw = (model.preferredFramework as unknown as LLMFramework) ?? LLMFramework.LlamaCpp;
+        const fw =
+          (model.preferredFramework as unknown as LLMFramework) ??
+          LLMFramework.LlamaCpp;
         const modelInfo = {
           id: model.id,
           name: model.name,
           category: ModelCategory.Language,
-          compatibleFrameworks: model.compatibleFrameworks as unknown as LLMFramework[] ?? [fw],
+          compatibleFrameworks:
+            (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
           preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
           supportsThinking: false,
         };
         setCurrentModel(modelInfo);
-        
+
         // Log model info for format detection debugging
         const format = detectToolCallFormat(model.id, model.name);
-        console.warn(`[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`);
-        
+        console.warn(
+          `[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`
+        );
+
         // Register tools when model loads
         registerChatTools();
         const tools = RunAnywhere.getRegisteredTools();
@@ -453,7 +492,15 @@ export const ChatScreen: React.FC = () => {
     try {
       // Detect tool call format based on loaded model (matches iOS LLMViewModel+ToolCalling.swift)
       const format = detectToolCallFormat(currentModel?.id, currentModel?.name);
-      console.log('[ChatScreen] Starting generation with tools for:', prompt, 'model:', currentModel?.id, 'format:', format);
+      // eslint-disable-next-line no-console -- demo generation diagnostic
+      console.log(
+        '[ChatScreen] Starting generation with tools for:',
+        prompt,
+        'model:',
+        currentModel?.id,
+        'format:',
+        format
+      );
 
       // Get user-configured generation options
       const options = await getGenerationOptions();
@@ -471,30 +518,42 @@ export const ChatScreen: React.FC = () => {
 
       // Log tool usage for debugging
       if (result.toolCalls.length > 0) {
-        console.log('[ChatScreen] Tools used:', result.toolCalls.map(t => t.toolName));
+        /* eslint-disable no-console -- demo tool-use diagnostic */
+        console.log(
+          '[ChatScreen] Tools used:',
+          result.toolCalls.map((t) => t.toolName)
+        );
         console.log('[ChatScreen] Tool results:', result.toolResults);
+        /* eslint-enable no-console */
       }
 
       // Build final message content
-      let finalContent = result.text || '(No response generated)';
+      const finalContent = result.text || '(No response generated)';
 
       // Extract tool call info from result (matching iOS implementation)
       let toolCallInfo: ToolCallInfo | undefined;
       if (result.toolCalls.length > 0) {
         const lastToolCall = result.toolCalls[result.toolCalls.length - 1];
-        const lastToolResult = result.toolResults[result.toolResults.length - 1];
-        
+        const lastToolResult =
+          result.toolResults[result.toolResults.length - 1];
+
         toolCallInfo = {
           toolName: lastToolCall.toolName,
           arguments: JSON.stringify(lastToolCall.arguments, null, 2),
-          result: lastToolResult?.success 
+          result: lastToolResult?.success
             ? JSON.stringify(lastToolResult.result, null, 2)
             : undefined,
           success: lastToolResult?.success ?? false,
           error: lastToolResult?.error,
         };
-        
-        console.log('[ChatScreen] Created toolCallInfo:', toolCallInfo.toolName, 'success:', toolCallInfo.success);
+
+        // eslint-disable-next-line no-console -- demo tool-use diagnostic
+        console.log(
+          '[ChatScreen] Created toolCallInfo:',
+          toolCallInfo.toolName,
+          'success:',
+          toolCallInfo.success
+        );
       }
 
       // Update with final message

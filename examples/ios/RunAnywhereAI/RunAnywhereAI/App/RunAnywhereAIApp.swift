@@ -21,6 +21,7 @@ import os
 import AppKit
 #endif
 
+// swiftlint:disable type_body_length
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
@@ -99,42 +100,7 @@ struct RunAnywhereAIApp: App {
 
             let startTime = Date()
 
-            // Check for custom API configuration (stored in Settings)
-            let customApiKey = SettingsViewModel.getStoredApiKey()
-            let customBaseURL = SettingsViewModel.getStoredBaseURL()
-
-            if let apiKey = customApiKey, let baseURL = customBaseURL {
-                // Custom configuration mode - use stored credentials
-                // Always use .production for custom backends (model assignment auto-fetch enabled)
-                logger.info("🔧 Found custom API configuration")
-                logger.info("   Base URL: \(baseURL, privacy: .public)")
-
-                try RunAnywhere.initialize(
-                    apiKey: apiKey,
-                    baseURL: baseURL,
-                    environment: .production
-                )
-                logger.info("✅ SDK initialized with CUSTOM configuration (production)")
-            } else {
-                // Default mode based on build configuration
-                #if DEBUG
-                // Development mode - uses Supabase, no API key needed
-                try RunAnywhere.initialize()
-                logger.info("✅ SDK initialized in DEVELOPMENT mode")
-                #else
-                // Production mode - requires API key and backend URL
-                // Configure these via Settings screen or set environment variables
-                let apiKey = "YOUR_API_KEY_HERE"
-                let baseURL = "YOUR_BASE_URL_HERE"
-
-                try RunAnywhere.initialize(
-                    apiKey: apiKey,
-                    baseURL: baseURL,
-                    environment: .production
-                )
-                logger.info("✅ SDK initialized in PRODUCTION mode")
-                #endif
-            }
+            try runSDKInitialize()
 
             // Register modules and models
             await registerModulesAndModels()
@@ -169,6 +135,47 @@ struct RunAnywhereAIApp: App {
         }
     }
 
+    /// Runs `RunAnywhere.initialize(...)` with either custom credentials
+    /// (from Settings) or a default build-configuration-driven mode.
+    private func runSDKInitialize() throws {
+        // Check for custom API configuration (stored in Settings)
+        let customApiKey = SettingsViewModel.getStoredApiKey()
+        let customBaseURL = SettingsViewModel.getStoredBaseURL()
+
+        if let apiKey = customApiKey, let baseURL = customBaseURL {
+            // Custom configuration mode - use stored credentials
+            // Always use .production for custom backends (model assignment auto-fetch enabled)
+            logger.info("🔧 Found custom API configuration")
+            logger.info("   Base URL: \(baseURL, privacy: .public)")
+
+            try RunAnywhere.initialize(
+                apiKey: apiKey,
+                baseURL: baseURL,
+                environment: .production
+            )
+            logger.info("✅ SDK initialized with CUSTOM configuration (production)")
+        } else {
+            // Default mode based on build configuration
+            #if DEBUG
+            // Development mode - uses Supabase, no API key needed
+            try RunAnywhere.initialize()
+            logger.info("✅ SDK initialized in DEVELOPMENT mode")
+            #else
+            // Production mode - requires API key and backend URL
+            // Configure these via Settings screen or set environment variables
+            let apiKey = "YOUR_API_KEY_HERE"
+            let baseURL = "YOUR_BASE_URL_HERE"
+
+            try RunAnywhere.initialize(
+                apiKey: apiKey,
+                baseURL: baseURL,
+                environment: .production
+            )
+            logger.info("✅ SDK initialized in PRODUCTION mode")
+            #endif
+        }
+    }
+
     private func retryInitialization() async {
         await MainActor.run {
             initializationError = nil
@@ -176,10 +183,10 @@ struct RunAnywhereAIApp: App {
         await initializeSDK()
     }
 
-    /// Register modules with their associated models
-    /// Each module explicitly owns its models - the framework is determined by the module
-    @MainActor
-    private func registerModulesAndModels() async { // swiftlint:disable:this function_body_length
+    // Register modules with their associated models.
+    // Each module explicitly owns its models - the framework is determined by the module.
+    // swiftlint:disable:next attributes function_body_length cyclomatic_complexity
+    @MainActor private func registerModulesAndModels() async {
         logger.info("📦 Registering modules with their models...")
 
         // NOTE: LlamaCPP, ONNX, and WhisperKitSTT backends are registered once
@@ -234,7 +241,8 @@ struct RunAnywhereAIApp: App {
             )
         }
         // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
-        // TODO: [Portal Integration] Remove once portal delivers model + adapter pairings
+        // swiftlint:disable:next todo
+        // TODO: #1 [Portal Integration] Remove once portal delivers model + adapter pairings
         if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen2.5-1.5b-instruct-q4_k_m",
@@ -305,31 +313,31 @@ struct RunAnywhereAIApp: App {
         }
 
         // Qwen3 models
-        if let qwen3_06bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf") {
+        if let qwen306bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3-0.6b-q4_k_m",
                 name: "Qwen3 0.6B Q4_K_M",
-                url: qwen3_06bURL,
+                url: qwen306bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 500_000_000,
                 supportsThinking: true
             )
         }
-        if let qwen3_17bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf") {
+        if let qwen317bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3-1.7b-q4_k_m",
                 name: "Qwen3 1.7B Q4_K_M",
-                url: qwen3_17bURL,
+                url: qwen317bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 1_200_000_000,
                 supportsThinking: true
             )
         }
-        if let qwen3_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf") {
+        if let qwen34bURL = URL(string: "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3-4b-q4_k_m",
                 name: "Qwen3 4B Q4_K_M",
-                url: qwen3_4bURL,
+                url: qwen34bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 2_800_000_000,
                 supportsThinking: true
@@ -337,31 +345,31 @@ struct RunAnywhereAIApp: App {
         }
 
         // Qwen3.5 models
-        if let qwen35_08bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf") {
+        if let qwen3508bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3.5-0.8b-q4_k_m",
                 name: "Qwen3.5 0.8B Q4_K_M",
-                url: qwen35_08bURL,
+                url: qwen3508bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 600_000_000,
                 supportsThinking: true
             )
         }
-        if let qwen35_2bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf") {
+        if let qwen352bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3.5-2b-q4_k_m",
                 name: "Qwen3.5 2B Q4_K_M",
-                url: qwen35_2bURL,
+                url: qwen352bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 1_500_000_000,
                 supportsThinking: true
             )
         }
-        if let qwen35_4bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf") {
+        if let qwen354bURL = URL(string: "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen3.5-4b-q4_k_m",
                 name: "Qwen3.5 4B Q4_K_M",
-                url: qwen35_4bURL,
+                url: qwen354bURL,
                 framework: .llamaCpp,
                 memoryRequirement: 2_800_000_000,
                 supportsThinking: true
@@ -667,6 +675,7 @@ struct RunAnywhereAIApp: App {
         logger.info("🎉 All modules and models registered")
     }
 }
+// swiftlint:enable type_body_length
 
 // MARK: - Loading Views
 
@@ -724,7 +733,7 @@ struct InitializationLoadingView: View {
     }
 
     private func startProgressAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { _ in
             if progress < 1.0 {
                 progress += 0.01
             } else {

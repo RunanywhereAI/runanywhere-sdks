@@ -69,6 +69,13 @@ if [ "${VERBOSE:-}" = "1" ]; then
     echo "    LLAMACPP_VERSION=${LLAMACPP_VERSION}"
     echo "    NLOHMANN_JSON_VERSION=${NLOHMANN_JSON_VERSION}"
     echo "    RAC_COMMONS_VERSION=${RAC_COMMONS_VERSION}"
+    echo "  Toolchain:"
+    echo "    NDK_VERSION=${NDK_VERSION}"
+    echo "    EMSCRIPTEN_VERSION=${EMSCRIPTEN_VERSION}"
+    echo "    NODE_VERSION=${NODE_VERSION}"
+    echo "    JAVA_VERSION=${JAVA_VERSION}"
+    echo "    GRADLE_VERSION=${GRADLE_VERSION}"
+    echo "    CMAKE_VERSION=${CMAKE_VERSION}"
 fi
 
 # Clean up temporary variables

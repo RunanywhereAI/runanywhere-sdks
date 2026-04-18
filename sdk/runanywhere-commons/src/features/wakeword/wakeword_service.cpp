@@ -9,9 +9,6 @@
  * - Callback-based detection events
  */
 
-#include "rac/features/wakeword/rac_wakeword_service.h"
-#include "rac/core/rac_logger.h"
-
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -19,6 +16,9 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
+#include "rac/core/rac_logger.h"
+#include "rac/features/wakeword/rac_wakeword_service.h"
 
 namespace rac {
 namespace wakeword {
@@ -77,9 +77,7 @@ struct WakewordService {
 
 static int64_t get_timestamp_ms() {
     auto now = std::chrono::steady_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()
-    ).count();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
 }
 
 static WakewordService* get_service(rac_handle_t handle) {
@@ -111,7 +109,7 @@ RAC_API rac_result_t rac_wakeword_create(rac_handle_t* out_handle) {
 }
 
 RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
-                                              const rac_wakeword_config_t* config) {
+                                             const rac_wakeword_config_t* config) {
     if (!is_valid_handle(handle)) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -133,7 +131,8 @@ RAC_API rac_result_t rac_wakeword_initialize(rac_handle_t handle,
         (static_cast<size_t>(service->config.sample_rate) * service->config.frame_length_ms) / 1000;
 
     if (service->samples_per_frame == 0) {
-        RAC_LOG_ERROR("WakeWord", "Invalid config: samples_per_frame is 0 (sample_rate=%d, frame_length_ms=%d)",
+        RAC_LOG_ERROR("WakeWord",
+                      "Invalid config: samples_per_frame is 0 (sample_rate=%d, frame_length_ms=%d)",
                       service->config.sample_rate, service->config.frame_length_ms);
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -174,10 +173,8 @@ RAC_API void rac_wakeword_destroy(rac_handle_t handle) {
 // MODEL MANAGEMENT
 // =============================================================================
 
-RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
-                                              const char* model_path,
-                                              const char* model_id,
-                                              const char* wake_word) {
+RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle, const char* model_path,
+                                             const char* model_id, const char* wake_word) {
     if (!is_valid_handle(handle) || !model_path || !model_id || !wake_word) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -216,8 +213,7 @@ RAC_API rac_result_t rac_wakeword_load_model(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
-                                            const char* vad_model_path) {
+RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle, const char* vad_model_path) {
     if (!is_valid_handle(handle) || !vad_model_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -237,8 +233,7 @@ RAC_API rac_result_t rac_wakeword_load_vad(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
-                                                const char* model_id) {
+RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle, const char* model_id) {
     if (!is_valid_handle(handle) || !model_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -247,9 +242,7 @@ RAC_API rac_result_t rac_wakeword_unload_model(rac_handle_t handle,
     std::lock_guard<std::mutex> lock(service->mutex);
 
     auto it = std::find_if(service->models.begin(), service->models.end(),
-                           [model_id](const LoadedModel& m) {
-                               return m.model_id == model_id;
-                           });
+                           [model_id](const LoadedModel& m) { return m.model_id == model_id; });
 
     if (it == service->models.end()) {
         return RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND;
@@ -276,8 +269,8 @@ RAC_API rac_result_t rac_wakeword_unload_all(rac_handle_t handle) {
 }
 
 RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
-                                              const rac_wakeword_model_info_t** out_models,
-                                              int32_t* out_count) {
+                                             const rac_wakeword_model_info_t** out_models,
+                                             int32_t* out_count) {
     if (!is_valid_handle(handle) || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -301,8 +294,7 @@ RAC_API rac_result_t rac_wakeword_get_models(rac_handle_t handle,
 // =============================================================================
 
 RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
-                                                rac_wakeword_callback_fn callback,
-                                                void* user_data) {
+                                               rac_wakeword_callback_fn callback, void* user_data) {
     if (!is_valid_handle(handle)) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -317,8 +309,8 @@ RAC_API rac_result_t rac_wakeword_set_callback(rac_handle_t handle,
 }
 
 RAC_API rac_result_t rac_wakeword_set_vad_callback(rac_handle_t handle,
-                                                    rac_wakeword_vad_callback_fn callback,
-                                                    void* user_data) {
+                                                   rac_wakeword_vad_callback_fn callback,
+                                                   void* user_data) {
     if (!is_valid_handle(handle)) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -425,10 +417,9 @@ RAC_API rac_result_t rac_wakeword_reset(rac_handle_t handle) {
 // AUDIO PROCESSING
 // =============================================================================
 
-RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
-                                           const float* samples,
-                                           size_t num_samples,
-                                           rac_wakeword_frame_result_t* out_result) {
+RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle, const float* samples,
+                                          size_t num_samples,
+                                          rac_wakeword_frame_result_t* out_result) {
     if (!is_valid_handle(handle) || !samples || num_samples == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -448,8 +439,7 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
     std::unique_lock<std::mutex> lock(service->mutex);
 
     // Accumulate samples
-    service->audio_buffer.insert(service->audio_buffer.end(),
-                                  samples, samples + num_samples);
+    service->audio_buffer.insert(service->audio_buffer.end(), samples, samples + num_samples);
 
     // Initialize result
     if (out_result) {
@@ -463,16 +453,12 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
     // Process complete frames
     while (service->audio_buffer.size() >= service->samples_per_frame) {
         // Extract frame
-        std::vector<float> frame(
-            service->audio_buffer.begin(),
-            service->audio_buffer.begin() + service->samples_per_frame
-        );
+        std::vector<float> frame(service->audio_buffer.begin(),
+                                 service->audio_buffer.begin() + service->samples_per_frame);
 
         // Remove processed samples
-        service->audio_buffer.erase(
-            service->audio_buffer.begin(),
-            service->audio_buffer.begin() + service->samples_per_frame
-        );
+        service->audio_buffer.erase(service->audio_buffer.begin(),
+                                    service->audio_buffer.begin() + service->samples_per_frame);
 
         // TODO: Process through ONNX backend
         // For now, simulate with placeholder
@@ -527,7 +513,8 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
                     out_result->confidence = confidence;
                 }
 
-                if (service->detection_callback && keyword_index < (int32_t)service->models.size()) {
+                if (service->detection_callback &&
+                    keyword_index < (int32_t)service->models.size()) {
                     det_cb = service->detection_callback;
                     det_ud = service->detection_user_data;
                     event_keyword_name = service->models[keyword_index].wake_word;
@@ -568,10 +555,9 @@ RAC_API rac_result_t rac_wakeword_process(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle,
-                                                 const int16_t* samples,
-                                                 size_t num_samples,
-                                                 rac_wakeword_frame_result_t* out_result) {
+RAC_API rac_result_t rac_wakeword_process_int16(rac_handle_t handle, const int16_t* samples,
+                                                size_t num_samples,
+                                                rac_wakeword_frame_result_t* out_result) {
     if (!samples || num_samples == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -606,9 +592,8 @@ RAC_API rac_result_t rac_wakeword_set_threshold(rac_handle_t handle, float thres
     return RAC_SUCCESS;
 }
 
-RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle,
-                                                       const char* model_id,
-                                                       float threshold) {
+RAC_API rac_result_t rac_wakeword_set_model_threshold(rac_handle_t handle, const char* model_id,
+                                                      float threshold) {
     if (!is_valid_handle(handle) || !model_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -647,8 +632,7 @@ RAC_API rac_result_t rac_wakeword_set_vad_enabled(rac_handle_t handle, rac_bool_
 // STATUS
 // =============================================================================
 
-RAC_API rac_result_t rac_wakeword_get_info(rac_handle_t handle,
-                                            rac_wakeword_info_t* out_info) {
+RAC_API rac_result_t rac_wakeword_get_info(rac_handle_t handle, rac_wakeword_info_t* out_info) {
     if (!is_valid_handle(handle) || !out_info) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -682,7 +666,7 @@ RAC_API rac_bool_t rac_wakeword_is_listening(rac_handle_t handle) {
     return get_service(handle)->listening ? RAC_TRUE : RAC_FALSE;
 }
 
-} // extern "C"
+}  // extern "C"
 
-} // namespace wakeword
-} // namespace rac
+}  // namespace wakeword
+}  // namespace rac

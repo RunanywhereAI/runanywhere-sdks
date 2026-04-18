@@ -5,12 +5,12 @@
 
 #include "rac_stt_metalrt.h"
 
+#include "metalrt_c_api.h"
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
-
-#include "metalrt_c_api.h"
 
 #include "rac/core/rac_logger.h"
 
@@ -24,10 +24,12 @@ struct rac_stt_metalrt_impl {
 extern "C" {
 
 rac_result_t rac_stt_metalrt_create(const char* model_path, rac_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_NULL_POINTER;
+    if (!out_handle)
+        return RAC_ERROR_NULL_POINTER;
 
     auto* impl = new (std::nothrow) rac_stt_metalrt_impl();
-    if (!impl) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!impl)
+        return RAC_ERROR_OUT_OF_MEMORY;
 
     impl->handle = metalrt_whisper_create();
     if (!impl->handle) {
@@ -51,7 +53,8 @@ rac_result_t rac_stt_metalrt_create(const char* model_path, rac_handle_t* out_ha
 }
 
 void rac_stt_metalrt_destroy(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_whisper_destroy(impl->handle);
@@ -60,12 +63,14 @@ void rac_stt_metalrt_destroy(rac_handle_t handle) {
 }
 
 rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_data,
-                                         size_t audio_size, const rac_stt_options_t* options,
-                                         rac_stt_result_t* out_result) {
+                                        size_t audio_size, const rac_stt_options_t* options,
+                                        rac_stt_result_t* out_result) {
     (void)options;
-    if (!handle || !audio_data || !out_result) return RAC_ERROR_NULL_POINTER;
+    if (!handle || !audio_data || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_stt_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     // SDK audio capture sends Int16 PCM at 16 kHz.
     // Convert to Float32 normalized [-1.0, 1.0] for metalrt_whisper_transcribe.
@@ -78,10 +83,11 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
         float_samples[i] = static_cast<float>(int16_samples[i]) / 32768.0f;
     }
 
-    RAC_LOG_INFO(LOG_CAT, "Transcribing %d samples (%.1fs) at %d Hz",
-                 n_samples, static_cast<float>(n_samples) / sample_rate, sample_rate);
+    RAC_LOG_INFO(LOG_CAT, "Transcribing %d samples (%.1fs) at %d Hz", n_samples,
+                 static_cast<float>(n_samples) / sample_rate, sample_rate);
 
-    const char* text = metalrt_whisper_transcribe(impl->handle, float_samples.data(), n_samples, sample_rate);
+    const char* text =
+        metalrt_whisper_transcribe(impl->handle, float_samples.data(), n_samples, sample_rate);
     if (!text) {
         rac_error_set_details("metalrt_whisper_transcribe returned null");
         return RAC_ERROR_INFERENCE_FAILED;
@@ -96,8 +102,9 @@ rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_d
     out_result->words = nullptr;
     out_result->num_words = 0;
     out_result->confidence = 1.0f;
-    out_result->processing_time_ms = static_cast<int64_t>(
-        metalrt_whisper_last_encode_ms(impl->handle) + metalrt_whisper_last_decode_ms(impl->handle));
+    out_result->processing_time_ms =
+        static_cast<int64_t>(metalrt_whisper_last_encode_ms(impl->handle) +
+                             metalrt_whisper_last_decode_ms(impl->handle));
 
     metalrt_whisper_free_text(text);
     return RAC_SUCCESS;

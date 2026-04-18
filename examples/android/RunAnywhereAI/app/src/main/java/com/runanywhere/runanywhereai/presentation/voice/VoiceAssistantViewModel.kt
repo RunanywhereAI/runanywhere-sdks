@@ -5,7 +5,6 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.models.SessionState
@@ -38,6 +37,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.ByteArrayOutputStream
 
 /**
@@ -292,81 +292,82 @@ class VoiceAssistantViewModel(
             audioBuffer.reset()
         }
 
-        processingJob = viewModelScope.launch {
-            try {
-                // Update state to processing (on main thread for UI)
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.PROCESSING,
-                        isListening = false,
-                        isSpeechDetected = false,
-                        audioLevel = 0f,
-                    )
-                }
-
-                // Stop audio capture during processing (matching iOS)
-                audioRecordingJob?.cancel()
-                silenceDetectionJob?.cancel()
-                audioCaptureService?.stopCapture()
-
-                Timber.i("🔄 Processing ${audioData.size} bytes through voice pipeline...")
-
-                // Process audio through STT → LLM → TTS pipeline
-                // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
-                val result =
-                    withContext(Dispatchers.Default) {
-                        RunAnywhere.processVoice(audioData)
-                    }
-
-                val transcription = result.transcription
-                val response = result.response
-
-                Timber.i(
-                    "✅ Voice pipeline result - speechDetected: ${result.speechDetected}, " +
-                        "transcription: ${transcription?.take(50)}, " +
-                        "response: ${response?.take(50)}",
-                )
-
-                if (result.speechDetected && transcription != null) {
+        processingJob =
+            viewModelScope.launch {
+                try {
+                    // Update state to processing (on main thread for UI)
                     _uiState.update {
                         it.copy(
-                            currentTranscript = transcription,
-                            assistantResponse = response ?: "",
+                            sessionState = SessionState.PROCESSING,
+                            isListening = false,
+                            isSpeechDetected = false,
+                            audioLevel = 0f,
                         )
                     }
 
-                    // Play synthesized audio if available (matching iOS autoPlayTTS)
-                    val synthesizedAudio = result.synthesizedAudio
-                    if (synthesizedAudio != null && synthesizedAudio.isNotEmpty()) {
-                        Timber.i("🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
-                        playAudio(synthesizedAudio)
-                        // Note: resumeListening() is called after playback completes
+                    // Stop audio capture during processing (matching iOS)
+                    audioRecordingJob?.cancel()
+                    silenceDetectionJob?.cancel()
+                    audioCaptureService?.stopCapture()
+
+                    Timber.i("🔄 Processing ${audioData.size} bytes through voice pipeline...")
+
+                    // Process audio through STT → LLM → TTS pipeline
+                    // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
+                    val result =
+                        withContext(Dispatchers.Default) {
+                            RunAnywhere.processVoice(audioData)
+                        }
+
+                    val transcription = result.transcription
+                    val response = result.response
+
+                    Timber.i(
+                        "✅ Voice pipeline result - speechDetected: ${result.speechDetected}, " +
+                            "transcription: ${transcription?.take(50)}, " +
+                            "response: ${response?.take(50)}",
+                    )
+
+                    if (result.speechDetected && transcription != null) {
+                        _uiState.update {
+                            it.copy(
+                                currentTranscript = transcription,
+                                assistantResponse = response ?: "",
+                            )
+                        }
+
+                        // Play synthesized audio if available (matching iOS autoPlayTTS)
+                        val synthesizedAudio = result.synthesizedAudio
+                        if (synthesizedAudio != null && synthesizedAudio.isNotEmpty()) {
+                            Timber.i("🔊 Playing TTS response (${synthesizedAudio.size} bytes)")
+                            playAudio(synthesizedAudio)
+                            // Note: resumeListening() is called after playback completes
+                        } else {
+                            Timber.d("No synthesized audio, resuming listening immediately")
+                            resumeListening()
+                        }
                     } else {
-                        Timber.d("No synthesized audio, resuming listening immediately")
+                        Timber.i("No speech detected in audio")
+                        _uiState.update {
+                            it.copy(
+                                errorMessage = if (!result.speechDetected) "No speech detected" else null,
+                            )
+                        }
                         resumeListening()
                     }
-                } else {
-                    Timber.i("No speech detected in audio")
+                } catch (e: Exception) {
+                    Timber.e(e, "Error processing voice: ${e.message}")
                     _uiState.update {
                         it.copy(
-                            errorMessage = if (!result.speechDetected) "No speech detected" else null,
+                            sessionState = SessionState.ERROR,
+                            errorMessage = "Processing error: ${e.message}",
                         )
                     }
+                    isProcessingTurn = false
+                    // Resume listening even on error
                     resumeListening()
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Error processing voice: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.ERROR,
-                        errorMessage = "Processing error: ${e.message}",
-                    )
-                }
-                isProcessingTurn = false
-                // Resume listening even on error
-                resumeListening()
             }
-        }
     }
 
     /**
@@ -453,31 +454,34 @@ class VoiceAssistantViewModel(
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
 
                     // Scan for WAV "data" chunk to find PCM offset
-                    val isWav = audioData.size > 44 &&
-                        audioData[0] == 'R'.code.toByte() &&
-                        audioData[1] == 'I'.code.toByte() &&
-                        audioData[2] == 'F'.code.toByte() &&
-                        audioData[3] == 'F'.code.toByte()
+                    val isWav =
+                        audioData.size > 44 &&
+                            audioData[0] == 'R'.code.toByte() &&
+                            audioData[1] == 'I'.code.toByte() &&
+                            audioData[2] == 'F'.code.toByte() &&
+                            audioData[3] == 'F'.code.toByte()
 
-                    val headerSize = if (isWav) {
-                        var offset = 12 // skip RIFF header (12 bytes)
-                        var dataStart = -1
-                        while (offset + 8 <= audioData.size) {
-                            val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
-                            val chunkSize = (audioData[offset + 4].toInt() and 0xFF) or
-                                ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
-                                ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
-                                ((audioData[offset + 7].toInt() and 0xFF) shl 24)
-                            if (chunkId == "data") {
-                                dataStart = offset + 8
-                                break
+                    val headerSize =
+                        if (isWav) {
+                            var offset = 12 // skip RIFF header (12 bytes)
+                            var dataStart = -1
+                            while (offset + 8 <= audioData.size) {
+                                val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
+                                val chunkSize =
+                                    (audioData[offset + 4].toInt() and 0xFF) or
+                                        ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
+                                        ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
+                                        ((audioData[offset + 7].toInt() and 0xFF) shl 24)
+                                if (chunkId == "data") {
+                                    dataStart = offset + 8
+                                    break
+                                }
+                                offset += 8 + chunkSize
                             }
-                            offset += 8 + chunkSize
+                            if (dataStart > 0) dataStart else 44 // fallback for malformed files
+                        } else {
+                            0
                         }
-                        if (dataStart > 0) dataStart else 44 // fallback for malformed files
-                    } else {
-                        0
-                    }
 
                     val pcmData = audioData.copyOfRange(headerSize, audioData.size)
                     Timber.d("PCM data size: ${pcmData.size} bytes (skipped $headerSize byte header)")
@@ -1195,7 +1199,9 @@ class VoiceAssistantViewModel(
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             try {
                 RunAnywhere.stopVoiceSession()
-            } catch (_: Exception) { /* best-effort cleanup */ }
+            } catch (_: Exception) {
+                // best-effort cleanup
+            }
         }
         super.onCleared()
     }

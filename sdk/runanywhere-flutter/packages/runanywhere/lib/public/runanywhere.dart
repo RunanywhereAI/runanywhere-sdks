@@ -17,14 +17,14 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
-import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart'
     hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/native/dart_bridge_vlm.dart';
 import 'package:runanywhere/native/ffi_types.dart' show RacVlmImageFormat;
-import 'package:runanywhere/native/dart_bridge_structured_output.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
@@ -153,6 +153,11 @@ class RunAnywhere {
 
       // Step 2.4: Register device with backend
       await _registerDeviceIfNeeded(params, logger);
+
+      // Step 2.5: Authenticate with backend (non-fatal — offline inference
+      // still works if auth fails; telemetry silently no-ops).
+      // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+      await _authenticateWithBackend(params, logger);
 
       // Step 2.6: Initialize model registry
       logger.debug('Initializing model registry...');
@@ -1376,9 +1381,9 @@ class RunAnywhere {
         cancel: () {
           logger.debug('Cancelling VLM streaming');
           DartBridge.vlm.cancel();
-          subscription.cancel();
+          unawaited(subscription.cancel());
           if (!controller.isClosed) {
-            controller.close();
+            unawaited(controller.close());
           }
         },
       );

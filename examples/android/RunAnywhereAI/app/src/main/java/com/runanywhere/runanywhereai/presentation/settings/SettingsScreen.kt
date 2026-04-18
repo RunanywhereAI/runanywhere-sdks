@@ -6,7 +6,6 @@ import android.app.Application
 import android.content.Intent
 import android.net.Uri
 import android.text.format.Formatter
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,31 +14,24 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -89,10 +81,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
         // 1. API Configuration (Testing)
         SettingsSection(title = "API Configuration (Testing)", icon = null) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { viewModel.showApiConfigSheet() }
-                    .padding(vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { viewModel.showApiConfigSheet() }
+                        .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -105,9 +98,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -121,10 +115,11 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             if (uiState.isApiKeyConfigured && uiState.isBaseURLConfigured) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { viewModel.clearApiConfiguration() }
-                        .padding(vertical = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.clearApiConfiguration() }
+                            .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -172,7 +167,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     value = uiState.temperature,
                     onValueChange = { viewModel.updateTemperature(it) },
                     valueRange = 0f..2f,
-                    steps = 19, // 0.1 increments from 0.0 to 2.0
+                    // 0.1 increments from 0.0 to 2.0
+                    steps = 19,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -200,7 +196,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                     value = uiState.maxTokens.toFloat(),
                     onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
                     valueRange = 50f..4096f,
-                    steps = 80, // 50-token increments
+                    // 50-token increments
+                    steps = 80,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -223,9 +220,10 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             // Save Button
             OutlinedButton(
                 onClick = { viewModel.saveGenerationSettings() },
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = AppColors.primaryAccent,
-                ),
+                colors =
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = AppColors.primaryAccent,
+                    ),
             ) {
                 Text("Save Settings")
             }
@@ -375,13 +373,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://docs.runanywhere.ai"))
-                        context.startActivity(intent)
-                    }
-                    .padding(vertical = 8.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://docs.runanywhere.ai"))
+                            context.startActivity(intent)
+                        }
+                        .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -489,9 +488,10 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Dimensions.padding16, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimensions.padding16, vertical = 8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -643,9 +643,10 @@ private fun StorageManagementButton(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
         color = MaterialTheme.colorScheme.surface,
     ) {
         Row(
@@ -798,9 +799,10 @@ fun ToolSettingsSection() {
     SettingsSection(title = "Tool Calling") {
         // Enable/Disable Toggle
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -818,10 +820,11 @@ fun ToolSettingsSection() {
             Switch(
                 checked = toolState.toolCallingEnabled,
                 onCheckedChange = { toolViewModel.setToolCallingEnabled(it) },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = AppColors.primaryAccent,
-                    checkedTrackColor = AppColors.primaryAccent.copy(alpha = 0.5f),
-                ),
+                colors =
+                    SwitchDefaults.colors(
+                        checkedThumbColor = AppColors.primaryAccent,
+                        checkedTrackColor = AppColors.primaryAccent.copy(alpha = 0.5f),
+                    ),
             )
         }
 
@@ -830,9 +833,10 @@ fun ToolSettingsSection() {
 
             // Registered Tools Count
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -863,9 +867,10 @@ fun ToolSettingsSection() {
             if (toolState.registeredTools.isNotEmpty()) {
                 toolState.registeredTools.forEach { tool ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(start = 28.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -887,9 +892,10 @@ fun ToolSettingsSection() {
                 OutlinedButton(
                     onClick = { toolViewModel.registerDemoTools() },
                     enabled = !toolState.isLoading,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = AppColors.primaryGreen,
-                    ),
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = AppColors.primaryGreen,
+                        ),
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(
@@ -905,9 +911,10 @@ fun ToolSettingsSection() {
                     OutlinedButton(
                         onClick = { toolViewModel.clearAllTools() },
                         enabled = !toolState.isLoading,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = AppColors.primaryRed,
-                        ),
+                        colors =
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = AppColors.primaryRed,
+                            ),
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,

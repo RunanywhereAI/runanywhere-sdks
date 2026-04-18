@@ -176,9 +176,9 @@ RAC_API rac_result_t rac_file_manager_create_directory_structure(const rac_file_
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbacks_t* cb,
-                                                           const char* model_id,
-                                                           rac_inference_framework_t framework,
-                                                           char* out_path, size_t path_size);
+                                                          const char* model_id,
+                                                          rac_inference_framework_t framework,
+                                                          char* out_path, size_t path_size);
 
 /**
  * @brief Check if a model folder exists and optionally if it has contents.
@@ -191,10 +191,10 @@ RAC_API rac_result_t rac_file_manager_create_model_folder(const rac_file_callbac
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbacks_t* cb,
-                                                           const char* model_id,
-                                                           rac_inference_framework_t framework,
-                                                           rac_bool_t* out_exists,
-                                                           rac_bool_t* out_has_contents);
+                                                          const char* model_id,
+                                                          rac_inference_framework_t framework,
+                                                          rac_bool_t* out_exists,
+                                                          rac_bool_t* out_has_contents);
 
 /**
  * @brief Delete a model folder recursively.
@@ -209,8 +209,8 @@ RAC_API rac_result_t rac_file_manager_model_folder_exists(const rac_file_callbac
  * @return RAC_SUCCESS, or RAC_ERROR_FILE_NOT_FOUND if folder doesn't exist
  */
 RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb,
-                                                    const char* model_id,
-                                                    rac_inference_framework_t framework);
+                                                   const char* model_id,
+                                                   rac_inference_framework_t framework);
 
 // =============================================================================
 // DIRECTORY SIZE CALCULATION
@@ -234,7 +234,7 @@ RAC_API rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* c
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callbacks_t* cb,
-                                                          const char* path, int64_t* out_size);
+                                                         const char* path, int64_t* out_size);
 
 /**
  * @brief Get total models directory storage used.
@@ -246,7 +246,7 @@ RAC_API rac_result_t rac_file_manager_calculate_dir_size(const rac_file_callback
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_models_storage_used(const rac_file_callbacks_t* cb,
-                                                           int64_t* out_size);
+                                                          int64_t* out_size);
 
 // =============================================================================
 // CACHE & TEMP MANAGEMENT
@@ -290,8 +290,7 @@ RAC_API rac_result_t rac_file_manager_clear_temp(const rac_file_callbacks_t* cb)
  * @param out_size Output: Cache size in bytes
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
-                                                  int64_t* out_size);
+RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb, int64_t* out_size);
 
 // =============================================================================
 // STORAGE INFO
@@ -313,7 +312,7 @@ RAC_API rac_result_t rac_file_manager_cache_size(const rac_file_callbacks_t* cb,
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_t* cb,
-                                                        rac_file_manager_storage_info_t* out_info);
+                                                       rac_file_manager_storage_info_t* out_info);
 
 /**
  * @brief Check storage availability for a download.
@@ -331,9 +330,9 @@ RAC_API rac_result_t rac_file_manager_get_storage_info(const rac_file_callbacks_
  *        from rac_storage_analyzer.h)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_file_manager_check_storage(
-    const rac_file_callbacks_t* cb, int64_t required_bytes,
-    rac_storage_availability_t* out_availability);
+RAC_API rac_result_t rac_file_manager_check_storage(const rac_file_callbacks_t* cb,
+                                                    int64_t required_bytes,
+                                                    rac_storage_availability_t* out_availability);
 
 // =============================================================================
 // DIRECTORY CLEARING (INTERNAL HELPER)
@@ -350,7 +349,7 @@ RAC_API rac_result_t rac_file_manager_check_storage(
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_file_manager_clear_directory(const rac_file_callbacks_t* cb,
-                                                       const char* path);
+                                                      const char* path);
 
 #ifdef __cplusplus
 }

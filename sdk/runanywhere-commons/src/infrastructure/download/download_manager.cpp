@@ -491,8 +491,8 @@ rac_result_t rac_download_manager_mark_failed(rac_download_manager_handle_t hand
 // =============================================================================
 
 rac_result_t rac_download_manager_mark_extraction_complete(rac_download_manager_handle_t handle,
-                                                            const char* task_id,
-                                                            const char* extracted_path) {
+                                                           const char* task_id,
+                                                           const char* extracted_path) {
     if (!handle || !task_id || !extracted_path) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -519,9 +519,9 @@ rac_result_t rac_download_manager_mark_extraction_complete(rac_download_manager_
 }
 
 rac_result_t rac_download_manager_mark_extraction_failed(rac_download_manager_handle_t handle,
-                                                          const char* task_id,
-                                                          rac_result_t error_code,
-                                                          const char* error_message) {
+                                                         const char* task_id,
+                                                         rac_result_t error_code,
+                                                         const char* error_message) {
     if (!handle || !task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }

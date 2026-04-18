@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-onnx",
-  "version": "0.1.0-beta.10",
+  "version": "0.19.7",
   "description": "RunAnywhere Web SDK - ONNX backend for STT, TTS, and VAD via sherpa-onnx",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,7 +22,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0",
+    "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/sherpa/sherpa-onnx.wasm || (echo 'ERROR: wasm/sherpa/sherpa-onnx.wasm missing. Run build-web.sh --build-sherpa first.' && exit 1)"
@@ -61,6 +62,9 @@
     "@runanywhere/web": ">=0.1.0-beta.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

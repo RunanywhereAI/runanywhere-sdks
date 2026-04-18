@@ -6,7 +6,6 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.core.types.InferenceFramework
@@ -32,6 +31,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -502,11 +502,12 @@ class TextToSpeechViewModel(
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     // Parse WAV header to extract actual audio parameters
-                    val isWav = audioData.size > 44 &&
-                        audioData[0] == 'R'.code.toByte() &&
-                        audioData[1] == 'I'.code.toByte() &&
-                        audioData[2] == 'F'.code.toByte() &&
-                        audioData[3] == 'F'.code.toByte()
+                    val isWav =
+                        audioData.size > 44 &&
+                            audioData[0] == 'R'.code.toByte() &&
+                            audioData[1] == 'I'.code.toByte() &&
+                            audioData[2] == 'F'.code.toByte() &&
+                            audioData[3] == 'F'.code.toByte()
 
                     val sampleRate: Int
                     val pcmOffset: Int
@@ -524,10 +525,11 @@ class TextToSpeechViewModel(
                         var dataStart = -1
                         while (offset + 8 <= audioData.size) {
                             val chunkId = String(audioData, offset, 4, Charsets.US_ASCII)
-                            val chunkSize = (audioData[offset + 4].toInt() and 0xFF) or
-                                ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
-                                ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
-                                ((audioData[offset + 7].toInt() and 0xFF) shl 24)
+                            val chunkSize =
+                                (audioData[offset + 4].toInt() and 0xFF) or
+                                    ((audioData[offset + 5].toInt() and 0xFF) shl 8) or
+                                    ((audioData[offset + 6].toInt() and 0xFF) shl 16) or
+                                    ((audioData[offset + 7].toInt() and 0xFF) shl 24)
                             if (chunkId == "data") {
                                 dataStart = offset + 8
                                 break
@@ -701,7 +703,10 @@ class TextToSpeechViewModel(
                         }
                     }
 
-                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                    override fun onStop(
+                        utteranceId: String?,
+                        interrupted: Boolean,
+                    ) {
                         if (continuation.isActive) {
                             if (interrupted) {
                                 continuation.resume(Unit)

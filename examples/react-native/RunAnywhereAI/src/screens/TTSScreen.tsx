@@ -108,7 +108,8 @@ export const TTSScreen: React.FC = () => {
   // State
   const [text, setText] = useState('');
   const [speed, setSpeed] = useState(1.0);
-  const [pitch, setPitch] = useState(1.0);
+  // Pitch slider is currently commented out (see renderSlider below); setter kept for future re-enable.
+  const [pitch, _setPitch] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);

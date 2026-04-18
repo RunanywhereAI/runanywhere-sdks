@@ -184,8 +184,7 @@ static const rac_voice_agent_wakeword_config_t RAC_VOICE_AGENT_WAKEWORD_CONFIG_D
     .wake_word = RAC_NULL,
     .threshold = 0.5f,
     .embedding_model_path = RAC_NULL,
-    .vad_model_path = RAC_NULL
-};
+    .vad_model_path = RAC_NULL};
 
 /**
  * @brief Voice agent configuration.
@@ -216,15 +215,13 @@ static const rac_voice_agent_config_t RAC_VOICE_AGENT_CONFIG_DEFAULT = {
     .stt_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
     .llm_config = {.model_path = RAC_NULL, .model_id = RAC_NULL, .model_name = RAC_NULL},
     .tts_config = {.voice_path = RAC_NULL, .voice_id = RAC_NULL, .voice_name = RAC_NULL},
-    .wakeword_config = {
-        .enabled = RAC_FALSE,
-        .model_path = RAC_NULL,
-        .model_id = RAC_NULL,
-        .wake_word = RAC_NULL,
-        .threshold = 0.5f,
-        .embedding_model_path = RAC_NULL,
-        .vad_model_path = RAC_NULL
-    }};
+    .wakeword_config = {.enabled = RAC_FALSE,
+                        .model_path = RAC_NULL,
+                        .model_id = RAC_NULL,
+                        .wake_word = RAC_NULL,
+                        .threshold = 0.5f,
+                        .embedding_model_path = RAC_NULL,
+                        .vad_model_path = RAC_NULL}};
 
 // =============================================================================
 // AUDIO PIPELINE STATE MANAGER CONFIG - Mirrors Swift's AudioPipelineStateManager.Configuration

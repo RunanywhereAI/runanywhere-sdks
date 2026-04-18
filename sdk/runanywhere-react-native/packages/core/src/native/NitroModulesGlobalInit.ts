@@ -9,13 +9,21 @@
  */
 
 import { NitroModules as NitroModulesNamed } from 'react-native-nitro-modules';
+import type { NitroModulesProxy } from 'react-native-nitro-modules/lib/typescript/NitroModulesProxy';
 import { NativeModules } from 'react-native';
+import { SDKLogger } from '../Foundation/Logging';
+
+/**
+ * The NitroModules proxy used by the SDK. Typed as a structural subset of
+ * `NitroModulesProxy` to avoid depending on non-exported implementation types.
+ */
+export type NitroProxy = Pick<NitroModulesProxy, 'createHybridObject'>;
 
 /** Global promise that tracks NitroModules installation */
-let _nitroInstallationPromise: Promise<any> | null = null;
+let _nitroInstallationPromise: Promise<NitroProxy> | null = null;
 
 /** Cached NitroModules proxy after successful installation */
-let _nitroModulesProxy: any = null;
+let _nitroModulesProxy: NitroProxy | null = null;
 
 /** Track whether native install() has been invoked */
 let _nitroInstallCalled = false;
@@ -26,7 +34,7 @@ let _nitroInstallCalled = false;
  *
  * @returns Promise resolving to NitroModules proxy
  */
-export async function initializeNitroModulesGlobally(): Promise<any> {
+export async function initializeNitroModulesGlobally(): Promise<NitroProxy> {
   // If already initialized, return cached proxy
   if (_nitroModulesProxy !== null) {
     return _nitroModulesProxy;
@@ -40,27 +48,29 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
   // Create the initialization promise
   _nitroInstallationPromise = (async () => {
     try {
-      console.debug('[NitroModulesGlobalInit] Starting global initialization...');
+      SDKLogger.core.debug('[NitroModulesGlobalInit] Starting global initialization...');
 
       // Try to get the proxy from the named import first (most reliable in Bridgeless)
-      _nitroModulesProxy = NitroModulesNamed;
+      _nitroModulesProxy = NitroModulesNamed as unknown as NitroProxy;
 
       // Always attempt native install() once to ensure JSI bindings are ready
-      const nativeNitro = NativeModules?.NitroModules;
+      const nativeNitro = NativeModules?.NitroModules as
+        | { install?: () => void }
+        | undefined;
       if (!_nitroInstallCalled && nativeNitro && typeof nativeNitro.install === 'function') {
         try {
-          console.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
+          SDKLogger.core.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
           nativeNitro.install();
           _nitroInstallCalled = true;
-          console.debug('[NitroModulesGlobalInit] Native install() completed');
+          SDKLogger.core.debug('[NitroModulesGlobalInit] Native install() completed');
         } catch (installError) {
-          console.warn('[NitroModulesGlobalInit] Native install() failed:', installError);
+          SDKLogger.core.warning('[NitroModulesGlobalInit] Native install() failed', { error: installError });
         }
       }
 
       // Try getting proxy again after install (if needed)
       if (!_nitroModulesProxy) {
-        _nitroModulesProxy = NitroModulesNamed;
+        _nitroModulesProxy = NitroModulesNamed as unknown as NitroProxy;
       }
 
       if (!_nitroModulesProxy) {
@@ -70,10 +80,10 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
         );
       }
 
-      console.debug('[NitroModulesGlobalInit] Global initialization successful');
+      SDKLogger.core.debug('[NitroModulesGlobalInit] Global initialization successful');
       return _nitroModulesProxy;
     } catch (error) {
-      console.error('[NitroModulesGlobalInit] Failed to initialize NitroModules:', error);
+      SDKLogger.core.error('[NitroModulesGlobalInit] Failed to initialize NitroModules', { error });
       _nitroInstallationPromise = null; // Reset on error to allow retry
       throw error;
     }
@@ -88,7 +98,7 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
  *
  * @returns NitroModules proxy or null if not yet initialized
  */
-export function getNitroModulesProxySync(): any {
+export function getNitroModulesProxySync(): NitroProxy | null {
   return _nitroModulesProxy;
 }
 

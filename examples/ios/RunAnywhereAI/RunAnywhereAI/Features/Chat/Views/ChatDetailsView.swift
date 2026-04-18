@@ -57,8 +57,12 @@ struct ChatDetailsView: View {
             }
         }
         .adaptiveSheetFrame(
-            minWidth: 500, idealWidth: 650, maxWidth: 800,
-            minHeight: 450, idealHeight: 550, maxHeight: 700
+            minWidth: 500,
+            idealWidth: 650,
+            maxWidth: 800,
+            minHeight: 450,
+            idealHeight: 550,
+            maxHeight: 700
         )
     }
 }

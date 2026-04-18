@@ -9,13 +9,12 @@ import Foundation
 import RunAnywhere
 
 struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
-
     let category: BenchmarkCategory = .tts
 
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Short Text", category: .tts, parameters: ["length": "short"]),
-            BenchmarkScenario(name: "Medium Text", category: .tts, parameters: ["length": "medium"]),
+            BenchmarkScenario(name: "Medium Text", category: .tts, parameters: ["length": "medium"])
         ]
     }
 
@@ -30,7 +29,8 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         case "short":
             text = "Hello, this is a test."
         default:
-            text = "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
+            text = "The quick brown fox jumps over the lazy dog. Machine learning models can "
+                + "generate speech from text with remarkable quality and natural intonation."
         }
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()

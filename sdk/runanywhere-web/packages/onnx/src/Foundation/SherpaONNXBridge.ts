@@ -225,7 +225,7 @@ export class SherpaONNXBridge {
         rejectWasm = reject;
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const modOrPromise = createModule({
         noFSInit: true,
         print: (text: string) => logger.debug(text),
@@ -266,7 +266,7 @@ export class SherpaONNXBridge {
 
       // Resolve the module: Emscripten returns a Promise<Module> when using async WASM init.
       // Promise.resolve() is a no-op if modOrPromise is already the Module object.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const mod = await Promise.resolve(modOrPromise) as SherpaONNXModule;
       this._module = mod;
 

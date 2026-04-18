@@ -14,7 +14,6 @@ import UIKit
 @MainActor
 @Observable
 final class BenchmarkViewModel {
-
     // MARK: - State
 
     var isRunning = false

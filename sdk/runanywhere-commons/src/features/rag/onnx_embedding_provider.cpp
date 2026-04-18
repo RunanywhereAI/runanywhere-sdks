@@ -4,23 +4,25 @@
  */
 
 #include "onnx_embedding_provider.h"
-#include "rac/features/rag/ort_guards.h"
-#include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
-#include "../../backends/onnx/onnx_backend.h"
 
-#include <nlohmann/json.hpp>
 #include <onnxruntime_c_api.h>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-#include <cmath>
-#include <cstring>
+
 #include <algorithm>
 #include <cctype>
-#include <unordered_map>
+#include <cmath>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <list>
 #include <mutex>
+#include <nlohmann/json.hpp>
+#include <sstream>
+#include <unordered_map>
+
+#include "../../backends/onnx/onnx_backend.h"
+#include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
+#include "rac/features/rag/ort_guards.h"
 
 #if defined(__aarch64__) && defined(__ARM_NEON)
 #include <arm_neon.h>
@@ -39,7 +41,7 @@ namespace rag {
 // =============================================================================
 
 class SimpleTokenizer {
-public:
+   public:
     SimpleTokenizer() {
         // Special tokens (defaults; may be overridden by vocab load)
         token_to_id_["[CLS]"] = 101;
@@ -87,7 +89,7 @@ public:
     std::vector<int64_t> encode_unpadded(const std::string& text, size_t max_length = 512) {
         std::vector<int64_t> token_ids;
         token_ids.reserve(std::min(max_length, static_cast<size_t>(128)));
-        token_ids.push_back(cls_id_); // [CLS]
+        token_ids.push_back(cls_id_);  // [CLS]
 
         const auto words = basic_tokenize(text);
         for (const auto& word : words) {
@@ -104,7 +106,7 @@ public:
             }
         }
 
-        token_ids.push_back(sep_id_); // [SEP]
+        token_ids.push_back(sep_id_);  // [SEP]
         return token_ids;
     }
 
@@ -124,7 +126,7 @@ public:
         std::vector<int64_t> mask;
         mask.reserve(token_ids.size());
         for (auto id : token_ids) {
-            mask.push_back(id != pad_id_ ? 1 : 0); 
+            mask.push_back(id != pad_id_ ? 1 : 0);
         }
         return mask;
     }
@@ -134,7 +136,7 @@ public:
         return std::vector<int64_t>(length, 0);
     }
 
-private:
+   private:
     static inline bool is_all_ascii(const std::string& text) {
         for (unsigned char ch : text) {
             if (ch & 0x80) {
@@ -145,9 +147,7 @@ private:
     }
 
     static inline bool is_ascii_alnum(unsigned char ch) {
-        return (ch >= 'A' && ch <= 'Z') ||
-               (ch >= 'a' && ch <= 'z') ||
-               (ch >= '0' && ch <= '9');
+        return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9');
     }
 
     static inline char to_lower_ascii(unsigned char ch) {
@@ -424,12 +424,8 @@ private:
 // =============================================================================
 
 // Mean pooling: average all token embeddings (excluding padding)
-std::vector<float> mean_pooling(
-    const float* embeddings,
-    const std::vector<int64_t>& attention_mask,
-    size_t seq_length,
-    size_t hidden_dim
-) {
+std::vector<float> mean_pooling(const float* embeddings, const std::vector<int64_t>& attention_mask,
+                                size_t seq_length, size_t hidden_dim) {
     std::vector<float> pooled(hidden_dim, 0.0f);
     int valid_tokens = 0;
 
@@ -472,27 +468,26 @@ void normalize_vector(std::vector<float>& vec) {
 // =============================================================================
 
 class ONNXEmbeddingProvider::Impl {
-public:
+   public:
     explicit Impl(const std::string& model_path, const std::string& config_json)
         : model_path_(model_path) {
-
         // Parse config
         if (!config_json.empty()) {
             try {
                 config_ = nlohmann::json::parse(config_json);
             } catch (const std::exception& e) {
-                RAC_LOG_ERROR(LOG_TAG,"Failed to parse config JSON: %s", e.what());
+                RAC_LOG_ERROR(LOG_TAG, "Failed to parse config JSON: %s", e.what());
             }
         }
 
         // Initialize ONNX Runtime
         if (!initialize_onnx_runtime()) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to initialize ONNX Runtime");
+            RAC_LOG_ERROR(LOG_TAG, "Failed to initialize ONNX Runtime");
             return;
         }
 
-        OrtStatus* mem_status = ort_api_->CreateCpuMemoryInfo(
-            OrtArenaAllocator, OrtMemTypeDefault, &memory_info_);
+        OrtStatus* mem_status =
+            ort_api_->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &memory_info_);
         if (mem_status != nullptr) {
             const char* error_msg = ort_api_->GetErrorMessage(mem_status);
             LOGE("CreateCpuMemoryInfo failed: %s", error_msg);
@@ -521,10 +516,12 @@ public:
         }
 
         if (vocab_path.empty() || !std::filesystem::exists(vocab_path)) {
-            LOGW("vocab.txt not at primary path: %s — scanning subdirectories...", vocab_path.c_str());
-            std::filesystem::path search_dir = std::filesystem::is_directory(model_path_)
-                ? std::filesystem::path(model_path_)
-                : std::filesystem::path(model_path_).parent_path();
+            LOGW("vocab.txt not at primary path: %s — scanning subdirectories...",
+                 vocab_path.c_str());
+            std::filesystem::path search_dir =
+                std::filesystem::is_directory(model_path_)
+                    ? std::filesystem::path(model_path_)
+                    : std::filesystem::path(model_path_).parent_path();
             bool found = false;
             if (std::filesystem::exists(search_dir) && std::filesystem::is_directory(search_dir)) {
                 for (auto& entry : std::filesystem::directory_iterator(search_dir)) {
@@ -540,23 +537,23 @@ public:
                 }
             }
             if (!found) {
-                LOGE("Tokenizer vocab not found at %s or subdirectories of %s",
-                     vocab_path.c_str(), search_dir.string().c_str());
+                LOGE("Tokenizer vocab not found at %s or subdirectories of %s", vocab_path.c_str(),
+                     search_dir.string().c_str());
                 return;
             }
-
         }
 
         if (!tokenizer_.load_vocab(vocab_path)) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to load tokenizer vocab: %s", vocab_path.c_str());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to load tokenizer vocab: %s", vocab_path.c_str());
             return;
         }
 
-        RAC_LOG_INFO(LOG_TAG,"Loaded tokenizer vocab: %s", vocab_path.c_str());
+        RAC_LOG_INFO(LOG_TAG, "Loaded tokenizer vocab: %s", vocab_path.c_str());
 
         std::string resolved_model_path = model_path;
         if (std::filesystem::is_directory(resolved_model_path)) {
-            resolved_model_path = (std::filesystem::path(resolved_model_path) / "model.onnx").string();
+            resolved_model_path =
+                (std::filesystem::path(resolved_model_path) / "model.onnx").string();
         }
 
         // Load model
@@ -567,19 +564,16 @@ public:
         }
 
         ready_ = true;
-        RAC_LOG_INFO(LOG_TAG,"ONNX embedding provider initialized: %s", model_path.c_str());
-        RAC_LOG_INFO(LOG_TAG,"  Hidden dimension: %zu", embedding_dim_);
+        RAC_LOG_INFO(LOG_TAG, "ONNX embedding provider initialized: %s", model_path.c_str());
+        RAC_LOG_INFO(LOG_TAG, "  Hidden dimension: %zu", embedding_dim_);
     }
 
-    ~Impl() {
-        cleanup();
-    }
+    ~Impl() { cleanup(); }
 
     std::vector<float> embed(const std::string& text) {
         if (!ready_) {
             LOGE("Embedding provider not ready");
             return {};
-
         }
 
         std::lock_guard<std::mutex> lock(embed_mutex_);
@@ -592,14 +586,15 @@ public:
             auto attention_mask = tokenizer_.create_attention_mask(token_ids);
 
             std::memcpy(input_ids_buf_.data(), token_ids.data(), pad_length * sizeof(int64_t));
-            std::memcpy(attention_mask_buf_.data(), attention_mask.data(), pad_length * sizeof(int64_t));
+            std::memcpy(attention_mask_buf_.data(), attention_mask.data(),
+                        pad_length * sizeof(int64_t));
             std::memset(token_type_ids_buf_.data(), 0, pad_length * sizeof(int64_t));
 
             input_shape_ = {1, static_cast<int64_t>(pad_length)};
 
             LOGI("Single embed: %zu real tokens, padded to %zu (max %zu)",
-                 token_ids.size() - std::count(token_ids.begin(), token_ids.end(), 0),
-                 pad_length, max_seq_length_);
+                 token_ids.size() - std::count(token_ids.begin(), token_ids.end(), 0), pad_length,
+                 max_seq_length_);
 
             OrtStatusGuard status_guard(ort_api_);
             OrtValueGuard input_ids_guard(ort_api_);
@@ -608,78 +603,51 @@ public:
 
             // Create input_ids tensor
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                input_ids_buf_.data(),
-                pad_length * sizeof(int64_t),
-                input_shape_.data(),
-                input_shape_.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                input_ids_guard.ptr()
-            ));
+                memory_info_, input_ids_buf_.data(), pad_length * sizeof(int64_t),
+                input_shape_.data(), input_shape_.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                input_ids_guard.ptr()));
             if (status_guard.is_error()) {
-
-                LOGE("CreateTensorWithDataAsOrtValue (input_ids) failed: %s", status_guard.error_message());
+                LOGE("CreateTensorWithDataAsOrtValue (input_ids) failed: %s",
+                     status_guard.error_message());
                 return {};
-
             }
 
             // Create attention_mask tensor
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                attention_mask_buf_.data(),
-                pad_length * sizeof(int64_t),
-                input_shape_.data(),
-                input_shape_.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                attention_mask_guard.ptr()
-            ));
+                memory_info_, attention_mask_buf_.data(), pad_length * sizeof(int64_t),
+                input_shape_.data(), input_shape_.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                attention_mask_guard.ptr()));
             if (status_guard.is_error()) {
-
-                LOGE("CreateTensorWithDataAsOrtValue (attention_mask) failed: %s", status_guard.error_message());
+                LOGE("CreateTensorWithDataAsOrtValue (attention_mask) failed: %s",
+                     status_guard.error_message());
                 return {};
-
             }
 
             // Create token_type_ids tensor
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                token_type_ids_buf_.data(),
-                pad_length * sizeof(int64_t),
-                input_shape_.data(),
-                input_shape_.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
-                token_type_ids_guard.ptr()
-            ));
+                memory_info_, token_type_ids_buf_.data(), pad_length * sizeof(int64_t),
+                input_shape_.data(), input_shape_.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                token_type_ids_guard.ptr()));
             if (status_guard.is_error()) {
-
-                LOGE("CreateTensorWithDataAsOrtValue (token_type_ids) failed: %s", status_guard.error_message());
+                LOGE("CreateTensorWithDataAsOrtValue (token_type_ids) failed: %s",
+                     status_guard.error_message());
                 return {};
-
             }
 
             // 3. Run inference
             const char* input_names[] = {"input_ids", "attention_mask", "token_type_ids"};
-            const OrtValue* inputs[] = {input_ids_guard.get(), attention_mask_guard.get(), token_type_ids_guard.get()};
+            const OrtValue* inputs[] = {input_ids_guard.get(), attention_mask_guard.get(),
+                                        token_type_ids_guard.get()};
             const char* output_names[] = {"last_hidden_state"};
             OrtValueGuard output_guard(ort_api_);
             OrtValue* output_ptr = nullptr;
 
-            status_guard.reset(ort_api_->Run(
-                session_,
-                nullptr,
-                input_names,
-                inputs,
-                3,
-                output_names,
-                1,
-                &output_ptr
-            ));
+            status_guard.reset(ort_api_->Run(session_, nullptr, input_names, inputs, 3,
+                                             output_names, 1, &output_ptr));
 
             if (status_guard.is_error()) {
-
                 LOGE("ONNX inference failed: %s", status_guard.error_message());
                 return {};
-
             }
 
             // Transfer ownership to guard for automatic cleanup
@@ -688,27 +656,25 @@ public:
             // 4. Extract output embeddings
             float* output_data = nullptr;
             OrtStatusGuard output_status_guard(ort_api_);
-            output_status_guard.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
+            output_status_guard.reset(
+                ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
 
             if (output_status_guard.is_error()) {
-
                 LOGE("Failed to get output tensor data: %s", output_status_guard.error_message());
                 return {};
-
             }
 
             if (output_data == nullptr) {
-
                 LOGE("Output tensor data pointer is null");
                 return {};
-
             }
 
             OrtTensorTypeAndShapeInfo* shape_info = nullptr;
             OrtStatusGuard shape_status_guard(ort_api_);
-            shape_status_guard.reset(ort_api_->GetTensorTypeAndShape(output_guard.get(), &shape_info));
+            shape_status_guard.reset(
+                ort_api_->GetTensorTypeAndShape(output_guard.get(), &shape_info));
 
-            size_t actual_hidden_dim = embedding_dim_; // fallback
+            size_t actual_hidden_dim = embedding_dim_;  // fallback
             if (!shape_status_guard.is_error() && shape_info != nullptr) {
                 size_t dim_count = 0;
                 ort_api_->GetDimensionsCount(shape_info, &dim_count);
@@ -717,32 +683,28 @@ public:
                     ort_api_->GetDimensions(shape_info, dims.data(), dim_count);
                     actual_hidden_dim = static_cast<size_t>(dims[2]);
                     if (actual_hidden_dim != embedding_dim_) {
-                        RAC_LOG_INFO(LOG_TAG,"Model hidden dim %zu differs from configured %zu, using actual",
-                             actual_hidden_dim, embedding_dim_);
+                        RAC_LOG_INFO(
+                            LOG_TAG,
+                            "Model hidden dim %zu differs from configured %zu, using actual",
+                            actual_hidden_dim, embedding_dim_);
                         embedding_dim_ = actual_hidden_dim;
                     }
                 }
                 ort_api_->ReleaseTensorTypeAndShapeInfo(shape_info);
             }
 
-            auto pooled = mean_pooling(
-                output_data,
-                attention_mask,
-                pad_length,
-                actual_hidden_dim
-            );
+            auto pooled = mean_pooling(output_data, attention_mask, pad_length, actual_hidden_dim);
 
             // 6. Normalize to unit vector
             normalize_vector(pooled);
 
             // All resources automatically cleaned up by RAII guards
-            RAC_LOG_INFO(LOG_TAG,"Generated embedding: dim=%zu, norm=1.0", pooled.size());
+            RAC_LOG_INFO(LOG_TAG, "Generated embedding: dim=%zu, norm=1.0", pooled.size());
             return pooled;
 
         } catch (const std::exception& e) {
             LOGE("Embedding generation failed: %s", e.what());
             return {};
-
         }
     }
 
@@ -769,10 +731,8 @@ public:
         for (size_t offset = 0; offset < texts.size(); offset += kMaxSubBatchSize) {
             size_t sub_batch_size = std::min(kMaxSubBatchSize, texts.size() - offset);
 
-            LOGI("Embedding sub-batch %zu/%zu (size=%zu)",
-                 offset / kMaxSubBatchSize + 1,
-                 (texts.size() + kMaxSubBatchSize - 1) / kMaxSubBatchSize,
-                 sub_batch_size);
+            LOGI("Embedding sub-batch %zu/%zu (size=%zu)", offset / kMaxSubBatchSize + 1,
+                 (texts.size() + kMaxSubBatchSize - 1) / kMaxSubBatchSize, sub_batch_size);
 
             auto sub_results = embed_sub_batch(texts, offset, sub_batch_size);
             if (sub_results.empty()) {
@@ -789,15 +749,11 @@ public:
         return all_results;
     }
 
-    size_t dimension() const noexcept {
-        return embedding_dim_;
-    }
+    size_t dimension() const noexcept { return embedding_dim_; }
 
-    bool is_ready() const noexcept {
-        return ready_;
-    }
+    bool is_ready() const noexcept { return ready_; }
 
-private:
+   private:
     static constexpr size_t kMaxSubBatchSize = 50;
 
     static size_t align_up(size_t value, size_t alignment) {
@@ -805,11 +761,8 @@ private:
         return std::min(aligned, static_cast<size_t>(512));
     }
 
-    std::vector<std::vector<float>> embed_sub_batch(
-        const std::vector<std::string>& texts,
-        size_t offset,
-        size_t count
-    ) {
+    std::vector<std::vector<float>> embed_sub_batch(const std::vector<std::string>& texts,
+                                                    size_t offset, size_t count) {
         try {
             std::vector<std::vector<int64_t>> all_token_ids(count);
             size_t max_actual_len = 0;
@@ -834,18 +787,16 @@ private:
                 tokenizer_.pad_to(all_token_ids[i], pad_length);
                 auto attn_mask = tokenizer_.create_attention_mask(all_token_ids[i]);
 
-                std::memcpy(flat_input_ids.data() + i * pad_length,
-                            all_token_ids[i].data(), pad_length * sizeof(int64_t));
-                std::memcpy(flat_attention_mask.data() + i * pad_length,
-                            attn_mask.data(), pad_length * sizeof(int64_t));
+                std::memcpy(flat_input_ids.data() + i * pad_length, all_token_ids[i].data(),
+                            pad_length * sizeof(int64_t));
+                std::memcpy(flat_attention_mask.data() + i * pad_length, attn_mask.data(),
+                            pad_length * sizeof(int64_t));
 
                 attention_masks[i] = std::move(attn_mask);
             }
 
-            std::vector<int64_t> batch_shape = {
-                static_cast<int64_t>(count),
-                static_cast<int64_t>(pad_length)
-            };
+            std::vector<int64_t> batch_shape = {static_cast<int64_t>(count),
+                                                static_cast<int64_t>(pad_length)};
 
             OrtStatusGuard status_guard(ort_api_);
             OrtValueGuard input_ids_guard(ort_api_);
@@ -853,54 +804,44 @@ private:
             OrtValueGuard token_type_ids_guard(ort_api_);
 
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                flat_input_ids.data(),
-                count * pad_length * sizeof(int64_t),
-                batch_shape.data(), batch_shape.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                memory_info_, flat_input_ids.data(), count * pad_length * sizeof(int64_t),
+                batch_shape.data(), batch_shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 input_ids_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Sub-batch: CreateTensor (input_ids) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (input_ids) failed: %s",
+                     status_guard.error_message());
                 return {};
             }
 
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                flat_attention_mask.data(),
-                count * pad_length * sizeof(int64_t),
-                batch_shape.data(), batch_shape.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                memory_info_, flat_attention_mask.data(), count * pad_length * sizeof(int64_t),
+                batch_shape.data(), batch_shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 attention_mask_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Sub-batch: CreateTensor (attention_mask) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (attention_mask) failed: %s",
+                     status_guard.error_message());
                 return {};
             }
 
             status_guard.reset(ort_api_->CreateTensorWithDataAsOrtValue(
-                memory_info_,
-                flat_token_type_ids.data(),
-                count * pad_length * sizeof(int64_t),
-                batch_shape.data(), batch_shape.size(),
-                ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
+                memory_info_, flat_token_type_ids.data(), count * pad_length * sizeof(int64_t),
+                batch_shape.data(), batch_shape.size(), ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64,
                 token_type_ids_guard.ptr()));
             if (status_guard.is_error()) {
-                LOGE("Sub-batch: CreateTensor (token_type_ids) failed: %s", status_guard.error_message());
+                LOGE("Sub-batch: CreateTensor (token_type_ids) failed: %s",
+                     status_guard.error_message());
                 return {};
             }
 
             const char* input_names[] = {"input_ids", "attention_mask", "token_type_ids"};
-            const OrtValue* inputs[] = {
-                input_ids_guard.get(), attention_mask_guard.get(), token_type_ids_guard.get()
-            };
+            const OrtValue* inputs[] = {input_ids_guard.get(), attention_mask_guard.get(),
+                                        token_type_ids_guard.get()};
             const char* output_names[] = {"last_hidden_state"};
             OrtValueGuard output_guard(ort_api_);
             OrtValue* output_ptr = nullptr;
 
-            status_guard.reset(ort_api_->Run(
-                session_, nullptr,
-                input_names, inputs, 3,
-                output_names, 1,
-                &output_ptr));
+            status_guard.reset(ort_api_->Run(session_, nullptr, input_names, inputs, 3,
+                                             output_names, 1, &output_ptr));
             if (status_guard.is_error()) {
                 LOGE("Sub-batch ONNX inference failed: %s", status_guard.error_message());
                 return {};
@@ -909,7 +850,8 @@ private:
 
             float* output_data = nullptr;
             OrtStatusGuard data_status(ort_api_);
-            data_status.reset(ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
+            data_status.reset(
+                ort_api_->GetTensorMutableData(output_guard.get(), (void**)&output_data));
             if (data_status.is_error() || output_data == nullptr) {
                 LOGE("Sub-batch: Failed to get output tensor data");
                 return {};
@@ -942,9 +884,8 @@ private:
 
             for (size_t i = 0; i < count; ++i) {
                 const float* sentence_data = output_data + i * stride;
-                auto pooled = mean_pooling(
-                    sentence_data, attention_masks[i],
-                    actual_seq_len, actual_hidden_dim);
+                auto pooled = mean_pooling(sentence_data, attention_masks[i], actual_seq_len,
+                                           actual_hidden_dim);
                 normalize_vector(pooled);
                 results[i] = std::move(pooled);
             }
@@ -962,15 +903,18 @@ private:
         const char* ort_version = ort_api_base ? ort_api_base->GetVersionString() : "unknown";
         ort_api_ = ort_api_base ? ort_api_base->GetApi(ORT_API_VERSION) : nullptr;
         if (!ort_api_) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)", ORT_API_VERSION, ort_version);
+            RAC_LOG_ERROR(LOG_TAG,
+                          "Failed to get ONNX Runtime API (ORT_API_VERSION=%d, runtime=%s)",
+                          ORT_API_VERSION, ort_version);
             return false;
         }
 
         // Create environment
-        OrtStatus* status = ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAGEmbedding", &ort_env_);
+        OrtStatus* status =
+            ort_api_->CreateEnv(ORT_LOGGING_LEVEL_WARNING, "RAGEmbedding", &ort_env_);
         if (status != nullptr) {
             const char* error_msg = ort_api_->GetErrorMessage(status);
-            RAC_LOG_ERROR(LOG_TAG,"Failed to create ORT environment: %s", error_msg);
+            RAC_LOG_ERROR(LOG_TAG, "Failed to create ORT environment: %s", error_msg);
             ort_api_->ReleaseStatus(status);
             return false;
         }
@@ -985,25 +929,29 @@ private:
 
         status_guard.reset(ort_api_->CreateSessionOptions(options_guard.ptr()));
         if (status_guard.is_error()) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to create session options: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to create session options: %s",
+                          status_guard.error_message());
             return false;
         }
 
         if (options_guard.get() == nullptr) {
-            RAC_LOG_ERROR(LOG_TAG,"Session options is null after creation");
+            RAC_LOG_ERROR(LOG_TAG, "Session options is null after creation");
             return false;
         }
 
         // Configure session options with error checking
         status_guard.reset(ort_api_->SetIntraOpNumThreads(options_guard.get(), 4));
         if (status_guard.is_error()) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to set intra-op threads: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to set intra-op threads: %s",
+                          status_guard.error_message());
             return false;
         }
 
-        status_guard.reset(ort_api_->SetSessionGraphOptimizationLevel(options_guard.get(), ORT_ENABLE_ALL));
+        status_guard.reset(
+            ort_api_->SetSessionGraphOptimizationLevel(options_guard.get(), ORT_ENABLE_ALL));
         if (status_guard.is_error()) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to set graph optimization level: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to set graph optimization level: %s",
+                          status_guard.error_message());
             return false;
         }
 
@@ -1013,24 +961,16 @@ private:
         // Materialize to a named local so the wchar_t* doesn't dangle.
 #ifdef _WIN32
         std::wstring wpath = rac_to_wstring(model_path);
-        status_guard.reset(ort_api_->CreateSession(
-            ort_env_,
-            wpath.c_str(),
-            options_guard.get(),
-            &session_
-        ));
+        status_guard.reset(
+            ort_api_->CreateSession(ort_env_, wpath.c_str(), options_guard.get(), &session_));
 #else
-        status_guard.reset(ort_api_->CreateSession(
-            ort_env_,
-            model_path.c_str(),
-            options_guard.get(),
-            &session_
-        ));
+        status_guard.reset(
+            ort_api_->CreateSession(ort_env_, model_path.c_str(), options_guard.get(), &session_));
 #endif
         // options_guard automatically releases session options on scope exit
 
         if (status_guard.is_error()) {
-            RAC_LOG_ERROR(LOG_TAG,"Failed to load model: %s", status_guard.error_message());
+            RAC_LOG_ERROR(LOG_TAG, "Failed to load model: %s", status_guard.error_message());
             return false;
         }
 
@@ -1072,20 +1012,18 @@ private:
     std::vector<int64_t> input_shape_ = {1, 0};  // Updated in constructor
 
     bool ready_ = false;
-    size_t embedding_dim_ = 384;  // all-MiniLM-L6-v2 dimension
+    size_t embedding_dim_ = 384;   // all-MiniLM-L6-v2 dimension
     size_t max_seq_length_ = 512;  // all-MiniLM-L6-v2 max_position_embeddings=512
-    std::mutex embed_mutex_;  // Protects pre-allocated buffers during concurrent embed() calls
+    std::mutex embed_mutex_;       // Protects pre-allocated buffers during concurrent embed() calls
 };
 
 // =============================================================================
 // PUBLIC API
 // =============================================================================
 
-ONNXEmbeddingProvider::ONNXEmbeddingProvider(
-    const std::string& model_path,
-    const std::string& config_json
-) : impl_(std::make_unique<Impl>(model_path, config_json)) {
-}
+ONNXEmbeddingProvider::ONNXEmbeddingProvider(const std::string& model_path,
+                                             const std::string& config_json)
+    : impl_(std::make_unique<Impl>(model_path, config_json)) {}
 
 ONNXEmbeddingProvider::~ONNXEmbeddingProvider() = default;
 
@@ -1096,7 +1034,8 @@ std::vector<float> ONNXEmbeddingProvider::embed(const std::string& text) {
     return impl_->embed(text);
 }
 
-std::vector<std::vector<float>> ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts) {
+std::vector<std::vector<float>>
+ONNXEmbeddingProvider::embed_batch(const std::vector<std::string>& texts) {
     return impl_->embed_batch(texts);
 }
 
@@ -1112,5 +1051,5 @@ const char* ONNXEmbeddingProvider::name() const noexcept {
     return "ONNX-Embedding";
 }
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere

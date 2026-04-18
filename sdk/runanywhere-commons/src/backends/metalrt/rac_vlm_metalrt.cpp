@@ -5,6 +5,8 @@
 
 #include "rac_vlm_metalrt.h"
 
+#include "metalrt_c_api.h"
+
 #include <climits>
 #include <cstdint>
 #include <cstdio>
@@ -12,8 +14,6 @@
 #include <cstring>
 #include <string>
 #include <vector>
-
-#include "metalrt_c_api.h"
 
 #include "rac/core/rac_logger.h"
 
@@ -40,11 +40,14 @@ struct rac_vlm_metalrt_impl {
 extern "C" {
 
 rac_result_t rac_vlm_metalrt_create(const char* model_path, rac_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_NULL_POINTER;
-    if (!model_path || model_path[0] == '\0') return RAC_ERROR_VALIDATION_FAILED;
+    if (!out_handle)
+        return RAC_ERROR_NULL_POINTER;
+    if (!model_path || model_path[0] == '\0')
+        return RAC_ERROR_VALIDATION_FAILED;
 
     auto* impl = new (std::nothrow) rac_vlm_metalrt_impl();
-    if (!impl) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!impl)
+        return RAC_ERROR_OUT_OF_MEMORY;
 
     impl->handle = metalrt_vision_create();
     if (!impl->handle) {
@@ -68,7 +71,8 @@ rac_result_t rac_vlm_metalrt_create(const char* model_path, rac_handle_t* out_ha
 }
 
 void rac_vlm_metalrt_destroy(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_vision_destroy(impl->handle);
@@ -77,11 +81,13 @@ void rac_vlm_metalrt_destroy(rac_handle_t handle) {
 }
 
 rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t* image,
-                                      const char* prompt, const rac_vlm_options_t* options,
-                                      rac_vlm_result_t* out_result) {
-    if (!handle || !image || !prompt || !out_result) return RAC_ERROR_NULL_POINTER;
+                                     const char* prompt, const rac_vlm_options_t* options,
+                                     rac_vlm_result_t* out_result) {
+    if (!handle || !image || !prompt || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
     vopts.max_tokens = options ? options->max_tokens : 256;
@@ -97,14 +103,12 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
         if (image->width == 0 || image->height == 0 ||
             image->width > static_cast<uint32_t>(INT_MAX) ||
             image->height > static_cast<uint32_t>(INT_MAX)) {
-            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions: %u x %u",
-                          image->width, image->height);
+            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions: %u x %u", image->width, image->height);
             return RAC_ERROR_VALIDATION_FAILED;
         }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
-        result = metalrt_vision_analyze_pixels(impl->handle, rgba.data(),
-                                                (int)image->width, (int)image->height,
-                                                prompt, &vopts);
+        result = metalrt_vision_analyze_pixels(impl->handle, rgba.data(), (int)image->width,
+                                               (int)image->height, prompt, &vopts);
     } else {
         RAC_LOG_ERROR(LOG_CAT, "Unsupported image format: %d", image->format);
         return RAC_ERROR_VALIDATION_FAILED;
@@ -121,8 +125,8 @@ rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t*
     out_result->total_tokens = result.prompt_tokens + result.generated_tokens;
     out_result->time_to_first_token_ms = static_cast<int64_t>(result.prefill_ms);
     out_result->image_encode_time_ms = static_cast<int64_t>(result.vision_encode_ms);
-    out_result->total_time_ms = static_cast<int64_t>(
-        result.vision_encode_ms + result.prefill_ms + result.decode_ms);
+    out_result->total_time_ms =
+        static_cast<int64_t>(result.vision_encode_ms + result.prefill_ms + result.decode_ms);
     out_result->tokens_per_second = static_cast<float>(result.tps);
 
     metalrt_vision_free_result(result);
@@ -137,17 +141,19 @@ struct VLMStreamCtx {
 
 static bool vlm_stream_bridge(const char* piece, void* ctx) {
     auto* adapter = static_cast<VLMStreamCtx*>(ctx);
-    if (!adapter || !adapter->callback) return false;
+    if (!adapter || !adapter->callback)
+        return false;
     return adapter->callback(piece, adapter->user_data) == RAC_TRUE;
 }
 
 rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
-                                             const char* prompt, const rac_vlm_options_t* options,
-                                             rac_vlm_stream_callback_fn callback,
-                                             void* user_data) {
-    if (!handle || !image || !prompt || !callback) return RAC_ERROR_NULL_POINTER;
+                                            const char* prompt, const rac_vlm_options_t* options,
+                                            rac_vlm_stream_callback_fn callback, void* user_data) {
+    if (!handle || !image || !prompt || !callback)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     struct MetalRTVisionOptions vopts = {};
     vopts.max_tokens = options ? options->max_tokens : 256;
@@ -159,20 +165,20 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
     struct MetalRTVisionResult result = {};
 
     if (image->format == RAC_VLM_IMAGE_FORMAT_FILE_PATH && image->file_path) {
-        result = metalrt_vision_analyze_stream(
-            impl->handle, image->file_path, prompt, vlm_stream_bridge, &ctx, &vopts);
+        result = metalrt_vision_analyze_stream(impl->handle, image->file_path, prompt,
+                                               vlm_stream_bridge, &ctx, &vopts);
     } else if (image->format == RAC_VLM_IMAGE_FORMAT_RGB_PIXELS && image->pixel_data) {
         if (image->width == 0 || image->height == 0 ||
             image->width > static_cast<uint32_t>(INT_MAX) ||
             image->height > static_cast<uint32_t>(INT_MAX)) {
-            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions for streaming: %u x %u",
-                          image->width, image->height);
+            RAC_LOG_ERROR(LOG_CAT, "Invalid RGB dimensions for streaming: %u x %u", image->width,
+                          image->height);
             return RAC_ERROR_VALIDATION_FAILED;
         }
         auto rgba = rgb_to_rgba(image->pixel_data, image->width, image->height);
-        result = metalrt_vision_analyze_pixels_stream(
-            impl->handle, rgba.data(), (int)image->width, (int)image->height,
-            prompt, vlm_stream_bridge, &ctx, &vopts);
+        result = metalrt_vision_analyze_pixels_stream(impl->handle, rgba.data(), (int)image->width,
+                                                      (int)image->height, prompt, vlm_stream_bridge,
+                                                      &ctx, &vopts);
     } else {
         RAC_LOG_ERROR(LOG_CAT, "Unsupported image format for streaming: %d", image->format);
         return RAC_ERROR_VALIDATION_FAILED;
@@ -183,7 +189,8 @@ rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_i
 }
 
 void rac_vlm_metalrt_reset(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_vlm_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_vision_reset(impl->handle);

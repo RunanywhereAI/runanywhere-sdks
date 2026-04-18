@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.presentation.stt
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import timber.log.Timber
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import kotlin.math.log10
 import kotlin.math.max

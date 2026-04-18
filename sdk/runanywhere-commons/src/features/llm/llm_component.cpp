@@ -275,10 +275,10 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
     rac_result_t result =
         rac_lifecycle_load(component->lifecycle, model_path, model_id, model_name, &service);
 
-    double load_duration_ms = static_cast<double>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
-                                                              load_start)
-            .count());
+    double load_duration_ms =
+        static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::steady_clock::now() - load_start)
+                                .count());
 
     if (result != RAC_SUCCESS) {
         rac_analytics_event_data_t event = {};
@@ -740,9 +740,9 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     final_result.prompt_tokens = ctx.prompt_tokens;
-    final_result.completion_tokens = ctx.token_count > 0
-        ? ctx.token_count
-        : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
+    final_result.completion_tokens =
+        ctx.token_count > 0 ? ctx.token_count
+                            : (ctx.full_text.empty() ? 0 : estimate_tokens(ctx.full_text.c_str()));
     final_result.total_tokens = final_result.prompt_tokens + final_result.completion_tokens;
     final_result.total_time_ms = total_time_ms;
 
@@ -1085,9 +1085,8 @@ extern "C" rac_result_t rac_llm_component_cancel(rac_handle_t handle) {
 // LORA ADAPTER API
 // =============================================================================
 
-extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
-                                                     const char* adapter_path,
-                                                     float scale) {
+extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle, const char* adapter_path,
+                                                    float scale) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!adapter_path || adapter_path[0] == '\0')
@@ -1110,7 +1109,7 @@ extern "C" rac_result_t rac_llm_component_load_lora(rac_handle_t handle,
 }
 
 extern "C" rac_result_t rac_llm_component_remove_lora(rac_handle_t handle,
-                                                       const char* adapter_path) {
+                                                      const char* adapter_path) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!adapter_path || adapter_path[0] == '\0')
@@ -1149,8 +1148,7 @@ extern "C" rac_result_t rac_llm_component_clear_lora(rac_handle_t handle) {
     return llm_service->ops->clear_lora(llm_service->impl);
 }
 
-extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
-                                                         char** out_json) {
+extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle, char** out_json) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!out_json)
@@ -1172,8 +1170,8 @@ extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle,
 }
 
 extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
-                                                              const char* adapter_path,
-                                                              char** out_error) {
+                                                            const char* adapter_path,
+                                                            char** out_error) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!adapter_path || !out_error)

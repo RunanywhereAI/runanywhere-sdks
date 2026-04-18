@@ -510,21 +510,29 @@ struct AdaptiveMicButton: View {
         Group {
             if #available(iOS 26.0, macOS 26.0, *) {
                 micContent
-                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
                     .onTapGesture(perform: action)
                     .glassEffect(.regular.interactive())
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Microphone")
-                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityHint(
+                        onLongPress != nil
+                            ? "Double tap to toggle recording. Long press for alternate action."
+                            : "Double tap to toggle recording."
+                    )
                     .accessibilityAction(.default, action)
                     .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             } else {
                 micContent
-                    .onLongPressGesture(minimumDuration: 0.5, perform: { onLongPress?() ?? action() })
+                    .onLongPressGesture(minimumDuration: 0.5) { onLongPress?() ?? action() }
                     .onTapGesture(perform: action)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Microphone")
-                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityHint(
+                        onLongPress != nil
+                            ? "Double tap to toggle recording. Long press for alternate action."
+                            : "Double tap to toggle recording."
+                    )
                     .accessibilityAction(.default, action)
                     .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             }

@@ -23,7 +23,9 @@ import kotlinx.serialization.Serializable
  * VLM image input format.
  * Mirrors C++ rac_vlm_image_format_t exactly.
  */
-enum class VLMImageFormat(val rawValue: Int) {
+enum class VLMImageFormat(
+    val rawValue: Int,
+) {
     /** Path to image file (JPEG, PNG, etc.) */
     FILE_PATH(0),
 

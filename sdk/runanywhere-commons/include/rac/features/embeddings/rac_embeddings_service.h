@@ -10,8 +10,8 @@
 #ifndef RAC_EMBEDDINGS_SERVICE_H
 #define RAC_EMBEDDINGS_SERVICE_H
 
-#include "rac/core/rac_types.h"
 #include "rac/core/rac_error.h"
+#include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
 
 #ifdef __cplusplus
@@ -32,13 +32,11 @@ typedef struct rac_embeddings_service_ops {
     rac_result_t (*initialize)(void* impl, const char* model_path);
 
     /** Generate embeddings for a single text */
-    rac_result_t (*embed)(void* impl, const char* text,
-                          const rac_embeddings_options_t* options,
+    rac_result_t (*embed)(void* impl, const char* text, const rac_embeddings_options_t* options,
                           rac_embeddings_result_t* out_result);
 
     /** Generate embeddings for a batch of texts */
-    rac_result_t (*embed_batch)(void* impl, const char* const* texts,
-                                size_t num_texts,
+    rac_result_t (*embed_batch)(void* impl, const char* const* texts, size_t num_texts,
                                 const rac_embeddings_options_t* options,
                                 rac_embeddings_result_t* out_result);
 
@@ -86,8 +84,8 @@ RAC_API rac_result_t rac_embeddings_create(const char* model_id, rac_handle_t* o
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_embeddings_create_with_config(const char* model_id,
-                                                        const char* config_json,
-                                                        rac_handle_t* out_handle);
+                                                       const char* config_json,
+                                                       rac_handle_t* out_handle);
 
 /**
  * @brief Initialize the service with a model
@@ -108,8 +106,8 @@ RAC_API rac_result_t rac_embeddings_initialize(rac_handle_t handle, const char* 
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
-                                           const rac_embeddings_options_t* options,
-                                           rac_embeddings_result_t* out_result);
+                                          const rac_embeddings_options_t* options,
+                                          rac_embeddings_result_t* out_result);
 
 /**
  * @brief Generate embeddings for a batch of texts
@@ -122,9 +120,9 @@ RAC_API rac_result_t rac_embeddings_embed(rac_handle_t handle, const char* text,
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char* const* texts,
-                                                 size_t num_texts,
-                                                 const rac_embeddings_options_t* options,
-                                                 rac_embeddings_result_t* out_result);
+                                                size_t num_texts,
+                                                const rac_embeddings_options_t* options,
+                                                rac_embeddings_result_t* out_result);
 
 /**
  * @brief Get service information

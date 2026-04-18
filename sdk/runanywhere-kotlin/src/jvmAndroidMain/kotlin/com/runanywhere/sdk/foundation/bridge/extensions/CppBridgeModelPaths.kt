@@ -273,60 +273,61 @@ object CppBridgeModelPaths {
         // Hold lock for both file checks and state write to prevent TOCTOU races.
         // File I/O here is fast (mkdirs/exists), and this is called rarely (once at init).
         var previousPath: String? = null
-        val success = synchronized(lock) {
-            try {
-                val file = File(path)
+        val success =
+            synchronized(lock) {
+                try {
+                    val file = File(path)
 
-                // Create directory if it doesn't exist
-                if (!file.exists()) {
-                    if (!file.mkdirs()) {
+                    // Create directory if it doesn't exist
+                    if (!file.exists()) {
+                        if (!file.mkdirs()) {
+                            CppBridgePlatformAdapter.logCallback(
+                                CppBridgePlatformAdapter.LogLevel.ERROR,
+                                TAG,
+                                "Failed to create base directory: $path",
+                            )
+                            return@synchronized false
+                        }
+                    }
+
+                    // Verify it's a directory and writable
+                    if (!file.isDirectory) {
                         CppBridgePlatformAdapter.logCallback(
                             CppBridgePlatformAdapter.LogLevel.ERROR,
                             TAG,
-                            "Failed to create base directory: $path",
+                            "Path is not a directory: $path",
                         )
                         return@synchronized false
                     }
-                }
 
-                // Verify it's a directory and writable
-                if (!file.isDirectory) {
+                    if (!file.canWrite()) {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            TAG,
+                            "Directory is not writable: $path",
+                        )
+                        return@synchronized false
+                    }
+
+                    previousPath = baseDirectory
+                    baseDirectory = path
+
+                    CppBridgePlatformAdapter.logCallback(
+                        CppBridgePlatformAdapter.LogLevel.DEBUG,
+                        TAG,
+                        "Base directory set: $path",
+                    )
+
+                    true
+                } catch (e: Exception) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.ERROR,
                         TAG,
-                        "Path is not a directory: $path",
+                        "Failed to set base directory: ${e.message}",
                     )
-                    return@synchronized false
+                    false
                 }
-
-                if (!file.canWrite()) {
-                    CppBridgePlatformAdapter.logCallback(
-                        CppBridgePlatformAdapter.LogLevel.ERROR,
-                        TAG,
-                        "Directory is not writable: $path",
-                    )
-                    return@synchronized false
-                }
-
-                previousPath = baseDirectory
-                baseDirectory = path
-
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Base directory set: $path",
-                )
-
-                true
-            } catch (e: Exception) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.ERROR,
-                    TAG,
-                    "Failed to set base directory: ${e.message}",
-                )
-                false
             }
-        }
 
         // Notify listener outside lock to avoid holding lock during callbacks
         if (success) {
@@ -910,11 +911,12 @@ object CppBridgeModelPaths {
 
             // Delete existing file/directory if present
             if (finalFile.exists()) {
-                val deleted = if (finalFile.isDirectory) {
-                    finalFile.deleteRecursively()
-                } else {
-                    finalFile.delete()
-                }
+                val deleted =
+                    if (finalFile.isDirectory) {
+                        finalFile.deleteRecursively()
+                    } else {
+                        finalFile.delete()
+                    }
                 if (!deleted) {
                     CppBridgePlatformAdapter.logCallback(
                         CppBridgePlatformAdapter.LogLevel.ERROR,

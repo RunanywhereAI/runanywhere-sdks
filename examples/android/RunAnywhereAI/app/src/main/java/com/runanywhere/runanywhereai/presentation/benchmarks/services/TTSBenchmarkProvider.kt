@@ -19,24 +19,25 @@ import kotlinx.coroutines.withContext
  * Matches iOS TTSBenchmarkProvider exactly.
  */
 class TTSBenchmarkProvider : BenchmarkScenarioProvider {
-
     override val category: BenchmarkCategory = BenchmarkCategory.TTS
 
-    override fun scenarios(): List<BenchmarkScenario> = listOf(
-        BenchmarkScenario(name = "Short Text", category = BenchmarkCategory.TTS),
-        BenchmarkScenario(name = "Medium Text", category = BenchmarkCategory.TTS),
-    )
+    override fun scenarios(): List<BenchmarkScenario> =
+        listOf(
+            BenchmarkScenario(name = "Short Text", category = BenchmarkCategory.TTS),
+            BenchmarkScenario(name = "Medium Text", category = BenchmarkCategory.TTS),
+        )
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
         model: ModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics {
-        val text = if (scenario.name.contains("Short")) {
-            "Hello, this is a test."
-        } else {
-            "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
-        }
+        val text =
+            if (scenario.name.contains("Short")) {
+                "Hello, this is a test."
+            } else {
+                "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
+            }
 
         val memBefore = SyntheticInputGenerator.availableMemoryBytes()
 

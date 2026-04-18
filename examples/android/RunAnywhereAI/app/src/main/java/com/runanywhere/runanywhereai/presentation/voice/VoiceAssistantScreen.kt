@@ -3,11 +3,11 @@ package com.runanywhere.runanywhereai.presentation.voice
 import android.Manifest
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
-import androidx.compose.animation.core.EaseInOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -19,27 +19,22 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.delay
-import kotlin.math.abs
-import kotlin.math.sin
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -50,7 +45,10 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
  * Voice Assistant screen
@@ -127,9 +125,10 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
         if (!uiState.allModelsLoaded) {
             VoicePipelineSetupView(
@@ -167,14 +166,23 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
                 sttLoadState = uiState.sttLoadState,
                 llmLoadState = uiState.llmLoadState,
                 ttsLoadState = uiState.ttsLoadState,
-                onSelectSTT = { showVoiceSetupSheet = false; showSTTModelSelection = true },
-                onSelectLLM = { showVoiceSetupSheet = false; showLLMModelSelection = true },
-                onSelectTTS = { showVoiceSetupSheet = false; showTTSModelSelection = true },
+                onSelectSTT = {
+                    showVoiceSetupSheet = false
+                    showSTTModelSelection = true
+                },
+                onSelectLLM = {
+                    showVoiceSetupSheet = false
+                    showLLMModelSelection = true
+                },
+                onSelectTTS = {
+                    showVoiceSetupSheet = false
+                    showTTSModelSelection = true
+                },
                 onStartVoice = { showVoiceSetupSheet = false },
             )
         }
     }
-    
+
     // Model selection bottom sheets - uses real SDK models
     // ModelSelectionSheet(context: .stt/.llm/.tts)
     if (showSTTModelSelection) {
@@ -188,7 +196,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             },
         )
     }
-    
+
     if (showLLMModelSelection) {
         ModelSelectionBottomSheet(
             context = ModelSelectionContext.LLM,
@@ -200,7 +208,7 @@ fun VoiceAssistantScreen(viewModel: VoiceAssistantViewModel = viewModel()) {
             },
         )
     }
-    
+
     if (showTTSModelSelection) {
         ModelSelectionBottomSheet(
             context = ModelSelectionContext.TTS,
@@ -242,9 +250,10 @@ private fun VoicePipelineSetupView(
 
     // VStack(spacing: 24), .padding(.top, 20), icon 48pt, .title2 .bold, .subheadline .secondary
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Dimensions.padding16),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Dimensions.padding16),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
@@ -271,9 +280,10 @@ private fun VoicePipelineSetupView(
 
         // VStack(spacing: 16), .padding(.horizontal) — scrollable for small screens
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             ModelSetupCard(
@@ -282,20 +292,20 @@ private fun VoicePipelineSetupView(
                 subtitle = "Converts your voice to text",
                 icon = Icons.Default.GraphicEq,
                 color = AppColors.primaryGreen,
-            selectedFramework = sttModel?.framework,
-            selectedModel = sttModel?.name,
-            loadState = sttLoadState,
+                selectedFramework = sttModel?.framework,
+                selectedModel = sttModel?.name,
+                loadState = sttLoadState,
                 onSelect = onSelectSTT,
             )
             ModelSetupCard(
-            step = 2,
-            title = "Language Model",
-            subtitle = "Processes and responds to your input",
-            icon = Icons.Default.Psychology,
-            color = AppColors.primaryAccent,
-            selectedFramework = llmModel?.framework,
-            selectedModel = llmModel?.name,
-            loadState = llmLoadState,
+                step = 2,
+                title = "Language Model",
+                subtitle = "Processes and responds to your input",
+                icon = Icons.Default.Psychology,
+                color = AppColors.primaryAccent,
+                selectedFramework = llmModel?.framework,
+                selectedModel = llmModel?.name,
+                loadState = llmLoadState,
                 onSelect = onSelectLLM,
             )
             ModelSetupCard(
@@ -315,9 +325,10 @@ private fun VoicePipelineSetupView(
         Button(
             onClick = onStartVoice,
             enabled = allModelsLoaded,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryAccent),
         ) {
             Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -330,17 +341,19 @@ private fun VoicePipelineSetupView(
 
         // .font(.caption), .padding(.bottom, 10)
         Text(
-            text = when {
-                !allModelsReady -> "Select all 3 models to continue"
-                !allModelsLoaded -> "Waiting for models to load..."
-                else -> "All models loaded and ready!"
-            },
+            text =
+                when {
+                    !allModelsReady -> "Select all 3 models to continue"
+                    !allModelsLoaded -> "Waiting for models to load..."
+                    else -> "All models loaded and ready!"
+                },
             style = MaterialTheme.typography.labelMedium,
-            color = when {
-                !allModelsReady -> MaterialTheme.colorScheme.onSurfaceVariant
-                !allModelsLoaded -> AppColors.statusOrange
-                else -> AppColors.primaryGreen
-            },
+            color =
+                when {
+                    !allModelsReady -> MaterialTheme.colorScheme.onSurfaceVariant
+                    !allModelsLoaded -> AppColors.statusOrange
+                    else -> AppColors.primaryGreen
+                },
         )
         Spacer(modifier = Modifier.height(10.dp))
     }
@@ -557,12 +570,12 @@ private fun ModelSetupCard(
 private fun MainVoiceAssistantUI(
     uiState: VoiceUiState,
     showModelInfo: Boolean,
-    onToggleModelInfo: () -> Unit,
+    @Suppress("UnusedParameter") onToggleModelInfo: () -> Unit,
     hasPermission: Boolean,
     onRequestPermission: () -> Unit,
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") onClearConversation: () -> Unit,
+    @Suppress("UnusedParameter") onClearConversation: () -> Unit,
 ) {
     val density = LocalDensity.current
 
@@ -594,8 +607,14 @@ private fun MainVoiceAssistantUI(
                 )
 
                 // Morph: sphere → ring when listening/speaking
-                val targetMorph = if (currentUiState.sessionState == SessionState.LISTENING ||
-                    currentUiState.sessionState == SessionState.SPEAKING) 1f else 0f
+                val targetMorph =
+                    if (currentUiState.sessionState == SessionState.LISTENING ||
+                        currentUiState.sessionState == SessionState.SPEAKING
+                    ) {
+                        1f
+                    } else {
+                        0f
+                    }
                 morphProgress += (targetMorph - morphProgress) * 0.04f
                 morphProgress = morphProgress.coerceIn(0f, 1f)
 
@@ -607,10 +626,11 @@ private fun MainVoiceAssistantUI(
                 }
 
                 // Re-check if animation is still needed
-                val stillNeeded = currentUiState.sessionState == SessionState.LISTENING ||
-                    currentUiState.sessionState == SessionState.SPEAKING ||
-                    amplitude > 0.001f ||
-                    morphProgress > 0.001f
+                val stillNeeded =
+                    currentUiState.sessionState == SessionState.LISTENING ||
+                        currentUiState.sessionState == SessionState.SPEAKING ||
+                        amplitude > 0.001f ||
+                        morphProgress > 0.001f
                 if (!stillNeeded) break
             }
         }
@@ -628,24 +648,25 @@ private fun MainVoiceAssistantUI(
                 scatterAmount = scatterAmount,
                 touchPoint = touchPoint,
                 isDarkMode = isDarkMode,
-                modifier = Modifier
-                    .size(with(density) { size.toDp() })
-                    .align(Alignment.Center)
-                    .offset(y = with(density) { (-50).dp })
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDrag = { change, _ ->
-                                change.consume()
-                                val pos = change.position
-                                val w = this.size.width.toFloat()
-                                val h = this.size.height.toFloat()
-                                val normX = ((pos.x - w / 2f) / (w / 2f)) * 0.85f
-                                val normY = -((pos.y - h / 2f) / (h / 2f)) * 0.85f
-                                touchPoint = Offset(normX, normY)
-                                scatterAmount = 1f
-                            }
-                        )
-                    },
+                modifier =
+                    Modifier
+                        .size(with(density) { size.toDp() })
+                        .align(Alignment.Center)
+                        .offset(y = with(density) { (-50).dp })
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    val pos = change.position
+                                    val w = this.size.width.toFloat()
+                                    val h = this.size.height.toFloat()
+                                    val normX = ((pos.x - w / 2f) / (w / 2f)) * 0.85f
+                                    val normY = -((pos.y - h / 2f) / (h / 2f)) * 0.85f
+                                    touchPoint = Offset(normX, normY)
+                                    scatterAmount = 1f
+                                },
+                            )
+                        },
             )
         }
 
@@ -653,88 +674,91 @@ private fun MainVoiceAssistantUI(
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
-        // Model info section - VStack spacing 8, HStack spacing 15, padding horizontal 20, padding bottom 15
-        AnimatedVisibility(
-            visible = showModelInfo,
-            enter = slideInVertically() + fadeIn(),
-            exit = slideOutVertically() + fadeOut(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 15.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+            // Model info section - VStack spacing 8, HStack spacing 15, padding horizontal 20, padding bottom 15
+            AnimatedVisibility(
+                visible = showModelInfo,
+                enter = slideInVertically() + fadeIn(),
+                exit = slideOutVertically() + fadeOut(),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(15.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 15.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    ModelBadge(
-                        icon = Icons.Default.Psychology,
-                        label = "LLM",
-                        value = uiState.llmModel?.name ?: "Not set",
-                        color = AppColors.primaryAccent,
-                    )
-                    ModelBadge(
-                        icon = Icons.Default.GraphicEq,
-                        label = "STT",
-                        value = uiState.sttModel?.name ?: "Not set",
-                        color = AppColors.primaryGreen,
-                    )
-                    ModelBadge(
-                        icon = Icons.AutoMirrored.Filled.VolumeUp,
-                        label = "TTS",
-                        value = uiState.ttsModel?.name ?: "Not set",
-                        color = AppColors.primaryPurple,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ModelBadge(
+                            icon = Icons.Default.Psychology,
+                            label = "LLM",
+                            value = uiState.llmModel?.name ?: "Not set",
+                            color = AppColors.primaryAccent,
+                        )
+                        ModelBadge(
+                            icon = Icons.Default.GraphicEq,
+                            label = "STT",
+                            value = uiState.sttModel?.name ?: "Not set",
+                            color = AppColors.primaryGreen,
+                        )
+                        ModelBadge(
+                            icon = Icons.AutoMirrored.Filled.VolumeUp,
+                            label = "TTS",
+                            value = uiState.ttsModel?.name ?: "Not set",
+                            color = AppColors.primaryPurple,
+                        )
+                    }
                 }
             }
-        }
 
-        // Conversation area is now hidden - messages shown as toast at bottom
-        Spacer(modifier = Modifier.weight(1f))
+            // Conversation area is now hidden - messages shown as toast at bottom
+            Spacer(modifier = Modifier.weight(1f))
 
-        // Control area - VStack spacing 20, error .caption, response maxHeight 150 padding H 30, mic, instruction .caption2, padding bottom 30
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 30.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Error message
-            uiState.errorMessage?.let { error ->
+            // Control area - VStack spacing 20, error .caption, response maxHeight 150 padding H 30, mic, instruction .caption2, padding bottom 30
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 30.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Error message
+                uiState.errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        // .caption
+                        style = MaterialTheme.typography.labelMedium,
+                        color = AppColors.statusRed,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                }
+
+                // Main mic button section
+                // Mic button section
+                micButtonSection(
+                    uiState = uiState,
+                    hasPermission = hasPermission,
+                    onRequestPermission = onRequestPermission,
+                    onStartSession = onStartSession,
+                    onStopSession = onStopSession,
+                )
+
+                // Instruction text
+                // .caption2, .secondary.opacity(0.7)
                 Text(
-                    text = error,
-                    style = MaterialTheme.typography.labelMedium, // .caption
-                    color = AppColors.statusRed,
+                    text = getInstructionText(uiState.sessionState),
+                    style = AppTypography.caption2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
-
-            // Main mic button section
-            // Mic button section
-            micButtonSection(
-                uiState = uiState,
-                hasPermission = hasPermission,
-                onRequestPermission = onRequestPermission,
-                onStartSession = onStartSession,
-                onStopSession = onStopSession,
-            )
-
-            // Instruction text
-            // .caption2, .secondary.opacity(0.7)
-            Text(
-                text = getInstructionText(uiState.sessionState),
-                style = AppTypography.caption2,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center,
-            )
-        }
         }
     }
 }
@@ -757,34 +781,35 @@ private fun updateAnimation(
 
     // Audio amplitude - reactive to both input (listening) and output (speaking)
     val currentAmplitude = amplitudeState()
-    val newAmplitude = when {
-        isListening -> {
-            // Use real audio level from microphone
-            val realAudioLevel = uiState.audioLevel
-            // Smooth interpolation for natural movement
-            (currentAmplitude * 0.7f + realAudioLevel * 0.3f).coerceIn(0f, 1f)
-        }
-        isSpeaking -> {
-            // TTS output - realistic speech-like pulse simulation
-            val time = System.currentTimeMillis() / 1000f
+    val newAmplitude =
+        when {
+            isListening -> {
+                // Use real audio level from microphone
+                val realAudioLevel = uiState.audioLevel
+                // Smooth interpolation for natural movement
+                (currentAmplitude * 0.7f + realAudioLevel * 0.3f).coerceIn(0f, 1f)
+            }
+            isSpeaking -> {
+                // TTS output - realistic speech-like pulse simulation
+                val time = System.currentTimeMillis() / 1000f
 
-            // Multiple frequency components for natural speech rhythm
-            val basePulse = 0.35f
-            val primaryWave = sin(time * 3.5f) * 0.2f // Main speech rhythm
-            val secondaryWave = sin(time * 7.0f) * 0.1f // Phoneme-like variation
-            val randomNoise = kotlin.random.Random.nextFloat() * 0.2f - 0.05f // Natural variation
+                // Multiple frequency components for natural speech rhythm
+                val basePulse = 0.35f
+                val primaryWave = sin(time * 3.5f) * 0.2f // Main speech rhythm
+                val secondaryWave = sin(time * 7.0f) * 0.1f // Phoneme-like variation
+                val randomNoise = kotlin.random.Random.nextFloat() * 0.2f - 0.05f // Natural variation
 
-            val targetAmplitude = basePulse + abs(primaryWave) + abs(secondaryWave) * 0.5f + randomNoise
+                val targetAmplitude = basePulse + abs(primaryWave) + abs(secondaryWave) * 0.5f + randomNoise
 
-            // Smooth interpolation to avoid jarring changes
-            (currentAmplitude * 0.75f + targetAmplitude * 0.25f).coerceIn(0f, 1f)
+                // Smooth interpolation to avoid jarring changes
+                (currentAmplitude * 0.75f + targetAmplitude * 0.25f).coerceIn(0f, 1f)
+            }
+            else -> {
+                // Smooth decay back to center when not active
+                val decayed = currentAmplitude * 0.93f
+                if (decayed < 0.001f) 0f else decayed
+            }
         }
-        else -> {
-            // Smooth decay back to center when not active
-            val decayed = currentAmplitude * 0.93f
-            if (decayed < 0.001f) 0f else decayed
-        }
-    }
     onAmplitudeChange(newAmplitude)
 }
 
@@ -799,8 +824,9 @@ private fun micButtonSection(
     onStartSession: () -> Unit,
     onStopSession: () -> Unit,
 ) {
-    val isLoading = uiState.sessionState == SessionState.CONNECTING ||
-        (uiState.sessionState == SessionState.PROCESSING && !uiState.isListening)
+    val isLoading =
+        uiState.sessionState == SessionState.CONNECTING ||
+            (uiState.sessionState == SessionState.PROCESSING && !uiState.isListening)
 
     Row(modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.weight(1f))
@@ -834,39 +860,6 @@ private fun micButtonSection(
 }
 
 @Composable
-private fun StatusIndicator(sessionState: SessionState) {
-    val color =
-        when (sessionState) {
-            SessionState.CONNECTED -> AppColors.statusGreen
-            SessionState.LISTENING -> AppColors.statusRed
-            SessionState.PROCESSING -> AppColors.primaryAccent
-            SessionState.SPEAKING -> AppColors.statusGreen
-            SessionState.ERROR -> AppColors.statusRed
-            SessionState.DISCONNECTED -> AppColors.statusGray
-            SessionState.CONNECTING -> AppColors.statusOrange
-        }
-
-    val animatedScale by animateFloatAsState(
-        targetValue = if (sessionState == SessionState.LISTENING) 1.2f else 1f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(1000),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "statusScale",
-    )
-
-    Box(
-        modifier =
-            Modifier
-                .size(8.dp)
-                .scale(if (sessionState == SessionState.LISTENING) animatedScale else 1f)
-                .clip(CircleShape)
-                .background(color),
-    )
-}
-
-@Composable
 private fun ModelBadge(
     icon: ImageVector,
     label: String,
@@ -875,9 +868,10 @@ private fun ModelBadge(
 ) {
     // Badge font size 9, label badgeFontSize-1 (8), value badgeFontSize (9) medium, padding H 8 V 4, cornerRadius 6, spacing 4
     Row(
-        modifier = Modifier
-            .background(color.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier =
+            Modifier
+                .background(color.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -903,128 +897,8 @@ private fun ModelBadge(
 }
 
 @Composable
-private fun ConversationBubble(
-    speaker: String,
-    message: String,
-    isUser: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.Start,
-    ) {
-        Text(
-            text = speaker,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier =
-                Modifier
-                    .background(
-                        if (isUser) {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        } else {
-                            AppColors.primaryAccent.copy(alpha = 0.08f)
-                        },
-                        RoundedCornerShape(16.dp),
-                    )
-                    .padding(12.dp)
-                    .fillMaxWidth(),
-        )
-    }
-}
-
-/**
- * Audio Level Indicator with RECORDING badge and animated bars
- *
- * Recording indicator
- * Shows 10 animated audio level bars during recording
- */
-@Composable
-private fun AudioLevelIndicator(
-    audioLevel: Float,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Recording status badge
-        // HStack with red circle + "RECORDING" text
-        Row(
-            modifier =
-                Modifier
-                    .background(
-                        AppColors.statusRed.copy(alpha = 0.1f),
-                        RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            // Pulsing red dot
-            val infiniteTransition = rememberInfiniteTransition(label = "recording_pulse")
-            val pulseAlpha by infiniteTransition.animateFloat(
-                initialValue = 1f,
-                targetValue = 0.5f,
-                animationSpec =
-                    infiniteRepeatable(
-                        animation = tween(500),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                label = "recordingDotPulse",
-            )
-            Box(
-                modifier =
-                    Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(AppColors.statusRed.copy(alpha = pulseAlpha)),
-            )
-            Text(
-                text = "RECORDING",
-                style = AppTypography.caption2Bold,
-                color = AppColors.statusRed,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Audio level bars (10 bars)
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            repeat(10) { index ->
-                val isActive = index < (audioLevel * 10).toInt()
-                Box(
-                    modifier =
-                        Modifier
-                            .width(25.dp)
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(
-                                if (isActive) AppColors.primaryGreen
-                                else AppColors.statusGray.copy(alpha = 0.3f),
-                            )
-                            .animateContentSize(
-                                animationSpec = tween(200, easing = EaseInOut),
-                            ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun MicrophoneButton(
-    isListening: Boolean,
+    @Suppress("UnusedParameter") isListening: Boolean,
     sessionState: SessionState,
     isSpeechDetected: Boolean,
     hasPermission: Boolean,
@@ -1107,18 +981,6 @@ private fun MicrophoneButton(
                 }
             }
         }
-    }
-}
-
-private fun getStatusText(sessionState: SessionState): String {
-    return when (sessionState) {
-        SessionState.DISCONNECTED -> "Ready"
-        SessionState.CONNECTING -> "Connecting"
-        SessionState.CONNECTED -> "Ready"
-        SessionState.LISTENING -> "Listening"
-        SessionState.PROCESSING -> "Thinking"
-        SessionState.SPEAKING -> "Speaking"
-        SessionState.ERROR -> "Error"
     }
 }
 

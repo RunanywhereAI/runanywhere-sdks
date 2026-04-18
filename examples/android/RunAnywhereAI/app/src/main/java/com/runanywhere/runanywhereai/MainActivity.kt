@@ -1,25 +1,21 @@
 package com.runanywhere.runanywhereai
 
 import android.os.Bundle
-import timber.log.Timber
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Modifier
 import com.runanywhere.runanywhereai.presentation.common.InitializationErrorView
 import com.runanywhere.runanywhereai.presentation.common.InitializationLoadingView
 import com.runanywhere.runanywhereai.presentation.navigation.AppNavigation
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Main Activity for RunAnywhere AI app.

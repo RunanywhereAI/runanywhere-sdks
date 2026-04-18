@@ -8,17 +8,16 @@
 
 #include "rac_llm_llamacpp.h"
 
+#include "llamacpp_backend.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
 
-#include "llamacpp_backend.h"
-
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/events/rac_events.h"
-
 
 // =============================================================================
 // INTERNAL HANDLE STRUCTURE
@@ -141,8 +140,10 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: START handle=%p", handle);
 
     if (handle == nullptr || prompt == nullptr || out_result == nullptr) {
-        RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: NULL pointer! handle=%p, prompt=%p, out_result=%p",
-                      handle, (void*)prompt, (void*)out_result);
+        RAC_LOG_ERROR(
+            "LLM.LlamaCpp",
+            "rac_llm_llamacpp_generate: NULL pointer! handle=%p, prompt=%p, out_result=%p", handle,
+            (void*)prompt, (void*)out_result);
         return RAC_ERROR_NULL_POINTER;
     }
 
@@ -154,14 +155,16 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     }
 
     // Build request from RAC options
-    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: building request, prompt_len=%zu", strlen(prompt));
+    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: building request, prompt_len=%zu",
+                  strlen(prompt));
     runanywhere::TextGenerationRequest request;
     request.prompt = prompt;
     if (options != nullptr) {
         request.max_tokens = options->max_tokens;
         request.temperature = options->temperature;
         request.top_p = options->top_p;
-        RAC_LOG_INFO("LLM.LlamaCpp", "rac_llm_llamacpp_generate: options max_tokens=%d, temp=%.2f, top_p=%.2f",
+        RAC_LOG_INFO("LLM.LlamaCpp",
+                     "rac_llm_llamacpp_generate: options max_tokens=%d, temp=%.2f, top_p=%.2f",
                      options->max_tokens, options->temperature, options->top_p);
         if (options->system_prompt != nullptr) {
             request.system_prompt = options->system_prompt;
@@ -174,14 +177,16 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
                 }
             }
         }
-        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=%s",
-             request.max_tokens, request.temperature, request.top_p,
-             request.system_prompt.empty() ? "(none)" : "(set)");
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API",
+                     "[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+                     "top_p=%.4f, system_prompt=%s",
+                     request.max_tokens, request.temperature, request.top_p,
+                     request.system_prompt.empty() ? "(none)" : "(set)");
     } else {
-        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=(none)",
-             request.max_tokens, request.temperature, request.top_p);
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API",
+                     "[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+                     "top_p=%.4f, system_prompt=(none)",
+                     request.max_tokens, request.temperature, request.top_p);
     }
 
     // Generate using C++ class.
@@ -200,11 +205,13 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
         rac_error_set_details("Unknown C++ exception during LLM generation");
         return RAC_ERROR_INFERENCE_FAILED;
     }
-    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d", result.tokens_generated);
+    RAC_LOG_DEBUG("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generate() returned, tokens=%d",
+                  result.tokens_generated);
 
     // finish_reason is std::string; TODO: migrate to enum if TextGenerationResult gains one
     if (result.finish_reason == "error") {
-        RAC_LOG_ERROR("LLM.LlamaCpp", "rac_llm_llamacpp_generate: generation failed (e.g. llama_decode error)");
+        RAC_LOG_ERROR("LLM.LlamaCpp",
+                      "rac_llm_llamacpp_generate: generation failed (e.g. llama_decode error)");
         rac_error_set_details("Generation failed: llama_decode returned non-zero");
         return RAC_ERROR_GENERATION_FAILED;
     }
@@ -223,10 +230,10 @@ rac_result_t rac_llm_llamacpp_generate(rac_handle_t handle, const char* prompt,
     out_result->total_tokens = result.prompt_tokens + result.tokens_generated;
     out_result->time_to_first_token_ms = 0;
     out_result->total_time_ms = result.inference_time_ms;
-    out_result->tokens_per_second = result.tokens_generated > 0 && result.inference_time_ms > 0
-                                        ? (float)result.tokens_generated /
-                                              (result.inference_time_ms / 1000.0f)
-                                        : 0.0f;
+    out_result->tokens_per_second =
+        result.tokens_generated > 0 && result.inference_time_ms > 0
+            ? (float)result.tokens_generated / (result.inference_time_ms / 1000.0f)
+            : 0.0f;
 
     // Publish event
     rac_event_track("llm.generation.completed", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
@@ -264,21 +271,23 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
                 }
             }
         }
-        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=%s",
-             request.max_tokens, request.temperature, request.top_p,
-             request.system_prompt.empty() ? "(none)" : "(set)");
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API",
+                     "[PARAMS] LLM C-API (from caller options): max_tokens=%d, temperature=%.4f, "
+                     "top_p=%.4f, system_prompt=%s",
+                     request.max_tokens, request.temperature, request.top_p,
+                     request.system_prompt.empty() ? "(none)" : "(set)");
     } else {
-        RAC_LOG_INFO("LLM.LlamaCpp.C-API","[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
-             "top_p=%.4f, system_prompt=(none)",
-             request.max_tokens, request.temperature, request.top_p);
+        RAC_LOG_INFO("LLM.LlamaCpp.C-API",
+                     "[PARAMS] LLM C-API (using struct defaults): max_tokens=%d, temperature=%.4f, "
+                     "top_p=%.4f, system_prompt=(none)",
+                     request.max_tokens, request.temperature, request.top_p);
     }
 
     // Stream using C++ class (see generate for rationale on try-catch)
     bool success = false;
     try {
-        success =
-            h->text_gen->generate_stream(request, [callback, user_data](const std::string& token) -> bool {
+        success = h->text_gen->generate_stream(
+            request, [callback, user_data](const std::string& token) -> bool {
                 return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
             });
     } catch (const std::exception& e) {
@@ -296,11 +305,11 @@ rac_result_t rac_llm_llamacpp_generate_stream(rac_handle_t handle, const char* p
     return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
 }
 
-rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
-                                                          const rac_llm_options_t* options,
-                                                          rac_llm_llamacpp_stream_callback_fn callback,
-                                                          void* user_data,
-                                                          rac_benchmark_timing_t* timing_out) {
+rac_result_t
+rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+                                             const rac_llm_options_t* options,
+                                             rac_llm_llamacpp_stream_callback_fn callback,
+                                             void* user_data, rac_benchmark_timing_t* timing_out) {
     if (handle == nullptr || prompt == nullptr || callback == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -337,8 +346,7 @@ rac_result_t rac_llm_llamacpp_generate_stream_with_timing(rac_handle_t handle, c
             [callback, user_data](const std::string& token) -> bool {
                 return callback(token.c_str(), RAC_FALSE, user_data) == RAC_TRUE;
             },
-            &prompt_tokens,
-            timing_out);
+            &prompt_tokens, timing_out);
     } catch (const std::exception& e) {
         rac_error_set_details(e.what());
         return RAC_ERROR_INFERENCE_FAILED;
@@ -401,9 +409,8 @@ rac_result_t rac_llm_llamacpp_get_model_info(rac_handle_t handle, char** out_jso
 // LORA ADAPTER API IMPLEMENTATION
 // =============================================================================
 
-rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
-                                         const char* adapter_path,
-                                         float scale) {
+rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle, const char* adapter_path,
+                                        float scale) {
     if (handle == nullptr || adapter_path == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -422,8 +429,7 @@ rac_result_t rac_llm_llamacpp_load_lora(rac_handle_t handle,
     return RAC_SUCCESS;
 }
 
-rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle,
-                                           const char* adapter_path) {
+rac_result_t rac_llm_llamacpp_remove_lora(rac_handle_t handle, const char* adapter_path) {
     if (handle == nullptr || adapter_path == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
@@ -514,10 +520,9 @@ rac_result_t rac_llm_llamacpp_append_context(rac_handle_t handle, const char* te
     }
 }
 
-
 rac_result_t rac_llm_llamacpp_generate_from_context(rac_handle_t handle, const char* query,
-                                                     const rac_llm_options_t* options,
-                                                     rac_llm_result_t* out_result) {
+                                                    const rac_llm_options_t* options,
+                                                    rac_llm_result_t* out_result) {
     if (handle == nullptr || query == nullptr || out_result == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

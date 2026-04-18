@@ -124,11 +124,11 @@ typedef void (*rac_extraction_progress_fn)(int32_t files_extracted, int32_t tota
  *  - RAC_ERROR_NULL_POINTER: archive_path or destination_dir is NULL
  */
 RAC_API rac_result_t rac_extract_archive_native(const char* archive_path,
-                                                 const char* destination_dir,
-                                                 const rac_extraction_options_t* options,
-                                                 rac_extraction_progress_fn progress_callback,
-                                                 void* user_data,
-                                                 rac_extraction_result_t* out_result);
+                                                const char* destination_dir,
+                                                const rac_extraction_options_t* options,
+                                                rac_extraction_progress_fn progress_callback,
+                                                void* user_data,
+                                                rac_extraction_result_t* out_result);
 
 /**
  * @brief Detect archive type from file magic bytes.

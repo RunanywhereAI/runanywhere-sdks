@@ -233,52 +233,52 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
 // struct construction, and vsnprintf formatting for filtered messages.
 // rac_logger_get_min_level() is an atomic read (no mutex).
 
-#define RAC_LOG_TRACE(category, ...)                                    \
-    do {                                                                \
-        if (RAC_LOG_TRACE >= rac_logger_get_min_level()) {              \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();             \
+#define RAC_LOG_TRACE(category, ...)                                       \
+    do {                                                                   \
+        if (RAC_LOG_TRACE >= rac_logger_get_min_level()) {                 \
+            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
             rac_logger_logf(RAC_LOG_TRACE, category, &_meta, __VA_ARGS__); \
-        }                                                               \
+        }                                                                  \
     } while (0)
 
-#define RAC_LOG_DEBUG(category, ...)                                    \
-    do {                                                                \
-        if (RAC_LOG_DEBUG >= rac_logger_get_min_level()) {              \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();             \
+#define RAC_LOG_DEBUG(category, ...)                                       \
+    do {                                                                   \
+        if (RAC_LOG_DEBUG >= rac_logger_get_min_level()) {                 \
+            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
             rac_logger_logf(RAC_LOG_DEBUG, category, &_meta, __VA_ARGS__); \
-        }                                                               \
+        }                                                                  \
     } while (0)
 
-#define RAC_LOG_INFO(category, ...)                                    \
-    do {                                                               \
-        if (RAC_LOG_INFO >= rac_logger_get_min_level()) {              \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();            \
-            rac_logger_logf(RAC_LOG_INFO, category, &_meta, __VA_ARGS__); \
-        }                                                              \
-    } while (0)
-
-#define RAC_LOG_WARNING(category, ...)                                    \
+#define RAC_LOG_INFO(category, ...)                                       \
     do {                                                                  \
-        if (RAC_LOG_WARNING >= rac_logger_get_min_level()) {              \
+        if (RAC_LOG_INFO >= rac_logger_get_min_level()) {                 \
             rac_log_metadata_t _meta = RAC_LOG_META_HERE();               \
-            rac_logger_logf(RAC_LOG_WARNING, category, &_meta, __VA_ARGS__); \
+            rac_logger_logf(RAC_LOG_INFO, category, &_meta, __VA_ARGS__); \
         }                                                                 \
     } while (0)
 
-#define RAC_LOG_ERROR(category, ...)                                    \
-    do {                                                                \
-        if (RAC_LOG_ERROR >= rac_logger_get_min_level()) {              \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();             \
-            rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__); \
-        }                                                               \
+#define RAC_LOG_WARNING(category, ...)                                       \
+    do {                                                                     \
+        if (RAC_LOG_WARNING >= rac_logger_get_min_level()) {                 \
+            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                  \
+            rac_logger_logf(RAC_LOG_WARNING, category, &_meta, __VA_ARGS__); \
+        }                                                                    \
     } while (0)
 
-#define RAC_LOG_FATAL(category, ...)                                    \
-    do {                                                                \
-        if (RAC_LOG_FATAL >= rac_logger_get_min_level()) {              \
-            rac_log_metadata_t _meta = RAC_LOG_META_HERE();             \
+#define RAC_LOG_ERROR(category, ...)                                       \
+    do {                                                                   \
+        if (RAC_LOG_ERROR >= rac_logger_get_min_level()) {                 \
+            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
+            rac_logger_logf(RAC_LOG_ERROR, category, &_meta, __VA_ARGS__); \
+        }                                                                  \
+    } while (0)
+
+#define RAC_LOG_FATAL(category, ...)                                       \
+    do {                                                                   \
+        if (RAC_LOG_FATAL >= rac_logger_get_min_level()) {                 \
+            rac_log_metadata_t _meta = RAC_LOG_META_HERE();                \
             rac_logger_logf(RAC_LOG_FATAL, category, &_meta, __VA_ARGS__); \
-        }                                                               \
+        }                                                                  \
     } while (0)
 
 // --- Error logging with code ---
@@ -366,7 +366,8 @@ class Logger {
     explicit Logger(const std::string& category) : category_(category) {}
 
     void trace(const char* format, ...) const {
-        if (RAC_LOG_TRACE < rac_logger_get_min_level()) return;
+        if (RAC_LOG_TRACE < rac_logger_get_min_level())
+            return;
         va_list args;
         va_start(args, format);
         rac_logger_logv(RAC_LOG_TRACE, category_.c_str(), nullptr, format, args);
@@ -374,7 +375,8 @@ class Logger {
     }
 
     void debug(const char* format, ...) const {
-        if (RAC_LOG_DEBUG < rac_logger_get_min_level()) return;
+        if (RAC_LOG_DEBUG < rac_logger_get_min_level())
+            return;
         va_list args;
         va_start(args, format);
         rac_logger_logv(RAC_LOG_DEBUG, category_.c_str(), nullptr, format, args);
@@ -382,7 +384,8 @@ class Logger {
     }
 
     void info(const char* format, ...) const {
-        if (RAC_LOG_INFO < rac_logger_get_min_level()) return;
+        if (RAC_LOG_INFO < rac_logger_get_min_level())
+            return;
         va_list args;
         va_start(args, format);
         rac_logger_logv(RAC_LOG_INFO, category_.c_str(), nullptr, format, args);
@@ -390,7 +393,8 @@ class Logger {
     }
 
     void warning(const char* format, ...) const {
-        if (RAC_LOG_WARNING < rac_logger_get_min_level()) return;
+        if (RAC_LOG_WARNING < rac_logger_get_min_level())
+            return;
         va_list args;
         va_start(args, format);
         rac_logger_logv(RAC_LOG_WARNING, category_.c_str(), nullptr, format, args);
@@ -398,7 +402,8 @@ class Logger {
     }
 
     void error(const char* format, ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level()) return;
+        if (RAC_LOG_ERROR < rac_logger_get_min_level())
+            return;
         va_list args;
         va_start(args, format);
         rac_logger_logv(RAC_LOG_ERROR, category_.c_str(), nullptr, format, args);
@@ -406,7 +411,8 @@ class Logger {
     }
 
     void error(int32_t code, const char* format, ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level()) return;
+        if (RAC_LOG_ERROR < rac_logger_get_min_level())
+            return;
         rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
         meta.error_code = code;
 
@@ -426,7 +432,8 @@ class Logger {
 
     // Log with model context
     void modelInfo(const char* model_id, const char* framework, const char* format, ...) const {
-        if (RAC_LOG_INFO < rac_logger_get_min_level()) return;
+        if (RAC_LOG_INFO < rac_logger_get_min_level())
+            return;
         rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
         meta.model_id = model_id;
         meta.framework = framework;
@@ -439,7 +446,8 @@ class Logger {
 
     void modelError(const char* model_id, const char* framework, int32_t code, const char* format,
                     ...) const {
-        if (RAC_LOG_ERROR < rac_logger_get_min_level()) return;
+        if (RAC_LOG_ERROR < rac_logger_get_min_level())
+            return;
         rac_log_metadata_t meta = RAC_LOG_METADATA_EMPTY;
         meta.model_id = model_id;
         meta.framework = framework;

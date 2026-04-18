@@ -70,7 +70,8 @@ final class VLMViewModel: NSObject {
         isModelLoaded = await RunAnywhere.isVLMModelLoaded
     }
 
-    @objc private func vlmModelLoaded(_ notification: Notification) {
+    @objc
+    private func vlmModelLoaded(_ notification: Notification) {
         Task {
             if let model = notification.object as? ModelInfo {
                 isModelLoaded = true
@@ -204,31 +205,7 @@ final class VLMViewModel: NSObject {
             }
             let width = cgImage.width
             let height = cgImage.height
-            let rgbaBytesPerRow = 4 * width
-            let rgbaTotalBytes = rgbaBytesPerRow * height
-            var rgbaData = Data(count: rgbaTotalBytes)
-            rgbaData.withUnsafeMutableBytes { ptr in
-                guard let context = CGContext(
-                    data: ptr.baseAddress,
-                    width: width,
-                    height: height,
-                    bitsPerComponent: 8,
-                    bytesPerRow: rgbaBytesPerRow,
-                    space: CGColorSpaceCreateDeviceRGB(),
-                    bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
-                ) else { return }
-                context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
-            }
-            // RGBX (4 bytes/pixel) → RGB (3 bytes/pixel): strip the padding byte
-            var rgbData = Data(capacity: width * height * 3)
-            rgbaData.withUnsafeBytes { buffer in
-                let pixels = buffer.bindMemory(to: UInt8.self)
-                for i in stride(from: 0, to: rgbaTotalBytes, by: 4) {
-                    rgbData.append(pixels[i])     // R
-                    rgbData.append(pixels[i + 1]) // G
-                    rgbData.append(pixels[i + 2]) // B
-                }
-            }
+            let rgbData = Self.rgbData(from: cgImage, width: width, height: height)
             let image = VLMImage(rgbPixels: rgbData, width: width, height: height)
             let result = try await RunAnywhere.processImageStream(
                 image,
@@ -244,6 +221,36 @@ final class VLMViewModel: NSObject {
         }
 
         isProcessing = false
+    }
+
+    /// Convert a `CGImage` to raw RGB (3 bytes/pixel) data — strips the padding byte
+    /// from the RGBX layout produced by `CGContext` using `noneSkipLast`.
+    private static func rgbData(from cgImage: CGImage, width: Int, height: Int) -> Data {
+        let rgbaBytesPerRow = 4 * width
+        let rgbaTotalBytes = rgbaBytesPerRow * height
+        var rgbaData = Data(count: rgbaTotalBytes)
+        rgbaData.withUnsafeMutableBytes { ptr in
+            guard let context = CGContext(
+                data: ptr.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: rgbaBytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return }
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        }
+        var rgbData = Data(capacity: width * height * 3)
+        rgbaData.withUnsafeBytes { buffer in
+            let pixels = buffer.bindMemory(to: UInt8.self)
+            for i in stride(from: 0, to: rgbaTotalBytes, by: 4) {
+                rgbData.append(pixels[i])     // R
+                rgbData.append(pixels[i + 1]) // G
+                rgbData.append(pixels[i + 2]) // B
+            }
+        }
+        return rgbData
     }
     #endif
 

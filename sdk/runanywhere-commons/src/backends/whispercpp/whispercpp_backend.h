@@ -14,11 +14,10 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 namespace runanywhere {
 
@@ -33,13 +32,7 @@ enum class DeviceType {
     CUDA = 4,
 };
 
-enum class STTModelType {
-    WHISPER,
-    ZIPFORMER,
-    TRANSDUCER,
-    PARAFORMER,
-    CUSTOM
-};
+enum class STTModelType { WHISPER, ZIPFORMER, TRANSDUCER, PARAFORMER, CUSTOM };
 
 // =============================================================================
 // STT RESULT TYPES
@@ -150,7 +143,8 @@ class WhisperCppSTT {
 
     bool supports_streaming() const;
     std::string create_stream(const nlohmann::json& config = {});
-    bool feed_audio(const std::string& stream_id, const std::vector<float>& samples, int sample_rate);
+    bool feed_audio(const std::string& stream_id, const std::vector<float>& samples,
+                    int sample_rate);
     bool is_stream_ready(const std::string& stream_id);
     STTResult decode(const std::string& stream_id);
     bool is_endpoint(const std::string& stream_id);

@@ -6,15 +6,17 @@
  */
 
 #include "openai_handler.h"
+
 #include "json_utils.h"
 #include "openai_translation.h"
+
+#include <chrono>
+#include <random>
+#include <sstream>
+
 #include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
-
-#include <chrono>
-#include <sstream>
-#include <random>
 
 namespace rac {
 namespace server {
@@ -35,17 +37,14 @@ std::string generateId(const std::string& prefix) {
 // Get current Unix timestamp
 int64_t currentTimestamp() {
     return std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 OpenAIHandler::OpenAIHandler(rac_handle_t llmHandle, const std::string& modelId)
-    : llmHandle_(llmHandle)
-    , modelId_(modelId)
-{
-}
+    : llmHandle_(llmHandle), modelId_(modelId) {}
 
 void OpenAIHandler::handleModels(const httplib::Request& /*req*/, httplib::Response& res) {
     rac_openai_models_response_t response = {};
@@ -116,9 +115,8 @@ void OpenAIHandler::handleHealth(const httplib::Request& /*req*/, httplib::Respo
     res.status = 200;
 }
 
-void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
-                                         httplib::Response& res,
-                                         const nlohmann::json& requestJson) {
+void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/, httplib::Response& res,
+                                        const nlohmann::json& requestJson) {
     RAC_LOG_INFO("Server", "processNonStreaming: START");
 
     // Get messages and tools from request
@@ -145,7 +143,8 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
                  options.max_tokens, options.temperature);
 
     // Generate response using LlamaCPP backend directly
-    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_llamacpp_generate with handle=%p", (void*)llmHandle_);
+    RAC_LOG_INFO("Server", "processNonStreaming: calling rac_llm_llamacpp_generate with handle=%p",
+                 (void*)llmHandle_);
     rac_llm_result_t result = {};
     rac_result_t rc = rac_llm_llamacpp_generate(llmHandle_, prompt.c_str(), &options, &result);
     RAC_LOG_INFO("Server", "processNonStreaming: rac_llm_llamacpp_generate returned rc=%d", rc);
@@ -198,7 +197,7 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
         openaiToolCall.function_name = toolName.c_str();
         openaiToolCall.function_arguments = toolArgs.c_str();
 
-        message.content = toolCall.clean_text; // Text without tool call tags
+        message.content = toolCall.clean_text;  // Text without tool call tags
         message.tool_calls = &openaiToolCall;
         message.num_tool_calls = 1;
     } else {
@@ -231,9 +230,8 @@ void OpenAIHandler::processNonStreaming(const httplib::Request& /*req*/,
     res.status = 200;
 }
 
-void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
-                                      httplib::Response& res,
-                                      const nlohmann::json& requestJson) {
+void OpenAIHandler::processStreaming(const httplib::Request& /*req*/, httplib::Response& res,
+                                     const nlohmann::json& requestJson) {
     // Get messages and tools from request
     const auto& messages = requestJson["messages"];
     nlohmann::json tools = requestJson.value("tools", nlohmann::json::array());
@@ -256,8 +254,8 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
 
     // Start streaming via content provider
     res.set_content_provider(
-        "text/event-stream",
-        [this, prompt, options, requestId, created](size_t /*offset*/, httplib::DataSink& sink) mutable {
+        "text/event-stream", [this, prompt, options, requestId,
+                              created](size_t /*offset*/, httplib::DataSink& sink) mutable {
             // First chunk: send role
             {
                 rac_openai_stream_chunk_t chunk = {};
@@ -291,9 +289,10 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
                 int32_t tokenCount;
             };
 
-            StreamCtx ctx = { &sink, &requestId, &modelId_, created, 0 };
+            StreamCtx ctx = {&sink, &requestId, &modelId_, created, 0};
 
-            auto streamCallback = [](const char* token, rac_bool_t is_final, void* user_data) -> rac_bool_t {
+            auto streamCallback = [](const char* token, rac_bool_t is_final,
+                                     void* user_data) -> rac_bool_t {
                 auto* ctx = static_cast<StreamCtx*>(user_data);
 
                 if (is_final) {
@@ -346,8 +345,8 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
                 return RAC_TRUE;  // Continue generating
             };
 
-            rac_result_t rc = rac_llm_llamacpp_generate_stream(
-                llmHandle_, prompt.c_str(), &options, streamCallback, &ctx);
+            rac_result_t rc = rac_llm_llamacpp_generate_stream(llmHandle_, prompt.c_str(), &options,
+                                                               streamCallback, &ctx);
 
             if (RAC_FAILED(rc)) {
                 RAC_LOG_ERROR("Server", "Streaming generation failed: %d", rc);
@@ -361,8 +360,7 @@ void OpenAIHandler::processStreaming(const httplib::Request& /*req*/,
 
             sink.done();
             return true;
-        }
-    );
+        });
 
     res.status = 200;
 }
@@ -385,12 +383,12 @@ rac_llm_options_t OpenAIHandler::parseOptions(const nlohmann::json& requestJson)
     return options;
 }
 
-void OpenAIHandler::sendError(httplib::Response& res, int statusCode,
-                               const std::string& message, const std::string& type) {
+void OpenAIHandler::sendError(httplib::Response& res, int statusCode, const std::string& message,
+                              const std::string& type) {
     auto errorJson = json::createErrorResponse(message, type, statusCode);
     res.set_content(errorJson.dump(), "application/json");
     res.status = statusCode;
 }
 
-} // namespace server
-} // namespace rac
+}  // namespace server
+}  // namespace rac

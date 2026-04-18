@@ -6,8 +6,19 @@
 /// Matches React Native SDK network layer structure.
 library network;
 
+// API client
+export 'api_client.dart' show APIClient, AuthTokenProvider;
+
+// API endpoints
+export 'api_endpoint.dart'
+    show APIEndpoint, APIEndpointPath, APIEndpointEnvironment;
+
 // Core HTTP service
 export 'http_service.dart' show HTTPService;
+
+// Models
+export 'models/auth/authentication_response.dart'
+    show AuthenticationResponse, RefreshTokenResponse;
 
 // Configuration utilities
 export 'network_configuration.dart'
@@ -22,20 +33,9 @@ export 'network_configuration.dart'
         isProduction,
         isStaging;
 
-// API endpoints
-export 'api_endpoint.dart'
-    show APIEndpoint, APIEndpointPath, APIEndpointEnvironment;
-
 // Network service protocol
 export 'network_service.dart' show NetworkService;
-
-// API client
-export 'api_client.dart' show APIClient, AuthTokenProvider;
 
 // Telemetry
 export 'telemetry_service.dart'
     show TelemetryService, TelemetryCategory, TelemetryEvent;
-
-// Models
-export 'models/auth/authentication_response.dart'
-    show AuthenticationResponse, RefreshTokenResponse;

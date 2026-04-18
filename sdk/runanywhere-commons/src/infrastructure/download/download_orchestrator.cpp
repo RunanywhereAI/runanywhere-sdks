@@ -22,6 +22,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+
 #include "rac/core/rac_platform_compat.h"
 
 #ifdef _WIN32
@@ -47,15 +48,18 @@ static const char* LOG_TAG = "DownloadOrchestrator";
  * Handles compound extensions like .tar.gz, .tar.bz2, .tar.xz.
  */
 static std::string get_file_extension(const char* url) {
-    if (!url) return "";
+    if (!url)
+        return "";
 
     std::string path(url);
 
     // Strip query string and fragment
     auto query_pos = path.find('?');
-    if (query_pos != std::string::npos) path = path.substr(0, query_pos);
+    if (query_pos != std::string::npos)
+        path = path.substr(0, query_pos);
     auto frag_pos = path.find('#');
-    if (frag_pos != std::string::npos) path = path.substr(0, frag_pos);
+    if (frag_pos != std::string::npos)
+        path = path.substr(0, frag_pos);
 
     // Find the last path component
     auto slash_pos = path.rfind('/');
@@ -64,14 +68,21 @@ static std::string get_file_extension(const char* url) {
     // Check for compound extensions first
     if (filename.length() > 7) {
         std::string lower = filename;
-        for (auto& c : lower) c = static_cast<char>(tolower(c));
+        for (auto& c : lower)
+            c = static_cast<char>(tolower(c));
 
-        if (lower.rfind(".tar.gz") == lower.length() - 7) return "tar.gz";
-        if (lower.rfind(".tar.bz2") == lower.length() - 8) return "tar.bz2";
-        if (lower.rfind(".tar.xz") == lower.length() - 7) return "tar.xz";
-        if (lower.rfind(".tgz") == lower.length() - 4) return "tar.gz";
-        if (lower.rfind(".tbz2") == lower.length() - 5) return "tar.bz2";
-        if (lower.rfind(".txz") == lower.length() - 4) return "tar.xz";
+        if (lower.rfind(".tar.gz") == lower.length() - 7)
+            return "tar.gz";
+        if (lower.rfind(".tar.bz2") == lower.length() - 8)
+            return "tar.bz2";
+        if (lower.rfind(".tar.xz") == lower.length() - 7)
+            return "tar.xz";
+        if (lower.rfind(".tgz") == lower.length() - 4)
+            return "tar.gz";
+        if (lower.rfind(".tbz2") == lower.length() - 5)
+            return "tar.bz2";
+        if (lower.rfind(".txz") == lower.length() - 4)
+            return "tar.xz";
     }
 
     // Simple extension
@@ -87,18 +98,21 @@ static std::string get_file_extension(const char* url) {
  * Get the filename (without extension) from a URL.
  */
 static std::string get_filename_stem(const char* url) {
-    if (!url) return "";
+    if (!url)
+        return "";
 
     std::string path(url);
     auto query_pos = path.find('?');
-    if (query_pos != std::string::npos) path = path.substr(0, query_pos);
+    if (query_pos != std::string::npos)
+        path = path.substr(0, query_pos);
 
     auto slash_pos = path.rfind('/');
     std::string filename = (slash_pos != std::string::npos) ? path.substr(slash_pos + 1) : path;
 
     // Strip compound extensions
     std::string lower = filename;
-    for (auto& c : lower) c = static_cast<char>(tolower(c));
+    for (auto& c : lower)
+        c = static_cast<char>(tolower(c));
 
     const char* compound_exts[] = {".tar.gz", ".tar.bz2", ".tar.xz", ".tgz", ".tbz2", ".txz"};
     for (const auto& ext : compound_exts) {
@@ -121,10 +135,12 @@ static std::string get_filename_stem(const char* url) {
  * Check if a file extension is a known model extension.
  */
 static bool is_model_extension(const char* ext) {
-    if (!ext) return false;
+    if (!ext)
+        return false;
     // Compare case-insensitively
     std::string lower(ext);
-    for (auto& c : lower) c = static_cast<char>(tolower(c));
+    for (auto& c : lower)
+        c = static_cast<char>(tolower(c));
 
     return lower == "gguf" || lower == "onnx" || lower == "ort" || lower == "bin" ||
            lower == "mlmodelc" || lower == "mlpackage";
@@ -142,7 +158,8 @@ static bool dir_exists(const char* path) {
  * Create directories recursively (like mkdir -p).
  */
 static bool mkdir_p(const char* path) {
-    if (dir_exists(path)) return true;
+    if (dir_exists(path))
+        return true;
 
     std::string s(path);
     std::string::size_type pos = 0;
@@ -191,10 +208,12 @@ static void delete_file(const char* path) {
  */
 static bool find_single_model_file(const char* directory, int depth, int max_depth, char* out_path,
                                    size_t path_size) {
-    if (depth >= max_depth) return false;
+    if (depth >= max_depth)
+        return false;
 
     DIR* dir = opendir(directory);
-    if (!dir) return false;
+    if (!dir)
+        return false;
 
     struct dirent* entry;
     std::string found_model;
@@ -202,14 +221,17 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
 
     while ((entry = readdir(dir)) != nullptr) {
         // Skip . and ..
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
         // Skip hidden files and macOS resource forks
-        if (entry->d_name[0] == '.') continue;
+        if (entry->d_name[0] == '.')
+            continue;
 
         std::string full_path = std::string(directory) + "/" + entry->d_name;
 
         struct stat st;
-        if (stat(full_path.c_str(), &st) != 0) continue;
+        if (stat(full_path.c_str(), &st) != 0)
+            continue;
 
         if (S_ISREG(st.st_mode)) {
             // Check if this is a model file
@@ -248,16 +270,20 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
  */
 static std::string find_nested_directory(const char* extracted_dir) {
     DIR* dir = opendir(extracted_dir);
-    if (!dir) return extracted_dir;
+    if (!dir)
+        return extracted_dir;
 
     struct dirent* entry;
     std::vector<std::string> visible_dirs;
 
     while ((entry = readdir(dir)) != nullptr) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
         // Skip hidden files and macOS resource forks
-        if (entry->d_name[0] == '.') continue;
-        if (strncmp(entry->d_name, "._", 2) == 0) continue;
+        if (entry->d_name[0] == '.')
+            continue;
+        if (strncmp(entry->d_name, "._", 2) == 0)
+            continue;
 
         std::string full_path = std::string(extracted_dir) + "/" + entry->d_name;
 
@@ -299,8 +325,8 @@ struct orchestrate_context {
     rac_archive_structure_t archive_structure;
 
     // Paths
-    std::string download_dest_path;    // Where HTTP downloads to
-    std::string model_folder_path;     // Final model folder
+    std::string download_dest_path;  // Where HTTP downloads to
+    std::string model_folder_path;   // Final model folder
     bool needs_extraction;
 
     // Task tracking
@@ -330,7 +356,8 @@ struct shared_ctx_holder {
 static void orchestrate_http_progress(int64_t bytes_downloaded, int64_t total_bytes,
                                       void* callback_user_data) {
     auto* holder = static_cast<shared_ctx_holder*>(callback_user_data);
-    if (!holder || !holder->ctx || !holder->ctx->dm_handle) return;
+    if (!holder || !holder->ctx || !holder->ctx->dm_handle)
+        return;
 
     auto& ctx = holder->ctx;
     rac_download_manager_update_progress(ctx->dm_handle, ctx->task_id.c_str(), bytes_downloaded,
@@ -371,7 +398,7 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
         // Mark download as complete (transitions to EXTRACTING state)
         rac_download_manager_mark_complete(ctx->dm_handle, ctx->task_id.c_str(),
                                            downloaded_path ? downloaded_path
-                                                          : ctx->download_dest_path.c_str());
+                                                           : ctx->download_dest_path.c_str());
 
         RAC_LOG_INFO(LOG_TAG, "Starting extraction for model: %s", ctx->model_id.c_str());
 
@@ -379,13 +406,13 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
         rac_extraction_result_t extraction_result = {};
         rac_result_t extract_result = rac_extract_archive_native(
             downloaded_path ? downloaded_path : ctx->download_dest_path.c_str(),
-            ctx->model_folder_path.c_str(), nullptr /* default options */, nullptr /* no progress */,
-            nullptr /* no user data */, &extraction_result);
+            ctx->model_folder_path.c_str(), nullptr /* default options */,
+            nullptr /* no progress */, nullptr /* no user data */, &extraction_result);
 
         if (extract_result != RAC_SUCCESS) {
             RAC_LOG_ERROR(LOG_TAG, "Extraction failed for model: %s", ctx->model_id.c_str());
-            rac_download_manager_mark_extraction_failed(ctx->dm_handle, ctx->task_id.c_str(),
-                                                        extract_result, "Archive extraction failed");
+            rac_download_manager_mark_extraction_failed(
+                ctx->dm_handle, ctx->task_id.c_str(), extract_result, "Archive extraction failed");
 
             if (ctx->user_complete_callback) {
                 ctx->user_complete_callback(ctx->task_id.c_str(), extract_result, nullptr,
@@ -411,10 +438,9 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
         } else {
             // Fallback to model folder itself
             final_path = ctx->model_folder_path;
-            RAC_LOG_WARNING(
-                LOG_TAG,
-                "Could not find specific model file after extraction, using folder: %s",
-                final_path.c_str());
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Could not find specific model file after extraction, using folder: %s",
+                            final_path.c_str());
         }
 
         // Cleanup temp archive file
@@ -425,8 +451,7 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
                                                       final_path.c_str());
     } else {
         // No extraction needed — file downloaded directly to model folder
-        final_path =
-            downloaded_path ? std::string(downloaded_path) : ctx->download_dest_path;
+        final_path = downloaded_path ? std::string(downloaded_path) : ctx->download_dest_path;
 
         rac_download_manager_mark_complete(ctx->dm_handle, ctx->task_id.c_str(),
                                            final_path.c_str());
@@ -446,14 +471,13 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
 // PUBLIC API — DOWNLOAD ORCHESTRATION
 // =============================================================================
 
-rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle,
-                                       const char* model_id, const char* download_url,
-                                       rac_inference_framework_t framework,
-                                       rac_model_format_t format,
-                                       rac_archive_structure_t archive_structure,
-                                       rac_download_progress_callback_fn progress_callback,
-                                       rac_download_complete_callback_fn complete_callback,
-                                       void* user_data, char** out_task_id) {
+rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle, const char* model_id,
+                                      const char* download_url, rac_inference_framework_t framework,
+                                      rac_model_format_t format,
+                                      rac_archive_structure_t archive_structure,
+                                      rac_download_progress_callback_fn progress_callback,
+                                      rac_download_complete_callback_fn complete_callback,
+                                      void* user_data, char** out_task_id) {
     if (!dm_handle || !model_id || !download_url || !out_task_id) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -489,26 +513,26 @@ rac_result_t rac_download_orchestrate(rac_download_manager_handle_t dm_handle,
 
         std::string ext = get_file_extension(download_url);
         std::string stem = get_filename_stem(download_url);
-        if (stem.empty()) stem = model_id;
+        if (stem.empty())
+            stem = model_id;
 
-        download_dest =
-            std::string(downloads_dir) + "/" + stem + (ext.empty() ? "" : "." + ext);
+        download_dest = std::string(downloads_dir) + "/" + stem + (ext.empty() ? "" : "." + ext);
     } else {
         // Download directly to model folder
         std::string ext = get_file_extension(download_url);
         std::string stem = get_filename_stem(download_url);
-        if (stem.empty()) stem = model_id;
+        if (stem.empty())
+            stem = model_id;
 
-        download_dest =
-            std::string(model_folder) + "/" + stem + (ext.empty() ? "" : "." + ext);
+        download_dest = std::string(model_folder) + "/" + stem + (ext.empty() ? "" : "." + ext);
     }
 
     // 4. Register with download manager (creates task tracking state)
     char* task_id = nullptr;
-    rac_result_t start_result = rac_download_manager_start(
-        dm_handle, model_id, download_url, download_dest.c_str(),
-        needs_extraction ? RAC_TRUE : RAC_FALSE, progress_callback, nullptr /* we handle complete */,
-        user_data, &task_id);
+    rac_result_t start_result =
+        rac_download_manager_start(dm_handle, model_id, download_url, download_dest.c_str(),
+                                   needs_extraction ? RAC_TRUE : RAC_FALSE, progress_callback,
+                                   nullptr /* we handle complete */, user_data, &task_id);
 
     if (start_result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_TAG, "Failed to register download task for: %s", model_id);
@@ -582,8 +606,8 @@ rac_result_t rac_download_orchestrate_multi(
     mkdir_p(model_folder);
 
     // Register a single task for the multi-file download
-    std::string composite_url = std::string(base_download_url) + " [" +
-                                std::to_string(file_count) + " files]";
+    std::string composite_url =
+        std::string(base_download_url) + " [" + std::to_string(file_count) + " files]";
     char* task_id = nullptr;
     rac_result_t start_result = rac_download_manager_start(
         dm_handle, model_id, composite_url.c_str(), model_folder, RAC_FALSE /* no extraction */,
@@ -616,7 +640,8 @@ rac_result_t rac_download_orchestrate_multi(
 
         // Build full download URL
         std::string file_url = std::string(base_download_url);
-        if (!file_url.empty() && file_url.back() != '/') file_url += "/";
+        if (!file_url.empty() && file_url.back() != '/')
+            file_url += "/";
         file_url += file.relative_path;
 
         // Build destination path
@@ -634,8 +659,8 @@ rac_result_t rac_download_orchestrate_multi(
         }
 
         // Update download manager with file-level progress
-        int64_t fake_downloaded = static_cast<int64_t>(
-            static_cast<double>(i) / static_cast<double>(file_count) * 100);
+        int64_t fake_downloaded =
+            static_cast<int64_t>(static_cast<double>(i) / static_cast<double>(file_count) * 100);
         rac_download_manager_update_progress(dm_handle, task_id, fake_downloaded, 100);
 
         // Increment pending count *before* launching so the barrier is always ahead of callbacks
@@ -648,7 +673,8 @@ rac_result_t rac_download_orchestrate_multi(
 
         auto file_complete = [](rac_result_t result, const char* /*path*/, void* ud) {
             auto* holder = static_cast<multi_file_holder*>(ud);
-            if (!holder) return;
+            if (!holder)
+                return;
 
             auto b = holder->barrier;
             bool required = holder->is_required;
@@ -663,11 +689,12 @@ rac_result_t rac_download_orchestrate_multi(
         };
 
         char* http_task_id = nullptr;
-        rac_result_t http_result = rac_http_download(
-            file_url.c_str(), dest_path.c_str(), nullptr /* no per-file progress */, file_complete,
-            file_holder, &http_task_id);
+        rac_result_t http_result = rac_http_download(file_url.c_str(), dest_path.c_str(),
+                                                     nullptr /* no per-file progress */,
+                                                     file_complete, file_holder, &http_task_id);
 
-        if (http_task_id) rac_free(http_task_id);
+        if (http_task_id)
+            rac_free(http_task_id);
 
         if (http_result != RAC_SUCCESS) {
             // Download never started — callback won't fire, so clean up manually
@@ -719,10 +746,10 @@ rac_result_t rac_download_orchestrate_multi(
 // =============================================================================
 
 rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
-                                                    rac_archive_structure_t structure,
-                                                    rac_inference_framework_t framework,
-                                                    rac_model_format_t format, char* out_path,
-                                                    size_t path_size) {
+                                                  rac_archive_structure_t structure,
+                                                  rac_inference_framework_t framework,
+                                                  rac_model_format_t format, char* out_path,
+                                                  size_t path_size) {
     if (!extracted_dir || !out_path || path_size == 0) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -774,10 +801,9 @@ rac_result_t rac_find_model_path_after_extraction(const char* extracted_dir,
 // =============================================================================
 
 rac_result_t rac_download_compute_destination(const char* model_id, const char* download_url,
-                                               rac_inference_framework_t framework,
-                                               rac_model_format_t format, char* out_path,
-                                               size_t path_size,
-                                               rac_bool_t* out_needs_extraction) {
+                                              rac_inference_framework_t framework,
+                                              rac_model_format_t format, char* out_path,
+                                              size_t path_size, rac_bool_t* out_needs_extraction) {
     if (!model_id || !download_url || !out_path || path_size == 0 || !out_needs_extraction) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -792,24 +818,28 @@ rac_result_t rac_download_compute_destination(const char* model_id, const char* 
         char downloads_dir[4096];
         rac_result_t result =
             rac_model_paths_get_downloads_directory(downloads_dir, sizeof(downloads_dir));
-        if (result != RAC_SUCCESS) return result;
+        if (result != RAC_SUCCESS)
+            return result;
 
         std::string ext = get_file_extension(download_url);
         std::string stem = get_filename_stem(download_url);
-        if (stem.empty()) stem = model_id;
+        if (stem.empty())
+            stem = model_id;
 
         snprintf(out_path, path_size, "%s/%s%s%s", downloads_dir, stem.c_str(),
                  ext.empty() ? "" : ".", ext.empty() ? "" : ext.c_str());
     } else {
         // Direct to model folder
         char model_folder[4096];
-        rac_result_t result =
-            rac_model_paths_get_model_folder(model_id, framework, model_folder, sizeof(model_folder));
-        if (result != RAC_SUCCESS) return result;
+        rac_result_t result = rac_model_paths_get_model_folder(model_id, framework, model_folder,
+                                                               sizeof(model_folder));
+        if (result != RAC_SUCCESS)
+            return result;
 
         std::string ext = get_file_extension(download_url);
         std::string stem = get_filename_stem(download_url);
-        if (stem.empty()) stem = model_id;
+        if (stem.empty())
+            stem = model_id;
 
         snprintf(out_path, path_size, "%s/%s%s%s", model_folder, stem.c_str(),
                  ext.empty() ? "" : ".", ext.empty() ? "" : ext.c_str());
@@ -819,7 +849,8 @@ rac_result_t rac_download_compute_destination(const char* model_id, const char* 
 }
 
 rac_bool_t rac_download_requires_extraction(const char* download_url) {
-    if (!download_url) return RAC_FALSE;
+    if (!download_url)
+        return RAC_FALSE;
 
     rac_archive_type_t type;
     return rac_archive_type_from_path(download_url, &type);

@@ -24,12 +24,22 @@ plugins {
     signing
 }
 
-val testLocal: Boolean =
-    rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        ?: false
+// `useLocalNatives` is the canonical property name (matches Swift/Flutter/RN);
+// `testLocal` still works as a legacy fallback.
+val useLocalNatives: Boolean =
+    run {
+        val newValue =
+            rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+                ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        if (newValue != null) return@run newValue
+        rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+            ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+            ?: false
+    }
+// Alias kept so existing references in this file keep working.
+val testLocal: Boolean = useLocalNatives
 
-logger.lifecycle("LlamaCPP Module: testLocal=$testLocal")
+logger.lifecycle("LlamaCPP Module: useLocalNatives=$useLocalNatives")
 
 // Detekt
 detekt {
@@ -172,10 +182,11 @@ tasks.register("downloadJniLibs") {
     val targetAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
     val packageType = "RABackendLLAMACPP-android"
 
-    val llamacppLibs = setOf(
-        "librac_backend_llamacpp.so",
-        "librac_backend_llamacpp_jni.so",
-    )
+    val llamacppLibs =
+        setOf(
+            "librac_backend_llamacpp.so",
+            "librac_backend_llamacpp_jni.so",
+        )
 
     outputs.dir(outputDir)
 

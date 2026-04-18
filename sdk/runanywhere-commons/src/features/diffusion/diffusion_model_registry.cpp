@@ -6,15 +6,15 @@
  * This is the shared C++ layer used by all SDKs.
  */
 
-#include "rac/features/diffusion/rac_diffusion_model_registry.h"
-#include "rac/core/rac_logger.h"
-#include "rac/core/rac_error.h"
-
-#include <mutex>
-#include <vector>
-#include <string>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "rac/core/rac_error.h"
+#include "rac/core/rac_logger.h"
+#include "rac/features/diffusion/rac_diffusion_model_registry.h"
 
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
@@ -37,29 +37,21 @@ static const rac_diffusion_model_def_t MODEL_SD15_COREML = {
     .backend = RAC_DIFFUSION_BACKEND_COREML,
     .platforms = RAC_DIFFUSION_PLATFORM_IOS | RAC_DIFFUSION_PLATFORM_MACOS,
     .hardware = RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_CPU,
-    .defaults = {
-        .width = 512,
-        .height = 512,
-        .steps = 20,
-        .guidance_scale = 7.5f,
-        .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
-        .requires_cfg = RAC_TRUE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized",
-        .onnx_path = nullptr,
-        .coreml_path = "split_einsum_v2_compiled",
-        .size_bytes = 1200000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_1_5,
-        .custom_url = nullptr
-    },
+    .defaults = {.width = 512,
+                 .height = 512,
+                 .steps = 20,
+                 .guidance_scale = 7.5f,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .requires_cfg = RAC_TRUE},
+    .download = {.base_url = "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized",
+                 .onnx_path = nullptr,
+                 .coreml_path = "split_einsum_v2_compiled",
+                 .size_bytes = 1200000000ULL,
+                 .checksum = nullptr},
+    .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_1_5, .custom_url = nullptr},
     .is_recommended = RAC_TRUE,
     .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_FALSE
-};
+    .supports_inpainting = RAC_FALSE};
 
 // SD 2.1 CoreML (iOS/macOS)
 static const rac_diffusion_model_def_t MODEL_SD21_COREML = {
@@ -70,29 +62,22 @@ static const rac_diffusion_model_def_t MODEL_SD21_COREML = {
     .backend = RAC_DIFFUSION_BACKEND_COREML,
     .platforms = RAC_DIFFUSION_PLATFORM_IOS | RAC_DIFFUSION_PLATFORM_MACOS,
     .hardware = RAC_DIFFUSION_HW_ANE | RAC_DIFFUSION_HW_GPU | RAC_DIFFUSION_HW_CPU,
-    .defaults = {
-        .width = 768,
-        .height = 768,
-        .steps = 20,
-        .guidance_scale = 7.5f,
-        .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
-        .requires_cfg = RAC_TRUE
-    },
-    .download = {
-        .base_url = "https://huggingface.co/apple/coreml-stable-diffusion-2-1-base-palettized",
-        .onnx_path = nullptr,
-        .coreml_path = "split_einsum_v2_compiled",
-        .size_bytes = 1500000000ULL,
-        .checksum = nullptr
-    },
-    .tokenizer = {
-        .source = RAC_DIFFUSION_TOKENIZER_SD_2_X,
-        .custom_url = nullptr
-    },
+    .defaults = {.width = 768,
+                 .height = 768,
+                 .steps = 20,
+                 .guidance_scale = 7.5f,
+                 .scheduler = RAC_DIFFUSION_SCHEDULER_DPM_PP_2M,
+                 .requires_cfg = RAC_TRUE},
+    .download = {.base_url =
+                     "https://huggingface.co/apple/coreml-stable-diffusion-2-1-base-palettized",
+                 .onnx_path = nullptr,
+                 .coreml_path = "split_einsum_v2_compiled",
+                 .size_bytes = 1500000000ULL,
+                 .checksum = nullptr},
+    .tokenizer = {.source = RAC_DIFFUSION_TOKENIZER_SD_2_X, .custom_url = nullptr},
     .is_recommended = RAC_FALSE,
     .supports_img2img = RAC_TRUE,
-    .supports_inpainting = RAC_FALSE
-};
+    .supports_inpainting = RAC_FALSE};
 
 // All built-in models (CoreML only)
 static const rac_diffusion_model_def_t* BUILTIN_MODELS[] = {
@@ -123,11 +108,11 @@ RegistryState& get_state() {
 
 uint32_t detect_current_platform() {
 #if defined(__APPLE__)
-    #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
-        return RAC_DIFFUSION_PLATFORM_IOS;
-    #else
-        return RAC_DIFFUSION_PLATFORM_MACOS;
-    #endif
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    return RAC_DIFFUSION_PLATFORM_IOS;
+#else
+    return RAC_DIFFUSION_PLATFORM_MACOS;
+#endif
 #elif defined(__ANDROID__)
     return RAC_DIFFUSION_PLATFORM_ANDROID;
 #elif defined(_WIN32) || defined(_WIN64)
@@ -144,8 +129,9 @@ uint32_t detect_current_platform() {
 // =============================================================================
 
 static rac_bool_t builtin_can_handle(const char* model_id, void* /*user_data*/) {
-    if (!model_id) return RAC_FALSE;
-    
+    if (!model_id)
+        return RAC_FALSE;
+
     for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
         if (std::strcmp(model_id, BUILTIN_MODELS[i]->model_id) == 0) {
             return RAC_TRUE;
@@ -154,11 +140,11 @@ static rac_bool_t builtin_can_handle(const char* model_id, void* /*user_data*/) 
     return RAC_FALSE;
 }
 
-static rac_result_t builtin_get_model_def(const char* model_id,
-                                           rac_diffusion_model_def_t* out_def,
-                                           void* /*user_data*/) {
-    if (!model_id || !out_def) return RAC_ERROR_INVALID_ARGUMENT;
-    
+static rac_result_t builtin_get_model_def(const char* model_id, rac_diffusion_model_def_t* out_def,
+                                          void* /*user_data*/) {
+    if (!model_id || !out_def)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
     for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
         if (std::strcmp(model_id, BUILTIN_MODELS[i]->model_id) == 0) {
             *out_def = *BUILTIN_MODELS[i];
@@ -168,13 +154,13 @@ static rac_result_t builtin_get_model_def(const char* model_id,
     return RAC_ERROR_NOT_FOUND;
 }
 
-static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
-                                         size_t* out_count,
-                                         void* /*user_data*/) {
-    if (!out_models || !out_count) return RAC_ERROR_INVALID_ARGUMENT;
-    
+static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models, size_t* out_count,
+                                        void* /*user_data*/) {
+    if (!out_models || !out_count)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
     uint32_t current_platform = detect_current_platform();
-    
+
     // Count available models for this platform
     size_t count = 0;
     for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
@@ -182,7 +168,7 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
             count++;
         }
     }
-    
+
     // Handle empty result (no models for this platform)
     if (count == 0) {
         *out_models = nullptr;
@@ -196,7 +182,7 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
     if (!models) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    
+
     // Copy available models
     size_t idx = 0;
     for (size_t i = 0; i < BUILTIN_MODEL_COUNT; i++) {
@@ -204,14 +190,14 @@ static rac_result_t builtin_list_models(rac_diffusion_model_def_t** out_models,
             models[idx++] = *BUILTIN_MODELS[i];
         }
     }
-    
+
     *out_models = models;
     *out_count = count;
     return RAC_SUCCESS;
 }
 
 static rac_diffusion_backend_t builtin_select_backend(const rac_diffusion_model_def_t* model,
-                                                       void* /*user_data*/) {
+                                                      void* /*user_data*/) {
     // Diffusion is Apple CoreML-only; no ONNX diffusion.
     if (!model) {
 #if defined(__APPLE__)
@@ -231,15 +217,14 @@ static rac_diffusion_backend_t builtin_select_backend(const rac_diffusion_model_
     return RAC_DIFFUSION_BACKEND_COREML;
 }
 
-static rac_diffusion_model_strategy_t BUILTIN_STRATEGY = {
-    .name = "BuiltIn",
-    .can_handle = builtin_can_handle,
-    .get_model_def = builtin_get_model_def,
-    .list_models = builtin_list_models,
-    .select_backend = builtin_select_backend,
-    .load_model = nullptr,  // Use default loading
-    .user_data = nullptr
-};
+static rac_diffusion_model_strategy_t BUILTIN_STRATEGY = {.name = "BuiltIn",
+                                                          .can_handle = builtin_can_handle,
+                                                          .get_model_def = builtin_get_model_def,
+                                                          .list_models = builtin_list_models,
+                                                          .select_backend = builtin_select_backend,
+                                                          .load_model =
+                                                              nullptr,  // Use default loading
+                                                          .user_data = nullptr};
 
 }  // anonymous namespace
 
@@ -252,28 +237,28 @@ extern "C" {
 void rac_diffusion_model_registry_init(void) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     if (state.initialized) {
         RAC_LOG_DEBUG(LOG_CAT, "Registry already initialized");
         return;
     }
-    
+
     // Register built-in strategy
     state.strategies.push_back(BUILTIN_STRATEGY);
     state.initialized = true;
-    
-    RAC_LOG_INFO(LOG_CAT, "Diffusion model registry initialized with %zu built-in models", 
+
+    RAC_LOG_INFO(LOG_CAT, "Diffusion model registry initialized with %zu built-in models",
                  BUILTIN_MODEL_COUNT);
-    
+
     // Log available models for current platform
     uint32_t platform = detect_current_platform();
     const char* platform_name = "Unknown";
 #if defined(__APPLE__)
-    #if TARGET_OS_IOS || TARGET_OS_SIMULATOR
-        platform_name = "iOS";
-    #else
-        platform_name = "macOS";
-    #endif
+#if TARGET_OS_IOS || TARGET_OS_SIMULATOR
+    platform_name = "iOS";
+#else
+    platform_name = "macOS";
+#endif
 #elif defined(__ANDROID__)
     platform_name = "Android";
 #elif defined(_WIN32)
@@ -281,17 +266,17 @@ void rac_diffusion_model_registry_init(void) {
 #else
     platform_name = "Linux";
 #endif
-    
+
     RAC_LOG_INFO(LOG_CAT, "Current platform: %s (0x%x)", platform_name, platform);
 }
 
 void rac_diffusion_model_registry_cleanup(void) {
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     state.strategies.clear();
     state.initialized = false;
-    
+
     RAC_LOG_INFO(LOG_CAT, "Diffusion model registry cleaned up");
 }
 
@@ -299,10 +284,10 @@ rac_result_t rac_diffusion_model_registry_register(const rac_diffusion_model_str
     if (!strategy || !strategy->name) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     // Check for duplicate
     for (const auto& s : state.strategies) {
         if (std::strcmp(s.name, strategy->name) == 0) {
@@ -310,10 +295,10 @@ rac_result_t rac_diffusion_model_registry_register(const rac_diffusion_model_str
             return RAC_ERROR_SERVICE_ALREADY_REGISTERED;
         }
     }
-    
+
     state.strategies.push_back(*strategy);
     RAC_LOG_INFO(LOG_CAT, "Registered diffusion model strategy: %s", strategy->name);
-    
+
     return RAC_SUCCESS;
 }
 
@@ -321,10 +306,10 @@ rac_result_t rac_diffusion_model_registry_unregister(const char* name) {
     if (!name) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     for (auto it = state.strategies.begin(); it != state.strategies.end(); ++it) {
         if (std::strcmp(it->name, name) == 0) {
             state.strategies.erase(it);
@@ -332,19 +317,19 @@ rac_result_t rac_diffusion_model_registry_unregister(const char* name) {
             return RAC_SUCCESS;
         }
     }
-    
+
     return RAC_ERROR_NOT_FOUND;
 }
 
 rac_result_t rac_diffusion_model_registry_get(const char* model_id,
-                                               rac_diffusion_model_def_t* out_def) {
+                                              rac_diffusion_model_def_t* out_def) {
     if (!model_id || !out_def) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     // Try each strategy
     for (const auto& strategy : state.strategies) {
         if (strategy.can_handle && strategy.can_handle(model_id, strategy.user_data)) {
@@ -356,29 +341,30 @@ rac_result_t rac_diffusion_model_registry_get(const char* model_id,
             }
         }
     }
-    
+
     RAC_LOG_WARNING(LOG_CAT, "Model not found: %s", model_id);
     return RAC_ERROR_NOT_FOUND;
 }
 
 rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_models,
-                                                size_t* out_count) {
+                                               size_t* out_count) {
     if (!out_models || !out_count) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     // Collect all models from all strategies
     std::vector<rac_diffusion_model_def_t> all_models;
-    
+
     for (const auto& strategy : state.strategies) {
         if (strategy.list_models) {
             rac_diffusion_model_def_t* models = nullptr;
             size_t count = 0;
-            
-            if (strategy.list_models(&models, &count, strategy.user_data) == RAC_SUCCESS && models) {
+
+            if (strategy.list_models(&models, &count, strategy.user_data) == RAC_SUCCESS &&
+                models) {
                 for (size_t i = 0; i < count; i++) {
                     all_models.push_back(models[i]);
                 }
@@ -386,24 +372,24 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
             }
         }
     }
-    
+
     if (all_models.empty()) {
         *out_models = nullptr;
         *out_count = 0;
         return RAC_SUCCESS;
     }
-    
+
     // Allocate output
     auto* result = static_cast<rac_diffusion_model_def_t*>(
         std::malloc(all_models.size() * sizeof(rac_diffusion_model_def_t)));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
-    
+
     for (size_t i = 0; i < all_models.size(); i++) {
         result[i] = all_models[i];
     }
-    
+
     *out_models = result;
     *out_count = all_models.size();
     return RAC_SUCCESS;
@@ -411,27 +397,28 @@ rac_result_t rac_diffusion_model_registry_list(rac_diffusion_model_def_t** out_m
 
 rac_diffusion_backend_t rac_diffusion_model_registry_select_backend(const char* model_id) {
     rac_diffusion_model_def_t model_def;
-    
+
     if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
-        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)", 
+        RAC_LOG_DEBUG(LOG_CAT, "Model '%s' not found, using CoreML (Apple only)",
                       model_id ? model_id : "(null)");
         return RAC_DIFFUSION_BACKEND_COREML;
     }
-    
+
     auto& state = get_state();
     std::lock_guard<std::mutex> lock(state.mutex);
-    
+
     // Find strategy that handles this model and use its backend selection
     for (const auto& strategy : state.strategies) {
         if (strategy.can_handle && strategy.can_handle(model_id, strategy.user_data)) {
             if (strategy.select_backend) {
-                rac_diffusion_backend_t backend = strategy.select_backend(&model_def, strategy.user_data);
+                rac_diffusion_backend_t backend =
+                    strategy.select_backend(&model_def, strategy.user_data);
                 RAC_LOG_DEBUG(LOG_CAT, "Selected backend %d for model '%s'", backend, model_id);
                 return backend;
             }
         }
     }
-    
+
     // Return model's preferred backend
     return model_def.backend;
 }
@@ -441,7 +428,7 @@ rac_bool_t rac_diffusion_model_registry_is_available(const char* model_id) {
     if (rac_diffusion_model_registry_get(model_id, &model_def) != RAC_SUCCESS) {
         return RAC_FALSE;
     }
-    
+
     // Check platform availability
     uint32_t current_platform = detect_current_platform();
     return (model_def.platforms & current_platform) ? RAC_TRUE : RAC_FALSE;
@@ -451,15 +438,15 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
     if (!out_def) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    
+
     rac_diffusion_model_def_t* models = nullptr;
     size_t count = 0;
-    
+
     rac_result_t result = rac_diffusion_model_registry_list(&models, &count);
     if (result != RAC_SUCCESS || !models || count == 0) {
         return RAC_ERROR_NOT_FOUND;
     }
-    
+
     // Find first recommended model
     for (size_t i = 0; i < count; i++) {
         if (models[i].is_recommended) {
@@ -468,7 +455,7 @@ rac_result_t rac_diffusion_model_registry_get_recommended(rac_diffusion_model_de
             return RAC_SUCCESS;
         }
     }
-    
+
     // No recommended model found, return first available
     *out_def = models[0];
     std::free(models);
@@ -485,7 +472,7 @@ rac_bool_t rac_diffusion_model_requires_cfg(rac_diffusion_model_variant_t varian
         case RAC_DIFFUSION_MODEL_SDXS:
         case RAC_DIFFUSION_MODEL_SDXL_TURBO:
             return RAC_FALSE;
-        
+
         // Standard models need CFG
         case RAC_DIFFUSION_MODEL_SD_1_5:
         case RAC_DIFFUSION_MODEL_SD_2_1:

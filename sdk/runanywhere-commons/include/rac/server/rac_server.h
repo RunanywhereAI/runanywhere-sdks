@@ -85,20 +85,18 @@ typedef struct rac_server_config {
 /**
  * @brief Default server configuration
  */
-static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {
-    .host = "127.0.0.1",
-    .port = 8080,
-    .model_path = RAC_NULL,
-    .model_id = RAC_NULL,
-    .context_size = 8192,
-    .threads = 4,
-    .gpu_layers = 0,
-    .enable_cors = RAC_TRUE,
-    .cors_origins = "*",
-    .request_timeout_seconds = 300,
-    .max_concurrent_requests = 4,
-    .verbose = RAC_FALSE
-};
+static const rac_server_config_t RAC_SERVER_CONFIG_DEFAULT = {.host = "127.0.0.1",
+                                                              .port = 8080,
+                                                              .model_path = RAC_NULL,
+                                                              .model_id = RAC_NULL,
+                                                              .context_size = 8192,
+                                                              .threads = 4,
+                                                              .gpu_layers = 0,
+                                                              .enable_cors = RAC_TRUE,
+                                                              .cors_origins = "*",
+                                                              .request_timeout_seconds = 300,
+                                                              .max_concurrent_requests = 4,
+                                                              .verbose = RAC_FALSE};
 
 // =============================================================================
 // SERVER STATUS
@@ -203,9 +201,8 @@ RAC_API int rac_server_wait(void);
  * @param path Request path (e.g., "/v1/chat/completions")
  * @param user_data User-provided context
  */
-typedef void (*rac_server_request_callback_fn)(const char* method,
-                                                const char* path,
-                                                void* user_data);
+typedef void (*rac_server_request_callback_fn)(const char* method, const char* path,
+                                               void* user_data);
 
 /**
  * @brief Set request callback
@@ -214,7 +211,7 @@ typedef void (*rac_server_request_callback_fn)(const char* method,
  * @param user_data Context passed to callback
  */
 RAC_API void rac_server_set_request_callback(rac_server_request_callback_fn callback,
-                                              void* user_data);
+                                             void* user_data);
 
 /**
  * @brief Error callback type
@@ -226,10 +223,8 @@ RAC_API void rac_server_set_request_callback(rac_server_request_callback_fn call
  * @param error_message Human-readable error message
  * @param user_data User-provided context
  */
-typedef void (*rac_server_error_callback_fn)(const char* path,
-                                              rac_result_t error_code,
-                                              const char* error_message,
-                                              void* user_data);
+typedef void (*rac_server_error_callback_fn)(const char* path, rac_result_t error_code,
+                                             const char* error_message, void* user_data);
 
 /**
  * @brief Set error callback
@@ -237,33 +232,32 @@ typedef void (*rac_server_error_callback_fn)(const char* path,
  * @param callback Callback function (NULL to disable)
  * @param user_data Context passed to callback
  */
-RAC_API void rac_server_set_error_callback(rac_server_error_callback_fn callback,
-                                            void* user_data);
+RAC_API void rac_server_set_error_callback(rac_server_error_callback_fn callback, void* user_data);
 
 // =============================================================================
 // ERROR CODES
 // =============================================================================
 
 /** Server is already running */
-#define RAC_ERROR_SERVER_ALREADY_RUNNING ((rac_result_t)-200)
+#define RAC_ERROR_SERVER_ALREADY_RUNNING ((rac_result_t) - 200)
 
 /** Server is not running */
-#define RAC_ERROR_SERVER_NOT_RUNNING ((rac_result_t)-201)
+#define RAC_ERROR_SERVER_NOT_RUNNING ((rac_result_t) - 201)
 
 /** Failed to bind to port */
-#define RAC_ERROR_SERVER_BIND_FAILED ((rac_result_t)-202)
+#define RAC_ERROR_SERVER_BIND_FAILED ((rac_result_t) - 202)
 
 /** Model file not found */
-#define RAC_ERROR_SERVER_MODEL_NOT_FOUND ((rac_result_t)-203)
+#define RAC_ERROR_SERVER_MODEL_NOT_FOUND ((rac_result_t) - 203)
 
 /** Failed to load model */
-#define RAC_ERROR_SERVER_MODEL_LOAD_FAILED ((rac_result_t)-204)
+#define RAC_ERROR_SERVER_MODEL_LOAD_FAILED ((rac_result_t) - 204)
 
 /** Request timeout */
-#define RAC_ERROR_SERVER_REQUEST_TIMEOUT ((rac_result_t)-205)
+#define RAC_ERROR_SERVER_REQUEST_TIMEOUT ((rac_result_t) - 205)
 
 /** Too many concurrent requests */
-#define RAC_ERROR_SERVER_TOO_MANY_REQUESTS ((rac_result_t)-206)
+#define RAC_ERROR_SERVER_TOO_MANY_REQUESTS ((rac_result_t) - 206)
 
 #ifdef __cplusplus
 }

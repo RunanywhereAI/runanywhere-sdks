@@ -13,15 +13,26 @@ export class VLMService {
    * Load the model and track internal state
    * Updated to accept modelName (3rd argument)
    */
-  async loadModel(modelPath: string, mmprojPath?: string, modelName?: string): Promise<void> {
+  async loadModel(
+    modelPath: string,
+    mmprojPath?: string,
+    modelName?: string
+  ): Promise<void> {
     try {
+      // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
       console.log(`[VLMService] Loading model: ${modelName}`);
-      
+
       // Pass 'undefined' for loraPath (3rd arg) as per SDK requirement
-      const success = await sdkLoadModel(modelPath, mmprojPath, undefined, modelName);
-      
+      const success = await sdkLoadModel(
+        modelPath,
+        mmprojPath,
+        undefined,
+        modelName
+      );
+
       if (success) {
         this._isLoaded = true;
+        // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
         console.log('[VLMService] Load success');
       } else {
         this._isLoaded = false;
@@ -41,7 +52,7 @@ export class VLMService {
     if (!this._isLoaded) return false;
     try {
       return await sdkCheckLoaded();
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -50,8 +61,8 @@ export class VLMService {
    * Describe an image with streaming results
    */
   async describeImage(
-    imagePath: string, 
-    prompt: string, 
+    imagePath: string,
+    prompt: string,
     maxTokens: number,
     onToken: (token: string) => void
   ): Promise<void> {
@@ -64,11 +75,12 @@ export class VLMService {
       filePath: imagePath,
     };
 
+    // eslint-disable-next-line no-console -- demo VLM inference diagnostic
     console.log(`[VLMService] Processing image: ${imagePath}`);
-    
+
     try {
       const response = await processImageStream(image, prompt, { maxTokens });
-      
+
       // Consume the async iterator and fire callback
       for await (const token of response.stream) {
         onToken(token);
@@ -85,6 +97,7 @@ export class VLMService {
 
   release(): void {
     this._isLoaded = false;
+    // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
     console.log('[VLMService] Service state released');
   }
 }

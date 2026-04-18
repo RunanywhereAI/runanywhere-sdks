@@ -19,14 +19,14 @@ import kotlinx.coroutines.withContext
  * Matches iOS LLMBenchmarkProvider exactly.
  */
 class LLMBenchmarkProvider : BenchmarkScenarioProvider {
-
     override val category: BenchmarkCategory = BenchmarkCategory.LLM
 
-    override fun scenarios(): List<BenchmarkScenario> = listOf(
-        BenchmarkScenario(name = "Short (50 tokens)", category = BenchmarkCategory.LLM),
-        BenchmarkScenario(name = "Medium (256 tokens)", category = BenchmarkCategory.LLM),
-        BenchmarkScenario(name = "Long (512 tokens)", category = BenchmarkCategory.LLM),
-    )
+    override fun scenarios(): List<BenchmarkScenario> =
+        listOf(
+            BenchmarkScenario(name = "Short (50 tokens)", category = BenchmarkCategory.LLM),
+            BenchmarkScenario(name = "Medium (256 tokens)", category = BenchmarkCategory.LLM),
+            BenchmarkScenario(name = "Long (512 tokens)", category = BenchmarkCategory.LLM),
+        )
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
@@ -53,10 +53,11 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
             // Benchmark
             val benchStart = System.nanoTime()
             val options = LLMGenerationOptions(maxTokens = maxTokens, temperature = 0.0f)
-            val streamResult = RunAnywhere.generateStreamWithMetrics(
-                "Explain the concept of machine learning in detail.",
-                options,
-            )
+            val streamResult =
+                RunAnywhere.generateStreamWithMetrics(
+                    "Explain the concept of machine learning in detail.",
+                    options,
+                )
             streamResult.stream.collect { }
             val result = streamResult.result.await()
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
@@ -83,9 +84,10 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
         }
     }
 
-    private fun tokenCount(scenario: BenchmarkScenario): Int = when {
-        scenario.name.contains("50") -> 50
-        scenario.name.contains("256") -> 256
-        else -> 512
-    }
+    private fun tokenCount(scenario: BenchmarkScenario): Int =
+        when {
+            scenario.name.contains("50") -> 50
+            scenario.name.contains("256") -> 256
+            else -> 512
+        }
 }

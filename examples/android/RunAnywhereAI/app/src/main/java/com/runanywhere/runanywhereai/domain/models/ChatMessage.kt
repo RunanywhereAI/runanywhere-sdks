@@ -124,8 +124,10 @@ data class PerformanceSummary(
 @Serializable
 data class ToolCallInfo(
     val toolName: String,
-    val arguments: String,  // JSON string for display
-    val result: String? = null,  // JSON string for display
+    // JSON string for display
+    val arguments: String,
+    // JSON string for display
+    val result: String? = null,
     val success: Boolean,
     val error: String? = null,
 )

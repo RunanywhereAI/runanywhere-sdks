@@ -14,6 +14,7 @@ import os.log
 
 // MARK: - LLM View Model
 
+// swiftlint:disable type_body_length
 @MainActor
 @Observable
 final class LLMViewModel {
@@ -447,7 +448,9 @@ final class LLMViewModel {
         // Validate GGUF magic bytes before saving
         guard Self.isValidGGUF(at: tempURL) else {
             try? FileManager.default.removeItem(at: tempURL)
-            throw LLMError.custom("Downloaded file is not a valid GGUF adapter (server may have returned an error page)")
+            throw LLMError.custom(
+                "Downloaded file is not a valid GGUF adapter (server may have returned an error page)"
+            )
         }
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
@@ -511,7 +514,9 @@ final class LLMViewModel {
     }()
 
     logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), "
+        + "maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), "
+        + "systemPrompt=\(systemPromptInfo)"
     )
 
     return LLMGenerationOptions(
@@ -540,7 +545,10 @@ final class LLMViewModel {
         UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
-        logger.info("Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")")
+        logger.info(
+            "Settings applied - Temperature: \(temperature), "
+            + "MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
+        )
     }
 
     @objc
@@ -581,3 +589,4 @@ final class LLMViewModel {
         ThinkingContentParser.strip(from: text)
     }
 }
+// swiftlint:enable type_body_length

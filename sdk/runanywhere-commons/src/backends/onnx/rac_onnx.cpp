@@ -6,6 +6,7 @@
  * Includes STT, TTS, and VAD functionality.
  */
 
+#include "onnx_backend.h"
 #include "rac_stt_onnx.h"
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
@@ -14,8 +15,6 @@
 #include <cstring>
 #include <memory>
 #include <string>
-
-#include "onnx_backend.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"

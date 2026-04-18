@@ -346,7 +346,7 @@ extension AudioCaptureManager {
     /// built-in microphone. Bluetooth SCO mic frequently fails on macOS,
     /// producing silence. Must be called after accessing `engine.inputNode`
     /// (which creates the audio unit) but before `engine.prepare()`.
-    fileprivate func configureMacOSInputDevice(engine: AVAudioEngine) {
+    func configureMacOSInputDevice(engine: AVAudioEngine) {
         guard let defaultInput = MacAudioDeviceQuery.defaultInputDevice() else {
             logger.warning("Could not determine default input device")
             return
@@ -435,7 +435,11 @@ private enum MacAudioDeviceQuery {
         )
         let status = AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
-            &address, 0, nil, &size, &deviceID
+            &address,
+            0,
+            nil,
+            &size,
+            &deviceID
         )
         guard status == noErr, deviceID != kAudioObjectUnknown else { return nil }
         return deviceInfo(for: deviceID)
@@ -460,14 +464,21 @@ private enum MacAudioDeviceQuery {
         )
         guard AudioObjectGetPropertyDataSize(
             AudioObjectID(kAudioObjectSystemObject),
-            &address, 0, nil, &size
+            &address,
+            0,
+            nil,
+            &size
         ) == noErr else { return [] }
 
         let count = Int(size) / MemoryLayout<AudioDeviceID>.size
         var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
         guard AudioObjectGetPropertyData(
             AudioObjectID(kAudioObjectSystemObject),
-            &address, 0, nil, &size, &deviceIDs
+            &address,
+            0,
+            nil,
+            &size,
+            &deviceIDs
         ) == noErr else { return [] }
 
         return deviceIDs.compactMap { id in

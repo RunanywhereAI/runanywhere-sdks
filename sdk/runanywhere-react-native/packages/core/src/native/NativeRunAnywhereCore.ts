@@ -13,10 +13,13 @@ import type { RunAnywhereCore } from '../specs/RunAnywhereCore.nitro';
 import type { RunAnywhereDeviceInfo } from '../specs/RunAnywhereDeviceInfo.nitro';
 import type { NativeRunAnywhereModule } from './NativeRunAnywhereModule';
 import { SDKLogger } from '../Foundation/Logging';
-import { initializeNitroModulesGlobally, getNitroModulesProxySync } from './NitroModulesGlobalInit';
+import {
+  getNitroModulesProxySync,
+  type NitroProxy,
+} from './NitroModulesGlobalInit';
 
 // Use the global NitroModules initialization
-function getNitroModulesProxy(): any {
+function getNitroModulesProxy(): NitroProxy | null {
   return getNitroModulesProxySync();
 }
 
@@ -127,13 +130,13 @@ function getDeviceInfoHybridObject(): RunAnywhereDeviceInfo | null {
   try {
     const NitroProxy = getNitroModulesProxy();
     if (!NitroProxy) {
-      console.warn('[NativeRunAnywhereCore] NitroModules not available for RunAnywhereDeviceInfo');
+      SDKLogger.core.warning('[NativeRunAnywhereCore] NitroModules not available for RunAnywhereDeviceInfo');
       return null;
     }
     _deviceInfoModule = NitroProxy.createHybridObject('RunAnywhereDeviceInfo') as RunAnywhereDeviceInfo;
     return _deviceInfoModule;
   } catch (error) {
-    console.warn('[NativeRunAnywhereCore] Failed to create RunAnywhereDeviceInfo:', error);
+    SDKLogger.core.warning('[NativeRunAnywhereCore] Failed to create RunAnywhereDeviceInfo', { error });
     return null;
   }
 }
@@ -157,7 +160,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getDeviceModel();
         } catch (error) {
-          console.warn('[DeviceInfo] getDeviceModel failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getDeviceModel failed', { error });
         }
       }
       return 'Unknown Device';
@@ -168,7 +171,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getChipName();
         } catch (error) {
-          console.warn('[DeviceInfo] getChipName failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getChipName failed', { error });
         }
       }
       return 'Unknown';
@@ -179,7 +182,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getTotalRAM();
         } catch (error) {
-          console.warn('[DeviceInfo] getTotalRAM failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getTotalRAM failed', { error });
         }
       }
       return 0;
@@ -190,7 +193,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getAvailableRAM();
         } catch (error) {
-          console.warn('[DeviceInfo] getAvailableRAM failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getAvailableRAM failed', { error });
         }
       }
       return 0;
@@ -201,7 +204,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.hasNPU();
         } catch (error) {
-          console.warn('[DeviceInfo] hasNPU failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] hasNPU failed', { error });
         }
       }
       return false;
@@ -212,7 +215,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getOSVersion();
         } catch (error) {
-          console.warn('[DeviceInfo] getOSVersion failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getOSVersion failed', { error });
         }
       }
       return 'Unknown';
@@ -223,7 +226,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.hasGPU();
         } catch (error) {
-          console.warn('[DeviceInfo] hasGPU failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] hasGPU failed', { error });
         }
       }
       return false;
@@ -234,7 +237,7 @@ export function requireDeviceInfoModule(): DeviceInfoModule {
         try {
           return await deviceInfo.getCPUCores();
         } catch (error) {
-          console.warn('[DeviceInfo] getCPUCores failed:', error);
+          SDKLogger.core.warning('[DeviceInfo] getCPUCores failed', { error });
         }
       }
       return 0;

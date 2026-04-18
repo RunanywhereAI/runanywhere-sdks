@@ -83,7 +83,7 @@ Native libraries can be sourced in two ways, controlled by `gradle.properties`:
 Downloads pre-built `.so` files from GitHub releases. No NDK required.
 
 ```properties
-runanywhere.testLocal=false
+runanywhere.useLocalNatives=false
 ```
 
 ### Local mode (for C++ development)
@@ -91,7 +91,7 @@ runanywhere.testLocal=false
 Builds native libraries from `runanywhere-commons` source. Requires NDK.
 
 ```properties
-runanywhere.testLocal=true
+runanywhere.useLocalNatives=true
 ```
 
 First-time local setup:

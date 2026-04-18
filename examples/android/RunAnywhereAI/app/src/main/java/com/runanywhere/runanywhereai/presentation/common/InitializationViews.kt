@@ -57,10 +57,11 @@ fun InitializationLoadingView() {
                 Spacer(modifier = Modifier.height(32.dp))
 
                 LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(2.dp)),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(2.dp)),
                     color = AppColors.primaryAccent,
                     trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )

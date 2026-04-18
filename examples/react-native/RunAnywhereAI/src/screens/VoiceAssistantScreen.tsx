@@ -53,13 +53,19 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
 
   // Session state
-  const [status, setStatus] = useState<VoicePipelineStatus>(VoicePipelineStatus.Idle);
-  const [conversation, setConversation] = useState<VoiceConversationEntry[]>([]);
+  const [status, setStatus] = useState<VoicePipelineStatus>(
+    VoicePipelineStatus.Idle
+  );
+  const [conversation, setConversation] = useState<VoiceConversationEntry[]>(
+    []
+  );
   const [audioLevel, setAudioLevel] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(true);
   const [showModelSelection, setShowModelSelection] = useState(false);
-  const [modelSelectionType, setModelSelectionType] = useState<'stt' | 'llm' | 'tts'>('stt');
+  const [modelSelectionType, setModelSelectionType] = useState<
+    'stt' | 'llm' | 'tts'
+  >('stt');
 
   // Voice session handle ref
   const sessionRef = useRef<VoiceSessionHandle | null>(null);
@@ -105,13 +111,22 @@ export const VoiceAssistantScreen: React.FC = () => {
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
 
       if (sttLoaded) {
-        setSTTModel({ id: 'stt-loaded', name: 'STT Model (Loaded)' } as ModelInfo);
+        setSTTModel({
+          id: 'stt-loaded',
+          name: 'STT Model (Loaded)',
+        } as ModelInfo);
       }
       if (llmLoaded) {
-        setLLMModel({ id: 'llm-loaded', name: 'LLM Model (Loaded)' } as ModelInfo);
+        setLLMModel({
+          id: 'llm-loaded',
+          name: 'LLM Model (Loaded)',
+        } as ModelInfo);
       }
       if (ttsLoaded) {
-        setTTSModel({ id: 'tts-loaded', name: 'TTS Model (Loaded)' } as ModelInfo);
+        setTTSModel({
+          id: 'tts-loaded',
+          name: 'TTS Model (Loaded)',
+        } as ModelInfo);
       }
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
@@ -149,7 +164,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             text: event.transcription,
             timestamp: new Date(),
           };
-          setConversation(prev => [...prev, userEntry]);
+          setConversation((prev) => [...prev, userEntry]);
         }
         setStatus(VoicePipelineStatus.Thinking);
         break;
@@ -163,7 +178,7 @@ export const VoiceAssistantScreen: React.FC = () => {
             text: event.response,
             timestamp: new Date(),
           };
-          setConversation(prev => [...prev, assistantEntry]);
+          setConversation((prev) => [...prev, assistantEntry]);
         }
         break;
 
@@ -251,51 +266,77 @@ export const VoiceAssistantScreen: React.FC = () => {
   /**
    * Get context for model selection
    */
-  const getSelectionContext = (type: 'stt' | 'llm' | 'tts'): ModelSelectionContext => {
+  const getSelectionContext = (
+    type: 'stt' | 'llm' | 'tts'
+  ): ModelSelectionContext => {
     switch (type) {
-      case 'stt': return ModelSelectionContext.STT;
-      case 'llm': return ModelSelectionContext.LLM;
-      case 'tts': return ModelSelectionContext.TTS;
+      case 'stt':
+        return ModelSelectionContext.STT;
+      case 'llm':
+        return ModelSelectionContext.LLM;
+      case 'tts':
+        return ModelSelectionContext.TTS;
     }
   };
 
   /**
    * Handle model selected from the sheet
    */
-  const handleModelSelected = useCallback(async (model: SDKModelInfo) => {
-    setShowModelSelection(false);
+  const handleModelSelected = useCallback(
+    async (model: SDKModelInfo) => {
+      setShowModelSelection(false);
 
-    try {
-      switch (modelSelectionType) {
-        case 'stt':
-          if (model.localPath) {
-            const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath, model.category || 'whisper');
-            if (sttSuccess) {
-              setSTTModel({ id: model.id, name: model.name, preferredFramework: LLMFramework.ONNX } as ModelInfo);
+      try {
+        switch (modelSelectionType) {
+          case 'stt':
+            if (model.localPath) {
+              const sttSuccess = await RunAnywhere.loadSTTModel(
+                model.localPath,
+                model.category || 'whisper'
+              );
+              if (sttSuccess) {
+                setSTTModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.ONNX,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
-        case 'llm':
-          if (model.localPath) {
-            const llmSuccess = await RunAnywhere.loadModel(model.localPath);
-            if (llmSuccess) {
-              setLLMModel({ id: model.id, name: model.name, preferredFramework: LLMFramework.LlamaCpp } as ModelInfo);
+            break;
+          case 'llm':
+            if (model.localPath) {
+              const llmSuccess = await RunAnywhere.loadModel(model.localPath);
+              if (llmSuccess) {
+                setLLMModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.LlamaCpp,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
-        case 'tts':
-          if (model.localPath) {
-            const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath, model.category || 'piper');
-            if (ttsSuccess) {
-              setTTSModel({ id: model.id, name: model.name, preferredFramework: LLMFramework.PiperTTS } as ModelInfo);
+            break;
+          case 'tts':
+            if (model.localPath) {
+              const ttsSuccess = await RunAnywhere.loadTTSModel(
+                model.localPath,
+                model.category || 'piper'
+              );
+              if (ttsSuccess) {
+                setTTSModel({
+                  id: model.id,
+                  name: model.name,
+                  preferredFramework: LLMFramework.PiperTTS,
+                } as ModelInfo);
+              }
             }
-          }
-          break;
+            break;
+        }
+      } catch (error) {
+        Alert.alert('Error', `Failed to load model: ${error}`);
       }
-    } catch (error) {
-      Alert.alert('Error', `Failed to load model: ${error}`);
-    }
-  }, [modelSelectionType]);
+    },
+    [modelSelectionType]
+  );
 
   /**
    * Clear conversation
@@ -315,7 +356,10 @@ export const VoiceAssistantScreen: React.FC = () => {
     onPress: () => void
   ) => (
     <TouchableOpacity
-      style={[styles.modelBadge, { borderColor: model ? color : Colors.borderLight }]}
+      style={[
+        styles.modelBadge,
+        { borderColor: model ? color : Colors.borderLight },
+      ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -342,10 +386,22 @@ export const VoiceAssistantScreen: React.FC = () => {
   const renderStatusIndicator = () => {
     const statusConfig = {
       [VoicePipelineStatus.Idle]: { color: Colors.statusGray, text: 'Ready' },
-      [VoicePipelineStatus.Listening]: { color: Colors.statusGreen, text: 'Listening...' },
-      [VoicePipelineStatus.Processing]: { color: Colors.statusOrange, text: 'Processing...' },
-      [VoicePipelineStatus.Thinking]: { color: Colors.primaryBlue, text: 'Thinking...' },
-      [VoicePipelineStatus.Speaking]: { color: Colors.primaryPurple, text: 'Speaking...' },
+      [VoicePipelineStatus.Listening]: {
+        color: Colors.statusGreen,
+        text: 'Listening...',
+      },
+      [VoicePipelineStatus.Processing]: {
+        color: Colors.statusOrange,
+        text: 'Processing...',
+      },
+      [VoicePipelineStatus.Thinking]: {
+        color: Colors.primaryBlue,
+        text: 'Thinking...',
+      },
+      [VoicePipelineStatus.Speaking]: {
+        color: Colors.primaryPurple,
+        text: 'Speaking...',
+      },
       [VoicePipelineStatus.Error]: { color: Colors.statusRed, text: 'Error' },
     };
 
@@ -354,7 +410,9 @@ export const VoiceAssistantScreen: React.FC = () => {
     return (
       <View style={styles.statusContainer}>
         <View style={[styles.statusDot, { backgroundColor: config.color }]} />
-        <Text style={[styles.statusText, { color: config.color }]}>{config.text}</Text>
+        <Text style={[styles.statusText, { color: config.color }]}>
+          {config.text}
+        </Text>
       </View>
     );
   };
@@ -367,7 +425,10 @@ export const VoiceAssistantScreen: React.FC = () => {
     return (
       <View
         key={entry.id}
-        style={[styles.conversationBubble, isUser ? styles.userBubble : styles.assistantBubble]}
+        style={[
+          styles.conversationBubble,
+          isUser ? styles.userBubble : styles.assistantBubble,
+        ]}
       >
         <Text style={styles.speakerLabel}>{isUser ? 'You' : 'AI'}</Text>
         <Text style={styles.bubbleText}>{entry.text}</Text>
@@ -389,9 +450,27 @@ export const VoiceAssistantScreen: React.FC = () => {
       </View>
 
       <View style={styles.modelsContainer}>
-        {renderModelBadge('mic-outline', 'Speech Recognition', sttModel, Colors.primaryGreen, () => handleSelectModel('stt'))}
-        {renderModelBadge('chatbubble-outline', 'Language Model', llmModel, Colors.primaryBlue, () => handleSelectModel('llm'))}
-        {renderModelBadge('volume-high-outline', 'Text-to-Speech', ttsModel, Colors.primaryPurple, () => handleSelectModel('tts'))}
+        {renderModelBadge(
+          'mic-outline',
+          'Speech Recognition',
+          sttModel,
+          Colors.primaryGreen,
+          () => handleSelectModel('stt')
+        )}
+        {renderModelBadge(
+          'chatbubble-outline',
+          'Language Model',
+          llmModel,
+          Colors.primaryBlue,
+          () => handleSelectModel('llm')
+        )}
+        {renderModelBadge(
+          'volume-high-outline',
+          'Text-to-Speech',
+          ttsModel,
+          Colors.primaryPurple,
+          () => handleSelectModel('tts')
+        )}
       </View>
 
       <View style={styles.experimentalBadge}>
@@ -408,8 +487,19 @@ export const VoiceAssistantScreen: React.FC = () => {
         <Text style={styles.title}>Voice Assistant</Text>
         <View style={styles.headerActions}>
           {allModelsLoaded && (
-            <TouchableOpacity style={styles.headerButton} onPress={() => setShowModelInfo(!showModelInfo)}>
-              <Icon name={showModelInfo ? 'information-circle' : 'information-circle-outline'} size={24} color={Colors.primaryBlue} />
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setShowModelInfo(!showModelInfo)}
+            >
+              <Icon
+                name={
+                  showModelInfo
+                    ? 'information-circle'
+                    : 'information-circle-outline'
+                }
+                size={24}
+                color={Colors.primaryBlue}
+              />
             </TouchableOpacity>
           )}
           {conversation.length > 0 && (
@@ -426,9 +516,27 @@ export const VoiceAssistantScreen: React.FC = () => {
       {/* Model Info (collapsible) */}
       {allModelsLoaded && showModelInfo && (
         <View style={styles.modelInfoContainer}>
-          {renderModelBadge('mic-outline', 'STT', sttModel, Colors.primaryGreen, () => handleSelectModel('stt'))}
-          {renderModelBadge('chatbubble-outline', 'LLM', llmModel, Colors.primaryBlue, () => handleSelectModel('llm'))}
-          {renderModelBadge('volume-high-outline', 'TTS', ttsModel, Colors.primaryPurple, () => handleSelectModel('tts'))}
+          {renderModelBadge(
+            'mic-outline',
+            'STT',
+            sttModel,
+            Colors.primaryGreen,
+            () => handleSelectModel('stt')
+          )}
+          {renderModelBadge(
+            'chatbubble-outline',
+            'LLM',
+            llmModel,
+            Colors.primaryBlue,
+            () => handleSelectModel('llm')
+          )}
+          {renderModelBadge(
+            'volume-high-outline',
+            'TTS',
+            ttsModel,
+            Colors.primaryPurple,
+            () => handleSelectModel('tts')
+          )}
         </View>
       )}
 
@@ -438,11 +546,20 @@ export const VoiceAssistantScreen: React.FC = () => {
       ) : (
         <>
           {/* Conversation */}
-          <ScrollView style={styles.conversationContainer} contentContainerStyle={styles.conversationContent}>
+          <ScrollView
+            style={styles.conversationContainer}
+            contentContainerStyle={styles.conversationContent}
+          >
             {conversation.length === 0 ? (
               <View style={styles.emptyConversation}>
-                <Icon name="mic-outline" size={40} color={Colors.textTertiary} />
-                <Text style={styles.emptyText}>Tap the microphone to start a conversation</Text>
+                <Icon
+                  name="mic-outline"
+                  size={40}
+                  color={Colors.textTertiary}
+                />
+                <Text style={styles.emptyText}>
+                  Tap the microphone to start a conversation
+                </Text>
               </View>
             ) : (
               conversation.map(renderConversationBubble)
@@ -460,18 +577,26 @@ export const VoiceAssistantScreen: React.FC = () => {
                       styles.audioLevelBar,
                       {
                         width: `${Math.round(audioLevel * 100)}%`,
-                        backgroundColor: audioLevel > 0.1 ? Colors.primaryGreen : Colors.primaryBlue,
+                        backgroundColor:
+                          audioLevel > 0.1
+                            ? Colors.primaryGreen
+                            : Colors.primaryBlue,
                       },
                     ]}
                   />
                 </View>
                 <Text style={styles.vadStatus}>
                   {status === VoicePipelineStatus.Listening
-                    ? audioLevel > 0.1 ? '🎙️ Speaking...' : '👂 Listening...'
-                    : status === VoicePipelineStatus.Processing ? '⚙️ Processing...'
-                    : status === VoicePipelineStatus.Thinking ? '💭 Thinking...'
-                    : status === VoicePipelineStatus.Speaking ? '🔊 Speaking...'
-                    : ''}
+                    ? audioLevel > 0.1
+                      ? '🎙️ Speaking...'
+                      : '👂 Listening...'
+                    : status === VoicePipelineStatus.Processing
+                      ? '⚙️ Processing...'
+                      : status === VoicePipelineStatus.Thinking
+                        ? '💭 Thinking...'
+                        : status === VoicePipelineStatus.Speaking
+                          ? '🔊 Speaking...'
+                          : ''}
                 </Text>
               </View>
             )}
@@ -479,16 +604,27 @@ export const VoiceAssistantScreen: React.FC = () => {
               style={[
                 styles.micButton,
                 isSessionActive && styles.micButtonRecording,
-                status !== VoicePipelineStatus.Idle && status !== VoicePipelineStatus.Listening && styles.micButtonDisabled,
+                status !== VoicePipelineStatus.Idle &&
+                  status !== VoicePipelineStatus.Listening &&
+                  styles.micButtonDisabled,
               ]}
               onPress={handleToggleSession}
-              disabled={status !== VoicePipelineStatus.Idle && status !== VoicePipelineStatus.Listening}
+              disabled={
+                status !== VoicePipelineStatus.Idle &&
+                status !== VoicePipelineStatus.Listening
+              }
               activeOpacity={0.8}
             >
-              <Icon name={isSessionActive ? 'stop' : 'mic'} size={36} color={Colors.textWhite} />
+              <Icon
+                name={isSessionActive ? 'stop' : 'mic'}
+                size={36}
+                color={Colors.textWhite}
+              />
             </TouchableOpacity>
             <Text style={styles.micLabel}>
-              {isSessionActive ? 'Tap to stop (auto-detects silence)' : 'Tap to speak'}
+              {isSessionActive
+                ? 'Tap to stop (auto-detects silence)'
+                : 'Tap to speak'}
             </Text>
           </View>
         </>

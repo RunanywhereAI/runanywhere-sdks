@@ -398,3 +398,6 @@ __pycache__/
 node_modules/
 /tools/
 *.trace
+
+# External starter-app clones for local reference (release.yml clones them fresh)
+external_examples/

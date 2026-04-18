@@ -14,16 +14,12 @@ namespace rag {
 
 namespace {
 
-void perform_recursive_chunking(
-    std::string_view text_view,
-    const std::string& original_text,
-    const std::vector<std::string>& separators,
-    size_t chunk_size_chars,
-    size_t chunk_overlap_chars,
-    std::vector<TextChunk>& output_chunks,
-    size_t& chunk_index
-) {
-    if (text_view.empty()) return;
+void perform_recursive_chunking(std::string_view text_view, const std::string& original_text,
+                                const std::vector<std::string>& separators, size_t chunk_size_chars,
+                                size_t chunk_overlap_chars, std::vector<TextChunk>& output_chunks,
+                                size_t& chunk_index) {
+    if (text_view.empty())
+        return;
 
     if (text_view.length() <= chunk_size_chars) {
         const char* start_ptr = text_view.data();
@@ -58,7 +54,8 @@ void perform_recursive_chunking(
     for (size_t i = 0; i < separators.size(); ++i) {
         if (separators[i].empty() || text_view.find(separators[i]) != std::string_view::npos) {
             separator = separators[i];
-            next_separators = std::vector<std::string>(separators.begin() + i + 1, separators.end());
+            next_separators =
+                std::vector<std::string>(separators.begin() + i + 1, separators.end());
             break;
         }
     }
@@ -66,7 +63,8 @@ void perform_recursive_chunking(
     std::vector<std::string_view> splits;
     if (separator.empty()) {
         for (size_t i = 0; i < text_view.length(); i += chunk_size_chars) {
-            splits.push_back(text_view.substr(i, std::min(chunk_size_chars, text_view.length() - i)));
+            splits.push_back(
+                text_view.substr(i, std::min(chunk_size_chars, text_view.length() - i)));
         }
     } else {
         size_t start = 0;
@@ -86,7 +84,8 @@ void perform_recursive_chunking(
     size_t current_length = 0;
 
     auto emit_chunk = [&]() {
-        if (current_batch.empty()) return;
+        if (current_batch.empty())
+            return;
         const char* start_ptr = current_batch.front().data();
         const char* end_ptr = current_batch.back().data() + current_batch.back().length();
         size_t start_pos = start_ptr - original_text.data();
@@ -122,10 +121,12 @@ void perform_recursive_chunking(
             current_length = 0;
 
             if (!next_separators.empty()) {
-                perform_recursive_chunking(split, original_text, next_separators, chunk_size_chars, chunk_overlap_chars, output_chunks, chunk_index);
+                perform_recursive_chunking(split, original_text, next_separators, chunk_size_chars,
+                                           chunk_overlap_chars, output_chunks, chunk_index);
             } else {
                 for (size_t j = 0; j < split.length(); j += chunk_size_chars) {
-                    std::string_view sub_split = split.substr(j, std::min(chunk_size_chars, split.length() - j));
+                    std::string_view sub_split =
+                        split.substr(j, std::min(chunk_size_chars, split.length() - j));
                     current_batch.push_back(sub_split);
                     emit_chunk();
                     current_batch.clear();
@@ -138,7 +139,8 @@ void perform_recursive_chunking(
             emit_chunk();
 
             while (current_batch.size() > 1 &&
-                   (current_length > chunk_overlap_chars || current_length + split.length() > chunk_size_chars)) {
+                   (current_length > chunk_overlap_chars ||
+                    current_length + split.length() > chunk_size_chars)) {
                 current_length -= current_batch.front().length();
                 current_batch.erase(current_batch.begin());
             }
@@ -157,7 +159,7 @@ void perform_recursive_chunking(
     }
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 DocumentChunker::DocumentChunker(const ChunkerConfig& config) : config_(config) {}
 
@@ -175,9 +177,8 @@ std::vector<TextChunk> DocumentChunker::chunk_document(const std::string& text) 
     // Hierarchy of separators for standard English text
     std::vector<std::string> separators = {"\n\n", "\n", ". ", "? ", "! ", "; ", ", ", " ", ""};
 
-    perform_recursive_chunking(
-        text, text, separators, chunk_size_chars, overlap_chars, chunks, chunk_index
-    );
+    perform_recursive_chunking(text, text, separators, chunk_size_chars, overlap_chars, chunks,
+                               chunk_index);
 
     return chunks;
 }
@@ -187,7 +188,8 @@ size_t DocumentChunker::estimate_tokens(const std::string& text) const {
 }
 
 std::vector<std::string> DocumentChunker::split_into_sentences(const std::string& text) const {
-    if (text.empty()) return {};
+    if (text.empty())
+        return {};
 
     auto boundaries = find_sentence_boundaries(text);
     std::vector<std::string> sentences;
@@ -210,7 +212,7 @@ std::vector<std::string> DocumentChunker::split_into_sentences(const std::string
 
 std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string& text) const {
     std::vector<size_t> boundaries;
-    boundaries.push_back(0); // Start of document
+    boundaries.push_back(0);  // Start of document
 
     for (size_t i = 0; i < text.length(); ++i) {
         char c = text[i];
@@ -224,9 +226,9 @@ std::vector<size_t> DocumentChunker::find_sentence_boundaries(const std::string&
         }
     }
 
-    boundaries.push_back(text.length()); // End of document
+    boundaries.push_back(text.length());  // End of document
     return boundaries;
 }
 
-} // namespace rag
-} // namespace runanywhere
+}  // namespace rag
+}  // namespace runanywhere

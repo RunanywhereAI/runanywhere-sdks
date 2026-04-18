@@ -81,15 +81,13 @@ typedef struct rac_wakeword_config {
 /**
  * @brief Default configuration
  */
-static const rac_wakeword_config_t RAC_WAKEWORD_CONFIG_DEFAULT = {
-    .sample_rate = 16000,
-    .threshold = 0.5f,
-    .num_threads = 1,
-    .frame_length_ms = 80,
-    .use_vad_filter = RAC_TRUE,
-    .min_detection_interval_ms = 500,
-    .refractory_period_ms = 2000
-};
+static const rac_wakeword_config_t RAC_WAKEWORD_CONFIG_DEFAULT = {.sample_rate = 16000,
+                                                                  .threshold = 0.5f,
+                                                                  .num_threads = 1,
+                                                                  .frame_length_ms = 80,
+                                                                  .use_vad_filter = RAC_TRUE,
+                                                                  .min_detection_interval_ms = 500,
+                                                                  .refractory_period_ms = 2000};
 
 // =============================================================================
 // MODEL INFO
@@ -164,8 +162,7 @@ typedef struct rac_wakeword_info {
  * @param event Detection event (valid only during callback)
  * @param user_data User context passed to rac_wakeword_set_callback
  */
-typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event,
-                                          void* user_data);
+typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event, void* user_data);
 
 /**
  * @brief VAD state callback (for debugging/visualization)
@@ -174,9 +171,8 @@ typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event,
  * @param confidence VAD confidence (0.0 - 1.0)
  * @param user_data User context
  */
-typedef void (*rac_wakeword_vad_callback_fn)(rac_bool_t is_speech,
-                                              float confidence,
-                                              void* user_data);
+typedef void (*rac_wakeword_vad_callback_fn)(rac_bool_t is_speech, float confidence,
+                                             void* user_data);
 
 // =============================================================================
 // RESULT TYPES
@@ -207,14 +203,14 @@ typedef struct rac_wakeword_frame_result {
 // =============================================================================
 
 /** Wake word specific error codes (range: -850 to -860, per rac_error.h convention) */
-#define RAC_ERROR_WAKEWORD_BASE               ((rac_result_t)-850)
-#define RAC_ERROR_WAKEWORD_NOT_INITIALIZED    ((rac_result_t)-851)
-#define RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND    ((rac_result_t)-852)
-#define RAC_ERROR_WAKEWORD_MODEL_LOAD_FAILED  ((rac_result_t)-853)
-#define RAC_ERROR_WAKEWORD_INVALID_AUDIO      ((rac_result_t)-854)
-#define RAC_ERROR_WAKEWORD_MAX_MODELS         ((rac_result_t)-855)
-#define RAC_ERROR_WAKEWORD_ALREADY_LISTENING  ((rac_result_t)-856)
-#define RAC_ERROR_WAKEWORD_NOT_LISTENING      ((rac_result_t)-857)
+#define RAC_ERROR_WAKEWORD_BASE ((rac_result_t) - 850)
+#define RAC_ERROR_WAKEWORD_NOT_INITIALIZED ((rac_result_t) - 851)
+#define RAC_ERROR_WAKEWORD_MODEL_NOT_FOUND ((rac_result_t) - 852)
+#define RAC_ERROR_WAKEWORD_MODEL_LOAD_FAILED ((rac_result_t) - 853)
+#define RAC_ERROR_WAKEWORD_INVALID_AUDIO ((rac_result_t) - 854)
+#define RAC_ERROR_WAKEWORD_MAX_MODELS ((rac_result_t) - 855)
+#define RAC_ERROR_WAKEWORD_ALREADY_LISTENING ((rac_result_t) - 856)
+#define RAC_ERROR_WAKEWORD_NOT_LISTENING ((rac_result_t) - 857)
 
 /** Maximum number of wake word models that can be loaded simultaneously */
 #define RAC_WAKEWORD_MAX_MODELS 8

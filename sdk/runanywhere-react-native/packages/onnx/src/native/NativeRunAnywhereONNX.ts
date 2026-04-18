@@ -6,10 +6,10 @@
  */
 
 import type { RunAnywhereONNX } from '../specs/RunAnywhereONNX.nitro';
-import { getNitroModulesProxySync } from '@runanywhere/core';
+import { getNitroModulesProxySync, type NitroProxy } from '@runanywhere/core';
 
 // Use the global NitroModules initialization
-function getNitroModulesProxy(): any {
+function getNitroModulesProxy(): NitroProxy | null {
   return getNitroModulesProxySync();
 }
 
@@ -29,7 +29,7 @@ export function requireNativeONNXModule(): NativeRunAnywhereONNXModule {
       'react-native-nitro-modules is not properly linked.'
     );
   }
-  return NitroProxy.createHybridObject<RunAnywhereONNX>('RunAnywhereONNX');
+  return NitroProxy.createHybridObject('RunAnywhereONNX') as RunAnywhereONNX;
 }
 
 /**

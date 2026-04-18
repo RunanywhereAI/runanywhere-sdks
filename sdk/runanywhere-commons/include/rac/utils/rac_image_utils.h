@@ -183,7 +183,8 @@ RAC_API rac_result_t rac_image_to_chw(const rac_image_float_t* image, rac_image_
  * @param rgba_data Source RGBA pixel data
  * @param width Image width in pixels
  * @param height Image height in pixels
- * @param row_stride Bytes per row in source (may be > width*4 due to padding). Use 0 for tight packing.
+ * @param row_stride Bytes per row in source (may be > width*4 due to padding). Use 0 for tight
+ * packing.
  * @param out_rgb_data Output buffer for RGB data (must be at least width * height * 3 bytes)
  * @param out_size Size of the output buffer
  * @return RAC_SUCCESS or error code

@@ -35,9 +35,7 @@ struct rac_embeddings_component {
     /** Mutex for thread safety */
     std::mutex mtx;
 
-    rac_embeddings_component() : lifecycle(nullptr) {
-        config = RAC_EMBEDDINGS_CONFIG_DEFAULT;
-    }
+    rac_embeddings_component() : lifecycle(nullptr) { config = RAC_EMBEDDINGS_CONFIG_DEFAULT; }
 };
 
 // =============================================================================
@@ -48,7 +46,7 @@ struct rac_embeddings_component {
  * Service creation callback for lifecycle manager.
  */
 static rac_result_t embeddings_create_service(const char* model_id, void* user_data,
-                                               rac_handle_t* out_service) {
+                                              rac_handle_t* out_service) {
     (void)user_data;
 
     RAC_LOG_INFO(LOG_CAT, "Creating embeddings service for model: %s", model_id ? model_id : "");
@@ -102,7 +100,8 @@ extern "C" rac_result_t rac_embeddings_component_create(rac_handle_t* out_handle
 
     // Create lifecycle manager
     rac_lifecycle_config_t lifecycle_config = {};
-    lifecycle_config.resource_type = RAC_RESOURCE_TYPE_LLM_MODEL;  // Reuse LLM model type (embedding models are LLMs)
+    lifecycle_config.resource_type =
+        RAC_RESOURCE_TYPE_LLM_MODEL;  // Reuse LLM model type (embedding models are LLMs)
     lifecycle_config.logger_category = "Embeddings.Lifecycle";
     lifecycle_config.user_data = component;
 
@@ -122,7 +121,7 @@ extern "C" rac_result_t rac_embeddings_component_create(rac_handle_t* out_handle
 }
 
 extern "C" rac_result_t rac_embeddings_component_configure(rac_handle_t handle,
-                                                            const rac_embeddings_config_t* config) {
+                                                           const rac_embeddings_config_t* config) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!config)
@@ -133,9 +132,9 @@ extern "C" rac_result_t rac_embeddings_component_configure(rac_handle_t handle,
 
     component->config = *config;
 
-    RAC_LOG_INFO(LOG_CAT, "Embeddings component configured (max_tokens=%d, normalize=%d, pooling=%d)",
-                 config->max_tokens, static_cast<int>(config->normalize),
-                 static_cast<int>(config->pooling));
+    RAC_LOG_INFO(
+        LOG_CAT, "Embeddings component configured (max_tokens=%d, normalize=%d, pooling=%d)",
+        config->max_tokens, static_cast<int>(config->normalize), static_cast<int>(config->pooling));
 
     return RAC_SUCCESS;
 }
@@ -176,9 +175,9 @@ extern "C" void rac_embeddings_component_destroy(rac_handle_t handle) {
 // =============================================================================
 
 extern "C" rac_result_t rac_embeddings_component_load_model(rac_handle_t handle,
-                                                             const char* model_path,
-                                                             const char* model_id,
-                                                             const char* model_name) {
+                                                            const char* model_path,
+                                                            const char* model_id,
+                                                            const char* model_name) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!model_path)
@@ -215,10 +214,9 @@ extern "C" rac_result_t rac_embeddings_component_cleanup(rac_handle_t handle) {
 // EMBEDDING GENERATION API
 // =============================================================================
 
-extern "C" rac_result_t rac_embeddings_component_embed(rac_handle_t handle,
-                                                        const char* text,
-                                                        const rac_embeddings_options_t* options,
-                                                        rac_embeddings_result_t* out_result) {
+extern "C" rac_result_t rac_embeddings_component_embed(rac_handle_t handle, const char* text,
+                                                       const rac_embeddings_options_t* options,
+                                                       rac_embeddings_result_t* out_result) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!text || !out_result)
@@ -249,17 +247,16 @@ extern "C" rac_result_t rac_embeddings_component_embed(rac_handle_t handle,
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     out_result->processing_time_ms = duration.count();
 
-    RAC_LOG_INFO(LOG_CAT, "Embedding generated: dim=%zu, time=%lldms",
-                 out_result->dimension, static_cast<long long>(out_result->processing_time_ms));
+    RAC_LOG_INFO(LOG_CAT, "Embedding generated: dim=%zu, time=%lldms", out_result->dimension,
+                 static_cast<long long>(out_result->processing_time_ms));
 
     return RAC_SUCCESS;
 }
 
-extern "C" rac_result_t rac_embeddings_component_embed_batch(rac_handle_t handle,
-                                                              const char* const* texts,
-                                                              size_t num_texts,
-                                                              const rac_embeddings_options_t* options,
-                                                              rac_embeddings_result_t* out_result) {
+extern "C" rac_result_t
+rac_embeddings_component_embed_batch(rac_handle_t handle, const char* const* texts,
+                                     size_t num_texts, const rac_embeddings_options_t* options,
+                                     rac_embeddings_result_t* out_result) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!texts || !out_result || num_texts == 0)
@@ -309,7 +306,7 @@ extern "C" rac_lifecycle_state_t rac_embeddings_component_get_state(rac_handle_t
 }
 
 extern "C" rac_result_t rac_embeddings_component_get_metrics(rac_handle_t handle,
-                                                              rac_lifecycle_metrics_t* out_metrics) {
+                                                             rac_lifecycle_metrics_t* out_metrics) {
     if (!handle)
         return RAC_ERROR_INVALID_HANDLE;
     if (!out_metrics)

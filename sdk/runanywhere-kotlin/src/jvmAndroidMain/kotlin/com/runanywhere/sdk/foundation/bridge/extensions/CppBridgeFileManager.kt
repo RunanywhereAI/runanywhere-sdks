@@ -21,7 +21,6 @@ import java.io.File
  * Kotlin provides: thin I/O callbacks (create dir, delete, list, stat, file size).
  */
 object CppBridgeFileManager {
-
     @Volatile
     private var isRegistered: Boolean = false
     private val lock = Any()
@@ -110,7 +109,6 @@ object CppBridgeFileManager {
      * Method signatures must match JNI expectations exactly.
      */
     private object FileCallbackProvider {
-
         @Suppress("unused") // Called from JNI
         fun createDirectory(path: String, recursive: Boolean): Int {
             return try {

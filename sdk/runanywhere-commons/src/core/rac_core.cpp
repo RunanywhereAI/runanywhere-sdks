@@ -16,8 +16,8 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
-#include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 #if !defined(RAC_PLATFORM_ANDROID)
 #include "rac/features/diffusion/rac_diffusion_model_registry.h"
 #endif
@@ -340,14 +340,16 @@ rac_lora_registry_handle_t rac_get_lora_registry(void) {
 
 rac_result_t rac_register_lora(const rac_lora_entry_t* entry) {
     rac_lora_registry_handle_t registry = rac_get_lora_registry();
-    if (registry == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    if (registry == nullptr)
+        return RAC_ERROR_NOT_INITIALIZED;
     return rac_lora_registry_register(registry, entry);
 }
 
 rac_result_t rac_get_lora_for_model(const char* model_id, rac_lora_entry_t*** out_entries,
-                                     size_t* out_count) {
+                                    size_t* out_count) {
     rac_lora_registry_handle_t registry = rac_get_lora_registry();
-    if (registry == nullptr) return RAC_ERROR_NOT_INITIALIZED;
+    if (registry == nullptr)
+        return RAC_ERROR_NOT_INITIALIZED;
     return rac_lora_registry_get_for_model(registry, model_id, out_entries, out_count);
 }
 

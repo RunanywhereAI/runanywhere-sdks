@@ -1,12 +1,11 @@
 package com.runanywhere.runanywhereai.data
 
-import timber.log.Timber
 import com.runanywhere.runanywhereai.data.models.AppModel
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.core.types.NPUChip
-import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.llm.genie.Genie
+import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.ModelCompanionFile
@@ -16,117 +15,201 @@ import com.runanywhere.sdk.public.extensions.getChip
 import com.runanywhere.sdk.public.extensions.registerLoraAdapter
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
+import timber.log.Timber
 
 object ModelList {
     // LLM Models
-    private val llmModels = listOf(
-        AppModel(id = "smollm2-360m-q8_0", name = "SmolLM2 360M Q8_0",
-            url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 500_000_000),
-        AppModel(id = "llama-2-7b-chat-q4_k_m", name = "Llama 2 7B Chat Q4_K_M",
-            url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 4_000_000_000),
-        AppModel(id = "mistral-7b-instruct-q4_k_m", name = "Mistral 7B Instruct Q4_K_M",
-            url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 4_000_000_000),
-        AppModel(id = "qwen2.5-0.5b-instruct-q8_0", name = "Qwen 2.5 0.5B Instruct Q8_0",
-            url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/base-model-q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 600_000_000, supportsLoraAdapters = true),
-        AppModel(id = "qwen2.5-1.5b-instruct-q4_k_m", name = "Qwen 2.5 1.5B Instruct Q4_K_M",
-            url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 2_500_000_000),
-        // Qwen3 models
-        AppModel(id = "qwen3-0.6b-q4_k_m", name = "Qwen3 0.6B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 500_000_000),
-        AppModel(id = "qwen3-1.7b-q4_k_m", name = "Qwen3 1.7B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 1_200_000_000),
-        AppModel(id = "qwen3-4b-q4_k_m", name = "Qwen3 4B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 2_800_000_000),
-        // Qwen3.5 models
-        AppModel(id = "qwen3.5-0.8b-q4_k_m", name = "Qwen3.5 0.8B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 600_000_000),
-        AppModel(id = "qwen3.5-2b-q4_k_m", name = "Qwen3.5 2B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 1_500_000_000),
-        AppModel(id = "qwen3.5-4b-q4_k_m", name = "Qwen3.5 4B Q4_K_M",
-            url = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 2_800_000_000),
-        AppModel(id = "lfm2-350m-q4_k_m", name = "LiquidAI LFM2 350M Q4_K_M",
-            url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 250_000_000),
-        AppModel(id = "lfm2-350m-q8_0", name = "LiquidAI LFM2 350M Q8_0",
-            url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 400_000_000),
-        AppModel(id = "lfm2-1.2b-tool-q4_k_m", name = "LiquidAI LFM2 1.2B Tool Q4_K_M",
-            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 800_000_000),
-        AppModel(id = "lfm2-1.2b-tool-q8_0", name = "LiquidAI LFM2 1.2B Tool Q8_0",
-            url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.LANGUAGE,
-            memoryRequirement = 1_400_000_000),
-    )
+    private val llmModels =
+        listOf(
+            AppModel(
+                id = "smollm2-360m-q8_0",
+                name = "SmolLM2 360M Q8_0",
+                url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 500_000_000,
+            ),
+            AppModel(
+                id = "llama-2-7b-chat-q4_k_m",
+                name = "Llama 2 7B Chat Q4_K_M",
+                url = "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 4_000_000_000,
+            ),
+            AppModel(
+                id = "mistral-7b-instruct-q4_k_m",
+                name = "Mistral 7B Instruct Q4_K_M",
+                url = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 4_000_000_000,
+            ),
+            AppModel(
+                id = "qwen2.5-0.5b-instruct-q8_0",
+                name = "Qwen 2.5 0.5B Instruct Q8_0",
+                url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/base-model-q8_0.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 600_000_000,
+                supportsLoraAdapters = true,
+            ),
+            AppModel(
+                id = "qwen2.5-1.5b-instruct-q4_k_m",
+                name = "Qwen 2.5 1.5B Instruct Q4_K_M",
+                url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 2_500_000_000,
+            ),
+            // Qwen3 models
+            AppModel(
+                id = "qwen3-0.6b-q4_k_m",
+                name = "Qwen3 0.6B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 500_000_000,
+            ),
+            AppModel(
+                id = "qwen3-1.7b-q4_k_m",
+                name = "Qwen3 1.7B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 1_200_000_000,
+            ),
+            AppModel(
+                id = "qwen3-4b-q4_k_m",
+                name = "Qwen3 4B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 2_800_000_000,
+            ),
+            // Qwen3.5 models
+            AppModel(
+                id = "qwen3.5-0.8b-q4_k_m",
+                name = "Qwen3.5 0.8B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 600_000_000,
+            ),
+            AppModel(
+                id = "qwen3.5-2b-q4_k_m",
+                name = "Qwen3.5 2B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 1_500_000_000,
+            ),
+            AppModel(
+                id = "qwen3.5-4b-q4_k_m",
+                name = "Qwen3.5 4B Q4_K_M",
+                url = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 2_800_000_000,
+            ),
+            AppModel(
+                id = "lfm2-350m-q4_k_m",
+                name = "LiquidAI LFM2 350M Q4_K_M",
+                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 250_000_000,
+            ),
+            AppModel(
+                id = "lfm2-350m-q8_0",
+                name = "LiquidAI LFM2 350M Q8_0",
+                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 400_000_000,
+            ),
+            AppModel(
+                id = "lfm2-1.2b-tool-q4_k_m",
+                name = "LiquidAI LFM2 1.2B Tool Q4_K_M",
+                url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 800_000_000,
+            ),
+            AppModel(
+                id = "lfm2-1.2b-tool-q8_0",
+                name = "LiquidAI LFM2 1.2B Tool Q8_0",
+                url = "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.LANGUAGE,
+                memoryRequirement = 1_400_000_000,
+            ),
+        )
 
     // STT / TTS
-    private val sttModels = listOf(
-        AppModel(id = "sherpa-onnx-whisper-tiny.en", name = "Sherpa Whisper Tiny (ONNX)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
-            framework = InferenceFramework.ONNX, category = ModelCategory.SPEECH_RECOGNITION,
-            memoryRequirement = 75_000_000),
-    )
-    private val ttsModels = listOf(
-        AppModel(id = "vits-piper-en_US-lessac-medium", name = "Piper TTS (US English - Medium)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
-            framework = InferenceFramework.ONNX, category = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000),
-        AppModel(id = "vits-piper-en_GB-alba-medium", name = "Piper TTS (British English)",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
-            framework = InferenceFramework.ONNX, category = ModelCategory.SPEECH_SYNTHESIS,
-            memoryRequirement = 65_000_000),
-    )
+    private val sttModels =
+        listOf(
+            AppModel(
+                id = "sherpa-onnx-whisper-tiny.en",
+                name = "Sherpa Whisper Tiny (ONNX)",
+                url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+                framework = InferenceFramework.ONNX,
+                category = ModelCategory.SPEECH_RECOGNITION,
+                memoryRequirement = 75_000_000,
+            ),
+        )
+    private val ttsModels =
+        listOf(
+            AppModel(
+                id = "vits-piper-en_US-lessac-medium",
+                name = "Piper TTS (US English - Medium)",
+                url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+                framework = InferenceFramework.ONNX,
+                category = ModelCategory.SPEECH_SYNTHESIS,
+                memoryRequirement = 65_000_000,
+            ),
+            AppModel(
+                id = "vits-piper-en_GB-alba-medium",
+                name = "Piper TTS (British English)",
+                url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
+                framework = InferenceFramework.ONNX,
+                category = ModelCategory.SPEECH_SYNTHESIS,
+                memoryRequirement = 65_000_000,
+            ),
+        )
 
     // Embedding
-    private val embeddingModels = listOf(
-        AppModel(id = "all-minilm-l6-v2", name = "All MiniLM L6 v2 (Embedding)",
-            url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
-            framework = InferenceFramework.ONNX, category = ModelCategory.EMBEDDING,
-            memoryRequirement = 25_500_000,
-            companionFiles = listOf(
-                ModelCompanionFile(url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/vocab.txt", filename = "vocab.txt"),
-                ModelCompanionFile(url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/tokenizer.json", filename = "tokenizer.json"),
-            )),
-    )
+    private val embeddingModels =
+        listOf(
+            AppModel(
+                id = "all-minilm-l6-v2",
+                name = "All MiniLM L6 v2 (Embedding)",
+                url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
+                framework = InferenceFramework.ONNX,
+                category = ModelCategory.EMBEDDING,
+                memoryRequirement = 25_500_000,
+                companionFiles =
+                    listOf(
+                        ModelCompanionFile(url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/vocab.txt", filename = "vocab.txt"),
+                        ModelCompanionFile(url = "https://huggingface.co/Xenova/all-MiniLM-L6-v2/raw/main/tokenizer.json", filename = "tokenizer.json"),
+                    ),
+            ),
+        )
 
     // LoRA Adapters
-    private val loraAdapters = listOf(
-        LoraAdapterCatalogEntry(
-            id = "abliterated-lora",
-            name = "Abliterated LoRA (F16)",
-            description = "Removes refusal behavior — model answers all questions directly without disclaimers",
-            downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
-            compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
-            fileSize = 17_600_000,
-            defaultScale = 1.0f,
-        ),
-    )
+    private val loraAdapters =
+        listOf(
+            LoraAdapterCatalogEntry(
+                id = "abliterated-lora",
+                name = "Abliterated LoRA (F16)",
+                description = "Removes refusal behavior — model answers all questions directly without disclaimers",
+                downloadUrl = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                compatibleModelIds = listOf("qwen2.5-0.5b-instruct-q8_0"),
+                fileSize = 17_600_000,
+                defaultScale = 1.0f,
+            ),
+        )
 
     // Genie NPU Models — URLs are built dynamically based on detected chipset.
     // getChip() returns the NPUChip for this device, or null if unsupported.
@@ -140,33 +223,34 @@ object ModelList {
         val quant: String = "w4a16",
     )
 
-    private val genieModelDefs = listOf(
-        GenieModelDef(
-            slug = "qwen3-4b",
-            name = "Qwen3 4B",
-            memoryRequirement = 2_800_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "llama3.2-1b-instruct",
-            name = "Llama 3.2 1B Instruct",
-            memoryRequirement = 1_200_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "sea-lion3.5-8b-instruct",
-            name = "SEA-LION v3.5 8B Instruct",
-            memoryRequirement = 4_800_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
-        ),
-        GenieModelDef(
-            slug = "qwen2.5-7b-instruct",
-            name = "Qwen 2.5 7B Instruct",
-            memoryRequirement = 4_200_000_000,
-            supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE),
-            quant = "w8a16",
-        ),
-    )
+    private val genieModelDefs =
+        listOf(
+            GenieModelDef(
+                slug = "qwen3-4b",
+                name = "Qwen3 4B",
+                memoryRequirement = 2_800_000_000,
+                supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+            ),
+            GenieModelDef(
+                slug = "llama3.2-1b-instruct",
+                name = "Llama 3.2 1B Instruct",
+                memoryRequirement = 1_200_000_000,
+                supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+            ),
+            GenieModelDef(
+                slug = "sea-lion3.5-8b-instruct",
+                name = "SEA-LION v3.5 8B Instruct",
+                memoryRequirement = 4_800_000_000,
+                supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE, NPUChip.SNAPDRAGON_8_ELITE_GEN5),
+            ),
+            GenieModelDef(
+                slug = "qwen2.5-7b-instruct",
+                name = "Qwen 2.5 7B Instruct",
+                memoryRequirement = 4_200_000_000,
+                supportedChips = setOf(NPUChip.SNAPDRAGON_8_ELITE),
+                quant = "w8a16",
+            ),
+        )
 
     private fun genieModels(): List<AppModel> {
         val chip = RunAnywhere.getChip() ?: return emptyList()
@@ -185,26 +269,49 @@ object ModelList {
     }
 
     // VLM
-    private val vlmModels = listOf(
-        AppModel(id = "smolvlm-500m-instruct-q8_0", name = "SmolVLM 500M Instruct",
-            url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.MULTIMODAL,
-            memoryRequirement = 600_000_000),
-        AppModel(id = "lfm2-vl-450m-q8_0", name = "LFM2-VL 450M", url = "",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.MULTIMODAL,
-            memoryRequirement = 600_000_000,
-            files = listOf(
-                ModelFileDescriptor(url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf", filename = "LFM2-VL-450M-Q8_0.gguf"),
-                ModelFileDescriptor(url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf", filename = "mmproj-LFM2-VL-450M-Q8_0.gguf"),
-            )),
-        AppModel(id = "qwen2-vl-2b-instruct-q4_k_m", name = "Qwen2-VL 2B Instruct", url = "",
-            framework = InferenceFramework.LLAMA_CPP, category = ModelCategory.MULTIMODAL,
-            memoryRequirement = 1_800_000_000,
-            files = listOf(
-                ModelFileDescriptor(url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf", filename = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
-                ModelFileDescriptor(url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf", filename = "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf"),
-            )),
-    )
+    private val vlmModels =
+        listOf(
+            AppModel(
+                id = "smolvlm-500m-instruct-q8_0",
+                name = "SmolVLM 500M Instruct",
+                url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.MULTIMODAL,
+                memoryRequirement = 600_000_000,
+            ),
+            AppModel(
+                id = "lfm2-vl-450m-q8_0",
+                name = "LFM2-VL 450M",
+                url = "",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.MULTIMODAL,
+                memoryRequirement = 600_000_000,
+                files =
+                    listOf(
+                        ModelFileDescriptor(url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf", filename = "LFM2-VL-450M-Q8_0.gguf"),
+                        ModelFileDescriptor(url = "https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf", filename = "mmproj-LFM2-VL-450M-Q8_0.gguf"),
+                    ),
+            ),
+            AppModel(
+                id = "qwen2-vl-2b-instruct-q4_k_m",
+                name = "Qwen2-VL 2B Instruct",
+                url = "",
+                framework = InferenceFramework.LLAMA_CPP,
+                category = ModelCategory.MULTIMODAL,
+                memoryRequirement = 1_800_000_000,
+                files =
+                    listOf(
+                        ModelFileDescriptor(
+                            url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                            filename = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                        ),
+                        ModelFileDescriptor(
+                            url = "https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                            filename = "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                        ),
+                    ),
+            ),
+        )
 
     fun setupModels() {
         Timber.i("Registering backends and models...")
@@ -226,32 +333,42 @@ object ModelList {
             Timber.w(e, "Genie backend unavailable — continuing without NPU models")
         }
 
-        val allModels = buildList {
-            add("LLM/STT/TTS" to (llmModels + sttModels + ttsModels))
-            if (genieRegistered) add("Genie NPU" to genieModels())
-            add("Embedding" to embeddingModels)
-            add("VLM" to vlmModels)
-        }
+        val allModels =
+            buildList {
+                add("LLM/STT/TTS" to (llmModels + sttModels + ttsModels))
+                if (genieRegistered) add("Genie NPU" to genieModels())
+                add("Embedding" to embeddingModels)
+                add("VLM" to vlmModels)
+            }
         for ((label, models) in allModels) {
             for (model in models) {
                 try {
                     if (model.files.isNotEmpty()) {
                         RunAnywhere.registerMultiFileModel(
-                            id = model.id, name = model.name, files = model.files,
-                            framework = model.framework, modality = model.category,
+                            id = model.id,
+                            name = model.name,
+                            files = model.files,
+                            framework = model.framework,
+                            modality = model.category,
                             memoryRequirement = model.memoryRequirement,
                         )
                     } else if (model.companionFiles.isNotEmpty()) {
                         RunAnywhere.registerMultiFileModel(
-                            id = model.id, name = model.name, primaryUrl = model.url,
+                            id = model.id,
+                            name = model.name,
+                            primaryUrl = model.url,
                             companionFiles = model.companionFiles,
-                            framework = model.framework, modality = model.category,
+                            framework = model.framework,
+                            modality = model.category,
                             memoryRequirement = model.memoryRequirement,
                         )
                     } else {
                         RunAnywhere.registerModel(
-                            id = model.id, name = model.name, url = model.url,
-                            framework = model.framework, modality = model.category,
+                            id = model.id,
+                            name = model.name,
+                            url = model.url,
+                            framework = model.framework,
+                            modality = model.category,
                             memoryRequirement = model.memoryRequirement,
                             supportsLora = model.supportsLoraAdapters,
                         )

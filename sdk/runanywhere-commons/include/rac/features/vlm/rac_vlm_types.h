@@ -94,9 +94,9 @@ RAC_API const rac_vlm_chat_template_t* rac_vlm_get_builtin_template(rac_vlm_mode
  * @brief VLM image input format enumeration
  */
 typedef enum rac_vlm_image_format {
-    RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0,   /**< Path to image file (JPEG, PNG, etc.) */
-    RAC_VLM_IMAGE_FORMAT_RGB_PIXELS = 1,  /**< Raw RGB pixel buffer (RGBRGBRGB...) */
-    RAC_VLM_IMAGE_FORMAT_BASE64 = 2,      /**< Base64-encoded image data */
+    RAC_VLM_IMAGE_FORMAT_FILE_PATH = 0,  /**< Path to image file (JPEG, PNG, etc.) */
+    RAC_VLM_IMAGE_FORMAT_RGB_PIXELS = 1, /**< Raw RGB pixel buffer (RGBRGBRGB...) */
+    RAC_VLM_IMAGE_FORMAT_BASE64 = 2,     /**< Base64-encoded image data */
 } rac_vlm_image_format_t;
 
 /**
@@ -197,14 +197,20 @@ typedef struct rac_vlm_options {
 /**
  * @brief Default VLM generation options
  */
-#define RAC_VLM_OPTIONS_DEFAULT                                                                    \
-    {                                                                                              \
-        .max_tokens = 2048, .temperature = 0.7f, .top_p = 0.9f, .stop_sequences = RAC_NULL,        \
-        .num_stop_sequences = 0, .streaming_enabled = RAC_TRUE, .system_prompt = RAC_NULL,         \
-        .max_image_size = 0, .n_threads = 0, .use_gpu = RAC_TRUE,                                  \
-        .model_family = RAC_VLM_MODEL_FAMILY_AUTO, .custom_chat_template = RAC_NULL,               \
-        .image_marker_override = RAC_NULL                                                          \
-    }
+#define RAC_VLM_OPTIONS_DEFAULT                 \
+    {.max_tokens = 2048,                        \
+     .temperature = 0.7f,                       \
+     .top_p = 0.9f,                             \
+     .stop_sequences = RAC_NULL,                \
+     .num_stop_sequences = 0,                   \
+     .streaming_enabled = RAC_TRUE,             \
+     .system_prompt = RAC_NULL,                 \
+     .max_image_size = 0,                       \
+     .n_threads = 0,                            \
+     .use_gpu = RAC_TRUE,                       \
+     .model_family = RAC_VLM_MODEL_FAMILY_AUTO, \
+     .custom_chat_template = RAC_NULL,          \
+     .image_marker_override = RAC_NULL}
 
 // =============================================================================
 // CONFIGURATION - VLM Component Configuration

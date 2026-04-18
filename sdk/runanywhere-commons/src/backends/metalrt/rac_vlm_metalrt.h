@@ -18,13 +18,12 @@ rac_result_t rac_vlm_metalrt_create(const char* model_path, rac_handle_t* out_ha
 void rac_vlm_metalrt_destroy(rac_handle_t handle);
 
 rac_result_t rac_vlm_metalrt_process(rac_handle_t handle, const rac_vlm_image_t* image,
-                                      const char* prompt, const rac_vlm_options_t* options,
-                                      rac_vlm_result_t* out_result);
+                                     const char* prompt, const rac_vlm_options_t* options,
+                                     rac_vlm_result_t* out_result);
 
 rac_result_t rac_vlm_metalrt_process_stream(rac_handle_t handle, const rac_vlm_image_t* image,
-                                             const char* prompt, const rac_vlm_options_t* options,
-                                             rac_vlm_stream_callback_fn callback,
-                                             void* user_data);
+                                            const char* prompt, const rac_vlm_options_t* options,
+                                            rac_vlm_stream_callback_fn callback, void* user_data);
 
 void rac_vlm_metalrt_reset(rac_handle_t handle);
 

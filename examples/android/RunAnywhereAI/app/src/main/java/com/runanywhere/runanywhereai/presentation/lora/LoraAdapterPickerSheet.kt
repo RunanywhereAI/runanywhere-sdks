@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.presentation.lora
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -36,7 +34,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -49,11 +46,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
 
 /**
  * Bottom sheet for picking and managing LoRA adapters for the current model.
@@ -72,9 +70,10 @@ fun LoraAdapterPickerSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Dimensions.large),
         ) {
             // Header
             Row(
@@ -190,11 +189,12 @@ private fun LoadedAdapterRow(
     val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(Dimensions.mediumLarge),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(Dimensions.mediumLarge),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -234,9 +234,10 @@ private fun LoadedAdapterRow(
             Spacer(modifier = Modifier.height(Dimensions.xSmall))
             examplePrompts.forEach { prompt ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Dimensions.xxSmall),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = Dimensions.xxSmall),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -279,11 +280,12 @@ private fun CatalogAdapterRow(
     var scale by remember(entry.id, entry.defaultScale) { mutableFloatStateOf(entry.defaultScale) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(Dimensions.mediumLarge),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Dimensions.cornerRadiusRegular))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(Dimensions.mediumLarge),
     ) {
         // Name + description
         Text(
@@ -320,13 +322,15 @@ private fun CatalogAdapterRow(
                     value = scale,
                     onValueChange = { scale = it },
                     valueRange = 0f..2f,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(Dimensions.loraScaleSliderHeight),
-                    colors = SliderDefaults.colors(
-                        thumbColor = AppColors.primaryPurple,
-                        activeTrackColor = AppColors.primaryPurple,
-                    ),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(Dimensions.loraScaleSliderHeight),
+                    colors =
+                        SliderDefaults.colors(
+                            thumbColor = AppColors.primaryPurple,
+                            activeTrackColor = AppColors.primaryPurple,
+                        ),
                 )
                 Spacer(modifier = Modifier.width(Dimensions.xSmall))
                 Text("%.1f".format(scale), style = MaterialTheme.typography.labelSmall)
@@ -345,9 +349,10 @@ private fun CatalogAdapterRow(
             Button(
                 onClick = onRemove,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
-                ),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
+                    ),
             ) {
                 Icon(Icons.Default.LinkOff, contentDescription = null, tint = AppColors.primaryRed, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(Dimensions.xSmall))

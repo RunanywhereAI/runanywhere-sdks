@@ -18,8 +18,8 @@ rac_result_t rac_stt_metalrt_create(const char* model_path, rac_handle_t* out_ha
 void rac_stt_metalrt_destroy(rac_handle_t handle);
 
 rac_result_t rac_stt_metalrt_transcribe(rac_handle_t handle, const void* audio_data,
-                                         size_t audio_size, const rac_stt_options_t* options,
-                                         rac_stt_result_t* out_result);
+                                        size_t audio_size, const rac_stt_options_t* options,
+                                        rac_stt_result_t* out_result);
 
 #ifdef __cplusplus
 }

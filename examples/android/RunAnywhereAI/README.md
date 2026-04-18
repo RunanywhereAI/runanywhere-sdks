@@ -61,7 +61,7 @@ The `build-kotlin.sh --setup` script:
 1. Downloads dependencies (Sherpa-ONNX, ~500MB)
 2. Builds the native C++ libraries from `runanywhere-commons`
 3. Copies JNI `.so` files to `sdk/runanywhere-kotlin/src/androidMain/jniLibs/`
-4. Sets `runanywhere.testLocal=true` in `gradle.properties`
+4. Sets `runanywhere.useLocalNatives=true` in `gradle.properties`
 
 ### After Modifying the SDK
 

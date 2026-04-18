@@ -282,4 +282,3 @@ private func withOptionalCString<T>(
         return try body(nil)
     }
 }
-

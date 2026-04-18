@@ -53,7 +53,11 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
  * iOS Reference: ContentView.swift TabView
  */
 enum class BottomNavTab {
-    Chat, Vision, Voice, More, Settings
+    Chat,
+    Vision,
+    Voice,
+    More,
+    Settings,
 }
 
 @Composable
@@ -63,23 +67,25 @@ fun AppBottomNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                ambientColor = Color.Black.copy(alpha = 0.08f),
-                spotColor = Color.Black.copy(alpha = 0.12f),
-            ),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = 16.dp,
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.08f),
+                    spotColor = Color.Black.copy(alpha = 0.12f),
+                ),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp)
-                .navigationBarsPadding(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                    .navigationBarsPadding(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -119,36 +125,39 @@ private fun BottomNavItem(
     )
 
     Column(
-        modifier = modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(vertical = 4.dp),
+        modifier =
+            modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick,
+                )
+                .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         // Icon with optional pill background when selected
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(width = 56.dp, height = 32.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .then(
-                    if (isSelected) {
-                        Modifier.background(tabColor.copy(alpha = 0.12f))
-                    } else {
-                        Modifier
-                    }
-                ),
+            modifier =
+                Modifier
+                    .size(width = 56.dp, height = 32.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .then(
+                        if (isSelected) {
+                            Modifier.background(tabColor.copy(alpha = 0.12f))
+                        } else {
+                            Modifier
+                        },
+                    ),
         ) {
             Icon(
                 imageVector = if (isSelected) getTabIconFilled(tab) else getTabIconOutlined(tab),
                 contentDescription = tab.name,
-                modifier = Modifier
-                    .size(22.dp)
-                    .scale(iconScale),
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .scale(iconScale),
                 tint = iconColor,
             )
         }

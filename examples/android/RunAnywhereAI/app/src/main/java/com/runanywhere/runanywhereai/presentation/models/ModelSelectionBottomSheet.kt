@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.SdStorage
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -36,7 +37,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,9 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -107,8 +107,9 @@ fun ModelSelectionBottomSheet(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val deviceStatus = uiState.deviceInfo?.let { toDeviceStatus(it) }
-        ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
+    val deviceStatus =
+        uiState.deviceInfo?.let { toDeviceStatus(it) }
+            ?: DeviceStatus(model = "—", chip = "—", memory = "—", hasNeuralEngine = false)
     var errorDialogText by remember { mutableStateOf<String?>(null) }
 
     if (errorDialogText != null) {
@@ -138,10 +139,11 @@ fun ModelSelectionBottomSheet(
     ) {
         Box {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .verticalScroll(rememberScrollState()),
             ) {
                 SheetHeader(title = uiState.context.title, onCancel = onDismiss)
 
@@ -158,9 +160,10 @@ fun ModelSelectionBottomSheet(
 
                 if (uiState.isLoading) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Dimensions.xLarge),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Dimensions.xLarge),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
                     ) {
@@ -179,14 +182,15 @@ fun ModelSelectionBottomSheet(
                                 scope.launch {
                                     viewModel.setLoadingModel(true)
                                     try {
-                                        val systemTTSModel = ModelInfo(
-                                            id = SYSTEM_TTS_MODEL_ID,
-                                            name = "System TTS",
-                                            downloadURL = null,
-                                            format = ModelFormat.UNKNOWN,
-                                            category = ModelCategory.SPEECH_SYNTHESIS,
-                                            framework = InferenceFramework.SYSTEM_TTS,
-                                        )
+                                        val systemTTSModel =
+                                            ModelInfo(
+                                                id = SYSTEM_TTS_MODEL_ID,
+                                                name = "System TTS",
+                                                downloadURL = null,
+                                                format = ModelFormat.UNKNOWN,
+                                                category = ModelCategory.SPEECH_SYNTHESIS,
+                                                framework = InferenceFramework.SYSTEM_TTS,
+                                            )
                                         onModelSelected(systemTTSModel)
                                         onDismiss()
                                     } finally {
@@ -198,13 +202,23 @@ fun ModelSelectionBottomSheet(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    val sortedModels = uiState.models.sortedWith(
-                        compareBy<ModelInfo> { if (it.framework == InferenceFramework.FOUNDATION_MODELS) 0 else if (it.isDownloaded) 1 else 2 }
-                            .thenBy { it.name },
-                    )
+                    val sortedModels =
+                        uiState.models.sortedWith(
+                            compareBy<ModelInfo> {
+                                if (it.framework == InferenceFramework.FOUNDATION_MODELS) {
+                                    0
+                                } else if (it.isDownloaded) {
+                                    1
+                                } else {
+                                    2
+                                }
+                            }
+                                .thenBy { it.name },
+                        )
                     sortedModels.forEachIndexed { index, model ->
-                        val isBuiltIn = model.framework == InferenceFramework.FOUNDATION_MODELS ||
-                            model.framework == InferenceFramework.SYSTEM_TTS
+                        val isBuiltIn =
+                            model.framework == InferenceFramework.FOUNDATION_MODELS ||
+                                model.framework == InferenceFramework.SYSTEM_TTS
                         val isReady = isBuiltIn || model.isDownloaded
                         val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
                         ModelCard(
@@ -253,7 +267,6 @@ fun ModelSelectionBottomSheet(
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
-
         }
     }
 }
@@ -268,19 +281,21 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
 
 private fun toAIModel(m: ModelInfo): AIModel {
     val isGenie = m.framework == InferenceFramework.GENIE
-    val formatStr = when (m.framework) {
-        InferenceFramework.LLAMA_CPP -> "Fast"
-        InferenceFramework.ONNX -> "ONNX"
-        InferenceFramework.FOUNDATION_MODELS -> "Apple"
-        InferenceFramework.SYSTEM_TTS -> "System"
-        InferenceFramework.GENIE -> "NPU"
-        else -> m.framework.displayName
-    }
-    val formatColor = when (m.framework) {
-        InferenceFramework.ONNX -> AppColors.primaryPurple
-        InferenceFramework.GENIE -> AppColors.primaryBlue
-        else -> AppColors.primaryAccent
-    }
+    val formatStr =
+        when (m.framework) {
+            InferenceFramework.LLAMA_CPP -> "Fast"
+            InferenceFramework.ONNX -> "ONNX"
+            InferenceFramework.FOUNDATION_MODELS -> "Apple"
+            InferenceFramework.SYSTEM_TTS -> "System"
+            InferenceFramework.GENIE -> "NPU"
+            else -> m.framework.displayName
+        }
+    val formatColor =
+        when (m.framework) {
+            InferenceFramework.ONNX -> AppColors.primaryPurple
+            InferenceFramework.GENIE -> AppColors.primaryBlue
+            else -> AppColors.primaryAccent
+        }
     val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
     return AIModel(
         name = m.name,
@@ -324,9 +339,10 @@ private fun SheetHeader(
     onCancel: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         TextButton(
             onClick = onCancel,
@@ -366,9 +382,10 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun DeviceStatusCard(status: DeviceStatus) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
@@ -429,17 +446,19 @@ private fun DeviceStatusRow(
     trailingContent: @Composable (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier
-                .size(30.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(iconTint.copy(alpha = 0.10f)),
+            modifier =
+                Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(iconTint.copy(alpha = 0.10f)),
         ) {
             Icon(
                 imageVector = icon,
@@ -492,27 +511,30 @@ private fun ModelCard(
     onDownloadClick: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .then(
-                if (isReady) Modifier.clickable(onClick = onCardClick) else Modifier,
-            ),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .then(
+                    if (isReady) Modifier.clickable(onClick = onCardClick) else Modifier,
+                ),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp)),
             ) {
                 Image(
                     painter = painterResource(id = model.logoResId),
@@ -635,26 +657,29 @@ private fun SystemTTSRow(
     onSelect: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clickable(enabled = !isLoading, onClick = onSelect),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clickable(enabled = !isLoading, onClick = onSelect),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 0.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(AppColors.primaryAccent.copy(alpha = 0.08f)),
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(AppColors.primaryAccent.copy(alpha = 0.08f)),
             ) {
                 Text(text = "🔊", style = MaterialTheme.typography.titleSmall)
             }

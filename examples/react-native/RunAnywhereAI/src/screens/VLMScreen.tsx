@@ -23,7 +23,6 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Linking,
-  Platform,
 } from 'react-native';
 import { Camera, useCameraDevice } from 'react-native-vision-camera';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -33,7 +32,7 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
-import { FileSystem } from '@runanywhere/core';
+import { FileSystem, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -61,21 +60,23 @@ const VLMScreen: React.FC = () => {
 
   // Handle model selection
   const handleModelSelected = useCallback(
-  async (model: any) => {
-    // 1. Find the projector path
-    const mmprojPath = model.localPath
-      ? await FileSystem.findMmprojForModel(model.localPath)
-      : undefined;
+    async (model: SDKModelInfo) => {
+      // 1. Find the projector path
+      const mmprojPath = model.localPath
+        ? await FileSystem.findMmprojForModel(model.localPath)
+        : undefined;
 
-    // 2. Load the model FIRST
-    await vlm.loadModel(model.localPath, model.name, mmprojPath);
-    await vlm.checkModelStatus();
-    
-    // 3. Close the modal AFTER the model is safely loaded and state is stable
-    setShowingModelSelection(false); 
-  },
-  [vlm]
-);
+      // 2. Load the model FIRST
+      if (model.localPath) {
+        await vlm.loadModel(model.localPath, model.name, mmprojPath);
+      }
+      await vlm.checkModelStatus();
+
+      // 3. Close the modal AFTER the model is safely loaded and state is stable
+      setShowingModelSelection(false);
+    },
+    [vlm]
+  );
 
   // Copy description to clipboard
   const handleCopyDescription = useCallback(() => {
@@ -98,8 +99,9 @@ const VLMScreen: React.FC = () => {
     }
   }, [vlm]);
 
-  // Dismiss error
-  const handleDismissError = useCallback(() => {
+  // Dismiss error (placeholder — hook does not expose setError yet).
+  // Retained for the error-banner callback once we add a clearError action.
+  const _handleDismissError = useCallback(() => {
     // Reset error in next render to prevent flicker
     // Since hook doesn't expose setError, we'll just let user retry
   }, []);
@@ -108,8 +110,8 @@ const VLMScreen: React.FC = () => {
   const mainButtonColor = vlm.isAutoStreaming
     ? Colors.primaryRed
     : vlm.isProcessing
-    ? Colors.textTertiary
-    : Colors.primaryOrange;
+      ? Colors.textTertiary
+      : Colors.primaryOrange;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -253,13 +255,18 @@ const VLMScreen: React.FC = () => {
               <Icon
                 name="images-outline"
                 size={24}
-                color={vlm.isProcessing ? Colors.textTertiary : Colors.primaryBlue}
+                color={
+                  vlm.isProcessing ? Colors.textTertiary : Colors.primaryBlue
+                }
               />
             </TouchableOpacity>
 
             {/* Main Action Button */}
             <TouchableOpacity
-              style={[styles.mainActionButton, { backgroundColor: mainButtonColor }]}
+              style={[
+                styles.mainActionButton,
+                { backgroundColor: mainButtonColor },
+              ]}
               onPress={handleMainAction}
               disabled={vlm.isProcessing && !vlm.isAutoStreaming}
               activeOpacity={0.8}
@@ -285,8 +292,8 @@ const VLMScreen: React.FC = () => {
                   vlm.isAutoStreaming
                     ? Colors.statusGreen
                     : vlm.isProcessing
-                    ? Colors.textTertiary
-                    : Colors.primaryBlue
+                      ? Colors.textTertiary
+                      : Colors.primaryBlue
                 }
               />
             </TouchableOpacity>

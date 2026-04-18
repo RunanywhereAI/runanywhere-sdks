@@ -5,10 +5,10 @@
 
 #include "rac_tts_metalrt.h"
 
+#include "metalrt_c_api.h"
+
 #include <cstdlib>
 #include <cstring>
-
-#include "metalrt_c_api.h"
 
 #include "rac/core/rac_logger.h"
 
@@ -22,10 +22,12 @@ struct rac_tts_metalrt_impl {
 extern "C" {
 
 rac_result_t rac_tts_metalrt_create(const char* model_path, rac_handle_t* out_handle) {
-    if (!out_handle) return RAC_ERROR_NULL_POINTER;
+    if (!out_handle)
+        return RAC_ERROR_NULL_POINTER;
 
     auto* impl = new (std::nothrow) rac_tts_metalrt_impl();
-    if (!impl) return RAC_ERROR_OUT_OF_MEMORY;
+    if (!impl)
+        return RAC_ERROR_OUT_OF_MEMORY;
 
     impl->handle = metalrt_tts_create();
     if (!impl->handle) {
@@ -49,7 +51,8 @@ rac_result_t rac_tts_metalrt_create(const char* model_path, rac_handle_t* out_ha
 }
 
 void rac_tts_metalrt_destroy(rac_handle_t handle) {
-    if (!handle) return;
+    if (!handle)
+        return;
     auto* impl = static_cast<rac_tts_metalrt_impl*>(handle);
     if (impl->handle) {
         metalrt_tts_destroy(impl->handle);
@@ -58,11 +61,13 @@ void rac_tts_metalrt_destroy(rac_handle_t handle) {
 }
 
 rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char* text,
-                                         const rac_tts_options_t* options,
-                                         rac_tts_result_t* out_result) {
-    if (!handle || !text || !out_result) return RAC_ERROR_NULL_POINTER;
+                                        const rac_tts_options_t* options,
+                                        rac_tts_result_t* out_result) {
+    if (!handle || !text || !out_result)
+        return RAC_ERROR_NULL_POINTER;
     auto* impl = static_cast<rac_tts_metalrt_impl*>(handle);
-    if (!impl->loaded) return RAC_ERROR_BACKEND_NOT_READY;
+    if (!impl->loaded)
+        return RAC_ERROR_BACKEND_NOT_READY;
 
     const char* voice = "af_heart";  // default voice
     float speed = 1.0f;
@@ -94,8 +99,8 @@ rac_result_t rac_tts_metalrt_synthesize(rac_handle_t handle, const char* text,
     out_result->audio_size = buf_size;
     out_result->audio_format = RAC_AUDIO_FORMAT_PCM;
     out_result->sample_rate = audio.sample_rate;
-    out_result->duration_ms = static_cast<int64_t>(
-        (static_cast<double>(audio.num_samples) / audio.sample_rate) * 1000.0);
+    out_result->duration_ms =
+        static_cast<int64_t>((static_cast<double>(audio.num_samples) / audio.sample_rate) * 1000.0);
     out_result->processing_time_ms = static_cast<int64_t>(audio.synthesis_ms);
 
     metalrt_tts_free_audio(audio);

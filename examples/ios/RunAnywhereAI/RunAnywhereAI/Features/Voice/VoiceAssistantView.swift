@@ -17,7 +17,8 @@ struct VoiceAssistantView: View {
     @State private var morphProgress: Float = 0.0
     @State private var scatterAmount: Float = 0.0
     @State private var touchPoint: SIMD2<Float> = .zero
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorScheme)
+    var colorScheme
 
     private let animationTimer = Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()
 
@@ -569,7 +570,7 @@ extension VoiceAssistantView {
             amplitude = max(0.0, min(1.0, amplitude))
         } else {
             // Gentle decay when not active
-            amplitude = amplitude * 0.95
+            amplitude *= 0.95
         }
     }
 }

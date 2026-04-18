@@ -89,7 +89,7 @@ object Dimensions {
     val messageBubbleShadowRadius: Dp @Composable get() = rDp(4.dp)
     val messageBubbleMinSpacing: Dp @Composable get() = rDp(60.dp)
     val messageSpacingBetween: Dp @Composable get() = rDp(12.dp)
-    val messageMaxWidthFraction = 0.85f
+    const val messageMaxWidthFraction = 0.85f
 
     // Assistant message icon
     val assistantIconSize: Dp @Composable get() = rDp(20.dp)

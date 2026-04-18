@@ -8,7 +8,6 @@
 import Foundation
 
 final class BenchmarkStore: Sendable {
-
     private static let fileName = "benchmarks.json"
     private static let maxRuns = 50
 
@@ -18,16 +17,16 @@ final class BenchmarkStore: Sendable {
     }
 
     private static let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }()
 
     private static let encoder: JSONEncoder = {
-        let e = JSONEncoder()
-        e.dateEncodingStrategy = .iso8601
-        e.outputFormatting = [.prettyPrinted, .sortedKeys]
-        return e
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
     }()
 
     func loadRuns() -> [BenchmarkRun] {

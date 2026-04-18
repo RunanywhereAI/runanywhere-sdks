@@ -8,6 +8,26 @@
 import CRACommons
 import Foundation
 
+// MARK: - Diffusion Callback Context
+
+// Boxed context for C callbacks — captures the Swift progress closure and
+// holds fields populated from the C completion/error callbacks before C++
+// frees its result.
+private final class DiffusionCallbackContext: @unchecked Sendable {
+    let progressCallback: (DiffusionProgress) -> Bool
+    var capturedImageData: Data?
+    var capturedWidth: Int32 = 0
+    var capturedHeight: Int32 = 0
+    var capturedSeedUsed: Int64 = 0
+    var capturedGenerationTimeMs: Int64 = 0
+    var capturedSafetyFlagged = false
+    var capturedErrorMessage: String?
+
+    init(_ callback: @escaping (DiffusionProgress) -> Bool) {
+        self.progressCallback = callback
+    }
+}
+
 // MARK: - Diffusion Component Bridge
 
 extension CppBridge {
@@ -177,30 +197,14 @@ extension CppBridge {
 
             var cOptions = options.toCOptions()
 
-            // Box the Swift closure and result storage so C callbacks can access them
-            final class CallbackContext: @unchecked Sendable {
-                let progressCallback: (DiffusionProgress) -> Bool
-                // Result captured from the complete callback (before C++ frees it)
-                var capturedImageData: Data?
-                var capturedWidth: Int32 = 0
-                var capturedHeight: Int32 = 0
-                var capturedSeedUsed: Int64 = 0
-                var capturedGenerationTimeMs: Int64 = 0
-                var capturedSafetyFlagged: Bool = false
-                var capturedErrorMessage: String?
-
-                init(_ callback: @escaping (DiffusionProgress) -> Bool) {
-                    self.progressCallback = callback
-                }
-            }
-            let context = CallbackContext(onProgress)
+            let context = DiffusionCallbackContext(onProgress)
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
 
             let progressCB: rac_diffusion_progress_callback_fn = { cProgressPtr, userData -> rac_bool_t in
                 guard let cProgressPtr = cProgressPtr, let userData = userData else {
                     return RAC_TRUE
                 }
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                let ctx = Unmanaged<DiffusionCallbackContext>.fromOpaque(userData).takeUnretainedValue()
                 let progress = DiffusionProgress(from: cProgressPtr.pointee)
                 return ctx.progressCallback(progress) ? RAC_TRUE : RAC_FALSE
             }
@@ -208,23 +212,23 @@ extension CppBridge {
             // Capture the result in the callback — C++ frees it immediately after
             let completeCB: rac_diffusion_complete_callback_fn = { resultPtr, userData in
                 guard let resultPtr = resultPtr, let userData = userData else { return }
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
-                let r = resultPtr.pointee
+                let ctx = Unmanaged<DiffusionCallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                let cResult = resultPtr.pointee
 
                 // Copy image data before C++ frees the result
-                if let imageData = r.image_data, r.image_size > 0 {
-                    ctx.capturedImageData = Data(bytes: imageData, count: Int(r.image_size))
+                if let imageData = cResult.image_data, cResult.image_size > 0 {
+                    ctx.capturedImageData = Data(bytes: imageData, count: Int(cResult.image_size))
                 }
-                ctx.capturedWidth = r.width
-                ctx.capturedHeight = r.height
-                ctx.capturedSeedUsed = r.seed_used
-                ctx.capturedGenerationTimeMs = r.generation_time_ms
-                ctx.capturedSafetyFlagged = r.safety_flagged == RAC_TRUE
+                ctx.capturedWidth = cResult.width
+                ctx.capturedHeight = cResult.height
+                ctx.capturedSeedUsed = cResult.seed_used
+                ctx.capturedGenerationTimeMs = cResult.generation_time_ms
+                ctx.capturedSafetyFlagged = cResult.safety_flagged == RAC_TRUE
             }
 
             let errorCB: rac_diffusion_error_callback_fn = { _, errorMsg, userData in
                 guard let userData = userData else { return }
-                let ctx = Unmanaged<CallbackContext>.fromOpaque(userData).takeUnretainedValue()
+                let ctx = Unmanaged<DiffusionCallbackContext>.fromOpaque(userData).takeUnretainedValue()
                 if let errorMsg = errorMsg {
                     ctx.capturedErrorMessage = String(cString: errorMsg)
                 }
@@ -235,15 +239,18 @@ extension CppBridge {
                     cOptions.prompt = promptPtr
                     cOptions.negative_prompt = negPtr
                     return rac_diffusion_component_generate_with_callbacks(
-                        handle, &cOptions,
-                        progressCB, completeCB, errorCB,
+                        handle,
+                        &cOptions,
+                        progressCB,
+                        completeCB,
+                        errorCB,
                         contextPtr
                     )
                 }
             }
 
             // Release the context
-            Unmanaged<CallbackContext>.fromOpaque(contextPtr).release()
+            Unmanaged<DiffusionCallbackContext>.fromOpaque(contextPtr).release()
 
             guard result == RAC_SUCCESS else {
                 let errorMsg = context.capturedErrorMessage ?? "Unknown error"

@@ -30,8 +30,8 @@ extern "C" {
  */
 typedef struct rac_vad_service_ops {
     /** Process audio samples and detect speech */
-    rac_result_t (*process)(void* impl, const float* samples,
-                            size_t num_samples, rac_bool_t* out_is_speech);
+    rac_result_t (*process)(void* impl, const float* samples, size_t num_samples,
+                            rac_bool_t* out_is_speech);
 
     /** Start VAD processing session */
     rac_result_t (*start)(void* impl);

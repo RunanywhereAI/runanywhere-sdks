@@ -58,7 +58,12 @@ public extension RunAnywhere {
         cOptions.top_p = opts.topP
         cOptions.streaming_enabled = RAC_FALSE
 
-        SDKLogger.llm.info("[PARAMS] generate: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), max_tokens=\(cOptions.max_tokens), system_prompt=\(opts.systemPrompt != nil ? "set(\(opts.systemPrompt!.count) chars)" : "nil"), streaming=\(cOptions.streaming_enabled == RAC_TRUE)")
+        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        SDKLogger.llm.info(
+            "[PARAMS] generate: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
+            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+        )
 
         // Generate (C++ emits events) - wrap in system_prompt lifetime scope
         var llmResult = rac_llm_result_t()
@@ -168,7 +173,12 @@ public extension RunAnywhere {
         cOptions.top_p = opts.topP
         cOptions.streaming_enabled = RAC_TRUE
 
-        SDKLogger.llm.info("[PARAMS] generateStream: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), max_tokens=\(cOptions.max_tokens), system_prompt=\(opts.systemPrompt != nil ? "set(\(opts.systemPrompt!.count) chars)" : "nil"), streaming=\(cOptions.streaming_enabled == RAC_TRUE)")
+        let systemPromptDesc = opts.systemPrompt.map { "set(\($0.count) chars)" } ?? "nil"
+        SDKLogger.llm.info(
+            "[PARAMS] generateStream: temperature=\(cOptions.temperature), top_p=\(cOptions.top_p), "
+            + "max_tokens=\(cOptions.max_tokens), system_prompt=\(systemPromptDesc), "
+            + "streaming=\(cOptions.streaming_enabled == RAC_TRUE)"
+        )
 
         let stream = createTokenStream(
             prompt: prompt,

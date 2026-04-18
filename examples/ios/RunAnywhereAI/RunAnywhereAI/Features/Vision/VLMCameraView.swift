@@ -18,7 +18,8 @@ struct VLMCameraView: View {
     @State private var showingPhotos = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var shouldResumeAutoStreaming = false
-    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.scenePhase)
+    private var scenePhase
 
     var body: some View {
         ZStack {
@@ -271,8 +272,7 @@ struct VLMCameraView: View {
 
     // MARK: - Toolbar
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
         #if os(iOS)
         ToolbarItem(placement: .navigationBarTrailing) {
             if let name = viewModel.loadedModelName {

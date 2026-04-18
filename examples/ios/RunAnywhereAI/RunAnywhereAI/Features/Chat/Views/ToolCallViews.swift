@@ -57,7 +57,8 @@ struct ToolCallIndicator: View {
 
 struct ToolCallDetailSheet: View {
     let toolCallInfo: ToolCallInfo
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)
+    private var dismiss
 
     var body: some View {
         NavigationStack {

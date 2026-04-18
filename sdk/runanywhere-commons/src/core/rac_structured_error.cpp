@@ -732,8 +732,7 @@ char* rac_error_to_json(const rac_error_t* error) {
     if (error->underlying_code != 0) {
         // NOLINTNEXTLINE(modernize-raw-string-literal)
         pos += snprintf(json + pos, buffer_size - pos,
-                        "\"underlying_code\":%d,\"underlying_message\":\"",
-                        error->underlying_code);
+                        "\"underlying_code\":%d,\"underlying_message\":\"", error->underlying_code);
         clamp();
         write_escaped(error->underlying_message);
         // NOLINTNEXTLINE(modernize-raw-string-literal)

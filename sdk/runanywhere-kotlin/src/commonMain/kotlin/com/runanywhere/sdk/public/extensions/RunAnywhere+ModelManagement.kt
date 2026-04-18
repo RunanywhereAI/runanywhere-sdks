@@ -200,14 +200,15 @@ fun RunAnywhere.registerMultiFileModel(
     modality: ModelCategory = ModelCategory.LANGUAGE,
     memoryRequirement: Long? = null,
 ): ModelInfo {
-    val modelInfo = registerModel(
-        id = id,
-        name = name,
-        url = primaryUrl,
-        framework = framework,
-        modality = modality,
-        memoryRequirement = memoryRequirement,
-    )
+    val modelInfo =
+        registerModel(
+            id = id,
+            name = name,
+            url = primaryUrl,
+            framework = framework,
+            modality = modality,
+            memoryRequirement = memoryRequirement,
+        )
     registerCompanionFilesInternal(id, companionFiles.map { it.url to it.filename })
     return modelInfo
 }

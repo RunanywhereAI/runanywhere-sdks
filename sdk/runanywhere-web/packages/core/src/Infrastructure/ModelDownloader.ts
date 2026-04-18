@@ -9,7 +9,7 @@
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger } from '../Foundation/SDKLogger';
 import { AnalyticsEmitter } from '../services/AnalyticsEmitter';
-import { OPFSStorage } from './OPFSStorage';
+import type { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import type { LocalFileStorage } from './LocalFileStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';

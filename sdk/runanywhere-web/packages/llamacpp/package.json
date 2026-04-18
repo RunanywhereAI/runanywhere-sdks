@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-llamacpp",
-  "version": "0.1.0-beta.10",
+  "version": "0.19.7",
   "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM/VLM inference",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,7 +26,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "tsc --noEmit",
+    "lint": "eslint 'src/**/*.ts' --max-warnings 0",
+    "lint:ts": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepublishOnly": "test -d dist || (echo 'ERROR: dist/ missing. Run npm run build first.' && exit 1); test -f wasm/racommons-llamacpp.wasm || (echo 'ERROR: wasm/racommons-llamacpp.wasm missing. Run build-web.sh first.' && exit 1)"
@@ -64,6 +65,9 @@
     "@runanywhere/web": ">=0.1.0-beta.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "eslint": "^9.0.0",
+    "@eslint/js": "^9.0.0",
+    "typescript-eslint": "^8.0.0"
   }
 }

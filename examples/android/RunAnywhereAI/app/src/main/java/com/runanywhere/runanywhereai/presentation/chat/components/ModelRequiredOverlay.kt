@@ -76,28 +76,31 @@ fun ModelRequiredOverlay(
     val circle1Offset by infiniteTransition.animateFloat(
         initialValue = -100f,
         targetValue = 100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 8000, easing = EaseInOut),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "c1",
     )
     val circle2Offset by infiniteTransition.animateFloat(
         initialValue = 100f,
         targetValue = -100f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 8000, easing = EaseInOut),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "c2",
     )
     val circle3Offset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 80f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 8000, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse,
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = 8000, easing = EaseInOut),
+                repeatMode = RepeatMode.Reverse,
+            ),
         label = "c3",
     )
 
@@ -117,15 +120,17 @@ fun ModelRequiredOverlay(
             val c1Center = Offset(x = size.width * 0.25f + c1XPx, y = -size.height * 0.05f)
             val c1Radius = with(density) { 230.dp.toPx() }
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        modalityColor.copy(alpha = 0.10f),
-                        modalityColor.copy(alpha = 0.04f),
-                        Color.Transparent,
+                brush =
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                modalityColor.copy(alpha = 0.10f),
+                                modalityColor.copy(alpha = 0.04f),
+                                Color.Transparent,
+                            ),
+                        center = c1Center,
+                        radius = c1Radius,
                     ),
-                    center = c1Center,
-                    radius = c1Radius,
-                ),
                 radius = c1Radius,
                 center = c1Center,
             )
@@ -135,15 +140,17 @@ fun ModelRequiredOverlay(
             val c2Center = Offset(x = size.width * 0.7f + c2XPx, y = size.height * 0.75f)
             val c2Radius = with(density) { 225.dp.toPx() }
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        modalityColor.copy(alpha = 0.08f),
-                        modalityColor.copy(alpha = 0.03f),
-                        Color.Transparent,
+                brush =
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                modalityColor.copy(alpha = 0.08f),
+                                modalityColor.copy(alpha = 0.03f),
+                                Color.Transparent,
+                            ),
+                        center = c2Center,
+                        radius = c2Radius,
                     ),
-                    center = c2Center,
-                    radius = c2Radius,
-                ),
                 radius = c2Radius,
                 center = c2Center,
             )
@@ -153,15 +160,17 @@ fun ModelRequiredOverlay(
             val c3Center = Offset(x = size.width * 0.4f - c3Px, y = size.height * 0.5f + c3Px)
             val c3Radius = with(density) { 230.dp.toPx() }
             drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        modalityColor.copy(alpha = 0.06f),
-                        modalityColor.copy(alpha = 0.02f),
-                        Color.Transparent,
+                brush =
+                    Brush.radialGradient(
+                        colors =
+                            listOf(
+                                modalityColor.copy(alpha = 0.06f),
+                                modalityColor.copy(alpha = 0.02f),
+                                Color.Transparent,
+                            ),
+                        center = c3Center,
+                        radius = c3Radius,
                     ),
-                    center = c3Center,
-                    radius = c3Radius,
-                ),
                 radius = c3Radius,
                 center = c3Center,
             )
@@ -176,17 +185,18 @@ fun ModelRequiredOverlay(
             // Friendly icon with gradient background
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(
-                            listOf(
-                                modalityColor.copy(alpha = 0.2f),
-                                modalityColor.copy(alpha = 0.1f),
+                modifier =
+                    Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    modalityColor.copy(alpha = 0.2f),
+                                    modalityColor.copy(alpha = 0.1f),
+                                ),
                             ),
                         ),
-                    ),
             ) {
                 Icon(
                     imageVector = modalityIcon,
@@ -251,7 +261,8 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
         ModelSelectionContext.TTS -> Icons.AutoMirrored.Filled.VolumeUp
         ModelSelectionContext.VOICE -> Icons.Default.Mic
         ModelSelectionContext.RAG_EMBEDDING,
-        ModelSelectionContext.RAG_LLM -> Icons.Default.Description
+        ModelSelectionContext.RAG_LLM,
+        -> Icons.Default.Description
         ModelSelectionContext.VLM -> Icons.Default.Visibility
     }
 }
@@ -263,7 +274,8 @@ private fun getModalityColor(modality: ModelSelectionContext): Color {
         ModelSelectionContext.TTS -> AppColors.primaryPurple
         ModelSelectionContext.VOICE -> AppColors.primaryAccent
         ModelSelectionContext.RAG_EMBEDDING,
-        ModelSelectionContext.RAG_LLM -> Color(0xFF2196F3)
+        ModelSelectionContext.RAG_LLM,
+        -> Color(0xFF2196F3)
         ModelSelectionContext.VLM -> AppColors.primaryPurple
     }
 }

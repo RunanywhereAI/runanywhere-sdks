@@ -7,9 +7,9 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkRun
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // -- Export Format --
 
@@ -23,14 +23,13 @@ enum class BenchmarkExportFormat(val displayName: String) {
  * Matches iOS BenchmarkReportFormatter exactly.
  */
 object BenchmarkReportFormatter {
+    private val json =
+        Json {
+            prettyPrint = true
+            encodeDefaults = true
+        }
 
-    private val json = Json {
-        prettyPrint = true
-        encodeDefaults = true
-    }
-
-    private val dateFormat: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a").withZone(ZoneId.systemDefault())
+    private val dateFormat = SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault())
 
     // -- Clipboard String --
 
@@ -38,14 +37,18 @@ object BenchmarkReportFormatter {
         run: BenchmarkRun,
         format: BenchmarkExportFormat,
         context: Context,
-    ): String = when (format) {
-        BenchmarkExportFormat.MARKDOWN -> formatMarkdown(run, context)
-        BenchmarkExportFormat.JSON -> formatJSON(run)
-    }
+    ): String =
+        when (format) {
+            BenchmarkExportFormat.MARKDOWN -> formatMarkdown(run, context)
+            BenchmarkExportFormat.JSON -> formatJSON(run)
+        }
 
     // -- Markdown --
 
-    fun formatMarkdown(run: BenchmarkRun, context: Context): String {
+    fun formatMarkdown(
+        run: BenchmarkRun,
+        context: Context,
+    ): String {
         val lines = mutableListOf<String>()
         lines.add("# Benchmark Report")
         lines.add("")
@@ -53,7 +56,7 @@ object BenchmarkReportFormatter {
         lines.add("**Chip:** ${run.deviceInfo.chipName}")
         lines.add("**RAM:** ${Formatter.formatFileSize(context, run.deviceInfo.totalMemoryBytes)}")
         lines.add("**OS:** ${run.deviceInfo.osVersion}")
-        lines.add("**Date:** ${dateFormat.format(Instant.ofEpochMilli(run.startedAt))}")
+        lines.add("**Date:** ${dateFormat.format(Date(run.startedAt))}")
         run.durationSeconds?.let {
             lines.add("**Duration:** ${"%.1f".format(it)}s")
         }
@@ -105,15 +108,19 @@ object BenchmarkReportFormatter {
 
     // -- JSON --
 
-    fun formatJSON(run: BenchmarkRun): String = try {
-        json.encodeToString(run)
-    } catch (_: Exception) {
-        "{\"error\": \"Failed to encode benchmark run\"}"
-    }
+    fun formatJSON(run: BenchmarkRun): String =
+        try {
+            json.encodeToString(run)
+        } catch (_: Exception) {
+            "{\"error\": \"Failed to encode benchmark run\"}"
+        }
 
     // -- File Export: JSON --
 
-    fun writeJSON(run: BenchmarkRun, context: Context): File {
+    fun writeJSON(
+        run: BenchmarkRun,
+        context: Context,
+    ): File {
         val content = formatJSON(run)
         val file = File(context.cacheDir, "benchmark_${run.id.take(8)}.json")
         file.writeText(content)
@@ -122,38 +129,43 @@ object BenchmarkReportFormatter {
 
     // -- File Export: CSV --
 
-    fun writeCSV(run: BenchmarkRun, context: Context): File {
+    fun writeCSV(
+        run: BenchmarkRun,
+        context: Context,
+    ): File {
         val header = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,TPS,TTFT,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,MemDeltaBytes,Success,Error"
-        val rows = run.results.map { r ->
-            val m = r.metrics
-            val row = listOf(
-                r.category.displayName,
-                r.scenario.name,
-                r.modelInfo.name,
-                r.modelInfo.framework,
-                "%.0f".format(m.loadTimeMs),
-                "%.0f".format(m.warmupTimeMs),
-                "%.0f".format(m.endToEndLatencyMs),
-                m.tokensPerSecond?.let { "%.1f".format(it) } ?: "",
-                m.ttftMs?.let { "%.0f".format(it) } ?: "",
-                m.realTimeFactor?.let { "%.2f".format(it) } ?: "",
-                m.audioLengthSeconds?.let { "%.1f".format(it) } ?: "",
-                m.audioDurationSeconds?.let { "%.1f".format(it) } ?: "",
-                m.charactersProcessed?.toString() ?: "",
-                m.promptTokens?.toString() ?: "",
-                m.completionTokens?.toString() ?: "",
-                m.memoryDeltaBytes.toString(),
-                if (m.didSucceed) "true" else "false",
-                m.errorMessage ?: "",
-            ).map { field ->
-                if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
-                    "\"${field.replace("\"", "\"\"")}\""
-                } else {
-                    field
-                }
+        val rows =
+            run.results.map { r ->
+                val m = r.metrics
+                val row =
+                    listOf(
+                        r.category.displayName,
+                        r.scenario.name,
+                        r.modelInfo.name,
+                        r.modelInfo.framework,
+                        "%.0f".format(m.loadTimeMs),
+                        "%.0f".format(m.warmupTimeMs),
+                        "%.0f".format(m.endToEndLatencyMs),
+                        m.tokensPerSecond?.let { "%.1f".format(it) } ?: "",
+                        m.ttftMs?.let { "%.0f".format(it) } ?: "",
+                        m.realTimeFactor?.let { "%.2f".format(it) } ?: "",
+                        m.audioLengthSeconds?.let { "%.1f".format(it) } ?: "",
+                        m.audioDurationSeconds?.let { "%.1f".format(it) } ?: "",
+                        m.charactersProcessed?.toString() ?: "",
+                        m.promptTokens?.toString() ?: "",
+                        m.completionTokens?.toString() ?: "",
+                        m.memoryDeltaBytes.toString(),
+                        if (m.didSucceed) "true" else "false",
+                        m.errorMessage ?: "",
+                    ).map { field ->
+                        if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
+                            "\"${field.replace("\"", "\"\"")}\""
+                        } else {
+                            field
+                        }
+                    }
+                row.joinToString(",")
             }
-            row.joinToString(",")
-        }
         val csv = (listOf(header) + rows).joinToString("\n")
         val file = File(context.cacheDir, "benchmark_${run.id.take(8)}.csv")
         file.writeText(csv)

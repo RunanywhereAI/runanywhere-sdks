@@ -101,16 +101,17 @@ actual fun RunAnywhere.generateStream(
             )
 
         // Launch generation on IO dispatcher — tied to this callbackFlow's scope
-        val job = launch(Dispatchers.IO) {
-            try {
-                CppBridgeLLM.generateStream(prompt, config) { token ->
-                    trySend(token)
-                    true // Continue generation
+        val job =
+            launch(Dispatchers.IO) {
+                try {
+                    CppBridgeLLM.generateStream(prompt, config) { token ->
+                        trySend(token)
+                        true // Continue generation
+                    }
+                } finally {
+                    channel.close()
                 }
-            } finally {
-                channel.close()
             }
-        }
 
         // When collector cancels, cancel both the coroutine and native generation
         awaitClose {
@@ -149,42 +150,43 @@ actual suspend fun RunAnywhere.generateStreamWithMetrics(
 
     val tokenStream =
         callbackFlow {
-            val job = launch(Dispatchers.IO) {
-                try {
-                    val cppResult =
-                        CppBridgeLLM.generateStream(prompt, config) { token ->
-                            if (firstTokenTime == null) {
-                                firstTokenTime = System.currentTimeMillis()
+            val job =
+                launch(Dispatchers.IO) {
+                    try {
+                        val cppResult =
+                            CppBridgeLLM.generateStream(prompt, config) { token ->
+                                if (firstTokenTime == null) {
+                                    firstTokenTime = System.currentTimeMillis()
+                                }
+                                fullText += token
+                                tokenCount++
+                                trySend(token)
+                                true // Continue generation
                             }
-                            fullText += token
-                            tokenCount++
-                            trySend(token)
-                            true // Continue generation
-                        }
 
-                    // Build final result after generation completes
-                    val endTime = System.currentTimeMillis()
-                    val latencyMs = (endTime - startTime).toDouble()
-                    val timeToFirstTokenMs = firstTokenTime?.let { (it - startTime).toDouble() }
+                        // Build final result after generation completes
+                        val endTime = System.currentTimeMillis()
+                        val latencyMs = (endTime - startTime).toDouble()
+                        val timeToFirstTokenMs = firstTokenTime?.let { (it - startTime).toDouble() }
 
-                    val result =
-                        LLMGenerationResult(
-                            text = fullText,
-                            tokensUsed = tokenCount,
-                            modelUsed = CppBridgeLLM.getLoadedModelId() ?: "unknown",
-                            latencyMs = latencyMs,
-                            framework = "llamacpp",
-                            tokensPerSecond = cppResult.tokensPerSecond.toDouble(),
-                            timeToFirstTokenMs = timeToFirstTokenMs,
-                            responseTokens = tokenCount,
-                        )
-                    resultDeferred.complete(result)
-                } catch (e: Exception) {
-                    resultDeferred.completeExceptionally(e)
-                } finally {
-                    channel.close()
+                        val result =
+                            LLMGenerationResult(
+                                text = fullText,
+                                tokensUsed = tokenCount,
+                                modelUsed = CppBridgeLLM.getLoadedModelId() ?: "unknown",
+                                latencyMs = latencyMs,
+                                framework = "llamacpp",
+                                tokensPerSecond = cppResult.tokensPerSecond.toDouble(),
+                                timeToFirstTokenMs = timeToFirstTokenMs,
+                                responseTokens = tokenCount,
+                            )
+                        resultDeferred.complete(result)
+                    } catch (e: Exception) {
+                        resultDeferred.completeExceptionally(e)
+                    } finally {
+                        channel.close()
+                    }
                 }
-            }
 
             awaitClose {
                 job.cancel()

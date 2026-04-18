@@ -151,17 +151,6 @@ private fun calculateDirectorySize(directory: File): Long {
     return CppBridgeFileManager.calculateDirectorySize(directory.absolutePath)
 }
 
-// Helper function to format bytes as human-readable string
-private fun formatBytes(bytes: Long): String {
-    if (bytes < 1024) return "$bytes B"
-    val kb = bytes / 1024.0
-    if (kb < 1024) return "%.1f KB".format(kb)
-    val mb = kb / 1024.0
-    if (mb < 1024) return "%.1f MB".format(mb)
-    val gb = mb / 1024.0
-    return "%.2f GB".format(gb)
-}
-
 /**
  * Parse storage availability JSON from C++ rac_file_manager_check_storage.
  */
@@ -170,11 +159,19 @@ private fun parseStorageAvailabilityJson(json: String, requiredBytes: Long): Sto
     val isAvailable = json.contains("\"isAvailable\":true")
     val hasWarning = json.contains("\"hasWarning\":true")
 
-    val availableSpace = Regex("\"availableSpace\":(\\d+)").find(json)
-        ?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+    val availableSpace =
+        Regex("\"availableSpace\":(\\d+)")
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.toLongOrNull() ?: 0L
 
-    val recommendation = Regex("\"recommendation\":\"([^\"]*)\"").find(json)
-        ?.groupValues?.get(1)?.takeIf { it.isNotEmpty() }
+    val recommendation =
+        Regex("\"recommendation\":\"([^\"]*)\"")
+            .find(json)
+            ?.groupValues
+            ?.get(1)
+            ?.takeIf { it.isNotEmpty() }
 
     return StorageAvailability(
         isAvailable = isAvailable,

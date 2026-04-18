@@ -51,7 +51,8 @@ typedef struct rac_llm_service_ops {
      */
     rac_result_t (*generate_stream_with_timing)(void* impl, const char* prompt,
                                                 const rac_llm_options_t* options,
-                                                rac_llm_stream_callback_fn callback, void* user_data,
+                                                rac_llm_stream_callback_fn callback,
+                                                void* user_data,
                                                 rac_benchmark_timing_t* timing_out);
 
     /** Get service info */
@@ -269,8 +270,8 @@ RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* tex
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
-                                                    const rac_llm_options_t* options,
-                                                    rac_llm_result_t* out_result);
+                                                   const rac_llm_options_t* options,
+                                                   rac_llm_result_t* out_result);
 
 /**
  * @brief Clear all KV cache state

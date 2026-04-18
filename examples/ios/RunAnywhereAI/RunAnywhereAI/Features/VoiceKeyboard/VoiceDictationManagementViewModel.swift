@@ -14,7 +14,6 @@ import os
 
 @MainActor
 final class VoiceDictationManagementViewModel: ObservableObject {
-
     private let logger = Logger(subsystem: "com.runanywhere", category: "VoiceKeyboard.Management")
 
     // MARK: - Published State

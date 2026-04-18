@@ -73,6 +73,11 @@ packages/*/build/
 .flutter-plugins-dependencies
 pubspec.lock
 
+# Local-dev pub overrides (should not be committed; they point to in-repo
+# sibling packages so `dart pub get` resolves to the current working copy
+# rather than the published version on pub.dev).
+packages/*/pubspec_overrides.yaml
+
 # =============================================================================
 # macOS
 # =============================================================================

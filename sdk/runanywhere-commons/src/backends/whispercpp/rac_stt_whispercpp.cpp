@@ -7,12 +7,12 @@
 
 #include "rac_stt_whispercpp.h"
 
+#include "whispercpp_backend.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
-
-#include "whispercpp_backend.h"
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"
@@ -77,7 +77,8 @@ rac_result_t rac_stt_whispercpp_create(const char* model_path,
             model_config["translate"] = true;
         }
 
-        if (!handle->stt->load_model(model_path, runanywhere::STTModelType::WHISPER, model_config)) {
+        if (!handle->stt->load_model(model_path, runanywhere::STTModelType::WHISPER,
+                                     model_config)) {
             delete handle;
             rac_error_set_details("Failed to load WhisperCPP model");
             return RAC_ERROR_MODEL_LOAD_FAILED;
@@ -138,8 +139,8 @@ rac_result_t rac_stt_whispercpp_transcribe(rac_handle_t handle, const float* aud
     out_result->words = nullptr;
     out_result->num_words = 0;
     if (!result.word_timings.empty()) {
-        out_result->words =
-            static_cast<rac_stt_word_t*>(malloc(result.word_timings.size() * sizeof(rac_stt_word_t)));
+        out_result->words = static_cast<rac_stt_word_t*>(
+            malloc(result.word_timings.size() * sizeof(rac_stt_word_t)));
         if (out_result->words) {
             out_result->num_words = result.word_timings.size();
             for (size_t i = 0; i < result.word_timings.size(); i++) {

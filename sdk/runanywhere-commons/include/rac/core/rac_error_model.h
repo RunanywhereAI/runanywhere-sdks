@@ -14,9 +14,9 @@ extern "C" {
  * structured error representation for cross-SDK consistency.
  */
 typedef struct {
-    rac_result_t code;      /**< Numeric error code */
-    const char* message;    /**< Human-readable error message */
-    const char* category;   /**< Error category (e.g., Model, Network, Validation) */
+    rac_result_t code;    /**< Numeric error code */
+    const char* message;  /**< Human-readable error message */
+    const char* category; /**< Error category (e.g., Model, Network, Validation) */
 } rac_error_model_t;
 
 /**
@@ -33,4 +33,4 @@ const char* rac_error_category(rac_result_t code);
 }
 #endif
 
-#endif // RAC_ERROR_MODEL_H
+#endif  // RAC_ERROR_MODEL_H

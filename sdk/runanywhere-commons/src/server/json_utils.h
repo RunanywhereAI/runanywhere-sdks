@@ -9,9 +9,10 @@
 #ifndef RAC_JSON_UTILS_H
 #define RAC_JSON_UTILS_H
 
-#include "rac/server/rac_openai_types.h"
 #include <nlohmann/json.hpp>
 #include <string>
+
+#include "rac/server/rac_openai_types.h"
 
 namespace rac {
 namespace server {
@@ -77,8 +78,8 @@ std::string formatSSE(const Json& chunk);
  */
 std::string formatSSEDone();
 
-} // namespace json
-} // namespace server
-} // namespace rac
+}  // namespace json
+}  // namespace server
+}  // namespace rac
 
-#endif // RAC_JSON_UTILS_H
+#endif  // RAC_JSON_UTILS_H
