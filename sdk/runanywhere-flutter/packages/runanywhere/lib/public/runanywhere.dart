@@ -154,6 +154,11 @@ class RunAnywhere {
       // Step 2.4: Register device with backend
       await _registerDeviceIfNeeded(params, logger);
 
+      // Step 2.5: Authenticate with backend (non-fatal — offline inference
+      // still works if auth fails; telemetry silently no-ops).
+      // Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
+      await _authenticateWithBackend(params, logger);
+
       // Step 2.6: Initialize model registry
       logger.debug('Initializing model registry...');
       await DartBridgeModelRegistry.instance.initialize();
@@ -1376,9 +1381,9 @@ class RunAnywhere {
         cancel: () {
           logger.debug('Cancelling VLM streaming');
           DartBridge.vlm.cancel();
-          subscription.cancel();
+          unawaited(subscription.cancel());
           if (!controller.isClosed) {
-            controller.close();
+            unawaited(controller.close());
           }
         },
       );

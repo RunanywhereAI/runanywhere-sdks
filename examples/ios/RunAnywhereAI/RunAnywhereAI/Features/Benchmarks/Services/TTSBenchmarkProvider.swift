@@ -30,7 +30,8 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         case "short":
             text = "Hello, this is a test."
         default:
-            text = "The quick brown fox jumps over the lazy dog. Machine learning models can generate speech from text with remarkable quality and natural intonation."
+            text = "The quick brown fox jumps over the lazy dog. Machine learning models can "
+                + "generate speech from text with remarkable quality and natural intonation."
         }
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()

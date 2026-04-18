@@ -465,7 +465,13 @@ extension ChatInterfaceView {
                     loraAddButton
                 }
             }
-            .padding(.top, ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking) || viewModel.useToolCalling || !viewModel.loraAdapters.isEmpty || hasModelSelected) ? 8 : 0)
+            .padding(
+                .top,
+                ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
+                    || viewModel.useToolCalling
+                    || !viewModel.loraAdapters.isEmpty
+                    || hasModelSelected) ? 8 : 0
+            )
 
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)

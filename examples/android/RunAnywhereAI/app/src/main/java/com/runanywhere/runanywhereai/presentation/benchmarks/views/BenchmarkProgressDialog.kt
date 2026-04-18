@@ -44,12 +44,13 @@ fun BenchmarkProgressDialog(
         properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
     ) {
         Column(
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .shadow(8.dp, RoundedCornerShape(AppSpacing.cornerRadiusMedium))
-                .clip(RoundedCornerShape(AppSpacing.cornerRadiusMedium))
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(AppSpacing.xxLarge),
+            modifier =
+                Modifier
+                    .widthIn(max = 320.dp)
+                    .shadow(8.dp, RoundedCornerShape(AppSpacing.cornerRadiusMedium))
+                    .clip(RoundedCornerShape(AppSpacing.cornerRadiusMedium))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(AppSpacing.xxLarge),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(

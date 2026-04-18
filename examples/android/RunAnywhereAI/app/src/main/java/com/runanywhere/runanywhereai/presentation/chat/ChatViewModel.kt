@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
 import android.app.Application
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
@@ -13,10 +12,13 @@ import com.runanywhere.runanywhereai.domain.models.MessageAnalytics
 import com.runanywhere.runanywhereai.domain.models.MessageModelInfo
 import com.runanywhere.runanywhereai.domain.models.MessageRole
 import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
-import com.runanywhere.sdk.public.extensions.LLM.ToolValue
+import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.LLMEvent
+import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
+import com.runanywhere.sdk.public.extensions.LLM.ToolValue
 import com.runanywhere.sdk.public.extensions.Models.ModelCategory
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
@@ -24,17 +26,17 @@ import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
+import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallFormat
-import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
-import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -42,10 +44,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.launch
+import timber.log.Timber
 import kotlin.math.ceil
 
 /**
@@ -247,13 +246,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             Timber.i("🔧 Tool calling with format: $format for model: ${modelName ?: "unknown"}")
 
             // Create tool calling options
-            val toolOptions = ToolCallingOptions(
-                maxToolCalls = 3,
-                autoExecute = true,
-                temperature = 0.7f,
-                maxTokens = 1024,
-                format = format
-            )
+            val toolOptions =
+                ToolCallingOptions(
+                    maxToolCalls = 3,
+                    autoExecute = true,
+                    temperature = 0.7f,
+                    maxTokens = 1024,
+                    format = format,
+                )
 
             // Generate with tools
             val result = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
@@ -274,32 +274,33 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val firstToolCall = result.toolCalls.first()
                 val firstToolResult = result.toolResults.firstOrNull { it.toolName == firstToolCall.toolName }
 
-                val toolCallInfo = ToolCallInfo(
-                    toolName = firstToolCall.toolName,
-                    arguments = formatToolValueMapToJson(firstToolCall.arguments),
-                    result = firstToolResult?.result?.let { formatToolValueMapToJson(it) },
-                    success = firstToolResult?.success ?: false,
-                    error = firstToolResult?.error,
-                )
+                val toolCallInfo =
+                    ToolCallInfo(
+                        toolName = firstToolCall.toolName,
+                        arguments = formatToolValueMapToJson(firstToolCall.arguments),
+                        result = firstToolResult?.result?.let { formatToolValueMapToJson(it) },
+                        success = firstToolResult?.success ?: false,
+                        error = firstToolResult?.error,
+                    )
 
                 updateAssistantMessageWithToolCallInfo(messageId, toolCallInfo)
             }
 
             // Create analytics
-            val analytics = createMessageAnalytics(
-                startTime = startTime,
-                endTime = endTime,
-                firstTokenTime = null,
-                thinkingStartTime = null,
-                thinkingEndTime = null,
-                inputText = prompt,
-                outputText = response,
-                thinkingText = null,
-                wasInterrupted = false,
-            )
+            val analytics =
+                createMessageAnalytics(
+                    startTime = startTime,
+                    endTime = endTime,
+                    firstTokenTime = null,
+                    thinkingStartTime = null,
+                    thinkingEndTime = null,
+                    inputText = prompt,
+                    outputText = response,
+                    thinkingText = null,
+                    wasInterrupted = false,
+                )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
-
         } catch (e: Exception) {
             Timber.e(e, "Tool calling failed")
             throw e
@@ -379,10 +380,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 } else {
                     // Not in thinking mode, show response tokens directly
-                    responseContent = fullResponse
-                        .replace("<think>", "")
-                        .replace("</think>", "")
-                        .trim()
+                    responseContent =
+                        fullResponse
+                            .replace("<think>", "")
+                            .replace("</think>", "")
+                            .trim()
                 }
 
                 // Update the assistant message
@@ -759,8 +761,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val allModels = RunAnywhere.availableModels()
                 val chatModel =
                     allModels.firstOrNull { model ->
-                        model.category == ModelCategory.LANGUAGE && model.isDownloaded
-                                && model.framework == com.runanywhere.sdk.core.types.InferenceFramework.GENIE
+                        model.category == ModelCategory.LANGUAGE && model.isDownloaded &&
+                            model.framework == com.runanywhere.sdk.core.types.InferenceFramework.GENIE
                     } ?: allModels.firstOrNull { model ->
                         model.category == ModelCategory.LANGUAGE && model.isDownloaded
                     }
@@ -822,16 +824,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Refresh LoRA loaded state for the active adapters indicator. */
     private var loraRefreshJob: Job? = null
+
     fun refreshLoraState() {
         loraRefreshJob?.cancel()
-        loraRefreshJob = viewModelScope.launch {
-            try {
-                val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                _uiState.value = _uiState.value.copy(hasActiveLoraAdapter = loaded.isNotEmpty())
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to refresh LoRA state")
+        loraRefreshJob =
+            viewModelScope.launch {
+                try {
+                    val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
+                    _uiState.value = _uiState.value.copy(hasActiveLoraAdapter = loaded.isNotEmpty())
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to refresh LoRA state")
+                }
             }
-        }
     }
 
     /**
@@ -906,7 +910,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions(
             maxTokens = maxTokens,
             temperature = temperature,
-            systemPrompt = systemPrompt
+            systemPrompt = systemPrompt,
         )
     }
 
@@ -915,11 +919,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      * Uses kotlinx.serialization for proper JSON escaping of special characters.
      */
     private fun formatToolValueMapToJson(map: Map<String, ToolValue>): String {
-        val jsonObject = buildJsonObject {
-            map.forEach { (key, value) ->
-                put(key, formatToolValueToJsonElement(value))
+        val jsonObject =
+            buildJsonObject {
+                map.forEach { (key, value) ->
+                    put(key, formatToolValueToJsonElement(value))
+                }
             }
-        }
         return Json.encodeToString(JsonObject.serializer(), jsonObject)
     }
 
@@ -933,13 +938,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             is ToolValue.NumberValue -> JsonPrimitive(value.value)
             is ToolValue.BoolValue -> JsonPrimitive(value.value)
             is ToolValue.NullValue -> JsonNull
-            is ToolValue.ArrayValue -> buildJsonArray {
-                value.value.forEach { add(formatToolValueToJsonElement(it)) }
-            }
-            is ToolValue.ObjectValue -> buildJsonObject {
-                value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
-            }
+            is ToolValue.ArrayValue ->
+                buildJsonArray {
+                    value.value.forEach { add(formatToolValueToJsonElement(it)) }
+                }
+            is ToolValue.ObjectValue ->
+                buildJsonObject {
+                    value.value.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
+                }
         }
     }
-
 }

@@ -35,7 +35,9 @@ import kotlin.random.Random
  */
 private class ParticleData(
     // Fibonacci sphere position
-    val sx: Float, val sy: Float, val sz: Float,
+    val sx: Float,
+    val sy: Float,
+    val sz: Float,
     // Normalized index 0..1
     val index: Float,
     // Random offset for ring thickness
@@ -104,7 +106,10 @@ private inline fun fastHash(v: Float): Float {
  * avoids 8 sin() calls and multiple floor/lerp chains.
  */
 @Suppress("NOTHING_TO_INLINE")
-private inline fun cheapNoise(phase: Float, time: Float): Float {
+private inline fun cheapNoise(
+    phase: Float,
+    time: Float,
+): Float {
     val a = fastHash(phase + time * 0.97f)
     val b = fastHash(phase * 1.31f + time * 1.23f)
     return (a + b) * 0.5f // 0..1
@@ -113,10 +118,18 @@ private inline fun cheapNoise(phase: Float, time: Float): Float {
 // Utility
 
 @Suppress("NOTHING_TO_INLINE")
-private inline fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
+private inline fun lerp(
+    a: Float,
+    b: Float,
+    t: Float,
+): Float = a + (b - a) * t
 
 @Suppress("NOTHING_TO_INLINE")
-private inline fun smoothstep(edge0: Float, edge1: Float, x: Float): Float {
+private inline fun smoothstep(
+    edge0: Float,
+    edge1: Float,
+    x: Float,
+): Float {
     val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
 }
@@ -149,8 +162,12 @@ private class FrameState(
     // Fast time for touch scatter noise
     val fastTime: Float,
     // Color
-    val baseR: Float, val baseG: Float, val baseB: Float,
-    val activeR: Float, val activeG: Float, val activeB: Float,
+    val baseR: Float,
+    val baseG: Float,
+    val baseB: Float,
+    val activeR: Float,
+    val activeG: Float,
+    val activeB: Float,
     val brightBase: Float,
     val brightEnergyScale: Float,
     // Whether touch scatter needs processing
@@ -173,11 +190,12 @@ private fun buildFrameState(
     val sphereAngle = -time * 0.2f
     val wander = morphProgress * (1f - morphProgress) * 4f
 
-    val baseColor = if (isDarkMode) {
-        Triple(0.75f, 0.45f, 0.08f)
-    } else {
-        Triple(0.65f, 0.3f, 0.04f)
-    }
+    val baseColor =
+        if (isDarkMode) {
+            Triple(0.75f, 0.45f, 0.08f)
+        } else {
+            Triple(0.65f, 0.3f, 0.04f)
+        }
 
     return FrameState(
         time = time,
@@ -237,19 +255,20 @@ fun VoiceAssistantParticleCanvas(
         val cy = size.height / 2f
         val vs = minOf(size.width, size.height) * 0.5f
 
-        val frame = buildFrameState(
-            time = time,
-            amplitude = amplitude,
-            morphProgress = morphProgress,
-            scatterAmount = scatterAmount,
-            touchPoint = touchPoint,
-            centerX = cx,
-            centerY = cy,
-            viewScale = vs,
-            width = size.width,
-            height = size.height,
-            isDarkMode = isDarkMode,
-        )
+        val frame =
+            buildFrameState(
+                time = time,
+                amplitude = amplitude,
+                morphProgress = morphProgress,
+                scatterAmount = scatterAmount,
+                touchPoint = touchPoint,
+                centerX = cx,
+                centerY = cy,
+                viewScale = vs,
+                width = size.width,
+                height = size.height,
+                isDarkMode = isDarkMode,
+            )
 
         drawParticlesBatched(particles, frame)
     }
@@ -289,14 +308,18 @@ private fun DrawScope.drawParticlesBatched(
         val ringY = sin(ringAngle) * ringRadius
 
         // Morph
-        val personalMorph = (f.morphProgress * p.personalSpeedFactor + p.personalMorphBias)
-            .coerceIn(0f, 1f)
+        val personalMorph =
+            (f.morphProgress * p.personalSpeedFactor + p.personalMorphBias)
+                .coerceIn(0f, 1f)
         var sm = personalMorph * personalMorph * (3f - 2f * personalMorph)
         sm = sm * sm * (3f - 2f * sm)
 
         // Wander + spiral (only during transition)
-        var wx = 0f; var wy = 0f; var wz = 0f
-        var spiralX = 0f; var spiralY = 0f
+        var wx = 0f
+        var wy = 0f
+        var wz = 0f
+        var spiralX = 0f
+        var spiralY = 0f
         if (f.wanderPhase > 0.01f) {
             wx = (cheapNoise(p.wanderPhaseX, f.slowTime) - 0.5f) * f.wanderPhase * 0.6f
             wy = (cheapNoise(p.wanderPhaseY, f.slowTime) - 0.5f) * f.wanderPhase * 0.6f
@@ -331,9 +354,9 @@ private fun DrawScope.drawParticlesBatched(
                 val invLen = 1f / sqrt(pdx * pdx + pdy * pdy)
                 val push = touchInfluence * 0.15f
                 finalX += pdx * invLen * push +
-                        (cheapNoise(p.seed * 200f, f.fastTime) - 0.5f) * touchInfluence * 0.08f
+                    (cheapNoise(p.seed * 200f, f.fastTime) - 0.5f) * touchInfluence * 0.08f
                 finalY += pdy * invLen * push +
-                        (cheapNoise(p.seed * 200f + 100f, f.fastTime) - 0.5f) * touchInfluence * 0.08f
+                    (cheapNoise(p.seed * 200f + 100f, f.fastTime) - 0.5f) * touchInfluence * 0.08f
                 screenX = (finalX / zDepth) * projScale
                 screenY = (finalY / zDepth) * projScale
             }
@@ -345,7 +368,10 @@ private fun DrawScope.drawParticlesBatched(
 
         // Skip off-screen particles
         if (projX < -20f || projX > size.width + 20f ||
-            projY < -20f || projY > size.height + 20f) continue
+            projY < -20f || projY > size.height + 20f
+        ) {
+            continue
+        }
 
         // Size
         val transGlow = 1f + f.wanderPhase * 0.25f
@@ -377,13 +403,13 @@ private fun DrawScope.drawParticlesBatched(
             drawCircle(
                 color = color.copy(alpha = alpha * 0.2f),
                 radius = radius * 1.4f,
-                center = Offset(projX, projY)
+                center = Offset(projX, projY),
             )
             // Core
             drawCircle(
                 color = color,
                 radius = radius,
-                center = Offset(projX, projY)
+                center = Offset(projX, projY),
             )
         }
     }

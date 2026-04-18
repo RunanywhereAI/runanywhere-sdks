@@ -552,7 +552,7 @@ struct ConversationRow: View {
             preview = "..." + preview
         }
         if previewEnd < text.count {
-            preview = preview + "..."
+            preview += "..."
         }
 
         return preview

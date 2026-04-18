@@ -1,16 +1,9 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -22,16 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,12 +70,13 @@ fun TextToSpeechScreen(
                 ) {
                     TTSModelChip(
                         modelName = uiState.selectedModelName,
-                        modifier = Modifier.padding(
-                            start = 6.dp,
-                            end = 12.dp,
-                            top = 6.dp,
-                            bottom = 6.dp,
-                        ),
+                        modifier =
+                            Modifier.padding(
+                                start = 6.dp,
+                                end = 12.dp,
+                                top = 6.dp,
+                                bottom = 6.dp,
+                            ),
                     )
                 }
             }
@@ -206,9 +197,10 @@ private fun TTSModelChip(
     ) {
         if (modelName != null) {
             Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(RoundedCornerShape(6.dp)),
+                modifier =
+                    Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(6.dp)),
             ) {
                 Image(
                     painter = painterResource(id = getModelLogoResIdForName(modelName)),
@@ -240,10 +232,11 @@ private fun TTSModelChip(
                     )
                     Text(
                         text = "Streaming",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                        ),
+                        style =
+                            MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
                         color = AppColors.primaryGreen,
                     )
                 }
@@ -265,7 +258,10 @@ private fun TTSModelChip(
     }
 }
 
-private fun shortModelNameTTS(name: String, maxLength: Int = 15): String {
+private fun shortModelNameTTS(
+    name: String,
+    maxLength: Int = 15,
+): String {
     val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
     return if (cleaned.length > maxLength) cleaned.take(maxLength - 1) + "\u2026" else cleaned
 }
@@ -273,6 +269,7 @@ private fun shortModelNameTTS(name: String, maxLength: Int = 15): String {
 /**
  * Model Status Banner for TTS (kept for reference; not used when app bar shows model)
  */
+@Suppress("UnusedPrivateMember")
 @Composable
 private fun ModelStatusBannerTTS(
     framework: String?,
@@ -438,14 +435,16 @@ private fun TextInputSection(
 }
 
 /**
- * Voice Settings Section with Speed and Pitch sliders
+ * Voice Settings Section with Speed and Pitch sliders.
+ * Pitch parameters are currently unused because the pitch slider is commented out,
+ * but retained here so the slider can be re-enabled without API changes.
  */
 @Composable
 private fun VoiceSettingsSection(
     speed: Float,
-    pitch: Float,
+    @Suppress("UnusedParameter") pitch: Float,
     onSpeedChange: (Float) -> Unit,
-    onPitchChange: (Float) -> Unit,
+    @Suppress("UnusedParameter") onPitchChange: (Float) -> Unit,
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -492,6 +491,7 @@ private fun VoiceSettingsSection(
             }
 
             // Pitch slider - Commented out for now
+
             /*
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
@@ -520,7 +520,7 @@ private fun VoiceSettingsSection(
                         ),
                 )
             }
-            */
+             */
         }
     }
 }

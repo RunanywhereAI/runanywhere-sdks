@@ -30,7 +30,7 @@ enum class NPUChip(
      * @param quant Quantization format (e.g. "w4a16", "w8a16"). Defaults to "w4a16".
      */
     fun downloadUrl(modelSlug: String, quant: String = "w4a16"): String =
-        "${BASE_URL}${modelSlug}-genie-${quant}-${npuSuffix}.tar.gz"
+        "${BASE_URL}$modelSlug-genie-$quant-$npuSuffix.tar.gz"
 
     companion object {
         /** Base URL for NPU model downloads on HuggingFace. */

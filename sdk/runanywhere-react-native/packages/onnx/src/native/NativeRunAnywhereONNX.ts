@@ -29,7 +29,7 @@ export function requireNativeONNXModule(): NativeRunAnywhereONNXModule {
       'react-native-nitro-modules is not properly linked.'
     );
   }
-  return NitroProxy.createHybridObject<RunAnywhereONNX>('RunAnywhereONNX');
+  return NitroProxy.createHybridObject('RunAnywhereONNX') as RunAnywhereONNX;
 }
 
 /**

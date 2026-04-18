@@ -27,8 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,23 +61,27 @@ fun ModelLoadedToast(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         contentAlignment = Alignment.TopCenter,
     ) {
         AnimatedVisibility(
             visible = isVisible,
-            enter = slideInVertically(
-                initialOffsetY = { -it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessLow,
-                ),
-            ) + fadeIn(),
-            exit = slideOutVertically(
-                targetOffsetY = { -it },
-            ) + fadeOut(),
+            enter =
+                slideInVertically(
+                    initialOffsetY = { -it },
+                    animationSpec =
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow,
+                        ),
+                ) + fadeIn(),
+            exit =
+                slideOutVertically(
+                    targetOffsetY = { -it },
+                ) + fadeOut(),
         ) {
             ToastContent(modelName = modelName)
         }
@@ -91,23 +93,24 @@ private fun ToastContent(modelName: String) {
     val shape = RoundedCornerShape(16.dp)
 
     Row(
-        modifier = Modifier
-            .shadow(
-                elevation = 16.dp,
-                shape = shape,
-                ambientColor = AppColors.shadowMedium,
-                spotColor = AppColors.shadowMedium,
-            )
-            .background(
-                color = MaterialTheme.colorScheme.surface,
-                shape = shape,
-            )
-            .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                shape = shape,
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier =
+            Modifier
+                .shadow(
+                    elevation = 16.dp,
+                    shape = shape,
+                    ambientColor = AppColors.shadowMedium,
+                    spotColor = AppColors.shadowMedium,
+                )
+                .background(
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = shape,
+                )
+                .border(
+                    width = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    shape = shape,
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Start,
     ) {

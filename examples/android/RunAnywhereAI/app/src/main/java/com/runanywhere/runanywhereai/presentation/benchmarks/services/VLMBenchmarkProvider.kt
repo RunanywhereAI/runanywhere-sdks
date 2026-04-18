@@ -20,13 +20,13 @@ import kotlinx.coroutines.withContext
  * Matches iOS VLMBenchmarkProvider exactly.
  */
 class VLMBenchmarkProvider : BenchmarkScenarioProvider {
-
     override val category: BenchmarkCategory = BenchmarkCategory.VLM
 
-    override fun scenarios(): List<BenchmarkScenario> = listOf(
-        BenchmarkScenario(name = "Solid Red Image", category = BenchmarkCategory.VLM),
-        BenchmarkScenario(name = "Gradient Image", category = BenchmarkCategory.VLM),
-    )
+    override fun scenarios(): List<BenchmarkScenario> =
+        listOf(
+            BenchmarkScenario(name = "Solid Red Image", category = BenchmarkCategory.VLM),
+            BenchmarkScenario(name = "Gradient Image", category = BenchmarkCategory.VLM),
+        )
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
@@ -44,11 +44,12 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
             // Generate synthetic image as RGB pixels
             val width = 224
             val height = 224
-            val rgbData = if (scenario.name.contains("Solid")) {
-                SyntheticInputGenerator.solidColorRgb(width, height)
-            } else {
-                SyntheticInputGenerator.gradientRgb(width, height)
-            }
+            val rgbData =
+                if (scenario.name.contains("Solid")) {
+                    SyntheticInputGenerator.solidColorRgb(width, height)
+                } else {
+                    SyntheticInputGenerator.gradientRgb(width, height)
+                }
             val vlmImage = VLMImage.fromRGBPixels(rgbData, width, height)
 
             // Warmup
@@ -59,11 +60,12 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
 
             // Benchmark
             val benchOptions = VLMGenerationOptions(maxTokens = 128, temperature = 0.0f)
-            val result = RunAnywhere.processImage(
-                vlmImage,
-                "Describe this image in detail.",
-                benchOptions,
-            )
+            val result =
+                RunAnywhere.processImage(
+                    vlmImage,
+                    "Describe this image in detail.",
+                    benchOptions,
+                )
 
             val memAfter = SyntheticInputGenerator.availableMemoryBytes()
 

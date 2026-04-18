@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -90,9 +89,10 @@ fun BenchmarkDetailScreen(
     } else {
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = AppSpacing.large),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = AppSpacing.large),
                 verticalArrangement = Arrangement.spacedBy(AppSpacing.large),
             ) {
                 // Run Info
@@ -142,11 +142,12 @@ fun BenchmarkDetailScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimary,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .padding(bottom = AppSpacing.xxLarge)
-                            .shadow(4.dp, RoundedCornerShape(AppSpacing.cornerRadiusLarge))
-                            .background(AppColors.statusGreen.copy(alpha = 0.9f), RoundedCornerShape(AppSpacing.cornerRadiusLarge))
-                            .padding(horizontal = AppSpacing.xxLarge, vertical = AppSpacing.medium),
+                        modifier =
+                            Modifier
+                                .padding(bottom = AppSpacing.xxLarge)
+                                .shadow(4.dp, RoundedCornerShape(AppSpacing.cornerRadiusLarge))
+                                .background(AppColors.statusGreen.copy(alpha = 0.9f), RoundedCornerShape(AppSpacing.cornerRadiusLarge))
+                                .padding(horizontal = AppSpacing.xxLarge, vertical = AppSpacing.medium),
                     )
                 }
             }
@@ -169,9 +170,10 @@ private fun RunInfoSection(run: BenchmarkRun) {
             run.completedAt?.let { DetailRow("Completed", dateFormat.format(Instant.ofEpochMilli(it))) }
             run.durationSeconds?.let { DetailRow("Duration", "${"%.1f".format(it)}s") }
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = AppSpacing.xxSmall),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = AppSpacing.xxSmall),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -188,7 +190,10 @@ private fun RunInfoSection(run: BenchmarkRun) {
 // -- Device Info --
 
 @Composable
-private fun DeviceSection(run: BenchmarkRun, context: Context) {
+private fun DeviceSection(
+    run: BenchmarkRun,
+    context: Context,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -307,7 +312,10 @@ private fun ResultCard(result: BenchmarkResult) {
 // -- Metrics Grid --
 
 @Composable
-private fun MetricsGrid(metrics: BenchmarkMetrics, category: BenchmarkCategory) {
+private fun MetricsGrid(
+    metrics: BenchmarkMetrics,
+    category: BenchmarkCategory,
+) {
     val context = LocalContext.current
     val items = buildMetricItems(metrics, category, context)
     val rows = items.chunked(2)
@@ -369,11 +377,15 @@ private fun buildMetricItems(
 // -- Helper Views --
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(
+    label: String,
+    value: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = AppSpacing.xxSmall),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = AppSpacing.xxSmall),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -383,28 +395,31 @@ private fun DetailRow(label: String, value: String) {
 
 @Composable
 private fun StatusBadge(status: BenchmarkRunStatus) {
-    val color = when (status) {
-        BenchmarkRunStatus.COMPLETED -> AppColors.statusGreen
-        BenchmarkRunStatus.RUNNING -> AppColors.primaryBlue
-        BenchmarkRunStatus.CANCELLED -> AppColors.statusOrange
-        BenchmarkRunStatus.FAILED -> AppColors.statusRed
-    }
+    val color =
+        when (status) {
+            BenchmarkRunStatus.COMPLETED -> AppColors.statusGreen
+            BenchmarkRunStatus.RUNNING -> AppColors.primaryBlue
+            BenchmarkRunStatus.CANCELLED -> AppColors.statusOrange
+            BenchmarkRunStatus.FAILED -> AppColors.statusRed
+        }
     Text(
         text = status.value.replaceFirstChar { it.uppercase() },
         style = MaterialTheme.typography.labelSmall,
         color = color,
-        modifier = Modifier
-            .background(color.copy(alpha = 0.2f), RoundedCornerShape(AppSpacing.cornerRadiusSmall))
-            .padding(horizontal = AppSpacing.smallMedium, vertical = AppSpacing.xxSmall),
+        modifier =
+            Modifier
+                .background(color.copy(alpha = 0.2f), RoundedCornerShape(AppSpacing.cornerRadiusSmall))
+                .padding(horizontal = AppSpacing.smallMedium, vertical = AppSpacing.xxSmall),
     )
 }
 
 @Composable
 private fun EmptyResultsState() {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = AppSpacing.xxLarge),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = AppSpacing.xxLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(
@@ -429,4 +444,3 @@ private fun EmptyResultsState() {
         )
     }
 }
-

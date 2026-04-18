@@ -681,7 +681,10 @@ private struct ApiConfigurationSheet: View {
                             .foregroundColor(AppColors.primaryOrange)
                             .font(AppTypography.subheadlineMedium)
 
-                        Text("After saving, you must restart the app for changes to take effect. The SDK will reinitialize with your custom configuration.")
+                        Text(
+                            "After saving, you must restart the app for changes to take effect. "
+                            + "The SDK will reinitialize with your custom configuration."
+                        )
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textSecondary)
                     }

@@ -33,35 +33,40 @@ fun ToolCallIndicator(
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val backgroundColor = if (toolCallInfo.success) {
-        AppColors.primaryAccent.copy(alpha = 0.1f)
-    } else {
-        AppColors.primaryOrange.copy(alpha = 0.1f)
-    }
-    
-    val borderColor = if (toolCallInfo.success) {
-        AppColors.primaryAccent.copy(alpha = 0.3f)
-    } else {
-        AppColors.primaryOrange.copy(alpha = 0.3f)
-    }
-    
-    val iconTint = if (toolCallInfo.success) {
-        AppColors.primaryAccent
-    } else {
-        AppColors.primaryOrange
-    }
+    val backgroundColor =
+        if (toolCallInfo.success) {
+            AppColors.primaryAccent.copy(alpha = 0.1f)
+        } else {
+            AppColors.primaryOrange.copy(alpha = 0.1f)
+        }
+
+    val borderColor =
+        if (toolCallInfo.success) {
+            AppColors.primaryAccent.copy(alpha = 0.3f)
+        } else {
+            AppColors.primaryOrange.copy(alpha = 0.3f)
+        }
+
+    val iconTint =
+        if (toolCallInfo.success) {
+            AppColors.primaryAccent
+        } else {
+            AppColors.primaryOrange
+        }
 
     Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable { onTap() },
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onTap() },
         color = backgroundColor,
         shape = RoundedCornerShape(8.dp),
     ) {
         Row(
-            modifier = Modifier
-                .border(0.5.dp, borderColor, RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier =
+                Modifier
+                    .border(0.5.dp, borderColor, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -92,18 +97,19 @@ fun ToolCallDetailSheet(
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .padding(bottom = 32.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 32.dp)
+                    .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             // Header
@@ -112,26 +118,26 @@ fun ToolCallDetailSheet(
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            
+
             // Status section
             StatusSection(success = toolCallInfo.success)
-            
+
             // Tool name section
             DetailSection(title = "Tool", content = toolCallInfo.toolName)
-            
+
             // Arguments section
             CodeSection(title = "Arguments", code = toolCallInfo.arguments)
-            
+
             // Result section (if available)
             toolCallInfo.result?.let { result ->
                 CodeSection(title = "Result", code = result)
             }
-            
+
             // Error section (if available)
             toolCallInfo.error?.let { error ->
                 DetailSection(title = "Error", content = error, isError = true)
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -139,19 +145,21 @@ fun ToolCallDetailSheet(
 
 @Composable
 private fun StatusSection(success: Boolean) {
-    val backgroundColor = if (success) {
-        AppColors.statusGreen.copy(alpha = 0.1f)
-    } else {
-        AppColors.primaryRed.copy(alpha = 0.1f)
-    }
-    
+    val backgroundColor =
+        if (success) {
+            AppColors.statusGreen.copy(alpha = 0.1f)
+        } else {
+            AppColors.primaryRed.copy(alpha = 0.1f)
+        }
+
     val iconTint = if (success) AppColors.statusGreen else AppColors.primaryRed
-    
+
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(backgroundColor, RoundedCornerShape(12.dp))
-            .padding(16.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(backgroundColor, RoundedCornerShape(12.dp))
+                .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -201,14 +209,15 @@ private fun CodeSection(
             color = AppColors.textSecondary,
         )
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surfaceVariant,
-                    RoundedCornerShape(8.dp)
-                )
-                .padding(12.dp)
-                .horizontalScroll(rememberScrollState())
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant,
+                        RoundedCornerShape(8.dp),
+                    )
+                    .padding(12.dp)
+                    .horizontalScroll(rememberScrollState()),
         ) {
             Text(
                 text = code,
@@ -224,36 +233,37 @@ private fun CodeSection(
  * Shows animated indicator when tool is being called
  */
 @Composable
-fun ToolCallingActiveIndicator(
-    modifier: Modifier = Modifier,
-) {
+fun ToolCallingActiveIndicator(modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "rotation")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(2000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "rotation",
     )
-    
+
     Row(
-        modifier = modifier
-            .background(
-                AppColors.primaryAccent.copy(alpha = 0.1f),
-                RoundedCornerShape(8.dp)
-            )
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier =
+            modifier
+                .background(
+                    AppColors.primaryAccent.copy(alpha = 0.1f),
+                    RoundedCornerShape(8.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(
             imageVector = Icons.Default.Settings,
             contentDescription = null,
-            modifier = Modifier
-                .size(12.dp)
-                .graphicsLayer { rotationZ = rotation },
+            modifier =
+                Modifier
+                    .size(12.dp)
+                    .graphicsLayer { rotationZ = rotation },
             tint = AppColors.primaryAccent,
         )
         Text(

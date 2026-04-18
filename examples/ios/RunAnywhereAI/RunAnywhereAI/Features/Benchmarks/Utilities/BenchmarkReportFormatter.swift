@@ -131,7 +131,9 @@ enum BenchmarkReportFormatter {
     // MARK: - File Export: CSV
 
     static func writeCSV(run: BenchmarkRun) -> URL {
-        var csv = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,DecodeTPS,PrefillTPS,TPS,TTFT,InTokens,OutTokens,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,GenMs,MemDeltaBytes,Success,Error\n"
+        var csv = "Category,Scenario,Model,Framework,LoadMs,WarmupMs,E2EMs,DecodeTPS,PrefillTPS,"
+            + "TPS,TTFT,InTokens,OutTokens,RTF,AudioLen,AudioDur,Chars,PromptTok,CompTok,"
+            + "GenMs,MemDeltaBytes,Success,Error\n"
         for r in run.results {
             let m = r.metrics
             var row: [String] = []

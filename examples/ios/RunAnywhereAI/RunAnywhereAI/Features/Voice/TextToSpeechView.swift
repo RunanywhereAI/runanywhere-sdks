@@ -244,7 +244,7 @@ struct TextToSpeechView: View {
                     .tint(AppColors.primaryAccent)
             }
 
-            // TODO: Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
+            // TODO: #2 Find a model for TTS that supports pitch, or manually implement a good quality pitch adjustment
 
             // Pitch (not implemented in the current TTS models. Once supported, we can have this back.)
             // VStack(alignment: .leading, spacing: 10) {

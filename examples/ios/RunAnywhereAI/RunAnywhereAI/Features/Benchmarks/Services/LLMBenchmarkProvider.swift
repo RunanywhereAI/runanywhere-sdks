@@ -48,12 +48,19 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Benchmark
             let benchStart = Date()
-            let systemPrompt = "You are a helpful assistant. Always give extremely detailed, thorough responses. Never stop early. Use the full response length available to you. Elaborate on every point with examples and explanations."
-            let options = LLMGenerationOptions(maxTokens: maxTokens, temperature: 0.0, systemPrompt: systemPrompt)
-            let streamResult = try await RunAnywhere.generateStream(
-                "Write a very long and detailed explanation of how neural networks work, covering perceptrons, activation functions, backpropagation, gradient descent, loss functions, convolutional layers, recurrent layers, transformers, attention mechanisms, and training procedures. Be as thorough as possible.",
-                options: options
+            let systemPrompt = "You are a helpful assistant. Always give extremely detailed, "
+                + "thorough responses. Never stop early. Use the full response length available "
+                + "to you. Elaborate on every point with examples and explanations."
+            let options = LLMGenerationOptions(
+                maxTokens: maxTokens,
+                temperature: 0.0,
+                systemPrompt: systemPrompt
             )
+            let prompt = "Write a very long and detailed explanation of how neural networks work, "
+                + "covering perceptrons, activation functions, backpropagation, gradient descent, "
+                + "loss functions, convolutional layers, recurrent layers, transformers, attention "
+                + "mechanisms, and training procedures. Be as thorough as possible."
+            let streamResult = try await RunAnywhere.generateStream(prompt, options: options)
             for try await _ in streamResult.stream {}
             let result = try await streamResult.result.value
 

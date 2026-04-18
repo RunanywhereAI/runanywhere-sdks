@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.presentation.rag
 
 import android.content.Context
 import android.net.Uri
-import timber.log.Timber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.DocumentService
@@ -20,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 // MARK: - Message Role
 
@@ -58,22 +58,16 @@ data class RAGMessage(
 data class RAGUiState(
     /** Display name of the loaded document (last path component). */
     val documentName: String? = null,
-
     /** Whether a document has been fully ingested into the pipeline. */
     val isDocumentLoaded: Boolean = false,
-
     /** Whether the document extraction + pipeline creation is in progress. */
     val isLoadingDocument: Boolean = false,
-
     /** All conversation messages (user questions and assistant answers). */
     val messages: List<RAGMessage> = emptyList(),
-
     /** Whether a query is currently running. */
     val isQuerying: Boolean = false,
-
     /** Last error message, if any. */
     val error: String? = null,
-
     /** Current text entered by the user in the question field. */
     val currentQuestion: String = "",
 ) {
@@ -96,7 +90,6 @@ data class RAGUiState(
  * Mirrors iOS RAGViewModel exactly, adapted for Android ViewModel + StateFlow + viewModelScope.
  */
 class RAGViewModel : ViewModel() {
-
     private val _uiState = MutableStateFlow(RAGUiState())
     val uiState: StateFlow<RAGUiState> = _uiState.asStateFlow()
 
@@ -121,16 +114,21 @@ class RAGViewModel : ViewModel() {
      * @param uri Content URI of the document (PDF or JSON)
      * @param config RAG pipeline configuration with model paths and tuning parameters
      */
-    fun loadDocument(context: Context, uri: Uri, config: RAGConfiguration) {
+    fun loadDocument(
+        context: Context,
+        uri: Uri,
+        config: RAGConfiguration,
+    ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDocument = true, error = null) }
 
             try {
                 val fileName = DocumentService.getFileName(context, uri) ?: "Document"
                 Timber.i("Extracting text from document: $fileName")
-                val extractedText = withContext(Dispatchers.IO) {
-                    DocumentService.extractText(context, uri)
-                }
+                val extractedText =
+                    withContext(Dispatchers.IO) {
+                        DocumentService.extractText(context, uri)
+                    }
 
                 Timber.i("Creating RAG pipeline")
                 RunAnywhere.ragCreatePipeline(config)
@@ -190,10 +188,12 @@ class RAGViewModel : ViewModel() {
 
                 _uiState.update {
                     it.copy(
-                        messages = it.messages + RAGMessage(
-                            role = RAGMessageRole.ASSISTANT,
-                            text = answerWithTiming,
-                        ),
+                        messages =
+                            it.messages +
+                                RAGMessage(
+                                    role = RAGMessageRole.ASSISTANT,
+                                    text = answerWithTiming,
+                                ),
                     )
                 }
                 Timber.i("Query complete (${result.totalTimeMs}ms)")
@@ -202,10 +202,12 @@ class RAGViewModel : ViewModel() {
                 val errorText = "Error: ${e.message ?: "Query failed"}"
                 _uiState.update {
                     it.copy(
-                        messages = it.messages + RAGMessage(
-                            role = RAGMessageRole.ASSISTANT,
-                            text = errorText,
-                        ),
+                        messages =
+                            it.messages +
+                                RAGMessage(
+                                    role = RAGMessageRole.ASSISTANT,
+                                    text = errorText,
+                                ),
                         error = e.message,
                     )
                 }

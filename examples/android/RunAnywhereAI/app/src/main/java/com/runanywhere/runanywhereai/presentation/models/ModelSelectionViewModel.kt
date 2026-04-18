@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.models
 
-import timber.log.Timber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -19,12 +18,10 @@ import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.currentVLMModelId
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.loadVLMModel
-import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +30,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * ViewModel for Model Selection Bottom Sheet
@@ -180,43 +178,45 @@ class ModelSelectionViewModel(
      * This mirrors iOS behavior where ragEmbedding/ragLLM contexts skip the model loader.
      */
     private fun getCurrentLoadedModelIdForContext(): String? {
-    return when (context) {
-        ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
-        ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
-        ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
-        ModelSelectionContext.VOICE -> null
-        ModelSelectionContext.RAG_EMBEDDING,
-        ModelSelectionContext.RAG_LLM -> null
-        ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
+        return when (context) {
+            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModelId
+            ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
+            ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
+            ModelSelectionContext.VOICE -> null
+            ModelSelectionContext.RAG_EMBEDDING,
+            ModelSelectionContext.RAG_LLM,
+            -> null
+            ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
+        }
     }
-}
 
     /**
      * Check if a model category is relevant for the current selection context
      */
     private fun isModelRelevantForContext(
-    category: ModelCategory,
-    ctx: ModelSelectionContext,
-): Boolean {
-    return when (ctx) {
-        ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
-        ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
-        ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
-        ModelSelectionContext.VOICE ->
-            category in listOf(
-                ModelCategory.LANGUAGE,
-                ModelCategory.SPEECH_RECOGNITION,
-                ModelCategory.SPEECH_SYNTHESIS,
-            )
-        ModelSelectionContext.RAG_EMBEDDING ->
-            category == ModelCategory.EMBEDDING
-        ModelSelectionContext.RAG_LLM ->
-            category == ModelCategory.LANGUAGE
-        ModelSelectionContext.VLM ->
-            category == ModelCategory.MULTIMODAL ||
-            category == ModelCategory.VISION
+        category: ModelCategory,
+        ctx: ModelSelectionContext,
+    ): Boolean {
+        return when (ctx) {
+            ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
+            ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
+            ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+            ModelSelectionContext.VOICE ->
+                category in
+                    listOf(
+                        ModelCategory.LANGUAGE,
+                        ModelCategory.SPEECH_RECOGNITION,
+                        ModelCategory.SPEECH_SYNTHESIS,
+                    )
+            ModelSelectionContext.RAG_EMBEDDING ->
+                category == ModelCategory.EMBEDDING
+            ModelSelectionContext.RAG_LLM ->
+                category == ModelCategory.LANGUAGE
+            ModelSelectionContext.VLM ->
+                category == ModelCategory.MULTIMODAL ||
+                    category == ModelCategory.VISION
+        }
     }
-}
 
     /**
      * Toggle framework expansion
@@ -327,32 +327,33 @@ class ModelSelectionViewModel(
 
             // Context-aware model loading - matches iOS exactly
             when (context) {
-    ModelSelectionContext.LLM -> {
-        RunAnywhere.loadLLMModel(modelId)
-    }
-    ModelSelectionContext.STT -> {
-        RunAnywhere.loadSTTModel(modelId)
-    }
-    ModelSelectionContext.TTS -> {
-        RunAnywhere.loadTTSVoice(modelId)
-    }
-    ModelSelectionContext.VOICE -> {
-        val model = _uiState.value.models.find { it.id == modelId }
-        when (model?.category) {
-            ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
-            ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
-            else -> RunAnywhere.loadLLMModel(modelId)
-        }
-    }
-    ModelSelectionContext.RAG_EMBEDDING,
-    ModelSelectionContext.RAG_LLM -> {
-        // RAG models are referenced by file path only
-        Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
-    }
-    ModelSelectionContext.VLM -> {
-        RunAnywhere.loadVLMModel(modelId)
-    }
-}
+                ModelSelectionContext.LLM -> {
+                    RunAnywhere.loadLLMModel(modelId)
+                }
+                ModelSelectionContext.STT -> {
+                    RunAnywhere.loadSTTModel(modelId)
+                }
+                ModelSelectionContext.TTS -> {
+                    RunAnywhere.loadTTSVoice(modelId)
+                }
+                ModelSelectionContext.VOICE -> {
+                    val model = _uiState.value.models.find { it.id == modelId }
+                    when (model?.category) {
+                        ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
+                        ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
+                        else -> RunAnywhere.loadLLMModel(modelId)
+                    }
+                }
+                ModelSelectionContext.RAG_EMBEDDING,
+                ModelSelectionContext.RAG_LLM,
+                -> {
+                    // RAG models are referenced by file path only
+                    Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
+                }
+                ModelSelectionContext.VLM -> {
+                    RunAnywhere.loadVLMModel(modelId)
+                }
+            }
 
             Timber.d("✅ Model selected successfully: $modelId")
 

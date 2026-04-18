@@ -69,12 +69,13 @@ fun MarkdownText(
                 }
 
                 is MarkdownBlock.Header -> {
-                    val headerStyle = when (block.level) {
-                        1 -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        2 -> MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
-                        3 -> MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                        else -> style.copy(fontWeight = FontWeight.SemiBold)
-                    }
+                    val headerStyle =
+                        when (block.level) {
+                            1 -> MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            2 -> MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                            3 -> MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                            else -> style.copy(fontWeight = FontWeight.SemiBold)
+                        }
                     val annotated = parseInlineMarkdown(block.text, color)
                     Text(
                         text = annotated,
@@ -127,10 +128,11 @@ fun MarkdownText(
                 is MarkdownBlock.Blockquote -> {
                     Row(modifier = Modifier.padding(vertical = 2.dp)) {
                         Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(20.dp)
-                                .background(color.copy(alpha = 0.3f)),
+                            modifier =
+                                Modifier
+                                    .width(3.dp)
+                                    .height(20.dp)
+                                    .background(color.copy(alpha = 0.3f)),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         val annotated = parseInlineMarkdown(block.text, color)
@@ -153,14 +155,15 @@ fun MarkdownText(
 
             // Add spacing between blocks (except last)
             if (index < blocks.lastIndex) {
-                val spacing = when (block) {
-                    is MarkdownBlock.Header -> 8.dp
-                    is MarkdownBlock.CodeBlock -> 8.dp
-                    is MarkdownBlock.HorizontalRule -> 0.dp
-                    is MarkdownBlock.BulletItem -> 4.dp
-                    is MarkdownBlock.NumberedItem -> 4.dp
-                    else -> 6.dp
-                }
+                val spacing =
+                    when (block) {
+                        is MarkdownBlock.Header -> 8.dp
+                        is MarkdownBlock.CodeBlock -> 8.dp
+                        is MarkdownBlock.HorizontalRule -> 0.dp
+                        is MarkdownBlock.BulletItem -> 4.dp
+                        is MarkdownBlock.NumberedItem -> 4.dp
+                        else -> 6.dp
+                    }
                 Spacer(modifier = Modifier.height(spacing))
             }
         }
@@ -176,20 +179,22 @@ private fun CodeBlockView(
     val codeBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(codeBackground)
-            .padding(1.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(codeBackground)
+                .padding(1.dp),
     ) {
         // Language label
         if (!language.isNullOrBlank()) {
             Text(
                 text = language,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                ),
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    ),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             )
             HorizontalDivider(
@@ -200,17 +205,19 @@ private fun CodeBlockView(
 
         // Code content with horizontal scroll
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(12.dp),
         ) {
             Text(
                 text = code,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontFamily = FontFamily.Monospace,
-                    lineHeight = 20.sp,
-                ),
+                style =
+                    MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 20.sp,
+                    ),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -221,11 +228,17 @@ private fun CodeBlockView(
 
 private sealed class MarkdownBlock {
     data class Paragraph(val text: String) : MarkdownBlock()
+
     data class Header(val level: Int, val text: String) : MarkdownBlock()
+
     data class CodeBlock(val code: String, val language: String?) : MarkdownBlock()
+
     data class BulletItem(val text: String) : MarkdownBlock()
+
     data class NumberedItem(val number: Int, val text: String) : MarkdownBlock()
+
     data class Blockquote(val text: String) : MarkdownBlock()
+
     data object HorizontalRule : MarkdownBlock()
 }
 
@@ -335,7 +348,10 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
  * Parse inline markdown formatting into AnnotatedString.
  * Supports: **bold**, *italic*, `inline code`, [links](url), ***bold italic***
  */
-private fun parseInlineMarkdown(text: String, defaultColor: Color): AnnotatedString {
+private fun parseInlineMarkdown(
+    text: String,
+    defaultColor: Color,
+): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
         val len = text.length
@@ -391,7 +407,8 @@ private fun parseInlineMarkdown(text: String, defaultColor: Color): AnnotatedStr
                         withStyle(
                             SpanStyle(
                                 fontFamily = FontFamily.Monospace,
-                                fontSize = 13.sp, // matches MaterialTheme.typography.bodySmall (iOS footnote)
+                                // matches MaterialTheme.typography.bodySmall (iOS footnote)
+                                fontSize = 13.sp,
                                 background = defaultColor.copy(alpha = 0.08f),
                             ),
                         ) {
@@ -416,10 +433,11 @@ private fun parseInlineMarkdown(text: String, defaultColor: Color): AnnotatedStr
                                 LinkAnnotation.Url(
                                     url,
                                     TextLinkStyles(
-                                        style = SpanStyle(
-                                            color = Color(0xFF3B82F6),
-                                            textDecoration = TextDecoration.Underline,
-                                        ),
+                                        style =
+                                            SpanStyle(
+                                                color = Color(0xFF3B82F6),
+                                                textDecoration = TextDecoration.Underline,
+                                            ),
                                     ),
                                 ),
                             ) {

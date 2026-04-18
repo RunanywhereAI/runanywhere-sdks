@@ -13,13 +13,22 @@ export class VLMService {
    * Load the model and track internal state
    * Updated to accept modelName (3rd argument)
    */
-  async loadModel(modelPath: string, mmprojPath?: string, modelName?: string): Promise<void> {
+  async loadModel(
+    modelPath: string,
+    mmprojPath?: string,
+    modelName?: string
+  ): Promise<void> {
     try {
       console.log(`[VLMService] Loading model: ${modelName}`);
-      
+
       // Pass 'undefined' for loraPath (3rd arg) as per SDK requirement
-      const success = await sdkLoadModel(modelPath, mmprojPath, undefined, modelName);
-      
+      const success = await sdkLoadModel(
+        modelPath,
+        mmprojPath,
+        undefined,
+        modelName
+      );
+
       if (success) {
         this._isLoaded = true;
         console.log('[VLMService] Load success');
@@ -50,8 +59,8 @@ export class VLMService {
    * Describe an image with streaming results
    */
   async describeImage(
-    imagePath: string, 
-    prompt: string, 
+    imagePath: string,
+    prompt: string,
     maxTokens: number,
     onToken: (token: string) => void
   ): Promise<void> {
@@ -65,10 +74,10 @@ export class VLMService {
     };
 
     console.log(`[VLMService] Processing image: ${imagePath}`);
-    
+
     try {
       const response = await processImageStream(image, prompt, { maxTokens });
-      
+
       // Consume the async iterator and fire callback
       for await (const token of response.stream) {
         onToken(token);

@@ -44,13 +44,12 @@ import {
   initializeNitroModulesGlobally,
   getChip,
   getNPUDownloadUrl,
-  NPU_CHIPS,
 } from '@runanywhere/core';
-import type { NPUChip } from '@runanywhere/core';
 
 // Make LlamaCPP optional for ONNX-only builds
 let LlamaCPP: any = null;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   LlamaCPP = require('@runanywhere/llamacpp').LlamaCPP;
 } catch (e) {
   console.warn('[App] LlamaCPP backend not available - some features disabled');
@@ -59,13 +58,18 @@ try {
 // Make Genie optional (Android/Snapdragon only)
 let Genie: any = null;
 try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   Genie = require('@runanywhere/genie').Genie;
 } catch (e) {
   console.warn('[App] Genie NPU backend not available');
 }
 
 import { ONNX } from '@runanywhere/onnx';
-import { getStoredApiKey, getStoredBaseURL, hasCustomConfiguration } from './src/screens/SettingsScreen';
+import {
+  getStoredApiKey,
+  getStoredBaseURL,
+  hasCustomConfiguration,
+} from './src/screens/SettingsScreen';
 
 type InitState = 'loading' | 'ready' | 'error';
 
@@ -220,8 +224,14 @@ async function registerModulesAndModels(): Promise<void> {
         id: 'qwen2-vl-2b-instruct-q4_k_m',
         name: 'Qwen2-VL 2B Instruct',
         files: [
-          { url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf', filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf' },
-          { url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf', filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf' },
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+            filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+          },
+          {
+            url: 'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+            filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+          },
         ],
         framework: LLMFramework.LlamaCpp,
         modality: ModelCategory.Multimodal,
@@ -232,8 +242,14 @@ async function registerModulesAndModels(): Promise<void> {
         id: 'lfm2-vl-450m-q8_0',
         name: 'LFM2-VL 450M',
         files: [
-          { url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf', filename: 'LFM2-VL-450M-Q8_0.gguf' },
-          { url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf', filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf' },
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
+            filename: 'LFM2-VL-450M-Q8_0.gguf',
+          },
+          {
+            url: 'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
+            filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
+          },
         ],
         framework: LLMFramework.LlamaCpp,
         modality: ModelCategory.Multimodal,
@@ -259,13 +275,34 @@ async function registerModulesAndModels(): Promise<void> {
         quant?: string;
       }> = [
         // Qwen3 4B — Gen 5 only
-        { slug: 'qwen3-4b', name: 'Qwen3 4B', mem: 2_800_000_000, chips: ['8elite-gen5'] },
+        {
+          slug: 'qwen3-4b',
+          name: 'Qwen3 4B',
+          mem: 2_800_000_000,
+          chips: ['8elite-gen5'],
+        },
         // Llama 3.2 1B Instruct — both chips
-        { slug: 'llama3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', mem: 1_200_000_000, chips: ['8elite', '8elite-gen5'] },
+        {
+          slug: 'llama3.2-1b-instruct',
+          name: 'Llama 3.2 1B Instruct',
+          mem: 1_200_000_000,
+          chips: ['8elite', '8elite-gen5'],
+        },
         // SEA-LION v3.5 8B Instruct — both chips
-        { slug: 'sea-lion3.5-8b-instruct', name: 'SEA-LION v3.5 8B Instruct', mem: 4_800_000_000, chips: ['8elite', '8elite-gen5'] },
+        {
+          slug: 'sea-lion3.5-8b-instruct',
+          name: 'SEA-LION v3.5 8B Instruct',
+          mem: 4_800_000_000,
+          chips: ['8elite', '8elite-gen5'],
+        },
         // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
-        { slug: 'qwen2.5-7b-instruct', name: 'Qwen 2.5 7B Instruct', mem: 4_200_000_000, chips: ['8elite'], quant: 'w8a16' },
+        {
+          slug: 'qwen2.5-7b-instruct',
+          name: 'Qwen 2.5 7B Instruct',
+          mem: 4_200_000_000,
+          chips: ['8elite'],
+          quant: 'w8a16',
+        },
       ];
 
       const registrations = genieModels
@@ -277,7 +314,7 @@ async function registerModulesAndModels(): Promise<void> {
             url: getNPUDownloadUrl(chip, m.slug, m.quant),
             framework: LLMFramework.Genie,
             memoryRequirement: m.mem,
-          }),
+          })
         );
       await Promise.all(registrations);
       console.log(`✅ Genie NPU models registered (chip: ${chip.displayName})`);
@@ -325,8 +362,14 @@ async function registerModulesAndModels(): Promise<void> {
       id: 'all-minilm-l6-v2',
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [
-        { url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx', filename: 'model.onnx' },
-        { url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt', filename: 'vocab.txt' },
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx',
+          filename: 'model.onnx',
+        },
+        {
+          url: 'https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt',
+          filename: 'vocab.txt',
+        },
       ],
       framework: LLMFramework.ONNX,
       modality: ModelCategory.Embedding,
@@ -367,7 +410,9 @@ const App: React.FC = () => {
           baseURL: customBaseURL,
           environment: SDKEnvironment.Production,
         });
-        console.log('[App] SDK initialized with custom configuration (production)');
+        console.log(
+          '[App] SDK initialized with custom configuration (production)'
+        );
       } else {
         await RunAnywhere.initialize({
           apiKey: '',

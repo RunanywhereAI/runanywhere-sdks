@@ -433,6 +433,8 @@ export class OPFSStorage {
   private sanitizeFilename(name: string): string {
     // Replace characters that are problematic in filenames across platforms.
     // Keeps: alphanumeric, dot, dash, underscore, plus, space, parentheses.
+    // Intentional: we want to strip C0 control characters from filenames.
+    // eslint-disable-next-line no-control-regex
     return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
   }
 }

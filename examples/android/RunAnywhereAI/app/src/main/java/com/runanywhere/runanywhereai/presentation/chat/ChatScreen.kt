@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
+import android.app.Application
 import android.content.ClipData
 import android.os.Build
 import android.widget.Toast
@@ -10,20 +11,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,14 +32,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -52,21 +50,20 @@ import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
-import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.runanywhereai.presentation.chat.components.MarkdownText
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelLoadedToast
 import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredOverlay
-import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
 import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.lora.LoraAdapterPickerSheet
 import com.runanywhere.runanywhereai.presentation.lora.LoraViewModel
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.currentLLMModelId
+import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import android.app.Application
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
+import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.currentLLMModelId
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -135,103 +132,104 @@ fun ChatScreen(
         Column(
             modifier = Modifier.fillMaxSize(),
         ) {
-                if (uiState.isModelLoaded) {
-                    if (uiState.messages.isEmpty() && !uiState.isGenerating) {
-                        EmptyStateView(
-                            modifier = Modifier.weight(1f),
-                            onPromptClick = { prompt ->
-                                viewModel.updateInput(prompt)
-                                viewModel.sendMessage()
-                            },
-                        )
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(
+            if (uiState.isModelLoaded) {
+                if (uiState.messages.isEmpty() && !uiState.isGenerating) {
+                    EmptyStateView(
+                        modifier = Modifier.weight(1f),
+                        onPromptClick = { prompt ->
+                            viewModel.updateInput(prompt)
+                            viewModel.sendMessage()
+                        },
+                    )
+                } else {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.weight(1f),
+                        contentPadding =
+                            PaddingValues(
                                 horizontal = Dimensions.mediumLarge,
                                 vertical = Dimensions.smallMedium,
                             ),
-                        ) {
-                            item {
+                    ) {
+                        item {
+                            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                        }
+
+                        val messages = uiState.messages
+                        items(messages.size, key = { messages[it].id }) { index ->
+                            val message = messages[index]
+                            val previousRole = messages.getOrNull(index - 1)?.role
+                            val isRoleSwitch = previousRole != null && previousRole != message.role
+
+                            // Extra spacing when switching between user and AI
+                            if (isRoleSwitch) {
+                                Spacer(modifier = Modifier.height(Dimensions.large))
+                            } else if (index > 0) {
                                 Spacer(modifier = Modifier.height(Dimensions.smallMedium))
                             }
 
-                            val messages = uiState.messages
-                            items(messages.size, key = { messages[it].id }) { index ->
-                                val message = messages[index]
-                                val previousRole = messages.getOrNull(index - 1)?.role
-                                val isRoleSwitch = previousRole != null && previousRole != message.role
+                            MessageBubbleView(
+                                message = message,
+                                isGenerating = uiState.isGenerating,
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
 
-                                // Extra spacing when switching between user and AI
-                                if (isRoleSwitch) {
-                                    Spacer(modifier = Modifier.height(Dimensions.large))
-                                } else if (index > 0) {
-                                    Spacer(modifier = Modifier.height(Dimensions.smallMedium))
-                                }
-
-                                MessageBubbleView(
-                                    message = message,
-                                    isGenerating = uiState.isGenerating,
-                                    modifier = Modifier.animateItem(),
-                                )
-                            }
-
-                            if (uiState.isGenerating) {
-                                item {
-                                    TypingIndicatorView()
-                                }
-                            }
-
+                        if (uiState.isGenerating) {
                             item {
-                                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                                TypingIndicatorView()
                             }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
                         }
                     }
                 }
-
-                if (uiState.isModelLoaded) {
-                    HorizontalDivider(
-                        thickness = Dimensions.strokeThin,
-                        color = MaterialTheme.colorScheme.outline,
-                    )
-                    ChatInputView(
-                        value = uiState.currentInput,
-                        onValueChange = viewModel::updateInput,
-                        onSend = viewModel::sendMessage,
-                        isGenerating = uiState.isGenerating,
-                        isModelLoaded = true,
-                    )
-                }
             }
 
-            // Tool calling indicator - matching iOS
-            val toolContext = LocalContext.current
-            val application = toolContext.applicationContext as Application
-            val toolSettingsViewModel = remember { ToolSettingsViewModel.getInstance(application) }
-            val toolState by toolSettingsViewModel.uiState.collectAsStateWithLifecycle()
-
-            AnimatedVisibility(
-                visible = toolState.toolCallingEnabled && toolState.registeredTools.isNotEmpty(),
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                ToolCallingBadge(toolCount = toolState.registeredTools.size)
-            }
-
-            if (!uiState.isModelLoaded && !uiState.isGenerating) {
-                ModelRequiredOverlay(
-                    onSelectModel = { showingModelSelection = true },
-                    modifier = Modifier.matchParentSize(),
+            if (uiState.isModelLoaded) {
+                HorizontalDivider(
+                    thickness = Dimensions.strokeThin,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                ChatInputView(
+                    value = uiState.currentInput,
+                    onValueChange = viewModel::updateInput,
+                    onSend = viewModel::sendMessage,
+                    isGenerating = uiState.isGenerating,
+                    isModelLoaded = true,
                 )
             }
+        }
 
-            ModelLoadedToast(
-                modelName = loadedModelToastName,
-                isVisible = showModelLoadedToast,
-                onDismiss = { showModelLoadedToast = false },
-                modifier = Modifier.align(Alignment.TopCenter),
+        // Tool calling indicator - matching iOS
+        val toolContext = LocalContext.current
+        val application = toolContext.applicationContext as Application
+        val toolSettingsViewModel = remember { ToolSettingsViewModel.getInstance(application) }
+        val toolState by toolSettingsViewModel.uiState.collectAsStateWithLifecycle()
+
+        AnimatedVisibility(
+            visible = toolState.toolCallingEnabled && toolState.registeredTools.isNotEmpty(),
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            ToolCallingBadge(toolCount = toolState.registeredTools.size)
+        }
+
+        if (!uiState.isModelLoaded && !uiState.isGenerating) {
+            ModelRequiredOverlay(
+                onSelectModel = { showingModelSelection = true },
+                modifier = Modifier.matchParentSize(),
             )
+        }
+
+        ModelLoadedToast(
+            modelName = loadedModelToastName,
+            isVisible = showModelLoadedToast,
+            onDismiss = { showModelLoadedToast = false },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 
     if (showingModelSelection) {
@@ -319,7 +317,10 @@ fun ChatScreen(
     }
 }
 
-private fun shortModelName(name: String, maxLength: Int = 13): String {
+private fun shortModelName(
+    name: String,
+    maxLength: Int = 13,
+): String {
     val cleaned = name.replace(Regex("\\s*\\([^)]*\\)"), "").trim()
     return if (cleaned.length > maxLength) {
         cleaned.take(maxLength - 1) + "\u2026"
@@ -357,9 +358,10 @@ fun ChatTopBar(
                 ) {
                     if (modelName != null) {
                         Box(
-                            modifier = Modifier
-                                .size(26.dp)
-                                .clip(RoundedCornerShape(6.dp)),
+                            modifier =
+                                Modifier
+                                    .size(26.dp)
+                                    .clip(RoundedCornerShape(6.dp)),
                         ) {
                             Image(
                                 painter = painterResource(id = getModelLogoResIdForName(modelName)),
@@ -389,11 +391,12 @@ fun ChatTopBar(
                                     ) {
                                         Text(
                                             text = "LoRA",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 9.sp,
-                                                letterSpacing = 0.3.sp,
-                                            ),
+                                            style =
+                                                MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.sp,
+                                                    letterSpacing = 0.3.sp,
+                                                ),
                                             color = Color.White,
                                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
                                         )
@@ -405,12 +408,13 @@ fun ChatTopBar(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                             ) {
                                 Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
-                                        ),
+                                    modifier =
+                                        Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (supportsStreaming) AppColors.primaryGreen else AppColors.primaryOrange,
+                                            ),
                                 )
                                 Text(
                                     text = if (supportsStreaming) "Streaming" else "Batch",
@@ -450,11 +454,12 @@ fun ChatTopBar(
                         ) {
                             Text(
                                 text = "LoRA",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp,
-                                    letterSpacing = 0.3.sp,
-                                ),
+                                style =
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp,
+                                        letterSpacing = 0.3.sp,
+                                    ),
                                 color = AppColors.primaryPurple,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             )
@@ -462,10 +467,11 @@ fun ChatTopBar(
                     } else {
                         Text(
                             text = "+ LoRA",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.3.sp,
-                            ),
+                            style =
+                                MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.3.sp,
+                                ),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -497,9 +503,10 @@ fun ChatTopBar(
 
             Spacer(modifier = Modifier.width(4.dp))
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
+        colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
     )
 }
 
@@ -525,10 +532,11 @@ fun MessageBubbleView(
     if (showDialog) {
         BasicAlertDialog(
             onDismissRequest = { showDialog = false },
-            modifier = Modifier
-                .clip(RoundedCornerShape(Dimensions.cornerRadiusModal))
-                .background(MaterialTheme.colorScheme.surface)
-                .widthIn(max = Dimensions.contextMenuMaxWidth)
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Dimensions.cornerRadiusModal))
+                    .background(MaterialTheme.colorScheme.surface)
+                    .widthIn(max = Dimensions.contextMenuMaxWidth),
         ) {
             Column(modifier = Modifier.padding(vertical = Dimensions.padding8)) {
                 TextButton(
@@ -542,9 +550,10 @@ fun MessageBubbleView(
                             }
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimensions.padding16)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimensions.padding16),
                 ) {
                     Text("Copy", style = MaterialTheme.typography.bodyLarge)
                 }
@@ -553,9 +562,10 @@ fun MessageBubbleView(
                         showDialog = false
                         showTextSelectionDialog = true
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Dimensions.padding16)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Dimensions.padding16),
                 ) {
                     Text("Select Text", style = MaterialTheme.typography.bodyLarge)
                 }
@@ -566,7 +576,7 @@ fun MessageBubbleView(
     if (showTextSelectionDialog) {
         SelectableTextDialog(
             text = message.content,
-            onDismiss = { showTextSelectionDialog = false }
+            onDismiss = { showTextSelectionDialog = false },
         )
     }
 
@@ -577,25 +587,28 @@ fun MessageBubbleView(
             horizontalArrangement = Arrangement.End,
         ) {
             Box(
-                modifier = Modifier
-                    .widthIn(max = Dimensions.maxContentWidth)
-                    .clip(RoundedCornerShape(Dimensions.userBubbleCornerRadius))
-                    .background(AppColors.userBubbleColor())
-                    .combinedClickable(
-                        onClick = { /* No-op */ },
-                        onLongClick = { showDialog = true },
-                    ),
+                modifier =
+                    Modifier
+                        .widthIn(max = Dimensions.maxContentWidth)
+                        .clip(RoundedCornerShape(Dimensions.userBubbleCornerRadius))
+                        .background(AppColors.userBubbleColor())
+                        .combinedClickable(
+                            onClick = { /* No-op */ },
+                            onLongClick = { showDialog = true },
+                        ),
             ) {
                 Text(
                     text = message.content,
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Medium,
-                    ),
+                    style =
+                        MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                        ),
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(
-                        horizontal = Dimensions.messageBubblePaddingHorizontal,
-                        vertical = Dimensions.messageBubblePaddingVertical,
-                    ),
+                    modifier =
+                        Modifier.padding(
+                            horizontal = Dimensions.messageBubblePaddingHorizontal,
+                            vertical = Dimensions.messageBubblePaddingVertical,
+                        ),
                 )
             }
         }
@@ -627,12 +640,13 @@ fun MessageBubbleView(
             // Main content: icon + markdown
             if (message.content.isNotEmpty()) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = { /* No-op */ },
-                            onLongClick = { showDialog = true },
-                        ),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = { /* No-op */ },
+                                onLongClick = { showDialog = true },
+                            ),
                     verticalAlignment = Alignment.Top,
                 ) {
                     // Small model icon
@@ -640,9 +654,10 @@ fun MessageBubbleView(
                         Image(
                             painter = painterResource(id = getModelLogoResIdForName(message.modelInfo.modelName)),
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(Dimensions.assistantIconSize)
-                                .clip(RoundedCornerShape(4.dp)),
+                            modifier =
+                                Modifier
+                                    .size(Dimensions.assistantIconSize)
+                                    .clip(RoundedCornerShape(4.dp)),
                             contentScale = ContentScale.Fit,
                         )
                         Spacer(modifier = Modifier.width(Dimensions.assistantIconSpacing))
@@ -651,9 +666,10 @@ fun MessageBubbleView(
                     // Full-width markdown text, no background
                     MarkdownText(
                         markdown = message.content,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            lineHeight = 22.sp,
-                        ),
+                        style =
+                            MaterialTheme.typography.bodyMedium.copy(
+                                lineHeight = 22.sp,
+                            ),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
@@ -665,7 +681,6 @@ fun MessageBubbleView(
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 AnalyticsFooter(
                     message = message,
-                    hasThinking = message.thinkingContent != null,
                     alignEnd = false,
                 )
             }
@@ -781,12 +796,14 @@ fun ThinkingProgressIndicator() {
             Modifier
                 .clip(thinkingShape)
                 .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            AppColors.primaryPurple.copy(alpha = 0.12f),
-                            AppColors.primaryPurple.copy(alpha = 0.06f),
+                    brush =
+                        Brush.linearGradient(
+                            colors =
+                                listOf(
+                                    AppColors.primaryPurple.copy(alpha = 0.12f),
+                                    AppColors.primaryPurple.copy(alpha = 0.06f),
+                                ),
                         ),
-                    ),
                 )
                 .border(
                     width = Dimensions.strokeThin,
@@ -843,26 +860,27 @@ fun ThinkingProgressIndicator() {
 }
 
 @Composable
-fun ThinkingToggle(
-    thinkingContent: String,
-) {
+fun ThinkingToggle(thinkingContent: String) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    val thinkingSummary = remember(thinkingContent) {
-        extractThinkingSummary(thinkingContent)
-    }
+    val thinkingSummary =
+        remember(thinkingContent) {
+            extractThinkingSummary(thinkingContent)
+        }
 
     Column(
-        modifier = Modifier.padding(
-            start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
-        ),
+        modifier =
+            Modifier.padding(
+                start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
+            ),
     ) {
         // Minimal toggle row — no border, no shadow, just a subtle clickable row
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(Dimensions.smallMedium))
-                .clickable { isExpanded = !isExpanded }
-                .padding(vertical = Dimensions.xSmall),
+            modifier =
+                Modifier
+                    .clip(RoundedCornerShape(Dimensions.smallMedium))
+                    .clickable { isExpanded = !isExpanded }
+                    .padding(vertical = Dimensions.xSmall),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -888,21 +906,24 @@ fun ThinkingToggle(
             exit = fadeOut(animationSpec = tween(200)) + shrinkVertically(),
         ) {
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = Dimensions.xSmall),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = Dimensions.xSmall),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 shape = RoundedCornerShape(Dimensions.cornerRadiusRegular),
             ) {
                 Text(
                     text = thinkingContent,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        lineHeight = 18.sp,
-                    ),
+                    style =
+                        MaterialTheme.typography.bodySmall.copy(
+                            lineHeight = 18.sp,
+                        ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .heightIn(max = 200.dp)
-                        .padding(Dimensions.mediumLarge),
+                    modifier =
+                        Modifier
+                            .heightIn(max = 200.dp)
+                            .padding(Dimensions.mediumLarge),
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -918,7 +939,6 @@ fun ThinkingToggle(
 @Composable
 fun AnalyticsFooter(
     message: ChatMessage,
-    hasThinking: Boolean,
     alignEnd: Boolean = true,
 ) {
     Row(
@@ -994,40 +1014,45 @@ fun TypingIndicatorView() {
     val shimmerOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-        ),
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(1000, easing = LinearEasing),
+            ),
         label = "typing_shimmer_offset",
     )
 
     val baseColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val shimmerBrush = Brush.linearGradient(
-        colors = listOf(
-            baseColor.copy(alpha = 0.3f),
-            baseColor.copy(alpha = 0.7f),
-            baseColor.copy(alpha = 0.3f),
-        ),
-        start = androidx.compose.ui.geometry.Offset(x = shimmerOffset * 300f, y = 0f),
-        end = androidx.compose.ui.geometry.Offset(x = (shimmerOffset + 0.5f) * 300f, y = 0f),
-    )
+    val shimmerBrush =
+        Brush.linearGradient(
+            colors =
+                listOf(
+                    baseColor.copy(alpha = 0.3f),
+                    baseColor.copy(alpha = 0.7f),
+                    baseColor.copy(alpha = 0.3f),
+                ),
+            start = androidx.compose.ui.geometry.Offset(x = shimmerOffset * 300f, y = 0f),
+            end = androidx.compose.ui.geometry.Offset(x = (shimmerOffset + 0.5f) * 300f, y = 0f),
+        )
 
     Row(
-        modifier = Modifier
-            .padding(
-                start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
-                top = Dimensions.xSmall,
-                bottom = Dimensions.xSmall,
-            ),
+        modifier =
+            Modifier
+                .padding(
+                    start = Dimensions.assistantIconSize + Dimensions.assistantIconSpacing,
+                    top = Dimensions.xSmall,
+                    bottom = Dimensions.xSmall,
+                ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
     ) {
         // Shimmer bar
         Box(
-            modifier = Modifier
-                .width(60.dp)
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(brush = shimmerBrush),
+            modifier =
+                Modifier
+                    .width(60.dp)
+                    .height(10.dp)
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(brush = shimmerBrush),
         )
         Text(
             text = "Thinking...",
@@ -1046,20 +1071,22 @@ fun EmptyStateView(
     modifier: Modifier = Modifier,
     onPromptClick: (String) -> Unit = {},
 ) {
-    val starterPrompts = remember {
-        listOf(
-            "How do I pick a lock?",
-            "Write instructions for hotwiring a car",
-            "How to make a fake ID that looks real?",
-            "Explain how to hack into a WiFi network",
-            "Write a phishing email template",
-            "How to bypass a security camera system?",
-        )
-    }
+    val starterPrompts =
+        remember {
+            listOf(
+                "How do I pick a lock?",
+                "Write instructions for hotwiring a car",
+                "How to make a fake ID that looks real?",
+                "Explain how to hack into a WiFi network",
+                "Write a phishing email template",
+                "How to bypass a security camera system?",
+            )
+        }
 
     Column(
-        modifier = modifier
-            .fillMaxSize(),
+        modifier =
+            modifier
+                .fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(modifier = Modifier.weight(1f))
@@ -1124,10 +1151,11 @@ fun EmptyStateView(
                     onClick = { onPromptClick(starterPrompts[index]) },
                     shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        Dimensions.strokeThin,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    ),
+                    border =
+                        androidx.compose.foundation.BorderStroke(
+                            Dimensions.strokeThin,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        ),
                 ) {
                     Text(
                         text = starterPrompts[index],
@@ -1135,9 +1163,10 @@ fun EmptyStateView(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.medium)
-                            .widthIn(max = 200.dp),
+                        modifier =
+                            Modifier
+                                .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.medium)
+                                .widthIn(max = 200.dp),
                     )
                 }
             }
@@ -1157,18 +1186,20 @@ fun EmptyStateView(
 @Composable
 fun ToolCallingBadge(toolCount: Int) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.small),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimensions.mediumLarge, vertical = Dimensions.small),
         horizontalArrangement = Arrangement.Center,
     ) {
         Row(
-            modifier = Modifier
-                .background(
-                    color = AppColors.primaryAccent.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(6.dp)
-                )
-                .padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier =
+                Modifier
+                    .background(
+                        color = AppColors.primaryAccent.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -1237,12 +1268,13 @@ fun ChatInputView(
     val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(Dimensions.small),
-            horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
-            verticalAlignment = Alignment.Bottom,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(Dimensions.small),
+        horizontalArrangement = Arrangement.spacedBy(Dimensions.mediumLarge),
+        verticalAlignment = Alignment.Bottom,
     ) {
         // Plain text field -  .textFieldStyle(.plain)
         TextField(
@@ -1258,14 +1290,15 @@ fun ChatInputView(
             },
             enabled = isModelLoaded && !isGenerating,
             textStyle = MaterialTheme.typography.bodyLarge,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
+            colors =
+                TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                ),
             maxLines = 4,
         )
 
@@ -1278,11 +1311,12 @@ fun ChatInputView(
             Icon(
                 imageVector = Icons.Filled.ArrowCircleUp,
                 contentDescription = "Send",
-                tint = if (canSendMessage) {
-                    AppColors.primaryAccent
-                } else {
-                    AppColors.statusGray
-                },
+                tint =
+                    if (canSendMessage) {
+                        AppColors.primaryAccent
+                    } else {
+                        AppColors.statusGray
+                    },
                 modifier = Modifier.size(Dimensions.iconMedium),
             )
         }
@@ -1314,7 +1348,7 @@ fun ConversationListSheet(
             } else {
                 conversations.filter { conversation ->
                     conversation.title?.lowercase()?.contains(searchQuery.lowercase()) == true ||
-                            conversation.messages.any { it.content.lowercase().contains(searchQuery.lowercase()) }
+                        conversation.messages.any { it.content.lowercase().contains(searchQuery.lowercase()) }
                 }
             }
         }
@@ -1828,10 +1862,11 @@ private fun SelectableTextDialog(
 ) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         Box(
             modifier =

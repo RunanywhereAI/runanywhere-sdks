@@ -50,7 +50,6 @@ data class BenchmarkUiState(
  * Matches iOS BenchmarkViewModel exactly.
  */
 class BenchmarkViewModel(application: Application) : AndroidViewModel(application) {
-
     private val _uiState = MutableStateFlow(BenchmarkUiState())
     val uiState: StateFlow<BenchmarkUiState> = _uiState.asStateFlow()
 
@@ -100,60 +99,66 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }
 
-        runJob = viewModelScope.launch {
-            val deviceInfo = makeDeviceInfo()
-            var run = BenchmarkRun(deviceInfo = deviceInfo)
+        runJob =
+            viewModelScope.launch {
+                val deviceInfo = makeDeviceInfo()
+                var run = BenchmarkRun(deviceInfo = deviceInfo)
 
-            try {
-                val runResult = runner.runBenchmarks(
-                    categories = _uiState.value.selectedCategories,
-                ) { update ->
-                    _uiState.update { state ->
-                        state.copy(
-                            progress = update.progress,
-                            completedCount = update.completedCount,
-                            totalCount = update.totalCount,
-                            currentScenario = update.currentScenario,
-                            currentModel = update.currentModel,
-                        )
+                try {
+                    val runResult =
+                        runner.runBenchmarks(
+                            categories = _uiState.value.selectedCategories,
+                        ) { update ->
+                            _uiState.update { state ->
+                                state.copy(
+                                    progress = update.progress,
+                                    completedCount = update.completedCount,
+                                    totalCount = update.totalCount,
+                                    currentScenario = update.currentScenario,
+                                    currentModel = update.currentModel,
+                                )
+                            }
+                        }
+
+                    if (runResult.skippedCategories.isNotEmpty()) {
+                        val names = runResult.skippedCategories.joinToString { it.displayName }
+                        _uiState.update { it.copy(skippedCategoriesMessage = "Skipped (no models): $names") }
                     }
+
+                    run =
+                        run.copy(
+                            results = runResult.results,
+                            status = BenchmarkRunStatus.COMPLETED,
+                            completedAt = System.currentTimeMillis(),
+                        )
+                } catch (_: kotlinx.coroutines.CancellationException) {
+                    run =
+                        run.copy(
+                            status = BenchmarkRunStatus.CANCELLED,
+                            completedAt = System.currentTimeMillis(),
+                        )
+                } catch (e: BenchmarkRunnerError) {
+                    run =
+                        run.copy(
+                            status = BenchmarkRunStatus.FAILED,
+                            completedAt = System.currentTimeMillis(),
+                        )
+                    _uiState.update { it.copy(errorMessage = e.message) }
+                } catch (e: Exception) {
+                    run =
+                        run.copy(
+                            status = BenchmarkRunStatus.FAILED,
+                            completedAt = System.currentTimeMillis(),
+                        )
+                    _uiState.update { it.copy(errorMessage = e.localizedMessage ?: e.message ?: "Unknown error") }
                 }
 
-                if (runResult.skippedCategories.isNotEmpty()) {
-                    val names = runResult.skippedCategories.joinToString { it.displayName }
-                    _uiState.update { it.copy(skippedCategoriesMessage = "Skipped (no models): $names") }
+                if (run.results.isNotEmpty() || run.status != BenchmarkRunStatus.RUNNING) {
+                    store.save(run)
                 }
-
-                run = run.copy(
-                    results = runResult.results,
-                    status = BenchmarkRunStatus.COMPLETED,
-                    completedAt = System.currentTimeMillis(),
-                )
-            } catch (_: kotlinx.coroutines.CancellationException) {
-                run = run.copy(
-                    status = BenchmarkRunStatus.CANCELLED,
-                    completedAt = System.currentTimeMillis(),
-                )
-            } catch (e: BenchmarkRunnerError) {
-                run = run.copy(
-                    status = BenchmarkRunStatus.FAILED,
-                    completedAt = System.currentTimeMillis(),
-                )
-                _uiState.update { it.copy(errorMessage = e.message) }
-            } catch (e: Exception) {
-                run = run.copy(
-                    status = BenchmarkRunStatus.FAILED,
-                    completedAt = System.currentTimeMillis(),
-                )
-                _uiState.update { it.copy(errorMessage = e.localizedMessage ?: e.message ?: "Unknown error") }
+                loadPastRuns()
+                _uiState.update { it.copy(isRunning = false) }
             }
-
-            if (run.results.isNotEmpty() || run.status != BenchmarkRunStatus.RUNNING) {
-                store.save(run)
-            }
-            loadPastRuns()
-            _uiState.update { it.copy(isRunning = false) }
-        }
     }
 
     fun cancel() {
@@ -182,7 +187,10 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     // -- Copy to Clipboard --
 
-    fun copyToClipboard(run: BenchmarkRun, format: BenchmarkExportFormat) {
+    fun copyToClipboard(
+        run: BenchmarkRun,
+        format: BenchmarkExportFormat,
+    ) {
         val context = getApplication<Application>()
         val report = BenchmarkReportFormatter.formattedString(run, format, context)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -196,18 +204,23 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     // -- File Export --
 
-    fun shareFile(run: BenchmarkRun, csv: Boolean): Intent {
+    fun shareFile(
+        run: BenchmarkRun,
+        csv: Boolean,
+    ): Intent {
         val context = getApplication<Application>()
-        val file: File = if (csv) {
-            BenchmarkReportFormatter.writeCSV(run, context)
-        } else {
-            BenchmarkReportFormatter.writeJSON(run, context)
-        }
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
+        val file: File =
+            if (csv) {
+                BenchmarkReportFormatter.writeCSV(run, context)
+            } else {
+                BenchmarkReportFormatter.writeJSON(run, context)
+            }
+        val uri =
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
         return Intent(Intent.ACTION_SEND).apply {
             type = if (csv) "text/csv" else "application/json"
             putExtra(Intent.EXTRA_STREAM, uri)

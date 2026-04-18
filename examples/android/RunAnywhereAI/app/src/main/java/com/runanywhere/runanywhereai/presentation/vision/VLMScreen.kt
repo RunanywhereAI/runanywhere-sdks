@@ -9,9 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +56,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -94,11 +94,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun VLMScreen(
     onBack: () -> Unit = {},
-    viewModel: VLMViewModel = viewModel(
-        factory = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
-            LocalContext.current.applicationContext as android.app.Application,
+    viewModel: VLMViewModel =
+        viewModel(
+            factory =
+                androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(
+                    LocalContext.current.applicationContext as android.app.Application,
+                ),
         ),
-    ),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -106,21 +108,23 @@ fun VLMScreen(
     val context = LocalContext.current
 
     // Photo picker launcher
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent(),
-    ) { uri: Uri? ->
-        viewModel.setSelectedImage(uri)
-        if (uri != null) {
-            viewModel.processSelectedImage()
+    val photoPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent(),
+        ) { uri: Uri? ->
+            viewModel.setSelectedImage(uri)
+            if (uri != null) {
+                viewModel.processSelectedImage()
+            }
         }
-    }
 
     // Camera permission launcher
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        viewModel.onCameraPermissionResult(granted)
-    }
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            viewModel.onCameraPermissionResult(granted)
+        }
 
     // Stop auto-streaming and camera when leaving screen
     DisposableEffect(Unit) {
@@ -142,10 +146,11 @@ fun VLMScreen(
                     )
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-                titleContentColor = MaterialTheme.colorScheme.onSurface,
-            ),
+            colors =
+                TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
             actions = {
                 uiState.loadedModelName?.let { name ->
                     Text(
@@ -160,64 +165,67 @@ fun VLMScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
     ) {
-            if (!uiState.isModelLoaded) {
-                ModelRequiredOverlay(
-                    modality = ModelSelectionContext.VLM,
-                    onSelectModel = { viewModel.setShowModelSelection(true) },
-                )
-            } else {
-                // Camera preview (top 45%) — mirrors iOS cameraPreview
-                CameraPreviewSection(
-                    viewModel = viewModel,
-                    uiState = uiState,
-                    onRequestPermission = {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    },
-                    modifier = Modifier
+        if (!uiState.isModelLoaded) {
+            ModelRequiredOverlay(
+                modality = ModelSelectionContext.VLM,
+                onSelectModel = { viewModel.setShowModelSelection(true) },
+            )
+        } else {
+            // Camera preview (top 45%) — mirrors iOS cameraPreview
+            CameraPreviewSection(
+                viewModel = viewModel,
+                uiState = uiState,
+                onRequestPermission = {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                },
+                modifier =
+                    Modifier
                         .fillMaxWidth()
                         .weight(0.45f),
-                )
+            )
 
-                // Description panel — mirrors iOS descriptionPanel
-                DescriptionPanel(
-                    description = uiState.currentDescription,
-                    error = uiState.error,
-                    isAutoStreaming = uiState.isAutoStreamingEnabled,
-                    onCopy = {
-                        if (uiState.currentDescription.isNotEmpty()) {
-                            scope.launch {
-                                clipboard.setClipEntry(
-                                    ClipEntry(
-                                        android.content.ClipData.newPlainText(
-                                            "description",
-                                            uiState.currentDescription,
-                                        ),
+            // Description panel — mirrors iOS descriptionPanel
+            DescriptionPanel(
+                description = uiState.currentDescription,
+                error = uiState.error,
+                isAutoStreaming = uiState.isAutoStreamingEnabled,
+                onCopy = {
+                    if (uiState.currentDescription.isNotEmpty()) {
+                        scope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(
+                                    android.content.ClipData.newPlainText(
+                                        "description",
+                                        uiState.currentDescription,
                                     ),
-                                )
-                            }
+                                ),
+                            )
                         }
-                    },
-                    modifier = Modifier
+                    }
+                },
+                modifier =
+                    Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                )
+            )
 
-                // Control bar (4 buttons) — mirrors iOS controlBar
-                ControlBar(
-                    isProcessing = uiState.isProcessing,
-                    isAutoStreaming = uiState.isAutoStreamingEnabled,
-                    onPickPhoto = { photoPickerLauncher.launch("image/*") },
-                    onDescribeFrame = { viewModel.describeCurrentFrame() },
-                    onStopAutoStream = { viewModel.stopAutoStreaming() },
-                    onToggleLive = { viewModel.toggleAutoStreaming() },
-                    onSelectModel = { viewModel.setShowModelSelection(true) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            // Control bar (4 buttons) — mirrors iOS controlBar
+            ControlBar(
+                isProcessing = uiState.isProcessing,
+                isAutoStreaming = uiState.isAutoStreamingEnabled,
+                onPickPhoto = { photoPickerLauncher.launch("image/*") },
+                onDescribeFrame = { viewModel.describeCurrentFrame() },
+                onStopAutoStream = { viewModel.stopAutoStreaming() },
+                onToggleLive = { viewModel.toggleAutoStreaming() },
+                onSelectModel = { viewModel.setShowModelSelection(true) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 
     // Model selection bottom sheet
@@ -254,12 +262,13 @@ private fun CameraPreviewSection(
             // Live camera preview via CameraX PreviewView
             val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
-            val previewView = remember {
-                PreviewView(context).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            val previewView =
+                remember {
+                    PreviewView(context).apply {
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    }
                 }
-            }
 
             AndroidView(
                 factory = {
@@ -281,13 +290,14 @@ private fun CameraPreviewSection(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .padding(bottom = 16.dp)
-                        .background(
-                            Color.Black.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(50),
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier =
+                        Modifier
+                            .padding(bottom = 16.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.6f),
+                                shape = RoundedCornerShape(50),
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
                     CircularProgressIndicator(
                         color = Color.White,
@@ -336,9 +346,10 @@ private fun CameraPermissionView(onRequestPermission: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                }
+                val intent =
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
                 context.startActivity(intent)
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
@@ -359,10 +370,11 @@ private fun DescriptionPanel(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         // Header row — "Description" + optional LIVE badge + copy button
         Row(
@@ -416,9 +428,10 @@ private fun DescriptionPanel(
 
         // Description text — mirrors iOS ScrollView
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
         ) {
             when {
                 error != null -> {
@@ -461,9 +474,10 @@ private fun ControlBar(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(vertical = 16.dp),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -473,9 +487,10 @@ private fun ControlBar(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clickable(enabled = !isProcessing) { onPickPhoto() }
-                .semantics { role = Role.Button },
+            modifier =
+                Modifier
+                    .clickable(enabled = !isProcessing) { onPickPhoto() }
+                    .semantics { role = Role.Button },
         ) {
             Icon(
                 imageVector = Icons.Filled.Image,
@@ -492,11 +507,12 @@ private fun ControlBar(
         }
 
         // Main action button (64dp circle) — mirrors iOS main action button
-        val buttonColor = when {
-            isAutoStreaming -> AppColors.primaryRed
-            isProcessing -> AppColors.statusGray
-            else -> AppColors.primaryAccent
-        }
+        val buttonColor =
+            when {
+                isAutoStreaming -> AppColors.primaryRed
+                isProcessing -> AppColors.statusGray
+                else -> AppColors.primaryAccent
+            }
 
         IconButton(
             onClick = {
@@ -507,10 +523,11 @@ private fun ControlBar(
                 }
             },
             enabled = !isProcessing || isAutoStreaming,
-            modifier = Modifier
-                .size(64.dp)
-                .clip(CircleShape)
-                .background(buttonColor),
+            modifier =
+                Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(buttonColor),
         ) {
             when {
                 isProcessing && !isAutoStreaming -> {
@@ -578,4 +595,3 @@ private fun ControlBar(
         }
     }
 }
-

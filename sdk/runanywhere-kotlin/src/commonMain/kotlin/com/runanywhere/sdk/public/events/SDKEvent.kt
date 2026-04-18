@@ -330,20 +330,23 @@ data class RAGEvent(
     override val type: String get() = "rag.${eventType.value}"
     override val category: EventCategory get() = EventCategory.RAG
     override val properties: Map<String, String>
-        get() = buildMap {
-            documentLength?.let { put("documentLength", it.toString()) }
-            chunkCount?.let { put("chunkCount", it.toString()) }
-            durationMs?.let { put("durationMs", "%.1f".format(it)) }
-            questionLength?.let { put("questionLength", it.toString()) }
-            answerLength?.let { put("answerLength", it.toString()) }
-            chunksRetrieved?.let { put("chunksRetrieved", it.toString()) }
-            retrievalTimeMs?.let { put("retrievalTimeMs", "%.1f".format(it)) }
-            generationTimeMs?.let { put("generationTimeMs", "%.1f".format(it)) }
-            totalTimeMs?.let { put("totalTimeMs", "%.1f".format(it)) }
-            errorMessage?.let { put("message", it) }
-        }
+        get() =
+            buildMap {
+                documentLength?.let { put("documentLength", it.toString()) }
+                chunkCount?.let { put("chunkCount", it.toString()) }
+                durationMs?.let { put("durationMs", "%.1f".format(it)) }
+                questionLength?.let { put("questionLength", it.toString()) }
+                answerLength?.let { put("answerLength", it.toString()) }
+                chunksRetrieved?.let { put("chunksRetrieved", it.toString()) }
+                retrievalTimeMs?.let { put("retrievalTimeMs", "%.1f".format(it)) }
+                generationTimeMs?.let { put("generationTimeMs", "%.1f".format(it)) }
+                totalTimeMs?.let { put("totalTimeMs", "%.1f".format(it)) }
+                errorMessage?.let { put("message", it) }
+            }
 
-    enum class RAGEventType(val value: String) {
+    enum class RAGEventType(
+        val value: String,
+    ) {
         INGESTION_STARTED("ingestion.started"),
         INGESTION_COMPLETE("ingestion.complete"),
         QUERY_STARTED("query.started"),
@@ -354,39 +357,44 @@ data class RAGEvent(
     }
 
     companion object {
-        fun ingestionStarted(documentLength: Int) = RAGEvent(
-            eventType = RAGEventType.INGESTION_STARTED,
-            documentLength = documentLength,
-        )
+        fun ingestionStarted(documentLength: Int) =
+            RAGEvent(
+                eventType = RAGEventType.INGESTION_STARTED,
+                documentLength = documentLength,
+            )
 
-        fun ingestionComplete(chunkCount: Int, durationMs: Double) = RAGEvent(
-            eventType = RAGEventType.INGESTION_COMPLETE,
-            chunkCount = chunkCount,
-            durationMs = durationMs,
-        )
+        fun ingestionComplete(chunkCount: Int, durationMs: Double) =
+            RAGEvent(
+                eventType = RAGEventType.INGESTION_COMPLETE,
+                chunkCount = chunkCount,
+                durationMs = durationMs,
+            )
 
-        fun queryStarted(question: String) = RAGEvent(
-            eventType = RAGEventType.QUERY_STARTED,
-            questionLength = question.length,
-        )
+        fun queryStarted(question: String) =
+            RAGEvent(
+                eventType = RAGEventType.QUERY_STARTED,
+                questionLength = question.length,
+            )
 
-        fun queryComplete(result: RAGResult) = RAGEvent(
-            eventType = RAGEventType.QUERY_COMPLETE,
-            answerLength = result.answer.length,
-            chunksRetrieved = result.retrievedChunks.size,
-            retrievalTimeMs = result.retrievalTimeMs,
-            generationTimeMs = result.generationTimeMs,
-            totalTimeMs = result.totalTimeMs,
-        )
+        fun queryComplete(result: RAGResult) =
+            RAGEvent(
+                eventType = RAGEventType.QUERY_COMPLETE,
+                answerLength = result.answer.length,
+                chunksRetrieved = result.retrievedChunks.size,
+                retrievalTimeMs = result.retrievalTimeMs,
+                generationTimeMs = result.generationTimeMs,
+                totalTimeMs = result.totalTimeMs,
+            )
 
         fun pipelineCreated() = RAGEvent(eventType = RAGEventType.PIPELINE_CREATED)
 
         fun pipelineDestroyed() = RAGEvent(eventType = RAGEventType.PIPELINE_DESTROYED)
 
-        fun error(message: String) = RAGEvent(
-            eventType = RAGEventType.ERROR,
-            errorMessage = message,
-            destination = EventDestination.ALL,
-        )
+        fun error(message: String) =
+            RAGEvent(
+                eventType = RAGEventType.ERROR,
+                errorMessage = message,
+                destination = EventDestination.ALL,
+            )
     }
 }

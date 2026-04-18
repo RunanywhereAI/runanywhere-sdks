@@ -569,7 +569,7 @@ extension VoiceAssistantView {
             amplitude = max(0.0, min(1.0, amplitude))
         } else {
             // Gentle decay when not active
-            amplitude = amplitude * 0.95
+            amplitude *= 0.95
         }
     }
 }

@@ -499,6 +499,8 @@ export class LocalFileStorage {
    * Keeps alphanumeric, dots, dashes, underscores. Replaces everything else.
    */
   private sanitizeFilename(key: string): string {
+    // Intentional: we want to strip C0 control characters from filenames.
+    // eslint-disable-next-line no-control-regex
     return key.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
   }
 }

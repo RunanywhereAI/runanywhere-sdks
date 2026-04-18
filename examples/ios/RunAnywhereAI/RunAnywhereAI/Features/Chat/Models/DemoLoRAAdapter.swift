@@ -5,7 +5,7 @@
 //  Registers LoRA adapters into the SDK's global LoRA registry at startup.
 //  Uses the SDK's LoraAdapterCatalogEntry — same type and registry that Android uses.
 //
-//  TODO: [Portal Integration] Replace hardcoded adapters with portal-provided catalog.
+//  TODO: #1 [Portal Integration] Replace hardcoded adapters with portal-provided catalog.
 
 import Foundation
 import RunAnywhere

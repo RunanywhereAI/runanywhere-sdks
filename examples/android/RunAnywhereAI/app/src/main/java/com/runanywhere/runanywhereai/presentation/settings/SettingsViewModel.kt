@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.presentation.settings
 
 import android.app.Application
 import android.content.Context
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Simple stored model info for settings display
@@ -71,15 +71,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private val encryptedPrefs by lazy {
-        val masterKey = MasterKey.Builder(application)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
+        val masterKey =
+            MasterKey.Builder(application)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
         EncryptedSharedPreferences.create(
             application,
             ENCRYPTED_PREFS_FILE,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
     }
 
@@ -112,16 +113,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
          */
         fun getStoredApiKey(context: Context): String? {
             return try {
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                val prefs = EncryptedSharedPreferences.create(
-                    context,
-                    ENCRYPTED_PREFS_FILE,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
+                val masterKey =
+                    MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                val prefs =
+                    EncryptedSharedPreferences.create(
+                        context,
+                        ENCRYPTED_PREFS_FILE,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                    )
                 val value = prefs.getString(KEY_API_KEY, null)
                 if (value.isNullOrEmpty()) null else value
             } catch (e: Exception) {
@@ -136,16 +139,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
          */
         fun getStoredBaseURL(context: Context): String? {
             return try {
-                val masterKey = MasterKey.Builder(context)
-                    .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                    .build()
-                val prefs = EncryptedSharedPreferences.create(
-                    context,
-                    ENCRYPTED_PREFS_FILE,
-                    masterKey,
-                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-                )
+                val masterKey =
+                    MasterKey.Builder(context)
+                        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                        .build()
+                val prefs =
+                    EncryptedSharedPreferences.create(
+                        context,
+                        ENCRYPTED_PREFS_FILE,
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+                    )
                 val value = prefs.getString(KEY_BASE_URL, null)
                 if (value.isNullOrEmpty()) return null
 
@@ -175,7 +180,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         data class GenerationSettings(
             val temperature: Float,
             val maxTokens: Int,
-            val systemPrompt: String?
+            val systemPrompt: String?,
         )
 
         /**
@@ -190,7 +195,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             return GenerationSettings(
                 temperature = temperature,
                 maxTokens = maxTokens,
-                systemPrompt = if (systemPrompt.isNullOrEmpty()) null else systemPrompt
+                systemPrompt = if (systemPrompt.isNullOrEmpty()) null else systemPrompt,
             )
         }
     }
@@ -377,7 +382,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 it.copy(
                     temperature = temperature,
                     maxTokens = maxTokens,
-                    systemPrompt = systemPrompt
+                    systemPrompt = systemPrompt,
                 )
             }
             Timber.d("Generation settings loaded - temperature: $temperature, maxTokens: $maxTokens, systemPrompt length: ${systemPrompt.length}")
@@ -445,7 +450,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     apiKey = storedApiKey,
                     baseURL = storedBaseURL,
                     isApiKeyConfigured = storedApiKey.isNotEmpty(),
-                    isBaseURLConfigured = storedBaseURL.isNotEmpty()
+                    isBaseURLConfigured = storedBaseURL.isNotEmpty(),
                 )
             }
             Timber.d("API configuration loaded - apiKey configured: ${storedApiKey.isNotEmpty()}, baseURL configured: ${storedBaseURL.isNotEmpty()}")
@@ -503,7 +508,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         isApiKeyConfigured = apiKey.isNotEmpty(),
                         isBaseURLConfigured = normalizedURL.isNotEmpty(),
                         showApiConfigSheet = false,
-                        showRestartDialog = true
+                        showRestartDialog = true,
                     )
                 }
 
@@ -537,7 +542,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                         baseURL = "",
                         isApiKeyConfigured = false,
                         isBaseURLConfigured = false,
-                        showRestartDialog = true
+                        showRestartDialog = true,
                     )
                 }
 

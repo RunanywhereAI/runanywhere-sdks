@@ -515,7 +515,11 @@ struct AdaptiveMicButton: View {
                     .glassEffect(.regular.interactive())
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Microphone")
-                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityHint(
+                        onLongPress != nil
+                            ? "Double tap to toggle recording. Long press for alternate action."
+                            : "Double tap to toggle recording."
+                    )
                     .accessibilityAction(.default, action)
                     .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             } else {
@@ -524,7 +528,11 @@ struct AdaptiveMicButton: View {
                     .onTapGesture(perform: action)
                     .accessibilityAddTraits(.isButton)
                     .accessibilityLabel("Microphone")
-                    .accessibilityHint(onLongPress != nil ? "Double tap to toggle recording. Long press for alternate action." : "Double tap to toggle recording.")
+                    .accessibilityHint(
+                        onLongPress != nil
+                            ? "Double tap to toggle recording. Long press for alternate action."
+                            : "Double tap to toggle recording."
+                    )
                     .accessibilityAction(.default, action)
                     .accessibilityAction(named: "Long Press") { onLongPress?() ?? action() }
             }

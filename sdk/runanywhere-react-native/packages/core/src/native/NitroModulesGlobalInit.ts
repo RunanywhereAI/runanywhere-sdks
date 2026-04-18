@@ -10,6 +10,7 @@
 
 import { NitroModules as NitroModulesNamed } from 'react-native-nitro-modules';
 import { NativeModules } from 'react-native';
+import { SDKLogger } from '../Foundation/Logging';
 
 /** Global promise that tracks NitroModules installation */
 let _nitroInstallationPromise: Promise<any> | null = null;
@@ -40,7 +41,7 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
   // Create the initialization promise
   _nitroInstallationPromise = (async () => {
     try {
-      console.debug('[NitroModulesGlobalInit] Starting global initialization...');
+      SDKLogger.core.debug('[NitroModulesGlobalInit] Starting global initialization...');
 
       // Try to get the proxy from the named import first (most reliable in Bridgeless)
       _nitroModulesProxy = NitroModulesNamed;
@@ -49,12 +50,12 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
       const nativeNitro = NativeModules?.NitroModules;
       if (!_nitroInstallCalled && nativeNitro && typeof nativeNitro.install === 'function') {
         try {
-          console.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
+          SDKLogger.core.debug('[NitroModulesGlobalInit] Calling native NitroModules.install()...');
           nativeNitro.install();
           _nitroInstallCalled = true;
-          console.debug('[NitroModulesGlobalInit] Native install() completed');
+          SDKLogger.core.debug('[NitroModulesGlobalInit] Native install() completed');
         } catch (installError) {
-          console.warn('[NitroModulesGlobalInit] Native install() failed:', installError);
+          SDKLogger.core.warning('[NitroModulesGlobalInit] Native install() failed', { error: installError });
         }
       }
 
@@ -70,10 +71,10 @@ export async function initializeNitroModulesGlobally(): Promise<any> {
         );
       }
 
-      console.debug('[NitroModulesGlobalInit] Global initialization successful');
+      SDKLogger.core.debug('[NitroModulesGlobalInit] Global initialization successful');
       return _nitroModulesProxy;
     } catch (error) {
-      console.error('[NitroModulesGlobalInit] Failed to initialize NitroModules:', error);
+      SDKLogger.core.error('[NitroModulesGlobalInit] Failed to initialize NitroModules', { error });
       _nitroInstallationPromise = null; // Reset on error to allow retry
       throw error;
     }

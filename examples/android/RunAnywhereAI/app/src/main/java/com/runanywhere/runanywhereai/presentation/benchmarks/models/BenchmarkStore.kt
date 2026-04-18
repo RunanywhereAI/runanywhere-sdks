@@ -10,12 +10,12 @@ import java.io.File
  * Matches iOS BenchmarkStore exactly.
  */
 class BenchmarkStore(private val context: Context) {
-
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-        encodeDefaults = true
-    }
+    private val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+        }
 
     private val file: File
         get() = File(context.filesDir, FILE_NAME)

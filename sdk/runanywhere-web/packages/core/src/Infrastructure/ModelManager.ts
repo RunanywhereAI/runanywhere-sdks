@@ -17,6 +17,8 @@ import { OPFSStorage } from './OPFSStorage';
 import type { MetadataMap } from './OPFSStorage';
 import { ModelRegistry } from './ModelRegistry';
 import { ModelDownloader } from './ModelDownloader';
+import type { QuotaCheckResult } from './ModelDownloader';
+import type { LocalFileStorage } from './LocalFileStorage';
 import { inferModelFromFilename, sanitizeId } from './ModelFileInference';
 import type {
   ManagedModel,
@@ -90,8 +92,9 @@ class ModelManagerImpl {
 
   constructor() {
     this.downloader = new ModelDownloader(this.registry, this.storage);
-    this.initStorage();
-    this.requestPersistentStorage();
+    // Fire-and-forget init — failures are logged inside each method.
+    void this.initStorage();
+    void this.requestPersistentStorage();
   }
 
   private async initStorage(): Promise<void> {
@@ -102,7 +105,8 @@ class ModelManagerImpl {
 
   registerModels(models: CompactModelDef[]): void {
     this.registry.registerModels(models);
-    this.refreshDownloadStatus();
+    // Fire-and-forget — status refresh errors are logged internally.
+    void this.refreshDownloadStatus();
   }
 
   setVLMLoader(loader: VLMLoader): void {
@@ -118,7 +122,7 @@ class ModelManagerImpl {
   getDownloader(): ModelDownloader { return this.downloader; }
 
   /** Set the local file storage backend for persistent model storage. */
-  setLocalFileStorage(storage: import('./LocalFileStorage').LocalFileStorage): void {
+  setLocalFileStorage(storage: LocalFileStorage): void {
     this.downloader.setLocalFileStorage(storage);
   }
 
@@ -216,7 +220,7 @@ class ModelManagerImpl {
 
   // --- Download ---
 
-  async checkDownloadFit(modelId: string): Promise<import('./ModelDownloader').QuotaCheckResult> {
+  async checkDownloadFit(modelId: string): Promise<QuotaCheckResult> {
     const model = this.registry.getModel(modelId);
     if (!model) return { fits: true, availableBytes: 0, neededBytes: 0, evictionCandidates: [] };
 

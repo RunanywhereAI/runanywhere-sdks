@@ -14,7 +14,8 @@
  *   console.log(result.text);
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, HardwareAcceleration } from '@runanywhere/web';
+import type { HardwareAcceleration } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 import { VLMImageFormat, VLMModelFamily } from './VLMTypes';

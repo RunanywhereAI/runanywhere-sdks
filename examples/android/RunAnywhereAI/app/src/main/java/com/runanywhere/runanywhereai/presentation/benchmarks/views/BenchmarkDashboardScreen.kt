@@ -20,9 +20,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
@@ -47,7 +47,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
@@ -93,9 +92,10 @@ fun BenchmarkDashboardScreen(
     )
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = AppSpacing.large),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = AppSpacing.large),
         verticalArrangement = Arrangement.spacedBy(AppSpacing.large),
     ) {
         // Device Info
@@ -155,7 +155,7 @@ fun BenchmarkDashboardScreen(
 
         item { Spacer(modifier = Modifier.height(AppSpacing.xxLarge)) }
     }
-    
+
     // Progress Dialog
     if (uiState.isRunning) {
         BenchmarkProgressDialog(
@@ -167,7 +167,7 @@ fun BenchmarkDashboardScreen(
             onCancel = { benchmarkViewModel.cancel() },
         )
     }
-    
+
     // Clear Confirmation Dialog
     if (uiState.showClearConfirmation) {
         AlertDialog(
@@ -185,7 +185,7 @@ fun BenchmarkDashboardScreen(
             },
         )
     }
-    
+
     // Error Dialog
     uiState.errorMessage?.let { error ->
         AlertDialog(
@@ -195,8 +195,8 @@ fun BenchmarkDashboardScreen(
             confirmButton = {
                 TextButton(onClick = { benchmarkViewModel.dismissError() }) { Text("OK") }
             },
-            )
-        }
+        )
+    }
 }
 
 // -- Device Info Section --
@@ -204,11 +204,12 @@ fun BenchmarkDashboardScreen(
 @Composable
 private fun DeviceInfoSection() {
     val context = LocalContext.current
-    val deviceInfo = try {
-        DeviceInfo.current
-    } catch (_: Exception) {
-        null
-    }
+    val deviceInfo =
+        try {
+            DeviceInfo.current
+        } catch (_: Exception) {
+            null
+        }
 
     if (deviceInfo != null) {
         Card(
@@ -228,11 +229,15 @@ private fun DeviceInfoSection() {
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+private fun InfoRow(
+    label: String,
+    value: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = AppSpacing.xxSmall),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = AppSpacing.xxSmall),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,16 +301,18 @@ private fun CategorySelectionSection(
                             modifier = Modifier.size(18.dp),
                         )
                     },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = AppColors.primaryAccent.copy(alpha = 0.2f),
-                        selectedLabelColor = AppColors.primaryAccent,
-                        selectedLeadingIconColor = AppColors.primaryAccent,
-                    ),
-                    border = if (isSelected) {
-                        BorderStroke(1.dp, AppColors.primaryAccent.copy(alpha = 0.5f))
-                    } else {
-                        FilterChipDefaults.filterChipBorder(enabled = true, selected = false)
-                    },
+                    colors =
+                        FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AppColors.primaryAccent.copy(alpha = 0.2f),
+                            selectedLabelColor = AppColors.primaryAccent,
+                            selectedLeadingIconColor = AppColors.primaryAccent,
+                        ),
+                    border =
+                        if (isSelected) {
+                            BorderStroke(1.dp, AppColors.primaryAccent.copy(alpha = 0.5f))
+                        } else {
+                            FilterChipDefaults.filterChipBorder(enabled = true, selected = false)
+                        },
                 )
             }
         }
@@ -331,12 +338,13 @@ private fun CategoryScenarioRow(category: BenchmarkCategory) {
     }
 }
 
-private fun scenarioDescription(category: BenchmarkCategory): String = when (category) {
-    BenchmarkCategory.LLM -> "Short (50 tok), Medium (256 tok), Long (512 tok) — measures tok/s, TTFT, load time"
-    BenchmarkCategory.STT -> "Silent 2s, Sine Tone 3s — measures RTF, processing time"
-    BenchmarkCategory.TTS -> "Short text, Medium text — measures audio duration, char throughput"
-    BenchmarkCategory.VLM -> "Solid color, Gradient image (224x224) — measures tok/s, completion tokens"
-}
+private fun scenarioDescription(category: BenchmarkCategory): String =
+    when (category) {
+        BenchmarkCategory.LLM -> "Short (50 tok), Medium (256 tok), Long (512 tok) — measures tok/s, TTFT, load time"
+        BenchmarkCategory.STT -> "Silent 2s, Sine Tone 3s — measures RTF, processing time"
+        BenchmarkCategory.TTS -> "Short text, Medium text — measures audio duration, char throughput"
+        BenchmarkCategory.VLM -> "Solid color, Gradient image (224x224) — measures tok/s, completion tokens"
+    }
 
 // -- Run Controls --
 
@@ -387,13 +395,14 @@ private fun RunControlsSection(
 @Composable
 private fun SkippedWarning(message: String) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                AppColors.statusOrange.copy(alpha = 0.1f),
-                RoundedCornerShape(AppSpacing.cornerRadiusSmall),
-            )
-            .padding(AppSpacing.medium),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    AppColors.statusOrange.copy(alpha = 0.1f),
+                    RoundedCornerShape(AppSpacing.cornerRadiusSmall),
+                )
+                .padding(AppSpacing.medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(Icons.Filled.Warning, contentDescription = null, tint = AppColors.statusOrange, modifier = Modifier.size(18.dp))
@@ -408,17 +417,22 @@ private val dateFormat: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, h:mm a").withZone(ZoneId.systemDefault())
 
 @Composable
-private fun RunRow(run: BenchmarkRun, onClick: () -> Unit) {
+private fun RunRow(
+    run: BenchmarkRun,
+    onClick: () -> Unit,
+) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AppSpacing.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(AppSpacing.large),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -469,19 +483,21 @@ private fun RunRow(run: BenchmarkRun, onClick: () -> Unit) {
 
 @Composable
 private fun RunStatusBadge(status: BenchmarkRunStatus) {
-    val color = when (status) {
-        BenchmarkRunStatus.COMPLETED -> AppColors.statusGreen
-        BenchmarkRunStatus.RUNNING -> AppColors.primaryBlue
-        BenchmarkRunStatus.CANCELLED -> AppColors.statusOrange
-        BenchmarkRunStatus.FAILED -> AppColors.statusRed
-    }
+    val color =
+        when (status) {
+            BenchmarkRunStatus.COMPLETED -> AppColors.statusGreen
+            BenchmarkRunStatus.RUNNING -> AppColors.primaryBlue
+            BenchmarkRunStatus.CANCELLED -> AppColors.statusOrange
+            BenchmarkRunStatus.FAILED -> AppColors.statusRed
+        }
     Text(
         text = status.value.replaceFirstChar { it.uppercase() },
         style = MaterialTheme.typography.labelSmall,
         color = color,
-        modifier = Modifier
-            .background(color.copy(alpha = 0.2f), RoundedCornerShape(AppSpacing.cornerRadiusSmall))
-            .padding(horizontal = AppSpacing.smallMedium, vertical = AppSpacing.xxSmall),
+        modifier =
+            Modifier
+                .background(color.copy(alpha = 0.2f), RoundedCornerShape(AppSpacing.cornerRadiusSmall))
+                .padding(horizontal = AppSpacing.smallMedium, vertical = AppSpacing.xxSmall),
     )
 }
 
@@ -490,9 +506,10 @@ private fun RunStatusBadge(status: BenchmarkRunStatus) {
 @Composable
 private fun EmptyState() {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = AppSpacing.xxLarge),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = AppSpacing.xxLarge),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(

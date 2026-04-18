@@ -7,10 +7,8 @@ import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/runanywhere.dart';
@@ -425,7 +423,7 @@ class ModelDownloadService {
         for (final item in innerItems) {
           final target = p.join(destDir, p.basename(item.path));
           try {
-            await (item as FileSystemEntity).rename(target);
+            await item.rename(target);
           } catch (e) {
             if (item is File) {
               await item.copy(target);

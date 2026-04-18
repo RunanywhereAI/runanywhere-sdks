@@ -14,7 +14,6 @@ import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.VLM.VLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.VLM.VLMImage
-import com.runanywhere.sdk.public.extensions.VLM.VLMImageFormat
 import com.runanywhere.sdk.public.extensions.VLM.VLMResult
 import com.runanywhere.sdk.public.extensions.VLM.VLMStreamingResult
 import kotlinx.coroutines.CompletableDeferred
@@ -60,16 +59,17 @@ actual suspend fun RunAnywhere.processImage(
 
     val optionsJson = options?.let { buildOptionsJson(it) }
 
-    val cppResult = CppBridgeVLM.process(
-        imageFormat = image.format.rawValue,
-        imagePath = image.filePath,
-        imageData = image.pixelData,
-        imageBase64 = image.base64Data,
-        imageWidth = image.width,
-        imageHeight = image.height,
-        prompt = prompt,
-        optionsJson = optionsJson,
-    )
+    val cppResult =
+        CppBridgeVLM.process(
+            imageFormat = image.format.rawValue,
+            imagePath = image.filePath,
+            imageData = image.pixelData,
+            imageBase64 = image.base64Data,
+            imageWidth = image.width,
+            imageHeight = image.height,
+            prompt = prompt,
+            optionsJson = optionsJson,
+        )
 
     vlmLogger.info(
         "VLM processing complete: ${cppResult.completionTokens} tokens in ${cppResult.totalTimeMs}ms " +
@@ -98,26 +98,28 @@ actual fun RunAnywhere.processImageStream(
         val optionsJson = options?.let { buildOptionsJson(it) }
 
         // Run blocking JNI call on IO dispatcher; callbackFlow handles cancellation
-        val job = launch(Dispatchers.IO) {
-            try {
-                CppBridgeVLM.processStream(
-                    imageFormat = image.format.rawValue,
-                    imagePath = image.filePath,
-                    imageData = image.pixelData,
-                    imageBase64 = image.base64Data,
-                    imageWidth = image.width,
-                    imageHeight = image.height,
-                    prompt = prompt,
-                    optionsJson = optionsJson,
-                    callback = CppBridgeVLM.StreamCallback { token ->
-                        trySend(token).isSuccess
-                    },
-                )
-                close()
-            } catch (e: Exception) {
-                close(e)
+        val job =
+            launch(Dispatchers.IO) {
+                try {
+                    CppBridgeVLM.processStream(
+                        imageFormat = image.format.rawValue,
+                        imagePath = image.filePath,
+                        imageData = image.pixelData,
+                        imageBase64 = image.base64Data,
+                        imageWidth = image.width,
+                        imageHeight = image.height,
+                        prompt = prompt,
+                        optionsJson = optionsJson,
+                        callback =
+                            CppBridgeVLM.StreamCallback { token ->
+                                trySend(token).isSuccess
+                            },
+                    )
+                    close()
+                } catch (e: Exception) {
+                    close(e)
+                }
             }
-        }
 
         awaitClose {
             CppBridgeVLM.cancel()
@@ -153,61 +155,66 @@ actual suspend fun RunAnywhere.processImageStreamWithMetrics(
 
     // Start generation in a child coroutine tied to a cancellable scope
     val jobScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    val job = jobScope.launch {
-        try {
-            val cppResult = CppBridgeVLM.processStream(
-                imageFormat = image.format.rawValue,
-                imagePath = image.filePath,
-                imageData = image.pixelData,
-                imageBase64 = image.base64Data,
-                imageWidth = image.width,
-                imageHeight = image.height,
-                prompt = prompt,
-                optionsJson = optionsJson,
-                callback = CppBridgeVLM.StreamCallback { token ->
-                    if (firstTokenTime == null) {
-                        firstTokenTime = System.currentTimeMillis()
-                    }
-                    fullText += token
-                    tokenCount++
-                    channel.trySend(token).isSuccess
-                },
-            )
+    val job =
+        jobScope.launch {
+            try {
+                val cppResult =
+                    CppBridgeVLM.processStream(
+                        imageFormat = image.format.rawValue,
+                        imagePath = image.filePath,
+                        imageData = image.pixelData,
+                        imageBase64 = image.base64Data,
+                        imageWidth = image.width,
+                        imageHeight = image.height,
+                        prompt = prompt,
+                        optionsJson = optionsJson,
+                        callback =
+                            CppBridgeVLM.StreamCallback { token ->
+                                if (firstTokenTime == null) {
+                                    firstTokenTime = System.currentTimeMillis()
+                                }
+                                fullText += token
+                                tokenCount++
+                                channel.trySend(token).isSuccess
+                            },
+                    )
 
-            // Build final result after generation completes
-            val endTime = System.currentTimeMillis()
-            val elapsedMs = endTime - startTime
-            val timeToFirstTokenMs = firstTokenTime?.let { it - startTime } ?: 0L
+                // Build final result after generation completes
+                val endTime = System.currentTimeMillis()
+                val elapsedMs = endTime - startTime
+                val timeToFirstTokenMs = firstTokenTime?.let { it - startTime } ?: 0L
 
-            val result = VLMResult(
-                text = fullText,
-                promptTokens = cppResult.promptTokens,
-                imageTokens = cppResult.imageTokens,
-                completionTokens = tokenCount,
-                totalTokens = cppResult.promptTokens + tokenCount,
-                timeToFirstTokenMs = timeToFirstTokenMs,
-                imageEncodeTimeMs = cppResult.imageEncodeTimeMs,
-                totalTimeMs = elapsedMs,
-                tokensPerSecond = if (elapsedMs > 0) tokenCount * 1000f / elapsedMs else 0f,
-            )
-            resultDeferred.complete(result)
-        } catch (e: Exception) {
-            resultDeferred.completeExceptionally(e)
-        } finally {
-            channel.close()
+                val result =
+                    VLMResult(
+                        text = fullText,
+                        promptTokens = cppResult.promptTokens,
+                        imageTokens = cppResult.imageTokens,
+                        completionTokens = tokenCount,
+                        totalTokens = cppResult.promptTokens + tokenCount,
+                        timeToFirstTokenMs = timeToFirstTokenMs,
+                        imageEncodeTimeMs = cppResult.imageEncodeTimeMs,
+                        totalTimeMs = elapsedMs,
+                        tokensPerSecond = if (elapsedMs > 0) tokenCount * 1000f / elapsedMs else 0f,
+                    )
+                resultDeferred.complete(result)
+            } catch (e: Exception) {
+                resultDeferred.completeExceptionally(e)
+            } finally {
+                channel.close()
+            }
         }
-    }
 
-    val tokenStream = callbackFlow {
-        for (token in channel) {
-            trySend(token)
+    val tokenStream =
+        callbackFlow {
+            for (token in channel) {
+                trySend(token)
+            }
+            close()
+            awaitClose {
+                CppBridgeVLM.cancel()
+                job.cancel()
+            }
         }
-        close()
-        awaitClose {
-            CppBridgeVLM.cancel()
-            job.cancel()
-        }
-    }
 
     return VLMStreamingResult(
         stream = tokenStream,
@@ -288,12 +295,13 @@ private fun buildOptionsJson(options: VLMGenerationOptions): String {
         append(",\"n_threads\":${options.nThreads}")
         append(",\"use_gpu\":${options.useGpu}")
         options.systemPrompt?.let { prompt ->
-            val escaped = prompt
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t")
+            val escaped =
+                prompt
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                    .replace("\t", "\\t")
             append(",\"system_prompt\":\"$escaped\"")
         }
         append("}")

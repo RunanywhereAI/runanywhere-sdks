@@ -29,7 +29,7 @@ export function requireNativeLlamaModule(): NativeRunAnywhereLlamaModule {
       'react-native-nitro-modules is not properly linked.'
     );
   }
-  return NitroProxy.createHybridObject<RunAnywhereLlama>('RunAnywhereLlama');
+  return NitroProxy.createHybridObject('RunAnywhereLlama') as RunAnywhereLlama;
 }
 
 /**

@@ -34,9 +34,7 @@ const VisionHubScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Vision</Text>
-        <Text style={styles.subtitle}>
-          Vision-language (VLM)
-        </Text>
+        <Text style={styles.subtitle}>Vision-language (VLM)</Text>
       </View>
       <View style={styles.list}>
         <TouchableOpacity
@@ -45,11 +43,7 @@ const VisionHubScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           <View style={styles.iconWrap}>
-            <Icon
-              name="camera-outline"
-              size={24}
-              color={Colors.primaryBlue}
-            />
+            <Icon name="camera-outline" size={24} color={Colors.primaryBlue} />
           </View>
           <View style={styles.rowContent}>
             <Text style={styles.rowTitle}>Vision Chat (VLM)</Text>
@@ -70,7 +64,9 @@ const VisionHubScreen: React.FC = () => {
             />
           </View>
           <View style={styles.rowContent}>
-            <Text style={[styles.rowTitle, styles.textDisabled]}>Image Generation</Text>
+            <Text style={[styles.rowTitle, styles.textDisabled]}>
+              Image Generation
+            </Text>
             <Text style={[styles.rowSubtitle, styles.textDisabled]}>
               Generate images from text descriptions
             </Text>
@@ -95,7 +91,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.medium,
   },
   title: {
-    ...Typography.title1,
+    ...Typography.title,
     color: Colors.textPrimary,
   },
   subtitle: {
@@ -131,7 +127,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
   rowSubtitle: {
-    ...Typography.caption1,
+    ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: 2,
   },

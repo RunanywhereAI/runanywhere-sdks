@@ -2,7 +2,6 @@ package com.runanywhere.runanywhereai.data
 
 import android.annotation.SuppressLint
 import android.content.Context
-import timber.log.Timber
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
 import com.runanywhere.runanywhereai.domain.models.Conversation
 import com.runanywhere.runanywhereai.domain.models.MessageRole
@@ -17,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import timber.log.Timber
 import java.io.File
 import java.util.*
 
@@ -115,7 +115,9 @@ class ConversationStore private constructor(context: Context) {
                 if (it.id == conversation.id) {
                     found = true
                     updated
-                } else it
+                } else {
+                    it
+                }
             }
         }
         if (found) {

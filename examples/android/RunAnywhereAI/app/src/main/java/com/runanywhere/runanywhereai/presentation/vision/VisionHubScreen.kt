@@ -38,42 +38,41 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
  * iOS Reference: examples/ios/RunAnywhereAI/.../App/ContentView.swift — VisionHubView
  */
 @Composable
-fun VisionHubScreen(
-    onNavigateToVLM: () -> Unit,
-) {
+fun VisionHubScreen(onNavigateToVLM: () -> Unit) {
     ConfigureTopBar(title = "Vision")
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
     ) {
-            // Section header
-            Text(
-                "Vision AI",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
-            )
+        // Section header
+        Text(
+            "Vision AI",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
 
-            // Vision Chat (VLM)
-            FeatureCard(
-                icon = Icons.Filled.CameraAlt,
-                iconColor = AppColors.featureCamera,
-                title = "Vision Chat",
-                subtitle = "Chat with images using your camera or photos",
-                onClick = onNavigateToVLM,
-            )
+        // Vision Chat (VLM)
+        FeatureCard(
+            icon = Icons.Filled.CameraAlt,
+            iconColor = AppColors.featureCamera,
+            title = "Vision Chat",
+            subtitle = "Chat with images using your camera or photos",
+            onClick = onNavigateToVLM,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.large))
+        Spacer(modifier = Modifier.height(Dimensions.large))
 
-            // Footer
-            Text(
-                "Understand and create visual content with AI",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall),
-            )
+        // Footer
+        Text(
+            "Understand and create visual content with AI",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall),
+        )
     }
 }
 
@@ -89,18 +88,21 @@ private fun FeatureCard(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
         shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.large),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(

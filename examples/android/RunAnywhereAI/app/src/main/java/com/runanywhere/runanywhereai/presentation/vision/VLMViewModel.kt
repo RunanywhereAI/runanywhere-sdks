@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
 import android.net.Uri
-import timber.log.Timber
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -30,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
@@ -124,9 +124,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkCameraPermission() {
         val context = getApplication<Application>()
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.CAMERA,
-        ) == PackageManager.PERMISSION_GRANTED
+        val granted =
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.CAMERA,
+            ) == PackageManager.PERMISSION_GRANTED
         _uiState.update { it.copy(isCameraAuthorized = granted) }
     }
 
@@ -140,21 +141,25 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
      *
      * Uses LifecycleCameraController which automatically manages Preview + ImageAnalysis.
      */
-    fun bindCamera(previewView: PreviewView, lifecycleOwner: LifecycleOwner) {
+    fun bindCamera(
+        previewView: PreviewView,
+        lifecycleOwner: LifecycleOwner,
+    ) {
         if (cameraController != null) return
 
         val context = getApplication<Application>()
 
-        val controller = LifecycleCameraController(context).apply {
-            cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-            setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-            imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
-            imageAnalysisOutputImageFormat = ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
+        val controller =
+            LifecycleCameraController(context).apply {
+                cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
+                imageAnalysisBackpressureStrategy = ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST
+                imageAnalysisOutputImageFormat = ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
 
-            setImageAnalysisAnalyzer(analysisExecutor) { imageProxy ->
-                captureFrame(imageProxy)
+                setImageAnalysisAnalyzer(analysisExecutor) { imageProxy ->
+                    captureFrame(imageProxy)
+                }
             }
-        }
 
         controller.bindToLifecycle(lifecycleOwner)
         previewView.controller = controller
@@ -189,9 +194,9 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 for (col in 0 until width) {
                     val srcIdx = row * rowStride + col * pixelStride
                     if (srcIdx + 2 < buffer.limit()) {
-                        rgb[rgbIdx++] = buffer[srcIdx]       // R
-                        rgb[rgbIdx++] = buffer[srcIdx + 1]   // G
-                        rgb[rgbIdx++] = buffer[srcIdx + 2]   // B
+                        rgb[rgbIdx++] = buffer[srcIdx] // R
+                        rgb[rgbIdx++] = buffer[srcIdx + 1] // G
+                        rgb[rgbIdx++] = buffer[srcIdx + 2] // B
                     } else {
                         rgbIdx += 3 // skip pixel but keep alignment
                     }
@@ -241,30 +246,31 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(isProcessing = true, currentDescription = "", error = null)
         }
 
-        generationJob = viewModelScope.launch {
-            try {
-                val image = VLMImage.fromRGBPixels(frameData, w, h)
-                val options = VLMGenerationOptions(maxTokens = 200, temperature = 0.7f)
+        generationJob =
+            viewModelScope.launch {
+                try {
+                    val image = VLMImage.fromRGBPixels(frameData, w, h)
+                    val options = VLMGenerationOptions(maxTokens = 200, temperature = 0.7f)
 
-                Timber.i("Describing current camera frame (${w}x${h})")
+                    Timber.i("Describing current camera frame (${w}x$h)")
 
-                RunAnywhere.processImageStream(
-                    image,
-                    "Describe what you see briefly.",
-                    options,
-                ).collect { token ->
-                    _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
+                    RunAnywhere.processImageStream(
+                        image,
+                        "Describe what you see briefly.",
+                        options,
+                    ).collect { token ->
+                        _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
+                    }
+
+                    _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
+                    Timber.i("Frame description completed")
+                } catch (e: Exception) {
+                    Timber.e(e, "Frame description failed: ${e.message}")
+                    _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
+                } finally {
+                    _uiState.update { it.copy(isProcessing = false) }
                 }
-
-                _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
-                Timber.i("Frame description completed")
-            } catch (e: Exception) {
-                Timber.e(e, "Frame description failed: ${e.message}")
-                _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
-            } finally {
-                _uiState.update { it.copy(isProcessing = false) }
             }
-        }
     }
 
     /**
@@ -285,30 +291,31 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(isProcessing = true, currentDescription = "", error = null)
         }
 
-        generationJob = viewModelScope.launch {
-            var tempFile: File? = null
-            try {
-                tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
-                val image = VLMImage.fromFilePath(tempFile.absolutePath)
-                val options = VLMGenerationOptions(maxTokens = 300, temperature = 0.7f)
+        generationJob =
+            viewModelScope.launch {
+                var tempFile: File? = null
+                try {
+                    tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
+                    val image = VLMImage.fromFilePath(tempFile.absolutePath)
+                    val options = VLMGenerationOptions(maxTokens = 300, temperature = 0.7f)
 
-                Timber.i("Starting VLM streaming for image: ${tempFile.name}")
+                    Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
-                RunAnywhere.processImageStream(image, prompt, options)
-                    .collect { token ->
-                        _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
-                    }
+                    RunAnywhere.processImageStream(image, prompt, options)
+                        .collect { token ->
+                            _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
+                        }
 
-                _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
-                Timber.i("VLM streaming completed")
-            } catch (e: Exception) {
-                Timber.e(e, "VLM processing failed: ${e.message}")
-                _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
-            } finally {
-                tempFile?.delete()
-                _uiState.update { it.copy(isProcessing = false) }
+                    _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
+                    Timber.i("VLM streaming completed")
+                } catch (e: Exception) {
+                    Timber.e(e, "VLM processing failed: ${e.message}")
+                    _uiState.update { it.copy(error = "Processing failed: ${e.message}") }
+                } finally {
+                    tempFile?.delete()
+                    _uiState.update { it.copy(isProcessing = false) }
+                }
             }
-        }
     }
 
     // AUTO-STREAMING - Mirrors iOS toggleAutoStreaming / startAutoStreaming
@@ -325,19 +332,20 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         if (autoStreamJob != null) return
         _uiState.update { it.copy(isAutoStreamingEnabled = true) }
 
-        autoStreamJob = viewModelScope.launch {
-            while (_uiState.value.isAutoStreamingEnabled) {
-                // Wait for any current processing to finish
-                while (_uiState.value.isProcessing) {
-                    delay(100)
-                    if (!_uiState.value.isAutoStreamingEnabled) return@launch
+        autoStreamJob =
+            viewModelScope.launch {
+                while (_uiState.value.isAutoStreamingEnabled) {
+                    // Wait for any current processing to finish
+                    while (_uiState.value.isProcessing) {
+                        delay(100)
+                        if (!_uiState.value.isAutoStreamingEnabled) return@launch
+                    }
+
+                    describeCurrentFrameForAutoStream()
+
+                    delay(AUTO_STREAM_INTERVAL_MS)
                 }
-
-                describeCurrentFrameForAutoStream()
-
-                delay(AUTO_STREAM_INTERVAL_MS)
             }
-        }
     }
 
     fun stopAutoStreaming() {
@@ -409,22 +417,23 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
     // HELPERS
 
-    private suspend fun copyUriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
-        try {
-            val context = getApplication<Application>()
-            val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
-            val tempFile = File.createTempFile("vlm_image_", ".jpg", context.cacheDir)
-            inputStream.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
+    private suspend fun copyUriToTempFile(uri: Uri): File? =
+        withContext(Dispatchers.IO) {
+            try {
+                val context = getApplication<Application>()
+                val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext null
+                val tempFile = File.createTempFile("vlm_image_", ".jpg", context.cacheDir)
+                inputStream.use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        input.copyTo(output)
+                    }
                 }
+                tempFile
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to copy URI to temp file: ${e.message}")
+                null
             }
-            tempFile
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to copy URI to temp file: ${e.message}")
-            null
         }
-    }
 
     override fun onCleared() {
         super.onCleared()

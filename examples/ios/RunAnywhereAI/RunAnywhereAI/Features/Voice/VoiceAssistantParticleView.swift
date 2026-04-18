@@ -478,7 +478,11 @@ struct VoiceAssistantMainPreview: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                Color(red: 1.0, green: 0.75, blue: 0.3).opacity(colorScheme == .dark ? Double(0.06 + morphProgress * 0.08) : Double(0.03 + morphProgress * 0.04)),
+                                Color(red: 1.0, green: 0.75, blue: 0.3).opacity(
+                                    colorScheme == .dark
+                                        ? Double(0.06 + morphProgress * 0.08)
+                                        : Double(0.03 + morphProgress * 0.04)
+                                ),
                                 Color(red: 1.0, green: 0.5, blue: 0.15).opacity(colorScheme == .dark ? 0.04 : 0.02),
                                 Color.clear
                             ],
@@ -598,7 +602,7 @@ struct VoiceAssistantMainPreview: View {
                 let random = Float.random(in: 0...0.2)
                 amplitude = amplitude * 0.8 + (base + abs(wave) + random) * 0.2
             } else {
-                amplitude = amplitude * 0.95
+                amplitude *= 0.95
             }
         }
     }

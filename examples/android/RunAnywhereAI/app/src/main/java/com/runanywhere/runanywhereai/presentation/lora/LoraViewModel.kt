@@ -1,14 +1,13 @@
 package com.runanywhere.runanywhereai.presentation.lora
 
 import android.app.Application
-import timber.log.Timber
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
-import com.runanywhere.sdk.public.extensions.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
+import com.runanywhere.sdk.public.extensions.LoraAdapterCatalogEntry
+import com.runanywhere.sdk.public.extensions.LoraCompatibilityResult
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import com.runanywhere.sdk.public.extensions.allRegisteredLoraAdapters
 import com.runanywhere.sdk.public.extensions.checkLoraCompatibility
@@ -28,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 data class LoraUiState(
     val registeredAdapters: List<LoraAdapterCatalogEntry> = emptyList(),
@@ -44,7 +44,6 @@ data class LoraUiState(
  * Handles listing, downloading, loading, and removing LoRA adapters.
  */
 class LoraViewModel(application: Application) : AndroidViewModel(application) {
-
     private val _uiState = MutableStateFlow(LoraUiState())
     val uiState: StateFlow<LoraUiState> = _uiState.asStateFlow()
     private var downloadJob: Job? = null
@@ -57,10 +56,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun refresh() {
         viewModelScope.launch {
             try {
-                val (registered, loaded, downloaded) = withContext(Dispatchers.IO) {
-                    val reg = RunAnywhere.allRegisteredLoraAdapters()
-                    Triple(reg, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(reg))
-                }
+                val (registered, loaded, downloaded) =
+                    withContext(Dispatchers.IO) {
+                        val reg = RunAnywhere.allRegisteredLoraAdapters()
+                        Triple(reg, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(reg))
+                    }
                 _uiState.update {
                     it.copy(
                         registeredAdapters = registered,
@@ -80,10 +80,11 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshForModel(modelId: String) {
         viewModelScope.launch {
             try {
-                val (compatible, loaded, downloaded) = withContext(Dispatchers.IO) {
-                    val compat = RunAnywhere.loraAdaptersForModel(modelId)
-                    Triple(compat, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(compat))
-                }
+                val (compatible, loaded, downloaded) =
+                    withContext(Dispatchers.IO) {
+                        val compat = RunAnywhere.loraAdaptersForModel(modelId)
+                        Triple(compat, RunAnywhere.getLoadedLoraAdapters(), scanDownloadedAdapters(compat))
+                    }
                 _uiState.update {
                     it.copy(
                         compatibleAdapters = compatible,
@@ -100,7 +101,10 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Load a LoRA adapter from a local file path. */
-    fun loadAdapter(path: String, scale: Float = 1.0f) {
+    fun loadAdapter(
+        path: String,
+        scale: Float = 1.0f,
+    ) {
         viewModelScope.launch {
             try {
                 val config = LoRAAdapterConfig(path = path, scale = scale)
@@ -145,11 +149,15 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** Check if a LoRA adapter file is compatible with the current model. */
-    fun checkCompatibility(loraPath: String, onResult: (LoraCompatibilityResult) -> Unit) {
+    fun checkCompatibility(
+        loraPath: String,
+        onResult: (LoraCompatibilityResult) -> Unit,
+    ) {
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) {
-                RunAnywhere.checkLoraCompatibility(loraPath)
-            }
+            val result =
+                withContext(Dispatchers.IO) {
+                    RunAnywhere.checkLoraCompatibility(loraPath)
+                }
             onResult(result)
         }
     }
@@ -186,44 +194,48 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(downloadingAdapterId = entry.id, downloadProgress = 0f, error = null)
         }
 
-        downloadJob = viewModelScope.launch {
-            try {
-                RunAnywhere.downloadLoraAdapter(entry.id).collect { progress ->
-                    _uiState.update { it.copy(downloadProgress = progress.progress) }
+        downloadJob =
+            viewModelScope.launch {
+                try {
+                    RunAnywhere.downloadLoraAdapter(entry.id).collect { progress ->
+                        _uiState.update { it.copy(downloadProgress = progress.progress) }
 
-                    if (progress.state == DownloadState.COMPLETED) {
-                        val path = RunAnywhere.loraAdapterLocalPath(entry.id)
-                        Timber.i("Downloaded LoRA adapter: ${entry.name} -> $path")
-                        _uiState.update {
-                            it.copy(
-                                downloadingAdapterId = null,
-                                downloadProgress = 0f,
-                                downloadedAdapterPaths = if (path != null)
-                                    it.downloadedAdapterPaths + (entry.id to path)
-                                else it.downloadedAdapterPaths,
-                            )
+                        if (progress.state == DownloadState.COMPLETED) {
+                            val path = RunAnywhere.loraAdapterLocalPath(entry.id)
+                            Timber.i("Downloaded LoRA adapter: ${entry.name} -> $path")
+                            _uiState.update {
+                                it.copy(
+                                    downloadingAdapterId = null,
+                                    downloadProgress = 0f,
+                                    downloadedAdapterPaths =
+                                        if (path != null) {
+                                            it.downloadedAdapterPaths + (entry.id to path)
+                                        } else {
+                                            it.downloadedAdapterPaths
+                                        },
+                                )
+                            }
                         }
                     }
-                }
-                // Flow completed without COMPLETED event — clear spinner
-                if (_uiState.value.downloadingAdapterId != null) {
+                    // Flow completed without COMPLETED event — clear spinner
+                    if (_uiState.value.downloadingAdapterId != null) {
+                        _uiState.update {
+                            it.copy(downloadingAdapterId = null, downloadProgress = 0f)
+                        }
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to download LoRA adapter: ${entry.name}")
                     _uiState.update {
-                        it.copy(downloadingAdapterId = null, downloadProgress = 0f)
+                        it.copy(
+                            downloadingAdapterId = null,
+                            downloadProgress = 0f,
+                            error = "Download failed: ${e.message}",
+                        )
                     }
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to download LoRA adapter: ${entry.name}")
-                _uiState.update {
-                    it.copy(
-                        downloadingAdapterId = null,
-                        downloadProgress = 0f,
-                        error = "Download failed: ${e.message}",
-                    )
-                }
             }
-        }
     }
 
     /** Cancel an in-progress download. */
@@ -248,7 +260,9 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                         try {
                             RunAnywhere.removeLoraAdapter(path)
                             Timber.i("Unloaded LoRA adapter before delete: ${entry.filename}")
-                        } catch (_: Exception) { /* not loaded, safe to ignore */ }
+                        } catch (_: Exception) {
+                            // not loaded, safe to ignore
+                        }
                     }
                     RunAnywhere.deleteDownloadedLoraAdapter(entry.id)
                     Timber.i("Deleted LoRA adapter file: ${entry.filename}")

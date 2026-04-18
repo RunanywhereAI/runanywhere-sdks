@@ -28,12 +28,17 @@ object CppBridgeLoraRegistry {
 
     fun register(entry: LoraEntry) {
         log(LogLevel.DEBUG, "Registering LoRA adapter: ${entry.id}")
-        val result = RunAnywhereBridge.racLoraRegistryRegister(
-            id = entry.id, name = entry.name, description = entry.description,
-            downloadUrl = entry.downloadUrl, filename = entry.filename,
-            compatibleModelIds = entry.compatibleModelIds.toTypedArray(),
-            fileSize = entry.fileSize, defaultScale = entry.defaultScale,
-        )
+        val result =
+            RunAnywhereBridge.racLoraRegistryRegister(
+                id = entry.id,
+                name = entry.name,
+                description = entry.description,
+                downloadUrl = entry.downloadUrl,
+                filename = entry.filename,
+                compatibleModelIds = entry.compatibleModelIds.toTypedArray(),
+                fileSize = entry.fileSize,
+                defaultScale = entry.defaultScale,
+            )
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
             log(LogLevel.ERROR, "Failed to register LoRA adapter: ${entry.id}, error=$result")
             throw RuntimeException("Failed to register LoRA adapter: $result")
@@ -92,13 +97,15 @@ object CppBridgeLoraRegistry {
     }
 
     private enum class LogLevel { DEBUG, INFO, WARN, ERROR }
+
     private fun log(level: LogLevel, message: String) {
-        val adapterLevel = when (level) {
-            LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
-            LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
-            LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
-            LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
-        }
+        val adapterLevel =
+            when (level) {
+                LogLevel.DEBUG -> CppBridgePlatformAdapter.LogLevel.DEBUG
+                LogLevel.INFO -> CppBridgePlatformAdapter.LogLevel.INFO
+                LogLevel.WARN -> CppBridgePlatformAdapter.LogLevel.WARN
+                LogLevel.ERROR -> CppBridgePlatformAdapter.LogLevel.ERROR
+            }
         CppBridgePlatformAdapter.logCallback(adapterLevel, TAG, message)
     }
 }

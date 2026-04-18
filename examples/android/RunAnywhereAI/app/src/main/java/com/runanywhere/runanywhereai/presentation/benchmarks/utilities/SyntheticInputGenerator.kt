@@ -10,11 +10,13 @@ import kotlin.math.sin
  * Matches iOS SyntheticInputGenerator exactly.
  */
 object SyntheticInputGenerator {
-
     // -- Audio --
 
     /** Generate silent PCM Int16 mono audio data. */
-    fun silentAudio(durationSeconds: Double, sampleRate: Int = 16_000): ByteArray {
+    fun silentAudio(
+        durationSeconds: Double,
+        sampleRate: Int = 16_000,
+    ): ByteArray {
         val sampleCount = (durationSeconds * sampleRate).toInt()
         return ByteArray(sampleCount * Short.SIZE_BYTES)
     }
@@ -26,8 +28,9 @@ object SyntheticInputGenerator {
         sampleRate: Int = 16_000,
     ): ByteArray {
         val sampleCount = (durationSeconds * sampleRate).toInt()
-        val buffer = ByteBuffer.allocate(sampleCount * Short.SIZE_BYTES)
-            .order(ByteOrder.LITTLE_ENDIAN)
+        val buffer =
+            ByteBuffer.allocate(sampleCount * Short.SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
         for (i in 0 until sampleCount) {
             val t = i.toDouble() / sampleRate
             val value = sin(2.0 * PI * frequencyHz * t) * (Short.MAX_VALUE / 2)
@@ -63,7 +66,10 @@ object SyntheticInputGenerator {
      * Generate a gradient RGB pixel buffer (top-left blue to bottom-right green).
      * Returns a ByteArray of (width * height * 3) bytes in RGB format.
      */
-    fun gradientRgb(width: Int = 224, height: Int = 224): ByteArray {
+    fun gradientRgb(
+        width: Int = 224,
+        height: Int = 224,
+    ): ByteArray {
         val data = ByteArray(width * height * 3)
         for (y in 0 until height) {
             for (x in 0 until width) {

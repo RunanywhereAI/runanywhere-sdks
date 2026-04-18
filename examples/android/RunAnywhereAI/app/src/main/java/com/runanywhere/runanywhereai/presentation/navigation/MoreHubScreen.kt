@@ -1,8 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.navigation
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,14 +10,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -50,100 +50,101 @@ fun MoreHubScreen(
     ConfigureTopBar(title = "More")
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Dimensions.large, vertical = Dimensions.smallMedium),
     ) {
-            // Audio AI section
-            Text(
-                "Audio AI",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
-            )
+        // Audio AI section
+        Text(
+            "Audio AI",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
 
-            MoreFeatureCard(
-                icon = Icons.Filled.GraphicEq,
-                iconColor = AppColors.featureBlue,
-                title = "Speech to Text",
-                subtitle = "Transcribe audio to text using on-device models",
-                onClick = onNavigateToSTT,
-            )
+        MoreFeatureCard(
+            icon = Icons.Filled.GraphicEq,
+            iconColor = AppColors.featureBlue,
+            title = "Speech to Text",
+            subtitle = "Transcribe audio to text using on-device models",
+            onClick = onNavigateToSTT,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+        Spacer(modifier = Modifier.height(Dimensions.smallMedium))
 
-            MoreFeatureCard(
-                icon = Icons.AutoMirrored.Filled.VolumeUp,
-                iconColor = AppColors.featureGreen,
-                title = "Text to Speech",
-                subtitle = "Convert text to natural-sounding speech",
-                onClick = onNavigateToTTS,
-            )
+        MoreFeatureCard(
+            icon = Icons.AutoMirrored.Filled.VolumeUp,
+            iconColor = AppColors.featureGreen,
+            title = "Text to Speech",
+            subtitle = "Convert text to natural-sounding speech",
+            onClick = onNavigateToTTS,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
+        Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
-            // Document AI section
-            Text(
-                "Document AI",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
-            )
+        // Document AI section
+        Text(
+            "Document AI",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
 
-            MoreFeatureCard(
-                icon = Icons.Filled.Description,
-                iconColor = AppColors.featureDeepPurple,
-                title = "Document Q&A",
-                subtitle = "Ask questions about your documents using on-device AI",
-                onClick = onNavigateToRAG,
-            )
+        MoreFeatureCard(
+            icon = Icons.Filled.Description,
+            iconColor = AppColors.featureDeepPurple,
+            title = "Document Q&A",
+            subtitle = "Ask questions about your documents using on-device AI",
+            onClick = onNavigateToRAG,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
+        Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
-            // Model Customization section
-            Text(
-                "Model Customization",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
-            )
+        // Model Customization section
+        Text(
+            "Model Customization",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
 
-            MoreFeatureCard(
-                icon = Icons.Filled.Tune,
-                iconColor = AppColors.primaryPurple,
-                title = "LoRA Adapters",
-                subtitle = "Manage and apply LoRA fine-tuning adapters to models",
-                onClick = onNavigateToLoraManager,
-            )
+        MoreFeatureCard(
+            icon = Icons.Filled.Tune,
+            iconColor = AppColors.primaryPurple,
+            title = "LoRA Adapters",
+            subtitle = "Manage and apply LoRA fine-tuning adapters to models",
+            onClick = onNavigateToLoraManager,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.xxLarge))
+        Spacer(modifier = Modifier.height(Dimensions.xxLarge))
 
-            // Performance section
-            Text(
-                "Performance",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
-            )
+        // Performance section
+        Text(
+            "Performance",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall, bottom = Dimensions.smallMedium),
+        )
 
-            MoreFeatureCard(
-                icon = Icons.Filled.Speed,
-                iconColor = AppColors.primaryAccent,
-                title = "Benchmarks",
-                subtitle = "Measure on-device AI performance across models",
-                onClick = onNavigateToBenchmarks,
-            )
+        MoreFeatureCard(
+            icon = Icons.Filled.Speed,
+            iconColor = AppColors.primaryAccent,
+            title = "Benchmarks",
+            subtitle = "Measure on-device AI performance across models",
+            onClick = onNavigateToBenchmarks,
+        )
 
-            Spacer(modifier = Modifier.height(Dimensions.large))
+        Spacer(modifier = Modifier.height(Dimensions.large))
 
-            // Footer
-            Text(
-                "Additional AI utilities and tools",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = Dimensions.xSmall),
-            )
+        // Footer
+        Text(
+            "Additional AI utilities and tools",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Dimensions.xSmall),
+        )
     }
 }
 
@@ -156,18 +157,21 @@ private fun MoreFeatureCard(
     onClick: () -> Unit,
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
         shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.large),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(

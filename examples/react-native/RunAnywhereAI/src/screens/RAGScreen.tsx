@@ -99,8 +99,9 @@ export const RAGScreen: React.FC = () => {
   // Model selection
   const [selectedEmbeddingModel, setSelectedEmbeddingModel] =
     useState<SDKModelInfo | null>(null);
-  const [selectedLLMModel, setSelectedLLMModel] =
-    useState<SDKModelInfo | null>(null);
+  const [selectedLLMModel, setSelectedLLMModel] = useState<SDKModelInfo | null>(
+    null
+  );
   const [showingEmbeddingPicker, setShowingEmbeddingPicker] = useState(false);
   const [showingLLMPicker, setShowingLLMPicker] = useState(false);
 
@@ -122,9 +123,7 @@ export const RAGScreen: React.FC = () => {
     selectedLLMModel?.localPath != null;
 
   const canAskQuestion =
-    isDocumentLoaded &&
-    !isQuerying &&
-    currentQuestion.trim().length > 0;
+    isDocumentLoaded && !isQuerying && currentQuestion.trim().length > 0;
 
   // MARK: - Initialization
 
@@ -140,7 +139,9 @@ export const RAGScreen: React.FC = () => {
       } catch (err) {
         if (mounted) {
           setNitroError(
-            err instanceof Error ? err.message : 'Failed to initialize NitroModules'
+            err instanceof Error
+              ? err.message
+              : 'Failed to initialize NitroModules'
           );
         }
       }
@@ -208,7 +209,8 @@ export const RAGScreen: React.FC = () => {
       if (err?.code === 'OPERATION_CANCELED') {
         return; // User cancelled
       }
-      const msg = err instanceof Error ? err.message : 'Failed to load document';
+      const msg =
+        err instanceof Error ? err.message : 'Failed to load document';
       setError(msg);
       console.error('[RAGScreen] Document load error:', err);
     } finally {
@@ -246,11 +248,17 @@ export const RAGScreen: React.FC = () => {
         topP: 0.9,
         topK: 40,
       });
-      setMessages((prev) => [...prev, { role: 'assistant', text: result.answer }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: result.answer },
+      ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Query failed';
       setError(msg);
-      setMessages((prev) => [...prev, { role: 'assistant', text: `Error: ${msg}` }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', text: `Error: ${msg}` },
+      ]);
     } finally {
       setIsQuerying(false);
     }
@@ -270,13 +278,10 @@ export const RAGScreen: React.FC = () => {
     []
   );
 
-  const handleLLMModelSelected = useCallback(
-    async (model: SDKModelInfo) => {
-      setSelectedLLMModel(model);
-      setShowingLLMPicker(false);
-    },
-    []
-  );
+  const handleLLMModelSelected = useCallback(async (model: SDKModelInfo) => {
+    setSelectedLLMModel(model);
+    setShowingLLMPicker(false);
+  }, []);
 
   // MARK: - Error state for NitroModules
 
@@ -287,7 +292,11 @@ export const RAGScreen: React.FC = () => {
           <Text style={styles.title}>Document Q&A</Text>
         </View>
         <View style={styles.centered}>
-          <Icon name="alert-circle-outline" size={64} color={Colors.primaryRed} />
+          <Icon
+            name="alert-circle-outline"
+            size={64}
+            color={Colors.primaryRed}
+          />
           <Text style={styles.errorTitle}>NitroModules Error</Text>
           <Text style={styles.errorHintText}>{nitroError}</Text>
         </View>
@@ -457,10 +466,12 @@ export const RAGScreen: React.FC = () => {
                 </>
               ) : !areModelsReady ? (
                 <>
-                  <Text style={styles.emptyTitle}>Select models to get started</Text>
+                  <Text style={styles.emptyTitle}>
+                    Select models to get started
+                  </Text>
                   <Text style={styles.emptySubtitle}>
-                    Choose an embedding model and an LLM model above, then pick a
-                    document
+                    Choose an embedding model and an LLM model above, then pick
+                    a document
                   </Text>
                 </>
               ) : (
@@ -505,7 +516,10 @@ export const RAGScreen: React.FC = () => {
               ))}
               {isQuerying && (
                 <View style={styles.queryingRow}>
-                  <ActivityIndicator size="small" color={Colors.textSecondary} />
+                  <ActivityIndicator
+                    size="small"
+                    color={Colors.textSecondary}
+                  />
                   <Text style={styles.queryingText}>Searching document...</Text>
                 </View>
               )}

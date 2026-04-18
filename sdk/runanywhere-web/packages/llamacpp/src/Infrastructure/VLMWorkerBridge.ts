@@ -70,7 +70,7 @@ export interface VLMWorkerResult {
  * RPC responses from the Worker to the main thread.
  */
 export type VLMWorkerResponse =
-  | { id: number; type: 'result'; payload: any }
+  | { id: number; type: 'result'; payload: unknown }
   | { id: number; type: 'error'; payload: { message: string } }
   | { id: number; type: 'progress'; payload: { stage: string } };
 
@@ -138,7 +138,7 @@ export class VLMWorkerBridge {
   // ---- State ----
   private worker: Worker | null = null;
   private nextId = 0;
-  private pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private _isInitialized = false;
   private _isModelLoaded = false;
   private _progressListeners: ProgressListener[] = [];

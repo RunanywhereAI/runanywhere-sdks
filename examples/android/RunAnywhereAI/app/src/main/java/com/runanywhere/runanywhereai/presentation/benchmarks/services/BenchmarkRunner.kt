@@ -18,7 +18,9 @@ import kotlin.coroutines.coroutineContext
 
 interface BenchmarkScenarioProvider {
     val category: BenchmarkCategory
+
     fun scenarios(): List<BenchmarkScenario>
+
     suspend fun execute(
         scenario: BenchmarkScenario,
         model: ModelInfo,
@@ -49,27 +51,28 @@ data class BenchmarkPreflightResult(
 // -- Runner --
 
 class BenchmarkRunner {
-
     private val providers: Map<BenchmarkCategory, BenchmarkScenarioProvider>
 
     init {
-        val all = listOf(
-            LLMBenchmarkProvider(),
-            STTBenchmarkProvider(),
-            TTSBenchmarkProvider(),
-            VLMBenchmarkProvider(),
-        )
+        val all =
+            listOf(
+                LLMBenchmarkProvider(),
+                STTBenchmarkProvider(),
+                TTSBenchmarkProvider(),
+                VLMBenchmarkProvider(),
+            )
         providers = all.associateBy { it.category }
     }
 
     // -- Preflight Check --
 
     suspend fun preflight(categories: Set<BenchmarkCategory>): BenchmarkPreflightResult {
-        val allModels: List<ModelInfo> = try {
-            RunAnywhere.availableModels()
-        } catch (e: Exception) {
-            throw BenchmarkRunnerError.FetchModelsFailed(e)
-        }
+        val allModels: List<ModelInfo> =
+            try {
+                RunAnywhere.availableModels()
+            } catch (e: Exception) {
+                throw BenchmarkRunnerError.FetchModelsFailed(e)
+            }
 
         val available = mutableMapOf<BenchmarkCategory, List<ModelInfo>>()
         val skipped = mutableListOf<BenchmarkCategory>()
@@ -80,9 +83,10 @@ class BenchmarkRunner {
                 skipped.add(category)
                 continue
             }
-            val models = allModels.filter {
-                it.category == category.modelCategory && it.isDownloaded && !it.isBuiltIn
-            }
+            val models =
+                allModels.filter {
+                    it.category == category.modelCategory && it.isDownloaded && !it.isBuiltIn
+                }
             if (models.isEmpty()) {
                 skipped.add(category)
             } else {
@@ -156,26 +160,28 @@ class BenchmarkRunner {
                 ),
             )
 
-            val metrics: BenchmarkMetrics = try {
-                val provider = providers[item.category] ?: continue
-                provider.execute(
-                    scenario = item.scenario,
-                    model = item.model,
-                    deviceInfo = BenchmarkDeviceInfo(
-                        modelName = "",
-                        chipName = "",
-                        totalMemoryBytes = 0,
-                        availableMemoryBytes = SyntheticInputGenerator.availableMemoryBytes(),
-                        osVersion = "",
-                    ),
-                )
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                BenchmarkMetrics(
-                    errorMessage = "${item.category.displayName} [${item.model.name}]: ${e.localizedMessage ?: e.message ?: "Unknown error"}",
-                )
-            }
+            val metrics: BenchmarkMetrics =
+                try {
+                    val provider = providers[item.category] ?: continue
+                    provider.execute(
+                        scenario = item.scenario,
+                        model = item.model,
+                        deviceInfo =
+                            BenchmarkDeviceInfo(
+                                modelName = "",
+                                chipName = "",
+                                totalMemoryBytes = 0,
+                                availableMemoryBytes = SyntheticInputGenerator.availableMemoryBytes(),
+                                osVersion = "",
+                            ),
+                    )
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    BenchmarkMetrics(
+                        errorMessage = "${item.category.displayName} [${item.model.name}]: ${e.localizedMessage ?: e.message ?: "Unknown error"}",
+                    )
+                }
 
             results.add(
                 BenchmarkResult(

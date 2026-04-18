@@ -8,6 +8,7 @@
 
 import { EventBus } from '../Foundation/EventBus';
 import { ModelCategory, LLMFramework, ModelStatus, SDKEventType } from '../types/enums';
+import type { DownloadStage } from '../types/enums';
 
 // Re-export SDK enums for convenience (consumers can import from either location)
 export { ModelCategory, LLMFramework, ModelStatus };
@@ -73,7 +74,7 @@ export interface ManagedModel {
 /** Structured download progress with stage information. */
 export interface DownloadProgress {
   modelId: string;
-  stage: import('../types/enums').DownloadStage;
+  stage: DownloadStage;
   /** Overall progress 0-1 */
   progress: number;
   bytesDownloaded: number;

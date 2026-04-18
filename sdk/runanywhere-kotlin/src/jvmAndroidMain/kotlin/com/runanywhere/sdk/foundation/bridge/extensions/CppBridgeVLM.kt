@@ -13,7 +13,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.extensions.VLM.VLMResult
 
 /**
  * VLM bridge that provides Vision Language Model component lifecycle management for C++ core.
@@ -258,9 +257,14 @@ object CppBridgeVLM {
         )
 
         // 3. Native call runs outside lock
-        val result = RunAnywhereBridge.racVlmComponentLoadModel(
-            currentHandle, modelPath, mmprojPath, modelId, modelName,
-        )
+        val result =
+            RunAnywhereBridge.racVlmComponentLoadModel(
+                currentHandle,
+                modelPath,
+                mmprojPath,
+                modelId,
+                modelName,
+            )
 
         // 4. Re-acquire lock for state updates
         if (result != 0) {
@@ -400,8 +404,15 @@ object CppBridgeVLM {
         try {
             val resultJson =
                 RunAnywhereBridge.racVlmComponentProcess(
-                    currentHandle, imageFormat, imagePath, imageData, imageBase64,
-                    imageWidth, imageHeight, prompt, optionsJson,
+                    currentHandle,
+                    imageFormat,
+                    imagePath,
+                    imageData,
+                    imageBase64,
+                    imageWidth,
+                    imageHeight,
+                    prompt,
+                    optionsJson,
                 ) ?: throw SDKError.vlm("VLM processing failed: null result")
 
             val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)
@@ -484,8 +495,16 @@ object CppBridgeVLM {
 
             val resultJson =
                 RunAnywhereBridge.racVlmComponentProcessStream(
-                    currentHandle, imageFormat, imagePath, imageData, imageBase64,
-                    imageWidth, imageHeight, prompt, optionsJson, jniCallback,
+                    currentHandle,
+                    imageFormat,
+                    imagePath,
+                    imageData,
+                    imageBase64,
+                    imageWidth,
+                    imageHeight,
+                    prompt,
+                    optionsJson,
+                    jniCallback,
                 ) ?: throw SDKError.vlm("VLM streaming processing failed: null result")
 
             val result = parseProcessingResult(resultJson, System.currentTimeMillis() - startTime)

@@ -16,7 +16,10 @@ import androidx.compose.ui.unit.sp
  */
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
-fun rDp(baseDp: Dp, designWidth: Float = 360f): Dp {
+fun rDp(
+    baseDp: Dp,
+    designWidth: Float = 360f,
+): Dp {
     if (designWidth <= 0f || !designWidth.isFinite()) return baseDp
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
     if (screenWidthDp <= 0f) return baseDp
@@ -29,7 +32,10 @@ fun rDp(baseDp: Dp, designWidth: Float = 360f): Dp {
  */
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
-fun rSp(baseSp: TextUnit, designWidth: Float = 360f): TextUnit {
+fun rSp(
+    baseSp: TextUnit,
+    designWidth: Float = 360f,
+): TextUnit {
     if (baseSp.type != TextUnitType.Sp) return baseSp
     if (designWidth <= 0f || !designWidth.isFinite()) return baseSp
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()

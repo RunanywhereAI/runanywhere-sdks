@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +25,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -82,9 +82,10 @@ fun AppNavigation() {
                             }
                         },
                         actions = topBarState.actions,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                        ),
+                        colors =
+                            TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                            ),
                     )
                 }
             },
@@ -109,9 +110,10 @@ fun AppNavigation() {
             NavHost(
                 navController = navController,
                 startDestination = NavigationRoute.CHAT,
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .then(if (isKeyboardOpen) Modifier.imePadding() else Modifier),
+                modifier =
+                    Modifier
+                        .padding(paddingValues)
+                        .then(if (isKeyboardOpen) Modifier.imePadding() else Modifier),
                 enterTransition = {
                     slideInHorizontally(
                         initialOffsetX = { it / SLIDE_OFFSET_FRACTION },
@@ -238,14 +240,15 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
         route == NavigationRoute.CHAT -> BottomNavTab.Chat
         route == NavigationRoute.VISION || route == NavigationRoute.VLM -> BottomNavTab.Vision
         route == NavigationRoute.VOICE -> BottomNavTab.Voice
-        route in listOf(
-            NavigationRoute.MORE,
-            NavigationRoute.STT,
-            NavigationRoute.TTS,
-            NavigationRoute.RAG,
-            NavigationRoute.BENCHMARKS,
-            NavigationRoute.LORA_MANAGER,
-        ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
+        route in
+            listOf(
+                NavigationRoute.MORE,
+                NavigationRoute.STT,
+                NavigationRoute.TTS,
+                NavigationRoute.RAG,
+                NavigationRoute.BENCHMARKS,
+                NavigationRoute.LORA_MANAGER,
+            ) || route.startsWith(NavigationRoute.BENCHMARK_DETAIL) -> BottomNavTab.More
         route == NavigationRoute.SETTINGS -> BottomNavTab.Settings
         else -> BottomNavTab.Chat
     }

@@ -62,21 +62,24 @@ logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)
 // rootProject checked first to support composite builds (app's gradle.properties takes precedence).
 // Legacy name `runanywhere.testLocal` still works as a fallback — emit a
 // deprecation warning so people migrate to the new name over time.
-val useLocalNatives: Boolean = run {
-    val newValue = rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-        ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-    if (newValue != null) return@run newValue
-    val legacyValue = rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-    if (legacyValue != null) {
-        logger.lifecycle(
-            "DEPRECATION: `runanywhere.testLocal` is deprecated; use " +
-                "`runanywhere.useLocalNatives` instead (same values)"
-        )
-        return@run legacyValue
+val useLocalNatives: Boolean =
+    run {
+        val newValue =
+            rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+                ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        if (newValue != null) return@run newValue
+        val legacyValue =
+            rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+                ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
+        if (legacyValue != null) {
+            logger.lifecycle(
+                "DEPRECATION: `runanywhere.testLocal` is deprecated; use " +
+                    "`runanywhere.useLocalNatives` instead (same values)",
+            )
+            return@run legacyValue
+        }
+        false
     }
-    false
-}
 // Alias kept so existing call sites below read the same value without churn.
 val testLocal: Boolean = useLocalNatives
 
@@ -427,12 +430,13 @@ tasks.register("downloadJniLibs") {
     val packageType = "RACommons-android"
 
     // Whitelist: only keep commons-owned .so files (the RACommons zip is a "fat" zip)
-    val commonsLibs = setOf(
-        "librac_commons.so",
-        "librunanywhere_jni.so",
-        "libc++_shared.so",
-        "libomp.so",
-    )
+    val commonsLibs =
+        setOf(
+            "librac_commons.so",
+            "librunanywhere_jni.so",
+            "libc++_shared.so",
+            "libomp.so",
+        )
 
     outputs.dir(outputDir)
 

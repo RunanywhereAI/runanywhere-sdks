@@ -31,7 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -42,6 +41,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.data.LoraExamplePrompts
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
@@ -64,177 +64,181 @@ fun LoraManagerScreen(
     ConfigureTopBar(title = "LoRA Adapters", showBack = true, onBack = onBack)
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Dimensions.large),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = Dimensions.large),
         verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium),
     ) {
-            // Currently loaded section
-            if (state.loadedAdapters.isNotEmpty()) {
-                item {
-                    Spacer(modifier = Modifier.height(Dimensions.smallMedium))
-                    Text(
-                        "Currently Loaded",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                items(state.loadedAdapters, key = { it.path }) { adapter ->
-                    val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
+        // Currently loaded section
+        if (state.loadedAdapters.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                Text(
+                    "Currently Loaded",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            items(state.loadedAdapters, key = { it.path }) { adapter ->
+                val examplePrompts = remember(adapter.path) { LoraExamplePrompts.forAdapterPath(adapter.path) }
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    ) {
-                        Column(
-                            modifier = Modifier
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Column(
+                        modifier =
+                            Modifier
                                 .fillMaxWidth()
                                 .padding(Dimensions.large),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        adapter.path.substringAfterLast("/"),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                    Text(
-                                        "Scale: ${"%.2f".format(adapter.scale)}  |  ${if (adapter.applied) "Applied" else "Pending"}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Button(
-                                    onClick = { loraViewModel.unloadAdapter(adapter.path) },
-                                    colors = ButtonDefaults.buttonColors(
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    adapter.path.substringAfterLast("/"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    "Scale: ${"%.2f".format(adapter.scale)}  |  ${if (adapter.applied) "Applied" else "Pending"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Button(
+                                onClick = { loraViewModel.unloadAdapter(adapter.path) },
+                                colors =
+                                    ButtonDefaults.buttonColors(
                                         containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
                                     ),
-                                ) {
-                                    Icon(
-                                        Icons.Default.LinkOff,
-                                        contentDescription = null,
-                                        tint = AppColors.primaryRed,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(Dimensions.xSmall))
-                                    Text("Unload", color = AppColors.primaryRed)
-                                }
-                            }
-
-                            // Example prompts
-                            if (examplePrompts.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(Dimensions.smallMedium))
-                                Text(
-                                    "Try it out:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.SemiBold,
+                            ) {
+                                Icon(
+                                    Icons.Default.LinkOff,
+                                    contentDescription = null,
+                                    tint = AppColors.primaryRed,
+                                    modifier = Modifier.size(16.dp),
                                 )
-                                Spacer(modifier = Modifier.height(Dimensions.xSmall))
-                                examplePrompts.forEach { prompt ->
-                                    Row(
-                                        modifier = Modifier
+                                Spacer(modifier = Modifier.width(Dimensions.xSmall))
+                                Text("Unload", color = AppColors.primaryRed)
+                            }
+                        }
+
+                        // Example prompts
+                        if (examplePrompts.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+                            Text(
+                                "Try it out:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(modifier = Modifier.height(Dimensions.xSmall))
+                            examplePrompts.forEach { prompt ->
+                                Row(
+                                    modifier =
+                                        Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = Dimensions.xxSmall),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        "\u201C$prompt\u201D",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AppColors.primaryPurple,
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    IconButton(
+                                        onClick = { clipboardManager.setText(AnnotatedString(prompt)) },
+                                        modifier = Modifier.size(Dimensions.iconRegular),
                                     ) {
-                                        Text(
-                                            "\u201C$prompt\u201D",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = AppColors.primaryPurple,
-                                            modifier = Modifier.weight(1f),
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
+                                        Icon(
+                                            Icons.Default.ContentCopy,
+                                            contentDescription = "Copy prompt",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(Dimensions.regular),
                                         )
-                                        IconButton(
-                                            onClick = { clipboardManager.setText(AnnotatedString(prompt)) },
-                                            modifier = Modifier.size(Dimensions.iconRegular),
-                                        ) {
-                                            Icon(
-                                                Icons.Default.ContentCopy,
-                                                contentDescription = "Copy prompt",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(Dimensions.regular),
-                                            )
-                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-
-                // Clear all button
-                item {
-                    Button(
-                        onClick = { loraViewModel.clearAll() },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryRed.copy(alpha = 0.1f)),
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteForever,
-                            contentDescription = null,
-                            tint = AppColors.primaryRed,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(Dimensions.xSmall))
-                        Text("Clear All Adapters", color = AppColors.primaryRed)
-                    }
-                }
             }
 
-            // All registered adapters section
+            // Clear all button
             item {
-                Spacer(modifier = Modifier.height(Dimensions.mediumLarge))
+                Button(
+                    onClick = { loraViewModel.clearAll() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryRed.copy(alpha = 0.1f)),
+                ) {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        tint = AppColors.primaryRed,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(Dimensions.xSmall))
+                    Text("Clear All Adapters", color = AppColors.primaryRed)
+                }
+            }
+        }
+
+        // All registered adapters section
+        item {
+            Spacer(modifier = Modifier.height(Dimensions.mediumLarge))
+            Text(
+                "All Adapters",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+
+        if (state.registeredAdapters.isEmpty()) {
+            item {
                 Text(
-                    "All Adapters",
-                    style = MaterialTheme.typography.titleSmall,
+                    "No adapters registered. Adapters are registered at app startup.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = Dimensions.large),
                 )
             }
-
-            if (state.registeredAdapters.isEmpty()) {
-                item {
-                    Text(
-                        "No adapters registered. Adapters are registered at app startup.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = Dimensions.large),
-                    )
-                }
-            } else {
-                items(state.registeredAdapters, key = { it.id }) { entry ->
-                    RegisteredAdapterCard(
-                        entry = entry,
-                        isDownloaded = loraViewModel.isDownloaded(entry),
-                        isDownloading = state.downloadingAdapterId == entry.id,
-                        downloadProgress = if (state.downloadingAdapterId == entry.id) state.downloadProgress else 0f,
-                        onDownload = { loraViewModel.downloadAdapter(entry) },
-                        onCancelDownload = { loraViewModel.cancelDownload() },
-                        onDelete = { loraViewModel.deleteAdapter(entry) },
-                    )
-                }
+        } else {
+            items(state.registeredAdapters, key = { it.id }) { entry ->
+                RegisteredAdapterCard(
+                    entry = entry,
+                    isDownloaded = loraViewModel.isDownloaded(entry),
+                    isDownloading = state.downloadingAdapterId == entry.id,
+                    downloadProgress = if (state.downloadingAdapterId == entry.id) state.downloadProgress else 0f,
+                    onDownload = { loraViewModel.downloadAdapter(entry) },
+                    onCancelDownload = { loraViewModel.cancelDownload() },
+                    onDelete = { loraViewModel.deleteAdapter(entry) },
+                )
             }
+        }
 
-            // Error
-            state.error?.let { error ->
-                item {
-                    Text(
-                        error,
-                        color = AppColors.primaryRed,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = Dimensions.small),
-                    )
-                }
+        // Error
+        state.error?.let { error ->
+            item {
+                Text(
+                    error,
+                    color = AppColors.primaryRed,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = Dimensions.small),
+                )
             }
+        }
 
-            item { Spacer(modifier = Modifier.height(Dimensions.xxLarge)) }
+        item { Spacer(modifier = Modifier.height(Dimensions.xxLarge)) }
     }
 }
 
@@ -254,9 +258,10 @@ private fun RegisteredAdapterCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Dimensions.large),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(Dimensions.large),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -281,10 +286,11 @@ private fun RegisteredAdapterCard(
                     style = MaterialTheme.typography.labelSmall,
                     color = AppColors.primaryPurple,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(Dimensions.cornerRadiusSmall))
-                        .background(AppColors.loraBadgeBg)
-                        .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
+                    modifier =
+                        Modifier
+                            .clip(RoundedCornerShape(Dimensions.cornerRadiusSmall))
+                            .background(AppColors.loraBadgeBg)
+                            .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
                 )
             }
 
@@ -299,10 +305,11 @@ private fun RegisteredAdapterCard(
                         modelId,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(Dimensions.cornerRadiusSmall))
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
+                        modifier =
+                            Modifier
+                                .clip(RoundedCornerShape(Dimensions.cornerRadiusSmall))
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(horizontal = Dimensions.small, vertical = Dimensions.xxSmall),
                     )
                 }
             }
@@ -347,9 +354,10 @@ private fun RegisteredAdapterCard(
                     Button(
                         onClick = onDelete,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
-                        ),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = AppColors.primaryRed.copy(alpha = 0.1f),
+                            ),
                     ) {
                         Icon(
                             Icons.Default.Delete,
