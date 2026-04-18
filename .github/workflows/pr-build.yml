@@ -420,6 +420,111 @@ jobs:
           done
 
   # ---------------------------------------------------------------------------
+  # Lint jobs — fast, parallel, symmetric across all 5 SDKs.
+  # Each runs independently of the native builds and can fail a PR on its own.
+  # Path-filtered so a Swift-only PR doesn't run Kotlin/Web/Flutter/RN lints.
+  # ---------------------------------------------------------------------------
+
+  lint_swift:
+    needs: detect
+    if: needs.detect.outputs.sdk_swift == 'true' || needs.detect.outputs.workflows == 'true'
+    runs-on: macos-14
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SwiftLint
+        run: brew install swiftlint
+      - name: Lint SDK
+        working-directory: sdk/runanywhere-swift
+        run: swiftlint --quiet --reporter github-actions-logging
+      - name: Lint iOS example app
+        working-directory: examples/ios/RunAnywhereAI
+        run: swiftlint --quiet --reporter github-actions-logging
+
+  lint_kotlin:
+    needs: detect
+    if: needs.detect.outputs.sdk_kotlin == 'true' || needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Lint Kotlin SDK (detekt + ktlint)
+        working-directory: sdk/runanywhere-kotlin
+        run: ./gradlew detekt ktlintCheck --no-daemon
+      - name: Lint Android example (detekt + ktlint)
+        working-directory: examples/android/RunAnywhereAI
+        run: ./gradlew detekt ktlintCheck --no-daemon
+
+  lint_web:
+    needs: detect
+    if: needs.detect.outputs.sdk_web == 'true' || needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Install deps
+        working-directory: sdk/runanywhere-web
+        run: npm install
+      - name: Build core (so llamacpp/onnx can resolve types)
+        working-directory: sdk/runanywhere-web
+        run: npm run build -w packages/core
+      - name: Lint
+        working-directory: sdk/runanywhere-web
+        run: npm run lint
+
+  lint_rn:
+    needs: detect
+    if: needs.detect.outputs.sdk_react_native == 'true' || needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-toolchain
+        with:
+          platform: sdk-only
+      - name: Enable Corepack (yarn@3.6.1)
+        run: corepack enable
+      - name: Install RN SDK deps
+        working-directory: sdk/runanywhere-react-native
+        run: yarn install --immutable || yarn install
+      - name: Prepare core (nitrogen + build for llamacpp/onnx)
+        working-directory: sdk/runanywhere-react-native
+        run: yarn core:prepare || true
+      - name: Lint RN SDK
+        working-directory: sdk/runanywhere-react-native
+        run: yarn lint
+
+  lint_flutter:
+    needs: detect
+    if: needs.detect.outputs.sdk_flutter == 'true' || needs.detect.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Flutter analyze — SDK packages
+        working-directory: sdk/runanywhere-flutter
+        run: |
+          set -e
+          for pkg in packages/runanywhere packages/runanywhere_genie packages/runanywhere_llamacpp packages/runanywhere_onnx; do
+            if [ -f "$pkg/pubspec.yaml" ]; then
+              echo "=== Analyzing $pkg ==="
+              (cd "$pkg" && flutter pub get && flutter analyze)
+            fi
+          done
+      - name: Flutter analyze — example app
+        working-directory: examples/flutter/RunAnywhereAI
+        run: flutter pub get && flutter analyze
+
+  # ---------------------------------------------------------------------------
   # summary: depends on every other job so the PR check shows an aggregate result
   # ---------------------------------------------------------------------------
   summary:
@@ -436,6 +541,11 @@ jobs:
       - sdk_web
       - sdk_flutter
       - sdk_react_native
+      - lint_swift
+      - lint_kotlin
+      - lint_web
+      - lint_rn
+      - lint_flutter
     runs-on: ubuntu-latest
     steps:
       - name: Print job results
@@ -451,6 +561,11 @@ jobs:
           echo "sdk_web          = ${{ needs.sdk_web.result }}"
           echo "sdk_flutter      = ${{ needs.sdk_flutter.result }}"
           echo "sdk_react_native = ${{ needs.sdk_react_native.result }}"
+          echo "lint_swift       = ${{ needs.lint_swift.result }}"
+          echo "lint_kotlin      = ${{ needs.lint_kotlin.result }}"
+          echo "lint_web         = ${{ needs.lint_web.result }}"
+          echo "lint_rn          = ${{ needs.lint_rn.result }}"
+          echo "lint_flutter     = ${{ needs.lint_flutter.result }}"
           echo "::endgroup::"
       - name: Fail on hard failures
         run: |
@@ -460,9 +575,14 @@ jobs:
             "${{ needs.native_android.result }}" \
             "${{ needs.native_linux.result }}" \
             "${{ needs.native_windows.result }}" \
-            "${{ needs.native_web.result }}"; do
+            "${{ needs.native_web.result }}" \
+            "${{ needs.lint_swift.result }}" \
+            "${{ needs.lint_kotlin.result }}" \
+            "${{ needs.lint_web.result }}" \
+            "${{ needs.lint_rn.result }}" \
+            "${{ needs.lint_flutter.result }}"; do
             if [ "$r" = "failure" ]; then
-              echo "::error::A native build job failed."
+              echo "::error::A build or lint job failed."
               exit 1
             fi
           done
