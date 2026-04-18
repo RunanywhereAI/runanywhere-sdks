@@ -124,22 +124,34 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Commit version bump + push tag
+      - name: Verify release PR contained version bump
         if: steps.label.outputs.should-release == 'true'
         env:
           NEW_VERSION: ${{ steps.version.outputs.new-version }}
-          BUMP: ${{ steps.label.outputs.bump }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+          # Main's branch protection requires all changes via PR — the workflow
+          # cannot push a version-bump commit. The release PR MUST already
+          # contain the sync-versions.sh output (run it locally before opening
+          # the PR). sync-versions.sh is re-run above as a sanity check; if it
+          # produced diff, the PR was missing the bump.
           git add -u
-          if git diff --cached --quiet; then
-            echo "No manifest changes from sync-versions.sh — unexpected; aborting"
+          if ! git diff --cached --quiet; then
+            echo "::error::PR merged with release:${{ steps.label.outputs.bump }} label but VERSIONS/manifests are out of sync with tag v${NEW_VERSION}."
+            echo "::error::Before opening a release PR, run: scripts/sync-versions.sh ${NEW_VERSION}  →  commit  →  open PR  →  merge with release label."
+            git diff --cached
             exit 1
           fi
-          git commit -m "chore: release v${NEW_VERSION} (${BUMP} bump from PR #${PR_NUMBER})"
+          echo "::notice::Manifests already bumped to v${NEW_VERSION} in the release PR."
+
+      - name: Push tag to trigger release.yml
+        if: steps.label.outputs.should-release == 'true'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new-version }}
+        run: |
+          set -euo pipefail
+          # Tags are not subject to branch protection, so the workflow token can push them.
           git tag "v${NEW_VERSION}"
-          git push origin main
           git push origin "v${NEW_VERSION}"
           echo "::notice::Pushed tag v${NEW_VERSION} — release.yml will now build and create a draft release"
 
