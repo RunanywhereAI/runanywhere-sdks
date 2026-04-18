@@ -30,7 +30,8 @@ on:
     branches: [main]
 
 permissions:
-  contents: write    # needed to commit version bump + push tag
+  contents: write       # needed to commit version bump + push tag
+  pull-requests: write  # needed for gh pr comment on the merged PR
 
 jobs:
   auto-tag:

@@ -135,6 +135,7 @@ echo ""
 echo ">> Flutter SDK:"
 for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
     bump_pubspec_version "$pkg"

@@ -340,7 +340,7 @@ jobs:
   # ---------------------------------------------------------------------------
 
   validate_consumer_swift:
-    needs: [validate, sdk_kotlin]   # dependency is arbitrary — we just want artifacts to exist
+    needs: [validate, native_ios, sdk_kotlin]  # native_ios produces the iOS artifact this job downloads
     if: always() && needs.validate.result == 'success'
     runs-on: macos-14
     timeout-minutes: 20
