@@ -1,0 +1,9 @@
+{
+  "_comment": "Single-source-of-truth for every publishable artifact in the v2 release. verify-versions.sh reads this file and asserts every per-SDK manifest agrees with these numbers before release.yml proceeds. Bumping a version requires a PR touching ONLY this file plus the matching manifest lines.",
+  "commons":             "2.0.0",
+  "runanywhere-swift":   "2.0.0-dev.1",
+  "runanywhere-kotlin":  "2.0.0-SNAPSHOT",
+  "runanywhere-flutter": "2.0.0-dev.1",
+  "runanywhere-rn":      "2.0.0-dev.1",
+  "runanywhere-web":     "2.0.0-dev.1"
+}
