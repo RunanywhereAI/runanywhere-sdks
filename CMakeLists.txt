@@ -71,6 +71,14 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/protobuf.cmake)
 # ---------------------------------------------------------------------------
 # Subprojects
 # ---------------------------------------------------------------------------
+# idl/ is a pure code-generation step — ra_idl depends only on
+# protobuf::libprotobuf and exposes the generated .pb.h to downstream
+# consumers (the C ABI serialization bridge + any test that round-trips
+# messages).
+if(RA_HAVE_PROTOBUF)
+    add_subdirectory(idl)
+endif()
+
 add_subdirectory(core)
 
 if(RA_BUILD_ENGINES)

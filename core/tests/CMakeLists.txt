@@ -1,7 +1,7 @@
 # gtest discovery is hoisted to the root CMakeLists so every subdir under
 # `RA_BUILD_TESTS` can link GTest::gtest without repeating find_package.
 
-add_executable(ra_core_tests
+set(_ra_core_test_sources
     ring_buffer_test.cpp
     memory_pool_test.cpp
     cancel_token_test.cpp
@@ -14,6 +14,14 @@ add_executable(ra_core_tests
     voice_pipeline_integration_test.cpp
 )
 
+# Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
+# Otherwise the test target would fail to link against the generated types.
+if(TARGET RunAnywhere::idl)
+    list(APPEND _ra_core_test_sources proto_roundtrip_test.cpp)
+endif()
+
+add_executable(ra_core_tests ${_ra_core_test_sources})
+
 target_link_libraries(ra_core_tests
     PRIVATE
         RunAnywhere::core
@@ -23,6 +31,9 @@ target_link_libraries(ra_core_tests
         GTest::gtest
         GTest::gtest_main
 )
+if(TARGET RunAnywhere::idl)
+    target_link_libraries(ra_core_tests PRIVATE RunAnywhere::idl)
+endif()
 
 include(GoogleTest)
 # detect_leaks is a Linux-only ASan feature; on macOS we rely on scope-based
