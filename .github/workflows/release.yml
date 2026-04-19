@@ -55,7 +55,7 @@ jobs:
           echo "version=$V" >> "$GITHUB_OUTPUT"
           echo "Releasing version: $V"
           # VERSIONS file should already be bumped before tag (sync-versions.sh)
-          PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          PROJECT_VERSION=$(grep -E '^PROJECT_VERSION=' sdk/legacy/commons/VERSIONS | cut -d= -f2 | xargs)
           if [ "$PROJECT_VERSION" != "$V" ]; then
             echo "::error::PROJECT_VERSION in VERSIONS is '$PROJECT_VERSION' but releasing '$V'."
             echo "::error::Run scripts/sync-versions.sh $V before tagging."
@@ -76,10 +76,10 @@ jobs:
         with:
           platform: ios
       - name: Build all backends for iOS + macOS (Release)
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-ios.sh --backend all --release --include-macos --package
       - name: Compute checksums
-        working-directory: sdk/runanywhere-commons/dist
+        working-directory: sdk/legacy/commons/dist
         run: |
           for f in *.zip; do
             [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
@@ -90,8 +90,8 @@ jobs:
         with:
           name: native-ios-macos
           path: |
-            sdk/runanywhere-commons/dist/*.zip
-            sdk/runanywhere-commons/dist/*.sha256
+            sdk/legacy/commons/dist/*.zip
+            sdk/legacy/commons/dist/*.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -109,10 +109,10 @@ jobs:
         with:
           platform: android
       - name: Build all backends for Android (${{ matrix.abi }})
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-android.sh all ${{ matrix.abi }}
       - name: Stage and zip per-ABI outputs
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: |
           mkdir -p dist/android-staging/${{ matrix.abi }}
           # Best-effort copy of standard layouts; tolerate missing dirs since some backends may not produce in this layout
@@ -129,8 +129,8 @@ jobs:
         with:
           name: native-android-${{ matrix.abi }}
           path: |
-            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
-            sdk/runanywhere-commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
+            sdk/legacy/commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip
+            sdk/legacy/commons/dist/RACommons-android-${{ matrix.abi }}-v${{ needs.validate.outputs.version }}.zip.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -144,10 +144,10 @@ jobs:
         with:
           platform: linux
       - name: Build commons + backends for Linux x86_64
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-linux.sh
       - name: Package Linux outputs
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: |
           if [ -d dist/linux ]; then
             (cd dist/linux && tar czf "../RACommons-linux-x86_64-v${{ needs.validate.outputs.version }}.tar.gz" .)
@@ -161,8 +161,8 @@ jobs:
         with:
           name: native-linux
           path: |
-            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz
-            sdk/runanywhere-commons/dist/RACommons-linux-*.tar.gz.sha256
+            sdk/legacy/commons/dist/RACommons-linux-*.tar.gz
+            sdk/legacy/commons/dist/RACommons-linux-*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: warn
 
@@ -176,11 +176,11 @@ jobs:
         with:
           platform: windows
       - name: Build commons + backends for Windows x64
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         shell: cmd
         run: scripts\build-windows.bat
       - name: Package Windows outputs
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         shell: bash
         run: |
           if [ -d dist/windows ]; then
@@ -195,8 +195,8 @@ jobs:
         with:
           name: native-windows
           path: |
-            sdk/runanywhere-commons/dist/RACommons-windows-*.zip
-            sdk/runanywhere-commons/dist/RACommons-windows-*.zip.sha256
+            sdk/legacy/commons/dist/RACommons-windows-*.zip
+            sdk/legacy/commons/dist/RACommons-windows-*.zip.sha256
           retention-days: 7
           if-no-files-found: warn
 

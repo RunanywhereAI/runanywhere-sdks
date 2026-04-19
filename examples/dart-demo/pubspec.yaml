@@ -8,7 +8,7 @@ environment:
 dependencies:
   ffi: ^2.1.0
   runanywhere_core:
-    path: ../../frontends/dart
+    path: ../../sdk/dart
 
 dev_dependencies:
   lints: ^5.0.0

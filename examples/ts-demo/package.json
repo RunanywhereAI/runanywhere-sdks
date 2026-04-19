@@ -8,7 +8,7 @@
     "start": "node --loader ts-node/esm src/main.ts"
   },
   "dependencies": {
-    "@runanywhere/core": "file:../../frontends/ts"
+    "@runanywhere/core": "file:../../sdk/ts"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

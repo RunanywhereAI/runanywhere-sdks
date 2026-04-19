@@ -27,7 +27,7 @@ let package = Package(
         // Produced by `scripts/build-core-xcframework.sh`.
         .binaryTarget(
             name: "RACommonsCoreBinary",
-            path: "../../sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework"
+            path: "Binaries/RACommonsCore.xcframework"
         ),
         .target(
             name: "RunAnywhereCore",

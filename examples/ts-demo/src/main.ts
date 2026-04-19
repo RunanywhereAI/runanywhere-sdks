@@ -6,9 +6,9 @@
 // Native TurboModules, and browser WASM). This demo plugs in a
 // no-op bindings provider to prove the public API traverses through.
 
-import { RunAnywhere, VoiceSession } from '../../../frontends/ts/src/index.js';
-import type { NativePipelineBindings } from '../../../frontends/ts/src/adapter/VoiceSession.js';
-import type { VoiceEvent } from '../../../frontends/ts/src/adapter/VoiceEvent.js';
+import { RunAnywhere, VoiceSession } from '../../../sdk/ts/src/index.js';
+import type { NativePipelineBindings } from '../../../sdk/ts/src/adapter/VoiceSession.js';
+import type { VoiceEvent } from '../../../sdk/ts/src/adapter/VoiceEvent.js';
 
 let nextHandle = 1;
 let eventsEmitted = 0;

@@ -6,7 +6,7 @@ on:
       - 'core/**'
       - 'engines/**'
       - 'solutions/**'
-      - 'frontends/**'
+      - 'sdk/**'
       - 'idl/**'
       - 'cmake/**'
       - 'tools/**'
@@ -20,7 +20,7 @@ on:
       - 'core/**'
       - 'engines/**'
       - 'solutions/**'
-      - 'frontends/**'
+      - 'sdk/**'
       - 'idl/**'
       - 'cmake/**'
       - 'tools/**'
@@ -94,14 +94,14 @@ jobs:
           # Phase 0 bootstrap: Generated/ only contains .gitkeep. After the
           # first real landing of generated files (tracked under
           # Generated/*.pb.swift), the drift check becomes strict.
-          TRACKED_PB=$(git ls-files 'frontends/swift/Sources/RunAnywhere/Generated/*.pb.swift')
+          TRACKED_PB=$(git ls-files 'sdk/swift/Sources/RunAnywhere/Generated/*.pb.swift')
           if [[ -z "$TRACKED_PB" ]]; then
             echo "No generated .pb.swift files tracked yet — drift check skipped until first codegen PR."
             exit 0
           fi
-          if [[ -n "$(git status --porcelain frontends/swift/Sources/RunAnywhere/Generated)" ]]; then
+          if [[ -n "$(git status --porcelain sdk/swift/Sources/RunAnywhere/Generated)" ]]; then
             echo "Generated Swift files are stale. Run ./idl/codegen/generate_swift.sh and commit." >&2
-            git --no-pager diff frontends/swift/Sources/RunAnywhere/Generated >&2
+            git --no-pager diff sdk/swift/Sources/RunAnywhere/Generated >&2
             exit 1
           fi
 
@@ -118,17 +118,17 @@ jobs:
         run: brew install cmake ninja protobuf libarchive
       - name: Build RACommonsCore xcframework
         # The Package.swift declares a binaryTarget pointing at
-        # sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework, which is
+        # sdk/swift/Binaries/RACommonsCore.xcframework, which is
         # a build artifact (gitignored). Regenerate it before `swift build`.
         run: bash scripts/build-core-xcframework.sh --platforms=macos
       - uses: swift-actions/setup-swift@v2
         with:
           swift-version: '5.9'
       - name: Build RunAnywhereCore (SwiftPM)
-        working-directory: frontends/swift
+        working-directory: sdk/swift
         run: swift build -v
       - name: Run tests
-        working-directory: frontends/swift
+        working-directory: sdk/swift
         run: swift test -v
       - name: Run swift-demo end-to-end CLI
         working-directory: examples/swift-demo
@@ -194,14 +194,14 @@ jobs:
         run: bash scripts/build-core-xcframework.sh --platforms=macos,ios-device,ios-sim --clean
       - name: Verify slices
         run: |
-          ls sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework/
-          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name libRACommonsCore.a | xargs -I{} sh -c 'echo "=== {} ==="; file "{}"'
-          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name module.modulemap
+          ls sdk/swift/Binaries/RACommonsCore.xcframework/
+          find sdk/swift/Binaries/RACommonsCore.xcframework -name libRACommonsCore.a | xargs -I{} sh -c 'echo "=== {} ==="; file "{}"'
+          find sdk/swift/Binaries/RACommonsCore.xcframework -name module.modulemap
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: RACommonsCore-xcframework
-          path: sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework
+          path: sdk/swift/Binaries/RACommonsCore.xcframework
 
   # ---------------------------------------------------------------------------
   # Kotlin frontend — Gradle build + unit tests + end-to-end JNI demo.
@@ -221,11 +221,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Build frontends/kotlin
-        working-directory: frontends/kotlin
+      - name: Build sdk/kotlin
+        working-directory: sdk/kotlin
         run: gradle --no-daemon build
-      - name: Test frontends/kotlin
-        working-directory: frontends/kotlin
+      - name: Test sdk/kotlin
+        working-directory: sdk/kotlin
         run: gradle --no-daemon test
       - name: Build racommons_core shared lib (with JNI bridge)
         run: |
@@ -258,13 +258,13 @@ jobs:
         with:
           sdk: stable
       - name: Pub get
-        working-directory: frontends/dart
+        working-directory: sdk/dart
         run: dart pub get
       - name: Analyze
-        working-directory: frontends/dart
+        working-directory: sdk/dart
         run: dart analyze
       - name: Test
-        working-directory: frontends/dart
+        working-directory: sdk/dart
         run: dart test
       - name: Build racommons_core shared lib
         run: |
@@ -292,13 +292,13 @@ jobs:
         with:
           node-version: '20'
       - name: Install TS deps
-        working-directory: frontends/ts
+        working-directory: sdk/ts
         run: npm install --no-save
       - name: Typecheck TS
-        working-directory: frontends/ts
+        working-directory: sdk/ts
         run: npm run typecheck
       - name: Test TS
-        working-directory: frontends/ts
+        working-directory: sdk/ts
         run: npm test
       - name: Run ts-demo end-to-end CLI
         working-directory: examples/ts-demo
@@ -307,13 +307,13 @@ jobs:
           npm run build
           node dist/examples/ts-demo/src/main.js
       - name: Install Web deps
-        working-directory: frontends/web
+        working-directory: sdk/web
         run: npm install --no-save
       - name: Typecheck Web
-        working-directory: frontends/web
+        working-directory: sdk/web
         run: npm run typecheck
       - name: Test Web
-        working-directory: frontends/web
+        working-directory: sdk/web
         run: npm test
       - name: Run web-demo end-to-end CLI
         working-directory: examples/web-demo

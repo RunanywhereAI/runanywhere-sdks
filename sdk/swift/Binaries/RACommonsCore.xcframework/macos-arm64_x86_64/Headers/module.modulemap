@@ -1,0 +1,11 @@
+module CRACommonsCore {
+    header "ra_errors.h"
+    header "ra_lifecycle.h"
+    header "ra_pipeline.h"
+    header "ra_plugin.h"
+    header "ra_primitives.h"
+    header "ra_version.h"
+    header "rac_compat.h"
+    link "RACommonsCore"
+    export *
+}

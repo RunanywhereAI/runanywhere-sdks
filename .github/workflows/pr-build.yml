@@ -59,50 +59,49 @@ jobs:
         with:
           filters: |
             commons_core:
-              - 'sdk/runanywhere-commons/include/**'
-              - 'sdk/runanywhere-commons/src/core/**'
-              - 'sdk/runanywhere-commons/src/infrastructure/**'
-              - 'sdk/runanywhere-commons/src/features/**'
-              - '!sdk/runanywhere-commons/src/features/**/backends/**'
-              - 'sdk/runanywhere-commons/CMakeLists.txt'
-              - 'sdk/runanywhere-commons/cmake/**'
-              - 'sdk/runanywhere-commons/CMakePresets.json'
+              - 'sdk/legacy/commons/include/**'
+              - 'sdk/legacy/commons/src/core/**'
+              - 'sdk/legacy/commons/src/infrastructure/**'
+              - 'sdk/legacy/commons/src/features/**'
+              - '!sdk/legacy/commons/src/features/**/backends/**'
+              - 'sdk/legacy/commons/CMakeLists.txt'
+              - 'sdk/legacy/commons/cmake/**'
+              - 'sdk/legacy/commons/CMakePresets.json'
             backend_llamacpp:
-              - 'sdk/runanywhere-commons/src/backends/llamacpp/**'
-              - 'sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h'
+              - 'sdk/legacy/commons/src/backends/llamacpp/**'
+              - 'sdk/legacy/commons/include/rac/backends/rac_llm_llamacpp.h'
             backend_onnx:
-              - 'sdk/runanywhere-commons/src/backends/onnx/**'
-              - 'sdk/runanywhere-commons/include/rac/backends/rac_*_onnx.h'
+              - 'sdk/legacy/commons/src/backends/onnx/**'
+              - 'sdk/legacy/commons/include/rac/backends/rac_*_onnx.h'
             script_ios:
-              - 'sdk/runanywhere-commons/scripts/build-ios.sh'
-              - 'sdk/runanywhere-commons/scripts/ios/**'
+              - 'sdk/legacy/commons/scripts/build-ios.sh'
+              - 'sdk/legacy/commons/scripts/ios/**'
             script_android:
-              - 'sdk/runanywhere-commons/scripts/build-android.sh'
-              - 'sdk/runanywhere-commons/scripts/android/**'
+              - 'sdk/legacy/commons/scripts/build-android.sh'
+              - 'sdk/legacy/commons/scripts/android/**'
             script_linux:
-              - 'sdk/runanywhere-commons/scripts/build-linux.sh'
+              - 'sdk/legacy/commons/scripts/build-linux.sh'
             script_windows:
-              - 'sdk/runanywhere-commons/scripts/build-windows.bat'
+              - 'sdk/legacy/commons/scripts/build-windows.bat'
             script_web:
-              - 'sdk/runanywhere-web/wasm/**'
-              - 'sdk/runanywhere-web/scripts/build-web.sh'
+              - 'sdk/legacy/web/wasm/**'
+              - 'sdk/legacy/web/scripts/build-web.sh'
             sdk_swift:
-              - 'sdk/runanywhere-swift/**'
+              - 'sdk/legacy/swift/**'
               - 'Package.swift'
             sdk_kotlin:
-              - 'sdk/runanywhere-kotlin/**'
-              - 'sdk/runanywhere-android/**'
+              - 'sdk/legacy/kotlin/**'
             sdk_web:
-              - 'sdk/runanywhere-web/packages/**'
-              - 'sdk/runanywhere-web/package.json'
-              - 'sdk/runanywhere-web/tsconfig.json'
+              - 'sdk/legacy/web/packages/**'
+              - 'sdk/legacy/web/package.json'
+              - 'sdk/legacy/web/tsconfig.json'
             sdk_flutter:
-              - 'sdk/runanywhere-flutter/**'
+              - 'sdk/legacy/flutter/**'
             sdk_react_native:
-              - 'sdk/runanywhere-react-native/**'
+              - 'sdk/legacy/react-native/**'
             versions:
-              - 'sdk/runanywhere-commons/VERSIONS'
-              - 'sdk/runanywhere-commons/VERSION'
+              - 'sdk/legacy/commons/VERSIONS'
+              - 'sdk/legacy/commons/VERSION'
             workflows:
               - '.github/workflows/**'
               - '.github/actions/**'
@@ -154,13 +153,13 @@ jobs:
         with:
           platform: ios
       - name: Build commons + backends for iOS (Debug, fast)
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-ios.sh --debug --backend all --skip-download || ./scripts/build-ios.sh --debug --backend all
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-ios-pr${{ github.event.pull_request.number }}
-          path: sdk/runanywhere-commons/dist/**
+          path: sdk/legacy/commons/dist/**
           retention-days: 30
           if-no-files-found: warn
 
@@ -185,13 +184,13 @@ jobs:
         with:
           platform: android
       - name: Build commons + backends for Android (${{ matrix.abi }})
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-android.sh all ${{ matrix.abi }}
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-android-${{ matrix.abi }}-pr${{ github.event.pull_request.number }}
-          path: sdk/runanywhere-commons/dist/**
+          path: sdk/legacy/commons/dist/**
           retention-days: 30
           if-no-files-found: warn
 
@@ -212,13 +211,13 @@ jobs:
         with:
           platform: linux
       - name: Build commons + backends for Linux x86_64
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         run: ./scripts/build-linux.sh
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-linux-x86_64-pr${{ github.event.pull_request.number }}
-          path: sdk/runanywhere-commons/dist/**
+          path: sdk/legacy/commons/dist/**
           retention-days: 30
           if-no-files-found: warn
 
@@ -239,14 +238,14 @@ jobs:
         with:
           platform: windows
       - name: Build commons + backends for Windows x64
-        working-directory: sdk/runanywhere-commons
+        working-directory: sdk/legacy/commons
         shell: cmd
         run: scripts\build-windows.bat
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-windows-x64-pr${{ github.event.pull_request.number }}
-          path: sdk/runanywhere-commons/dist/**
+          path: sdk/legacy/commons/dist/**
           retention-days: 30
           if-no-files-found: warn
 
@@ -267,14 +266,14 @@ jobs:
         with:
           platform: web
       - name: Build WASM (commons + llamacpp + onnx)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: ./scripts/build-web.sh --build-wasm --all-backends
       - name: Upload Web/WASM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: native-web-pr${{ github.event.pull_request.number }}
           path: |
-            sdk/runanywhere-web/packages/*/wasm/**
+            sdk/legacy/web/packages/*/wasm/**
           retention-days: 30
           if-no-files-found: warn
 
@@ -323,7 +322,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
       - name: Gradle build (no test)
-        working-directory: sdk/runanywhere-kotlin
+        working-directory: sdk/legacy/kotlin
         run: ./gradlew build -x test --no-daemon || echo "::warning::Kotlin gradle build failed — non-blocking on PR"
 
   sdk_web:
@@ -341,16 +340,16 @@ jobs:
         with:
           platform: sdk-only
       - name: Install web deps
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: npm install
       - name: Build TS (core then llamacpp then onnx)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         # build:ts must run before typecheck because llamacpp/onnx packages
         # import from `@runanywhere/web`; tsc can only resolve those imports
         # once the core package has produced its `dist/` (with .d.ts files).
         run: npm run build:ts
       - name: Typecheck (now that dist/ exists)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: npm run typecheck
 
   sdk_flutter:
@@ -371,7 +370,7 @@ jobs:
         with:
           channel: stable
       - name: Flutter analyze (each package)
-        working-directory: sdk/runanywhere-flutter
+        working-directory: sdk/legacy/flutter
         run: |
           for pkg in packages/*/; do
             if [ -f "$pkg/pubspec.yaml" ]; then
@@ -400,7 +399,7 @@ jobs:
       - name: Enable Corepack (for yarn@3.6.1 declared in packageManager)
         run: corepack enable
       - name: Install RN workspace
-        working-directory: sdk/runanywhere-react-native
+        working-directory: sdk/legacy/react-native
         run: |
           # The RN SDK uses yarn workspaces + yarn@3.6.1 via Corepack; fall
           # back to npm install only as a last resort for older checkouts.
@@ -410,7 +409,7 @@ jobs:
             npm install --legacy-peer-deps
           fi
       - name: Typecheck packages
-        working-directory: sdk/runanywhere-react-native
+        working-directory: sdk/legacy/react-native
         run: |
           for pkg in packages/*/; do
             if [ -f "$pkg/tsconfig.json" ]; then
@@ -435,7 +434,7 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
       - name: Lint SDK
-        working-directory: sdk/runanywhere-swift
+        working-directory: sdk/legacy/swift
         run: swiftlint --quiet --reporter github-actions-logging
       - name: Lint iOS example app
         working-directory: examples/ios/RunAnywhereAI
@@ -452,7 +451,7 @@ jobs:
         with:
           platform: sdk-only
       - name: Lint Kotlin SDK (detekt + ktlint)
-        working-directory: sdk/runanywhere-kotlin
+        working-directory: sdk/legacy/kotlin
         run: ./gradlew detekt ktlintCheck --no-daemon
       - name: Lint Android example (detekt + ktlint)
         working-directory: examples/android/RunAnywhereAI
@@ -469,13 +468,13 @@ jobs:
         with:
           platform: sdk-only
       - name: Install deps
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: npm install
       - name: Build core (so llamacpp/onnx can resolve types)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: npm run build -w packages/core
       - name: Lint
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: npm run lint
 
   lint_rn:
@@ -491,13 +490,13 @@ jobs:
       - name: Enable Corepack (yarn@3.6.1)
         run: corepack enable
       - name: Install RN SDK deps
-        working-directory: sdk/runanywhere-react-native
+        working-directory: sdk/legacy/react-native
         run: yarn install --immutable || yarn install
       - name: Prepare core (nitrogen + build for llamacpp/onnx)
-        working-directory: sdk/runanywhere-react-native
+        working-directory: sdk/legacy/react-native
         run: yarn core:prepare || true
       - name: Lint RN SDK
-        working-directory: sdk/runanywhere-react-native
+        working-directory: sdk/legacy/react-native
         run: yarn lint
 
   lint_flutter:
@@ -511,7 +510,7 @@ jobs:
         with:
           channel: stable
       - name: Flutter analyze — SDK packages
-        working-directory: sdk/runanywhere-flutter
+        working-directory: sdk/legacy/flutter
         run: |
           set -e
           # Generate pubspec_overrides.yaml for each sub-package so that

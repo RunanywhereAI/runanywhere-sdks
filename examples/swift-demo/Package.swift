@@ -1,6 +1,6 @@
 // swift-tools-version: 5.9
 // Minimal Swift CLI demo — links the new RunAnywhereCore from
-// frontends/swift and exercises a full VoiceSession lifecycle.
+// sdk/swift and exercises a full VoiceSession lifecycle.
 // Builds standalone: `swift run` inside examples/swift-demo/.
 
 import PackageDescription
@@ -11,7 +11,7 @@ let package = Package(
         .macOS(.v13),
     ],
     dependencies: [
-        .package(path: "../../frontends/swift"),
+        .package(path: "../../sdk/swift"),
     ],
     targets: [
         .executableTarget(

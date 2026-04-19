@@ -9,7 +9,7 @@ name: Auto-Tag Release
 #   release:major   — v0.19.7 → v1.0.0
 #
 # this workflow:
-#   1. Determines the current PROJECT_VERSION from sdk/runanywhere-commons/VERSIONS
+#   1. Determines the current PROJECT_VERSION from sdk/legacy/commons/VERSIONS
 #   2. Bumps it according to the label
 #   3. Runs scripts/sync-versions.sh to propagate the new version across all manifests
 #   4. Commits the bump to main and pushes tag v{new-version}
@@ -81,7 +81,7 @@ jobs:
           BUMP: ${{ steps.label.outputs.bump }}
         run: |
           set -euo pipefail
-          CURRENT=$(grep -E '^PROJECT_VERSION=' sdk/runanywhere-commons/VERSIONS | cut -d= -f2 | xargs)
+          CURRENT=$(grep -E '^PROJECT_VERSION=' sdk/legacy/commons/VERSIONS | cut -d= -f2 | xargs)
           # Strip any pre-release suffix for bumping
           BASE="${CURRENT%%-*}"
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE"

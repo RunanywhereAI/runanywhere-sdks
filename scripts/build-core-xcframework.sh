@@ -8,7 +8,7 @@
 # thoughts/shared/plans/v2_rearchitecture/sdk_migration/01_swift.md.
 #
 # Output:
-#   sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework/
+#   sdk/swift/Binaries/RACommonsCore.xcframework/
 #
 # The XCFramework bundles static libraries for every Apple platform +
 # simulator arch slice. sdk/runanywhere-swift then declares a binaryTarget
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT_DIR="${ROOT}/sdk/runanywhere-swift/Binaries"
+OUT_DIR="${ROOT}/sdk/swift/Binaries"
 FRAMEWORK_NAME="RACommonsCore"
 FRAMEWORK="${OUT_DIR}/${FRAMEWORK_NAME}.xcframework"
 BUILD_ROOT="${ROOT}/build/xcframework"

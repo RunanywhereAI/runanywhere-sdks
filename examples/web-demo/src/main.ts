@@ -7,7 +7,7 @@
 // lands, this demo just proves the public surface runs to completion
 // with a BACKEND_UNAVAILABLE error.
 
-import { RunAnywhere, VoiceSession } from '../../../frontends/web/src/index.js';
+import { RunAnywhere, VoiceSession } from '../../../sdk/web/src/index.js';
 
 async function main(): Promise<void> {
   console.log('RunAnywhere Web demo');
