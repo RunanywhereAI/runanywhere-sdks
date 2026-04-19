@@ -154,6 +154,8 @@ add_library(RunAnywhere::core_net ALIAS ra_core_net)
 add_library(ra_core_util STATIC
     util/audio_utils.cpp
     util/extraction.cpp
+    util/file_manager.cpp
+    util/storage_analyzer.cpp
 )
 target_include_directories(ra_core_util PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
