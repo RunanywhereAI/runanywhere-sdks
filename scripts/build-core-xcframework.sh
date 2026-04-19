@@ -72,6 +72,7 @@ build_slice() {
         -DRA_BUILD_TESTS=OFF \
         -DRA_BUILD_TOOLS=OFF \
         -DRA_BUILD_ENGINES=ON \
+        -DRA_BUILD_SHERPA=OFF \
         -DRA_BUILD_SOLUTIONS=ON \
         -DRA_STATIC_PLUGINS=ON \
         "$@"

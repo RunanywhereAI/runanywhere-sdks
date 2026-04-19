@@ -85,7 +85,14 @@ if(RA_BUILD_ENGINES)
     add_subdirectory(engines/llamacpp)
     # sherpa-onnx also serves the wake_word primitive via its keyword
     # spotter, so we no longer build a separate stub wakeword engine.
-    add_subdirectory(engines/sherpa)
+    # Sherpa fetches a ~30 MB pre-built tarball from GitHub releases; it
+    # can fail on flaky networks and is not mergeable into the Swift
+    # xcframework (dynamic-only). Let callers opt out via RA_BUILD_SHERPA=OFF
+    # so xcframework builds skip the fetch entirely.
+    option(RA_BUILD_SHERPA "Build the sherpa-onnx engine plugin" ON)
+    if(RA_BUILD_SHERPA)
+        add_subdirectory(engines/sherpa)
+    endif()
 endif()
 
 # Discover gtest BEFORE descending into subdirs whose CMakeLists may already
