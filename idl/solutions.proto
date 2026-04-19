@@ -42,6 +42,10 @@ message VoiceAgentConfig {
     int32  chunk_ms       = 6;   // default 20
     AudioSource audio_source = 7;
 
+    // Absolute path to an audio file. Required when `audio_source` is
+    // `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
+    string audio_file_path = 15;
+
     // Barge-in behavior.
     bool   enable_barge_in = 8;  // default true
     int32  barge_in_threshold_ms = 9;  // default 200

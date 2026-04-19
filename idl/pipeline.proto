@@ -68,7 +68,9 @@ message EdgeSpec {
     string from     = 1;
     string to       = 2;
 
-    // Optional channel depth — overrides the per-edge default.
+    // Channel depth override. Proto3 scalars have no presence bit, so the
+    // sentinel value 0 means "use the per-edge default (16 for PCM, 256 for
+    // tokens, 32 for sentences)". Any positive value overrides.
     int32  capacity = 3;
 
     EdgePolicy policy = 4;

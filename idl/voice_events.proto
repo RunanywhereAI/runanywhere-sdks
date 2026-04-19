@@ -142,4 +142,9 @@ message MetricsEvent {
     double end_to_end_ms      = 4;
     int64  tokens_generated   = 5;
     int64  audio_samples_played = 6;
+
+    // True when `end_to_end_ms` exceeded the `PipelineOptions.latency_budget_ms`
+    // configured for this run. Frontends can surface this to the UI for SLO
+    // dashboards without re-computing the threshold themselves.
+    bool   is_over_budget     = 7;
 }
