@@ -63,7 +63,16 @@ public:
           policy_(policy),
           cancel_token_(std::move(token)) {
         if (cancel_token_) {
-            cancel_token_->on_cancel([this]() { wake_all(); });
+            // The CancelToken may outlive this edge (common when the token is
+            // pipeline-owned and shared across multiple edges). Capture the
+            // shared alive_ flag by value — after ~StreamEdge clears the flag
+            // under its mutex, any late-firing callback is a no-op and never
+            // dereferences the dead `this`.
+            auto alive = alive_;
+            cancel_token_->on_cancel([this, alive]() {
+                std::lock_guard<std::mutex> lk(alive->mu);
+                if (alive->live) this->wake_all();
+            });
         }
     }
 
@@ -71,7 +80,14 @@ public:
     StreamEdge& operator=(const StreamEdge&) = delete;
     StreamEdge(StreamEdge&&)                 = delete;
     StreamEdge& operator=(StreamEdge&&)      = delete;
-    ~StreamEdge() = default;
+
+    ~StreamEdge() {
+        // Synchronize with any in-flight cancel callback. After this returns,
+        // future invocations of the lambda registered in the constructor see
+        // `live=false` and do not touch `*this`.
+        std::lock_guard<std::mutex> lk(alive_->mu);
+        alive_->live = false;
+    }
 
     // --- Producer side ---
 
@@ -198,6 +214,12 @@ private:
         cv_pop_.notify_all();
     }
 
+    // Shared alive tombstone for CancelToken callback safety. See ctor.
+    struct AliveFlag {
+        std::mutex mu;
+        bool       live = true;
+    };
+
     mutable std::mutex           mu_;
     std::condition_variable      cv_push_;
     std::condition_variable      cv_pop_;
@@ -206,6 +228,7 @@ private:
     EdgePolicy                   policy_;
     bool                         closed_ = false;
     std::shared_ptr<CancelToken> cancel_token_;
+    std::shared_ptr<AliveFlag>   alive_ = std::make_shared<AliveFlag>();
 };
 
 }  // namespace ra::core
