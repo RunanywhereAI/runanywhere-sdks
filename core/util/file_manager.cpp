@@ -86,7 +86,7 @@ fs::path home_dir() {
     return fs::path("/tmp");
 }
 
-fs::path env_or(fs::path default_path, const char* envvar) {
+[[maybe_unused]] fs::path env_or(fs::path default_path, const char* envvar) {
     if (const char* v = std::getenv(envvar); v && *v) return fs::path(v);
     return default_path;
 }

@@ -210,7 +210,10 @@ ExtractionResult list_archive(std::string_view archive_path,
             return out;
         }
         ArchiveEntry e;
-        e.path       = archive_entry_pathname(entry) ?: "";
+        {
+            const char* p = archive_entry_pathname(entry);
+            e.path = p ? p : "";
+        }
         e.size       = static_cast<std::size_t>(archive_entry_size(entry));
         e.is_dir     = archive_entry_filetype(entry) == AE_IFDIR;
         e.is_symlink = archive_entry_filetype(entry) == AE_IFLNK;

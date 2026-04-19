@@ -66,9 +66,11 @@ final class RaVoiceAgentConfig extends Struct {
   @Uint8()
   external int emitThoughts;
   @Uint8()
-  external int _reserved0;
+  // ignore: unused_field
+  external int reserved0;
   @Uint8()
-  external int _reserved1;
+  // ignore: unused_field
+  external int reserved1;
 }
 
 /// C `ra_voice_event_t`.
@@ -82,11 +84,14 @@ final class RaVoiceEvent extends Struct {
   @Uint8()
   external int isFinal;
   @Uint8()
-  external int _r0;
+  // ignore: unused_field
+  external int r0;
   @Uint8()
-  external int _r1;
+  // ignore: unused_field
+  external int r1;
   @Uint8()
-  external int _r2;
+  // ignore: unused_field
+  external int r2;
   @Int32()
   external int tokenKind;
   @Int32()

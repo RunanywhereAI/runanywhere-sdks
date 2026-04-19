@@ -21,7 +21,6 @@ class VoiceSession {
 
   // Populated lazily inside `run()`.
   Pointer<Void>?   _handle;
-  Completer<void>? _finished;
   StreamController<VoiceEvent>? _events;
 
   VoiceSession._(this._config);
@@ -34,7 +33,6 @@ class VoiceSession {
     _events = StreamController<VoiceEvent>(
       onCancel: stop,
     );
-    _finished = Completer<void>();
 
     RaCoreBindings bindings;
     try {
@@ -55,10 +53,11 @@ class VoiceSession {
   }
 
   void _startVoiceAgent(RaCoreBindings b) {
-    if (_config is! VoiceAgentSolution) {
+    final cfg = _config;
+    if (cfg is! VoiceAgentSolution) {
       throw StateError('only VoiceAgent solutions wired through ra_pipeline yet');
     }
-    final va = (_config as VoiceAgentSolution).config;
+    final va = cfg.config;
 
     final cfgPtr = calloc<RaVoiceAgentConfig>();
     final llm  = va.llm.toNativeUtf8();
