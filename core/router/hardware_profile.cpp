@@ -129,6 +129,23 @@ HardwareProfile HardwareProfile::detect() {
     } else {
         p.cpu_vendor = CpuVendor::kArm;
     }
+
+    // Populate cpu_isa. Linux exposes it via uname(2) but that's overkill;
+    // the compile-time __aarch64__ / __x86_64__ / __arm__ macros resolve
+    // to the same answer for a given build target and cost nothing.
+#if defined(__aarch64__)
+    p.cpu_isa = "aarch64";
+#elif defined(__x86_64__)
+    p.cpu_isa = "x86_64";
+#elif defined(__arm__)
+    p.cpu_isa = "arm";
+#elif defined(__i386__)
+    p.cpu_isa = "i386";
+#elif defined(__riscv)
+    p.cpu_isa = "riscv";
+#else
+    p.cpu_isa = "unknown";
+#endif
     // TODO: probe /dev/nvidia* for CUDA, vulkaninfo for Vulkan, etc.
 
 #elif defined(_WIN32)
