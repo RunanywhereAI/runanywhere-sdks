@@ -6,6 +6,7 @@ add_executable(ra_core_tests
     memory_pool_test.cpp
     cancel_token_test.cpp
     stream_edge_test.cpp
+    stream_edge_stress_test.cpp
     sentence_detector_test.cpp
     text_sanitizer_test.cpp
     plugin_registry_test.cpp
