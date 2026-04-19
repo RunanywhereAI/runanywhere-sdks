@@ -20,7 +20,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 
 namespace ra::core {
@@ -32,7 +34,7 @@ class RingBuffer {
 
 public:
     explicit RingBuffer(std::size_t capacity)
-        : capacity_(round_up_pow2(capacity)),
+        : capacity_(normalize_capacity(capacity)),
           mask_(capacity_ - 1),
           data_(new T[capacity_]()),
           head_(0),
@@ -111,6 +113,20 @@ public:
     }
 
 private:
+    // Highest power-of-two that fits in a size_t. Any request larger than
+    // this would overflow `round_up_pow2` to zero and silently produce a
+    // buffer that never holds data.
+    static constexpr std::size_t max_power_of_two() noexcept {
+        return (std::numeric_limits<std::size_t>::max() >> 1) + 1;
+    }
+
+    static std::size_t normalize_capacity(std::size_t n) {
+        if (n > max_power_of_two()) {
+            throw std::length_error("RingBuffer capacity exceeds size_t range");
+        }
+        return round_up_pow2(n);
+    }
+
     static constexpr std::size_t round_up_pow2(std::size_t n) noexcept {
         if (n <= 1) return 1;
         --n;
