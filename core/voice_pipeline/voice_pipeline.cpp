@@ -75,18 +75,23 @@ VoiceAgentPipeline::~VoiceAgentPipeline() {
         if (t.joinable()) t.join();
     }
 
-    // Destroy engine sessions.
-    if (llm_session_ && llm_plugin_ && llm_plugin_->vtable.llm_destroy) {
-        llm_plugin_->vtable.llm_destroy(llm_session_);
+    // Destroy engine sessions. Acquire-load each atomic pointer exactly
+    // once; threads are already joined so no further publish can race us.
+    if (auto* s = llm_session_.load(std::memory_order_acquire);
+        s && llm_plugin_ && llm_plugin_->vtable.llm_destroy) {
+        llm_plugin_->vtable.llm_destroy(s);
     }
-    if (stt_session_ && stt_plugin_ && stt_plugin_->vtable.stt_destroy) {
-        stt_plugin_->vtable.stt_destroy(stt_session_);
+    if (auto* s = stt_session_.load(std::memory_order_acquire);
+        s && stt_plugin_ && stt_plugin_->vtable.stt_destroy) {
+        stt_plugin_->vtable.stt_destroy(s);
     }
-    if (tts_session_ && tts_plugin_ && tts_plugin_->vtable.tts_destroy) {
-        tts_plugin_->vtable.tts_destroy(tts_session_);
+    if (auto* s = tts_session_.load(std::memory_order_acquire);
+        s && tts_plugin_ && tts_plugin_->vtable.tts_destroy) {
+        tts_plugin_->vtable.tts_destroy(s);
     }
-    if (vad_session_ && vad_plugin_ && vad_plugin_->vtable.vad_destroy) {
-        vad_plugin_->vtable.vad_destroy(vad_session_);
+    if (auto* s = vad_session_.load(std::memory_order_acquire);
+        s && vad_plugin_ && vad_plugin_->vtable.vad_destroy) {
+        vad_plugin_->vtable.vad_destroy(s);
     }
 }
 
@@ -174,8 +179,11 @@ void VoiceAgentPipeline::on_barge_in() {
     std::lock_guard<std::mutex> lk(barge_in_mu_);
     barge_in_flag_.store(true, std::memory_order_release);
 
-    if (llm_session_ && llm_plugin_ && llm_plugin_->vtable.llm_cancel) {
-        llm_plugin_->vtable.llm_cancel(llm_session_);
+    // Acquire-load the session pointer. llm_loop's release-store is the
+    // matching side of this happens-before edge.
+    if (auto* s = llm_session_.load(std::memory_order_acquire);
+        s && llm_plugin_ && llm_plugin_->vtable.llm_cancel) {
+        llm_plugin_->vtable.llm_cancel(s);
     }
     playback_rb_.drain();
     sentence_edge_.clear_locked();
@@ -199,16 +207,20 @@ void VoiceAgentPipeline::vad_loop() {
     spec.format   = RA_FORMAT_ONNX;
     ra_session_config_t session_cfg{};
 
-    auto rc = vad_plugin_->vtable.vad_create(&spec, &session_cfg, &vad_session_);
+    ra_vad_session_t* local_vad = nullptr;
+    auto rc = vad_plugin_->vtable.vad_create(&spec, &session_cfg, &local_vad);
     if (rc != RA_OK) {
         output_.push(make_error(rc, "VAD create failed"));
         return;
     }
+    // Publish the handle atomically so on_barge_in and ~VoiceAgentPipeline
+    // see a fully-constructed session.
+    vad_session_.store(local_vad, std::memory_order_release);
 
     // Wire VAD callback so BARGE_IN triggers on_barge_in().
     if (vad_plugin_->vtable.vad_set_callback) {
         vad_plugin_->vtable.vad_set_callback(
-            vad_session_,
+            local_vad,
             [](const ra_vad_event_t* ev, void* ud) {
                 auto* self = static_cast<VoiceAgentPipeline*>(ud);
                 if (ev->type == RA_VAD_EVENT_BARGE_IN &&
@@ -229,7 +241,7 @@ void VoiceAgentPipeline::vad_loop() {
         if (!frame) break;
         if (!vad_plugin_->vtable.vad_feed_audio) continue;
         vad_plugin_->vtable.vad_feed_audio(
-            vad_session_, frame->data(),
+            local_vad, frame->data(),
             static_cast<int>(frame->size()), cfg_.sample_rate_hz);
         // The same frame is also consumed by stt_loop via the shared edge.
     }
@@ -243,15 +255,17 @@ void VoiceAgentPipeline::stt_loop() {
     spec.format   = RA_FORMAT_ONNX;
     ra_session_config_t session_cfg{};
 
-    auto rc = stt_plugin_->vtable.stt_create(&spec, &session_cfg, &stt_session_);
+    ra_stt_session_t* local_stt = nullptr;
+    auto rc = stt_plugin_->vtable.stt_create(&spec, &session_cfg, &local_stt);
     if (rc != RA_OK) {
         output_.push(make_error(rc, "STT create failed"));
         return;
     }
+    stt_session_.store(local_stt, std::memory_order_release);
 
     if (stt_plugin_->vtable.stt_set_callback) {
         stt_plugin_->vtable.stt_set_callback(
-            stt_session_,
+            local_stt,
             [](const ra_transcript_chunk_t* chunk, void* ud) {
                 auto* self = static_cast<VoiceAgentPipeline*>(ud);
                 if (chunk->is_partial && !self->cfg_.emit_partials) return;
@@ -276,7 +290,7 @@ void VoiceAgentPipeline::stt_loop() {
         if (!frame) break;
         if (!stt_plugin_->vtable.stt_feed_audio) continue;
         stt_plugin_->vtable.stt_feed_audio(
-            stt_session_, frame->data(),
+            local_stt, frame->data(),
             static_cast<int>(frame->size()), cfg_.sample_rate_hz);
     }
 }
@@ -290,11 +304,13 @@ void VoiceAgentPipeline::llm_loop() {
     ra_session_config_t session_cfg{};
     session_cfg.context_size = cfg_.max_context_tokens;
 
-    auto rc = llm_plugin_->vtable.llm_create(&spec, &session_cfg, &llm_session_);
+    ra_llm_session_t* local_llm = nullptr;
+    auto rc = llm_plugin_->vtable.llm_create(&spec, &session_cfg, &local_llm);
     if (rc != RA_OK) {
         output_.push(make_error(rc, "LLM create failed"));
         return;
     }
+    llm_session_.store(local_llm, std::memory_order_release);
 
     while (!cancel_->is_cancelled()) {
         auto prompt_text = transcript_edge_.pop();
@@ -307,7 +323,7 @@ void VoiceAgentPipeline::llm_loop() {
         if (!llm_plugin_->vtable.llm_generate) continue;
         // The engine plugin calls this callback on its own decode thread.
         llm_plugin_->vtable.llm_generate(
-            llm_session_,
+            local_llm,
             &prompt,
             [](const ra_token_output_t* tok, void* ud) {
                 auto* self = static_cast<VoiceAgentPipeline*>(ud);
@@ -351,11 +367,13 @@ void VoiceAgentPipeline::tts_loop() {
     spec.format   = RA_FORMAT_ONNX;
     ra_session_config_t session_cfg{};
 
-    auto rc = tts_plugin_->vtable.tts_create(&spec, &session_cfg, &tts_session_);
+    ra_tts_session_t* local_tts = nullptr;
+    auto rc = tts_plugin_->vtable.tts_create(&spec, &session_cfg, &local_tts);
     if (rc != RA_OK) {
         output_.push(make_error(rc, "TTS create failed"));
         return;
     }
+    tts_session_.store(local_tts, std::memory_order_release);
 
     std::vector<float> pcm_buf(48000 * 10);  // 10 s scratch at 48 kHz
     while (!cancel_->is_cancelled()) {
@@ -370,7 +388,7 @@ void VoiceAgentPipeline::tts_loop() {
         int32_t sr      = 0;
         if (!tts_plugin_->vtable.tts_synthesize) continue;
         const ra_status_t st = tts_plugin_->vtable.tts_synthesize(
-            tts_session_, clean.c_str(),
+            local_tts, clean.c_str(),
             pcm_buf.data(), static_cast<int32_t>(pcm_buf.size()),
             &written, &sr);
         if (st != RA_OK || written <= 0) continue;

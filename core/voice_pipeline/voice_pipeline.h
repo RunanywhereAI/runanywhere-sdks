@@ -147,10 +147,22 @@ private:
     PluginHandleRef vad_plugin_;
 
     // Engine sessions.
-    ra_llm_session_t*   llm_session_ = nullptr;
-    ra_stt_session_t*   stt_session_ = nullptr;
-    ra_tts_session_t*   tts_session_ = nullptr;
-    ra_vad_session_t*   vad_session_ = nullptr;
+    //
+    // Each session handle is written exactly once by its creating worker
+    // thread (llm_loop, stt_loop, tts_loop, vad_loop), then read from
+    // on_barge_in() running on the VAD callback thread and from the
+    // destructor on the main thread. Those readers have no mutual
+    // happens-before with the creating worker otherwise, so without atomic
+    // publishing the pointers race — TSan flags it and a real frontend
+    // build loses barge-in reliability.
+    //
+    // atomic<T*> gives us acquire/release semantics on the pointer alone;
+    // the pointee object (FakeLlmSession, LlamaSession, …) is engine-owned
+    // and assumed to be publishing its own internal state atomically.
+    std::atomic<ra_llm_session_t*> llm_session_{nullptr};
+    std::atomic<ra_stt_session_t*> stt_session_{nullptr};
+    std::atomic<ra_tts_session_t*> tts_session_{nullptr};
+    std::atomic<ra_vad_session_t*> vad_session_{nullptr};
 
     // Shared state — accessed from multiple threads.
     std::shared_ptr<CancelToken> cancel_;

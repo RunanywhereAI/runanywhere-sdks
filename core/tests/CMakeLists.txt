@@ -11,11 +11,13 @@ add_executable(ra_core_tests
     text_sanitizer_test.cpp
     plugin_registry_test.cpp
     engine_router_test.cpp
+    voice_pipeline_integration_test.cpp
 )
 
 target_link_libraries(ra_core_tests
     PRIVATE
         RunAnywhere::core
+        RunAnywhere::core_voice_pipeline
         RunAnywhere::platform_flags
         RunAnywhere::sanitizers
         GTest::gtest
