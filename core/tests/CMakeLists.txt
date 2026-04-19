@@ -2,6 +2,7 @@
 # `RA_BUILD_TESTS` can link GTest::gtest without repeating find_package.
 
 set(_ra_core_test_sources
+    abi_test.cpp
     ring_buffer_test.cpp
     memory_pool_test.cpp
     cancel_token_test.cpp
