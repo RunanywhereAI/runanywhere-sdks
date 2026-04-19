@@ -9,7 +9,7 @@
         "sourceMap": true,
         "outDir": "dist",
         "rootDir": "src",
-        "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
