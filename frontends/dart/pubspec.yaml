@@ -1,0 +1,17 @@
+name: runanywhere_core
+description: RunAnywhere core — Dart/Flutter frontend adapter (thin FFI wrapper around the C++ core).
+version: 2.0.0-dev.1
+homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  ffi: ^2.1.0
+  protobuf: ^3.1.0
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0

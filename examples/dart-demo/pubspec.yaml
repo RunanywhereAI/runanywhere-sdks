@@ -1,0 +1,14 @@
+name: runanywhere_demo
+description: Minimal CLI demo that loads libracommons_core via FFI and exercises the new pipeline ABI.
+version: 0.1.0
+
+environment:
+  sdk: ^3.4.0
+
+dependencies:
+  ffi: ^2.1.0
+  runanywhere_core:
+    path: ../../frontends/dart
+
+dev_dependencies:
+  lints: ^5.0.0

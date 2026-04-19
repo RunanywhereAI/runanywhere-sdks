@@ -1,0 +1,322 @@
+name: v2 core
+
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'engines/**'
+      - 'solutions/**'
+      - 'frontends/**'
+      - 'idl/**'
+      - 'cmake/**'
+      - 'tools/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - '.github/workflows/v2-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'engines/**'
+      - 'solutions/**'
+      - 'frontends/**'
+      - 'idl/**'
+      - 'cmake/**'
+      - 'tools/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - '.github/workflows/v2-core.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: v2-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # C++ core + engines + solutions — macOS Debug (ASan + UBSan).
+  # ---------------------------------------------------------------------------
+  cpp-macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          brew install cmake ninja protobuf libarchive
+      - name: Configure (macOS Debug, sanitizers ON)
+        run: |
+          cmake --preset macos-debug -DRA_BUILD_ENGINES=ON -DRA_BUILD_SOLUTIONS=ON
+      - name: Build
+        run: cmake --build --preset macos-debug
+      - name: Test
+        run: ctest --preset macos-debug --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # C++ core + engines + solutions — Linux Debug (ASan + UBSan).
+  # ---------------------------------------------------------------------------
+  cpp-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev libgtest-dev \
+            libcurl4-openssl-dev libssl-dev libarchive-dev
+      - name: Configure (Linux Debug, sanitizers ON)
+        run: |
+          cmake --preset linux-debug -DRA_BUILD_ENGINES=ON -DRA_BUILD_SOLUTIONS=ON
+      - name: Build
+        run: cmake --build --preset linux-debug
+      - name: Test
+        run: ctest --preset linux-debug --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # Proto codegen — verify checked-in generated files are up-to-date.
+  # ---------------------------------------------------------------------------
+  proto-codegen-swift:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc + swift-protobuf
+        run: brew install protobuf swift-protobuf
+      - name: Regenerate Swift bindings
+        run: ./idl/codegen/generate_swift.sh
+      - name: Verify no drift (only when generated files are already committed)
+        run: |
+          # Phase 0 bootstrap: Generated/ only contains .gitkeep. After the
+          # first real landing of generated files (tracked under
+          # Generated/*.pb.swift), the drift check becomes strict.
+          TRACKED_PB=$(git ls-files 'frontends/swift/Sources/RunAnywhere/Generated/*.pb.swift')
+          if [[ -z "$TRACKED_PB" ]]; then
+            echo "No generated .pb.swift files tracked yet — drift check skipped until first codegen PR."
+            exit 0
+          fi
+          if [[ -n "$(git status --porcelain frontends/swift/Sources/RunAnywhere/Generated)" ]]; then
+            echo "Generated Swift files are stale. Run ./idl/codegen/generate_swift.sh and commit." >&2
+            git --no-pager diff frontends/swift/Sources/RunAnywhere/Generated >&2
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Swift frontend — SwiftPM build + test (macOS). Generated/ stays empty in
+  # this PR so SwiftPM falls back to adapter-only compilation.
+  # ---------------------------------------------------------------------------
+  swift-frontend:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install core build deps
+        run: brew install cmake ninja protobuf libarchive
+      - name: Build RACommonsCore xcframework
+        # The Package.swift declares a binaryTarget pointing at
+        # sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework, which is
+        # a build artifact (gitignored). Regenerate it before `swift build`.
+        run: bash scripts/build-core-xcframework.sh --platforms=macos
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '5.9'
+      - name: Build RunAnywhereCore (SwiftPM)
+        working-directory: frontends/swift
+        run: swift build -v
+      - name: Run tests
+        working-directory: frontends/swift
+        run: swift test -v
+      - name: Run swift-demo end-to-end CLI
+        working-directory: examples/swift-demo
+        run: swift run
+
+  # ---------------------------------------------------------------------------
+  # Android NDK cross-build — produces libracommons_core.so for arm64-v8a
+  # + x86_64 + armeabi-v7a. Proves the CMake options guard libcurl/
+  # libarchive/rac_compat correctly for the NDK toolchain.
+  # ---------------------------------------------------------------------------
+  android-ndk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64, armeabi-v7a]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Install host build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build
+      - name: Configure ${{ matrix.abi }}
+        run: |
+          cmake -S . -B build/android-${{ matrix.abi }} -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_TOOLS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF \
+            -DRA_BUILD_HTTP_CLIENT=OFF -DRA_BUILD_MODEL_DOWNLOADER=OFF \
+            -DRA_BUILD_EXTRACTION=OFF -DRA_BUILD_RAC_COMPAT=OFF
+      - name: Build racommons_core.so (${{ matrix.abi }})
+        run: cmake --build build/android-${{ matrix.abi }} --target racommons_core
+      - name: Verify artifact
+        run: |
+          file build/android-${{ matrix.abi }}/core/libracommons_core.so
+          ls -la build/android-${{ matrix.abi }}/core/libracommons_core.so
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}
+          path: build/android-${{ matrix.abi }}/core/libracommons_core.so
+
+  # ---------------------------------------------------------------------------
+  # iOS cross-build — proves the xcframework slices compile. Ships as
+  # part of swift-frontend's xcframework step; this job just double-checks
+  # each slice can build in isolation on a fresh checkout.
+  # ---------------------------------------------------------------------------
+  ios-xcframework:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: brew install cmake ninja protobuf libarchive
+      - name: Build multi-slice xcframework (macos + ios-device + ios-sim)
+        run: bash scripts/build-core-xcframework.sh --platforms=macos,ios-device,ios-sim --clean
+      - name: Verify slices
+        run: |
+          ls sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework/
+          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name libRACommonsCore.a | xargs -I{} sh -c 'echo "=== {} ==="; file "{}"'
+          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name module.modulemap
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RACommonsCore-xcframework
+          path: sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework
+
+  # ---------------------------------------------------------------------------
+  # Kotlin frontend — Gradle build + unit tests + end-to-end JNI demo.
+  # ---------------------------------------------------------------------------
+  kotlin-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install core build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev \
+            libcurl4-openssl-dev libssl-dev libarchive-dev openjdk-17-jdk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build frontends/kotlin
+        working-directory: frontends/kotlin
+        run: gradle --no-daemon build
+      - name: Test frontends/kotlin
+        working-directory: frontends/kotlin
+        run: gradle --no-daemon test
+      - name: Build racommons_core shared lib (with JNI bridge)
+        run: |
+          cmake -S . -B build/linux-release \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF
+          cmake --build build/linux-release --target racommons_core
+      - name: Run kotlin-demo end-to-end (JNI → C ABI)
+        working-directory: examples/kotlin-demo
+        run: |
+          RA_LIB_DIR="$(pwd)/../../build/linux-release/core" \
+            gradle --no-daemon run --console=plain
+
+  # ---------------------------------------------------------------------------
+  # Dart frontend — analyze + test.
+  # ---------------------------------------------------------------------------
+  dart-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install core build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev \
+            libcurl4-openssl-dev libssl-dev libarchive-dev
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Pub get
+        working-directory: frontends/dart
+        run: dart pub get
+      - name: Analyze
+        working-directory: frontends/dart
+        run: dart analyze
+      - name: Test
+        working-directory: frontends/dart
+        run: dart test
+      - name: Build racommons_core shared lib
+        run: |
+          cmake -S . -B build/linux-release \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF
+          cmake --build build/linux-release --target racommons_core
+      - name: Run dart-demo end-to-end (FFI → C ABI)
+        working-directory: examples/dart-demo
+        run: |
+          dart pub get
+          LIB_PATH="$(pwd)/../../build/linux-release/core/libracommons_core.so" \
+            dart run bin/demo.dart
+
+  # ---------------------------------------------------------------------------
+  # TS / RN frontend — tsc + vitest.
+  # ---------------------------------------------------------------------------
+  ts-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install TS deps
+        working-directory: frontends/ts
+        run: npm install --no-save
+      - name: Typecheck TS
+        working-directory: frontends/ts
+        run: npm run typecheck
+      - name: Test TS
+        working-directory: frontends/ts
+        run: npm test
+      - name: Run ts-demo end-to-end CLI
+        working-directory: examples/ts-demo
+        run: |
+          npm install
+          npm run build
+          node dist/examples/ts-demo/src/main.js
+      - name: Install Web deps
+        working-directory: frontends/web
+        run: npm install --no-save
+      - name: Typecheck Web
+        working-directory: frontends/web
+        run: npm run typecheck
+      - name: Test Web
+        working-directory: frontends/web
+        run: npm test
+      - name: Run web-demo end-to-end CLI
+        working-directory: examples/web-demo
+        run: |
+          npm install
+          npm test

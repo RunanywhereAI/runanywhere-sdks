@@ -1,0 +1,9 @@
+# TSan suppressions for RunAnywhere commons.
+#
+# Format: `race:<regex matching symbol / source path>`
+# Each entry must carry a rationale comment.
+#
+# (empty — all currently-known TSan races are in our own code; the most
+# recent example was the VoiceAgentPipeline session-pointer race, fixed by
+# making the session handles std::atomic. Add entries here only when a
+# third-party dep flags something we can't patch.)

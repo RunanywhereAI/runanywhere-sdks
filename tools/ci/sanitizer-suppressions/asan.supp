@@ -1,0 +1,8 @@
+# ASan suppressions for RunAnywhere commons.
+#
+# Keep this file minimal. Our own code must be ASan-clean; anything we add
+# here is a third-party dep we can't patch. Document each entry per the
+# README.
+#
+# (empty — all currently-known ASan hits are in our own code and have been
+# fixed in-tree.)

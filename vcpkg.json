@@ -1,0 +1,49 @@
+{
+    "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+    "name": "runanywhere",
+    "version": "2.0.0",
+    "description": "RunAnywhere v2 — C++20 core + codegen'd frontends for on-device AI",
+    "license": "Apache-2.0",
+    "builtin-baseline": "c82f74667287d3dc386bce81e44964370c91a289",
+    "dependencies": [
+        {
+            "name": "protobuf",
+            "version>=": "3.21.0"
+        },
+        {
+            "name": "boost-asio",
+            "platform": "!emscripten & !ios"
+        },
+        {
+            "name": "gtest",
+            "features": ["gmock"]
+        },
+        {
+            "name": "spdlog",
+            "version>=": "1.12.0"
+        },
+        {
+            "name": "yaml-cpp"
+        },
+        {
+            "name": "nlohmann-json"
+        }
+    ],
+    "features": {
+        "usearch": {
+            "description": "In-process HNSW vector store for RAG",
+            "dependencies": ["usearch"]
+        },
+        "pdf": {
+            "description": "PDF ingestion for RAG (portable, via pdfium)",
+            "dependencies": []
+        }
+    },
+    "vcpkg-configuration": {
+        "default-registry": {
+            "kind": "git",
+            "repository": "https://github.com/microsoft/vcpkg",
+            "baseline": "c82f74667287d3dc386bce81e44964370c91a289"
+        }
+    }
+}

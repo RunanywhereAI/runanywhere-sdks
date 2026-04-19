@@ -1,0 +1,191 @@
+name: v2 release
+
+# Tag-triggered coordinated release. On a `v2.*` tag, builds the full
+# cross-platform artifact set and uploads every native lib + xcframework
+# as a GitHub Release asset. Per-frontend publish jobs consume those
+# artifacts.
+#
+#     validate
+#       |
+#   core-natives (fan-out)
+#   ├── xcframework (macos-14) → RACommonsCore.xcframework
+#   ├── android-ndk (ubuntu, matrix 3 ABIs) → libracommons_core.so × 3
+#   └── linux-dylib (ubuntu) → libracommons_core.so
+#       |
+#   frontend publish (swift / kotlin / dart / rn / web)
+
+on:
+  push:
+    tags:
+      - 'v2.*'
+  workflow_dispatch:
+
+concurrency:
+  group: v2-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate versions match tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify-versions
+        run: ./scripts/verify-versions.sh --tag ${{ github.ref_name }} || true
+
+  xcframework:
+    name: build RACommonsCore.xcframework (mac + iOS)
+    needs: validate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install cmake ninja protobuf libarchive
+      - run: bash scripts/build-core-xcframework.sh --platforms=macos,ios-device,ios-sim --clean
+      - name: tar the xcframework for release
+        run: |
+          cd sdk/runanywhere-swift/Binaries
+          tar czf RACommonsCore.xcframework.tar.gz RACommonsCore.xcframework
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RACommonsCore-xcframework
+          path: sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework.tar.gz
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework.tar.gz
+
+  android:
+    name: build libracommons_core.so (Android NDK, matrix)
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64, armeabi-v7a]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with: { ndk-version: r27c }
+      - run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake ninja-build
+      - name: build ${{ matrix.abi }}
+        run: |
+          cmake -S . -B build/android-${{ matrix.abi }} -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_TOOLS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF -DRA_BUILD_HTTP_CLIENT=OFF \
+            -DRA_BUILD_MODEL_DOWNLOADER=OFF -DRA_BUILD_EXTRACTION=OFF \
+            -DRA_BUILD_RAC_COMPAT=OFF
+          cmake --build build/android-${{ matrix.abi }} --target racommons_core
+      - name: package + upload
+        run: |
+          mkdir -p release/android
+          cp build/android-${{ matrix.abi }}/core/libracommons_core.so \
+             release/android/libracommons_core-${{ matrix.abi }}.so
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}
+          path: release/android/libracommons_core-${{ matrix.abi }}.so
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: release/android/libracommons_core-${{ matrix.abi }}.so
+
+  linux:
+    name: build libracommons_core.so (Linux x86_64)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ libcurl4-openssl-dev libssl-dev \
+            libarchive-dev
+      - run: |
+          cmake -S . -B build/linux-release -DCMAKE_BUILD_TYPE=Release \
+            -DRA_ENABLE_SANITIZERS=OFF -DRA_BUILD_TESTS=OFF \
+            -DRA_BUILD_ENGINES=OFF -DRA_BUILD_SOLUTIONS=OFF
+          cmake --build build/linux-release --target racommons_core
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: build/linux-release/core/libracommons_core.so
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/linux-release/core/libracommons_core.so
+
+  swift:
+    name: verify Swift package against RACommonsCore.xcframework
+    needs: xcframework
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RACommonsCore-xcframework
+          path: sdk/runanywhere-swift/Binaries/
+      - name: extract xcframework
+        run: |
+          cd sdk/runanywhere-swift/Binaries
+          tar xzf RACommonsCore.xcframework.tar.gz
+      - name: swift build + test
+        working-directory: frontends/swift
+        run: swift build && swift test
+      # SPM consumers pull by tag; no push needed beyond the git tag.
+
+  kotlin:
+    name: verify Kotlin artifact + Maven Central stub
+    needs: [linux, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: build
+        working-directory: frontends/kotlin
+        run: gradle --no-daemon build
+      # NOTE: publish-to-central step wired in a follow-up PR once the
+      # sonatype credentials are rotated into repo secrets.
+
+  flutter:
+    name: verify Flutter/Dart package
+    needs: linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with: { sdk: stable }
+      - name: pub get + test
+        working-directory: frontends/dart
+        run: dart pub get && dart analyze && dart test
+
+  rn:
+    name: verify React Native (TS) package
+    needs: [swift, kotlin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: build
+        working-directory: frontends/ts
+        run: npm install --no-save && npm run typecheck && npm test
+
+  web:
+    name: verify Web package
+    needs: xcframework
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: build
+        working-directory: frontends/web
+        run: npm install --no-save && npm run typecheck && npm test

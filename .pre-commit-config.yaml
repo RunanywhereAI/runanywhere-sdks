@@ -72,6 +72,50 @@ repos:
         files: ^examples/ios/RunAnywhereAI/.*\.swift$
         pass_filenames: false
 
+  # --- v2 core + frontend hooks ---------------------------------------------
+  - repo: local
+    hooks:
+      - id: v2-verify-versions
+        name: v2 verify-versions
+        entry: ./scripts/verify-versions.sh
+        language: system
+        pass_filenames: false
+        files: '^(VERSIONS|frontends/.*/(package\.json|pubspec\.yaml|build\.gradle\.kts|Package\.swift)|vcpkg\.json)$'
+
+      - id: v2-cpp-clang-format
+        name: v2 cpp clang-format
+        entry: bash -c 'if command -v clang-format >/dev/null 2>&1; then clang-format -i "$@"; fi' --
+        language: system
+        files: '^(core|engines|solutions|tools)/.*\.(cpp|hpp|cc|h|c)$'
+
+      - id: v2-swift
+        name: v2 frontends/swift swiftlint
+        entry: bash -c 'if command -v swiftlint >/dev/null 2>&1; then (cd frontends/swift && swiftlint --quiet) ; fi'
+        language: system
+        pass_filenames: false
+        files: '^frontends/swift/.*\.swift$'
+
+      - id: v2-dart
+        name: v2 frontends/dart analyze
+        entry: bash -c 'if command -v flutter >/dev/null 2>&1; then (cd frontends/dart && flutter analyze) ; elif command -v dart >/dev/null 2>&1; then (cd frontends/dart && dart analyze) ; fi'
+        language: system
+        pass_filenames: false
+        files: '^frontends/dart/.*\.dart$'
+
+      - id: v2-ts
+        name: v2 frontends/ts typecheck
+        entry: bash -c '(cd frontends/ts && npm run typecheck --silent)'
+        language: system
+        pass_filenames: false
+        files: '^frontends/ts/.*\.(ts|tsx|json)$'
+
+      - id: v2-web
+        name: v2 frontends/web typecheck
+        entry: bash -c '(cd frontends/web && npm run typecheck --silent)'
+        language: system
+        pass_filenames: false
+        files: '^frontends/web/.*\.(ts|tsx|json)$'
+
 # Configuration
 default_language_version:
   python: python3

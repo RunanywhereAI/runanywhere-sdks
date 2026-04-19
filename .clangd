@@ -1,0 +1,50 @@
+# clangd config — used by IDEs until CMake produces compile_commands.json.
+# After running `cmake --preset macos-debug`, clangd picks up the full flags
+# from build/macos-debug/compile_commands.json.
+
+CompileFlags:
+  Add:
+    - "-std=c++20"
+    - "-xc++"
+    - "-Wall"
+    - "-Wextra"
+    - "-Wpedantic"
+    - "-I${workspaceFolder}/core"
+    - "-I${workspaceFolder}/core/abi"
+  CompilationDatabase: build/macos-debug
+
+Diagnostics:
+  UnusedIncludes: Strict
+  ClangTidy:
+    Add:
+      - modernize-*
+      - performance-*
+      - bugprone-*
+      - cppcoreguidelines-*
+    Remove:
+      - modernize-use-trailing-return-type
+      - modernize-avoid-c-arrays
+      - cppcoreguidelines-avoid-c-arrays
+      - cppcoreguidelines-pro-type-union-access
+      - cppcoreguidelines-pro-bounds-array-to-pointer-decay
+      - cppcoreguidelines-pro-bounds-pointer-arithmetic
+
+Index:
+  Background: Build
+
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+
+---
+# C/ABI headers are plain C — exclude C++ flags.
+If:
+  PathMatch: [ "core/abi/.*\\.h", "core/abi/.*\\.c" ]
+CompileFlags:
+  Add:
+    - "-xc"
+    - "-std=c11"
+  Remove:
+    - "-std=c++20"
+    - "-xc++"

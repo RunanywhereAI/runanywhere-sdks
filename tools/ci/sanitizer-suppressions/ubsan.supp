@@ -1,0 +1,8 @@
+# UBSan suppressions for RunAnywhere commons.
+#
+# Format: `<check-name>:<regex matching source path>`
+# Each entry must carry a rationale comment.
+#
+# (empty — the commons code base compiles clean under -fsanitize=undefined
+# with no suppressions needed. Add entries here only when a third-party
+# dep flags alignment / signed-overflow / etc that we cannot fix.)

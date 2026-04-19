@@ -1,0 +1,15 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - lib/generated/**
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    avoid_print: true
+    prefer_single_quotes: true
+    require_trailing_commas: true
