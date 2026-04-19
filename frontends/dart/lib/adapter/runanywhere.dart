@@ -30,24 +30,24 @@ sealed class SolutionConfig {
   const SolutionConfig._();
 
   factory SolutionConfig.voiceAgent(VoiceAgentConfig config) =
-      _VoiceAgentSolution;
-  factory SolutionConfig.rag(RAGConfig config) = _RAGSolution;
-  factory SolutionConfig.wakeWord(WakeWordConfig config) = _WakeWordSolution;
+      VoiceAgentSolution;
+  factory SolutionConfig.rag(RAGConfig config) = RAGSolution;
+  factory SolutionConfig.wakeWord(WakeWordConfig config) = WakeWordSolution;
 }
 
-class _VoiceAgentSolution extends SolutionConfig {
+class VoiceAgentSolution extends SolutionConfig {
   final VoiceAgentConfig config;
-  const _VoiceAgentSolution(this.config) : super._();
+  const VoiceAgentSolution(this.config) : super._();
 }
 
-class _RAGSolution extends SolutionConfig {
+class RAGSolution extends SolutionConfig {
   final RAGConfig config;
-  const _RAGSolution(this.config) : super._();
+  const RAGSolution(this.config) : super._();
 }
 
-class _WakeWordSolution extends SolutionConfig {
+class WakeWordSolution extends SolutionConfig {
   final WakeWordConfig config;
-  const _WakeWordSolution(this.config) : super._();
+  const WakeWordSolution(this.config) : super._();
 }
 
 class VoiceAgentConfig {

@@ -222,6 +222,62 @@ target_link_libraries(ra_core INTERFACE
 )
 add_library(RunAnywhere::core ALIAS ra_core)
 
+# --- Single shared-library artifact ------------------------------------------
+# Wraps the full core as one .dylib / .so / .dll for runtime linking from
+# Dart FFI, JNI (Kotlin), Node.js N-API, etc. Re-exports every C ABI symbol
+# from the static archives via whole-archive linkage so dlsym / FFI
+# DynamicLibrary.open can find them.
+#
+# Named `libracommons_core.dylib` on macOS to match the historical commons
+# name — downstream FFI bindings default-search for that filename.
+add_library(racommons_core SHARED
+    # Empty source — this target is purely a shared-lib facade that
+    # re-exports symbols from the static archives below. CMake needs at
+    # least one source for SHARED; we supply a one-line sentinel file.
+    abi/ra_shared_facade.c
+)
+set_target_properties(racommons_core PROPERTIES
+    OUTPUT_NAME "racommons_core"
+    POSITION_INDEPENDENT_CODE ON)
+
+if(APPLE)
+    # -undefined dynamic_lookup defers resolution of the ra_llm_* /
+    # ra_stt_* / ra_tts_* / ra_vad_* / ra_embed_* / ra_ww_* primitive
+    # symbols to runtime. Those come from engine plugins (llamacpp,
+    # sherpa, etc) which are loaded via dlopen or statically linked into
+    # the host app — the core itself does not declare them.
+    target_link_options(racommons_core PRIVATE
+        -Wl,-undefined,dynamic_lookup)
+    target_link_libraries(racommons_core PRIVATE
+        -Wl,-force_load,$<TARGET_FILE:ra_core_abi>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_pipeline_abi>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_voice_pipeline>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_graph>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_registry>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_router>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_model_registry>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_net>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_util>
+        ra_core_abi ra_core_pipeline_abi
+        ra_core_voice_pipeline ra_core_graph ra_core_registry
+        ra_core_router ra_core_model_registry ra_core_net ra_core_util
+    )
+elseif(UNIX)
+    target_link_libraries(racommons_core PRIVATE
+        -Wl,--whole-archive ra_core_abi ra_core_pipeline_abi
+        ra_core_voice_pipeline ra_core_graph ra_core_registry
+        ra_core_router ra_core_model_registry ra_core_net ra_core_util
+        -Wl,--no-whole-archive
+    )
+else()
+    target_link_libraries(racommons_core PRIVATE
+        ra_core_abi ra_core_pipeline_abi
+        ra_core_voice_pipeline ra_core_graph ra_core_registry
+        ra_core_router ra_core_model_registry ra_core_net ra_core_util
+    )
+endif()
+add_library(RunAnywhere::core_shared ALIAS racommons_core)
+
 # --- Install -----------------------------------------------------------------
 # Ship the full public header tree, not just abi/. Downstream consumers that
 # do `find_package(RunAnywhere)` and link `RunAnywhere::core` need the
