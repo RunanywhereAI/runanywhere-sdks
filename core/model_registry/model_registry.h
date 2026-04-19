@@ -28,7 +28,8 @@ struct ModelEntry {
     std::string       local_path;         // Absolute path once downloaded
     std::string       remote_url;         // HTTPS mirror
     std::string       sha256;             // Expected hex digest
-    std::size_t       size_bytes = 0;
+    std::size_t       size_bytes = 0;               // Download size on disk
+    std::size_t       memory_required_bytes = 0;    // Peak RAM to run; 0 = unknown
     std::vector<ra_primitive_t> capabilities;
     bool              is_downloaded = false;
     std::chrono::system_clock::time_point last_used;

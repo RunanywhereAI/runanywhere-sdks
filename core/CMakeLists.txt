@@ -95,6 +95,8 @@ add_library(RunAnywhere::core_voice_pipeline ALIAS ra_core_voice_pipeline)
 add_library(ra_core_model_registry STATIC
     model_registry/model_registry.cpp
     model_registry/model_downloader.cpp
+    model_registry/lora_registry.cpp
+    model_registry/model_compatibility.cpp
 )
 target_include_directories(ra_core_model_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
