@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import 'package:test/test.dart';
-import 'package:runanywhere_v2/runanywhere_v2.dart';
+import 'package:runanywhere_core/runanywhere_core.dart';
 
 void main() {
   group('VoiceAgentConfig', () {

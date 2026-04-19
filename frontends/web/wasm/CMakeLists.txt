@@ -1,4 +1,4 @@
-# WASM build for RunAnywhere v2 — invoked by `cmake --preset wasm-release`
+# WASM build for RunAnywhere core — invoked by `cmake --preset wasm-release`
 # from the repo root. All engines compile in statically because Emscripten
 # doesn't support dlopen.
 
@@ -7,15 +7,15 @@ if(NOT EMSCRIPTEN)
     return()
 endif()
 
-add_executable(runanywhere_v2_wasm
+add_executable(runanywhere_wasm
     runanywhere_wasm_main.cpp
 )
 
-target_link_libraries(runanywhere_v2_wasm PRIVATE
+# wakeword_engine was removed; sherpa serves WAKE_WORD now.
+target_link_libraries(runanywhere_wasm PRIVATE
     RunAnywhere::core
     llamacpp_engine
     sherpa_engine
-    wakeword_engine
     ra_solution_voice_agent
     ra_solution_rag
 )
@@ -25,7 +25,7 @@ target_link_libraries(runanywhere_v2_wasm PRIVATE
 # `ra_pipeline_run` can `await` its callbacks from JavaScript, and produce
 # ES modules. `target_link_options` is the modern CMake spelling and avoids
 # the shell-quoting traps of LINK_FLAGS.
-target_link_options(runanywhere_v2_wasm PRIVATE
+target_link_options(runanywhere_wasm PRIVATE
     "-sMODULARIZE=1"
     "-sEXPORT_ES6=1"
     "-sEXPORT_NAME=createRunAnywhereModule"

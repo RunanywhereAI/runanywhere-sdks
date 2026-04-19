@@ -2,9 +2,9 @@
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
 import XCTest
-@testable import RunAnywhereV2
+@testable import RunAnywhereCore
 
-final class RunAnywhereV2Tests: XCTestCase {
+final class RunAnywhereCoreTests: XCTestCase {
 
     func testVoiceAgentConfigDefaults() {
         let cfg = VoiceAgentConfig()

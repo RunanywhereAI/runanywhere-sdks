@@ -1,18 +1,18 @@
 // swift-tools-version: 5.9
-// RunAnywhere v2 — Swift frontend adapter.
+// RunAnywhereCore — Swift frontend adapter for the new C++ core.
 //
 // This package is independent of the legacy `sdk/runanywhere-swift` tree.
-// Consumers wire BOTH during the v1→v2 migration window:
+// During the migration window consumers wire both:
 //
-//   .package(name: "RunAnywhere",   path: "../runanywhere-sdks/sdk/runanywhere-swift"),
-//   .package(name: "RunAnywhereV2", path: "../runanywhere-sdks/frontends/swift"),
+//   .package(name: "RunAnywhere",      path: "../runanywhere-sdks/sdk/runanywhere-swift"),
+//   .package(name: "RunAnywhereCore",  path: "../runanywhere-sdks/frontends/swift"),
 //
-// v1 is removed from clients after the v2 Phase 1 gate passes.
+// The legacy package is removed once per-SDK migration lands.
 
 import PackageDescription
 
 let package = Package(
-    name: "RunAnywhereV2",
+    name: "RunAnywhereCore",
     platforms: [
         .iOS(.v16),
         .macOS(.v13),
@@ -21,8 +21,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "RunAnywhereV2",
-            targets: ["RunAnywhereV2"]
+            name: "RunAnywhereCore",
+            targets: ["RunAnywhereCore"]
         ),
     ],
     dependencies: [
@@ -30,7 +30,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "RunAnywhereV2",
+            name: "RunAnywhereCore",
             dependencies: [
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
             ],
@@ -43,8 +43,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "RunAnywhereV2Tests",
-            dependencies: ["RunAnywhereV2"],
+            name: "RunAnywhereCoreTests",
+            dependencies: ["RunAnywhereCore"],
             path: "Tests/RunAnywhereTests"
         ),
     ]
