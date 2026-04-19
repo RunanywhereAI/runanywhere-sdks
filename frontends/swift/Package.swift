@@ -1,13 +1,10 @@
 // swift-tools-version: 5.9
-// RunAnywhereCore — Swift frontend adapter for the new C++ core.
+// RunAnywhereCore — Swift frontend for the new C++ core.
 //
-// This package is independent of the legacy `sdk/runanywhere-swift` tree.
-// During the migration window consumers wire both:
-//
-//   .package(name: "RunAnywhere",      path: "../runanywhere-sdks/sdk/runanywhere-swift"),
-//   .package(name: "RunAnywhereCore",  path: "../runanywhere-sdks/frontends/swift"),
-//
-// The legacy package is removed once per-SDK migration lands.
+// Links the RACommonsCore xcframework (pre-built by
+// `scripts/build-core-xcframework.sh`). Uses a struct-based C ABI so no
+// protobuf runtime is needed at link time — proto3 in idl/*.proto remains
+// the canonical IDL but is used for compile-time schema validation only.
 
 import PackageDescription
 
@@ -25,21 +22,27 @@ let package = Package(
             targets: ["RunAnywhereCore"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.26.0"),
-    ],
     targets: [
+        // Pre-built C core (libRACommonsCore.a + headers + modulemap).
+        // Produced by `scripts/build-core-xcframework.sh`.
+        .binaryTarget(
+            name: "RACommonsCoreBinary",
+            path: "../../sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework"
+        ),
         .target(
             name: "RunAnywhereCore",
             dependencies: [
-                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+                "RACommonsCoreBinary",
             ],
             path: "Sources/RunAnywhere",
             exclude: [
-                // Generated/ is populated by idl/codegen/generate_swift.sh.
-                // It is tracked in git — but during fresh clones before the
-                // first codegen run, we skip it so the build still succeeds.
-                "Generated/.gitkeep",
+                // Generated/ holds SwiftProtobuf codegen used for IDL
+                // validation tests only; the runtime adapter uses the
+                // struct-based C ABI and does not import these types.
+                "Generated",
+            ],
+            linkerSettings: [
+                .linkedLibrary("c++"),
             ]
         ),
         .testTarget(

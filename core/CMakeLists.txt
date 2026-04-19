@@ -182,6 +182,31 @@ target_link_libraries(ra_core_util
 set_target_properties(ra_core_util PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_util ALIAS ra_core_util)
 
+# --- Pipeline C ABI bridge ---------------------------------------------------
+# Turns the `ra_pipeline_*` entry points in abi/ra_pipeline.h into a real
+# bridge onto core/voice_pipeline + solutions/voice-agent. Uses plain C
+# structs, not proto3 — frontends do not need a protobuf runtime at link
+# time. The matching proto3 schemas in idl/*.proto remain the canonical IDL.
+# Defined after voice_pipeline/router/registry so link dependencies resolve.
+add_library(ra_core_pipeline_abi STATIC
+    abi/ra_pipeline.cpp
+)
+target_include_directories(ra_core_pipeline_abi PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ra_core_pipeline_abi
+    PUBLIC  ra_core_abi
+            ra_core_voice_pipeline
+            ra_core_router
+            ra_core_registry
+            RunAnywhere::platform_flags
+    PRIVATE RunAnywhere::sanitizers
+)
+set_target_properties(ra_core_pipeline_abi PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+add_library(RunAnywhere::core_pipeline_abi ALIAS ra_core_pipeline_abi)
+
 # --- Umbrella target ---------------------------------------------------------
 add_library(ra_core INTERFACE)
 target_link_libraries(ra_core INTERFACE
@@ -193,6 +218,7 @@ target_link_libraries(ra_core INTERFACE
     ra_core_model_registry
     ra_core_net
     ra_core_util
+    ra_core_pipeline_abi
 )
 add_library(RunAnywhere::core ALIAS ra_core)
 
@@ -225,6 +251,7 @@ install(TARGETS
             ra_core_model_registry
             ra_core_net
             ra_core_util
+            ra_core_pipeline_abi
         EXPORT RunAnywhereTargets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib

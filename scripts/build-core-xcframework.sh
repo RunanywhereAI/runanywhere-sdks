@@ -81,7 +81,7 @@ build_slice() {
     cmake --build "${build_dir}" --target \
         ra_core_abi ra_core_graph ra_core_registry ra_core_router \
         ra_core_voice_pipeline ra_core_model_registry \
-        ra_core_net ra_core_util \
+        ra_core_net ra_core_util ra_core_pipeline_abi \
         ra_solution_voice_agent ra_solution_rag \
         llamacpp_engine \
         --parallel
@@ -96,6 +96,7 @@ build_slice() {
              "${build_dir}/core/libra_core_model_registry.a" \
              "${build_dir}/core/libra_core_net.a" \
              "${build_dir}/core/libra_core_util.a" \
+             "${build_dir}/core/libra_core_pipeline_abi.a" \
              "${build_dir}/solutions/voice-agent/libra_solution_voice_agent.a" \
              "${build_dir}/solutions/rag/libra_solution_rag.a" \
              "${build_dir}/engines/llamacpp/libllamacpp_engine.a"; do
@@ -159,6 +160,21 @@ HEADERS_DIR="${BUILD_ROOT}/headers"
 rm -rf "${HEADERS_DIR}"
 mkdir -p "${HEADERS_DIR}"
 cp "${ROOT}/core/abi/"*.h "${HEADERS_DIR}/"
+
+# Module map so Swift `import CRACommonsCore` resolves the C headers.
+cat > "${HEADERS_DIR}/module.modulemap" <<'MAP'
+module CRACommonsCore {
+    header "ra_errors.h"
+    header "ra_lifecycle.h"
+    header "ra_pipeline.h"
+    header "ra_plugin.h"
+    header "ra_primitives.h"
+    header "ra_version.h"
+    header "rac_compat.h"
+    link "RACommonsCore"
+    export *
+}
+MAP
 
 # -----------------------------------------------------------------------------
 # Combine slices into a single XCFramework.
