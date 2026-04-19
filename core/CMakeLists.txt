@@ -115,6 +115,14 @@ target_link_libraries(ra_core_model_registry
 if(APPLE)
     # CommonCrypto for SHA-256 (no extra dep).
     target_link_libraries(ra_core_model_registry PRIVATE "-framework CoreFoundation")
+else()
+    # Non-Apple hosts route SHA-256 through OpenSSL. libcurl already
+    # links libssl transitively, but the linker needs an explicit dep on
+    # libcrypto because model_downloader.cpp calls SHA256_Init/Update/Final.
+    find_package(OpenSSL QUIET)
+    if(OpenSSL_FOUND)
+        target_link_libraries(ra_core_model_registry PRIVATE OpenSSL::Crypto)
+    endif()
 endif()
 set_target_properties(ra_core_model_registry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
