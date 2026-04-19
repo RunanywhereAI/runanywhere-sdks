@@ -384,7 +384,6 @@ sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
 sdk/runanywhere-react-native/packages/*/ios/xcframeworks/
-tools/
 sdk/runanywhere-react-native/packages/rag/ios/.testlocal
 
 
@@ -396,7 +395,6 @@ __pycache__/
 
 # Node
 node_modules/
-/tools/
 *.trace
 
 # External starter-app clones for local reference (release.yml clones them fresh)

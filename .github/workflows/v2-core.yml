@@ -85,8 +85,16 @@ jobs:
         run: brew install protobuf swift-protobuf
       - name: Regenerate Swift bindings
         run: ./idl/codegen/generate_swift.sh
-      - name: Verify no drift
+      - name: Verify no drift (only when generated files are already committed)
         run: |
+          # Phase 0 bootstrap: Generated/ only contains .gitkeep. After the
+          # first real landing of generated files (tracked under
+          # Generated/*.pb.swift), the drift check becomes strict.
+          TRACKED_PB=$(git ls-files 'frontends/swift/Sources/RunAnywhere/Generated/*.pb.swift')
+          if [[ -z "$TRACKED_PB" ]]; then
+            echo "No generated .pb.swift files tracked yet — drift check skipped until first codegen PR."
+            exit 0
+          fi
           if [[ -n "$(git status --porcelain frontends/swift/Sources/RunAnywhere/Generated)" ]]; then
             echo "Generated Swift files are stale. Run ./idl/codegen/generate_swift.sh and commit." >&2
             git --no-pager diff frontends/swift/Sources/RunAnywhere/Generated >&2
