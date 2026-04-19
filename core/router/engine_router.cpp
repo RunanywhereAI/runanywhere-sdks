@@ -71,8 +71,7 @@ RouteResult EngineRouter::route(const RouteRequest& request) const {
 
     // Pinned engine — exact-name lookup with format + memory verification.
     if (!request.pinned_engine.empty()) {
-        const PluginHandle* pinned =
-            registry_.find_by_name(request.pinned_engine);
+        PluginHandleRef pinned = registry_.find_by_name(request.pinned_engine);
         if (!pinned) {
             best.rejection_reason = std::string("pinned engine not found: ") +
                                     std::string(request.pinned_engine);
@@ -88,17 +87,21 @@ RouteResult EngineRouter::route(const RouteRequest& request) const {
                 "pinned engine does not support requested model format";
             return best;
         }
-        best.plugin = pinned;
         best.score  = score_plugin(*pinned, request);
+        best.plugin = std::move(pinned);
         return best;
     }
 
-    // General search.
-    registry_.enumerate([&](const PluginHandle& p) {
-        const int s = score_plugin(p, request);
+    // General search. The enumerate callback receives ref-counted handles;
+    // we keep the best one alive via the same shared_ptr stored in
+    // RouteResult, so the caller holds a valid reference even if the
+    // registry is mutated after the callback returns.
+    registry_.enumerate([&](const PluginHandleRef& p) {
+        if (!p) return;
+        const int s = score_plugin(*p, request);
         if (s > best.score) {
             best.score  = s;
-            best.plugin = &p;
+            best.plugin = p;
         }
     });
 

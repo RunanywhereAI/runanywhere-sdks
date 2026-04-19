@@ -62,17 +62,17 @@ bool PluginRegistry::populate_from_entry(ra_plugin_entry_fn entry,
 
 void PluginRegistry::register_static(std::string_view   name,
                                       ra_plugin_entry_fn entry) {
-    PluginHandle h{};
+    auto h = std::make_shared<PluginHandle>();
     if (!populate_from_entry(entry, name, nullptr,
                              /*is_static=*/true,
-                             /*path=*/"", &h)) {
+                             /*path=*/"", h.get())) {
         return;
     }
 
     std::lock_guard<std::mutex> lk(mu_);
     // Reject duplicates silently — static registration is idempotent.
     for (const auto& existing : plugins_) {
-        if (existing.name == h.name) return;
+        if (existing->name == h->name) return;
     }
     plugins_.push_back(std::move(h));
 }
@@ -85,8 +85,9 @@ ra_status_t PluginRegistry::load_plugin(std::string_view dylib_path) {
     std::string sz(dylib_path);
     void* handle = ::dlopen(sz.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (!handle) {
+        const char* err = ::dlerror();
         std::fprintf(stderr, "[runanywhere] dlopen(%s) failed: %s\n",
-                     sz.c_str(), ::dlerror());
+                     sz.c_str(), err ? err : "unknown");
         return RA_ERR_IO;
     }
 
@@ -99,16 +100,16 @@ ra_status_t PluginRegistry::load_plugin(std::string_view dylib_path) {
         return RA_ERR_IO;
     }
 
-    PluginHandle h{};
+    auto h = std::make_shared<PluginHandle>();
     if (!populate_from_entry(entry, /*name_hint=*/sz, handle,
-                             /*is_static=*/false, sz, &h)) {
+                             /*is_static=*/false, sz, h.get())) {
         ::dlclose(handle);
         return RA_ERR_ABI_MISMATCH;
     }
 
     std::lock_guard<std::mutex> lk(mu_);
     for (const auto& existing : plugins_) {
-        if (existing.name == h.name) {
+        if (existing->name == h->name) {
             ::dlclose(handle);
             return RA_OK;  // already loaded, treat as success
         }
@@ -119,30 +120,46 @@ ra_status_t PluginRegistry::load_plugin(std::string_view dylib_path) {
 }
 
 ra_status_t PluginRegistry::unload_plugin(std::string_view name) {
-    std::lock_guard<std::mutex> lk(mu_);
-    auto it = std::find_if(plugins_.begin(), plugins_.end(),
-        [&](const PluginHandle& p) { return p.name == name; });
-    if (it == plugins_.end()) return RA_ERR_INVALID_ARGUMENT;
-
-    if (it->vtable.plugin_shutdown) {
-        it->vtable.plugin_shutdown();
+    std::shared_ptr<PluginHandle> handle_to_drop;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        auto it = std::find_if(plugins_.begin(), plugins_.end(),
+            [&](const std::shared_ptr<PluginHandle>& p) {
+                return p && p->name == name;
+            });
+        if (it == plugins_.end()) return RA_ERR_INVALID_ARGUMENT;
+        handle_to_drop = *it;
+        plugins_.erase(it);
     }
+
+    // Call shutdown outside the lock — it may take non-trivial time and
+    // we don't want to block other threads that are querying the registry.
+    if (handle_to_drop && handle_to_drop->vtable.plugin_shutdown) {
+        handle_to_drop->vtable.plugin_shutdown();
+    }
+
 #if !defined(RA_STATIC_PLUGINS)
-    if (!it->is_static && it->dl_handle) {
-        ::dlclose(it->dl_handle);
+    // Any outstanding PluginHandleRef keeps the shared_ptr (and therefore
+    // this memory) alive, but we still close the dlopen handle so the OS
+    // can reclaim the mapped image. Callers who hold a PluginHandleRef
+    // MUST have destroyed all sessions before they called unload_plugin.
+    if (handle_to_drop && !handle_to_drop->is_static &&
+        handle_to_drop->dl_handle) {
+        ::dlclose(handle_to_drop->dl_handle);
+        handle_to_drop->dl_handle = nullptr;
     }
 #endif
-    plugins_.erase(it);
     return RA_OK;
 }
 
-const PluginHandle* PluginRegistry::find(ra_primitive_t    primitive,
-                                          ra_model_format_t format) const {
+PluginHandleRef PluginRegistry::find(ra_primitive_t    primitive,
+                                       ra_model_format_t format) const {
     std::lock_guard<std::mutex> lk(mu_);
     for (const auto& p : plugins_) {
+        if (!p) continue;
         bool serves_primitive = false;
-        for (std::size_t i = 0; i < p.vtable.metadata.primitives_count; ++i) {
-            if (p.vtable.metadata.primitives[i] == primitive) {
+        for (std::size_t i = 0; i < p->vtable.metadata.primitives_count; ++i) {
+            if (p->vtable.metadata.primitives[i] == primitive) {
                 serves_primitive = true;
                 break;
             }
@@ -150,29 +167,38 @@ const PluginHandle* PluginRegistry::find(ra_primitive_t    primitive,
         if (!serves_primitive) continue;
 
         bool serves_format = false;
-        for (std::size_t i = 0; i < p.vtable.metadata.formats_count; ++i) {
-            if (p.vtable.metadata.formats[i] == format) {
+        for (std::size_t i = 0; i < p->vtable.metadata.formats_count; ++i) {
+            if (p->vtable.metadata.formats[i] == format) {
                 serves_format = true;
                 break;
             }
         }
-        if (serves_format) return &p;
+        if (serves_format) return p;
     }
-    return nullptr;
+    return {};
 }
 
-const PluginHandle* PluginRegistry::find_by_name(std::string_view name) const {
+PluginHandleRef PluginRegistry::find_by_name(std::string_view name) const {
     std::lock_guard<std::mutex> lk(mu_);
     for (const auto& p : plugins_) {
-        if (p.name == name) return &p;
+        if (p && p->name == name) return p;
     }
-    return nullptr;
+    return {};
 }
 
 void PluginRegistry::enumerate(
-        std::function<void(const PluginHandle&)> fn) const {
-    std::lock_guard<std::mutex> lk(mu_);
-    for (const auto& p : plugins_) fn(p);
+        std::function<void(const PluginHandleRef&)> fn) const {
+    // Snapshot so the callback can invoke registry mutations without
+    // deadlocking on our own mutex.
+    std::vector<PluginHandleRef> snapshot;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        snapshot.reserve(plugins_.size());
+        for (const auto& p : plugins_) {
+            if (p) snapshot.push_back(p);
+        }
+    }
+    for (const auto& p : snapshot) fn(p);
 }
 
 std::size_t PluginRegistry::size() const {

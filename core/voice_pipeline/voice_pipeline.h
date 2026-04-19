@@ -138,11 +138,13 @@ private:
     PluginRegistry&   registry_;
     EngineRouter&     router_;
 
-    // Plugin handles — resolved at construction.
-    const PluginHandle* llm_plugin_ = nullptr;
-    const PluginHandle* stt_plugin_ = nullptr;
-    const PluginHandle* tts_plugin_ = nullptr;
-    const PluginHandle* vad_plugin_ = nullptr;
+    // Plugin handles — resolved at construction. Ref-counted so that
+    // concurrent unload_plugin() doesn't pull the vtable out from under
+    // our worker threads mid-call.
+    PluginHandleRef llm_plugin_;
+    PluginHandleRef stt_plugin_;
+    PluginHandleRef tts_plugin_;
+    PluginHandleRef vad_plugin_;
 
     // Engine sessions.
     ra_llm_session_t*   llm_session_ = nullptr;

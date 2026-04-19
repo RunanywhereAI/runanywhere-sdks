@@ -33,6 +33,8 @@ struct PluginHandle {
     bool                        is_static;
 };
 
+using PluginHandleRef = std::shared_ptr<const PluginHandle>;
+
 class PluginRegistry {
 public:
     static PluginRegistry& global();
@@ -50,21 +52,29 @@ public:
     // success, an error code otherwise.
     ra_status_t load_plugin(std::string_view dylib_path);
 
-    // Unloads a previously-loaded plugin by name. After this returns, all
-    // sessions created from that plugin are invalid.
+    // Unloads a previously-loaded plugin by name. Any outstanding
+    // PluginHandleRef keeps the handle memory alive until released, so
+    // in-flight sessions can complete gracefully — but the caller must
+    // still cancel and destroy sessions before the shared_ptr drops, since
+    // unload closes the dlopen handle that backs the vtable.
     ra_status_t unload_plugin(std::string_view name);
 
     // --- Lookup ---
-    // Returns the first plugin that advertises the given primitive AND
-    // supports the given model format. Returns nullptr if none match.
-    const PluginHandle* find(ra_primitive_t primitive,
-                             ra_model_format_t format) const;
+    // Returns a stable, ref-counted handle to the first plugin that
+    // advertises the given primitive AND supports the given model format.
+    // The returned shared_ptr survives even if the registry is mutated
+    // concurrently; the caller is free to hold it for the lifetime of any
+    // session it owns.
+    PluginHandleRef find(ra_primitive_t primitive,
+                          ra_model_format_t format) const;
 
-    // Returns the plugin with the given name, or nullptr.
-    const PluginHandle* find_by_name(std::string_view name) const;
+    // Returns the plugin with the given name, or nullptr-equivalent.
+    PluginHandleRef find_by_name(std::string_view name) const;
 
-    // Enumerate every registered plugin. Safe to call from any thread.
-    void enumerate(std::function<void(const PluginHandle&)> fn) const;
+    // Enumerate every registered plugin. The callback receives a
+    // ref-counted handle that stays valid for the duration of the call.
+    // Safe to call from any thread.
+    void enumerate(std::function<void(const PluginHandleRef&)> fn) const;
 
     std::size_t size() const;
 
@@ -78,8 +88,8 @@ private:
                              const std::string& path,
                              PluginHandle*      out);
 
-    mutable std::mutex           mu_;
-    std::vector<PluginHandle>    plugins_;
+    mutable std::mutex                                    mu_;
+    std::vector<std::shared_ptr<PluginHandle>>           plugins_;
 };
 
 // Exported for the C ABI bridge — used by RA_STATIC_PLUGIN_REGISTER.

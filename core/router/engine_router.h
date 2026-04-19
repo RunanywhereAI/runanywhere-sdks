@@ -32,7 +32,9 @@ struct RouteRequest {
 };
 
 struct RouteResult {
-    const PluginHandle* plugin = nullptr;
+    // Ref-counted handle — safe to retain even if the registry is mutated
+    // concurrently. Empty when no engine matches.
+    PluginHandleRef     plugin;
     int                 score  = 0;      // Higher = better match.
     std::string         rejection_reason;
 };

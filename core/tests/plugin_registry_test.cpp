@@ -36,8 +36,8 @@ TEST(PluginRegistry, StaticRegistrationRoundtrip) {
     reg.register_static("fake_llm", fake_entry);
     EXPECT_GE(reg.size(), before);
 
-    const PluginHandle* h = reg.find_by_name("fake_llm");
-    ASSERT_NE(h, nullptr);
+    PluginHandleRef h = reg.find_by_name("fake_llm");
+    ASSERT_TRUE(h);
     EXPECT_EQ(h->name, "fake_llm");
     EXPECT_TRUE(h->is_static);
 }
@@ -46,13 +46,13 @@ TEST(PluginRegistry, FindByCapabilityAndFormat) {
     auto& reg = PluginRegistry::global();
     reg.register_static("fake_llm", fake_entry);
 
-    const PluginHandle* h =
+    PluginHandleRef h =
         reg.find(RA_PRIMITIVE_GENERATE_TEXT, RA_FORMAT_GGUF);
-    ASSERT_NE(h, nullptr);
+    ASSERT_TRUE(h);
     EXPECT_EQ(h->name, "fake_llm");
 
-    EXPECT_EQ(reg.find(RA_PRIMITIVE_TRANSCRIBE, RA_FORMAT_GGUF), nullptr);
-    EXPECT_EQ(reg.find(RA_PRIMITIVE_GENERATE_TEXT, RA_FORMAT_ONNX), nullptr);
+    EXPECT_FALSE(reg.find(RA_PRIMITIVE_TRANSCRIBE, RA_FORMAT_GGUF));
+    EXPECT_FALSE(reg.find(RA_PRIMITIVE_GENERATE_TEXT, RA_FORMAT_ONNX));
 }
 
 TEST(PluginRegistry, DuplicateStaticRegistrationIsIdempotent) {
