@@ -138,16 +138,28 @@ typedef ra_status_t (*ra_plugin_entry_fn)(ra_engine_vtable_t* out_vtable);
 // Plugin authors: use this macro to declare the fill function. It expands to
 // an extern "C" symbol on dlopen builds, and to a file-local function with
 // a fresh name on static builds.
+//
+// The entry symbol must survive -fvisibility=hidden. Engine plugin libs are
+// built with CXX_VISIBILITY_PRESET hidden so internal symbols don't leak;
+// ra_plugin_entry is the one symbol the host dlsym()'s, so it carries an
+// explicit visibility("default") attribute. Without it the dlsym call in
+// PluginRegistry::load_plugin returns NULL and the plugin fails to load.
+#if defined(_WIN32)
+#  define RA_PLUGIN_ENTRY_EXPORT __declspec(dllexport)
+#else
+#  define RA_PLUGIN_ENTRY_EXPORT __attribute__((visibility("default")))
+#endif
+
 #ifdef RA_STATIC_PLUGINS
 #  define RA_PLUGIN_ENTRY_DECL(PluginName) \
     static ra_status_t PluginName##_fill_vtable(ra_engine_vtable_t* out_vtable)
 #else
 #  ifdef __cplusplus
 #    define RA_PLUGIN_ENTRY_DECL(PluginName) \
-    extern "C" ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
+    extern "C" RA_PLUGIN_ENTRY_EXPORT ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
 #  else
 #    define RA_PLUGIN_ENTRY_DECL(PluginName) \
-    ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
+    RA_PLUGIN_ENTRY_EXPORT ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
 #  endif
 #endif
 

@@ -10,6 +10,7 @@ set(_ra_core_test_sources
     sentence_detector_test.cpp
     text_sanitizer_test.cpp
     plugin_registry_test.cpp
+    plugin_loader_dynamic_test.cpp
     engine_router_test.cpp
     voice_pipeline_integration_test.cpp
 )
@@ -33,6 +34,25 @@ target_link_libraries(ra_core_tests
 )
 if(TARGET RunAnywhere::idl)
     target_link_libraries(ra_core_tests PRIVATE RunAnywhere::idl)
+endif()
+
+# Pass the built-plugins directory into the dynamic loader smoke test so
+# it can dlopen the engine dylibs without hunting through the build tree.
+target_compile_definitions(ra_core_tests PRIVATE
+    RA_ENGINE_PLUGIN_DIR="${CMAKE_BINARY_DIR}/engines"
+)
+
+# The engine dylibs are built as MODULE libraries with their own custom
+# output path; ensure they're built before the test runs so the discovery
+# path is populated. They don't need to be linked in.
+if(TARGET llamacpp_engine)
+    add_dependencies(ra_core_tests llamacpp_engine)
+endif()
+if(TARGET sherpa_engine)
+    add_dependencies(ra_core_tests sherpa_engine)
+endif()
+if(TARGET wakeword_engine)
+    add_dependencies(ra_core_tests wakeword_engine)
 endif()
 
 include(GoogleTest)
