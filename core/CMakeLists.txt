@@ -228,14 +228,29 @@ add_library(RunAnywhere::core ALIAS ra_core)
 # from the static archives via whole-archive linkage so dlsym / FFI
 # DynamicLibrary.open can find them.
 #
+# The JNI bridge (frontends/kotlin/src/main/cpp/jni_bridge.cpp) is bundled
+# here too so a single System.loadLibrary("racommons_core") on Android / JVM
+# reaches both the C ABI and the Java_... glue functions.
+#
 # Named `libracommons_core.dylib` on macOS to match the historical commons
 # name — downstream FFI bindings default-search for that filename.
-add_library(racommons_core SHARED
-    # Empty source — this target is purely a shared-lib facade that
-    # re-exports symbols from the static archives below. CMake needs at
-    # least one source for SHARED; we supply a one-line sentinel file.
-    abi/ra_shared_facade.c
-)
+set(RA_SHARED_SOURCES abi/ra_shared_facade.c)
+if(EXISTS ${CMAKE_SOURCE_DIR}/frontends/kotlin/src/main/cpp/jni_bridge.cpp
+   AND NOT RA_DISABLE_JNI_BRIDGE)
+    # JNI headers only needed on platforms where Kotlin host is expected
+    # (Linux/macOS CI, Android). Guard behind an opt-out so iOS + WASM
+    # builds skip the JNI extension.
+    find_package(JNI QUIET)
+    if(JNI_FOUND)
+        list(APPEND RA_SHARED_SOURCES
+            ${CMAKE_SOURCE_DIR}/frontends/kotlin/src/main/cpp/jni_bridge.cpp)
+        set(RA_HAVE_JNI ON)
+    endif()
+endif()
+add_library(racommons_core SHARED ${RA_SHARED_SOURCES})
+if(RA_HAVE_JNI)
+    target_include_directories(racommons_core PRIVATE ${JNI_INCLUDE_DIRS})
+endif()
 set_target_properties(racommons_core PROPERTIES
     OUTPUT_NAME "racommons_core"
     POSITION_INDEPENDENT_CODE ON)
