@@ -12,6 +12,17 @@
 //
 // Each wrapper is a thin forwarder — trivially inlinable, zero cost.
 // Non-trivial call-shape mappings live in rac_compat_shim.c (future).
+//
+// Platforms that don't link engine plugins into the shared lib (Android
+// NDK, iOS static slice, emscripten) can't resolve the ra_*_destroy etc
+// primitives at link time. Those platforms define RA_NO_RAC_COMPAT=1
+// and skip this file entirely — they don't need rac_* binary compat
+// because no legacy commons binaries exist on those platforms.
+
+#ifdef RA_NO_RAC_COMPAT
+// Whole file suppressed. One marker symbol so the object isn't empty.
+const int ra_compat_disabled_marker = 1;
+#else
 
 #include "ra_primitives.h"
 #include "ra_version.h"
@@ -171,3 +182,5 @@ RA_COMPAT_EXPORT const char*  rac_lifecycle_state_string(ra_lifecycle_state_t s)
 #ifdef __cplusplus
 }  /* extern "C" */
 #endif
+
+#endif  // RA_NO_RAC_COMPAT

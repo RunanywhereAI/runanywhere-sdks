@@ -31,7 +31,13 @@ void event_callback(const ra_voice_event_t* ev, void* ud) {
     if (!ev || !ud) return;
     auto* ref = static_cast<JvmRef*>(ud);
     JNIEnv* env = nullptr;
-    if (ref->vm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+    if (ref->vm->AttachCurrentThread(
+#ifdef __ANDROID__
+            &env,
+#else
+            reinterpret_cast<void**>(&env),
+#endif
+            nullptr) != JNI_OK) {
         return;
     }
     jstring jtext = env->NewStringUTF(ev->text ? ev->text : "");
@@ -50,7 +56,13 @@ void completion_callback(ra_status_t status, const char* message, void* ud) {
     if (!ud) return;
     auto* ref = static_cast<JvmRef*>(ud);
     JNIEnv* env = nullptr;
-    if (ref->vm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+    if (ref->vm->AttachCurrentThread(
+#ifdef __ANDROID__
+            &env,
+#else
+            reinterpret_cast<void**>(&env),
+#endif
+            nullptr) != JNI_OK) {
         return;
     }
     if (status == RA_OK) {

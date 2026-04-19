@@ -8,13 +8,27 @@
 #                     solutions link against this.
 
 # --- L0: C ABI ---------------------------------------------------------------
-add_library(ra_core_abi STATIC
+# `rac_compat` is the ABI-level rac_* → ra_* binary bridge for pre-
+# compiled legacy binaries. It's only wired on platforms where legacy
+# commons binaries actually exist (macOS, Linux desktop builds). On
+# Android NDK / iOS / WASM nothing links against rac_* symbols so we
+# skip the forwarders, which would otherwise need the ra_llm_*/... engine
+# primitives to be linkable at static-lib time.
+option(RA_BUILD_RAC_COMPAT
+    "Build the rac_* → ra_* ABI forwarders (needs engine symbols at link)"
+    ON)
+
+set(_ra_core_abi_sources
     abi/ra_version.c
     abi/ra_status.c
     abi/ra_errors.c
     abi/ra_lifecycle.c
     abi/rac_compat.c
 )
+add_library(ra_core_abi STATIC ${_ra_core_abi_sources})
+if(NOT RA_BUILD_RAC_COMPAT)
+    target_compile_definitions(ra_core_abi PRIVATE RA_NO_RAC_COMPAT=1)
+endif()
 target_include_directories(ra_core_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/abi>
     $<INSTALL_INTERFACE:include>
@@ -92,31 +106,56 @@ set_target_properties(ra_core_voice_pipeline PROPERTIES POSITION_INDEPENDENT_COD
 add_library(RunAnywhere::core_voice_pipeline ALIAS ra_core_voice_pipeline)
 
 # --- Model registry ----------------------------------------------------------
-add_library(ra_core_model_registry STATIC
+set(_ra_core_model_registry_sources
     model_registry/model_registry.cpp
-    model_registry/model_downloader.cpp
     model_registry/lora_registry.cpp
     model_registry/model_compatibility.cpp
 )
+option(RA_BUILD_MODEL_DOWNLOADER
+    "Build the libcurl-backed model downloader (requires libcurl)" ON)
+if(RA_BUILD_MODEL_DOWNLOADER)
+    list(APPEND _ra_core_model_registry_sources model_registry/model_downloader.cpp)
+endif()
+add_library(ra_core_model_registry STATIC ${_ra_core_model_registry_sources})
+if(RA_BUILD_MODEL_DOWNLOADER AND NOT APPLE AND NOT WIN32)
+    # OpenSSL 3.0 (ubuntu 22.04+) deprecated SHA256_* in favor of EVP_*.
+    # The legacy calls still work but produce warnings that kill -Werror.
+    # Suppress only for this file; the rest of the core keeps -Werror.
+    set_source_files_properties(model_registry/model_downloader.cpp
+        PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
+endif()
 target_include_directories(ra_core_model_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
-# libcurl for the real downloader. System package on macOS / Linux; Android
-# NDK has it; WASM-emscripten provides a curl shim over fetch().
-find_package(CURL QUIET)
-if(NOT CURL_FOUND)
-    find_package(CURL CONFIG QUIET)
+# libcurl for the real downloader. System package on macOS / Linux;
+# missing on iOS + Android NDK + Emscripten. Platforms without libcurl
+# pass -DRA_BUILD_MODEL_DOWNLOADER=OFF — apps bring their own download
+# transport (URLSession / OkHttp / fetch) and the static registry still
+# builds; only the libcurl-backed auto-downloader is skipped.
+if(RA_BUILD_MODEL_DOWNLOADER)
+    find_package(CURL QUIET)
+    if(NOT CURL_FOUND)
+        find_package(CURL CONFIG QUIET)
+    endif()
+    if(NOT CURL_FOUND)
+        message(FATAL_ERROR
+            "libcurl not found. Install libcurl-dev (Linux) or let vcpkg "
+            "provide it — or pass -DRA_BUILD_MODEL_DOWNLOADER=OFF for "
+            "platforms (iOS/Android/WASM) that supply their own transport.")
+    endif()
+    target_link_libraries(ra_core_model_registry
+        PUBLIC  ra_core_abi RunAnywhere::platform_flags
+        PRIVATE RunAnywhere::sanitizers CURL::libcurl
+    )
+else()
+    target_compile_definitions(ra_core_model_registry
+        PUBLIC RA_NO_MODEL_DOWNLOADER=1)
+    target_link_libraries(ra_core_model_registry
+        PUBLIC  ra_core_abi RunAnywhere::platform_flags
+        PRIVATE RunAnywhere::sanitizers
+    )
 endif()
-if(NOT CURL_FOUND)
-    message(FATAL_ERROR
-        "libcurl not found. Install libcurl-dev (Linux) or let vcpkg "
-        "provide it — the real model downloader needs it.")
-endif()
-target_link_libraries(ra_core_model_registry
-    PUBLIC  ra_core_abi RunAnywhere::platform_flags
-    PRIVATE RunAnywhere::sanitizers CURL::libcurl
-)
 if(APPLE)
     # CommonCrypto for SHA-256 (no extra dep).
     target_link_libraries(ra_core_model_registry PRIVATE "-framework CoreFoundation")
@@ -135,27 +174,47 @@ add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 # --- Network / auth layer ----------------------------------------------------
 # Ports capability surface from sdk/runanywhere-commons/include/rac/
 # infrastructure/network/{rac_http_client,rac_endpoints,rac_environment,
-# rac_auth_manager}.h into a single libcurl-backed implementation.
-add_library(ra_core_net STATIC
-    net/http_client.cpp
-    net/environment.cpp
-    net/telemetry.cpp
-)
+# rac_auth_manager}.h. HTTP client is libcurl-backed; environment + auth
+# are pure C++ and always compile. Platforms without libcurl (iOS,
+# Android, WASM) pass -DRA_BUILD_HTTP_CLIENT=OFF; the static auth/env
+# still builds and apps bring their own transport (URLSession, OkHttp,
+# fetch).
+option(RA_BUILD_HTTP_CLIENT
+    "Build the libcurl-backed HTTP client + telemetry (requires libcurl)" ON)
+set(_ra_core_net_sources net/environment.cpp)
+if(RA_BUILD_HTTP_CLIENT)
+    list(APPEND _ra_core_net_sources net/http_client.cpp net/telemetry.cpp)
+endif()
+add_library(ra_core_net STATIC ${_ra_core_net_sources})
 target_include_directories(ra_core_net PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(ra_core_net
-    PUBLIC  ra_core_abi RunAnywhere::platform_flags
-    PRIVATE RunAnywhere::sanitizers CURL::libcurl
-)
+if(RA_BUILD_HTTP_CLIENT)
+    target_link_libraries(ra_core_net
+        PUBLIC  ra_core_abi RunAnywhere::platform_flags
+        PRIVATE RunAnywhere::sanitizers CURL::libcurl
+    )
+else()
+    target_compile_definitions(ra_core_net PUBLIC RA_NO_HTTP_CLIENT=1)
+    target_link_libraries(ra_core_net
+        PUBLIC  ra_core_abi RunAnywhere::platform_flags
+        PRIVATE RunAnywhere::sanitizers
+    )
+endif()
 set_target_properties(ra_core_net PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_net ALIAS ra_core_net)
 
-# --- Utilities (audio WAV encode/decode, image helpers) ----------------------
-add_library(ra_core_util STATIC
+# --- Utilities (audio, file manager, VAD, tool calling, LLM metrics) --------
+# util/extraction.cpp depends on libarchive which is absent on iOS / Android
+# NDK / WASM. Platforms that lack it pass -DRA_BUILD_EXTRACTION=OFF; apps
+# bring their own unzip (Compress framework on Apple, libandroidicu on
+# Android NDK 32+, fflate/jszip on Web).
+option(RA_BUILD_EXTRACTION
+    "Build the libarchive-backed archive extractor (requires libarchive)" ON)
+
+set(_ra_core_util_sources
     util/audio_utils.cpp
-    util/extraction.cpp
     util/file_manager.cpp
     util/storage_analyzer.cpp
     util/tool_calling.cpp
@@ -163,12 +222,17 @@ add_library(ra_core_util STATIC
     util/energy_vad.cpp
     util/llm_metrics.cpp
 )
+if(RA_BUILD_EXTRACTION)
+    list(APPEND _ra_core_util_sources util/extraction.cpp)
+endif()
+add_library(ra_core_util STATIC ${_ra_core_util_sources})
 target_include_directories(ra_core_util PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 # libarchive for ZIP / TAR / TAR.GZ / TAR.BZ2 / TAR.XZ extraction.
 # macOS ships it at /usr/lib/libarchive; Linux via apt libarchive-dev.
+if(RA_BUILD_EXTRACTION)
 find_path(LIBARCHIVE_INCLUDE_DIR NAMES archive.h
     PATHS /opt/homebrew/include /usr/include /usr/local/include
     /opt/homebrew/Cellar/libarchive/*/include)
@@ -185,6 +249,13 @@ target_link_libraries(ra_core_util
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
     PRIVATE RunAnywhere::sanitizers ${LIBARCHIVE_LIBRARY}
 )
+else()
+    target_compile_definitions(ra_core_util PUBLIC RA_NO_EXTRACTION=1)
+    target_link_libraries(ra_core_util
+        PUBLIC  ra_core_abi RunAnywhere::platform_flags
+        PRIVATE RunAnywhere::sanitizers
+    )
+endif()
 set_target_properties(ra_core_util PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_util ALIAS ra_core_util)
 
@@ -284,6 +355,13 @@ if(APPLE)
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
     )
 elseif(UNIX)
+    # -Wl,--unresolved-symbols=ignore-in-shared-libs lets the ra_llm_* /
+    # ra_stt_* / ra_tts_* / ra_vad_* primitive symbols stay undefined at
+    # link time on Linux/Android — engine plugins fill them in via
+    # dlopen at runtime. This mirrors the macOS -undefined dynamic_lookup.
+    target_link_options(racommons_core PRIVATE
+        -Wl,--allow-shlib-undefined
+        -Wl,--unresolved-symbols=ignore-all)
     target_link_libraries(racommons_core PRIVATE
         -Wl,--whole-archive ra_core_abi ra_core_pipeline_abi
         ra_core_voice_pipeline ra_core_graph ra_core_registry
