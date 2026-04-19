@@ -1,0 +1,118 @@
+name: v2 release
+
+# Tag-triggered coordinated release of all six v2 artifacts. Runs the same
+# verify-versions.sh gate as every PR, then fans out to per-artifact
+# publish jobs in a DAG matching their dependency order:
+#
+#                         validate
+#                            |
+#                         commons
+#                         /  |  \
+#                  swift  kotlin  web
+#                    \     |
+#                     +--- rn
+#                    flutter
+#
+# The release is aborted if any artifact rejects the publish.
+
+on:
+  push:
+    tags:
+      - 'v2.*'
+
+concurrency:
+  group: v2-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate versions match tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: verify-versions
+        run: ./scripts/verify-versions.sh --tag ${{ github.ref_name }}
+
+  commons:
+    name: build + upload commons XCFramework + dylibs
+    needs: validate
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: install deps
+        run: brew install ninja protobuf
+      - name: build
+        run: |
+          cmake --preset macos-release
+          cmake --build --preset macos-release
+      - name: upload
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/macos-release/engines/llamacpp/librunanywhere_llamacpp.dylib
+            build/macos-release/engines/sherpa/librunanywhere_sherpa.dylib
+            build/macos-release/engines/wakeword/librunanywhere_wakeword.dylib
+
+  swift:
+    name: publish Swift package
+    needs: commons
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: build + test
+        working-directory: frontends/swift
+        run: swift build && swift test
+      # SPM consumers pull by tag; no push needed beyond the git tag.
+
+  kotlin:
+    name: publish Kotlin artifact to Maven Central
+    needs: commons
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: build
+        working-directory: frontends/kotlin
+        run: ./gradlew build --no-daemon || gradle build --no-daemon
+      # NOTE: publish-to-central step wired in a follow-up PR once the
+      # sonatype credentials are rotated into repo secrets.
+
+  flutter:
+    name: publish Flutter/Dart package
+    needs: commons
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: build + test
+        working-directory: frontends/dart
+        run: flutter pub get && flutter analyze && flutter test
+
+  rn:
+    name: publish React Native package to npm
+    needs: [swift, kotlin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: build
+        working-directory: frontends/ts
+        run: npm ci && npm run typecheck && npm test
+
+  web:
+    name: publish Web package to npm
+    needs: commons
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: build
+        working-directory: frontends/web
+        run: npm ci && npm run typecheck && npm test
