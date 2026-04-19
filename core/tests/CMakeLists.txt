@@ -24,6 +24,7 @@ set(_ra_core_test_sources
     energy_vad_test.cpp
     llm_metrics_test.cpp
     auth_manager_test.cpp
+    plugin_registry_abi_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
