@@ -401,3 +401,4 @@ node_modules/
 
 # External starter-app clones for local reference (release.yml clones them fresh)
 external_examples/
+build/

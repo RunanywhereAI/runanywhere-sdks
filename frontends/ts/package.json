@@ -1,0 +1,30 @@
+{
+  "name": "@runanywhere/v2",
+  "version": "2.0.0-dev.1",
+  "description": "RunAnywhere v2 — TypeScript / React Native frontend adapter",
+  "license": "Apache-2.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint 'src/**/*.ts'",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react-native": ">=0.73.0"
+  },
+  "dependencies": {
+    "long": "^5.2.3",
+    "protobufjs": "^7.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.3.0"
+  }
+}

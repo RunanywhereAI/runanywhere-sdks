@@ -1,0 +1,183 @@
+name: v2 core
+
+on:
+  pull_request:
+    paths:
+      - 'core/**'
+      - 'engines/**'
+      - 'solutions/**'
+      - 'frontends/**'
+      - 'idl/**'
+      - 'cmake/**'
+      - 'tools/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - '.github/workflows/v2-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'core/**'
+      - 'engines/**'
+      - 'solutions/**'
+      - 'frontends/**'
+      - 'idl/**'
+      - 'cmake/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+  workflow_dispatch:
+
+concurrency:
+  group: v2-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # C++ core + engines + solutions — macOS Debug (ASan + UBSan).
+  # ---------------------------------------------------------------------------
+  cpp-macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          brew install cmake ninja protobuf
+      - name: Configure (macOS Debug, sanitizers ON)
+        run: |
+          cmake --preset macos-debug -DRA_BUILD_ENGINES=ON -DRA_BUILD_SOLUTIONS=ON
+      - name: Build
+        run: cmake --build --preset macos-debug
+      - name: Test
+        run: ctest --preset macos-debug --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # C++ core + engines + solutions — Linux Debug (ASan + UBSan).
+  # ---------------------------------------------------------------------------
+  cpp-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev libgtest-dev
+      - name: Configure (Linux Debug, sanitizers ON)
+        run: |
+          cmake --preset linux-debug -DRA_BUILD_ENGINES=ON -DRA_BUILD_SOLUTIONS=ON
+      - name: Build
+        run: cmake --build --preset linux-debug
+      - name: Test
+        run: ctest --preset linux-debug --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # Proto codegen — verify checked-in generated files are up-to-date.
+  # ---------------------------------------------------------------------------
+  proto-codegen-swift:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install protoc + swift-protobuf
+        run: brew install protobuf swift-protobuf
+      - name: Regenerate Swift bindings
+        run: ./idl/codegen/generate_swift.sh
+      - name: Verify no drift
+        run: |
+          if [[ -n "$(git status --porcelain frontends/swift/Sources/RunAnywhere/Generated)" ]]; then
+            echo "Generated Swift files are stale. Run ./idl/codegen/generate_swift.sh and commit." >&2
+            git --no-pager diff frontends/swift/Sources/RunAnywhere/Generated >&2
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Swift frontend — SwiftPM build + test (macOS). Generated/ stays empty in
+  # this PR so SwiftPM falls back to adapter-only compilation.
+  # ---------------------------------------------------------------------------
+  swift-frontend:
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '5.9'
+      - name: Build RunAnywhereV2 (SwiftPM)
+        working-directory: frontends/swift
+        run: swift build -v
+      - name: Run tests
+        working-directory: frontends/swift
+        run: swift test -v
+
+  # ---------------------------------------------------------------------------
+  # Kotlin frontend — Gradle build + unit tests.
+  # ---------------------------------------------------------------------------
+  kotlin-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build frontends/kotlin
+        working-directory: frontends/kotlin
+        run: gradle --no-daemon build
+      - name: Test frontends/kotlin
+        working-directory: frontends/kotlin
+        run: gradle --no-daemon test
+
+  # ---------------------------------------------------------------------------
+  # Dart frontend — analyze + test.
+  # ---------------------------------------------------------------------------
+  dart-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - name: Pub get
+        working-directory: frontends/dart
+        run: dart pub get
+      - name: Analyze
+        working-directory: frontends/dart
+        run: dart analyze
+      - name: Test
+        working-directory: frontends/dart
+        run: dart test
+
+  # ---------------------------------------------------------------------------
+  # TS / RN frontend — tsc + vitest.
+  # ---------------------------------------------------------------------------
+  ts-frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install TS deps
+        working-directory: frontends/ts
+        run: npm install --no-save
+      - name: Typecheck TS
+        working-directory: frontends/ts
+        run: npm run typecheck
+      - name: Test TS
+        working-directory: frontends/ts
+        run: npm test
+      - name: Install Web deps
+        working-directory: frontends/web
+        run: npm install --no-save
+      - name: Typecheck Web
+        working-directory: frontends/web
+        run: npm run typecheck
+      - name: Test Web
+        working-directory: frontends/web
+        run: npm test

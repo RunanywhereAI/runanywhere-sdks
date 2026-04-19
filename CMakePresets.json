@@ -1,0 +1,144 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "RA_BUILD_TESTS": "ON",
+                "RA_BUILD_TOOLS": "ON"
+            }
+        },
+        {
+            "name": "macos-debug",
+            "inherits": "base",
+            "displayName": "macOS Debug (ASan + UBSan)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RA_ENABLE_SANITIZERS": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "macos-release",
+            "inherits": "base",
+            "displayName": "macOS Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "RA_ENABLE_LTO": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "macos-tsan",
+            "inherits": "base",
+            "displayName": "macOS Debug (TSan)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RA_ENABLE_SANITIZERS": "OFF",
+                "RA_ENABLE_TSAN": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "linux-debug",
+            "inherits": "base",
+            "displayName": "Linux Debug (ASan + UBSan)",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RA_ENABLE_SANITIZERS": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
+            "name": "linux-release",
+            "inherits": "base",
+            "displayName": "Linux Release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "RA_ENABLE_LTO": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
+            "name": "ios-release",
+            "inherits": "base",
+            "displayName": "iOS Release (static XCFramework)",
+            "generator": "Xcode",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "16.0",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_BUILD_TYPE": "Release",
+                "RA_BUILD_TESTS": "OFF",
+                "RA_BUILD_TOOLS": "OFF",
+                "RA_BUILD_FRONTENDS": "ON",
+                "RA_STATIC_PLUGINS": "ON"
+            }
+        },
+        {
+            "name": "ios-simulator-release",
+            "inherits": "ios-release",
+            "displayName": "iOS Simulator Release",
+            "cacheVariables": {
+                "CMAKE_OSX_SYSROOT": "iphonesimulator",
+                "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64"
+            }
+        },
+        {
+            "name": "android-release",
+            "inherits": "base",
+            "displayName": "Android Release",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "Android",
+                "CMAKE_ANDROID_ARCH_ABI": "arm64-v8a",
+                "CMAKE_ANDROID_STL_TYPE": "c++_shared",
+                "CMAKE_SYSTEM_VERSION": "24",
+                "CMAKE_BUILD_TYPE": "Release",
+                "RA_BUILD_TESTS": "OFF",
+                "RA_BUILD_TOOLS": "OFF"
+            }
+        },
+        {
+            "name": "wasm-release",
+            "inherits": "base",
+            "displayName": "WASM Release (Emscripten)",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "CMAKE_BUILD_TYPE": "Release",
+                "RA_BUILD_TESTS": "OFF",
+                "RA_BUILD_TOOLS": "OFF",
+                "RA_BUILD_FRONTENDS": "ON",
+                "RA_STATIC_PLUGINS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "macos-debug",   "configurePreset": "macos-debug" },
+        { "name": "macos-release", "configurePreset": "macos-release" },
+        { "name": "macos-tsan",    "configurePreset": "macos-tsan" },
+        { "name": "linux-debug",   "configurePreset": "linux-debug" },
+        { "name": "linux-release", "configurePreset": "linux-release" },
+        { "name": "ios-release",   "configurePreset": "ios-release" },
+        { "name": "ios-simulator-release", "configurePreset": "ios-simulator-release" },
+        { "name": "android-release", "configurePreset": "android-release" },
+        { "name": "wasm-release",  "configurePreset": "wasm-release" }
+    ],
+    "testPresets": [
+        {
+            "name": "macos-debug",
+            "configurePreset": "macos-debug",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        {
+            "name": "linux-debug",
+            "configurePreset": "linux-debug",
+            "output": { "outputOnFailure": true }
+        }
+    ]
+}

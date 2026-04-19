@@ -212,6 +212,28 @@ check_libs_exist() {
     return 0
 }
 
+# Cross-platform stat wrapper — BSD/macOS uses `-f`, GNU/Linux uses `-c`.
+# Args: <format-spec-sans-flag> <file>
+# Format spec uses BSD style ("%m" = mtime, "%N" = name, "%z" = size).
+_ra_stat() {
+    local spec="$1"
+    local file="$2"
+    if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "FreeBSD" ]; then
+        stat -f "$spec" "$file" 2>/dev/null
+    else
+        # Translate BSD format spec to GNU
+        local gnu_spec
+        case "$spec" in
+            "%m %N") gnu_spec="%Y %n" ;;
+            "%m")    gnu_spec="%Y" ;;
+            "%N")    gnu_spec="%n" ;;
+            "%z")    gnu_spec="%s" ;;
+            *)       gnu_spec="$spec" ;;
+        esac
+        stat -c "$gnu_spec" "$file" 2>/dev/null
+    fi
+}
+
 check_commons_changed() {
     local marker_file="${KOTLIN_SDK_DIR}/.commons-build-marker"
 
@@ -219,15 +241,21 @@ check_commons_changed() {
         return 0  # No marker = needs rebuild
     fi
 
-    # Check if any C++ source files are newer than the marker
-    local newer_files=$(find "${COMMONS_DIR}/src" -name "*.cpp" -o -name "*.h" 2>/dev/null | \
-        xargs stat -f "%m %N" 2>/dev/null | \
-        while read mtime file; do
-            marker_mtime=$(stat -f "%m" "$marker_file" 2>/dev/null || echo 0)
+    local marker_mtime
+    marker_mtime=$(_ra_stat "%m" "$marker_file" || echo 0)
+
+    # Check if any C++ source file is newer than the marker.
+    # Portable across macOS (BSD stat) and Linux (GNU stat).
+    local newer_files
+    newer_files=$(find "${COMMONS_DIR}/src" \( -name "*.cpp" -o -name "*.h" \) -print 2>/dev/null | \
+        while IFS= read -r file; do
+            local mtime
+            mtime=$(_ra_stat "%m" "$file" || echo 0)
             if [ "$mtime" -gt "$marker_mtime" ]; then
                 echo "$file"
+                break
             fi
-        done | head -1)
+        done)
 
     if [ -n "$newer_files" ]; then
         return 0  # Changed
