@@ -153,14 +153,29 @@ add_library(RunAnywhere::core_net ALIAS ra_core_net)
 # --- Utilities (audio WAV encode/decode, image helpers) ----------------------
 add_library(ra_core_util STATIC
     util/audio_utils.cpp
+    util/extraction.cpp
 )
 target_include_directories(ra_core_util PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
+# libarchive for ZIP / TAR / TAR.GZ / TAR.BZ2 / TAR.XZ extraction.
+# macOS ships it at /usr/lib/libarchive; Linux via apt libarchive-dev.
+find_path(LIBARCHIVE_INCLUDE_DIR NAMES archive.h
+    PATHS /opt/homebrew/include /usr/include /usr/local/include
+    /opt/homebrew/Cellar/libarchive/*/include)
+find_library(LIBARCHIVE_LIBRARY NAMES archive libarchive
+    PATHS /opt/homebrew/lib /usr/lib /usr/local/lib
+    /opt/homebrew/Cellar/libarchive/*/lib)
+if(NOT LIBARCHIVE_INCLUDE_DIR OR NOT LIBARCHIVE_LIBRARY)
+    message(FATAL_ERROR
+        "libarchive not found. Install via 'brew install libarchive' on "
+        "macOS or 'apt install libarchive-dev' on Linux.")
+endif()
+target_include_directories(ra_core_util PRIVATE ${LIBARCHIVE_INCLUDE_DIR})
 target_link_libraries(ra_core_util
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
-    PRIVATE RunAnywhere::sanitizers
+    PRIVATE RunAnywhere::sanitizers ${LIBARCHIVE_LIBRARY}
 )
 set_target_properties(ra_core_util PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_util ALIAS ra_core_util)
