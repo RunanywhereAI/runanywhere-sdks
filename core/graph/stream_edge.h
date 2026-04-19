@@ -26,6 +26,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <utility>
 
 #include "cancel_token.h"
@@ -59,7 +60,15 @@ public:
     StreamEdge(std::size_t                   capacity,
                std::shared_ptr<CancelToken>  token     = nullptr,
                EdgePolicy                    policy    = EdgePolicy::kBlock)
-        : capacity_(capacity),
+        // Zero capacity would make every push() block forever with nothing
+        // to drain it — reject at construction instead of shipping a
+        // deadlock primitive. Callers are expected to have already
+        // normalized any PipelineSpec `capacity == 0` sentinel to the
+        // per-edge default before reaching this point.
+        : capacity_(capacity == 0
+                     ? throw std::invalid_argument(
+                         "StreamEdge capacity must be > 0")
+                     : capacity),
           policy_(policy),
           cancel_token_(std::move(token)) {
         if (cancel_token_) {
