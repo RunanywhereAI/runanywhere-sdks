@@ -190,4 +190,24 @@ Java_com_runanywhere_adapter_VoiceSession_nativeBargeIn(JNIEnv*, jobject, jlong 
     return ra_pipeline_inject_barge_in(h->pipeline);
 }
 
+// --- Plugin registry bridge ------------------------------------------------
+
+// Forward declarations — ra_plugin.h provides these via the shared lib.
+extern ra_status_t ra_registry_load_plugin(const char* library_path);
+extern int32_t     ra_registry_plugin_count(void);
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_adapter_PluginBridge_loadPlugin(JNIEnv* env, jobject, jstring jpath) {
+    if (!jpath) return JNI_FALSE;
+    const char* path = env->GetStringUTFChars(jpath, nullptr);
+    const ra_status_t rc = ra_registry_load_plugin(path ? path : "");
+    env->ReleaseStringUTFChars(jpath, path);
+    return rc == RA_OK ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_adapter_PluginBridge_pluginCount(JNIEnv*, jobject) {
+    return ra_registry_plugin_count();
+}
+
 }  // extern "C"

@@ -18,6 +18,7 @@
 //     }
 
 import Foundation
+import CRACommonsCore
 
 @MainActor
 public enum RunAnywhere {
@@ -43,6 +44,26 @@ public enum RunAnywhere {
         var b = RegistrationBuilder()
         setup(&b)
         b.apply()
+    }
+
+    /// Loads an engine plugin from a shared-library path. macOS only — iOS
+    /// cannot dlopen, so iOS apps register plugins statically via
+    /// `configure`. Returns true on success.
+    ///
+    /// Example:
+    ///
+    ///     RunAnywhere.loadPlugin(at: "/usr/local/lib/librunanywhere_llamacpp.dylib")
+    @discardableResult
+    public static func loadPlugin(at libraryPath: String) -> Bool {
+        libraryPath.withCString { cstr in
+            ra_registry_load_plugin(cstr) == Int32(RA_OK)
+        }
+    }
+
+    /// Count of currently-registered engine plugins. Useful for tests that
+    /// assert a plugin was loaded before creating a session.
+    public static var registeredPluginCount: Int {
+        Int(ra_registry_plugin_count())
     }
 }
 

@@ -217,4 +217,28 @@ extern "C" void ra_registry_register_static(const char*        name,
         name ? name : "unknown", entry);
 }
 
+extern "C" ra_status_t ra_registry_load_plugin(const char* library_path) {
+#if defined(RA_STATIC_PLUGINS)
+    (void)library_path;
+    return RA_ERR_CAPABILITY_UNSUPPORTED;
+#else
+    if (!library_path) return RA_ERR_INVALID_ARGUMENT;
+    return PluginRegistry::global().load_plugin(library_path);
+#endif
+}
+
+extern "C" ra_status_t ra_registry_unload_plugin(const char* plugin_name) {
+#if defined(RA_STATIC_PLUGINS)
+    (void)plugin_name;
+    return RA_ERR_CAPABILITY_UNSUPPORTED;
+#else
+    if (!plugin_name) return RA_ERR_INVALID_ARGUMENT;
+    return PluginRegistry::global().unload_plugin(plugin_name);
+#endif
+}
+
+extern "C" int32_t ra_registry_plugin_count(void) {
+    return static_cast<int32_t>(PluginRegistry::global().size());
+}
+
 }  // namespace ra::core

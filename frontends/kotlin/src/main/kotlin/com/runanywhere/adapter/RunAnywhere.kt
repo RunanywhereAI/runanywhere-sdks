@@ -29,14 +29,28 @@ object RunAnywhere {
 
     /**
      * Dynamic plugin load — Android/JVM only. Resolves the plugin's ABI
-     * version and capabilities before returning. No-op on platforms with
-     * static plugins.
+     * version and capabilities before returning. On iOS (compiled
+     * statically), this is a no-op that returns false.
      */
     @JvmStatic
     fun loadPlugin(libPath: String): Boolean {
-        // TODO(phase-2): JNI call into core/registry/plugin_registry.cpp
-        return false
+        return if (NativeLibrary.isLoaded) {
+            PluginBridge.loadPlugin(libPath)
+        } else {
+            false
+        }
     }
+
+    /** Count of currently-registered engine plugins. */
+    @JvmStatic
+    val registeredPluginCount: Int
+        get() = if (NativeLibrary.isLoaded) PluginBridge.pluginCount() else 0
+}
+
+/** Internal bridge to the ra_registry_* JNI shims. */
+internal object PluginBridge {
+    external fun loadPlugin(path: String): Boolean
+    external fun pluginCount(): Int
 }
 
 sealed interface SolutionConfig

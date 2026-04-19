@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
+import 'package:ffi/ffi.dart';
+
+import '../src/ffi/bindings.dart';
 import 'voice_session.dart';
 
 /// Public entry point — mirror of RunAnywhere.swift / RunAnywhere.kt.
@@ -19,10 +22,27 @@ class RunAnywhere {
   static VoiceSession solution(SolutionConfig config) =>
       VoiceSession.create(config);
 
-  /// Dynamic plugin load — Android/macOS/Linux only.
+  /// Dynamic plugin load — Android/macOS/Linux only. Returns true on
+  /// success. No-op on iOS (static plugin mode) where this returns false.
   static bool loadPlugin(String libPath) {
-    // TODO(phase-3): Dart FFI → core/registry/plugin_registry.cpp
-    return false;
+    try {
+      final b = RaCoreBindings.open();
+      final cpath = libPath.toNativeUtf8();
+      final rc = b.loadPluginRaw(cpath);
+      calloc.free(cpath);
+      return rc == raOk;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Count of currently-registered engine plugins.
+  static int get registeredPluginCount {
+    try {
+      return RaCoreBindings.open().pluginCountRaw();
+    } catch (_) {
+      return 0;
+    }
   }
 }
 

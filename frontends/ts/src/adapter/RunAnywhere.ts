@@ -48,11 +48,26 @@ export const RunAnywhere = {
   },
 
   /**
-   * Dynamic plugin load — React Native / Node only. Web builds have all
-   * engines compiled into the WASM bundle; calling this is a no-op there.
+   * Dynamic plugin load — React Native / Node only. Delegates to the
+   * registered NativePipelineBindings (the TurboModule / N-API wrapper)
+   * when one is present; returns false otherwise.
    */
-  loadPlugin(_libPath: string): boolean {
-    // TODO(phase-3): JSI TurboModule call into core/registry/plugin_registry.cpp
-    return false;
+  loadPlugin(libPath: string): boolean {
+    const hostAny = RunAnywhere as unknown as {
+      _hostLoadPlugin?: (path: string) => boolean;
+    };
+    return hostAny._hostLoadPlugin
+      ? hostAny._hostLoadPlugin(libPath)
+      : false;
+  },
+
+  /**
+   * Host plug-in (React Native / Node) installs its loader here at
+   * startup. See VoiceSession.setNativeBindings for the analogous
+   * per-session surface.
+   */
+  setHostLoadPlugin(fn: ((path: string) => boolean) | null): void {
+    (RunAnywhere as unknown as { _hostLoadPlugin?: ((p: string) => boolean) | null })
+      ._hostLoadPlugin = fn ?? undefined;
   },
 };

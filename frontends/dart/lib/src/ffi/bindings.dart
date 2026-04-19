@@ -126,6 +126,8 @@ typedef NativeVoiceEventCb  = Void Function(Pointer<RaVoiceEvent>, Pointer<Void>
 typedef NativeCompletionCb  = Void Function(Int32, Pointer<Utf8>, Pointer<Void>);
 
 // C function signatures.
+typedef _LoadPluginNative       = Int32 Function(Pointer<Utf8>);
+typedef _PluginCountNative      = Int32 Function();
 typedef _CreateVoiceAgentNative = Int32 Function(
     Pointer<RaVoiceAgentConfig>, Pointer<Pointer<Void>>);
 typedef _DestroyNative          = Void  Function(Pointer<Void>);
@@ -140,6 +142,8 @@ typedef _FeedAudioNative        = Int32 Function(
 typedef _InjectBargeInNative    = Int32 Function(Pointer<Void>);
 
 // Dart function signatures.
+typedef LoadPlugin       = int Function(Pointer<Utf8>);
+typedef PluginCount      = int Function();
 typedef CreateVoiceAgent = int Function(
     Pointer<RaVoiceAgentConfig>, Pointer<Pointer<Void>>);
 typedef Destroy          = void Function(Pointer<Void>);
@@ -163,6 +167,8 @@ final class RaCoreBindings {
   final Cancel            cancel;
   final FeedAudio         feedAudio;
   final InjectBargeIn     injectBargeIn;
+  final LoadPlugin        loadPluginRaw;
+  final PluginCount       pluginCountRaw;
 
   RaCoreBindings._({
     required this.createVoiceAgent,
@@ -173,6 +179,8 @@ final class RaCoreBindings {
     required this.cancel,
     required this.feedAudio,
     required this.injectBargeIn,
+    required this.loadPluginRaw,
+    required this.pluginCountRaw,
   });
 
   factory RaCoreBindings.open([String? libraryPath]) {
@@ -193,6 +201,10 @@ final class RaCoreBindings {
           'ra_pipeline_feed_audio'),
       injectBargeIn: lib.lookupFunction<_InjectBargeInNative, InjectBargeIn>(
           'ra_pipeline_inject_barge_in'),
+      loadPluginRaw: lib.lookupFunction<_LoadPluginNative, LoadPlugin>(
+          'ra_registry_load_plugin'),
+      pluginCountRaw: lib.lookupFunction<_PluginCountNative, PluginCount>(
+          'ra_registry_plugin_count'),
     );
   }
 

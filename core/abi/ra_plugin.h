@@ -135,6 +135,25 @@ typedef struct {
 // ---------------------------------------------------------------------------
 typedef ra_status_t (*ra_plugin_entry_fn)(ra_engine_vtable_t* out_vtable);
 
+// ---------------------------------------------------------------------------
+// Public plugin registry ABI — lets frontends load an engine plugin at
+// runtime without depending on the C++ PluginRegistry class directly.
+// On iOS / WASM static builds, plugin_load is a no-op returning
+// RA_ERR_CAPABILITY_UNSUPPORTED since plugins are already compiled in.
+// ---------------------------------------------------------------------------
+
+// Loads a plugin from a shared-library path (.so / .dylib / .dll). Returns
+// RA_OK when the plugin is registered and its capability_check passes.
+ra_status_t ra_registry_load_plugin(const char* library_path);
+
+// Unloads a previously-loaded plugin by its declared name
+// (ra_engine_metadata_t.name). Returns RA_OK on success.
+ra_status_t ra_registry_unload_plugin(const char* plugin_name);
+
+// Returns the count of currently-registered plugins — useful for frontends
+// to confirm a load call succeeded without having to enumerate.
+int32_t     ra_registry_plugin_count(void);
+
 // Plugin authors: use this macro to declare the fill function. It expands to
 // an extern "C" symbol on dlopen builds, and to a file-local function with
 // a fresh name on static builds.
