@@ -13,6 +13,7 @@ add_library(ra_core_abi STATIC
     abi/ra_status.c
     abi/ra_errors.c
     abi/ra_lifecycle.c
+    abi/rac_compat.c
 )
 target_include_directories(ra_core_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/abi>
