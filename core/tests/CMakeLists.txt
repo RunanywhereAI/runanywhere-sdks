@@ -19,6 +19,7 @@ set(_ra_core_test_sources
     engine_router_test.cpp
     hardware_profile_test.cpp
     voice_pipeline_integration_test.cpp
+    tool_calling_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).

@@ -158,6 +158,7 @@ add_library(ra_core_util STATIC
     util/extraction.cpp
     util/file_manager.cpp
     util/storage_analyzer.cpp
+    util/tool_calling.cpp
 )
 target_include_directories(ra_core_util PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
