@@ -23,8 +23,11 @@ on:
       - 'frontends/**'
       - 'idl/**'
       - 'cmake/**'
+      - 'tools/**'
       - 'CMakeLists.txt'
       - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - '.github/workflows/v2-core.yml'
   workflow_dispatch:
 
 concurrency:

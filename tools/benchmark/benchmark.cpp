@@ -72,6 +72,12 @@ double percentile(std::vector<double>& xs, double p) {
 int main(int argc, char** argv) {
     std::printf("RunAnywhere v2 benchmark — ABI 0x%x\n", ra_abi_version());
     const auto opts = parse_args(argc, argv);
+    if (opts.iterations <= 0) {
+        std::fprintf(stderr,
+                     "error: --iterations must be a positive integer, got %d\n",
+                     opts.iterations);
+        return 2;
+    }
 
     auto& reg    = PluginRegistry::global();
     EngineRouter router(reg, HardwareProfile::detect());
