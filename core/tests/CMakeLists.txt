@@ -22,6 +22,7 @@ set(_ra_core_test_sources
     tool_calling_test.cpp
     structured_output_test.cpp
     energy_vad_test.cpp
+    llm_metrics_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
