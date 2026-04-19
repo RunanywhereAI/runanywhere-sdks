@@ -300,7 +300,11 @@ jobs:
         with:
           platform: ios
       - name: Resolve Swift package
-        run: swift package resolve
+        # Non-blocking: Package.swift points to binaries at the bumped version,
+        # which may not exist yet on a release PR (chicken-and-egg). The
+        # release.yml workflow will produce them. Swift build below is similarly
+        # gated.
+        run: swift package resolve || echo "::warning::swift package resolve failed — binaries at v${PROJECT_VERSION} may not exist yet (ok on release PRs)"
       - name: Build Swift package (smoke check)
         # Builds with whatever Binaries/ already contains (or fetches remote per Package.swift).
         # We don't fail the SDK job if natives aren't present yet — that's a follow-up.
