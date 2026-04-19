@@ -67,7 +67,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake ninja-build g++ protobuf-compiler libprotobuf-dev libgtest-dev
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev libgtest-dev \
+            libcurl4-openssl-dev libssl-dev
       - name: Configure (Linux Debug, sanitizers ON)
         run: |
           cmake --preset linux-debug -DRA_BUILD_ENGINES=ON -DRA_BUILD_SOLUTIONS=ON
