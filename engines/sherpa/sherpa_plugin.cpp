@@ -269,8 +269,18 @@ ra_status_t tts_synthesize(ra_tts_session_t* handle,
     if (!s || !s->tts || !text || !out_pcm || !written || max <= 0) {
         return RA_ERR_INVALID_ARGUMENT;
     }
-    const auto* audio = ::SherpaOnnxOfflineTtsGenerate(
-        s->tts, text, s->speaker_id, s->speed);
+    // Use the non-deprecated GenerateWithConfig API. The simpler (sid,
+    // speed) variant was marked @deprecated in v1.12.35+.
+    SherpaOnnxGenerationConfig gen{};
+    gen.silence_scale        = 1.f;
+    gen.speed                = s->speed;
+    gen.sid                  = s->speaker_id;
+    gen.reference_audio      = nullptr;
+    gen.reference_audio_len  = 0;
+    gen.reference_sample_rate = 0;
+    const auto* audio = ::SherpaOnnxOfflineTtsGenerateWithConfig(
+        s->tts, text, &gen,
+        /*callback=*/nullptr, /*arg=*/nullptr);
     if (!audio) return RA_ERR_INTERNAL;
 
     if (sr) *sr = s->sample_rate;
