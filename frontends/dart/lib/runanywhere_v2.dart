@@ -3,8 +3,6 @@
 //
 // RunAnywhere v2 — public Dart entry point.
 
-library runanywhere_v2;
-
 export 'adapter/runanywhere.dart';
 export 'adapter/voice_session.dart';
 export 'adapter/voice_event.dart';

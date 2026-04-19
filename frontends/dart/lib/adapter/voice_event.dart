@@ -17,8 +17,11 @@ class AssistantToken extends VoiceEvent {
   final String    text;
   final TokenKind kind;
   final bool      isFinal;
-  const AssistantToken(this.text,
-      {this.kind = TokenKind.answer, required this.isFinal});
+  const AssistantToken(
+    this.text, {
+    this.kind = TokenKind.answer,
+    required this.isFinal,
+  });
 }
 
 class AudioFrame extends VoiceEvent {
