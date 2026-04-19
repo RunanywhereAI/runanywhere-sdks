@@ -83,8 +83,9 @@ add_subdirectory(core)
 
 if(RA_BUILD_ENGINES)
     add_subdirectory(engines/llamacpp)
+    # sherpa-onnx also serves the wake_word primitive via its keyword
+    # spotter, so we no longer build a separate stub wakeword engine.
     add_subdirectory(engines/sherpa)
-    add_subdirectory(engines/wakeword)
 endif()
 
 # Discover gtest BEFORE descending into subdirs whose CMakeLists may already

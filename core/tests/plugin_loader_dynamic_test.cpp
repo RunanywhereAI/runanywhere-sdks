@@ -122,7 +122,8 @@ TEST(PluginLoaderDynamic, LoadsAllThreeEnginesSideBySide) {
     const Expected engines[] = {
         {"llamacpp", "runanywhere_llamacpp", "llamacpp"},
         {"sherpa",   "runanywhere_sherpa",   "sherpa"  },
-        {"wakeword", "runanywhere_wakeword", "wakeword"},
+        // wakeword primitive is served by the sherpa plugin — no
+        // separate wakeword plugin is built.
     };
 
     auto& reg = PluginRegistry::global();
