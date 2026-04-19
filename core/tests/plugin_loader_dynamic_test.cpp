@@ -108,4 +108,36 @@ TEST(PluginLoaderDynamic, DuplicateLoadIsIdempotent) {
     EXPECT_EQ(reg.size(), before);
 }
 
+TEST(PluginLoaderDynamic, LoadsAllThreeEnginesSideBySide) {
+    // Cross-engine sanity: loading llamacpp + sherpa + wakeword should
+    // populate three distinct registry entries with non-overlapping
+    // primitives. This is the closest we get to a realistic "production
+    // bootstrap" without real inference.
+    const auto dir = find_plugin_dir();
+    struct Expected {
+        const char* subdir;
+        const char* lib_stem;
+        const char* plugin_name;
+    };
+    const Expected engines[] = {
+        {"llamacpp", "runanywhere_llamacpp", "llamacpp"},
+        {"sherpa",   "runanywhere_sherpa",   "sherpa"  },
+        {"wakeword", "runanywhere_wakeword", "wakeword"},
+    };
+
+    auto& reg = PluginRegistry::global();
+    for (const auto& e : engines) {
+        const auto path = dir / e.subdir / plugin_basename(e.lib_stem);
+        if (!std::filesystem::exists(path)) {
+            GTEST_SKIP() << "plugin dylib not present at " << path;
+        }
+        EXPECT_EQ(reg.load_plugin(path.string()), RA_OK);
+    }
+    for (const auto& e : engines) {
+        auto h = reg.find_by_name(e.plugin_name);
+        ASSERT_TRUE(h) << "plugin " << e.plugin_name << " not found";
+        EXPECT_STREQ(h->vtable.metadata.name, e.plugin_name);
+    }
+}
+
 #endif  // !RA_STATIC_PLUGINS
