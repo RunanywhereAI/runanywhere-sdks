@@ -97,10 +97,25 @@ target_include_directories(ra_core_model_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
+# libcurl for the real downloader. System package on macOS / Linux; Android
+# NDK has it; WASM-emscripten provides a curl shim over fetch().
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    find_package(CURL CONFIG QUIET)
+endif()
+if(NOT CURL_FOUND)
+    message(FATAL_ERROR
+        "libcurl not found. Install libcurl-dev (Linux) or let vcpkg "
+        "provide it — the real model downloader needs it.")
+endif()
 target_link_libraries(ra_core_model_registry
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
-    PRIVATE RunAnywhere::sanitizers
+    PRIVATE RunAnywhere::sanitizers CURL::libcurl
 )
+if(APPLE)
+    # CommonCrypto for SHA-256 (no extra dep).
+    target_link_libraries(ra_core_model_registry PRIVATE "-framework CoreFoundation")
+endif()
 set_target_properties(ra_core_model_registry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 
