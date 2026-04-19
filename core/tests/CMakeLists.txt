@@ -15,6 +15,7 @@ set(_ra_core_test_sources
     plugin_loader_dynamic_test.cpp
     llamacpp_live_test.cpp
     sherpa_live_test.cpp
+    net_util_errors_test.cpp
     engine_router_test.cpp
     hardware_profile_test.cpp
     voice_pipeline_integration_test.cpp

@@ -11,6 +11,7 @@
 add_library(ra_core_abi STATIC
     abi/ra_version.c
     abi/ra_status.c
+    abi/ra_errors.c
 )
 target_include_directories(ra_core_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/abi>
@@ -127,6 +128,40 @@ endif()
 set_target_properties(ra_core_model_registry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 
+# --- Network / auth layer ----------------------------------------------------
+# Ports capability surface from sdk/runanywhere-commons/include/rac/
+# infrastructure/network/{rac_http_client,rac_endpoints,rac_environment,
+# rac_auth_manager}.h into a single libcurl-backed implementation.
+add_library(ra_core_net STATIC
+    net/http_client.cpp
+    net/environment.cpp
+)
+target_include_directories(ra_core_net PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ra_core_net
+    PUBLIC  ra_core_abi RunAnywhere::platform_flags
+    PRIVATE RunAnywhere::sanitizers CURL::libcurl
+)
+set_target_properties(ra_core_net PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(RunAnywhere::core_net ALIAS ra_core_net)
+
+# --- Utilities (audio WAV encode/decode, image helpers) ----------------------
+add_library(ra_core_util STATIC
+    util/audio_utils.cpp
+)
+target_include_directories(ra_core_util PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ra_core_util
+    PUBLIC  ra_core_abi RunAnywhere::platform_flags
+    PRIVATE RunAnywhere::sanitizers
+)
+set_target_properties(ra_core_util PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(RunAnywhere::core_util ALIAS ra_core_util)
+
 # --- Umbrella target ---------------------------------------------------------
 add_library(ra_core INTERFACE)
 target_link_libraries(ra_core INTERFACE
@@ -136,6 +171,8 @@ target_link_libraries(ra_core INTERFACE
     ra_core_router
     ra_core_voice_pipeline
     ra_core_model_registry
+    ra_core_net
+    ra_core_util
 )
 add_library(RunAnywhere::core ALIAS ra_core)
 
@@ -150,6 +187,8 @@ install(DIRECTORY
             router/
             voice_pipeline/
             model_registry/
+            net/
+            util/
         DESTINATION include/runanywhere
         FILES_MATCHING
             PATTERN "*.h"
@@ -164,6 +203,8 @@ install(TARGETS
             ra_core_router
             ra_core_voice_pipeline
             ra_core_model_registry
+            ra_core_net
+            ra_core_util
         EXPORT RunAnywhereTargets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
