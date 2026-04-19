@@ -10,6 +10,7 @@ set(_ra_core_test_sources
     sentence_detector_test.cpp
     text_sanitizer_test.cpp
     plugin_registry_test.cpp
+    plugin_registry_lifecycle_test.cpp
     plugin_loader_dynamic_test.cpp
     engine_router_test.cpp
     hardware_profile_test.cpp
