@@ -161,7 +161,11 @@ emcmake cmake \
 # Build
 echo ""
 echo ">>> Building WASM module..."
-emmake cmake --build "${BUILD_DIR}" --parallel
+# Cap parallelism to 2 to avoid an intermittent zlib static-lib race with
+# llvm-ranlib under emmake where two parallel link steps produce and then
+# immediately consume libz.a, and the reader can see it before the writer
+# finishes. 2 workers is plenty on 2-core CI runners and safe locally.
+emmake cmake --build "${BUILD_DIR}" --parallel 2
 
 # Verify outputs
 echo ""
