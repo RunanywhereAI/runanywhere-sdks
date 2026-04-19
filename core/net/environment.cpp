@@ -3,6 +3,8 @@
 
 #include "environment.h"
 
+#include <ctime>
+
 namespace ra::core::net {
 
 Endpoints default_endpoints_for(Environment env) {
@@ -66,6 +68,55 @@ Endpoints& AuthManager::endpoints() {
 const Endpoints& AuthManager::endpoints() const {
     std::lock_guard<std::mutex> lk(mu_);
     return endpoints_;
+}
+
+void AuthManager::set_tokens(AuthTokens tokens) {
+    std::lock_guard<std::mutex> lk(mu_);
+    tokens_ = std::move(tokens);
+}
+
+AuthTokens AuthManager::tokens() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return tokens_;
+}
+
+void AuthManager::clear_tokens() {
+    std::lock_guard<std::mutex> lk(mu_);
+    tokens_ = AuthTokens{};
+}
+
+bool AuthManager::is_authenticated() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (tokens_.access_token.empty()) return false;
+    if (tokens_.expires_at_unix == 0) return true;  // no declared expiry
+    return std::time(nullptr) < tokens_.expires_at_unix;
+}
+
+bool AuthManager::token_needs_refresh(int horizon_seconds) const {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (tokens_.access_token.empty()) return false;
+    if (tokens_.expires_at_unix == 0) return false;
+    return std::time(nullptr) + horizon_seconds >= tokens_.expires_at_unix;
+}
+
+void AuthManager::set_device_id(std::string_view id) {
+    std::lock_guard<std::mutex> lk(mu_);
+    device_id_ = id;
+}
+
+std::string AuthManager::device_id() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return device_id_;
+}
+
+void AuthManager::set_device_registered(bool registered) {
+    std::lock_guard<std::mutex> lk(mu_);
+    device_registered_ = registered;
+}
+
+bool AuthManager::is_device_registered() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return device_registered_;
 }
 
 }  // namespace ra::core::net
