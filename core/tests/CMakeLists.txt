@@ -1,10 +1,22 @@
+# Try system gtest first — vcpkg / brew / apt / any find_package mechanism.
 find_package(GTest CONFIG QUIET)
 if(NOT GTest_FOUND)
     find_package(GTest QUIET)
 endif()
+
+# Fall back to FetchContent so `cmake --build` works on a fresh CI worker
+# without any prior setup. Pinned to a recent release.
 if(NOT GTest_FOUND)
-    message(STATUS "gtest not found — skipping core/tests (set RA_BUILD_TESTS=OFF to silence)")
-    return()
+    message(STATUS "gtest not found via find_package — fetching via FetchContent")
+    include(FetchContent)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    set(BUILD_GMOCK   OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        v1.14.0
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(googletest)
 endif()
 
 add_executable(ra_core_tests
