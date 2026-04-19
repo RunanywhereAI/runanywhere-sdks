@@ -5,6 +5,7 @@
 # own CI job.
 
 add_library(ra_sanitizers INTERFACE)
+install(TARGETS ra_sanitizers EXPORT RunAnywhereTargets)
 add_library(RunAnywhere::sanitizers ALIAS ra_sanitizers)
 
 if(MSVC)

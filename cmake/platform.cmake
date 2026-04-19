@@ -75,6 +75,9 @@ endif()
 # them selectively instead of leaking into every target via add_compile_options.
 # ---------------------------------------------------------------------------
 add_library(ra_platform_flags INTERFACE)
+# Export under a stable alias; downstream find_package consumers link
+# against RunAnywhere::platform_flags transitively via RunAnywhere::core.
+install(TARGETS ra_platform_flags EXPORT RunAnywhereTargets)
 add_library(RunAnywhere::platform_flags ALIAS ra_platform_flags)
 
 target_compile_definitions(ra_platform_flags INTERFACE

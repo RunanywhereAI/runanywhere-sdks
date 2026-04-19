@@ -30,6 +30,7 @@ add_library(ra_core_graph STATIC
 )
 target_include_directories(ra_core_graph PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ra_core_graph
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
@@ -44,6 +45,7 @@ add_library(ra_core_registry STATIC
 )
 target_include_directories(ra_core_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ra_core_registry
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
@@ -59,6 +61,7 @@ add_library(ra_core_router STATIC
 )
 target_include_directories(ra_core_router PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ra_core_router
     PUBLIC  ra_core_abi ra_core_registry RunAnywhere::platform_flags
@@ -75,6 +78,7 @@ add_library(ra_core_voice_pipeline STATIC
 )
 target_include_directories(ra_core_voice_pipeline PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ra_core_voice_pipeline
     PUBLIC  ra_core_graph ra_core_router ra_core_registry ra_core_abi
@@ -91,6 +95,7 @@ add_library(ra_core_model_registry STATIC
 )
 target_include_directories(ra_core_model_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(ra_core_model_registry
     PUBLIC  ra_core_abi RunAnywhere::platform_flags
@@ -112,11 +117,24 @@ target_link_libraries(ra_core INTERFACE
 add_library(RunAnywhere::core ALIAS ra_core)
 
 # --- Install -----------------------------------------------------------------
-install(DIRECTORY abi/
+# Ship the full public header tree, not just abi/. Downstream consumers that
+# do `find_package(RunAnywhere)` and link `RunAnywhere::core` need the
+# graph/, registry/, router/, voice_pipeline/, model_registry/ headers too.
+install(DIRECTORY
+            abi/
+            graph/
+            registry/
+            router/
+            voice_pipeline/
+            model_registry/
         DESTINATION include/runanywhere
-        FILES_MATCHING PATTERN "*.h")
+        FILES_MATCHING
+            PATTERN "*.h"
+            PATTERN "*.inl"
+)
 
 install(TARGETS
+            ra_core                       # the INTERFACE umbrella
             ra_core_abi
             ra_core_graph
             ra_core_registry
@@ -127,4 +145,10 @@ install(TARGETS
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
         RUNTIME DESTINATION bin
+)
+
+install(EXPORT RunAnywhereTargets
+        FILE        RunAnywhereTargets.cmake
+        NAMESPACE   RunAnywhere::
+        DESTINATION lib/cmake/RunAnywhere
 )
