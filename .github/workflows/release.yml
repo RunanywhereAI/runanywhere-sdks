@@ -293,7 +293,12 @@ jobs:
         # only the packaging tasks directly. Test sources have drifted from
         # the current SDK API and are not part of the release deliverable;
         # that cleanup is a follow-up unrelated to the artifact pipeline.
+        #
+        # SDK_VERSION is consumed by build.gradle.kts (line ~52) to name the
+        # JVM JAR artifact. Without it, it falls back to "0.1.5-SNAPSHOT".
         working-directory: sdk/runanywhere-kotlin
+        env:
+          SDK_VERSION: ${{ needs.validate.outputs.version }}
         run: ./gradlew -Prunanywhere.useLocalNatives=true assembleRelease jvmJar --no-daemon
       - name: Collect Kotlin SDK artifacts
         run: |
