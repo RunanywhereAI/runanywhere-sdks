@@ -135,6 +135,7 @@ add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 add_library(ra_core_net STATIC
     net/http_client.cpp
     net/environment.cpp
+    net/telemetry.cpp
 )
 target_include_directories(ra_core_net PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
