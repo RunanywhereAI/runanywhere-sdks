@@ -130,15 +130,24 @@ jobs:
       - name: Run tests
         working-directory: frontends/swift
         run: swift test -v
+      - name: Run swift-demo end-to-end CLI
+        working-directory: examples/swift-demo
+        run: swift run
 
   # ---------------------------------------------------------------------------
-  # Kotlin frontend — Gradle build + unit tests.
+  # Kotlin frontend — Gradle build + unit tests + end-to-end JNI demo.
   # ---------------------------------------------------------------------------
   kotlin-frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Install core build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev \
+            libcurl4-openssl-dev libssl-dev libarchive-dev openjdk-17-jdk
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -149,15 +158,33 @@ jobs:
       - name: Test frontends/kotlin
         working-directory: frontends/kotlin
         run: gradle --no-daemon test
+      - name: Build racommons_core shared lib (with JNI bridge)
+        run: |
+          cmake -S . -B build/linux-release \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF
+          cmake --build build/linux-release --target racommons_core
+      - name: Run kotlin-demo end-to-end (JNI → C ABI)
+        working-directory: examples/kotlin-demo
+        run: |
+          RA_LIB_DIR="$(pwd)/../../build/linux-release/core" \
+            gradle --no-daemon run --console=plain
 
   # ---------------------------------------------------------------------------
   # Dart frontend — analyze + test.
   # ---------------------------------------------------------------------------
   dart-frontend:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Install core build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake ninja-build g++ protobuf-compiler libprotobuf-dev \
+            libcurl4-openssl-dev libssl-dev libarchive-dev
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
@@ -170,6 +197,19 @@ jobs:
       - name: Test
         working-directory: frontends/dart
         run: dart test
+      - name: Build racommons_core shared lib
+        run: |
+          cmake -S . -B build/linux-release \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF
+          cmake --build build/linux-release --target racommons_core
+      - name: Run dart-demo end-to-end (FFI → C ABI)
+        working-directory: examples/dart-demo
+        run: |
+          dart pub get
+          LIB_PATH="$(pwd)/../../build/linux-release/core/libracommons_core.so" \
+            dart run bin/demo.dart
 
   # ---------------------------------------------------------------------------
   # TS / RN frontend — tsc + vitest.
@@ -191,6 +231,12 @@ jobs:
       - name: Test TS
         working-directory: frontends/ts
         run: npm test
+      - name: Run ts-demo end-to-end CLI
+        working-directory: examples/ts-demo
+        run: |
+          npm install
+          npm run build
+          node dist/examples/ts-demo/src/main.js
       - name: Install Web deps
         working-directory: frontends/web
         run: npm install --no-save
@@ -200,3 +246,8 @@ jobs:
       - name: Test Web
         working-directory: frontends/web
         run: npm test
+      - name: Run web-demo end-to-end CLI
+        working-directory: examples/web-demo
+        run: |
+          npm install
+          npm test
