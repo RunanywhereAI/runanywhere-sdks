@@ -135,6 +135,75 @@ jobs:
         run: swift run
 
   # ---------------------------------------------------------------------------
+  # Android NDK cross-build — produces libracommons_core.so for arm64-v8a
+  # + x86_64 + armeabi-v7a. Proves the CMake options guard libcurl/
+  # libarchive/rac_compat correctly for the NDK toolchain.
+  # ---------------------------------------------------------------------------
+  android-ndk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [arm64-v8a, x86_64, armeabi-v7a]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - name: Install host build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build
+      - name: Configure ${{ matrix.abi }}
+        run: |
+          cmake -S . -B build/android-${{ matrix.abi }} -G "Unix Makefiles" \
+            -DCMAKE_TOOLCHAIN_FILE="${{ steps.ndk.outputs.ndk-path }}/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI=${{ matrix.abi }} -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release -DRA_ENABLE_SANITIZERS=OFF \
+            -DRA_BUILD_TESTS=OFF -DRA_BUILD_TOOLS=OFF -DRA_BUILD_ENGINES=OFF \
+            -DRA_BUILD_SOLUTIONS=OFF \
+            -DRA_BUILD_HTTP_CLIENT=OFF -DRA_BUILD_MODEL_DOWNLOADER=OFF \
+            -DRA_BUILD_EXTRACTION=OFF -DRA_BUILD_RAC_COMPAT=OFF
+      - name: Build racommons_core.so (${{ matrix.abi }})
+        run: cmake --build build/android-${{ matrix.abi }} --target racommons_core
+      - name: Verify artifact
+        run: |
+          file build/android-${{ matrix.abi }}/core/libracommons_core.so
+          ls -la build/android-${{ matrix.abi }}/core/libracommons_core.so
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ matrix.abi }}
+          path: build/android-${{ matrix.abi }}/core/libracommons_core.so
+
+  # ---------------------------------------------------------------------------
+  # iOS cross-build — proves the xcframework slices compile. Ships as
+  # part of swift-frontend's xcframework step; this job just double-checks
+  # each slice can build in isolation on a fresh checkout.
+  # ---------------------------------------------------------------------------
+  ios-xcframework:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: brew install cmake ninja protobuf libarchive
+      - name: Build multi-slice xcframework (macos + ios-device + ios-sim)
+        run: bash scripts/build-core-xcframework.sh --platforms=macos,ios-device,ios-sim --clean
+      - name: Verify slices
+        run: |
+          ls sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework/
+          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name libRACommonsCore.a | xargs -I{} sh -c 'echo "=== {} ==="; file "{}"'
+          find sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework -name module.modulemap
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RACommonsCore-xcframework
+          path: sdk/runanywhere-swift/Binaries/RACommonsCore.xcframework
+
+  # ---------------------------------------------------------------------------
   # Kotlin frontend — Gradle build + unit tests + end-to-end JNI demo.
   # ---------------------------------------------------------------------------
   kotlin-frontend:
