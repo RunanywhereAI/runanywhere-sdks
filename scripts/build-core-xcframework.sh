@@ -63,6 +63,29 @@ build_slice() {
     local slice="$1"; shift
     local build_dir="${BUILD_ROOT}/${slice}"
 
+    # iOS slices skip libcurl / libarchive / rac_compat because neither
+    # is available in the iOS sysroot and no legacy commons binaries
+    # consume rac_* on iOS anyway. macOS keeps all of them.
+    # iOS also skips RA_BUILD_ENGINES because llama.cpp uses try_run()
+    # which doesn't cross-compile; engines ship as a separate iOS slice
+    # built via llama.cpp's native xcframework later.
+    local extra_args=("")
+    local targets_list="ra_core_abi ra_core_graph ra_core_registry ra_core_router ra_core_voice_pipeline ra_core_model_registry ra_core_net ra_core_util ra_core_pipeline_abi ra_solution_voice_agent ra_solution_rag"
+    case "$slice" in
+        ios-device|ios-sim)
+            extra_args=(
+                -DRA_BUILD_HTTP_CLIENT=OFF
+                -DRA_BUILD_MODEL_DOWNLOADER=OFF
+                -DRA_BUILD_EXTRACTION=OFF
+                -DRA_BUILD_RAC_COMPAT=OFF
+                -DRA_BUILD_ENGINES=OFF
+            )
+            ;;
+        macos)
+            targets_list="$targets_list llamacpp_engine"
+            ;;
+    esac
+
     echo "=== Building slice: ${slice} ==================================="
     # Build core + solutions + engines all as STATIC libs so the xcframework
     # delivers every symbol the Swift SDK links against in a single archive.
@@ -75,17 +98,14 @@ build_slice() {
         -DRA_BUILD_SHERPA=OFF \
         -DRA_BUILD_SOLUTIONS=ON \
         -DRA_STATIC_PLUGINS=ON \
+        "${extra_args[@]}" \
         "$@"
     # llamacpp_engine is pure source (FetchContent-built). sherpa_engine
     # links against pre-built dynamic libs which can't merge cleanly into
     # a static xcframework; it's shipped separately (see plan 01_swift.md).
-    cmake --build "${build_dir}" --target \
-        ra_core_abi ra_core_graph ra_core_registry ra_core_router \
-        ra_core_voice_pipeline ra_core_model_registry \
-        ra_core_net ra_core_util ra_core_pipeline_abi \
-        ra_solution_voice_agent ra_solution_rag \
-        llamacpp_engine \
-        --parallel
+    # Per-slice target list computed above — iOS skips llamacpp_engine.
+    # shellcheck disable=SC2086
+    cmake --build "${build_dir}" --target ${targets_list} --parallel
 
     # Collect every produced static archive for the merge step.
     local archives=()
@@ -122,41 +142,8 @@ build_slice() {
 # -----------------------------------------------------------------------------
 SLICE_ARGS=()
 
-IFS=',' read -ra REQUESTED <<< "${PLATFORMS}"
-for p in "${REQUESTED[@]}"; do
-    case "$p" in
-        ios-device)
-            build_slice ios-device \
-                -DCMAKE_SYSTEM_NAME=iOS \
-                -DCMAKE_OSX_ARCHITECTURES=arm64 \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
-                -DCMAKE_OSX_SYSROOT=iphoneos
-            SLICE_ARGS+=(-library "${BUILD_ROOT}/ios-device/libRACommonsCore.a")
-            ;;
-        ios-sim)
-            build_slice ios-sim \
-                -DCMAKE_SYSTEM_NAME=iOS \
-                -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
-                -DCMAKE_OSX_SYSROOT=iphonesimulator
-            SLICE_ARGS+=(-library "${BUILD_ROOT}/ios-sim/libRACommonsCore.a")
-            ;;
-        macos)
-            build_slice macos \
-                -DCMAKE_SYSTEM_NAME=Darwin \
-                -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-                -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
-            SLICE_ARGS+=(-library "${BUILD_ROOT}/macos/libRACommonsCore.a")
-            ;;
-        *)
-            echo "unknown platform: $p" >&2
-            exit 2
-            ;;
-    esac
-done
-
-# Collect public headers once — the xcframework carries them per slice but
-# our headers are arch-independent so a single copy suffices.
+# Collect public headers once. The xcframework carries them per slice
+# (arch-independent), and each -library flag pairs with its own -headers.
 HEADERS_DIR="${BUILD_ROOT}/headers"
 rm -rf "${HEADERS_DIR}"
 mkdir -p "${HEADERS_DIR}"
@@ -177,13 +164,48 @@ module CRACommonsCore {
 }
 MAP
 
+IFS=',' read -ra REQUESTED <<< "${PLATFORMS}"
+for p in "${REQUESTED[@]}"; do
+    case "$p" in
+        ios-device)
+            build_slice ios-device \
+                -DCMAKE_SYSTEM_NAME=iOS \
+                -DCMAKE_OSX_ARCHITECTURES=arm64 \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+                -DCMAKE_OSX_SYSROOT=iphoneos
+            SLICE_ARGS+=(-library "${BUILD_ROOT}/ios-device/libRACommonsCore.a" \
+                         -headers "${HEADERS_DIR}")
+            ;;
+        ios-sim)
+            build_slice ios-sim \
+                -DCMAKE_SYSTEM_NAME=iOS \
+                -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+                -DCMAKE_OSX_SYSROOT=iphonesimulator
+            SLICE_ARGS+=(-library "${BUILD_ROOT}/ios-sim/libRACommonsCore.a" \
+                         -headers "${HEADERS_DIR}")
+            ;;
+        macos)
+            build_slice macos \
+                -DCMAKE_SYSTEM_NAME=Darwin \
+                -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+                -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+            SLICE_ARGS+=(-library "${BUILD_ROOT}/macos/libRACommonsCore.a" \
+                         -headers "${HEADERS_DIR}")
+            ;;
+        *)
+            echo "unknown platform: $p" >&2
+            exit 2
+            ;;
+    esac
+done
+
 # -----------------------------------------------------------------------------
 # Combine slices into a single XCFramework.
 # -----------------------------------------------------------------------------
 echo "=== Creating XCFramework ========================================"
 xcodebuild -create-xcframework \
     "${SLICE_ARGS[@]}" \
-    -headers "${HEADERS_DIR}" \
     -output "${FRAMEWORK}"
 
 echo
