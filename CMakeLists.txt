@@ -79,6 +79,28 @@ if(RA_BUILD_ENGINES)
     add_subdirectory(engines/wakeword)
 endif()
 
+# Discover gtest BEFORE descending into subdirs whose CMakeLists may already
+# reference GTest:: targets from their own add_subdirectory(tests).
+if(RA_BUILD_TESTS AND NOT RA_PLATFORM STREQUAL "IOS" AND NOT RA_PLATFORM STREQUAL "WASM")
+    enable_testing()
+    find_package(GTest CONFIG QUIET)
+    if(NOT GTest_FOUND)
+        find_package(GTest QUIET)
+    endif()
+    if(NOT GTest_FOUND)
+        message(STATUS "gtest not found via find_package — fetching via FetchContent")
+        include(FetchContent)
+        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+        set(BUILD_GMOCK   OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG        v1.14.0
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(googletest)
+    endif()
+endif()
+
 if(RA_BUILD_SOLUTIONS)
     add_subdirectory(solutions/voice-agent)
     add_subdirectory(solutions/rag)
@@ -101,7 +123,9 @@ if(RA_BUILD_TOOLS)
 endif()
 
 if(RA_BUILD_TESTS AND NOT RA_PLATFORM STREQUAL "IOS" AND NOT RA_PLATFORM STREQUAL "WASM")
-    enable_testing()
+    # gtest was discovered earlier in this file (before descending into
+    # solutions/*). enable_testing() was also hoisted. All that remains is
+    # to recurse into core/tests here.
     add_subdirectory(core/tests)
 endif()
 

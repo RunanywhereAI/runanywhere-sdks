@@ -24,3 +24,7 @@ install(TARGETS ra_solution_rag
         EXPORT RunAnywhereTargets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib)
+
+if(RA_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
