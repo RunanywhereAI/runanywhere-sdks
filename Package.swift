@@ -44,7 +44,7 @@ let useLocalNatives = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.9"
+let sdkVersion = "0.19.10"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip

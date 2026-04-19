@@ -1,6 +1,6 @@
 name: runanywhere_genie
 description: Qualcomm Genie NPU backend for RunAnywhere Flutter SDK. On-device LLM inference on Snapdragon NPU.
-version: 0.19.9
+version: 0.19.10
 homepage: https://runanywhere.ai
 repository: https://github.com/RunanywhereAI/runanywhere-sdks
 issue_tracker: https://github.com/RunanywhereAI/runanywhere-sdks/issues

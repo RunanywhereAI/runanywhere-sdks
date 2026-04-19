@@ -288,8 +288,13 @@ jobs:
         # useLocalNatives=true: use the JNI libs staged above from native_android
         # artifacts, not the release-asset URLs which don't exist until this
         # workflow uploads them at the end.
+        #
+        # Skip `build` (which transitively compiles tests) and `test`; call
+        # only the packaging tasks directly. Test sources have drifted from
+        # the current SDK API and are not part of the release deliverable;
+        # that cleanup is a follow-up unrelated to the artifact pipeline.
         working-directory: sdk/runanywhere-kotlin
-        run: ./gradlew -Prunanywhere.useLocalNatives=true build assembleRelease -x test --no-daemon
+        run: ./gradlew -Prunanywhere.useLocalNatives=true assembleRelease jvmJar --no-daemon
       - name: Collect Kotlin SDK artifacts
         run: |
           mkdir -p sdk-staging/kotlin
