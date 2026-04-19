@@ -126,23 +126,30 @@ typedef struct {
     ra_runtime_id_t   preferred_runtime;
 } ra_model_spec_t;
 
+// ABI note: every boolean is encoded as uint8_t (0=false, non-zero=true).
+// The C99 `_Bool` type is implementation-defined in size — using a fixed-width
+// integer keeps struct layout identical across Swift (Bool), JNI (jboolean),
+// Dart FFI (Uint8), Emscripten, MSVC, and plain C.
 typedef struct {
     int32_t n_gpu_layers;    // -1 = all layers on GPU, 0 = CPU-only
     int32_t n_threads;       // 0 = auto
     int32_t context_size;    // 0 = engine default
-    bool    use_mmap;
-    bool    use_mlock;
+    uint8_t use_mmap;        // 0 = false, non-zero = true
+    uint8_t use_mlock;       // 0 = false, non-zero = true
+    uint8_t _reserved0[2];   // reserved for alignment, must be zero
 } ra_session_config_t;
 
 typedef struct {
     const char* text;
-    bool        is_final;
+    uint8_t     is_final;    // 0 = false, non-zero = true
+    uint8_t     _reserved0[3];
     int32_t     token_kind;  // 1=answer, 2=thought, 3=tool_call
 } ra_token_output_t;
 
 typedef struct {
     const char* text;
-    bool        is_partial;
+    uint8_t     is_partial;  // 0 = false, non-zero = true
+    uint8_t     _reserved0[3];
     float       confidence;
     int64_t     audio_start_us;
     int64_t     audio_end_us;
@@ -297,7 +304,7 @@ ra_status_t ra_ww_feed_audio(ra_ww_session_t* session,
                              const float*     pcm_f32,
                              int32_t          num_samples,
                              int32_t          sample_rate_hz,
-                             bool*            detected);
+                             uint8_t*         detected);  // 0/non-zero, not C bool
 
 #ifdef __cplusplus
 }  // extern "C"

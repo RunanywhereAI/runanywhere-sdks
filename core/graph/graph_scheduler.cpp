@@ -26,10 +26,14 @@ void GraphScheduler::start() {
     }
 
     // initialize() all nodes before any worker thread starts — any exception
-    // here must tear the DAG down cleanly.
+    // here must tear the DAG down cleanly, calling finalize() on every node
+    // that already initialized successfully so they can release engine
+    // sessions / file handles / threads before the scheduler object unwinds.
+    std::size_t initialized_prefix = 0;
     for (auto& node : nodes_) {
         try {
             node->initialize();
+            ++initialized_prefix;
         } catch (const std::exception& e) {
             {
                 std::lock_guard<std::mutex> lk(error_mu_);
@@ -39,6 +43,17 @@ void GraphScheduler::start() {
             }
             error_seen_.store(true, std::memory_order_release);
             root_cancel_->cancel();
+
+            // Finalize every node that was successfully initialized before
+            // the failure, in reverse order. finalize() is noexcept by
+            // contract.
+            for (std::size_t i = initialized_prefix; i > 0; --i) {
+                try {
+                    nodes_[i - 1]->finalize();
+                } catch (...) {
+                    // swallow — finalize must not throw, but we defend.
+                }
+            }
             maybe_signal_completion();
             return;
         }

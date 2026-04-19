@@ -78,8 +78,13 @@ advance phases without passing the gate.
 
 ## Building v1 and v2 together
 
-v2 adds files to new directories and does not modify any v1 path. Existing
-build flows are untouched:
+v2 is additive at the source tree level — new top-level directories, no
+modifications to any v1 source file. There is a single v1 footprint in this
+bootstrap PR: `sdk/runanywhere-kotlin/scripts/build-kotlin.sh`, updated to
+make the stat-based incremental-rebuild check portable between macOS (BSD
+`stat`) and Linux (GNU `stat`). That change is a strict bug fix — the
+previous code returned `stat -f` errors on Linux CI and silently rebuilt
+commons every run. Existing build flows otherwise remain untouched:
 
 ```bash
 # v1 Kotlin (unchanged)

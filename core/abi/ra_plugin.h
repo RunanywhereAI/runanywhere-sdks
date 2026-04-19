@@ -108,7 +108,7 @@ typedef struct {
                              ra_ww_session_t**);
     void        (*ww_destroy)(ra_ww_session_t*);
     ra_status_t (*ww_feed_audio)(ra_ww_session_t*, const float*,
-                                 int32_t, int32_t, bool*);
+                                 int32_t, int32_t, uint8_t*);
 
     // Plugin teardown — called when the core unloads the plugin.
     // Optional; may be NULL.
@@ -118,45 +118,73 @@ typedef struct {
 // ---------------------------------------------------------------------------
 // Plugin entry point.
 //
-// The single function every plugin must export. On dlopen platforms the core
-// resolves this via dlsym. On static platforms (iOS/WASM), it is registered
-// at link time via RA_STATIC_PLUGIN_REGISTER.
+// Every plugin provides ONE function that fills a vtable. It is delivered to
+// the core in one of two ways:
 //
-// Returns RA_OK if the vtable was populated successfully, or an error code
-// if the plugin cannot run on this host.
+//   * dlopen platforms (Android/macOS/Linux/Windows): the function is
+//     exported under the fixed extern "C" symbol `ra_plugin_entry`, resolved
+//     via `dlsym()`. Each plugin lives in its own .so/.dylib, so the symbol
+//     never collides at link time.
+//
+//   * static platforms (iOS/WASM): every plugin's fill function is linked
+//     into the same binary, so exporting a shared extern "C" symbol would
+//     collide. Instead, each plugin keeps its fill function in an anonymous
+//     namespace and registers it at dynamic-init time via
+//     RA_STATIC_PLUGIN_REGISTER. The macro generates a unique auto-register
+//     type per plugin name, preventing any duplicate symbols.
 // ---------------------------------------------------------------------------
 typedef ra_status_t (*ra_plugin_entry_fn)(ra_engine_vtable_t* out_vtable);
 
-// Static plugin registration. Expands to a zero-argument static initializer
-// that registers the plugin at dynamic-init time. iOS and WASM only.
+// Plugin authors: use this macro to declare the fill function. It expands to
+// an extern "C" symbol on dlopen builds, and to a file-local function with
+// a fresh name on static builds.
+#ifdef RA_STATIC_PLUGINS
+#  define RA_PLUGIN_ENTRY_DECL(PluginName) \
+    static ra_status_t PluginName##_fill_vtable(ra_engine_vtable_t* out_vtable)
+#else
+#  ifdef __cplusplus
+#    define RA_PLUGIN_ENTRY_DECL(PluginName) \
+    extern "C" ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
+#  else
+#    define RA_PLUGIN_ENTRY_DECL(PluginName) \
+    ra_status_t ra_plugin_entry(ra_engine_vtable_t* out_vtable)
+#  endif
+#endif
+
+// Static plugin registration. On static platforms this generates a
+// `PluginName##_auto_register` symbol that calls
+// ra_registry_register_static() at dynamic-init time, wiring up the local
+// fill function. On dlopen platforms this is a no-op — the core discovers
+// the plugin via dlopen/dlsym at runtime.
 #ifdef RA_STATIC_PLUGINS
 
 #ifdef __cplusplus
-#define RA_STATIC_PLUGIN_REGISTER(PluginName, EntryFn)                     \
+#define RA_STATIC_PLUGIN_REGISTER(PluginName)                              \
     namespace {                                                             \
-        struct PluginName##_auto_register {                                 \
-            PluginName##_auto_register() {                                  \
-                extern void ra_registry_register_static(                    \
+        struct PluginName##_auto_register_t {                               \
+            PluginName##_auto_register_t() {                                \
+                extern "C" void ra_registry_register_static(                \
                     const char* name, ra_plugin_entry_fn entry);            \
-                ra_registry_register_static(#PluginName, EntryFn);          \
+                ra_registry_register_static(#PluginName,                    \
+                                             PluginName##_fill_vtable);     \
             }                                                               \
         };                                                                  \
-        static PluginName##_auto_register PluginName##_auto_register_{};    \
+        static PluginName##_auto_register_t PluginName##_auto_register_;    \
     }
 #else
-#define RA_STATIC_PLUGIN_REGISTER(PluginName, EntryFn)                     \
+#define RA_STATIC_PLUGIN_REGISTER(PluginName)                              \
     __attribute__((constructor))                                            \
-    static void PluginName##_auto_register(void) {                          \
+    static void PluginName##_auto_register_fn(void) {                       \
         extern void ra_registry_register_static(                            \
             const char* name, ra_plugin_entry_fn entry);                    \
-        ra_registry_register_static(#PluginName, EntryFn);                  \
+        ra_registry_register_static(#PluginName,                            \
+                                     PluginName##_fill_vtable);             \
     }
 #endif  // __cplusplus
 
 #else
-// On dlopen platforms static registration is a no-op — the plugin is
-// discovered at runtime via dlopen/dlsym.
-#define RA_STATIC_PLUGIN_REGISTER(PluginName, EntryFn)
+// On dlopen platforms the extern "C" ra_plugin_entry is the contract.
+#define RA_STATIC_PLUGIN_REGISTER(PluginName) /* no-op on dlopen builds */
 #endif  // RA_STATIC_PLUGINS
 
 #ifdef __cplusplus

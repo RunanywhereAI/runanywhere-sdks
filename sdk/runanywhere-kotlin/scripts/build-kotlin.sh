@@ -247,7 +247,10 @@ check_commons_changed() {
     # Check if any C++ source file is newer than the marker.
     # Portable across macOS (BSD stat) and Linux (GNU stat).
     local newer_files
-    newer_files=$(find "${COMMONS_DIR}/src" \( -name "*.cpp" -o -name "*.h" \) -print 2>/dev/null | \
+    newer_files=$(find "${COMMONS_DIR}/src" \( \
+            -name "*.c"  -o -name "*.cc"  -o -name "*.cpp" -o -name "*.cxx" -o \
+            -name "*.h"  -o -name "*.hh"  -o -name "*.hpp" -o -name "*.inl" -o \
+            -name "*.mm" \) -print 2>/dev/null | \
         while IFS= read -r file; do
             local mtime
             mtime=$(_ra_stat "%m" "$file" || echo 0)

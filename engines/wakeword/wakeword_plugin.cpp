@@ -48,32 +48,32 @@ void ww_destroy(ra_ww_session_t* s) {
 ra_status_t ww_feed_audio(ra_ww_session_t* /*s*/,
                            const float* /*pcm*/,
                            int32_t /*n*/, int32_t /*sr*/,
-                           bool* detected) {
+                           uint8_t* detected) {
     if (!detected) return RA_ERR_INVALID_ARGUMENT;
-    *detected = false;  // Real sherpa-onnx integration to be wired in next PR.
-    return RA_OK;       // unlike the old stub, we return OK so the caller
-                        // does not error out — detection is simply negative.
+    *detected = 0;  // Real sherpa-onnx integration to be wired in next PR.
+    return RA_OK;   // unlike the old stub, we return OK so the caller does
+                    // not error out — detection is simply negative.
 }
 
 }  // namespace
 
-extern "C" ra_status_t ra_plugin_entry(ra_engine_vtable_t* out) {
-    if (!out) return RA_ERR_INVALID_ARGUMENT;
-    *out = {};
-    out->metadata.name              = "wakeword";
-    out->metadata.version           = "0.1.0";
-    out->metadata.abi_version       = RA_PLUGIN_API_VERSION;
-    out->metadata.primitives        = kPrimitives.data();
-    out->metadata.primitives_count  = kPrimitives.size();
-    out->metadata.formats           = kFormats.data();
-    out->metadata.formats_count     = kFormats.size();
-    out->metadata.runtimes          = kRuntimes.data();
-    out->metadata.runtimes_count    = kRuntimes.size();
+RA_PLUGIN_ENTRY_DECL(wakeword) {
+    if (!out_vtable) return RA_ERR_INVALID_ARGUMENT;
+    *out_vtable = {};
+    out_vtable->metadata.name              = "wakeword";
+    out_vtable->metadata.version           = "0.1.0";
+    out_vtable->metadata.abi_version       = RA_PLUGIN_API_VERSION;
+    out_vtable->metadata.primitives        = kPrimitives.data();
+    out_vtable->metadata.primitives_count  = kPrimitives.size();
+    out_vtable->metadata.formats           = kFormats.data();
+    out_vtable->metadata.formats_count     = kFormats.size();
+    out_vtable->metadata.runtimes          = kRuntimes.data();
+    out_vtable->metadata.runtimes_count    = kRuntimes.size();
 
-    out->ww_create     = &ww_create;
-    out->ww_destroy    = &ww_destroy;
-    out->ww_feed_audio = &ww_feed_audio;
+    out_vtable->ww_create     = &ww_create;
+    out_vtable->ww_destroy    = &ww_destroy;
+    out_vtable->ww_feed_audio = &ww_feed_audio;
     return RA_OK;
 }
 
-RA_STATIC_PLUGIN_REGISTER(wakeword, ra_plugin_entry)
+RA_STATIC_PLUGIN_REGISTER(wakeword)

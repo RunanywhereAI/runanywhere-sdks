@@ -114,33 +114,36 @@ int32_t embed_dims(ra_embed_session_t* /*session*/) {
 
 }  // namespace
 
-extern "C" ra_status_t ra_plugin_entry(ra_engine_vtable_t* out) {
-    if (!out) return RA_ERR_INVALID_ARGUMENT;
-    *out = {};
-    out->metadata.name              = "llamacpp";
-    out->metadata.version           = "0.1.0";
-    out->metadata.abi_version       = RA_PLUGIN_API_VERSION;
-    out->metadata.primitives        = kPrimitives.data();
-    out->metadata.primitives_count  = kPrimitives.size();
-    out->metadata.formats           = kFormats.data();
-    out->metadata.formats_count     = kFormats.size();
-    out->metadata.runtimes          = kRuntimes.data();
-    out->metadata.runtimes_count    = kRuntimes.size();
+// Entry point. Expands to `extern "C" ra_plugin_entry` on dlopen builds,
+// and to `static llamacpp_fill_vtable` on static builds (iOS/WASM), so the
+// symbol does not collide with sherpa/wakeword in the same binary.
+RA_PLUGIN_ENTRY_DECL(llamacpp) {
+    if (!out_vtable) return RA_ERR_INVALID_ARGUMENT;
+    *out_vtable = {};
+    out_vtable->metadata.name              = "llamacpp";
+    out_vtable->metadata.version           = "0.1.0";
+    out_vtable->metadata.abi_version       = RA_PLUGIN_API_VERSION;
+    out_vtable->metadata.primitives        = kPrimitives.data();
+    out_vtable->metadata.primitives_count  = kPrimitives.size();
+    out_vtable->metadata.formats           = kFormats.data();
+    out_vtable->metadata.formats_count     = kFormats.size();
+    out_vtable->metadata.runtimes          = kRuntimes.data();
+    out_vtable->metadata.runtimes_count    = kRuntimes.size();
 
-    out->capability_check = &capability_check;
+    out_vtable->capability_check = &capability_check;
 
-    out->llm_create   = &llm_create;
-    out->llm_destroy  = &llm_destroy;
-    out->llm_generate = &llm_generate;
-    out->llm_cancel   = &llm_cancel;
-    out->llm_reset    = &llm_reset;
+    out_vtable->llm_create   = &llm_create;
+    out_vtable->llm_destroy  = &llm_destroy;
+    out_vtable->llm_generate = &llm_generate;
+    out_vtable->llm_cancel   = &llm_cancel;
+    out_vtable->llm_reset    = &llm_reset;
 
-    out->embed_create  = &embed_create;
-    out->embed_destroy = &embed_destroy;
-    out->embed_text    = &embed_text;
-    out->embed_dims    = &embed_dims;
+    out_vtable->embed_create  = &embed_create;
+    out_vtable->embed_destroy = &embed_destroy;
+    out_vtable->embed_text    = &embed_text;
+    out_vtable->embed_dims    = &embed_dims;
     return RA_OK;
 }
 
-// Static-mode registration (iOS/WASM).
-RA_STATIC_PLUGIN_REGISTER(llamacpp, ra_plugin_entry)
+// Static-mode registration (iOS/WASM). No-op on dlopen platforms.
+RA_STATIC_PLUGIN_REGISTER(llamacpp)

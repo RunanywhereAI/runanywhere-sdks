@@ -130,35 +130,35 @@ ra_status_t vad_set_callback(ra_vad_session_t* s,
 
 }  // namespace
 
-extern "C" ra_status_t ra_plugin_entry(ra_engine_vtable_t* out) {
-    if (!out) return RA_ERR_INVALID_ARGUMENT;
-    *out = {};
-    out->metadata.name              = "sherpa";
-    out->metadata.version           = "0.1.0";
-    out->metadata.abi_version       = RA_PLUGIN_API_VERSION;
-    out->metadata.primitives        = kPrimitives.data();
-    out->metadata.primitives_count  = kPrimitives.size();
-    out->metadata.formats           = kFormats.data();
-    out->metadata.formats_count     = kFormats.size();
-    out->metadata.runtimes          = kRuntimes.data();
-    out->metadata.runtimes_count    = kRuntimes.size();
+RA_PLUGIN_ENTRY_DECL(sherpa) {
+    if (!out_vtable) return RA_ERR_INVALID_ARGUMENT;
+    *out_vtable = {};
+    out_vtable->metadata.name              = "sherpa";
+    out_vtable->metadata.version           = "0.1.0";
+    out_vtable->metadata.abi_version       = RA_PLUGIN_API_VERSION;
+    out_vtable->metadata.primitives        = kPrimitives.data();
+    out_vtable->metadata.primitives_count  = kPrimitives.size();
+    out_vtable->metadata.formats           = kFormats.data();
+    out_vtable->metadata.formats_count     = kFormats.size();
+    out_vtable->metadata.runtimes          = kRuntimes.data();
+    out_vtable->metadata.runtimes_count    = kRuntimes.size();
 
-    out->stt_create        = &stt_create;
-    out->stt_destroy       = &stt_destroy;
-    out->stt_feed_audio    = &stt_feed_audio;
-    out->stt_flush         = &stt_flush;
-    out->stt_set_callback  = &stt_set_callback;
+    out_vtable->stt_create        = &stt_create;
+    out_vtable->stt_destroy       = &stt_destroy;
+    out_vtable->stt_feed_audio    = &stt_feed_audio;
+    out_vtable->stt_flush         = &stt_flush;
+    out_vtable->stt_set_callback  = &stt_set_callback;
 
-    out->tts_create        = &tts_create;
-    out->tts_destroy       = &tts_destroy;
-    out->tts_synthesize    = &tts_synthesize;
-    out->tts_cancel        = &tts_cancel;
+    out_vtable->tts_create        = &tts_create;
+    out_vtable->tts_destroy       = &tts_destroy;
+    out_vtable->tts_synthesize    = &tts_synthesize;
+    out_vtable->tts_cancel        = &tts_cancel;
 
-    out->vad_create        = &vad_create;
-    out->vad_destroy       = &vad_destroy;
-    out->vad_feed_audio    = &vad_feed_audio;
-    out->vad_set_callback  = &vad_set_callback;
+    out_vtable->vad_create        = &vad_create;
+    out_vtable->vad_destroy       = &vad_destroy;
+    out_vtable->vad_feed_audio    = &vad_feed_audio;
+    out_vtable->vad_set_callback  = &vad_set_callback;
     return RA_OK;
 }
 
-RA_STATIC_PLUGIN_REGISTER(sherpa, ra_plugin_entry)
+RA_STATIC_PLUGIN_REGISTER(sherpa)
