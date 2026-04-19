@@ -305,14 +305,14 @@ add_library(RunAnywhere::core ALIAS ra_core)
 # from the static archives via whole-archive linkage so dlsym / FFI
 # DynamicLibrary.open can find them.
 #
-# The JNI bridge (frontends/kotlin/src/main/cpp/jni_bridge.cpp) is bundled
+# The JNI bridge (sdk/kotlin/src/main/cpp/jni_bridge.cpp) is bundled
 # here too so a single System.loadLibrary("racommons_core") on Android / JVM
 # reaches both the C ABI and the Java_... glue functions.
 #
 # Named `libracommons_core.dylib` on macOS to match the historical commons
 # name — downstream FFI bindings default-search for that filename.
 set(RA_SHARED_SOURCES abi/ra_shared_facade.c)
-if(EXISTS ${CMAKE_SOURCE_DIR}/frontends/kotlin/src/main/cpp/jni_bridge.cpp
+if(EXISTS ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
    AND NOT RA_DISABLE_JNI_BRIDGE)
     # JNI headers only needed on platforms where Kotlin host is expected
     # (Linux/macOS CI, Android). Guard behind an opt-out so iOS + WASM
@@ -320,7 +320,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/frontends/kotlin/src/main/cpp/jni_bridge.cpp
     find_package(JNI QUIET)
     if(JNI_FOUND)
         list(APPEND RA_SHARED_SOURCES
-            ${CMAKE_SOURCE_DIR}/frontends/kotlin/src/main/cpp/jni_bridge.cpp)
+            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp)
         set(RA_HAVE_JNI ON)
     endif()
 endif()
