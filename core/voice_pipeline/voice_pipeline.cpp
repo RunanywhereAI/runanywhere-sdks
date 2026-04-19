@@ -128,7 +128,8 @@ ra_status_t VoiceAgentPipeline::start() {
 
 ra_status_t VoiceAgentPipeline::stop() {
     cancel_->cancel();
-    audio_edge_.close();
+    vad_audio_edge_.close();
+    stt_audio_edge_.close();
     transcript_edge_.close();
     token_edge_.close();
     sentence_edge_.close();
@@ -142,9 +143,20 @@ ra_status_t VoiceAgentPipeline::feed_audio(const float* pcm,
                                             int          sample_rate_hz) {
     if (!pcm || num_samples <= 0) return RA_ERR_INVALID_ARGUMENT;
     (void)sample_rate_hz;  // For MVP, caller ensures cfg_.sample_rate_hz matches.
-    std::vector<float> buf(pcm, pcm + num_samples);
-    auto rc = audio_edge_.push(std::move(buf));
-    return rc == PushResult::kOk ? RA_OK : RA_ERR_CANCELLED;
+
+    // Tee the frame to BOTH consumers — StreamEdge::pop() is single-consumer
+    // (removes items), so publishing to only one edge would nondeterministically
+    // starve either VAD (breaking barge-in detection) or STT (breaking
+    // transcription). Two independent copies keep both pipelines hot.
+    std::vector<float> for_vad(pcm, pcm + num_samples);
+    std::vector<float> for_stt = for_vad;
+
+    auto rc_vad = vad_audio_edge_.push(std::move(for_vad));
+    auto rc_stt = stt_audio_edge_.push(std::move(for_stt));
+    if (rc_vad != PushResult::kOk || rc_stt != PushResult::kOk) {
+        return RA_ERR_CANCELLED;
+    }
+    return RA_OK;
 }
 
 // --- Barge-in — the transactional cancel boundary ---------------------------
@@ -213,7 +225,7 @@ void VoiceAgentPipeline::vad_loop() {
     }
 
     while (!cancel_->is_cancelled()) {
-        auto frame = audio_edge_.pop();
+        auto frame = vad_audio_edge_.pop();
         if (!frame) break;
         if (!vad_plugin_->vtable.vad_feed_audio) continue;
         vad_plugin_->vtable.vad_feed_audio(
@@ -257,10 +269,10 @@ void VoiceAgentPipeline::stt_loop() {
             this);
     }
 
-    // For MVP we re-read audio from the shared audio_edge_ (a proper
-    // implementation uses a fan-out tee at the VAD stage).
+    // STT consumes its own copy of each frame via the dedicated
+    // stt_audio_edge_ that feed_audio() tees into. VAD gets the mirror edge.
     while (!cancel_->is_cancelled()) {
-        auto frame = audio_edge_.pop();
+        auto frame = stt_audio_edge_.pop();
         if (!frame) break;
         if (!stt_plugin_->vtable.stt_feed_audio) continue;
         stt_plugin_->vtable.stt_feed_audio(

@@ -155,13 +155,17 @@ private:
     std::atomic<bool>            barge_in_flag_{false};
     std::atomic<bool>            started_{false};
 
-    // L4 edges.
-    StreamEdge<std::vector<float>>        audio_edge_{64};      // mic -> vad, stt
-    StreamEdge<std::string>               transcript_edge_{16}; // stt -> llm
-    StreamEdge<std::string>               token_edge_{256};     // llm -> sentence_detector
-    StreamEdge<std::string>               sentence_edge_{32};   // sentence_detector -> tts
-    StreamEdge<std::vector<float>>        audio_out_edge_{64};  // tts -> audio sink
-    StreamEdge<VoiceAgentEvent>           output_{128};         // all events -> ABI
+    // L4 edges. feed_audio() tees each PCM frame to BOTH vad_audio_edge_
+    // and stt_audio_edge_ so VAD and STT each get a complete copy — a single
+    // edge would be drained by whichever worker popped first, causing
+    // nondeterministic frame splitting between VAD and STT.
+    StreamEdge<std::vector<float>>        vad_audio_edge_{64};   // mic -> vad
+    StreamEdge<std::vector<float>>        stt_audio_edge_{64};   // mic -> stt
+    StreamEdge<std::string>               transcript_edge_{16};  // stt -> llm
+    StreamEdge<std::string>               token_edge_{256};      // llm -> sentence_detector
+    StreamEdge<std::string>               sentence_edge_{32};    // sentence_detector -> tts
+    StreamEdge<std::vector<float>>        audio_out_edge_{64};   // tts -> audio sink
+    StreamEdge<VoiceAgentEvent>           output_{128};          // all events -> ABI
 
     // Playback ring buffer — drained by audio sink, filled by tts worker.
     // Size = ~2 seconds at 48 kHz.

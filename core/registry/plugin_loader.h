@@ -65,7 +65,11 @@ public:
         std::string sz(path);
         handle_ = ::dlopen(sz.c_str(), RTLD_NOW | RTLD_LOCAL);
         if (!handle_) {
-            last_error_ = ::dlerror() ? ::dlerror() : "dlopen failed";
+            // dlerror() returns the last error and CLEARS it. A second call
+            // returns nullptr — constructing std::string from nullptr is UB.
+            // Capture once, check for null, then assign.
+            const char* err = ::dlerror();
+            last_error_ = err ? err : "dlopen failed";
             return false;
         }
 

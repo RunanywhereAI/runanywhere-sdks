@@ -38,10 +38,19 @@ public:
     void add_document(std::uint32_t doc_id, std::string_view text);
     void build_done();
 
-    // Top-K retrieval. `scratch` must be reusable; the implementation uses
-    // the pre-allocated member buffer. Thread-safe for concurrent readers
-    // as long as no one calls add_document().
-    std::vector<BM25Hit> search(std::string_view query, std::size_t top_k) const;
+    // Top-K retrieval.
+    //
+    // After build_done(), search() is data-race-safe for any number of
+    // concurrent callers: the per-query score buffer is allocated on the
+    // caller's stack (or thread-local scratch) instead of being shared
+    // mutable state, so there is no write aliasing between threads.
+    //
+    // `scratch` may be a reused thread-local vector; if empty it will be
+    // sized on the first call. Callers who don't care can pass nullptr
+    // and a temporary will be allocated per call.
+    std::vector<BM25Hit> search(std::string_view   query,
+                                 std::size_t        top_k,
+                                 std::vector<float>* scratch = nullptr) const;
 
     std::size_t doc_count() const noexcept { return doc_lengths_.size(); }
 
@@ -56,7 +65,6 @@ private:
     std::unordered_map<std::string, float>            idf_;
     std::vector<std::uint32_t>                        doc_lengths_;
     float                                             avg_doc_length_ = 0.f;
-    mutable std::vector<float>                        scratch_scores_;
     bool                                              built_ = false;
 };
 

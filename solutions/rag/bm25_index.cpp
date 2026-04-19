@@ -70,15 +70,21 @@ void BM25Index::build_done() {
         idf_[term] = std::log((n - df + 0.5f) / (df + 0.5f) + 1.f);
     }
 
-    scratch_scores_.assign(doc_lengths_.size(), 0.f);
     built_ = true;
 }
 
-std::vector<BM25Hit> BM25Index::search(std::string_view query,
-                                        std::size_t      top_k) const {
+std::vector<BM25Hit> BM25Index::search(std::string_view    query,
+                                        std::size_t         top_k,
+                                        std::vector<float>* scratch) const {
     if (!built_ || doc_lengths_.empty()) return {};
 
-    std::fill(scratch_scores_.begin(), scratch_scores_.end(), 0.f);
+    // Per-caller score buffer — either the caller-supplied reusable scratch
+    // (for hot paths that want to avoid the vector alloc) or a local one.
+    // Either way, it's not shared mutable state across threads.
+    std::vector<float> local_scores;
+    std::vector<float>& scores = scratch ? *scratch : local_scores;
+    scores.assign(doc_lengths_.size(), 0.f);
+
     auto tokens = tokenize(query);
     for (const auto& tok : tokens) {
         auto p_it = postings_.find(tok);
@@ -92,16 +98,15 @@ std::vector<BM25Hit> BM25Index::search(std::string_view query,
             const float tf = static_cast<float>(posting.term_freq);
             const float denom = tf + params_.k1 *
                 (1.f - params_.b + params_.b * doc_len / avg_doc_length_);
-            scratch_scores_[posting.doc_id] += idf * (tf * (params_.k1 + 1.f))
-                / denom;
+            scores[posting.doc_id] += idf * (tf * (params_.k1 + 1.f)) / denom;
         }
     }
 
     std::vector<BM25Hit> hits;
-    hits.reserve(scratch_scores_.size());
-    for (std::uint32_t i = 0; i < scratch_scores_.size(); ++i) {
-        if (scratch_scores_[i] > 0.f) {
-            hits.push_back({i, scratch_scores_[i]});
+    hits.reserve(scores.size());
+    for (std::uint32_t i = 0; i < scores.size(); ++i) {
+        if (scores[i] > 0.f) {
+            hits.push_back({i, scores[i]});
         }
     }
     std::partial_sort(hits.begin(),

@@ -17,9 +17,14 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <new>
 #include <vector>
+
+#if defined(_WIN32)
+#  include <malloc.h>  // _aligned_malloc / _aligned_free
+#endif
 
 namespace ra::core {
 
@@ -33,7 +38,14 @@ public:
         : block_bytes_(block_bytes),
           num_blocks_(num_blocks),
           alignment_(alignment) {
-        // Round block size up to alignment.
+        // posix_memalign requires alignment to be a power of two and at
+        // least sizeof(void*). Reject anything else up front so we never
+        // populate the free list with invalid addresses.
+        if (alignment_ < sizeof(void*) ||
+            (alignment_ & (alignment_ - 1)) != 0) {
+            return;  // storage_ stays null, free_list_ stays empty.
+        }
+
         const auto stride = (block_bytes_ + alignment_ - 1) & ~(alignment_ - 1);
         storage_size_ = stride * num_blocks_;
 
@@ -46,6 +58,15 @@ public:
             storage_ = nullptr;
         }
 #endif
+
+        // If allocation failed, leave the pool empty. acquire() returns
+        // nullptr and callers can fall back to heap or drop the frame —
+        // rather than populating the free list with garbage (null + offset)
+        // pointers.
+        if (!storage_) {
+            storage_size_ = 0;
+            return;
+        }
 
         free_list_.reserve(num_blocks_);
         for (std::size_t i = 0; i < num_blocks_; ++i) {
