@@ -1,0 +1,9 @@
+{
+  "name": "proto_encode_cost",
+  "description": "VoiceEvent proto serialize + deserialize round-trip",
+  "metric": "roundtrip_us",
+  "p50_ms": 0.0005,
+  "p90_ms": 0.001,
+  "p99_ms": 0.002,
+  "tolerance_pct": 20
+}

@@ -1,0 +1,9 @@
+{
+  "name": "rag_retrieval_latency",
+  "description": "Top-6 hybrid retrieval over a 10K-chunk corpus including reranker",
+  "metric": "retrieval_ms",
+  "p50_ms": 5,
+  "p90_ms": 8,
+  "p99_ms": 12,
+  "tolerance_pct": 10
+}

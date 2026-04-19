@@ -1,0 +1,9 @@
+{
+  "name": "llm_first_token",
+  "description": "LLM prompt evaluation to first emitted token, tiny-llama Q4",
+  "metric": "first_token_ms",
+  "p50_ms": 120,
+  "p90_ms": 200,
+  "p99_ms": 350,
+  "tolerance_pct": 15
+}

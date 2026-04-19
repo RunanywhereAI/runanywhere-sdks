@@ -1,0 +1,9 @@
+{
+  "name": "voice_agent_latency",
+  "description": "End-of-utterance to first audible PCM frame with pinned reference models",
+  "metric": "first_audio_ms",
+  "p50_ms": 80,
+  "p90_ms": 120,
+  "p99_ms": 180,
+  "tolerance_pct": 10
+}
