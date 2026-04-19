@@ -14,7 +14,12 @@
 namespace ra::core {
 
 namespace {
+// Only referenced inside load_plugin's dlsym path. Under RA_STATIC_PLUGINS
+// plugins register themselves via RA_STATIC_PLUGIN_REGISTER and the
+// symbol name is unused — guard accordingly so -Werror=unused passes.
+#if !defined(RA_STATIC_PLUGINS)
 constexpr const char* kEntrySymbol = "ra_plugin_entry";
+#endif
 }
 
 PluginRegistry& PluginRegistry::global() {
