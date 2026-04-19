@@ -79,7 +79,10 @@ jobs:
         working-directory: sdk/runanywhere-commons
         run: ./scripts/build-ios.sh --backend all --release --include-macos --package
       - name: Compute checksums
-        working-directory: sdk/runanywhere-commons/dist
+        # build-ios.sh --package writes zips to dist/packages/, not dist/.
+        # Checksum each packaged zip and keep them in the same directory so
+        # they upload as one bundle.
+        working-directory: sdk/runanywhere-commons/dist/packages
         run: |
           for f in *.zip; do
             [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
@@ -90,8 +93,8 @@ jobs:
         with:
           name: native-ios-macos
           path: |
-            sdk/runanywhere-commons/dist/*.zip
-            sdk/runanywhere-commons/dist/*.sha256
+            sdk/runanywhere-commons/dist/packages/*.zip
+            sdk/runanywhere-commons/dist/packages/*.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -213,12 +216,27 @@ jobs:
         working-directory: sdk/runanywhere-web
         run: ./scripts/build-web.sh --build-wasm --all-backends
       - name: Package Web/WASM outputs
+        # build-web.sh puts every WASM variant (CPU, WebGPU, sherpa) under
+        # packages/llamacpp/wasm (see WASM_OUTPUT_DIR in scripts/build-web.sh).
+        # Also include packages/core/wasm if present (sherpa-onnx artifacts
+        # sometimes land here). Package only directories that actually exist
+        # so a missing optional variant (e.g. WebGPU on older emsdk) doesn't
+        # break the release.
         working-directory: sdk/runanywhere-web
         run: |
+          set -euo pipefail
           mkdir -p dist
+          tar_inputs=()
+          for d in llamacpp/wasm core/wasm onnx/wasm; do
+            [ -d "packages/$d" ] && tar_inputs+=("$d")
+          done
+          if [ ${#tar_inputs[@]} -eq 0 ]; then
+            echo "::error::No WASM output directories produced by build-web.sh"
+            exit 1
+          fi
+          echo "Packaging: ${tar_inputs[*]}"
           tar czf "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
-            -C packages \
-            $(ls packages | grep -E '^(core|llamacpp|onnx)$' | sed 's,$,/wasm,')
+            -C packages "${tar_inputs[@]}"
           shasum -a 256 "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
             > "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz.sha256"
       - name: Upload Web/WASM artifacts
@@ -267,8 +285,11 @@ jobs:
           done
           ls -la sdk/runanywhere-kotlin/src/androidMain/jniLibs/ || true
       - name: Build Kotlin AAR + JAR
+        # useLocalNatives=true: use the JNI libs staged above from native_android
+        # artifacts, not the release-asset URLs which don't exist until this
+        # workflow uploads them at the end.
         working-directory: sdk/runanywhere-kotlin
-        run: ./gradlew build assembleRelease -x test --no-daemon
+        run: ./gradlew -Prunanywhere.useLocalNatives=true build assembleRelease -x test --no-daemon
       - name: Collect Kotlin SDK artifacts
         run: |
           mkdir -p sdk-staging/kotlin
