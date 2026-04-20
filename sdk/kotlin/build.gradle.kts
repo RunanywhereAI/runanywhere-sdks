@@ -3,18 +3,33 @@
 // glue, backend register entry points). JNI bridge + native libs live in
 // libracommons_core.so consumed via System.loadLibrary("racommons_core").
 
+// The Kotlin SDK ships as both:
+// (a) a standalone Gradle build — `cd sdk/kotlin && gradle build`
+// (b) a subproject of a sample-app root (see
+//     examples/android/RunAnywhereAI/settings.gradle.kts)
+//
+// Version resolution is left to pluginManagement so case (b) doesn't
+// collide with the sample's version catalog. Case (a) relies on
+// settings.gradle.kts here to inject the same versions.
 plugins {
-    kotlin("jvm") version "2.1.21"
-    id("com.squareup.wire") version "5.0.0"
-    id("org.jetbrains.dokka") version "1.9.20"
+    kotlin("jvm")
+    id("com.squareup.wire")
+    id("org.jetbrains.dokka")
 }
 
 group = "com.runanywhere"
 version = project.findProperty("v2Version") as? String ?: "2.0.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-    google()
+// Standalone builds (`cd sdk/kotlin && gradle build`) need project-level
+// repos. Sample-app builds declare repos via
+// dependencyResolutionManagement in their settings.gradle.kts and set
+// RepositoriesMode.FAIL_ON_PROJECT_REPOS — only declare repos here when
+// we're the root project so we don't clash with that mode.
+if (project == rootProject) {
+    repositories {
+        mavenCentral()
+        google()
+    }
 }
 
 dependencies {

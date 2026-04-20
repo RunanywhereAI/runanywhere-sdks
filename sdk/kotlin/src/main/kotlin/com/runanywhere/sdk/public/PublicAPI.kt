@@ -46,7 +46,32 @@ data class TTSResult(val pcm: FloatArray, val sampleRateHz: Int) {
     override fun hashCode(): Int = 31 * sampleRateHz + pcm.contentHashCode()
 }
 
-typealias SDKEnvironment = SDKState.Environment
+// Main-branch spelling exposed as a standalone enum so that the sample
+// apps' explicit type-ascriptions (`val environment: SDKEnvironment = ...`)
+// and the RunAnywhere.initialize(environment:) signature resolve
+// identically.  The two enums are one-to-one and conversion is free.
+enum class SDKEnvironment(val raw: Int) {
+    DEVELOPMENT(0), STAGING(1), PRODUCTION(2);
+
+    fun toSDKState(): SDKState.Environment = when (this) {
+        DEVELOPMENT -> SDKState.Environment.DEVELOPMENT
+        STAGING     -> SDKState.Environment.STAGING
+        PRODUCTION  -> SDKState.Environment.PRODUCTION
+    }
+
+    companion object {
+        @JvmStatic
+        fun of(raw: Int): SDKEnvironment =
+            values().firstOrNull { it.raw == raw } ?: PRODUCTION
+
+        @JvmStatic
+        fun from(state: SDKState.Environment): SDKEnvironment = when (state) {
+            SDKState.Environment.DEVELOPMENT -> DEVELOPMENT
+            SDKState.Environment.STAGING     -> STAGING
+            SDKState.Environment.PRODUCTION  -> PRODUCTION
+        }
+    }
+}
 
 // --- Implicit-session registry ---------------------------------------------
 

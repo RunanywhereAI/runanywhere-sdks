@@ -78,6 +78,12 @@ ktlint = "12.1.2"
 intellij = "1.17.4"
 
 # ============================================================================
+# Build plugins used by sdk/kotlin when pulled in as a subproject
+# ============================================================================
+wire  = "5.0.0"
+dokka = "1.9.20"
+
+# ============================================================================
 # Dependency Injection
 # ============================================================================
 hilt = "2.52"
@@ -375,3 +381,9 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 # IDE Plugin Development
 # ----------------------------------------------------------------------------
 intellij = { id = "org.jetbrains.intellij", version.ref = "intellij" }
+
+# ----------------------------------------------------------------------------
+# sdk/kotlin subproject plugins (proto / docs)
+# ----------------------------------------------------------------------------
+wire  = { id = "com.squareup.wire",     version.ref = "wire"  }
+dokka = { id = "org.jetbrains.dokka",   version.ref = "dokka" }

@@ -45,6 +45,52 @@ object RunAnywhere {
     @JvmStatic
     val registeredPluginCount: Int
         get() = if (NativeLibrary.isLoaded) PluginBridge.pluginCount() else 0
+
+    // =========================================================================
+    // Sample-app shaped initialization. Forwards to SDKState.initialize.
+    // =========================================================================
+
+    /** Is the SDK initialized? Backed by the C ABI state flag. */
+    @JvmStatic
+    val isInitialized: Boolean
+        get() = SDKState.isInitialized
+
+    /**
+     * SDK initialization — apiKey + optional baseURL + optional environment.
+     * The sample app's bootstrap path uses this shape verbatim.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun initialize(
+        apiKey: String = "dev-local-placeholder",
+        baseURL: String = "",
+        environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
+        deviceId: String = "",
+    ) {
+        SDKState.initialize(
+            apiKey      = apiKey,
+            environment = environment.toSDKState(),
+            baseUrl     = baseURL,
+            deviceId    = deviceId)
+    }
+
+    /**
+     * Environment-only overload — used in development fall-back paths.
+     */
+    @JvmStatic
+    fun initialize(environment: SDKEnvironment) {
+        initialize(apiKey = "dev-local-placeholder",
+                    baseURL = "",
+                    environment = environment)
+    }
+
+    /**
+     * Completes lazy-init for platform services (audio pre-warm, device
+     * registration, KV cache seed). v2 performs this lazily on first
+     * session; exposed for source-compat with the sample bootstrap.
+     */
+    @JvmStatic
+    suspend fun completeServicesInitialization() {}
 }
 
 /** Internal bridge to the ra_registry_* JNI shims. */
