@@ -236,29 +236,137 @@ typedef ra_state_load_callback_t     rac_state_load_callback_t;
 #define rac_state_on_auth_changed         ra_state_on_auth_changed
 #define rac_state_set_persistence_callbacks ra_state_set_persistence_callbacks
 
-/* --- Gaps not yet bridged --------------------------------------------
+/* --- Phase A extensions -------------------------------------------------
  *
- * These legacy-only entry points are still only available from
- * sdk/runanywhere-commons:
+ * Every legacy `rac_*` capability is now bridged onto a `ra_*` C ABI:
  *
- *   rac_llm_tool_calling_*           → port to ra_llm_tool_calling
- *   rac_llm_structured_output_*      → port to ra_llm_structured_output
- *   rac_llm_load_lora / remove_lora  → port to ra_llm_lora_*
- *   rac_voice_agent_*                → solutions/voice-agent wrapper
- *   rac_server_*                     → port to ra_server (OpenAI HTTP server)
- *   rac_download_*                   → use core::net::HttpClient (already real)
- *   rac_extract_*                    → TODO: port rac_extraction.h
- *   rac_file_manager_*               → TODO: port rac_file_manager.h
- *   rac_telemetry_*                  → use core::net::TelemetryManager (already real)
- *   rac_http_*                       → use core::net::HttpClient (already real)
- *   rac_device_*                     → partial via core::router::HardwareProfile
- *
- * Each blocking gap is tracked in
- * thoughts/shared/plans/v2_rearchitecture/feature_parity_audit.md and
- * closed incrementally. A frontend may #include "rac_compat_legacy.h"
- * (future follow-up) for transitional wrappers to the legacy commons
- * while the remaining gaps close.
+ *   rac_llm_tool_calling_*       → ra_tool_call_* (ra_tool.h)
+ *   rac_llm_structured_output_*  → ra_structured_output_* (ra_structured.h)
+ *   rac_image_*                  → ra_image_* (ra_image.h)
+ *   rac_vlm_*                    → ra_vlm_* (ra_vlm.h)
+ *   rac_diffusion_*              → ra_diffusion_* (ra_diffusion.h)
+ *   rac_download_manager_*       → ra_download_manager_* (ra_download.h)
+ *   rac_file_manager_*           → ra_file_* (ra_file.h)
+ *   rac_storage_analyzer_*       → ra_storage_* (ra_storage.h)
+ *   rac_extract_*                → ra_extract_* (ra_extract.h)
+ *   rac_device_manager_*         → ra_device_manager_* (ra_device.h)
+ *   rac_telemetry_*              → ra_telemetry_* (ra_telemetry.h)
+ *   rac_event_*, rac_analytics_* → ra_event_* (ra_event.h)
+ *   rac_http_*                   → ra_http_* (ra_http.h)
+ *   rac_platform_llm_*           → ra_platform_llm_* (ra_platform_llm.h)
+ *   rac_benchmark_*              → ra_benchmark_* (ra_benchmark.h)
+ *   rac_server_*                 → ra_server_* (ra_server.h, gated by RA_BUILD_SERVER)
  */
+#include "ra_tool.h"
+#include "ra_structured.h"
+#include "ra_image.h"
+#include "ra_vlm.h"
+#include "ra_diffusion.h"
+#include "ra_download.h"
+#include "ra_file.h"
+#include "ra_storage.h"
+#include "ra_extract.h"
+#include "ra_device.h"
+#include "ra_telemetry.h"
+#include "ra_event.h"
+#include "ra_http.h"
+#include "ra_platform_llm.h"
+#include "ra_benchmark.h"
+#include "ra_server.h"
+
+/* Aliases for the most commonly-called legacy symbols. */
+#define rac_tool_call_parse                ra_tool_call_parse
+#define rac_tool_call_parse_with_format    ra_tool_call_parse_with_format
+#define rac_tool_call_format_name          ra_tool_call_format_name
+#define rac_tool_call_format_from_name     ra_tool_call_format_from_name
+#define rac_tool_call_detect_format        ra_tool_call_detect_format
+#define rac_tool_call_format_prompt        ra_tool_call_format_prompt
+#define rac_tool_call_build_initial_prompt ra_tool_call_build_initial_prompt
+#define rac_tool_call_build_followup_prompt ra_tool_call_build_followup_prompt
+
+#define rac_structured_output_extract_json    ra_structured_output_extract_json
+#define rac_structured_output_get_system_prompt ra_structured_output_get_system_prompt
+#define rac_structured_output_prepare_prompt   ra_structured_output_prepare_prompt
+#define rac_structured_output_validate         ra_structured_output_validate
+
+#define rac_image_load_file        ra_image_load_file
+#define rac_image_decode_bytes     ra_image_decode_bytes
+#define rac_image_decode_base64    ra_image_decode_base64
+#define rac_image_resize           ra_image_resize
+#define rac_image_resize_max       ra_image_resize_max
+#define rac_image_to_chw           ra_image_to_chw
+#define rac_image_normalize        ra_image_normalize
+#define rac_image_free             ra_image_free
+#define rac_image_float_free       ra_image_float_free
+#define rac_image_calc_resize      ra_image_calc_resize
+
+#define rac_download_manager_create        ra_download_manager_create
+#define rac_download_manager_destroy       ra_download_manager_destroy
+#define rac_download_manager_start         ra_download_manager_start
+#define rac_download_manager_cancel        ra_download_manager_cancel
+#define rac_download_orchestrate           ra_download_orchestrate
+#define rac_download_compute_destination   ra_download_compute_destination
+#define rac_find_model_path_after_extraction ra_find_model_path_after_extraction
+#define rac_download_requires_extraction   ra_download_requires_extraction
+
+#define rac_extract_archive_native         ra_extract_archive_native
+#define rac_detect_archive_type            ra_detect_archive_type
+
+#define rac_file_manager_create_directory  ra_file_create_directory
+#define rac_file_manager_remove_path       ra_file_remove_path
+#define rac_file_manager_path_exists       ra_file_path_exists
+#define rac_file_manager_app_support_dir   ra_file_app_support_dir
+#define rac_file_manager_cache_dir         ra_file_cache_dir
+#define rac_file_manager_models_dir        ra_file_models_dir
+#define rac_file_manager_clear_cache       ra_file_clear_cache
+
+#define rac_storage_analyzer_disk_space_for ra_storage_disk_space_for
+#define rac_storage_analyzer_can_fit        ra_storage_can_fit
+#define rac_storage_analyzer_list_models    ra_storage_list_models
+
+#define rac_device_manager_set_callbacks    ra_device_manager_set_callbacks
+#define rac_device_manager_register_if_needed ra_device_manager_register_if_needed
+#define rac_device_manager_clear_registration ra_device_manager_clear_registration
+#define rac_device_manager_is_registered    ra_device_manager_is_registered
+#define rac_device_manager_get_device_id    ra_device_manager_get_device_id
+
+#define rac_telemetry_manager_set_http_callback ra_telemetry_set_http_callback
+#define rac_telemetry_manager_flush             ra_telemetry_flush
+#define rac_telemetry_manager_track             ra_telemetry_track
+
+#define rac_event_subscribe       ra_event_subscribe
+#define rac_event_subscribe_all   ra_event_subscribe_all
+#define rac_event_unsubscribe     ra_event_unsubscribe
+#define rac_events_set_callback   ra_event_set_callback
+#define rac_analytics_events_set_callback        ra_analytics_events_set_callback
+#define rac_analytics_events_set_public_callback ra_analytics_events_set_public_callback
+
+#define rac_http_set_executor   ra_http_set_executor
+#define rac_http_has_executor   ra_http_has_executor
+#define rac_http_execute        ra_http_execute
+
+#define rac_platform_llm_set_callbacks ra_platform_llm_set_callbacks
+#define rac_platform_llm_get_callbacks ra_platform_llm_get_callbacks
+#define rac_platform_llm_is_available  ra_platform_llm_is_available
+#define rac_backend_platform_register   ra_backend_platform_register
+#define rac_backend_platform_unregister ra_backend_platform_unregister
+
+#define rac_monotonic_now_ms          ra_monotonic_now_ms
+#define rac_benchmark_timing_init     ra_benchmark_timing_init
+#define rac_benchmark_timing_to_json  ra_benchmark_timing_to_json
+#define rac_benchmark_stats_create    ra_benchmark_stats_create
+#define rac_benchmark_stats_destroy   ra_benchmark_stats_destroy
+#define rac_benchmark_stats_record    ra_benchmark_stats_record
+#define rac_benchmark_stats_reset     ra_benchmark_stats_reset
+#define rac_benchmark_stats_get_summary ra_benchmark_stats_get_summary
+
+#define rac_server_start          ra_server_start
+#define rac_server_stop           ra_server_stop
+#define rac_server_is_running     ra_server_is_running
+#define rac_server_get_status     ra_server_get_status
+#define rac_server_set_request_callback ra_server_set_request_callback
+
+#define rac_ww_feed_audio_s16     ra_ww_feed_audio_s16
 
 #ifdef __cplusplus
 }  /* extern "C" */

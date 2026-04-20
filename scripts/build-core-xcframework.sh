@@ -70,7 +70,7 @@ build_slice() {
     # which doesn't cross-compile; engines ship as a separate iOS slice
     # built via llama.cpp's native xcframework later.
     local extra_args=("")
-    local targets_list="ra_core_abi ra_core_graph ra_core_registry ra_core_router ra_core_voice_pipeline ra_core_model_registry ra_core_net ra_core_util ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi ra_solution_voice_agent ra_solution_rag"
+    local targets_list="ra_core_abi ra_core_graph ra_core_registry ra_core_router ra_core_voice_pipeline ra_core_model_registry ra_core_net ra_core_util ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi ra_core_abi_ext ra_solution_voice_agent ra_solution_rag"
     case "$slice" in
         ios-device|ios-sim)
             extra_args=(
@@ -120,6 +120,7 @@ build_slice() {
              "${build_dir}/core/libra_core_pipeline_abi.a" \
              "${build_dir}/core/libra_core_llm_dispatch.a" \
              "${build_dir}/core/libra_core_state_abi.a" \
+             "${build_dir}/core/libra_core_abi_ext.a" \
              "${build_dir}/solutions/voice-agent/libra_solution_voice_agent.a" \
              "${build_dir}/solutions/rag/libra_solution_rag.a" \
              "${build_dir}/engines/llamacpp/libllamacpp_engine.a"; do
@@ -163,6 +164,23 @@ module CRACommonsCore {
     header "ra_platform_adapter.h"
     header "ra_core_init.h"
     header "ra_state.h"
+    // Phase A extensions — full ra_* parity surface
+    header "ra_tool.h"
+    header "ra_structured.h"
+    header "ra_image.h"
+    header "ra_vlm.h"
+    header "ra_diffusion.h"
+    header "ra_download.h"
+    header "ra_file.h"
+    header "ra_storage.h"
+    header "ra_extract.h"
+    header "ra_device.h"
+    header "ra_telemetry.h"
+    header "ra_event.h"
+    header "ra_http.h"
+    header "ra_platform_llm.h"
+    header "ra_benchmark.h"
+    header "ra_server.h"
     header "rac_compat.h"
     link "RACommonsCore"
     export *

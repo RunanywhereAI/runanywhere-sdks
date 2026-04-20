@@ -343,6 +343,15 @@ ra_status_t ra_ww_feed_audio(ra_ww_session_t* session,
                              int32_t          sample_rate_hz,
                              uint8_t*         detected);  // 0/non-zero, not C bool
 
+// Same, but accepts int16 PCM (saves a float conversion on Android
+// AudioRecord and similar APIs that natively deliver s16le frames).
+// Internally converts to float32 and dispatches to ra_ww_feed_audio.
+ra_status_t ra_ww_feed_audio_s16(ra_ww_session_t* session,
+                                  const int16_t*   pcm_s16,
+                                  int32_t          num_samples,
+                                  int32_t          sample_rate_hz,
+                                  uint8_t*         detected);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

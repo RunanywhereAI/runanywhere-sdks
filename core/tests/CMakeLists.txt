@@ -25,6 +25,7 @@ set(_ra_core_test_sources
     llm_metrics_test.cpp
     auth_manager_test.cpp
     plugin_registry_abi_test.cpp
+    abi_extensions_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
@@ -39,6 +40,7 @@ target_link_libraries(ra_core_tests
     PRIVATE
         RunAnywhere::core
         RunAnywhere::core_voice_pipeline
+        RunAnywhere::core_abi_ext
         RunAnywhere::platform_flags
         RunAnywhere::sanitizers
         GTest::gtest

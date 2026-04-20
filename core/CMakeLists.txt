@@ -261,6 +261,62 @@ endif()
 set_target_properties(ra_core_util PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_util ALIAS ra_core_util)
 
+# --- Phase A ABI extension targets ------------------------------------------
+# Each new ABI module landed in Phase A is grouped into a single static lib
+# `ra_core_abi_ext` that pulls in the helpers from ra_core_util / ra_core_net /
+# ra_core_model_registry as needed. Frontends link the umbrella `ra_core` and
+# get all of these symbols.
+option(RA_BUILD_SERVER  "Build the OpenAI-compatible HTTP server"  OFF)
+option(RA_BUILD_VLM     "Build VLM dispatch (text+image)"          ON)
+option(RA_BUILD_DIFFUSION "Build diffusion dispatch (text→image)"  ON)
+
+set(_ra_core_abi_ext_sources
+    abi/ra_tool.cpp
+    abi/ra_structured.cpp
+    abi/ra_image.cpp
+    abi/ra_file.cpp
+    abi/ra_storage.cpp
+    abi/ra_extract.cpp
+    abi/ra_device.cpp
+    abi/ra_telemetry.cpp
+    abi/ra_event.cpp
+    abi/ra_http.cpp
+    abi/ra_platform_llm.cpp
+    abi/ra_benchmark.cpp
+    abi/ra_download.cpp
+)
+if(RA_BUILD_VLM)
+    list(APPEND _ra_core_abi_ext_sources abi/ra_vlm.cpp)
+endif()
+if(RA_BUILD_DIFFUSION)
+    list(APPEND _ra_core_abi_ext_sources abi/ra_diffusion.cpp)
+endif()
+if(RA_BUILD_SERVER)
+    list(APPEND _ra_core_abi_ext_sources abi/ra_server.cpp)
+endif()
+
+add_library(ra_core_abi_ext STATIC ${_ra_core_abi_ext_sources})
+target_include_directories(ra_core_abi_ext PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ra_core_abi_ext
+    PUBLIC  ra_core_abi
+            ra_core_util
+            ra_core_net
+            ra_core_model_registry
+            ra_core_router
+            ra_core_registry
+            ra_core_state_abi
+            RunAnywhere::platform_flags
+    PRIVATE RunAnywhere::sanitizers
+)
+if(RA_BUILD_SERVER)
+    target_compile_definitions(ra_core_abi_ext PUBLIC RA_BUILD_SERVER=1)
+endif()
+set_target_properties(ra_core_abi_ext PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(RunAnywhere::core_abi_ext ALIAS ra_core_abi_ext)
+
 # --- L3 primitive dispatch ---------------------------------------------------
 # Implements the public `ra_llm_create / ra_llm_generate / ra_llm_*` C ABI
 # declared in core/abi/ra_primitives.h. Without this, those symbols are
@@ -345,6 +401,7 @@ target_link_libraries(ra_core INTERFACE
     ra_core_llm_dispatch
     ra_core_state_abi
     ra_core_pipeline_abi
+    ra_core_abi_ext
 )
 add_library(RunAnywhere::core ALIAS ra_core)
 
@@ -395,6 +452,7 @@ if(APPLE)
         -Wl,-force_load,$<TARGET_FILE:ra_core_pipeline_abi>
         -Wl,-force_load,$<TARGET_FILE:ra_core_llm_dispatch>
         -Wl,-force_load,$<TARGET_FILE:ra_core_state_abi>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_abi_ext>
         -Wl,-force_load,$<TARGET_FILE:ra_core_voice_pipeline>
         -Wl,-force_load,$<TARGET_FILE:ra_core_graph>
         -Wl,-force_load,$<TARGET_FILE:ra_core_registry>
@@ -403,6 +461,7 @@ if(APPLE)
         -Wl,-force_load,$<TARGET_FILE:ra_core_net>
         -Wl,-force_load,$<TARGET_FILE:ra_core_util>
         ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi
+        ra_core_abi_ext
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
     )
@@ -416,7 +475,7 @@ elseif(UNIX)
         -Wl,--unresolved-symbols=ignore-all)
     target_link_libraries(racommons_core PRIVATE
         -Wl,--whole-archive ra_core_abi ra_core_pipeline_abi
-        ra_core_llm_dispatch ra_core_state_abi
+        ra_core_llm_dispatch ra_core_state_abi ra_core_abi_ext
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
         -Wl,--no-whole-archive
@@ -424,6 +483,7 @@ elseif(UNIX)
 else()
     target_link_libraries(racommons_core PRIVATE
         ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi
+        ra_core_abi_ext
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
     )
@@ -462,6 +522,7 @@ install(TARGETS
             ra_core_llm_dispatch
             ra_core_state_abi
             ra_core_pipeline_abi
+            ra_core_abi_ext
         EXPORT RunAnywhereTargets
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib

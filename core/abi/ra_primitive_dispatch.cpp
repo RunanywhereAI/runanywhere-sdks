@@ -14,6 +14,7 @@
 #include "../router/engine_router.h"
 #include "../router/hardware_profile.h"
 
+#include <memory>
 #include <new>
 
 namespace {
@@ -268,6 +269,26 @@ ra_status_t ra_ww_feed_audio(ra_ww_session_t* session, const float* pcm,
     auto* w = reinterpret_cast<WWDispatch*>(session);
     if (!w || !w->plugin || !w->plugin->vtable.ww_feed_audio) return RA_ERR_INVALID_ARGUMENT;
     return w->plugin->vtable.ww_feed_audio(w->inner, pcm, n, sr, detected);
+}
+
+ra_status_t ra_ww_feed_audio_s16(ra_ww_session_t* session, const int16_t* pcm_s16,
+                                  int32_t n, int32_t sr, uint8_t* detected) {
+    if (!pcm_s16 || n <= 0) return RA_ERR_INVALID_ARGUMENT;
+    // Convert int16 → float32 in 1/32768 normalisation (matches AudioRecord
+    // PCM_16BIT scaling). Stack-buffered up to 4kB; heap fallback otherwise
+    // to avoid pathological allocations on long buffers.
+    constexpr int32_t kStackSamples = 1024;
+    float             stack_buf[kStackSamples];
+    float*            buf = stack_buf;
+    std::unique_ptr<float[]> heap;
+    if (n > kStackSamples) {
+        heap = std::make_unique<float[]>(static_cast<std::size_t>(n));
+        buf  = heap.get();
+    }
+    for (int32_t i = 0; i < n; ++i) {
+        buf[i] = static_cast<float>(pcm_s16[i]) / 32768.0f;
+    }
+    return ra_ww_feed_audio(session, buf, n, sr, detected);
 }
 
 }  // extern "C"
