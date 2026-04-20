@@ -27,6 +27,7 @@ set(_ra_core_test_sources
     plugin_registry_abi_test.cpp
     abi_extensions_test.cpp
     ra_auth_abi_test.cpp
+    ra_telemetry_abi_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
