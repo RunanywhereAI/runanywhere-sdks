@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../voice_pipeline/sentence_detector.h"
+#include "sentence_detector.h"
 #include <gtest/gtest.h>
 
 #include <string>

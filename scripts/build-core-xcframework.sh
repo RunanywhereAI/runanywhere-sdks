@@ -161,7 +161,7 @@ SLICE_ARGS=()
 HEADERS_DIR="${BUILD_ROOT}/headers"
 rm -rf "${HEADERS_DIR}"
 mkdir -p "${HEADERS_DIR}"
-cp "${ROOT}/core/abi/"*.h "${HEADERS_DIR}/"
+cp "${ROOT}/core/Public/"*.h "${HEADERS_DIR}/"
 
 # Module map so Swift `import CRACommonsCore` resolves the C headers.
 cat > "${HEADERS_DIR}/module.modulemap" <<'MAP'

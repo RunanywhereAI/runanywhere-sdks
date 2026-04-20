@@ -15,7 +15,7 @@
 //
 // Skipped under RA_STATIC_PLUGINS.
 
-#include "../registry/plugin_registry.h"
+#include "plugin_registry.h"
 
 #include <gtest/gtest.h>
 

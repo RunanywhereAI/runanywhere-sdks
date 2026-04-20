@@ -13,7 +13,7 @@
 // already linked and their RA_STATIC_PLUGIN_REGISTER constructors fire
 // at process start, so dlopen has nothing to do.
 
-#include "../registry/plugin_registry.h"
+#include "plugin_registry.h"
 
 #include <gtest/gtest.h>
 

@@ -9,10 +9,10 @@
 #include <string>
 #include <vector>
 
-#include "../abi/ra_errors.h"
-#include "../net/environment.h"
-#include "../net/http_client.h"
-#include "../util/audio_utils.h"
+#include "ra_errors.h"
+#include "environment.h"
+#include "http_client.h"
+#include "audio_utils.h"
 
 using ra::core::net::AuthManager;
 using ra::core::net::default_endpoints_for;

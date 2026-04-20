@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../graph/stream_edge.h"
-#include "../graph/cancel_token.h"
+#include "stream_edge.h"
+#include "cancel_token.h"
 #include <gtest/gtest.h>
 
 #include <thread>

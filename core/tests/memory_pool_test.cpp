@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../graph/memory_pool.h"
+#include "memory_pool.h"
 #include <gtest/gtest.h>
 
 using ra::core::MemoryPool;

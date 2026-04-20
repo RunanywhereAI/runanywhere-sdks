@@ -1,0 +1,99 @@
+# RunAnywhere v2 C++ core — Linux end-to-end build + test image.
+#
+# Two-stage: (1) builder with full toolchain + deps, (2) slim runtime that
+# only ships the built binaries, unit tests, and minimal shared libs.
+#
+# Build:
+#   docker build -f infra/docker/Dockerfile.cpp-linux -t ra-core-linux .
+# Run tests:
+#   docker run --rm ra-core-linux
+# Run OpenAI server:
+#   docker run --rm -p 8080:8080 -e RA_TEST_GGUF=/models/model.gguf \
+#              -v $HOME/.ra-models:/models ra-core-linux runanywhere-server
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CC=clang-18
+ENV CXX=clang++-18
+
+# Full build toolchain. libcurl + libssl enable the real HTTP client +
+# model downloader + telemetry. libarchive enables archive extraction.
+# protobuf is needed for idl/. googletest is pulled from apt; if missing
+# core's CMake will fall back to FetchContent.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        clang-18 \
+        cmake \
+        curl \
+        git \
+        libarchive-dev \
+        libcurl4-openssl-dev \
+        libgtest-dev \
+        libprotobuf-dev \
+        libssl-dev \
+        ninja-build \
+        pkg-config \
+        protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy only what the C++ build needs. Frontends (sdk/{swift,kotlin,dart,ts,web})
+# are excluded — this image does not build them.
+COPY CMakeLists.txt CMakePresets.json ./
+COPY cmake/    cmake/
+COPY core/     core/
+COPY engines/  engines/
+COPY solutions/ solutions/
+COPY tools/    tools/
+COPY idl/      idl/
+
+# Linux C++ build. Disable sanitizers — the tests run in Release mode for
+# integration coverage. Disable sherpa engine (fetches 30 MB tarball at
+# configure time; slow + flaky in CI). Disable whispercpp stub (tracked
+# in A5). Enable RA_BUILD_SERVER for the OpenAI harness.
+RUN cmake -S . -B build -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DRA_BUILD_TESTS=ON \
+        -DRA_BUILD_SERVER=ON \
+        -DRA_BUILD_ENGINES=ON \
+        -DRA_BUILD_SOLUTIONS=ON \
+        -DRA_BUILD_SHERPA=OFF \
+        -DRA_ENABLE_SANITIZERS=OFF \
+        -DRA_DISABLE_JNI_BRIDGE=ON \
+    && cmake --build build -j "$(nproc)"
+
+# ---------------------------------------------------------------------------
+# Runtime image — only what's needed to execute ctest + the OpenAI server.
+# ---------------------------------------------------------------------------
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        cmake \
+        libarchive13t64 \
+        libcurl4t64 \
+        libprotobuf32t64 \
+        libssl3t64 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+COPY --from=builder /workspace/build    /workspace/build
+COPY --from=builder /workspace/CMakeLists.txt /workspace/CMakeLists.txt
+COPY --from=builder /workspace/core     /workspace/core
+COPY --from=builder /workspace/engines  /workspace/engines
+COPY --from=builder /workspace/solutions /workspace/solutions
+COPY --from=builder /workspace/tools    /workspace/tools
+COPY --from=builder /workspace/idl      /workspace/idl
+
+# Symlink server binary onto PATH if/when A3 produces one.
+RUN if [ -f /workspace/build/solutions/openai-server/runanywhere-server ]; then \
+        ln -s /workspace/build/solutions/openai-server/runanywhere-server /usr/local/bin/runanywhere-server; \
+    fi
+
+EXPOSE 8080
+
+WORKDIR /workspace/build
+ENTRYPOINT ["ctest", "--output-on-failure"]

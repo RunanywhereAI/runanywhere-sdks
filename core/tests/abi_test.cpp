@@ -9,8 +9,8 @@
 #include <gtest/gtest.h>
 
 extern "C" {
-#include "../abi/ra_primitives.h"
-#include "../abi/ra_version.h"
+#include "ra_primitives.h"
+#include "ra_version.h"
 }
 
 TEST(AbiStatusStr, AllKnownCodesHaveDescriptiveString) {

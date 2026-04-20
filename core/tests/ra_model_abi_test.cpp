@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-#include "../abi/ra_model.h"
-#include "../abi/ra_primitives.h"
+#include "ra_model.h"
+#include "ra_primitives.h"
 
 TEST(RaModelAbi, FrameworkSupportMatrix) {
     EXPECT_EQ(ra_framework_supports("llamacpp", "llm"),       1);

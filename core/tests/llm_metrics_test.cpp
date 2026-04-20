@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-#include "../util/llm_metrics.h"
+#include "llm_metrics.h"
 
 #include <gtest/gtest.h>
 

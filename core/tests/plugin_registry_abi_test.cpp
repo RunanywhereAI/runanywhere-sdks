@@ -4,8 +4,8 @@
 // Smoke test for the public ra_registry_* C ABI (used by every frontend
 // SDK's loadPlugin path).
 
-#include "../abi/ra_primitives.h"
-#include "../abi/ra_plugin.h"
+#include "ra_primitives.h"
+#include "ra_plugin.h"
 
 #include <gtest/gtest.h>
 

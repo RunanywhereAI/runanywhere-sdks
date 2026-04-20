@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-#include "../graph/ring_buffer.h"
+#include "ring_buffer.h"
 
 #include <gtest/gtest.h>
 

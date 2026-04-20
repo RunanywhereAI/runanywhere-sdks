@@ -91,7 +91,13 @@ if(RA_BUILD_ENGINES)
     # in the per-engine CMakeLists.txt.
     add_subdirectory(engines/onnx)
     add_subdirectory(engines/whisperkit)
-    add_subdirectory(engines/whispercpp)
+    # whispercpp is opt-in — without a real whisper.cpp link it just
+    # registers a placeholder that returns RA_ERR_CAPABILITY_UNSUPPORTED.
+    # Skip it by default to keep the plugin list clean on default builds.
+    option(RA_BUILD_WHISPERCPP "Include engines/whispercpp plugin" OFF)
+    if(RA_BUILD_WHISPERCPP)
+        add_subdirectory(engines/whispercpp)
+    endif()
     add_subdirectory(engines/metalrt)
     add_subdirectory(engines/genie)
     add_subdirectory(engines/diffusion-coreml)

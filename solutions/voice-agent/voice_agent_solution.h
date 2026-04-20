@@ -9,7 +9,7 @@
 
 #include <memory>
 
-#include "../../core/voice_pipeline/voice_pipeline.h"
+#include "voice_pipeline.h"
 
 namespace ra::solutions {
 

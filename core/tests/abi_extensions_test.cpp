@@ -8,18 +8,18 @@
 
 #include <gtest/gtest.h>
 
-#include "../abi/ra_benchmark.h"
-#include "../abi/ra_device.h"
-#include "../abi/ra_event.h"
-#include "../abi/ra_extract.h"
-#include "../abi/ra_file.h"
-#include "../abi/ra_http.h"
-#include "../abi/ra_image.h"
-#include "../abi/ra_platform_llm.h"
-#include "../abi/ra_storage.h"
-#include "../abi/ra_structured.h"
-#include "../abi/ra_telemetry.h"
-#include "../abi/ra_tool.h"
+#include "ra_benchmark.h"
+#include "ra_device.h"
+#include "ra_event.h"
+#include "ra_extract.h"
+#include "ra_file.h"
+#include "ra_http.h"
+#include "ra_image.h"
+#include "ra_platform_llm.h"
+#include "ra_storage.h"
+#include "ra_structured.h"
+#include "ra_telemetry.h"
+#include "ra_tool.h"
 
 #include <cstring>
 #include <string>

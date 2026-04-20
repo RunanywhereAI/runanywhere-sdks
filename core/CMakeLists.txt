@@ -12,17 +12,29 @@
 # every consumer (sdk/{swift,kotlin,dart,ts,web}, engines/*, solutions/*)
 # calls ra_* directly.
 set(_ra_core_abi_sources
-    abi/ra_version.c
-    abi/ra_status.c
-    abi/ra_errors.c
-    abi/ra_lifecycle.c
-    abi/ra_platform_adapter.c
-    abi/ra_core_init.c
+    Public/ra_version.c
+    Public/ra_status.c
+    Public/ra_errors.c
+    Public/ra_lifecycle.c
+    Public/ra_platform_adapter.c
+    Public/ra_core_init.c
 )
 add_library(ra_core_abi STATIC ${_ra_core_abi_sources})
+# Expose every reorganized subdir as an include root so consumers can keep
+# using short `#include "ra_primitives.h"` / `"plugin_registry.h"` etc.
 target_include_directories(ra_core_abi PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/abi>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Public>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Core/Graph>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Core/Registry>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Core/Router>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Foundation>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Features/VoiceAgent>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Infrastructure/Network>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Infrastructure/ModelManagement>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Infrastructure/FileManagement>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Infrastructure/Extraction>
     $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:include/runanywhere>
 )
 set_target_properties(ra_core_abi PROPERTIES
     POSITION_INDEPENDENT_CODE ON
@@ -34,7 +46,7 @@ add_library(RunAnywhere::core_abi ALIAS ra_core_abi)
 
 # --- L4: graph + runtime -----------------------------------------------------
 add_library(ra_core_graph STATIC
-    graph/graph_scheduler.cpp
+    Core/Graph/graph_scheduler.cpp
 )
 target_include_directories(ra_core_graph PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -49,7 +61,7 @@ add_library(RunAnywhere::core_graph ALIAS ra_core_graph)
 
 # --- Plugin registry + loader ------------------------------------------------
 add_library(ra_core_registry STATIC
-    registry/plugin_registry.cpp
+    Core/Registry/plugin_registry.cpp
 )
 target_include_directories(ra_core_registry PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -64,8 +76,8 @@ add_library(RunAnywhere::core_registry ALIAS ra_core_registry)
 
 # --- Engine router + hardware profile ----------------------------------------
 add_library(ra_core_router STATIC
-    router/hardware_profile.cpp
-    router/engine_router.cpp
+    Core/Router/hardware_profile.cpp
+    Core/Router/engine_router.cpp
 )
 target_include_directories(ra_core_router PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -80,9 +92,9 @@ add_library(RunAnywhere::core_router ALIAS ra_core_router)
 
 # --- VoiceAgent concrete pipeline (port of RCLI / FastVoice orchestrator) ----
 add_library(ra_core_voice_pipeline STATIC
-    voice_pipeline/sentence_detector.cpp
-    voice_pipeline/text_sanitizer.cpp
-    voice_pipeline/voice_pipeline.cpp
+    Features/VoiceAgent/sentence_detector.cpp
+    Features/VoiceAgent/text_sanitizer.cpp
+    Features/VoiceAgent/voice_pipeline.cpp
 )
 target_include_directories(ra_core_voice_pipeline PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -98,25 +110,25 @@ add_library(RunAnywhere::core_voice_pipeline ALIAS ra_core_voice_pipeline)
 
 # --- Model registry ----------------------------------------------------------
 set(_ra_core_model_registry_sources
-    model_registry/model_registry.cpp
-    model_registry/lora_registry.cpp
-    model_registry/model_compatibility.cpp
+    Infrastructure/ModelManagement/model_registry.cpp
+    Infrastructure/ModelManagement/lora_registry.cpp
+    Infrastructure/ModelManagement/model_compatibility.cpp
 )
 option(RA_BUILD_MODEL_DOWNLOADER
     "Build the libcurl-backed model downloader (requires libcurl)" ON)
 if(RA_BUILD_MODEL_DOWNLOADER)
-    list(APPEND _ra_core_model_registry_sources model_registry/model_downloader.cpp)
+    list(APPEND _ra_core_model_registry_sources Infrastructure/ModelManagement/model_downloader.cpp)
 else()
     # Stub ModelDownloader::create() that returns nullptr so downstream
     # callers (ra_download.cpp) fall through to the platform-adapter path.
-    list(APPEND _ra_core_model_registry_sources model_registry/model_downloader_stub.cpp)
+    list(APPEND _ra_core_model_registry_sources Infrastructure/ModelManagement/model_downloader_stub.cpp)
 endif()
 add_library(ra_core_model_registry STATIC ${_ra_core_model_registry_sources})
 if(RA_BUILD_MODEL_DOWNLOADER AND NOT APPLE AND NOT WIN32)
     # OpenSSL 3.0 (ubuntu 22.04+) deprecated SHA256_* in favor of EVP_*.
     # The legacy calls still work but produce warnings that kill -Werror.
     # Suppress only for this file; the rest of the core keeps -Werror.
-    set_source_files_properties(model_registry/model_downloader.cpp
+    set_source_files_properties(Infrastructure/ModelManagement/model_downloader.cpp
         PROPERTIES COMPILE_FLAGS "-Wno-deprecated-declarations")
 endif()
 target_include_directories(ra_core_model_registry PUBLIC
@@ -174,13 +186,13 @@ add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 # (URLSession on iOS, OkHttp on Android, fetch on Web).
 option(RA_BUILD_HTTP_CLIENT
     "Build the libcurl-backed HTTP client + telemetry (requires libcurl)" ON)
-set(_ra_core_net_sources net/environment.cpp)
+set(_ra_core_net_sources Infrastructure/Network/environment.cpp)
 if(RA_BUILD_HTTP_CLIENT)
-    list(APPEND _ra_core_net_sources net/http_client.cpp net/telemetry.cpp)
+    list(APPEND _ra_core_net_sources Infrastructure/Network/http_client.cpp Infrastructure/Network/telemetry.cpp)
 else()
     # Stub TelemetryManager so ra_core_abi_ext (telemetry.cpp) links
     # without pulling in the libcurl-backed uploader.
-    list(APPEND _ra_core_net_sources net/telemetry_stub.cpp)
+    list(APPEND _ra_core_net_sources Infrastructure/Network/telemetry_stub.cpp)
 endif()
 add_library(ra_core_net STATIC ${_ra_core_net_sources})
 target_include_directories(ra_core_net PUBLIC
@@ -203,7 +215,7 @@ set_target_properties(ra_core_net PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_net ALIAS ra_core_net)
 
 # --- Utilities (audio, file manager, VAD, tool calling, LLM metrics) --------
-# util/extraction.cpp depends on libarchive which is absent on iOS / Android
+# Infrastructure/Extraction/extraction.cpp depends on libarchive which is absent on iOS / Android
 # NDK / WASM. Platforms that lack it pass -DRA_BUILD_EXTRACTION=OFF; apps
 # bring their own unzip (Compress framework on Apple, libandroidicu on
 # Android NDK 32+, fflate/jszip on Web).
@@ -211,16 +223,16 @@ option(RA_BUILD_EXTRACTION
     "Build the libarchive-backed archive extractor (requires libarchive)" ON)
 
 set(_ra_core_util_sources
-    util/audio_utils.cpp
-    util/file_manager.cpp
-    util/storage_analyzer.cpp
-    util/tool_calling.cpp
-    util/structured_output.cpp
-    util/energy_vad.cpp
-    util/llm_metrics.cpp
+    Foundation/audio_utils.cpp
+    Infrastructure/FileManagement/file_manager.cpp
+    Infrastructure/FileManagement/storage_analyzer.cpp
+    Foundation/tool_calling.cpp
+    Foundation/structured_output.cpp
+    Foundation/energy_vad.cpp
+    Foundation/llm_metrics.cpp
 )
 if(RA_BUILD_EXTRACTION)
-    list(APPEND _ra_core_util_sources util/extraction.cpp)
+    list(APPEND _ra_core_util_sources Infrastructure/Extraction/extraction.cpp)
 endif()
 add_library(ra_core_util STATIC ${_ra_core_util_sources})
 target_include_directories(ra_core_util PUBLIC
@@ -266,31 +278,31 @@ option(RA_BUILD_VLM     "Build VLM dispatch (text+image)"          ON)
 option(RA_BUILD_DIFFUSION "Build diffusion dispatch (text→image)"  ON)
 
 set(_ra_core_abi_ext_sources
-    abi/ra_tool.cpp
-    abi/ra_structured.cpp
-    abi/ra_image.cpp
-    abi/ra_file.cpp
-    abi/ra_storage.cpp
-    abi/ra_extract.cpp
-    abi/ra_device.cpp
-    abi/ra_telemetry.cpp
-    abi/ra_event.cpp
-    abi/ra_http.cpp
-    abi/ra_platform_llm.cpp
-    abi/ra_benchmark.cpp
-    abi/ra_download.cpp
-    abi/ra_auth.cpp
-    abi/ra_model.cpp
-    abi/ra_rag.cpp
+    Public/ra_tool.cpp
+    Public/ra_structured.cpp
+    Public/ra_image.cpp
+    Public/ra_file.cpp
+    Public/ra_storage.cpp
+    Public/ra_extract.cpp
+    Public/ra_device.cpp
+    Public/ra_telemetry.cpp
+    Public/ra_event.cpp
+    Public/ra_http.cpp
+    Public/ra_platform_llm.cpp
+    Public/ra_benchmark.cpp
+    Public/ra_download.cpp
+    Public/ra_auth.cpp
+    Public/ra_model.cpp
+    Public/ra_rag.cpp
 )
 if(RA_BUILD_VLM)
-    list(APPEND _ra_core_abi_ext_sources abi/ra_vlm.cpp)
+    list(APPEND _ra_core_abi_ext_sources Public/ra_vlm.cpp)
 endif()
 if(RA_BUILD_DIFFUSION)
-    list(APPEND _ra_core_abi_ext_sources abi/ra_diffusion.cpp)
+    list(APPEND _ra_core_abi_ext_sources Public/ra_diffusion.cpp)
 endif()
 if(RA_BUILD_SERVER)
-    list(APPEND _ra_core_abi_ext_sources abi/ra_server.cpp)
+    list(APPEND _ra_core_abi_ext_sources Public/ra_server.cpp)
 endif()
 
 add_library(ra_core_abi_ext STATIC ${_ra_core_abi_ext_sources})
@@ -317,7 +329,7 @@ add_library(RunAnywhere::core_abi_ext ALIAS ra_core_abi_ext)
 
 # --- L3 primitive dispatch ---------------------------------------------------
 # Implements the public `ra_llm_create / ra_llm_generate / ra_llm_*` C ABI
-# declared in core/abi/ra_primitives.h. Without this, those symbols are
+# declared in core/Public/ra_primitives.h. Without this, those symbols are
 # extern-declared only and resolved by -undefined dynamic_lookup at
 # runtime against a specific engine plugin — which works inside the
 # voice pipeline (uses vtable directly) but breaks any frontend trying
@@ -325,8 +337,8 @@ add_library(RunAnywhere::core_abi_ext ALIAS ra_core_abi_ext)
 # wraps the engine's raw session in a typed handle carrying the vtable
 # pointer, and dispatches each subsequent call through that vtable.
 add_library(ra_core_llm_dispatch STATIC
-    abi/ra_llm_dispatch.cpp
-    abi/ra_primitive_dispatch.cpp
+    Public/ra_llm_dispatch.cpp
+    Public/ra_primitive_dispatch.cpp
 )
 target_include_directories(ra_core_llm_dispatch PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -341,12 +353,12 @@ set_target_properties(ra_core_llm_dispatch PROPERTIES POSITION_INDEPENDENT_CODE 
 add_library(RunAnywhere::core_llm_dispatch ALIAS ra_core_llm_dispatch)
 
 # --- State C ABI bridge ------------------------------------------------------
-# Implements ra_state_* C ABI declared in core/abi/ra_state.h. Thin
+# Implements ra_state_* C ABI declared in core/Public/ra_state.h. Thin
 # wrapper over AuthManager + Environment — needed because legacy
 # Swift/Kotlin bridges call rac_state_* at startup and throughout the
 # auth lifecycle.
 add_library(ra_core_state_abi STATIC
-    abi/ra_state.cpp
+    Public/ra_state.cpp
 )
 target_include_directories(ra_core_state_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -361,13 +373,13 @@ set_target_properties(ra_core_state_abi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_state_abi ALIAS ra_core_state_abi)
 
 # --- Pipeline C ABI bridge ---------------------------------------------------
-# Turns the `ra_pipeline_*` entry points in abi/ra_pipeline.h into a real
+# Turns the `ra_pipeline_*` entry points in Public/ra_pipeline.h into a real
 # bridge onto core/voice_pipeline + solutions/voice-agent. Uses plain C
 # structs, not proto3 — frontends do not need a protobuf runtime at link
 # time. The matching proto3 schemas in idl/*.proto remain the canonical IDL.
-# Defined after voice_pipeline/router/registry so link dependencies resolve.
+# Defined after Features/VoiceAgent/router/registry so link dependencies resolve.
 add_library(ra_core_pipeline_abi STATIC
-    abi/ra_pipeline.cpp
+    Public/ra_pipeline.cpp
 )
 target_include_directories(ra_core_pipeline_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -415,7 +427,7 @@ add_library(RunAnywhere::core ALIAS ra_core)
 #
 # Named `libracommons_core.dylib` on macOS to match the historical commons
 # name — downstream FFI bindings default-search for that filename.
-set(RA_SHARED_SOURCES abi/ra_shared_facade.c)
+set(RA_SHARED_SOURCES Public/ra_shared_facade.c)
 if(EXISTS ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
    AND NOT RA_DISABLE_JNI_BRIDGE)
     # JNI headers only needed on platforms where Kotlin host is expected
@@ -492,16 +504,13 @@ add_library(RunAnywhere::core_shared ALIAS racommons_core)
 # --- Install -----------------------------------------------------------------
 # Ship the full public header tree, not just abi/. Downstream consumers that
 # do `find_package(RunAnywhere)` and link `RunAnywhere::core` need the
-# graph/, registry/, router/, voice_pipeline/, model_registry/ headers too.
+# Core/Graph/, registry/, router/, Features/VoiceAgent/, Infrastructure/ModelManagement/ headers too.
 install(DIRECTORY
-            abi/
-            graph/
-            registry/
-            router/
-            voice_pipeline/
-            model_registry/
-            net/
-            util/
+            Public/
+            Core/
+            Foundation/
+            Features/
+            Infrastructure/
         DESTINATION include/runanywhere
         FILES_MATCHING
             PATTERN "*.h"

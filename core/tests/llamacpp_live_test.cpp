@@ -20,7 +20,7 @@
 // statically there and the whole filesystem-based dlopen path is
 // inapplicable.
 
-#include "../registry/plugin_registry.h"
+#include "plugin_registry.h"
 
 #include <gtest/gtest.h>
 

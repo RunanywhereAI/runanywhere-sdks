@@ -5,7 +5,7 @@
 // and concurrent reader/writer stress. The existing plugin_registry_test.cpp
 // covers the happy-path; this file covers the corners.
 
-#include "../registry/plugin_registry.h"
+#include "plugin_registry.h"
 
 #include <gtest/gtest.h>
 

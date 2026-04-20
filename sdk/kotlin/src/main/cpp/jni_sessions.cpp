@@ -11,10 +11,10 @@
 #include <string>
 #include <vector>
 
-#include "../../../../../core/abi/ra_primitives.h"
-#include "../../../../../core/abi/ra_state.h"
-#include "../../../../../core/abi/ra_core_init.h"
-#include "../../../../../core/abi/ra_platform_adapter.h"
+#include "ra_primitives.h"
+#include "ra_state.h"
+#include "ra_core_init.h"
+#include "ra_platform_adapter.h"
 
 namespace {
 

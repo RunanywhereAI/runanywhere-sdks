@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-#include "../util/energy_vad.h"
+#include "energy_vad.h"
 
 #include <gtest/gtest.h>
 

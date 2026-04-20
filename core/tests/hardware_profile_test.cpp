@@ -10,7 +10,7 @@
 // a battery of self-consistency invariants that catch regressions in the
 // detection logic.
 
-#include "../router/hardware_profile.h"
+#include "hardware_profile.h"
 
 #include <gtest/gtest.h>
 

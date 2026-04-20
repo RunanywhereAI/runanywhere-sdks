@@ -3,9 +3,9 @@
 
 #include <gtest/gtest.h>
 
-#include "../abi/ra_auth.h"
-#include "../abi/ra_state.h"
-#include "../abi/ra_primitives.h"
+#include "ra_auth.h"
+#include "ra_state.h"
+#include "ra_primitives.h"
 
 #include <cstdlib>
 #include <cstring>

@@ -123,10 +123,10 @@ final class APICompatibilityTests: XCTestCase {
         _ = await RunAnywhere.deleteModel("nonexistent-id")
     }
 
-    func testDownloadModelReturnsAsyncStream() {
+    func testDownloadModelReturnsAsyncStream() async throws {
         // Type-only check — we're not executing the download.
-        let stream: AsyncThrowingStream<DownloadProgress, Error> =
-            RunAnywhere.downloadModel("nonexistent-id")
+        let stream: AsyncStream<DownloadProgress> =
+            try await RunAnywhere.downloadModel("nonexistent-id")
         _ = stream
     }
 

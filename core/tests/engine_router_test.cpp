@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../router/engine_router.h"
+#include "engine_router.h"
 #include <gtest/gtest.h>
 
 #include <array>

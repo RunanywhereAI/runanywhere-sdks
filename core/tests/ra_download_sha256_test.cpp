@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-#include "../abi/ra_download.h"
-#include "../abi/ra_primitives.h"
+#include "ra_download.h"
+#include "ra_primitives.h"
 
 #include <cstdio>
 #include <cstdlib>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-#include "../util/tool_calling.h"
+#include "tool_calling.h"
 
 #include <gtest/gtest.h>
 

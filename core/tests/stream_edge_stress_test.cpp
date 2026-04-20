@@ -9,8 +9,8 @@
 // This suite is deliberately heavier than stream_edge_test.cpp — every
 // test here spawns ≥2 threads. Green under ASan/UBSan and TSan.
 
-#include "../graph/stream_edge.h"
-#include "../graph/cancel_token.h"
+#include "stream_edge.h"
+#include "cancel_token.h"
 
 #include <gtest/gtest.h>
 

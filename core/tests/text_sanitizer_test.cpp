@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-#include "../voice_pipeline/text_sanitizer.h"
+#include "text_sanitizer.h"
 #include <gtest/gtest.h>
 
 using ra::core::TextSanitizer;

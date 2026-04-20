@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "../../../../../core/abi/ra_pipeline.h"
+#include "ra_pipeline.h"
 
 namespace {
 

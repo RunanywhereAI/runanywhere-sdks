@@ -16,9 +16,9 @@
 //
 // Real inference is out of scope; this is a structural / concurrency test.
 
-#include "../voice_pipeline/voice_pipeline.h"
-#include "../registry/plugin_registry.h"
-#include "../router/engine_router.h"
+#include "voice_pipeline.h"
+#include "plugin_registry.h"
+#include "engine_router.h"
 
 #include <gtest/gtest.h>
 
