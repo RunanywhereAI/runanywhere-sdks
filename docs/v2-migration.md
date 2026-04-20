@@ -1,119 +1,142 @@
 # RunAnywhere v1 → v2 migration
 
-This document describes the coexistence strategy for v1 (existing
-`sdk/runanywhere-*`) and v2 (`core/`, `engines/`, `solutions/`, `frontends/`)
-during the rewrite. **v1 keeps shipping unchanged** until the Phase 1 gate
-lands; v2 is additive.
+The legacy `sdk/runanywhere-*` packages (v1) have been replaced by the v2
+architecture (`core/` C++20 + `engines/` plugins + `sdk/{swift,kotlin,dart,ts,web}/`
+thin frontends). This document summarises the mapping for developers who
+wrote code against v1.
 
-## Layout
+## Directory layout
 
-| v1 (current, unchanged)       | v2 (new, bootstrapped in this PR)     |
-| ----------------------------- | ------------------------------------- |
-| `sdk/runanywhere-commons/`    | `core/` (+ `engines/`, `solutions/`)  |
-| `sdk/runanywhere-swift/`      | `frontends/swift/`                    |
-| `sdk/runanywhere-kotlin/`     | `frontends/kotlin/`                   |
-| `sdk/runanywhere-flutter/`    | `frontends/dart/`                     |
-| `sdk/runanywhere-react-native/` | `frontends/ts/`                     |
-| `sdk/runanywhere-web/`        | `frontends/web/`                      |
+| v1 (deleted)                          | v2 (now canonical)                 |
+| ------------------------------------- | ---------------------------------- |
+| `sdk/runanywhere-commons/`            | `core/` (+ `engines/`, `solutions/`) |
+| `sdk/runanywhere-swift/`              | `sdk/swift/`                        |
+| `sdk/runanywhere-kotlin/`             | `sdk/kotlin/`                       |
+| `sdk/runanywhere-flutter/`            | `sdk/dart/`                         |
+| `sdk/runanywhere-react-native/`       | `sdk/ts/` (+ future `sdk/rn/`)      |
+| `sdk/runanywhere-web/`                | `sdk/web/`                          |
 
-## What this PR includes
+The public API shape (method names, argument types) is preserved — only
+the dependency paths change.
 
-The bootstrap PR contains the **complete v2 skeleton** with every
-integration point defined:
+## C ABI mapping: `rac_*` → `ra_*`
 
-- ✅ proto3 IDL (`idl/voice_events.proto`, `pipeline.proto`, `solutions.proto`)
-- ✅ C ABI (`core/abi/ra_primitives.h`, `ra_pipeline.h`, `ra_plugin.h`)
-- ✅ L4 graph primitives (`RingBuffer`, `MemoryPool`, `StreamEdge`,
-  `CancelToken`, `PipelineNode`, `GraphScheduler`)
-- ✅ L2 plugin system (`PluginRegistry`, `PluginLoader<VTABLE>`,
-  static iOS / dlopen Android dual-path)
-- ✅ L3 engine router + `HardwareProfile`
-- ✅ Concrete VoiceAgent pipeline with transactional barge-in cancellation
-- ✅ L5 solutions: VoiceAgent + RAG (BM25 + HybridRetriever ported from
-  FastVoice)
-- ✅ L2 engine plugins: llamacpp, sherpa, wakeword (vtable structure +
-  stub implementations that return a clear error instead of silently lying)
-- ✅ L6 frontends for all 5 languages: Swift (SwiftPM), Kotlin (Gradle),
-  Dart (pub), TS / RN (npm), Web (npm + WASM build)
-- ✅ CMake build (presets for macOS / Linux / iOS / Android / WASM) with
-  ASan, UBSan, and TSan wired
-- ✅ vcpkg dependency manifest
-- ✅ CI workflow (`.github/workflows/v2-core.yml`) that builds C++ core
-  + runs every frontend's native lint/test on every PR
-- ✅ codegen scripts for all 5 languages (`idl/codegen/generate_*.sh`)
-- ✅ unit tests for ring buffer, memory pool, cancel token, stream edge,
-  sentence detector, text sanitizer, plugin registry, engine router
-- ✅ per-primitive benchmark harness (`tools/benchmark/ra_bench`)
-- ✅ pipeline validator stub (`tools/pipeline-validator/ra_validate`)
+Every legacy `rac_*` symbol now has a `ra_*` equivalent in `core/abi/`.
+Notable mappings:
 
-## What this PR does NOT include (next PRs)
+### Core
 
-- The actual llama.cpp / sherpa-onnx / sherpa-wakeword C integrations —
-  the plugin vtables are wired but the implementations return
-  `RA_ERR_RUNTIME_UNAVAILABLE`. This is intentional: the engine work is
-  large enough to deserve its own PR per engine.
-- JNI/JSI/FFI bridges from L6 frontends to the C ABI. The frontends
-  currently emit a clear `backendUnavailable` error when you call
-  `session.run()`; this is the correct path while the bridges are landed
-  one platform at a time.
-- Proto codegen output (`frontends/*/Generated/`, `frontends/*/generated/`
-  directories). These are populated on the first run of
-  `idl/codegen/generate_*.sh` and committed. CI verifies they are in sync.
-- Port of the existing v1 examples to use the v2 adapters. v1 examples
-  continue to work against the v1 SDKs unchanged.
+| v1 `rac_*` | v2 `ra_*` | Header |
+|---|---|---|
+| `rac_init` / `rac_shutdown` | `ra_init` / `ra_shutdown` | `ra_core_init.h` |
+| `rac_state_initialize` | `ra_state_initialize` | `ra_state.h` |
+| `rac_logger_*` | `ra_logger_*` | `ra_core_init.h` |
 
-## Migration order
+### Plugins & sessions
 
-Per `thoughts/shared/plans/v2_rearchitecture/MASTER_PLAN.md`:
+| v1 | v2 |
+|---|---|
+| `rac_llm_*` | `ra_llm_*` on `ra_engine_vtable_t.llm_*` slots |
+| `rac_stt_*` | `ra_stt_*` |
+| `rac_tts_*` | `ra_tts_*` |
+| `rac_vad_*` | `ra_vad_*` |
+| `rac_wakeword_*` | `ra_ww_*` |
+| `rac_embed_*` | `ra_embed_*` |
+| `rac_vlm_*` | `ra_vlm_*` (header: `ra_vlm.h`) |
+| `rac_diffusion_*` | `ra_diffusion_*` (header: `ra_diffusion.h`) |
 
-1. **Phase 0** (this PR + next few): C++ core + VoiceAgent pipeline with
-   real llama.cpp/sherpa integrations; macOS/Linux benchmarks.
-2. **Phase 1**: Swift frontend + iOS XCFramework.
-3. **Phase 2**: Kotlin frontend + Android + RAG solution shipping.
-4. **Phase 3**: Dart, TS/RN, Web frontends + L1 runtimes (ORT, ExecuTorch,
-   MLX, CoreML) + production CI.
+### Feature modules
 
-The hard go/no-go gate for each phase is in the MASTER_PLAN. Do not
-advance phases without passing the gate.
+| v1 | v2 |
+|---|---|
+| `rac_tool_*` | `ra_tool_*` (header: `ra_tool.h`) |
+| `rac_structured_*` | `ra_structured_*` (header: `ra_structured.h`) |
+| `rac_rag_*` | `ra_rag_*` (header: `ra_rag.h`, planned) |
+| `rac_auth_*` | `ra_auth_*` (header: `ra_auth.h`) |
+| `rac_telemetry_*` | `ra_telemetry_*` (header: `ra_telemetry.h`) |
+| `rac_download_*` | `ra_download_*` (header: `ra_download.h`) |
+| `rac_file_*` | `ra_file_*` (header: `ra_file.h`) |
+| `rac_storage_*` | `ra_storage_*` (header: `ra_storage.h`) |
+| `rac_extract_*` | `ra_extract_*` (header: `ra_extract.h`) |
+| `rac_device_*` | `ra_device_*` (header: `ra_device.h`) |
+| `rac_event_*` | `ra_event_*` (header: `ra_event.h`) |
+| `rac_http_*` | `ra_http_*` (header: `ra_http.h`) |
+| `rac_platform_llm_*` | `ra_platform_llm_*` (header: `ra_platform_llm.h`) |
+| `rac_benchmark_*` | `ra_benchmark_*` (header: `ra_benchmark.h`) |
+| `rac_image_*` | `ra_image_*` (header: `ra_image.h`) |
+| `rac_model_*` | `ra_model_*` (header: `ra_model.h`) |
+| `rac_server_*` | `ra_server_*` (header: `ra_server.h`) |
 
-## Building v1 and v2 together
+### Types
 
-v2 is additive at the source tree level — new top-level directories, no
-modifications to any v1 source file. There is a single v1 footprint in this
-bootstrap PR: `sdk/runanywhere-kotlin/scripts/build-kotlin.sh`, updated to
-make the stat-based incremental-rebuild check portable between macOS (BSD
-`stat`) and Linux (GNU `stat`). That change is a strict bug fix — the
-previous code returned `stat -f` errors on Linux CI and silently rebuilt
-commons every run. Existing build flows otherwise remain untouched:
+| v1 | v2 |
+|---|---|
+| `rac_status_t` | `ra_status_t` |
+| `rac_model_format_t` | `ra_model_format_t` (aliases: `RA_MODEL_FORMAT_*`) |
+| `rac_model_category_t` | `ra_model_category_t` (new, no v1 counterpart) |
+| `rac_runtime_id_t` | `ra_runtime_id_t` |
+| `rac_primitive_id_t` | `ra_primitive_id_t` |
+| `rac_platform_adapter_t` | `ra_platform_adapter_t` |
 
-```bash
-# v1 Kotlin (unchanged)
-cd sdk/runanywhere-kotlin && ./scripts/sdk.sh build
+## Swift SDK
 
-# v1 Swift (unchanged)
-cd sdk/runanywhere-swift && swift build
+The `RunAnywhere.*` top-level API is preserved across all sample-app call
+sites. Notable internal changes:
 
-# v2 C++ core (new)
-cmake --preset macos-debug && cmake --build --preset macos-debug
+- `RACommonsCore.xcframework` replaces the v1 `RACommons.xcframework`.
+  The Swift module is `CRACommonsCore`.
+- `sdk/swift/Package.swift` now exposes `RunAnywhere`, plus
+  `RunAnywhereLlamaCPP`, `RunAnywhereONNX`, `RunAnywhereWhisperKit`,
+  `RunAnywhereMetalRT`, `RunAnywhereGenie`, and
+  `RunAnywhereFoundationModels` products.
+- `sdk/swift/Sources/RunAnywhere/Platform/` hosts ported services:
+  `AudioCaptureManager`, `AudioPlaybackManager`, `KeychainManager`,
+  `DownloadService`, `SentryAdapter`.
 
-# v2 Swift (new, independent package)
-cd frontends/swift && swift build
+## Kotlin SDK
 
-# v2 Kotlin (new)
-cd frontends/kotlin && gradle build
-```
+- Single Gradle project at `sdk/kotlin/` replaces the v1 multi-module
+  `sdk/runanywhere-kotlin/`.
+- JNI surface lives in `sdk/kotlin/src/main/cpp/` (condensed
+  `jni_all.cpp` pending — see `docs/restoration_progress.md` Wave 5).
 
-## For reviewers
+## Dart / Flutter
 
-The PR is intentionally large to establish the complete skeleton in one
-commit rather than land it piecemeal. Review priorities:
+- `sdk/dart/` is the single Dart package. Federated split into
+  `sdk/dart/packages/runanywhere{,_llamacpp,_onnx,_genie}` is pending
+  (Wave 7).
 
-1. `core/abi/*.h` — these are the stable contract every frontend depends on.
-2. `core/voice_pipeline/voice_pipeline.cpp` — the barge-in transactional
-   boundary is the most subtle piece of the entire rewrite.
-3. `idl/*.proto` — any wire-format concerns should be flagged now.
-4. `.github/workflows/v2-core.yml` — the CI matrix.
-5. `CMakeLists.txt` + `cmake/*.cmake` — the build system.
+## TypeScript / React Native
 
-Everything else (unit tests, frontend adapters, scripts) is scaffolding
-that gets filled in over the subsequent phases.
+- `sdk/ts/` hosts the core TS adapter. React-Native Nitro / JSI bridge
+  lives under `sdk/rn/` (not yet created — Wave 6).
+
+## Web / WASM
+
+- `sdk/web/` hosts the Web adapter. Per-backend WASM bundles
+  (`scripts/build-core-wasm.sh`) pending (Wave 8).
+
+## Removed external dependencies
+
+The new core drops these v1 runtime deps (handled by platform adapters now):
+
+- `Alamofire` → replaced by `DownloadService.swift` (URLSessionDownloadDelegate).
+- `swift-crypto` → `CommonCrypto` via the platform adapter.
+- `protobuf` runtime → struct-based C ABI (no wire serialisation inside core).
+
+Opt-in SDK targets can still pull external deps:
+- `RunAnywhereSentry` optional target pulls `Sentry` SPM package when linked.
+- `RunAnywhereWhisperKit` pulls `WhisperKit` when linked (Wave 2b).
+
+## CI / CD
+
+The legacy `release.yml`, `pr-build.yml`, and `auto-tag.yml` GitHub
+workflows were removed — they only built the deleted `sdk/legacy/`
+artifacts. The v2 workflows (`v2-core.yml`, `v2-release.yml`,
+`secret-scan.yml`) remain.
+
+## Further reading
+
+- `docs/restoration_progress.md` — per-wave status tracker
+- `/Users/sanchitmonga/.cursor/plans/path_a_restore_parity_b9043b08.plan.md`
+  — the full restoration plan
