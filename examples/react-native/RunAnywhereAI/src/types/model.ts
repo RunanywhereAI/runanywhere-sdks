@@ -1,7 +1,7 @@
 /**
  * Model Types - Matching iOS and SDK model definitions
  *
- * Reference: sdk/runanywhere-react-native/src/types/models.ts
+ * Reference: legacy types (predates v2 cutover)
  */
 
 /**

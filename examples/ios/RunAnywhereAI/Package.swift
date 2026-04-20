@@ -6,8 +6,8 @@
 // This example app demonstrates how to use the RunAnywhere SDK.
 //
 // SETUP (first time):
-//   cd ../../sdk/runanywhere-swift
-//   ./scripts/build-swift.sh --setup
+//   scripts/build-core-xcframework.sh --platforms=macos
+// (or `--platforms=ios-device,ios-sim,macos` for full iOS slices)
 //
 // Then open this project in Xcode and build.
 //

@@ -1,16 +1,11 @@
 # RunAnywhere v2 — top-level CMake entry point.
 #
-# This file is the entry point for the v2 monorepo build. It does NOT replace
-# the legacy `sdk/runanywhere-commons/CMakeLists.txt` during the migration — v1
-# and v2 coexist until Phase 3 flips the default.
-#
-# Build the v2 core only:
+# Build the core:
 #   cmake --preset macos-debug
 #   cmake --build --preset macos-debug
 #
-# Build a specific frontend (e.g. Swift XCFramework):
-#   cmake --preset ios-release
-#   cmake --build --preset ios-release --target RunAnywhereCore
+# Build the Swift XCFramework (Apple slices) for sdk/swift:
+#   scripts/build-core-xcframework.sh --platforms=macos,ios-device,ios-sim
 #
 # See cmake/presets.json and docs/v2_build.md for the full matrix.
 
@@ -56,9 +51,6 @@ option(RA_BUILD_SOLUTIONS    "Build solutions/*"                         ON)
 option(RA_ENABLE_SANITIZERS  "Enable ASan/UBSan (Debug only)"            ON)
 option(RA_ENABLE_TSAN        "Enable TSan (separate from ASan/UBSan)"    OFF)
 option(RA_ENABLE_LTO         "Enable Link-Time Optimization on Release"  OFF)
-
-# Plugin discovery mode — mutually exclusive with the legacy commons tree.
-option(RA_USE_LEGACY_COMMONS "Fall back to sdk/runanywhere-commons for engines" OFF)
 
 # ---------------------------------------------------------------------------
 # Platform detection + compiler flags

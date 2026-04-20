@@ -163,13 +163,11 @@ set_target_properties(ra_core_model_registry PROPERTIES POSITION_INDEPENDENT_COD
 add_library(RunAnywhere::core_model_registry ALIAS ra_core_model_registry)
 
 # --- Network / auth layer ----------------------------------------------------
-# Ports capability surface from sdk/runanywhere-commons/include/rac/
-# infrastructure/network/{rac_http_client,rac_endpoints,rac_environment,
-# rac_auth_manager}.h. HTTP client is libcurl-backed; environment + auth
-# are pure C++ and always compile. Platforms without libcurl (iOS,
-# Android, WASM) pass -DRA_BUILD_HTTP_CLIENT=OFF; the static auth/env
-# still builds and apps bring their own transport (URLSession, OkHttp,
-# fetch).
+# HTTP client + environment + AuthManager + telemetry. HTTP client is
+# libcurl-backed; environment + auth are pure C++ and always compile.
+# Platforms without libcurl (iOS, Android, WASM) pass
+# -DRA_BUILD_HTTP_CLIENT=OFF and inject a transport via ra_http_set_executor
+# (URLSession on iOS, OkHttp on Android, fetch on Web).
 option(RA_BUILD_HTTP_CLIENT
     "Build the libcurl-backed HTTP client + telemetry (requires libcurl)" ON)
 set(_ra_core_net_sources net/environment.cpp)

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 //
-// Canonical RunAnywhere top-level public API — these are the canonical RunAnywhere.chat / .generate /
-// .transcribe / .synthesize / .initialize top-level surface compiling.
-// Sample apps migrating from sdk/legacy/kotlin to sdk/kotlin should
-// mostly only need to update imports (package is unchanged).
+// Canonical RunAnywhere top-level public API — RunAnywhere.chat /
+// .generate / .transcribe / .synthesize / .initialize entry points
+// implemented as extension functions on the RunAnywhere singleton.
+// SessionRegistry tracks the process-wide "current" LLM/STT/TTS handles.
 
 package com.runanywhere.sdk.`public`
 

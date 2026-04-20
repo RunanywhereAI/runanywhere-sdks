@@ -1,6 +1,7 @@
-// RunAnywhere v2 — Kotlin frontend adapter. Independent of the legacy
-// `sdk/runanywhere-kotlin` KMP tree. During the v1→v2 migration, clients
-// can depend on both simultaneously.
+// RunAnywhere v2 — Kotlin frontend adapter. Single Gradle project that
+// hosts the public API (sessions, catalog, EventBus, RAG/VLM/Diffusion/LoRA
+// glue, backend register entry points). JNI bridge + native libs live in
+// libracommons_core.so consumed via System.loadLibrary("racommons_core").
 
 plugins {
     kotlin("jvm") version "2.1.21"

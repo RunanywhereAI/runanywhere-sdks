@@ -1,9 +1,0 @@
-module ONNXBackend {
-    umbrella header "ONNXBackend.h"
-
-    export *
-    module * { export * }
-
-    link framework "Accelerate"
-    link framework "CoreML"
-}
