@@ -181,6 +181,15 @@ public extension RunAnywhere {
         return try session.generate(prompt: request.prompt, options: request.options)
     }
 
+    /// Legacy-shaped convenience. Sample apps call
+    /// `RunAnywhere.generateImage(prompt: "...", options: .init(...))`.
+    static func generateImage(
+        prompt: String,
+        options: DiffusionGenerationOptions = .init()
+    ) async throws -> DiffusionResult {
+        try await generateImage(DiffusionRequest(prompt: prompt, options: options))
+    }
+
     static func cancelImageGeneration() {
         // Best-effort: no per-process diffusion session held in registry.
     }

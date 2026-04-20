@@ -12,7 +12,7 @@ import CRACommonsCore
 ///     if SDKState.isAuthenticated { … }
 public enum SDKState {
 
-    public enum Environment: Sendable {
+    public enum Environment: Sendable, CustomStringConvertible {
         case development, staging, production
 
         var raw: Int32 {
@@ -28,6 +28,14 @@ public enum SDKState {
             case Int32(RA_ENVIRONMENT_DEVELOPMENT): self = .development
             case Int32(RA_ENVIRONMENT_STAGING):     self = .staging
             default:                                 self = .production
+            }
+        }
+
+        public var description: String {
+            switch self {
+            case .development: return "development"
+            case .staging:     return "staging"
+            case .production:  return "production"
             }
         }
     }

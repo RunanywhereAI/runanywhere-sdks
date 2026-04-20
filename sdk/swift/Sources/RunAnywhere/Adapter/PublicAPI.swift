@@ -131,12 +131,37 @@ public extension RunAnywhere {
                                  logLevel: logLevel)
     }
 
+    /// No-argument initializer — used by the iOS sample's DEBUG bootstrap.
+    /// Starts the SDK in development mode with a local-dev placeholder API
+    /// key. Cloud features (telemetry upload, model assignment) are not
+    /// usable in this mode; on-device inference works normally.
+    ///
+    /// The placeholder key is ≥16 chars to satisfy the core validator.
+    /// Production code must call `initialize(apiKey:baseURL:environment:)`
+    /// with real credentials.
+    static func initialize() throws {
+        try SDKState.initialize(
+            apiKey: "dev-local-00000000",
+            environment: .development,
+            baseUrl: nil,
+            deviceId: nil,
+            logLevel: .info)
+    }
+
     static var isSDKInitialized: Bool { SDKState.isInitialized }
     static var isActive: Bool        { SDKState.isInitialized }
     static var version: String       { "2.0.0" }
+
+    /// Current SDK environment, nil when not yet initialized.
+    /// Preferred name: `currentEnvironment`. Legacy name `environment`
+    /// kept for sample-app call-site compatibility.
     static var currentEnvironment: SDKEnvironment? {
         SDKState.isInitialized ? SDKState.environment : nil
     }
+
+    /// Legacy alias of `currentEnvironment`. Returns the environment raw
+    /// value or nil when not yet initialized.
+    static var environment: SDKEnvironment? { currentEnvironment }
 
     static func shutdown() { SDKState.shutdown() }
 

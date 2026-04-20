@@ -16,13 +16,19 @@ public enum InferenceFramework: String, Sendable, Codable, CaseIterable {
     case llamaCpp     = "llamacpp"
     case onnx         = "onnx"
     case whisperKit   = "whisperkit"
+    case whisperKitCoreML = "whisperkit_coreml"
     case metalRT      = "metalrt"
     case genie        = "genie"
     case foundationModels = "foundation_models"
     case coreML       = "coreml"
     case mlx          = "mlx"
     case sherpa       = "sherpa"
+    case whisperCpp   = "whispercpp"
     case unknown      = "unknown"
+
+    /// Lowercase alias. The legacy SDK spelled `metalRT` as `metalrt`; the
+    /// sample apps use the lowercase form. Provides both.
+    public static var metalrt: InferenceFramework { .metalRT }
 }
 
 public enum ModelCategory: String, Sendable, Codable, CaseIterable {
@@ -38,19 +44,28 @@ public enum ModelCategory: String, Sendable, Codable, CaseIterable {
     case unknown
 }
 
+/// Model artifact shape — maps to how the downloader extracts it.
 public enum ModelArtifactType: Sendable, Codable {
     case singleFile
-    case archive(format: String)   // "zip" | "tar.gz" | ...
+    case archive(ArchiveFormat, structure: ArchiveStructure = .flat)
     case multiFile
 
-    private enum CodingKeys: String, CodingKey { case kind, format }
+    /// Legacy string-form overload. Kept for back-compat with earlier v2 SDKs
+    /// that accepted `.archive(format: "tar.gz")`.
+    public static func archive(format: String) -> ModelArtifactType {
+        .archive(ArchiveFormat.from(rawString: format), structure: .flat)
+    }
+
+    private enum CodingKeys: String, CodingKey { case kind, format, structure }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(String.self, forKey: .kind)
         switch kind {
         case "archive":
-            self = .archive(format: try c.decode(String.self, forKey: .format))
+            let f = try c.decode(ArchiveFormat.self, forKey: .format)
+            let s = (try? c.decode(ArchiveStructure.self, forKey: .structure)) ?? .flat
+            self = .archive(f, structure: s)
         case "multiFile": self = .multiFile
         default: self = .singleFile
         }
@@ -61,15 +76,72 @@ public enum ModelArtifactType: Sendable, Codable {
         switch self {
         case .singleFile:           try c.encode("singleFile", forKey: .kind)
         case .multiFile:            try c.encode("multiFile",  forKey: .kind)
-        case .archive(let format):
+        case .archive(let f, let s):
             try c.encode("archive", forKey: .kind)
-            try c.encode(format,    forKey: .format)
+            try c.encode(f,         forKey: .format)
+            try c.encode(s,         forKey: .structure)
+        }
+    }
+}
+
+public enum ArchiveFormat: String, Sendable, Codable {
+    case zip
+    case tar
+    case tarGz    = "tar.gz"
+    case tarBz2   = "tar.bz2"
+    case tarXz    = "tar.xz"
+
+    public static func from(rawString s: String) -> ArchiveFormat {
+        switch s.lowercased() {
+        case "zip":                 return .zip
+        case "tar":                 return .tar
+        case "tar.gz", "tgz":       return .tarGz
+        case "tar.bz2":             return .tarBz2
+        case "tar.xz":              return .tarXz
+        default:                    return .zip
+        }
+    }
+}
+
+public enum ArchiveStructure: String, Sendable, Codable {
+    /// Archive contents unpacked directly into the model dir.
+    case flat
+    /// Archive contains exactly one top-level directory; that directory is the model root.
+    case nestedDirectory = "nested_directory"
+    /// Model's layout is itself directory-based (e.g. CoreML .mlmodelc folder tree).
+    case directoryBased  = "directory_based"
+}
+
+/// Semantic category of a model — what inference task it serves. Maps onto
+/// `ModelCategory` but provides the richer Swift-level naming the legacy SDK
+/// exposed (legacy enum was `.speechRecognition`, `.speechSynthesis`, etc.).
+public enum Modality: String, Sendable, Codable, CaseIterable {
+    case text
+    case speechRecognition      = "speech_recognition"
+    case speechSynthesis        = "speech_synthesis"
+    case voiceActivityDetection = "voice_activity_detection"
+    case embedding
+    case multimodal
+    case imageGeneration        = "image_generation"
+    case wakeword
+
+    public var category: ModelCategory {
+        switch self {
+        case .text:                    return .llm
+        case .speechRecognition:       return .stt
+        case .speechSynthesis:         return .tts
+        case .voiceActivityDetection:  return .vad
+        case .embedding:               return .embedding
+        case .multimodal:              return .vlm
+        case .imageGeneration:         return .diffusion
+        case .wakeword:                return .wakeword
         }
     }
 }
 
 public struct ModelFileDescriptor: Sendable, Codable {
     public var url: URL
+    /// Path relative to the model root where this file should be placed.
     public var relativePath: String
     public var sha256: String?
     public var sizeBytes: Int64?
@@ -78,6 +150,20 @@ public struct ModelFileDescriptor: Sendable, Codable {
                 sizeBytes: Int64? = nil) {
         self.url = url; self.relativePath = relativePath
         self.sha256 = sha256; self.sizeBytes = sizeBytes
+    }
+
+    /// Legacy initializer — the main SDK named the field `filename` (with the
+    /// relative path being the filename itself). Kept for source compat.
+    public init(url: URL, filename: String, sha256: String? = nil,
+                sizeBytes: Int64? = nil) {
+        self.init(url: url, relativePath: filename,
+                  sha256: sha256, sizeBytes: sizeBytes)
+    }
+
+    /// Legacy read accessor: returns the trailing filename portion of the
+    /// relative path so existing sample-app code that reads `.filename` works.
+    public var filename: String {
+        (relativePath as NSString).lastPathComponent
     }
 }
 
@@ -231,32 +317,58 @@ public extension RunAnywhere {
 
     // --- Registration -----------------------------------------------------
 
+    /// Canonical v2 registration — accepts a rich `Modality` enum.
+    /// The modality determines the default `category` when none is passed.
+    static func registerModel(id: String, name: String, url: URL,
+                               framework: InferenceFramework,
+                               category: ModelCategory? = nil,
+                               artifactType: ModelArtifactType = .singleFile,
+                               memoryRequirement: Int64? = nil,
+                               supportsThinking: Bool = false,
+                               modality: Modality = .text) {
+        let info = ModelInfo(
+            id: id, name: name, url: url,
+            framework: framework,
+            category: category ?? modality.category,
+            artifactType: artifactType,
+            memoryRequirement: memoryRequirement,
+            supportsThinking: supportsThinking,
+            modality: modality.rawValue)
+        ModelCatalog.register(info)
+    }
+
+    /// Legacy overload accepting `modality: String?` — kept for sample-app
+    /// code that already passes a raw string.
     static func registerModel(id: String, name: String, url: URL,
                                framework: InferenceFramework,
                                category: ModelCategory = .llm,
                                artifactType: ModelArtifactType = .singleFile,
                                memoryRequirement: Int64? = nil,
                                supportsThinking: Bool = false,
-                               modality: String? = nil) {
+                               modality modalityString: String?) {
         let info = ModelInfo(id: id, name: name, url: url,
                               framework: framework, category: category,
                               artifactType: artifactType,
                               memoryRequirement: memoryRequirement,
                               supportsThinking: supportsThinking,
-                              modality: modality)
+                              modality: modalityString)
         ModelCatalog.register(info)
     }
 
     static func registerMultiFileModel(id: String, name: String,
                                         files: [ModelFileDescriptor],
                                         framework: InferenceFramework,
-                                        category: ModelCategory = .llm,
-                                        memoryRequirement: Int64? = nil) {
-        let info = ModelInfo(id: id, name: name, url: nil,
-                              framework: framework, category: category,
-                              artifactType: .multiFile,
-                              memoryRequirement: memoryRequirement,
-                              files: files)
+                                        category: ModelCategory? = nil,
+                                        memoryRequirement: Int64? = nil,
+                                        modality: Modality = .text) {
+        let info = ModelInfo(
+            id: id, name: name, url: nil,
+            framework: framework,
+            category: category ?? modality.category,
+            artifactType: .multiFile,
+            memoryRequirement: memoryRequirement,
+            modality: modality.rawValue,
+            files: files)
         ModelCatalog.register(info)
     }
 
@@ -292,6 +404,11 @@ public extension RunAnywhere {
 
     static var availableModels: [ModelInfo] { ModelCatalog.allModels }
 
+    /// Async parenthesised overload matching the legacy SDK shape. Lets
+    /// sample apps write `try await RunAnywhere.availableModels()` against
+    /// code originally written for the main-branch SDK.
+    static func availableModels() async -> [ModelInfo] { ModelCatalog.allModels }
+
     static func availableModels(for framework: InferenceFramework) -> [ModelInfo] {
         ModelCatalog.allModels.filter { $0.framework == framework }
     }
@@ -315,6 +432,16 @@ public extension RunAnywhere {
     static func model(by id: String) -> ModelInfo? { ModelCatalog.model(id: id) }
 
     // --- Storage / cleanup ------------------------------------------------
+
+    /// Legacy name for `getStorageInfo()`.
+    static func storageInfo() -> StorageInfo { getStorageInfo() }
+
+    /// Delete a model by id. Looks up the framework from the catalog.
+    @discardableResult
+    static func deleteModel(_ modelId: String) async -> Bool {
+        guard let info = ModelCatalog.model(id: modelId) else { return false }
+        return deleteStoredModel(modelId, framework: info.framework)
+    }
 
     static func getStorageInfo() -> StorageInfo {
         var info = ra_storage_disk_space_t()
@@ -390,12 +517,12 @@ public extension RunAnywhere {
 internal extension InferenceFramework {
     var modelFormat: ModelFormat {
         switch self {
-        case .llamaCpp:         return .gguf
-        case .onnx, .sherpa:    return .onnx
-        case .whisperKit:       return .whisperKit
-        case .coreML:           return .coreml
-        case .mlx:              return .mlxSafetensors
-        default:                return .unknown
+        case .llamaCpp, .whisperCpp:                 return .gguf
+        case .onnx, .sherpa:                         return .onnx
+        case .whisperKit, .whisperKitCoreML:         return .whisperKit
+        case .coreML:                                return .coreml
+        case .mlx:                                   return .mlxSafetensors
+        default:                                     return .unknown
         }
     }
 }
@@ -403,4 +530,114 @@ internal extension InferenceFramework {
 // Public alias since the legacy enum case was capitalised .coreML.
 public extension ModelFormat {
     static var coreML: ModelFormat { .coreml }
+}
+
+// MARK: - DownloadProgress + RunAnywhere.downloadModel(_:) streaming
+
+public struct DownloadProgress: Sendable {
+    public enum State: Sendable {
+        case pending
+        case downloading
+        case extracting
+        case complete(localPath: String)
+        case failed(message: String)
+        case cancelled
+    }
+    public var bytesDownloaded: Int64
+    public var totalBytes: Int64
+    public var percent: Double
+    public var state: State
+
+    public init(bytesDownloaded: Int64 = 0, totalBytes: Int64 = 0,
+                percent: Double = 0, state: State = .pending) {
+        self.bytesDownloaded = bytesDownloaded
+        self.totalBytes = totalBytes
+        self.percent = percent
+        self.state = state
+    }
+}
+
+@MainActor
+public extension RunAnywhere {
+
+    /// Stream progress for a registered model download. Drives the URLSession
+    /// download via the platform adapter and maps its callback fire rate into
+    /// `DownloadProgress` chunks. Terminates with `.complete(localPath:)` or
+    /// `.failed(message:)` and then finishes the stream.
+    static func downloadModel(_ modelId: String)
+        -> AsyncThrowingStream<DownloadProgress, Error>
+    {
+        AsyncThrowingStream { continuation in
+            guard let info = ModelCatalog.model(id: modelId) else {
+                continuation.finish(throwing: RunAnywhereError.invalidArgument(
+                    "model not registered: \(modelId)"))
+                return
+            }
+            guard let url = info.url else {
+                continuation.finish(throwing: RunAnywhereError.invalidArgument(
+                    "model has no download URL: \(modelId)"))
+                return
+            }
+
+            // Compute destination path via ra_file_model_path.
+            var path: UnsafeMutablePointer<CChar>?
+            let rc = info.framework.rawValue.withCString { fw in
+                modelId.withCString { mid in
+                    ra_file_model_path(fw, mid, &path)
+                }
+            }
+            guard rc == RA_OK, let raw = path else {
+                continuation.finish(throwing: RunAnywhereError.invalidArgument(
+                    "could not resolve destination path"))
+                return
+            }
+            let destPath = String(cString: raw)
+            ra_file_string_free(path)
+
+            // Use Foundation URLSession so we get KVO progress today,
+            // even before the full platform-adapter download upgrade lands.
+            Task.detached {
+                do {
+                    continuation.yield(DownloadProgress(state: .downloading))
+                    let (tmpURL, _) = try await URLSession.shared.download(from: url)
+                    try FileManager.default.createDirectory(
+                        at: URL(fileURLWithPath: destPath).deletingLastPathComponent(),
+                        withIntermediateDirectories: true)
+                    try? FileManager.default.removeItem(atPath: destPath)
+                    try FileManager.default.moveItem(
+                        at: tmpURL, to: URL(fileURLWithPath: destPath))
+                    let size = (try? FileManager.default.attributesOfItem(
+                        atPath: destPath)[.size] as? Int64) ?? 0
+                    continuation.yield(DownloadProgress(
+                        bytesDownloaded: size, totalBytes: size, percent: 1.0,
+                        state: .complete(localPath: destPath)))
+                    continuation.finish()
+                } catch {
+                    continuation.yield(DownloadProgress(
+                        state: .failed(message: error.localizedDescription)))
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - LoRAAdapterCatalog facade
+
+/// Legacy-named LoRA catalog entry point. Sample apps call
+/// `LoRAAdapterCatalog.registerAll()` at startup; this forwards to the
+/// catalog's flush pass so any adapter entries enqueued before the SDK
+/// was fully initialised get applied.
+@MainActor
+public enum LoRAAdapterCatalog {
+    /// Runs any pending registrations queued into the catalog. No-op if
+    /// there are none.
+    public static func registerAll() async {
+        ModelCatalog.runPendingFlushes()
+    }
+
+    /// Enumerate all registered LoRA catalog entries.
+    public static var allEntries: [LoraAdapterCatalogEntry] {
+        ModelCatalog.allLoraEntries
+    }
 }
