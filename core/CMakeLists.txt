@@ -24,6 +24,7 @@ set(_ra_core_abi_sources
     abi/ra_errors.c
     abi/ra_lifecycle.c
     abi/ra_platform_adapter.c
+    abi/ra_core_init.c
     abi/rac_compat.c
 )
 add_library(ra_core_abi STATIC ${_ra_core_abi_sources})

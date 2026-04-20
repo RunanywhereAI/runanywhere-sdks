@@ -187,6 +187,21 @@ typedef ra_extract_progress_callback_fn rac_extract_progress_callback_fn;
 #define rac_http_download_cancel    ra_http_download_cancel
 #define rac_extract_archive         ra_extract_archive_via_adapter
 
+/* --- Top-level init / logger / validators ----------------------------- */
+#include "ra_core_init.h"
+typedef ra_init_config_t rac_config_t;
+#define rac_init                    ra_init
+#define rac_shutdown                ra_shutdown
+#define rac_is_initialized          ra_is_initialized
+#define rac_logger_init(lvl)        (ra_logger_set_min_level(lvl), RA_OK)
+#define rac_logger_shutdown()       ((void)0)
+#define rac_logger_set_min_level    ra_logger_set_min_level
+#define rac_logger_get_min_level    ra_logger_get_min_level
+#define rac_logger_set_stderr_fallback ra_logger_set_stderr_fallback
+#define rac_logger_log              ra_logger_log
+#define rac_validate_api_key        ra_validate_api_key
+#define rac_validate_base_url       ra_validate_base_url
+
 /* --- Gaps not yet bridged --------------------------------------------
  *
  * These legacy-only entry points are still only available from
