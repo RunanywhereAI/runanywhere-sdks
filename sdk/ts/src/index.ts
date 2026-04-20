@@ -14,4 +14,5 @@ export * from './adapter/SDKState.js';
 export * from './adapter/ChatSession.js';
 export * from './adapter/ToolCalling.js';
 export * from './adapter/StructuredOutput.js';
-export * from './adapter/LegacyShims.js';
+export * from './adapter/PublicAPI.js';
+export * from './adapter/PublicCatalog.js';

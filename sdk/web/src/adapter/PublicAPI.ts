@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 //
-// Legacy-compat surface on the RunAnywhere singleton:
+// Canonical RunAnywhere top-level public API — these are the methods
 // RunAnywhere.initialize / .chat / .generate / .generateStream /
 // .transcribe / .synthesize / .loadModel / .registerTool / .generateWithTools
 // / .generateStructured — all delegate to the new session-based classes.
