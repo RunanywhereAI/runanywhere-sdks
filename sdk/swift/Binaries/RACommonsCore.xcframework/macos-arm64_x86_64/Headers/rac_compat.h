@@ -33,6 +33,7 @@
 #include "ra_version.h"
 #include "ra_plugin.h"
 #include "ra_errors.h"
+#include "ra_platform_adapter.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,6 +163,78 @@ typedef ra_audio_callback_t      rac_audio_callback_t;
 #define rac_abi_version        ra_abi_version
 #define rac_plugin_api_version ra_plugin_api_version
 #define rac_build_info         ra_build_info
+
+/* --- Platform adapter --------------------------------------------------- */
+typedef ra_platform_adapter_t          rac_platform_adapter_t;
+typedef ra_log_level_t                 rac_log_level_t;
+typedef ra_memory_info_t               rac_memory_info_t;
+typedef ra_http_progress_callback_fn   rac_http_progress_callback_fn;
+typedef ra_http_complete_callback_fn   rac_http_complete_callback_fn;
+typedef ra_extract_progress_callback_fn rac_extract_progress_callback_fn;
+
+#define RAC_LOG_LEVEL_TRACE RA_LOG_LEVEL_TRACE
+#define RAC_LOG_LEVEL_DEBUG RA_LOG_LEVEL_DEBUG
+#define RAC_LOG_LEVEL_INFO  RA_LOG_LEVEL_INFO
+#define RAC_LOG_LEVEL_WARN  RA_LOG_LEVEL_WARN
+#define RAC_LOG_LEVEL_ERROR RA_LOG_LEVEL_ERROR
+#define RAC_LOG_LEVEL_FATAL RA_LOG_LEVEL_FATAL
+
+#define rac_set_platform_adapter    ra_set_platform_adapter
+#define rac_get_platform_adapter    ra_get_platform_adapter
+#define rac_log                     ra_log
+#define rac_get_current_time_ms     ra_get_current_time_ms
+#define rac_http_download           ra_http_download
+#define rac_http_download_cancel    ra_http_download_cancel
+#define rac_extract_archive         ra_extract_archive_via_adapter
+
+/* --- Top-level init / logger / validators ----------------------------- */
+#include "ra_core_init.h"
+typedef ra_init_config_t rac_config_t;
+#define rac_init                    ra_init
+#define rac_shutdown                ra_shutdown
+#define rac_is_initialized          ra_is_initialized
+#define rac_logger_init(lvl)        (ra_logger_set_min_level(lvl), RA_OK)
+#define rac_logger_shutdown()       ((void)0)
+#define rac_logger_set_min_level    ra_logger_set_min_level
+#define rac_logger_get_min_level    ra_logger_get_min_level
+#define rac_logger_set_stderr_fallback ra_logger_set_stderr_fallback
+#define rac_logger_log              ra_logger_log
+#define rac_validate_api_key        ra_validate_api_key
+#define rac_validate_base_url       ra_validate_base_url
+
+/* --- SDK state / auth --------------------------------------------------- */
+#include "ra_state.h"
+typedef ra_environment_t             rac_environment_t;
+typedef ra_auth_data_t               rac_auth_data_t;
+typedef ra_auth_changed_callback_t   rac_auth_changed_callback_t;
+typedef ra_state_persist_callback_t  rac_state_persist_callback_t;
+typedef ra_state_load_callback_t     rac_state_load_callback_t;
+
+#define RAC_ENVIRONMENT_DEVELOPMENT RA_ENVIRONMENT_DEVELOPMENT
+#define RAC_ENVIRONMENT_STAGING     RA_ENVIRONMENT_STAGING
+#define RAC_ENVIRONMENT_PRODUCTION  RA_ENVIRONMENT_PRODUCTION
+
+#define rac_state_initialize              ra_state_initialize
+#define rac_state_is_initialized          ra_state_is_initialized
+#define rac_state_reset                   ra_state_reset
+#define rac_state_shutdown                ra_state_shutdown
+#define rac_state_get_environment         ra_state_get_environment
+#define rac_state_get_base_url            ra_state_get_base_url
+#define rac_state_get_api_key             ra_state_get_api_key
+#define rac_state_get_device_id           ra_state_get_device_id
+#define rac_state_set_auth                ra_state_set_auth
+#define rac_state_get_access_token        ra_state_get_access_token
+#define rac_state_get_refresh_token       ra_state_get_refresh_token
+#define rac_state_is_authenticated        ra_state_is_authenticated
+#define rac_state_token_needs_refresh     ra_state_token_needs_refresh
+#define rac_state_get_token_expires_at    ra_state_get_token_expires_at
+#define rac_state_get_user_id             ra_state_get_user_id
+#define rac_state_get_organization_id     ra_state_get_organization_id
+#define rac_state_clear_auth              ra_state_clear_auth
+#define rac_state_set_device_registered   ra_state_set_device_registered
+#define rac_state_is_device_registered    ra_state_is_device_registered
+#define rac_state_on_auth_changed         ra_state_on_auth_changed
+#define rac_state_set_persistence_callbacks ra_state_set_persistence_callbacks
 
 /* --- Gaps not yet bridged --------------------------------------------
  *

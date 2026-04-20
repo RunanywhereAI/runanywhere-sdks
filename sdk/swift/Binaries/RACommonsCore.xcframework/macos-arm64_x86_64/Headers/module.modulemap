@@ -5,6 +5,9 @@ module CRACommonsCore {
     header "ra_plugin.h"
     header "ra_primitives.h"
     header "ra_version.h"
+    header "ra_platform_adapter.h"
+    header "ra_core_init.h"
+    header "ra_state.h"
     header "rac_compat.h"
     link "RACommonsCore"
     export *
