@@ -73,6 +73,19 @@ bump_pubspec_version() {
     bump_line "$file" '^version: .+' "version: ${NEW_VERSION}"
 }
 
+# Flutter sub-packages (genie/llamacpp/onnx) depend on the core `runanywhere`
+# package via a caret constraint like `runanywhere: ^0.19.0`. When we bump
+# the suite, that constraint must track the NEW_VERSION's MAJOR.MINOR floor
+# so the sub-packages pull a matching core, not an older published one.
+bump_pubspec_runanywhere_dep() {
+    local file="$1"
+    # Caret floor = current MAJOR.MINOR.0 (e.g. 0.19.12 → 0.19.0)
+    local major_minor
+    major_minor="$(echo "${NEW_VERSION}" | awk -F. '{print $1"."$2".0"}')"
+    bump_line "$file" '^  runanywhere: \^[0-9]+\.[0-9]+\.[0-9]+' \
+        "  runanywhere: ^${major_minor}"
+}
+
 echo ">> Syncing versions to ${NEW_VERSION}"
 echo ">> Repo root: ${REPO_ROOT}"
 echo ""
@@ -139,6 +152,15 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
     "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
     bump_pubspec_version "$pkg"
+done
+
+# Sub-packages depend on the core `runanywhere` package; align their
+# dependency floor to match the bumped suite version.
+for pkg in \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_genie/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_llamacpp/pubspec.yaml" \
+    "${REPO_ROOT}/sdk/runanywhere-flutter/packages/runanywhere_onnx/pubspec.yaml"; do
+    bump_pubspec_runanywhere_dep "$pkg"
 done
 
 echo ""
