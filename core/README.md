@@ -1,93 +1,125 @@
-# RunAnywhere v2 — C++20 core
+# `core/` — RunAnywhere C++ core
 
-This directory is the **single source of truth** for every SDK's business
-logic. Every frontend (Swift, Kotlin, Dart, TS/RN, Web) is a thin adapter
-that encodes/decodes proto3 messages across the C ABI and does not contain
-pipeline logic, routing logic, barge-in logic, or RAG logic.
+The single shared C++20 core that every frontend SDK (Swift, Kotlin,
+Dart, TypeScript/React Native, Web/WASM) consumes through the public
+`ra_*` C ABI.
 
-```text
-core/
-├── abi/                  # L0 — stable extern "C" ABI
-├── graph/                # L4 — RingBuffer, MemoryPool, StreamEdge, CancelToken
-├── registry/             # L2 infra — PluginRegistry + PluginLoader<VTABLE>
-├── router/               # L3 — EngineRouter, HardwareProfile
-├── voice_pipeline/       # concrete VoiceAgent DAG with transactional barge-in
-├── model_registry/       # download + cache
-└── tests/                # gtest unit tests (ASan + UBSan + TSan in CI)
+## Taxonomy
+
+The source tree is organized into the same 7 buckets the frontend SDKs
+use, so symbol ownership is obvious from its path:
+
+| Bucket               | Directory                             | Purpose                                                |
+| -------------------- | ------------------------------------- | ------------------------------------------------------ |
+| **Public API**       | `abi/ra_*.h` (public headers)         | Every symbol a frontend SDK is allowed to call.        |
+| **Core primitives**  | `registry/`, `router/`, `graph/`      | Plugin registry, engine routing, scheduler primitives. |
+| **Foundation**       | `util/`                               | Cross-cutting utilities: audio, text parsing, extraction, file I/O, VAD energy, metrics. |
+| **Features**         | `voice_pipeline/`                     | Voice-agent composite pipeline and related feature code. More feature code lives inside engine plugins under `engines/`. |
+| **Infrastructure**   | `model_registry/`, `net/`             | Model catalog + downloader; HTTP client + telemetry + environment + auth manager. |
+| **Tests**            | `tests/`                              | gtest suites (see `CMakeLists.txt`).                   |
+| **Engine plugins**   | `../engines/*/`                       | `llamacpp`, `sherpa`, `onnx`, `whisperkit`, `metalrt`, `diffusion-coreml`. |
+| **Solutions**        | `../solutions/*/`                     | Cross-feature composites: `voice-agent`, `rag`, `openai-server`. |
+
+### How the buckets map to main's `commons/src/` taxonomy
+
+| v2 path                          | main branch counterpart                                       |
+| -------------------------------- | ------------------------------------------------------------- |
+| `core/abi/ra_*.h`                | `commons/include/rac/*` (public C ABI headers)                |
+| `core/abi/ra_*.cpp`              | `commons/src/core/*` + `commons/src/features/*/rac_*.cpp`     |
+| `core/registry/`                 | `commons/src/infrastructure/registry/`                        |
+| `core/router/`                   | `commons/src/core/` (engine routing logic)                    |
+| `core/graph/`                    | `commons/src/core/` (pipeline scheduler)                      |
+| `core/util/audio_utils.*`        | `commons/src/utils/audio_*.cpp`                               |
+| `core/util/text/*` (tool, struct) | `commons/src/utils/` + `commons/src/features/llm/`           |
+| `core/util/extraction.*`         | `commons/src/infrastructure/extraction/`                      |
+| `core/util/storage_analyzer.*`   | `commons/src/infrastructure/storage/`                         |
+| `core/util/file_manager.*`       | `commons/src/infrastructure/file_management/`                 |
+| `core/util/energy_vad.*`         | `commons/src/features/vad/`                                   |
+| `core/util/llm_metrics.*`        | `commons/src/features/llm/metrics/`                           |
+| `core/voice_pipeline/`           | `commons/src/features/voice_agent/`                           |
+| `core/model_registry/`           | `commons/src/infrastructure/model_management/`                |
+| `core/net/`                      | `commons/src/infrastructure/network/` + `telemetry/`          |
+| `engines/llamacpp/`              | `commons/src/backends/llamacpp/`                              |
+| `engines/onnx/`                  | `commons/src/backends/onnx/`                                  |
+| `engines/sherpa/`                | `commons/src/backends/sherpa_onnx/` (renamed)                 |
+| `engines/whisperkit/`            | `commons/src/backends/whisperkit_coreml/`                     |
+| `engines/metalrt/`               | `commons/src/backends/metalrt/`                               |
+| `engines/diffusion-coreml/`      | `commons/src/features/diffusion/` + `diffusion_platform/`     |
+| `solutions/voice-agent/`         | `commons/src/features/voice_agent/`                           |
+| `solutions/rag/`                 | `commons/src/features/rag/`                                   |
+| `solutions/openai-server/`       | `commons/src/server/`                                         |
+
+### Public C ABI — `core/abi/`
+
+The C ABI is kept in a single flat directory for two practical reasons:
+
+1. The `ra_*` prefix on every header is self-documenting — grepping
+   `ra_stt` or `ra_rag` finds every relevant symbol immediately.
+2. The XCFramework module map (`scripts/build-core-xcframework.sh`)
+   lists every exported header by name. Grouping the `.h` files into
+   `features/`, `infrastructure/`, etc. sub-paths requires parallel
+   changes in the module map + all Swift / Kotlin / Dart / TS / Web
+   bindings (~40 files). The organisational win is marginal.
+
+The `README.md` sections below act as the canonical grouping:
+
+#### Public Configuration
+
+| Header                     | Purpose                                           |
+| -------------------------- | ------------------------------------------------- |
+| `ra_core_init.h`           | SDK init / shutdown / is-initialized              |
+| `ra_state.h`               | SDKState: env, API key, device ID, auth tokens    |
+| `ra_lifecycle.h`           | Global lifecycle callbacks                        |
+| `ra_version.h`             | SDK version + build info                          |
+| `ra_platform_adapter.h`    | Platform bridge function pointer table            |
+| `ra_plugin.h`              | Engine plugin vtable + registration macros        |
+| `ra_primitives.h`          | Primitive IDs, formats, runtime IDs, session IDs  |
+| `ra_errors.h`              | Status codes + error strings                      |
+| `ra_pipeline.h`            | Pipeline creation + driving                       |
+
+#### Public Sessions
+
+| Header               | Purpose                         |
+| -------------------- | ------------------------------- |
+| `ra_primitives.h`    | `ra_llm_*`, `ra_stt_*`, `ra_tts_*`, `ra_vad_*`, `ra_embed_*`, `ra_ww_*` session APIs |
+| `ra_vlm.h`           | Vision-LM session API           |
+| `ra_diffusion.h`     | Text-to-image session API       |
+
+#### Public Extensions
+
+| Header                  | Purpose                                                 |
+| ----------------------- | ------------------------------------------------------- |
+| `ra_tool.h`             | Tool calling detection / parsing / prompt formatting    |
+| `ra_structured.h`       | Structured-output JSON extraction + validation          |
+| `ra_rag.h`              | Chunker + in-memory vector store                        |
+| `ra_model.h`            | Framework × category matrix + format detection          |
+| `ra_auth.h`             | Auth manager C ABI                                      |
+| `ra_http.h`             | HTTP executor injection                                 |
+| `ra_platform_llm.h`     | Platform-LLM callback injection (FoundationModels etc.) |
+| `ra_server.h`           | OpenAI-compatible HTTP server control                   |
+| `ra_backends.h`         | Swift / Kotlin engine-plugin bridge callback tables     |
+| `ra_image.h`            | Image loading/decoding/resize/normalize                 |
+
+#### Public Infrastructure
+
+| Header                 | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `ra_device.h`          | Device ID, registration, capabilities                     |
+| `ra_download.h`        | Download manager + orchestrator + SHA-256 verify          |
+| `ra_event.h`           | Event bus (subscribe / publish)                           |
+| `ra_file.h`            | File system (create / remove / listings / canonical dirs) |
+| `ra_storage.h`         | Disk space + stored-model enumeration                     |
+| `ra_extract.h`         | Archive detection + extraction                            |
+| `ra_telemetry.h`       | Telemetry manager + HTTP callback injection               |
+| `ra_benchmark.h`       | Benchmark timing + stats                                  |
+
+## Build
+
+```
+cmake -S . -B build/macos-debug -DRA_BUILD_SERVER=ON -DRA_BUILD_TESTS=ON
+cmake --build build/macos-debug -j8
+cd build/macos-debug && ctest -j8
 ```
 
-## Building
-
-```bash
-# macOS Debug, sanitizers on
-cmake --preset macos-debug
-cmake --build --preset macos-debug
-ctest --preset macos-debug
-
-# macOS Release
-cmake --preset macos-release
-cmake --build --preset macos-release
-
-# Linux Debug
-cmake --preset linux-debug
-cmake --build --preset linux-debug
-
-# iOS XCFramework (Phase 1)
-cmake --preset ios-release && cmake --build --preset ios-release
-
-# Android (Phase 2)
-cmake --preset android-release && cmake --build --preset android-release
-
-# WASM (Phase 3)
-cmake --preset wasm-release && cmake --build --preset wasm-release
-```
-
-All presets enable `compile_commands.json` so clangd picks up full flags
-automatically.
-
-## Dependencies
-
-Managed by vcpkg (`vcpkg.json` at repo root):
-
-- `protobuf`       — proto3 runtime and `protoc` codegen
-- `boost-asio`     — async runtime on macOS/Linux/Android
-- `gtest`          — unit tests
-- `spdlog`         — structured logging
-- `yaml-cpp`       — solution YAML loader
-- `nlohmann-json`  — model registry metadata
-- `usearch`        — in-process HNSW for RAG (optional feature)
-
-## Adding a new L2 engine
-
-1. Create `engines/<name>/<name>_plugin.cpp` that exports
-   `ra_plugin_entry` and ends with `RA_STATIC_PLUGIN_REGISTER(...)`.
-2. Add a `CMakeLists.txt` that calls `ra_add_engine_plugin(...)` from
-   `cmake/plugins.cmake`.
-3. Append `add_subdirectory(engines/<name>)` to the root `CMakeLists.txt`.
-
-The plugin is immediately discoverable by the `PluginRegistry` — no
-frontend changes required.
-
-## Adding a new L5 solution
-
-1. Create `solutions/<name>/` with its own `CMakeLists.txt`.
-2. Implement the solution as a DAG built on top of `core/graph` primitives.
-3. Expose a factory function that takes the ergonomic config struct.
-4. Add the proto3 solution config to `idl/solutions.proto`.
-
-## Platform conditionals
-
-- **iOS**: `RA_STATIC_PLUGINS=ON` — App Store §3.3.2 prohibits dlopen. All
-  engines compile into the XCFramework.
-- **Android/macOS/Linux**: `dlopen`-based plugin loading via
-  `PluginLoader<VTABLE>`. Plugins ship as separate `.so`/`.dylib` files.
-- **WASM**: `RA_STATIC_PLUGINS=ON` — single-threaded, no dynamic loading.
-  Plugins compile into the WASM bundle.
-- **iOS async**: Grand Central Dispatch (no `std::thread`). Other platforms
-  use `std::jthread` or Boost.Asio.
-
-## Design principles
-
-See `thoughts/shared/plans/v2_rearchitecture/MASTER_PLAN.md` for the full
-design document, including the before/after diagrams, the six-layer model,
-and the RCLI/FastVoice reference implementations that Phase 0 ports.
+Expected: 188 / 188 passing, 5 Live* tests skipped (need .gguf / .onnx
+model weights present on disk).

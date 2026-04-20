@@ -91,6 +91,7 @@ if(RA_BUILD_ENGINES)
     # in the per-engine CMakeLists.txt.
     add_subdirectory(engines/onnx)
     add_subdirectory(engines/whisperkit)
+    add_subdirectory(engines/whispercpp)
     add_subdirectory(engines/metalrt)
     add_subdirectory(engines/genie)
     add_subdirectory(engines/diffusion-coreml)
