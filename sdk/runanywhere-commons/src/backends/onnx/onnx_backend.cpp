@@ -18,10 +18,30 @@
 #include <sys/stat.h>
 
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 #include "rac/core/rac_logger.h"
+
+#if SHERPA_ONNX_AVAILABLE
+namespace {
+// Mean-log-prob → confidence in [0,1]. Returns NaN when the model does not
+// populate per-token log probs (e.g. Whisper/CTC Sherpa models). The router
+// treats NaN as "no confidence signal available — trust this result".
+float compute_stt_confidence(const SherpaOnnxOfflineRecognizerResult* r) {
+    if (!r || !r->ys_log_probs || r->count <= 0) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+    double sum = 0.0;
+    for (int32_t i = 0; i < r->count; ++i) {
+        sum += r->ys_log_probs[i];
+    }
+    return static_cast<float>(std::exp(sum / static_cast<double>(r->count)));
+}
+}  // namespace
+#endif
 
 #if SHERPA_ONNX_AVAILABLE
 // espeak-ng reinitialization is handled by destroying and recreating
@@ -462,9 +482,12 @@ STTResult ONNXSTT::transcribe(const STTRequest& request) {
             result.detected_language = recognizer_result->lang;
         }
 
+        result.confidence = compute_stt_confidence(recognizer_result);
+
         SherpaOnnxDestroyOfflineRecognizerResult(recognizer_result);
     } else {
         result.text = "";
+        result.confidence = std::numeric_limits<float>::quiet_NaN();
         RAC_LOG_DEBUG("ONNX.STT", "No transcription result (empty audio or silence)");
     }
 
@@ -572,7 +595,11 @@ STTResult ONNXSTT::decode(const std::string& stream_id) {
             result.detected_language = recognizer_result->lang;
         }
 
+        result.confidence = compute_stt_confidence(recognizer_result);
+
         SherpaOnnxDestroyOfflineRecognizerResult(recognizer_result);
+    } else {
+        result.confidence = std::numeric_limits<float>::quiet_NaN();
     }
 #endif
 

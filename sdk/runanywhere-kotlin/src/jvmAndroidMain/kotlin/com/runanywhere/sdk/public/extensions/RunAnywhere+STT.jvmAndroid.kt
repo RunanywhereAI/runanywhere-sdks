@@ -76,25 +76,27 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
             sttLogger.debug("Routing STT to '${descriptor.moduleId}'")
             val result = backend.transcribe(audioData, options)
 
-            // Mock confidence score for now — replace with real inference confidence later
-            val mockConfidence = kotlin.random.Random.nextFloat()
+            val confidence = result.confidence
             val resultWithRouting = result.copy(
                 routingBackendId = descriptor.moduleId,
                 routingBackendName = descriptor.moduleName,
-                confidence = mockConfidence,
             )
 
             sttLogger.info(
                 "Transcription via '${descriptor.moduleId}': " +
-                    "confidence=${"%.2f".format(mockConfidence)}, " +
+                    "confidence=${"%.2f".format(confidence)}, " +
                     "text=${result.text.take(50)}${if (result.text.length > 50) "..." else ""}"
             )
 
             // Confidence cascade: if local backend scored below threshold and there
             // are cloud fallbacks available, hand off to the next candidate.
-            if (mockConfidence < confidenceThreshold && descriptor.isLocalOnly && index < candidates.lastIndex) {
+            // NaN confidence means "no signal available" — do not cascade.
+            if (!confidence.isNaN() &&
+                confidence < confidenceThreshold &&
+                descriptor.isLocalOnly &&
+                index < candidates.lastIndex) {
                 sttLogger.info(
-                    "Confidence ${"%.2f".format(mockConfidence)} < $confidenceThreshold — " +
+                    "Confidence ${"%.2f".format(confidence)} < $confidenceThreshold — " +
                         "cascading to next backend"
                 )
                 val fallbackDescriptor = candidates[index + 1]
@@ -112,7 +114,7 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
                             routingBackendId = fallbackDescriptor.moduleId,
                             routingBackendName = fallbackDescriptor.moduleName,
                             wasFallback = true,
-                            primaryConfidence = mockConfidence,
+                            primaryConfidence = confidence,
                         )
                     } catch (e: Exception) {
                         sttLogger.warn("Fallback '${fallbackDescriptor.moduleId}' failed: ${e.message}")

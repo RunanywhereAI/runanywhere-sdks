@@ -328,6 +328,8 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
+    # Routing (hybrid router — capability-generic core + STT dispatch)
+    src/routing/rac_router.cpp
     # TTS
     src/features/tts/tts_component.cpp
     src/features/tts/rac_tts_service.cpp

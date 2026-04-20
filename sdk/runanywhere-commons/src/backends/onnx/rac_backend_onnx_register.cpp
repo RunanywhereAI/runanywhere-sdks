@@ -11,9 +11,11 @@
 #include "rac_vad_onnx.h"
 #include "rac/backends/rac_embeddings_onnx.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 // std::filesystem is not available on Emscripten/WASM
@@ -71,7 +73,7 @@ static rac_result_t onnx_stt_vtable_transcribe(void* impl, const void* audio_dat
     // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
     if (audio_size < 1600) {
         out_result->text = nullptr;
-        out_result->confidence = 0.0f;
+        out_result->confidence = std::numeric_limits<float>::quiet_NaN();
         return RAC_SUCCESS;
     }
     std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);

@@ -4,6 +4,17 @@ cmake_minimum_required(VERSION 3.22)
 # Integration Test Suite for runanywhere-commons
 # =============================================================================
 
+# --- test_router: Always built (no backend dependency) ---
+# Tests the hybrid router core with fake backends.
+add_executable(test_router test_router.cpp)
+target_include_directories(test_router PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_router PRIVATE rac_commons)
+target_compile_features(test_router PRIVATE cxx_std_20)
+add_test(NAME router_tests COMMAND test_router)
+
 # --- test_core: Always built (no backend dependency) ---
 add_executable(test_core test_core.cpp)
 target_include_directories(test_core PRIVATE
