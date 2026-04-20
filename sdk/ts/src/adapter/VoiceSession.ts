@@ -142,4 +142,3 @@ export class VoiceSession {
   }
 }
 
-export { RunAnywhereError };
