@@ -79,7 +79,7 @@ build_slice() {
             )
             ;;
         macos)
-            targets_list="$targets_list llamacpp_engine"
+            targets_list="$targets_list llamacpp_engine onnx_engine whisperkit_engine metalrt_engine diffusion_coreml_engine"
             ;;
     esac
 
@@ -120,7 +120,11 @@ build_slice() {
              "${build_dir}/core/libra_core_abi_ext.a" \
              "${build_dir}/solutions/voice-agent/libra_solution_voice_agent.a" \
              "${build_dir}/solutions/rag/libra_solution_rag.a" \
-             "${build_dir}/engines/llamacpp/libllamacpp_engine.a"; do
+             "${build_dir}/engines/llamacpp/libllamacpp_engine.a" \
+             "${build_dir}/engines/onnx/librunanywhere_onnx.a" \
+             "${build_dir}/engines/whisperkit/librunanywhere_whisperkit.a" \
+             "${build_dir}/engines/metalrt/librunanywhere_metalrt.a" \
+             "${build_dir}/engines/diffusion-coreml/librunanywhere_diffusion_coreml.a"; do
         if [ -f "$f" ]; then
             archives+=("$f")
         else

@@ -93,6 +93,15 @@ if(RA_BUILD_ENGINES)
     if(RA_BUILD_SHERPA)
         add_subdirectory(engines/sherpa)
     endif()
+    # New Phase C engine plugins. Each ships as a metadata-only stub that
+    # exports its RA_PLUGIN_ENTRY_DECL so frontend register() calls find
+    # the plugin; real engine integrations land behind opt-in CMake gates
+    # in the per-engine CMakeLists.txt.
+    add_subdirectory(engines/onnx)
+    add_subdirectory(engines/whisperkit)
+    add_subdirectory(engines/metalrt)
+    add_subdirectory(engines/genie)
+    add_subdirectory(engines/diffusion-coreml)
 endif()
 
 # Discover gtest BEFORE descending into subdirs whose CMakeLists may already
