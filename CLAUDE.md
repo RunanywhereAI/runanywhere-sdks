@@ -27,10 +27,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository contains cross-platform SDKs for the RunAnywhere on-device AI platform. The platform provides intelligent routing between on-device and cloud AI models to optimize for cost and privacy.
 
 ### SDK Implementations
-- **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
-- **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
-- **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
-- **Web SDK** (`sdk/runanywhere-web/`) - TypeScript/WASM SDK for browsers via Emscripten
+- **Kotlin Multiplatform SDK** (`sdk/kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
+- **Android SDK** (`sdk/kotlin/`) - Kotlin-based SDK for Android
+- **iOS SDK** (`sdk/swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
+- **Web SDK** (`sdk/web/`) - TypeScript/WASM SDK for browsers via Emscripten
 
 ### Example Applications
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
@@ -44,7 +44,7 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 
 ```bash
 # Navigate to Kotlin SDK
-cd sdk/runanywhere-kotlin/
+cd sdk/kotlin/
 
 # Build Commands (using scripts/sdk.sh)
 ./scripts/sdk.sh build            # Build all platforms (JVM and Android)
@@ -104,7 +104,7 @@ After a successful build:
 
 ```bash
 # Navigate to Android SDK
-cd sdk/runanywhere-android/
+cd sdk/kotlin/
 
 # Build the SDK
 ./gradlew build
@@ -126,7 +126,7 @@ cd sdk/runanywhere-android/
 
 ```bash
 # Navigate to iOS SDK
-cd sdk/runanywhere-swift/
+cd sdk/swift/
 
 # Build the SDK
 swift build
@@ -216,7 +216,7 @@ open RunAnywhereAI.xcworkspace
 
 ```bash
 # Navigate to Web SDK
-cd sdk/runanywhere-web/
+cd sdk/web/
 
 # First-time setup (installs emsdk, npm deps, builds WASM + TypeScript)
 ./scripts/build-web.sh --setup

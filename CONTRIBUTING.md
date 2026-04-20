@@ -55,13 +55,13 @@ By participating in this project, you are expected to uphold our code of conduct
 
 2. **Android SDK Setup:**
    ```bash
-   cd sdk/runanywhere-kotlin/
+   cd sdk/kotlin/
    ./scripts/sdk.sh android
    ```
 
 3. **iOS SDK Setup:**
    ```bash
-   cd sdk/runanywhere-swift/
+   cd sdk/swift/
    swift build
    ```
 
@@ -109,12 +109,12 @@ docs: update README with new API examples
 3. **Run the test suite** to ensure nothing is broken:
    ```bash
    # Android
-   cd sdk/runanywhere-kotlin/
+   cd sdk/kotlin/
    ./scripts/sdk.sh test-android
    ./scripts/sdk.sh lint
 
    # iOS
-   cd sdk/runanywhere-swift/
+   cd sdk/swift/
    swift test
    swiftlint
    ```
@@ -172,11 +172,11 @@ docs: update README with new API examples
 
 ```bash
 # Android SDK tests
-cd sdk/runanywhere-kotlin/
+cd sdk/kotlin/
 ./scripts/sdk.sh test-android
 
 # iOS SDK tests
-cd sdk/runanywhere-swift/
+cd sdk/swift/
 swift test
 
 # Android example app tests

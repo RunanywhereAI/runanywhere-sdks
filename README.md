@@ -80,7 +80,7 @@ No cloud. No latency. No data leaves the device.
 |----------|--------|--------------|---------------|
 | **Swift** (iOS/macOS) | Stable | [Swift Package Manager](#swift-ios--macos) | [docs.runanywhere.ai/swift](https://docs.runanywhere.ai/swift/introduction) |
 | **Kotlin** (Android) | Stable | [Gradle](#kotlin-android) | [docs.runanywhere.ai/kotlin](https://docs.runanywhere.ai/kotlin/introduction) |
-| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/runanywhere-web/) |
+| **Web** (Browser) | Beta | [npm](#web-browser) | [SDK README](sdk/web/) |
 | **React Native** | Beta | [npm](#react-native) | [docs.runanywhere.ai/react-native](https://docs.runanywhere.ai/react-native/introduction) |
 | **Flutter** | Beta | [pub.dev](#flutter) | [docs.runanywhere.ai/flutter](https://docs.runanywhere.ai/flutter/introduction) |
 
@@ -113,7 +113,7 @@ print(response) // "Paris is the capital of France."
 https://github.com/RunanywhereAI/runanywhere-sdks
 ```
 
-[Full documentation →](https://docs.runanywhere.ai/swift/introduction) · [Source code](sdk/runanywhere-swift/)
+[Full documentation →](https://docs.runanywhere.ai/swift/introduction) · [Source code](sdk/swift/)
 
 ---
 
@@ -145,7 +145,7 @@ dependencies {
 }
 ```
 
-[Full documentation →](https://docs.runanywhere.ai/kotlin/introduction) · [Source code](sdk/runanywhere-kotlin/)
+[Full documentation →](https://docs.runanywhere.ai/kotlin/introduction) · [Source code](sdk/kotlin/)
 
 ---
 
@@ -174,7 +174,7 @@ console.log(response); // "Paris is the capital of France."
 npm install @runanywhere/core @runanywhere/llamacpp
 ```
 
-[Full documentation →](https://docs.runanywhere.ai/react-native/introduction) · [Source code](sdk/runanywhere-react-native/)
+[Full documentation →](https://docs.runanywhere.ai/react-native/introduction) · [Source code](sdk/ts/)
 
 ---
 
@@ -206,7 +206,7 @@ dependencies:
   # runanywhere_onnx: ^0.16.0   # Add this if you need STT, TTS, or Voice features
 ```
 
-[Full documentation →](https://docs.runanywhere.ai/flutter/introduction) · [Source code](sdk/runanywhere-flutter/)
+[Full documentation →](https://docs.runanywhere.ai/flutter/introduction) · [Source code](sdk/dart/)
 
 ---
 
@@ -232,7 +232,7 @@ console.log(result.text); // "Paris is the capital of France."
 npm install @runanywhere/web
 ```
 
-[Full documentation →](sdk/runanywhere-web/) · [Source code](sdk/runanywhere-web/)
+[Full documentation →](sdk/web/) · [Source code](sdk/web/)
 
 ---
 
@@ -389,7 +389,7 @@ We welcome contributions. See our [Contributing Guide](CONTRIBUTING.md) for deta
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 
 # Set up a specific SDK (example: Swift)
-cd runanywhere-sdks/sdk/runanywhere-swift
+cd runanywhere-sdks/sdk/swift
 ./scripts/build-swift.sh --setup
 
 # Run the sample app
