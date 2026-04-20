@@ -41,12 +41,13 @@ let package = Package(
         .macOS(.v14),
     ],
     products: [
-        .library(name: "RunAnywhere",            targets: ["RunAnywhere"]),
-        .library(name: "RunAnywhereLlamaCPP",    targets: ["LlamaCPPRuntime"]),
-        .library(name: "RunAnywhereONNX",        targets: ["ONNXRuntime"]),
-        .library(name: "RunAnywhereWhisperKit",  targets: ["WhisperKitRuntime"]),
-        .library(name: "RunAnywhereMetalRT",     targets: ["MetalRTRuntime"]),
-        .library(name: "RunAnywhereGenie",       targets: ["GenieRuntime"]),
+        .library(name: "RunAnywhere",                targets: ["RunAnywhere"]),
+        .library(name: "RunAnywhereLlamaCPP",        targets: ["LlamaCPPRuntime"]),
+        .library(name: "RunAnywhereONNX",            targets: ["ONNXRuntime"]),
+        .library(name: "RunAnywhereWhisperKit",      targets: ["WhisperKitRuntime"]),
+        .library(name: "RunAnywhereMetalRT",         targets: ["MetalRTRuntime"]),
+        .library(name: "RunAnywhereGenie",           targets: ["GenieRuntime"]),
+        .library(name: "RunAnywhereFoundationModels", targets: ["FoundationModelsRuntime"]),
     ],
     dependencies: [],
     targets: [
@@ -107,6 +108,11 @@ let package = Package(
             name: "GenieRuntime",
             dependencies: ["RunAnywhere"],
             path: "sdk/swift/Sources/Backends/GenieRuntime"
+        ),
+        .target(
+            name: "FoundationModelsRuntime",
+            dependencies: ["RunAnywhere"],
+            path: "sdk/swift/Sources/Backends/FoundationModelsRuntime"
         ),
 
         // -----------------------------------------------------------------

@@ -66,11 +66,22 @@ public enum Genie {
     }
 }
 
-/// Apple Foundation Models native LLM hook (iOS 18+ / macOS 15+).
+/// Apple Foundation Models native LLM hook (iOS 26+ / macOS 26+).
+/// The real Swift bridge lives in the `FoundationModelsRuntime` target —
+/// which calls `FoundationModels.setInstaller(_:)` on import. When the
+/// consumer links that target, `register()` installs the platform
+/// callback table into `ra_platform_llm_*`.
 public enum FoundationModels {
+
+    /// Installer hook set by the `FoundationModelsRuntime` target. Nil when
+    /// the consumer did not link that target, in which case `register()`
+    /// records the priority but installs no callbacks.
+    public static var installer: (() -> Void)?
+
     @discardableResult
     public static func register(priority: Int = 50) -> Bool {
         registeredPriorities["foundation_models"] = priority
+        installer?()
         return true
     }
 }
