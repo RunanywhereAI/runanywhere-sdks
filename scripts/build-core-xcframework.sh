@@ -185,6 +185,7 @@ module CRACommonsCore {
     header "ra_auth.h"
     header "ra_model.h"
     header "ra_backends.h"
+    header "ra_rag.h"
     link "RACommonsCore"
     export *
 }

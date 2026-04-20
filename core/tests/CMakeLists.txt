@@ -30,6 +30,7 @@ set(_ra_core_test_sources
     ra_telemetry_abi_test.cpp
     ra_model_abi_test.cpp
     ra_download_sha256_test.cpp
+    ra_rag_abi_test.cpp
 )
 
 # Only include the proto round-trip when ra_idl exists (RA_HAVE_PROTOBUF).
