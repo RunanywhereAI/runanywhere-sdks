@@ -1,0 +1,27 @@
+name: runanywhere_onnx
+description: RunAnywhere SDK — onnx engine registration for Flutter.
+version: 2.0.0-dev.1
+homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  runanywhere: ^2.0.0-dev.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.runanywhere.onnx
+        pluginClass: RunanywhereOnnxPlugin
+      ios:
+        pluginClass: RunanywhereOnnxPlugin

@@ -1,0 +1,28 @@
+name: runanywhere
+description: RunAnywhere SDK — Dart/Flutter core adapter (thin FFI wrapper around the v2 C ABI).
+version: 2.0.0-dev.1
+homepage: https://runanywhere.ai
+repository: https://github.com/RunanywhereAI/runanywhere-sdks
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.19.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^5.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.runanywhere.core
+        pluginClass: RunanywhereCorePlugin
+      ios:
+        pluginClass: RunanywhereCorePlugin
