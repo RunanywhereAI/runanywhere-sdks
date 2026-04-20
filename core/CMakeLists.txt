@@ -271,6 +271,7 @@ set(_ra_core_abi_ext_sources
     abi/ra_platform_llm.cpp
     abi/ra_benchmark.cpp
     abi/ra_download.cpp
+    abi/ra_auth.cpp
 )
 if(RA_BUILD_VLM)
     list(APPEND _ra_core_abi_ext_sources abi/ra_vlm.cpp)

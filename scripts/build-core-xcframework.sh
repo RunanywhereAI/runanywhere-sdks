@@ -182,6 +182,7 @@ module CRACommonsCore {
     header "ra_platform_llm.h"
     header "ra_benchmark.h"
     header "ra_server.h"
+    header "ra_auth.h"
     link "RACommonsCore"
     export *
 }
