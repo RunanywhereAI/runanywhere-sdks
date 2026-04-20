@@ -46,7 +46,7 @@ let package = Package(
         .library(name: "RunAnywhereONNX",            targets: ["ONNXRuntime"]),
         .library(name: "RunAnywhereWhisperKit",      targets: ["WhisperKitRuntime"]),
         .library(name: "RunAnywhereMetalRT",         targets: ["MetalRTRuntime"]),
-        .library(name: "RunAnywhereGenie",           targets: ["GenieRuntime"]),
+        // Qualcomm Genie is Android-only; no iOS/macOS counterpart.
         .library(name: "RunAnywhereFoundationModels", targets: ["FoundationModelsRuntime"]),
         .library(name: "RunAnywhereDiffusionCoreML",  targets: ["DiffusionCoreMLRuntime"]),
     ],
@@ -104,11 +104,6 @@ let package = Package(
             name: "MetalRTRuntime",
             dependencies: ["RunAnywhere"],
             path: "sdk/swift/Sources/Backends/MetalRTRuntime"
-        ),
-        .target(
-            name: "GenieRuntime",
-            dependencies: ["RunAnywhere"],
-            path: "sdk/swift/Sources/Backends/GenieRuntime"
         ),
         .target(
             name: "FoundationModelsRuntime",

@@ -6,7 +6,10 @@
 //   ONNX.register(priority:)
 //   WhisperKitSTT.register(priority:)
 //   MetalRT.register(priority:)
-//   Genie.register(priority:)
+//   FoundationModels.register(priority:)
+//
+// Qualcomm Genie is Android-only and is intentionally NOT exported from
+// the Swift SDK — it has no iOS / macOS implementation path.
 //
 // On iOS the engines are statically compiled into the XCFramework; their
 // `RA_STATIC_PLUGIN_REGISTER(name)` macro fires at dynamic-init time and
@@ -53,15 +56,6 @@ public enum MetalRT {
     @discardableResult
     public static func register(priority: Int = 100) -> Bool {
         registeredPriorities["metalrt"] = priority
-        return true
-    }
-}
-
-/// Qualcomm Genie Android-only LLM engine. iOS no-op.
-public enum Genie {
-    @discardableResult
-    public static func register(priority: Int = 100) -> Bool {
-        registeredPriorities["genie"] = priority
         return true
     }
 }
