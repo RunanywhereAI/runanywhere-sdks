@@ -285,6 +285,26 @@ target_link_libraries(ra_core_llm_dispatch
 set_target_properties(ra_core_llm_dispatch PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(RunAnywhere::core_llm_dispatch ALIAS ra_core_llm_dispatch)
 
+# --- State C ABI bridge ------------------------------------------------------
+# Implements ra_state_* C ABI declared in core/abi/ra_state.h. Thin
+# wrapper over AuthManager + Environment — needed because legacy
+# Swift/Kotlin bridges call rac_state_* at startup and throughout the
+# auth lifecycle.
+add_library(ra_core_state_abi STATIC
+    abi/ra_state.cpp
+)
+target_include_directories(ra_core_state_abi PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(ra_core_state_abi
+    PUBLIC  ra_core_abi ra_core_net
+            RunAnywhere::platform_flags
+    PRIVATE RunAnywhere::sanitizers
+)
+set_target_properties(ra_core_state_abi PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(RunAnywhere::core_state_abi ALIAS ra_core_state_abi)
+
 # --- Pipeline C ABI bridge ---------------------------------------------------
 # Turns the `ra_pipeline_*` entry points in abi/ra_pipeline.h into a real
 # bridge onto core/voice_pipeline + solutions/voice-agent. Uses plain C
@@ -322,6 +342,7 @@ target_link_libraries(ra_core INTERFACE
     ra_core_net
     ra_core_util
     ra_core_llm_dispatch
+    ra_core_state_abi
     ra_core_pipeline_abi
 )
 add_library(RunAnywhere::core ALIAS ra_core)
@@ -371,6 +392,7 @@ if(APPLE)
         -Wl,-force_load,$<TARGET_FILE:ra_core_abi>
         -Wl,-force_load,$<TARGET_FILE:ra_core_pipeline_abi>
         -Wl,-force_load,$<TARGET_FILE:ra_core_llm_dispatch>
+        -Wl,-force_load,$<TARGET_FILE:ra_core_state_abi>
         -Wl,-force_load,$<TARGET_FILE:ra_core_voice_pipeline>
         -Wl,-force_load,$<TARGET_FILE:ra_core_graph>
         -Wl,-force_load,$<TARGET_FILE:ra_core_registry>
@@ -378,7 +400,7 @@ if(APPLE)
         -Wl,-force_load,$<TARGET_FILE:ra_core_model_registry>
         -Wl,-force_load,$<TARGET_FILE:ra_core_net>
         -Wl,-force_load,$<TARGET_FILE:ra_core_util>
-        ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch
+        ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
     )
@@ -392,14 +414,14 @@ elseif(UNIX)
         -Wl,--unresolved-symbols=ignore-all)
     target_link_libraries(racommons_core PRIVATE
         -Wl,--whole-archive ra_core_abi ra_core_pipeline_abi
-        ra_core_llm_dispatch
+        ra_core_llm_dispatch ra_core_state_abi
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
         -Wl,--no-whole-archive
     )
 else()
     target_link_libraries(racommons_core PRIVATE
-        ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch
+        ra_core_abi ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi
         ra_core_voice_pipeline ra_core_graph ra_core_registry
         ra_core_router ra_core_model_registry ra_core_net ra_core_util
     )
@@ -436,6 +458,7 @@ install(TARGETS
             ra_core_net
             ra_core_util
             ra_core_llm_dispatch
+            ra_core_state_abi
             ra_core_pipeline_abi
         EXPORT RunAnywhereTargets
         ARCHIVE DESTINATION lib

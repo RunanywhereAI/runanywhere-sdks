@@ -29,6 +29,7 @@ const int ra_compat_disabled_marker = 1;
 #include "ra_errors.h"
 #include "ra_lifecycle.h"
 #include "ra_platform_adapter.h"
+#include "ra_state.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -201,6 +202,52 @@ RA_COMPAT_EXPORT const char*  rac_extended_error_string(ra_extended_error_t c) {
 }
 RA_COMPAT_EXPORT const char*  rac_lifecycle_state_string(ra_lifecycle_state_t s) {
     return ra_lifecycle_state_str(s);
+}
+
+/* --- SDK state / auth (binary exports) ---------------------------------- */
+RA_COMPAT_EXPORT ra_status_t rac_state_initialize(ra_environment_t env, const char* k,
+                                                    const char* u, const char* d) {
+    return ra_state_initialize(env, k, u, d);
+}
+RA_COMPAT_EXPORT bool  rac_state_is_initialized(void)  { return ra_state_is_initialized(); }
+RA_COMPAT_EXPORT void  rac_state_reset(void)           { ra_state_reset(); }
+RA_COMPAT_EXPORT void  rac_state_shutdown(void)        { ra_state_shutdown(); }
+RA_COMPAT_EXPORT ra_environment_t rac_state_get_environment(void) {
+    return ra_state_get_environment();
+}
+RA_COMPAT_EXPORT const char* rac_state_get_base_url(void)  { return ra_state_get_base_url(); }
+RA_COMPAT_EXPORT const char* rac_state_get_api_key(void)   { return ra_state_get_api_key(); }
+RA_COMPAT_EXPORT const char* rac_state_get_device_id(void) { return ra_state_get_device_id(); }
+RA_COMPAT_EXPORT ra_status_t rac_state_set_auth(const ra_auth_data_t* a) {
+    return ra_state_set_auth(a);
+}
+RA_COMPAT_EXPORT const char* rac_state_get_access_token(void) {
+    return ra_state_get_access_token();
+}
+RA_COMPAT_EXPORT const char* rac_state_get_refresh_token(void) {
+    return ra_state_get_refresh_token();
+}
+RA_COMPAT_EXPORT bool rac_state_is_authenticated(void) {
+    return ra_state_is_authenticated();
+}
+RA_COMPAT_EXPORT bool rac_state_token_needs_refresh(int h) {
+    return ra_state_token_needs_refresh(h);
+}
+RA_COMPAT_EXPORT int64_t rac_state_get_token_expires_at(void) {
+    return ra_state_get_token_expires_at();
+}
+RA_COMPAT_EXPORT const char* rac_state_get_user_id(void)         { return ra_state_get_user_id(); }
+RA_COMPAT_EXPORT const char* rac_state_get_organization_id(void) { return ra_state_get_organization_id(); }
+RA_COMPAT_EXPORT void rac_state_clear_auth(void)                 { ra_state_clear_auth(); }
+RA_COMPAT_EXPORT void rac_state_set_device_registered(bool r)    { ra_state_set_device_registered(r); }
+RA_COMPAT_EXPORT bool rac_state_is_device_registered(void)       { return ra_state_is_device_registered(); }
+RA_COMPAT_EXPORT void rac_state_on_auth_changed(ra_auth_changed_callback_t cb, void* ud) {
+    ra_state_on_auth_changed(cb, ud);
+}
+RA_COMPAT_EXPORT void rac_state_set_persistence_callbacks(ra_state_persist_callback_t p,
+                                                            ra_state_load_callback_t l,
+                                                            void* ud) {
+    ra_state_set_persistence_callbacks(p, l, ud);
 }
 
 #ifdef __cplusplus

@@ -202,6 +202,40 @@ typedef ra_init_config_t rac_config_t;
 #define rac_validate_api_key        ra_validate_api_key
 #define rac_validate_base_url       ra_validate_base_url
 
+/* --- SDK state / auth --------------------------------------------------- */
+#include "ra_state.h"
+typedef ra_environment_t             rac_environment_t;
+typedef ra_auth_data_t               rac_auth_data_t;
+typedef ra_auth_changed_callback_t   rac_auth_changed_callback_t;
+typedef ra_state_persist_callback_t  rac_state_persist_callback_t;
+typedef ra_state_load_callback_t     rac_state_load_callback_t;
+
+#define RAC_ENVIRONMENT_DEVELOPMENT RA_ENVIRONMENT_DEVELOPMENT
+#define RAC_ENVIRONMENT_STAGING     RA_ENVIRONMENT_STAGING
+#define RAC_ENVIRONMENT_PRODUCTION  RA_ENVIRONMENT_PRODUCTION
+
+#define rac_state_initialize              ra_state_initialize
+#define rac_state_is_initialized          ra_state_is_initialized
+#define rac_state_reset                   ra_state_reset
+#define rac_state_shutdown                ra_state_shutdown
+#define rac_state_get_environment         ra_state_get_environment
+#define rac_state_get_base_url            ra_state_get_base_url
+#define rac_state_get_api_key             ra_state_get_api_key
+#define rac_state_get_device_id           ra_state_get_device_id
+#define rac_state_set_auth                ra_state_set_auth
+#define rac_state_get_access_token        ra_state_get_access_token
+#define rac_state_get_refresh_token       ra_state_get_refresh_token
+#define rac_state_is_authenticated        ra_state_is_authenticated
+#define rac_state_token_needs_refresh     ra_state_token_needs_refresh
+#define rac_state_get_token_expires_at    ra_state_get_token_expires_at
+#define rac_state_get_user_id             ra_state_get_user_id
+#define rac_state_get_organization_id     ra_state_get_organization_id
+#define rac_state_clear_auth              ra_state_clear_auth
+#define rac_state_set_device_registered   ra_state_set_device_registered
+#define rac_state_is_device_registered    ra_state_is_device_registered
+#define rac_state_on_auth_changed         ra_state_on_auth_changed
+#define rac_state_set_persistence_callbacks ra_state_set_persistence_callbacks
+
 /* --- Gaps not yet bridged --------------------------------------------
  *
  * These legacy-only entry points are still only available from
