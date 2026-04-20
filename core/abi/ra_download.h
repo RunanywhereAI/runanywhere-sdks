@@ -130,6 +130,30 @@ ra_status_t ra_download_orchestrate(const char* url,
                                      void*                            user_data,
                                      char**                           out_final_path);
 
+// Orchestrate with retry + exponential backoff. `max_retries` of 0 behaves
+// identically to `ra_download_orchestrate`. On each retry the manager
+// sleeps `base_backoff_ms << attempt` before trying again, capped at
+// `max_backoff_ms`. Progress callback reflects the final attempt only.
+ra_status_t ra_download_orchestrate_with_retry(
+    const char* url,
+    const char* destination_path,
+    const char* expected_sha256,
+    int32_t                          max_retries,
+    int32_t                          base_backoff_ms,
+    int32_t                          max_backoff_ms,
+    ra_download_progress_callback_fn progress_cb,
+    void*                            user_data,
+    char**                           out_final_path);
+
+// Compute SHA-256 of a file on disk and return the hex digest (64 chars
+// lowercase). Heap-allocated; free with `ra_download_string_free`.
+ra_status_t ra_download_sha256_file(const char* file_path, char** out_hex);
+
+// Verify that `file_path` matches `expected_hex_sha256`. Returns RA_OK on
+// match, RA_ERR_IO on mismatch, RA_ERR_INVALID_ARGUMENT on missing file.
+ra_status_t ra_download_verify_sha256(const char* file_path,
+                                        const char* expected_hex_sha256);
+
 // ---------------------------------------------------------------------------
 // Memory ownership
 // ---------------------------------------------------------------------------
