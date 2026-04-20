@@ -48,6 +48,7 @@ let package = Package(
         .library(name: "RunAnywhereMetalRT",         targets: ["MetalRTRuntime"]),
         .library(name: "RunAnywhereGenie",           targets: ["GenieRuntime"]),
         .library(name: "RunAnywhereFoundationModels", targets: ["FoundationModelsRuntime"]),
+        .library(name: "RunAnywhereDiffusionCoreML",  targets: ["DiffusionCoreMLRuntime"]),
     ],
     dependencies: [],
     targets: [
@@ -113,6 +114,11 @@ let package = Package(
             name: "FoundationModelsRuntime",
             dependencies: ["RunAnywhere"],
             path: "sdk/swift/Sources/Backends/FoundationModelsRuntime"
+        ),
+        .target(
+            name: "DiffusionCoreMLRuntime",
+            dependencies: ["RunAnywhere"],
+            path: "sdk/swift/Sources/Backends/DiffusionCoreMLRuntime"
         ),
 
         // -----------------------------------------------------------------
