@@ -272,6 +272,7 @@ add_library(RunAnywhere::core_util ALIAS ra_core_util)
 # pointer, and dispatches each subsequent call through that vtable.
 add_library(ra_core_llm_dispatch STATIC
     abi/ra_llm_dispatch.cpp
+    abi/ra_primitive_dispatch.cpp
 )
 target_include_directories(ra_core_llm_dispatch PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
