@@ -45,14 +45,15 @@ fi
 
 # swiftpm binary target name → local-filename-prefix pairs. Names match the
 # `.binaryTarget(name: "X", ...)` entries in Package.swift.
+# Since v0.19.0, iOS xcframework zips are suffixed "-ios-" to disambiguate
+# from Android per-ABI zips. ONNX Runtime is now bundled into RABackendONNX
+# and no longer distributed as a separate artifact.
 declare_mapping() {
     # Printed form: BINARY_NAME|ZIP_PREFIX
-    echo "RACommonsBinary|RACommons"
-    echo "RABackendLlamaCPPBinary|RABackendLLAMACPP"
-    echo "RABackendONNXBinary|RABackendONNX"
-    echo "RABackendMetalRTBinary|RABackendMetalRT"
-    echo "ONNXRuntimeiOSBinary|onnxruntime-ios"
-    echo "ONNXRuntimemacOSBinary|onnxruntime-macos"
+    echo "RACommonsBinary|RACommons-ios"
+    echo "RABackendLlamaCPPBinary|RABackendLLAMACPP-ios"
+    echo "RABackendONNXBinary|RABackendONNX-ios"
+    echo "RABackendMetalRTBinary|RABackendMetalRT-ios"
 }
 
 sha256_of() {
@@ -77,9 +78,13 @@ binary_name, new_sum, path = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(path) as f:
     src = f.read()
 
-# Find the `name: "X"` line and the first `checksum: "..."` within 6 lines.
+# Find the remote-mode binaryTarget: `name: "X", url: "...", checksum: "..."`.
+# We require `url:` between name and checksum to avoid the local-mode entry
+# (which uses `path:` and has no checksum) — without this anchor, the non-
+# greedy `.*?` would skip past the local entry and match the checksum of
+# the NEXT remote target in the file, causing cross-target mis-assignment.
 pattern = re.compile(
-    r'(name:\s*"' + re.escape(binary_name) + r'".*?checksum:\s*")([0-9a-f]{64})(")',
+    r'(name:\s*"' + re.escape(binary_name) + r'"\s*,\s*url:\s*"[^"]+"\s*,\s*checksum:\s*")([0-9a-f]{64})(")',
     re.DOTALL,
 )
 
