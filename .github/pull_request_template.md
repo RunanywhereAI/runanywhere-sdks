@@ -44,12 +44,12 @@ Brief description of the changes made.
 Please add the appropriate label(s):
 
 **SDKs:**
-- [ ] `Swift SDK` - Changes to Swift SDK (`sdk/runanywhere-swift`)
-- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/runanywhere-kotlin`)
-- [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/runanywhere-flutter`)
-- [ ] `React Native SDK` - Changes to React Native SDK (`sdk/runanywhere-react-native`)
-- [ ] `Web SDK` - Changes to Web SDK (`sdk/runanywhere-web`)
-- [ ] `Commons` - Changes to shared native code (`sdk/runanywhere-commons`)
+- [ ] `Swift SDK` - Changes to Swift SDK (`sdk/legacy/swift`)
+- [ ] `Kotlin SDK` - Changes to Kotlin SDK (`sdk/legacy/kotlin`)
+- [ ] `Flutter SDK` - Changes to Flutter SDK (`sdk/legacy/flutter`)
+- [ ] `React Native SDK` - Changes to React Native SDK (`sdk/legacy/react-native`)
+- [ ] `Web SDK` - Changes to Web SDK (`sdk/legacy/web`)
+- [ ] `Commons` - Changes to shared native code (`sdk/legacy/commons`)
 
 **Sample Apps:**
 - [ ] `iOS Sample` - Changes to iOS example app (`examples/ios`)

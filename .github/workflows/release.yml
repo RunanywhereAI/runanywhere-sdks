@@ -210,10 +210,10 @@ jobs:
         with:
           platform: web
       - name: Build WASM (all backends)
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: ./scripts/build-web.sh --build-wasm --all-backends
       - name: Package Web/WASM outputs
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: |
           mkdir -p dist
           tar czf "dist/RACommons-web-v${{ needs.validate.outputs.version }}.tar.gz" \
@@ -226,8 +226,8 @@ jobs:
         with:
           name: native-web
           path: |
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz
-            sdk/runanywhere-web/dist/RACommons-web-*.tar.gz.sha256
+            sdk/legacy/web/dist/RACommons-web-*.tar.gz
+            sdk/legacy/web/dist/RACommons-web-*.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
 
@@ -256,24 +256,24 @@ jobs:
           path: native-android-staging
       - name: Stage natives into Kotlin SDK
         run: |
-          mkdir -p sdk/runanywhere-kotlin/src/androidMain/jniLibs
+          mkdir -p sdk/legacy/kotlin/src/androidMain/jniLibs
           for abi_dir in native-android-staging/*; do
             [ -d "$abi_dir" ] || continue
             for zip in "$abi_dir"/*.zip; do
               [ -f "$zip" ] || continue
               echo "Extracting $zip"
-              unzip -o "$zip" -d sdk/runanywhere-kotlin/src/androidMain/jniLibs/
+              unzip -o "$zip" -d sdk/legacy/kotlin/src/androidMain/jniLibs/
             done
           done
-          ls -la sdk/runanywhere-kotlin/src/androidMain/jniLibs/ || true
+          ls -la sdk/legacy/kotlin/src/androidMain/jniLibs/ || true
       - name: Build Kotlin AAR + JAR
-        working-directory: sdk/runanywhere-kotlin
+        working-directory: sdk/legacy/kotlin
         run: ./gradlew build assembleRelease -x test --no-daemon
       - name: Collect Kotlin SDK artifacts
         run: |
           mkdir -p sdk-staging/kotlin
-          find sdk/runanywhere-kotlin/build/outputs/aar -name "*.aar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
-          find sdk/runanywhere-kotlin/build/libs -name "*.jar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
+          find sdk/legacy/kotlin/build/outputs/aar -name "*.aar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
+          find sdk/legacy/kotlin/build/libs -name "*.jar" -exec cp {} sdk-staging/kotlin/ \; 2>/dev/null || true
           ls -la sdk-staging/kotlin/ || true
           for f in sdk-staging/kotlin/*; do
             [ -f "$f" ] && shasum -a 256 "$f" > "$f.sha256"
@@ -303,15 +303,15 @@ jobs:
       - name: Stage WASM into Web SDK
         run: |
           for tar in native-web-staging/*.tar.gz; do
-            [ -f "$tar" ] && tar xzf "$tar" -C sdk/runanywhere-web/packages/
+            [ -f "$tar" ] && tar xzf "$tar" -C sdk/legacy/web/packages/
           done
       - name: Install + build Web SDK
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: |
           npm install
           npm run build:ts
       - name: npm pack each Web package
-        working-directory: sdk/runanywhere-web
+        working-directory: sdk/legacy/web
         run: |
           mkdir -p ../../sdk-staging/web
           for pkg in packages/core packages/llamacpp packages/onnx; do

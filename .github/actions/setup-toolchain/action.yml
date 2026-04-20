@@ -1,6 +1,6 @@
 name: Setup Toolchain
 description: |
-  Loads sdk/runanywhere-commons/VERSIONS into $GITHUB_ENV and installs the
+  Loads sdk/legacy/commons/VERSIONS into $GITHUB_ENV and installs the
   per-platform toolchain (Xcode, NDK, JDK, Node, Emscripten, CMake) at the
   versions pinned in VERSIONS. Single source of truth for tool versions.
 
@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        VERSIONS_FILE="${GITHUB_WORKSPACE}/sdk/runanywhere-commons/VERSIONS"
+        VERSIONS_FILE="${GITHUB_WORKSPACE}/sdk/legacy/commons/VERSIONS"
         if [ ! -f "$VERSIONS_FILE" ]; then
           echo "::error::VERSIONS file not found at $VERSIONS_FILE"
           exit 1

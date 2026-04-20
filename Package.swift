@@ -12,22 +12,22 @@ import Foundation
 //   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.17.0")
 //
 // FOR LOCAL DEVELOPMENT:
-//   1. Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//   1. Run: cd sdk/legacy/swift && ./scripts/build-swift.sh --setup
 //   2. Open the example app in Xcode
 //   3. The app references this package via relative path
 //
 // =============================================================================
 
 // Combined ONNX Runtime xcframework (local dev) is created by:
-//   cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
+//   cd sdk/legacy/swift && ./scripts/create-onnxruntime-xcframework.sh
 
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
 //
-// useLocalNatives = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
+// useLocalNatives = true  → Use local XCFrameworks from sdk/legacy/swift/Binaries/
 //                           For local development. Run first-time setup:
-//                             cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//                             cd sdk/legacy/swift && ./scripts/build-swift.sh --setup
 //
 // useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION)
 //                           For external users via SPM. No setup needed.
@@ -113,7 +113,7 @@ let package = Package(
         .target(
             name: "CRACommons",
             dependencies: ["RACommonsBinary"],
-            path: "sdk/runanywhere-swift/Sources/RunAnywhere/CRACommons",
+            path: "sdk/legacy/swift/Sources/RunAnywhere/CRACommons",
             publicHeadersPath: "include"
         ),
 
@@ -123,7 +123,7 @@ let package = Package(
         .target(
             name: "LlamaCPPBackend",
             dependencies: ["RABackendLlamaCPPBinary"],
-            path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime/include",
+            path: "sdk/legacy/swift/Sources/LlamaCPPRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -137,7 +137,7 @@ let package = Package(
                 .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
                 .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
             ],
-            path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
+            path: "sdk/legacy/swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
         ),
 
@@ -156,7 +156,7 @@ let package = Package(
                 "CRACommons",
                 "RACommonsBinary",
             ],
-            path: "sdk/runanywhere-swift/Sources/RunAnywhere",
+            path: "sdk/legacy/swift/Sources/RunAnywhere",
             exclude: ["CRACommons"],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
@@ -178,7 +178,7 @@ let package = Package(
                 .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
                 .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
             ],
-            path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
+            path: "sdk/legacy/swift/Sources/ONNXRuntime",
             exclude: ["include"],
             linkerSettings: [
                 .linkedLibrary("c++"),
@@ -199,7 +199,7 @@ let package = Package(
                 "LlamaCPPBackend",
                 "RABackendLlamaCPPBinary",
             ],
-            path: "sdk/runanywhere-swift/Sources/LlamaCPPRuntime",
+            path: "sdk/legacy/swift/Sources/LlamaCPPRuntime",
             exclude: ["include"],
             linkerSettings: [
                 .linkedLibrary("c++"),
@@ -218,7 +218,7 @@ let package = Package(
                 "RunAnywhere",
                 .product(name: "WhisperKit", package: "whisperkit"),
             ],
-            path: "sdk/runanywhere-swift/Sources/WhisperKitRuntime",
+            path: "sdk/legacy/swift/Sources/WhisperKitRuntime",
             linkerSettings: [
                 .linkedFramework("CoreML"),
                 .linkedFramework("Accelerate"),
@@ -231,7 +231,7 @@ let package = Package(
         .testTarget(
             name: "RunAnywhereTests",
             dependencies: ["RunAnywhere"],
-            path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
+            path: "sdk/legacy/swift/Tests/RunAnywhereTests"
         ),
 
     ] + metalRTTargets() + binaryTargets()
@@ -263,7 +263,7 @@ func metalRTTargets() -> [Target] {
         .target(
             name: "MetalRTBackend",
             dependencies: ["RABackendMetalRTBinary"],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
+            path: "sdk/legacy/swift/Sources/MetalRTRuntime/include",
             publicHeadersPath: "."
         ),
         // MetalRT Runtime Backend (custom Metal GPU kernels)
@@ -274,7 +274,7 @@ func metalRTTargets() -> [Target] {
                 "MetalRTBackend",
                 "RABackendMetalRTBinary",
             ],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
+            path: "sdk/legacy/swift/Sources/MetalRTRuntime",
             exclude: ["include"],
             resources: [
                 .copy("Resources/default.metallib"),
@@ -298,8 +298,8 @@ func binaryTargets() -> [Target] {
     if useLocalNatives {
         // =====================================================================
         // LOCAL DEVELOPMENT MODE
-        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/
-        // Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+        // Use XCFrameworks from sdk/legacy/swift/Binaries/
+        // Run: cd sdk/legacy/swift && ./scripts/build-swift.sh --setup
         //
         // For macOS support, build with --include-macos:
         //   ./scripts/build-swift.sh --setup --include-macos
@@ -307,19 +307,19 @@ func binaryTargets() -> [Target] {
         var targets: [Target] = [
             .binaryTarget(
                 name: "RACommonsBinary",
-                path: "sdk/runanywhere-swift/Binaries/RACommons.xcframework"
+                path: "sdk/legacy/swift/Binaries/RACommons.xcframework"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework"
+                path: "sdk/legacy/swift/Binaries/RABackendLLAMACPP.xcframework"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
+                path: "sdk/legacy/swift/Binaries/RABackendONNX.xcframework"
             ),
             .binaryTarget(
                 name: "RABackendMetalRTBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
+                path: "sdk/legacy/swift/Binaries/RABackendMetalRT.xcframework"
             ),
         ]
 
@@ -329,11 +329,11 @@ func binaryTargets() -> [Target] {
         targets.append(contentsOf: [
             .binaryTarget(
                 name: "ONNXRuntimeiOSBinary",
-                path: "sdk/runanywhere-swift/Binaries/onnxruntime-ios.xcframework"
+                path: "sdk/legacy/swift/Binaries/onnxruntime-ios.xcframework"
             ),
             .binaryTarget(
                 name: "ONNXRuntimemacOSBinary",
-                path: "sdk/runanywhere-swift/Binaries/onnxruntime-macos.xcframework"
+                path: "sdk/legacy/swift/Binaries/onnxruntime-macos.xcframework"
             ),
         ])
 
