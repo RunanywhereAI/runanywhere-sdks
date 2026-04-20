@@ -155,4 +155,27 @@ final class RunAnywhereCoreTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - ChatSession prompt rendering
+
+    func testChatSessionRendersChatML() {
+        let rendered = ChatSession.renderMessages([
+            .system("You are helpful."),
+            .user("What is 2+2?"),
+        ], skipSystem: false)
+        XCTAssertTrue(rendered.contains("<|im_start|>system"))
+        XCTAssertTrue(rendered.contains("You are helpful."))
+        XCTAssertTrue(rendered.contains("<|im_start|>user"))
+        XCTAssertTrue(rendered.contains("What is 2+2?"))
+        XCTAssertTrue(rendered.hasSuffix("<|im_start|>assistant\n"))
+    }
+
+    func testChatSessionSkipsSystemWhenInjected() {
+        let rendered = ChatSession.renderMessages([
+            .system("You are helpful."),
+            .user("Hello"),
+        ], skipSystem: true)
+        XCTAssertFalse(rendered.contains("<|im_start|>system"))
+        XCTAssertTrue(rendered.contains("<|im_start|>user"))
+    }
 }
