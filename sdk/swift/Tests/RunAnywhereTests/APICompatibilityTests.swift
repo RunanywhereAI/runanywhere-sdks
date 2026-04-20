@@ -71,8 +71,8 @@ final class APICompatibilityTests: XCTestCase {
             name: "Test STT",
             url: url,
             framework: .whisperKitCoreML,
-            memoryRequirement: 100_000_000,
-            modality: .speechRecognition)
+            modality: .speechRecognition,
+            memoryRequirement: 100_000_000)
         let found = RunAnywhere.availableModels.first { $0.id == "api-compat-stt" }
         XCTAssertNotNil(found)
         XCTAssertEqual(found?.category, .stt)

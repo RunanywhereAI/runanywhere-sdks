@@ -24,11 +24,13 @@ public enum InferenceFramework: String, Sendable, Codable, CaseIterable {
     case mlx          = "mlx"
     case sherpa       = "sherpa"
     case whisperCpp   = "whispercpp"
+    case systemTTS    = "system_tts"
+    case fluidAudio   = "fluid_audio"
     case unknown      = "unknown"
 
-    /// Lowercase alias. The legacy SDK spelled `metalRT` as `metalrt`; the
-    /// sample apps use the lowercase form. Provides both.
+    /// Lowercase aliases the sample sometimes uses.
     public static var metalrt: InferenceFramework { .metalRT }
+    public static var coreml: InferenceFramework  { .coreML }
 }
 
 public enum ModelCategory: String, Sendable, Codable, CaseIterable {
@@ -42,6 +44,15 @@ public enum ModelCategory: String, Sendable, Codable, CaseIterable {
     case rerank
     case wakeword
     case unknown
+
+    // Legacy aliases used by the sample apps.
+    public static var language:              ModelCategory { .llm }
+    public static var speechRecognition:     ModelCategory { .stt }
+    public static var speechSynthesis:       ModelCategory { .tts }
+    public static var voiceActivityDetection: ModelCategory { .vad }
+    public static var multimodal:            ModelCategory { .vlm }
+    public static var imageGeneration:       ModelCategory { .diffusion }
+    public static var vision:                ModelCategory { .vlm }
 }
 
 /// Model artifact shape — maps to how the downloader extracts it.
@@ -319,13 +330,16 @@ public extension RunAnywhere {
 
     /// Canonical v2 registration — accepts a rich `Modality` enum.
     /// The modality determines the default `category` when none is passed.
+    /// Argument order matches the legacy main-branch SDK:
+    /// (id, name, url, framework, modality, category, artifactType,
+    ///  memoryRequirement, supportsThinking).
     static func registerModel(id: String, name: String, url: URL,
                                framework: InferenceFramework,
+                               modality: Modality = .text,
                                category: ModelCategory? = nil,
                                artifactType: ModelArtifactType = .singleFile,
                                memoryRequirement: Int64? = nil,
-                               supportsThinking: Bool = false,
-                               modality: Modality = .text) {
+                               supportsThinking: Bool = false) {
         let info = ModelInfo(
             id: id, name: name, url: url,
             framework: framework,

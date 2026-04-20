@@ -43,11 +43,24 @@ public enum EventCategory: Sendable {
     }
 }
 
-public struct SDKEvent: Sendable {
+/// Concrete event record produced by the core. The sample-app API uses
+/// the `SDKEventRecord` protocol (defined in SampleAppCompat.swift) which this
+/// struct conforms to. Internal code using `SDKEventRecord` directly
+/// gets strongly-typed fields; external code using `any SDKEventRecord` gets
+/// a protocol-based view with `.category`, `.type`, `.properties`.
+public struct SDKEventRecord: Sendable {
     public let category: EventCategory
     public let name: String
     public let payloadJSON: String?
     public let timestampMs: Int64
+
+    public init(category: EventCategory, name: String,
+                payloadJSON: String?, timestampMs: Int64) {
+        self.category = category
+        self.name = name
+        self.payloadJSON = payloadJSON
+        self.timestampMs = timestampMs
+    }
 }
 
 public struct LifecycleEvent: Sendable {
@@ -91,12 +104,12 @@ public final class EventBus {
     /// - `events` (see `SampleAppCompat.swift`): a Combine `AnyPublisher`
     ///   that republishes every emission. Use from Combine `.sink` /
     ///   `.receive(on:)` callers.
-    public var eventStream: AsyncStream<SDKEvent> {
+    public var eventStream: AsyncStream<SDKEventRecord> {
         AsyncStream { continuation in
             final class Ctx {
-                let cont: AsyncStream<SDKEvent>.Continuation
+                let cont: AsyncStream<SDKEventRecord>.Continuation
                 var subId: ra_event_subscription_id_t = -1
-                init(_ c: AsyncStream<SDKEvent>.Continuation) { cont = c }
+                init(_ c: AsyncStream<SDKEventRecord>.Continuation) { cont = c }
             }
             let ctx = Unmanaged.passRetained(Ctx(continuation))
 
@@ -106,7 +119,7 @@ public final class EventBus {
                 let ctx = Unmanaged<Ctx>.fromOpaque(user).takeUnretainedValue()
                 let name = evt.name.flatMap { String(cString: $0) } ?? ""
                 let payload = evt.payload_json.flatMap { String(cString: $0) }
-                ctx.cont.yield(SDKEvent(
+                ctx.cont.yield(SDKEventRecord(
                     category: EventCategory(raw: evt.category),
                     name: name,
                     payloadJSON: payload,
@@ -123,7 +136,7 @@ public final class EventBus {
         }
     }
 
-    public func emit(_ event: SDKEvent) {
+    public func emit(_ event: SDKEventRecord) {
         var raEvent = ra_event_t()
         raEvent.category = event.category.raw
         raEvent.timestamp_ms = event.timestampMs
