@@ -13,3 +13,4 @@ export 'adapter/sdk_state.dart';
 export 'adapter/chat_session.dart';
 export 'adapter/tool_calling.dart';
 export 'adapter/structured_output.dart';
+export 'adapter/public_api.dart';
