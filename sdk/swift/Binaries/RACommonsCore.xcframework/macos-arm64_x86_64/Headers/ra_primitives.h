@@ -85,6 +85,43 @@ enum {
     RA_FORMAT_EXECUTORCH_PTE   = 5,
     RA_FORMAT_WHISPERKIT       = 6,
     RA_FORMAT_OPENVINO_IR      = 7,
+    RA_FORMAT_SAFETENSORS      = 8,
+    RA_FORMAT_TFLITE           = 9,
+    RA_FORMAT_PYTORCH          = 10,
+    RA_FORMAT_BIN              = 11,
+};
+
+// Aliases used by ra_model.h helpers. Names match the main-branch
+// convention (`RA_MODEL_FORMAT_*`) for easier cross-reference with
+// legacy rac_model_* code.
+#define RA_MODEL_FORMAT_UNKNOWN          RA_FORMAT_UNKNOWN
+#define RA_MODEL_FORMAT_GGUF             RA_FORMAT_GGUF
+#define RA_MODEL_FORMAT_ONNX             RA_FORMAT_ONNX
+#define RA_MODEL_FORMAT_COREML           RA_FORMAT_COREML
+#define RA_MODEL_FORMAT_MLX_SAFETENSORS  RA_FORMAT_MLX_SAFETENSORS
+#define RA_MODEL_FORMAT_EXECUTORCH       RA_FORMAT_EXECUTORCH_PTE
+#define RA_MODEL_FORMAT_WHISPER_KIT      RA_FORMAT_WHISPERKIT
+#define RA_MODEL_FORMAT_SAFETENSORS      RA_FORMAT_SAFETENSORS
+#define RA_MODEL_FORMAT_TFLITE           RA_FORMAT_TFLITE
+#define RA_MODEL_FORMAT_PYTORCH          RA_FORMAT_PYTORCH
+#define RA_MODEL_FORMAT_BIN              RA_FORMAT_BIN
+
+// ---------------------------------------------------------------------------
+// Model categories — semantic task the model serves.
+// ---------------------------------------------------------------------------
+typedef int32_t ra_model_category_t;
+
+enum {
+    RA_MODEL_CATEGORY_UNKNOWN     = 0,
+    RA_MODEL_CATEGORY_LLM         = 1,
+    RA_MODEL_CATEGORY_STT         = 2,
+    RA_MODEL_CATEGORY_TTS         = 3,
+    RA_MODEL_CATEGORY_VAD         = 4,
+    RA_MODEL_CATEGORY_EMBEDDING   = 5,
+    RA_MODEL_CATEGORY_VLM         = 6,
+    RA_MODEL_CATEGORY_DIFFUSION   = 7,
+    RA_MODEL_CATEGORY_RERANK      = 8,
+    RA_MODEL_CATEGORY_WAKEWORD    = 9,
 };
 
 // ---------------------------------------------------------------------------
