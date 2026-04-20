@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 //
-// Legacy-compat shims — keep the legacy RunAnywhere.chat / .generate /
+// Canonical RunAnywhere top-level public API — these are the canonical RunAnywhere.chat / .generate /
 // .transcribe / .synthesize / .initialize top-level surface compiling.
 // Sample apps migrating from sdk/legacy/kotlin to sdk/kotlin should
 // mostly only need to update imports (package is unchanged).
@@ -50,7 +50,7 @@ typealias SDKEnvironment = SDKState.Environment
 
 // --- Implicit-session registry ---------------------------------------------
 
-internal object LegacySessionRegistry {
+internal object SessionRegistry {
     var currentLLM: LLMSession? = null
     var currentLLMChat: ChatSession? = null
     var currentSTT: STTSession? = null
@@ -90,22 +90,22 @@ fun RunAnywhere.shutdown() = SDKState.reset()
 fun RunAnywhere.loadModel(modelId: String, modelPath: String,
                           format: ModelFormat = ModelFormat.GGUF) {
     val session = LLMSession(modelId, modelPath, format)
-    LegacySessionRegistry.currentLLM = session
-    LegacySessionRegistry.currentLLMChat = null
-    LegacySessionRegistry.currentModelId = modelId
-    LegacySessionRegistry.currentModelPath = modelPath
+    SessionRegistry.currentLLM = session
+    SessionRegistry.currentLLMChat = null
+    SessionRegistry.currentModelId = modelId
+    SessionRegistry.currentModelPath = modelPath
 }
 
 fun RunAnywhere.unloadModel() {
-    LegacySessionRegistry.currentLLM?.close()
-    LegacySessionRegistry.currentLLMChat?.close()
-    LegacySessionRegistry.currentLLM = null
-    LegacySessionRegistry.currentLLMChat = null
-    LegacySessionRegistry.currentModelId = ""
-    LegacySessionRegistry.currentModelPath = ""
+    SessionRegistry.currentLLM?.close()
+    SessionRegistry.currentLLMChat?.close()
+    SessionRegistry.currentLLM = null
+    SessionRegistry.currentLLMChat = null
+    SessionRegistry.currentModelId = ""
+    SessionRegistry.currentModelPath = ""
 }
 
-fun RunAnywhere.getCurrentModelId(): String = LegacySessionRegistry.currentModelId
+fun RunAnywhere.getCurrentModelId(): String = SessionRegistry.currentModelId
 
 suspend fun RunAnywhere.chat(
     prompt: String,
@@ -132,7 +132,7 @@ suspend fun RunAnywhere.generate(
     return LLMGenerationResult(
         text = buf.toString(),
         tokensUsed = tokens,
-        modelUsed = LegacySessionRegistry.currentModelId,
+        modelUsed = SessionRegistry.currentModelId,
         latencyMs = elapsed,
         tokensPerSecond = tps)
 }
@@ -152,8 +152,8 @@ fun RunAnywhere.generateStream(
 
 fun RunAnywhere.loadSTT(modelId: String, modelPath: String,
                         format: ModelFormat = ModelFormat.WHISPERKIT) {
-    LegacySessionRegistry.currentSTT?.close()
-    LegacySessionRegistry.currentSTT = STTSession(modelId, modelPath, format)
+    SessionRegistry.currentSTT?.close()
+    SessionRegistry.currentSTT = STTSession(modelId, modelPath, format)
 }
 
 suspend fun RunAnywhere.transcribe(
@@ -187,8 +187,8 @@ suspend fun RunAnywhere.transcribeWithOptions(
 
 fun RunAnywhere.loadTTS(modelId: String, modelPath: String,
                         format: ModelFormat = ModelFormat.ONNX) {
-    LegacySessionRegistry.currentTTS?.close()
-    LegacySessionRegistry.currentTTS = TTSSession(modelId, modelPath, format)
+    SessionRegistry.currentTTS?.close()
+    SessionRegistry.currentTTS = TTSSession(modelId, modelPath, format)
 }
 
 fun RunAnywhere.synthesize(
@@ -206,21 +206,21 @@ fun RunAnywhere.registerTool(
     definition: ToolDefinition,
     executor: suspend (Map<String, Any?>) -> String,
 ) {
-    LegacySessionRegistry.registeredTools.add(definition)
-    LegacySessionRegistry.toolExecutors[definition.name] = executor
+    SessionRegistry.registeredTools.add(definition)
+    SessionRegistry.toolExecutors[definition.name] = executor
 }
 
 suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: LLMGenerationOptions = LLMGenerationOptions(),
 ): LLMGenerationResult {
-    require(LegacySessionRegistry.currentModelId.isNotEmpty()) {
+    require(SessionRegistry.currentModelId.isNotEmpty()) {
         "no model loaded — call RunAnywhere.loadModel(...) first"
     }
     val agent = ToolCallingAgent(
-        modelId = LegacySessionRegistry.currentModelId,
-        modelPath = LegacySessionRegistry.currentModelPath,
-        tools = LegacySessionRegistry.registeredTools,
+        modelId = SessionRegistry.currentModelId,
+        modelPath = SessionRegistry.currentModelPath,
+        tools = SessionRegistry.registeredTools,
         systemPrompt = options.systemPrompt ?: "")
     var remaining = 4
     var reply = agent.send(prompt)
@@ -229,10 +229,10 @@ suspend fun RunAnywhere.generateWithTools(
             is ToolCallingAgent.Reply.Assistant ->
                 return LLMGenerationResult(
                     text = reply.text,
-                    modelUsed = LegacySessionRegistry.currentModelId)
+                    modelUsed = SessionRegistry.currentModelId)
             is ToolCallingAgent.Reply.ToolCalls -> {
                 val results = reply.calls.map { call ->
-                    val exec = LegacySessionRegistry.toolExecutors[call.name]
+                    val exec = SessionRegistry.toolExecutors[call.name]
                     call.name to (exec?.invoke(call.arguments) ?: "error")
                 }
                 reply = agent.continueAfter(results)
@@ -246,29 +246,29 @@ suspend fun RunAnywhere.generateWithTools(
 // --- Helpers ---------------------------------------------------------------
 
 private fun requireLLM(): LLMSession =
-    LegacySessionRegistry.currentLLM
+    SessionRegistry.currentLLM
         ?: throw RunAnywhereException(RunAnywhereException.BACKEND_UNAVAILABLE,
             "no LLM loaded — call RunAnywhere.loadModel first")
 
 private fun requireSTT(): STTSession =
-    LegacySessionRegistry.currentSTT
+    SessionRegistry.currentSTT
         ?: throw RunAnywhereException(RunAnywhereException.BACKEND_UNAVAILABLE,
             "no STT loaded — call RunAnywhere.loadSTT first")
 
 private fun requireTTS(): TTSSession =
-    LegacySessionRegistry.currentTTS
+    SessionRegistry.currentTTS
         ?: throw RunAnywhereException(RunAnywhereException.BACKEND_UNAVAILABLE,
             "no TTS loaded — call RunAnywhere.loadTTS first")
 
 private fun ensureChatSession(systemPrompt: String?): ChatSession {
-    LegacySessionRegistry.currentLLMChat?.let { return it }
-    require(LegacySessionRegistry.currentModelId.isNotEmpty()) {
+    SessionRegistry.currentLLMChat?.let { return it }
+    require(SessionRegistry.currentModelId.isNotEmpty()) {
         "no model loaded — call RunAnywhere.loadModel first"
     }
     val chat = ChatSession(
-        modelId = LegacySessionRegistry.currentModelId,
-        modelPath = LegacySessionRegistry.currentModelPath,
+        modelId = SessionRegistry.currentModelId,
+        modelPath = SessionRegistry.currentModelPath,
         systemPrompt = systemPrompt ?: "")
-    LegacySessionRegistry.currentLLMChat = chat
+    SessionRegistry.currentLLMChat = chat
     return chat
 }
