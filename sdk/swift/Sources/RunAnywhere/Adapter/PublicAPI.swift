@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 //
-// Legacy-compat shims — keep the legacy `RunAnywhere.chat / .generate /
-// .transcribe / .synthesize / .initialize` top-level surface compiling
-// against the new session-based implementation. Sample apps migrating
-// from sdk/legacy/swift to sdk/swift should mostly only need to swap
-// `import RunAnywhere` → `import RunAnywhereCore`.
+// Canonical RunAnywhere top-level public API — the methods the sample
+// apps call directly. Implements the implicit-model surface
+// (`initialize / loadModel / chat / generate / generateStream /
+// transcribe / synthesize / registerTool / generateWithTools /
+// generateStructured / shutdown`) on top of the session classes.
 //
-// These wrappers maintain a process-wide "current" LLM/STT/TTS session
-// so the implicit-model legacy shape has something to delegate into.
+// Internally this maintains a process-wide "current" LLM/STT/TTS session
+// (`SessionRegistry`) so callers don't need to thread a session handle
+// through every call site. For multi-session apps, use the LLMSession /
+// STTSession / TTSSession / VLMSession / DiffusionSession classes
+// directly — they have no dependency on the registry.
 
 import Foundation
 
@@ -92,13 +95,20 @@ public typealias SDKEnvironment = SDKState.Environment
 // MARK: - Implicit-session registry
 
 @MainActor
-internal enum LegacySessionRegistry {
+internal enum SessionRegistry {
     static var currentLLM: LLMSession?
     static var currentLLMChat: ChatSession?
     static var currentSTT: STTSession?
     static var currentTTS: TTSSession?
+    static var currentVAD: VADSession?
+    static var currentEmbed: EmbedSession?
     static var currentModelId: String = ""
     static var currentModelPath: String = ""
+    static var currentSTTModelId: String = ""
+    static var currentTTSVoiceId: String = ""
+    static var currentVADModelId: String = ""
+    static var currentVLMModelId: String = ""
+    static var currentDiffusionModelId: String = ""
     static var registeredTools: [ToolDefinition] = []
     static var toolExecutors: [String: @Sendable ([String: Any]) async throws -> String] = [:]
 }
@@ -138,22 +148,22 @@ public extension RunAnywhere {
                            format: ModelFormat = .gguf) throws {
         let session = try LLMSession(modelId: modelId, modelPath: modelPath,
                                       config: .init())
-        LegacySessionRegistry.currentLLM = session
-        LegacySessionRegistry.currentLLMChat = nil  // lazy-init on first chat
-        LegacySessionRegistry.currentModelId = modelId
-        LegacySessionRegistry.currentModelPath = modelPath
+        SessionRegistry.currentLLM = session
+        SessionRegistry.currentLLMChat = nil  // lazy-init on first chat
+        SessionRegistry.currentModelId = modelId
+        SessionRegistry.currentModelPath = modelPath
     }
 
     static func unloadModel() {
-        LegacySessionRegistry.currentLLM = nil
-        LegacySessionRegistry.currentLLMChat = nil
-        LegacySessionRegistry.currentModelId = ""
-        LegacySessionRegistry.currentModelPath = ""
+        SessionRegistry.currentLLM = nil
+        SessionRegistry.currentLLMChat = nil
+        SessionRegistry.currentModelId = ""
+        SessionRegistry.currentModelPath = ""
     }
 
     static func getCurrentModelId() -> String {
-        LegacySessionRegistry.currentModelId.isEmpty
-            ? "" : LegacySessionRegistry.currentModelId
+        SessionRegistry.currentModelId.isEmpty
+            ? "" : SessionRegistry.currentModelId
     }
 
     @discardableResult
@@ -181,7 +191,7 @@ public extension RunAnywhere {
         return LLMGenerationResult(
             text: buf,
             tokensUsed: tokenCount,
-            modelUsed: LegacySessionRegistry.currentModelId,
+            modelUsed: SessionRegistry.currentModelId,
             latencyMs: elapsed,
             tokensPerSecond: tps)
     }
@@ -214,7 +224,7 @@ public extension RunAnywhere {
                          format: ModelFormat = .whisperKit) throws {
         let session = try STTSession(modelId: modelId, modelPath: modelPath,
                                        format: format)
-        LegacySessionRegistry.currentSTT = session
+        SessionRegistry.currentSTT = session
     }
 
     static func transcribe(_ audioData: Data,
@@ -252,7 +262,7 @@ public extension RunAnywhere {
                          format: ModelFormat = .onnx) throws {
         let session = try TTSSession(modelId: modelId, modelPath: modelPath,
                                        format: format)
-        LegacySessionRegistry.currentTTS = session
+        SessionRegistry.currentTTS = session
     }
 
     static func synthesize(_ text: String,
@@ -266,21 +276,21 @@ public extension RunAnywhere {
 
     static func registerTool(_ definition: ToolDefinition,
                               executor: @escaping @Sendable ([String: Any]) async throws -> String) {
-        LegacySessionRegistry.registeredTools.append(definition)
-        LegacySessionRegistry.toolExecutors[definition.name] = executor
+        SessionRegistry.registeredTools.append(definition)
+        SessionRegistry.toolExecutors[definition.name] = executor
     }
 
     static func generateWithTools(_ prompt: String,
                                     options: LLMGenerationOptions = .init()) async throws
         -> LLMGenerationResult
     {
-        guard !LegacySessionRegistry.currentModelId.isEmpty else {
+        guard !SessionRegistry.currentModelId.isEmpty else {
             throw RunAnywhereError.backendUnavailable("no model loaded")
         }
         let agent = try ToolCallingAgent(
-            modelId: LegacySessionRegistry.currentModelId,
-            modelPath: LegacySessionRegistry.currentModelPath,
-            tools: LegacySessionRegistry.registeredTools,
+            modelId: SessionRegistry.currentModelId,
+            modelPath: SessionRegistry.currentModelPath,
+            tools: SessionRegistry.registeredTools,
             systemPrompt: options.systemPrompt ?? "")
 
         var remaining = 4
@@ -289,11 +299,11 @@ public extension RunAnywhere {
             switch lastReply {
             case .assistant(let text):
                 return LLMGenerationResult(text: text,
-                                             modelUsed: LegacySessionRegistry.currentModelId)
+                                             modelUsed: SessionRegistry.currentModelId)
             case .toolCalls(let calls):
                 var results: [(String, String)] = []
                 for call in calls {
-                    if let exec = LegacySessionRegistry.toolExecutors[call.name] {
+                    if let exec = SessionRegistry.toolExecutors[call.name] {
                         let r = (try? await exec(call.arguments)) ?? "error"
                         results.append((call.name, r))
                     }
@@ -318,7 +328,7 @@ public extension RunAnywhere {
     // --- Helpers -------------------------------------------------------------
 
     private static func requireLLM() throws -> LLMSession {
-        guard let s = LegacySessionRegistry.currentLLM else {
+        guard let s = SessionRegistry.currentLLM else {
             throw RunAnywhereError.backendUnavailable(
                 "no LLM loaded — call RunAnywhere.loadModel(_:modelPath:) first")
         }
@@ -326,7 +336,7 @@ public extension RunAnywhere {
     }
 
     private static func requireSTT() throws -> STTSession {
-        guard let s = LegacySessionRegistry.currentSTT else {
+        guard let s = SessionRegistry.currentSTT else {
             throw RunAnywhereError.backendUnavailable(
                 "no STT loaded — call RunAnywhere.loadSTT(_:modelPath:) first")
         }
@@ -334,7 +344,7 @@ public extension RunAnywhere {
     }
 
     private static func requireTTS() throws -> TTSSession {
-        guard let s = LegacySessionRegistry.currentTTS else {
+        guard let s = SessionRegistry.currentTTS else {
             throw RunAnywhereError.backendUnavailable(
                 "no TTS loaded — call RunAnywhere.loadTTS(_:modelPath:) first")
         }
@@ -342,16 +352,16 @@ public extension RunAnywhere {
     }
 
     private static func ensureChatSession(systemPrompt: String?) throws -> ChatSession {
-        if let existing = LegacySessionRegistry.currentLLMChat { return existing }
-        guard !LegacySessionRegistry.currentModelId.isEmpty else {
+        if let existing = SessionRegistry.currentLLMChat { return existing }
+        guard !SessionRegistry.currentModelId.isEmpty else {
             throw RunAnywhereError.backendUnavailable(
                 "no model loaded — call RunAnywhere.loadModel first")
         }
         let chat = try ChatSession(
-            modelId: LegacySessionRegistry.currentModelId,
-            modelPath: LegacySessionRegistry.currentModelPath,
+            modelId: SessionRegistry.currentModelId,
+            modelPath: SessionRegistry.currentModelPath,
             systemPrompt: systemPrompt)
-        LegacySessionRegistry.currentLLMChat = chat
+        SessionRegistry.currentLLMChat = chat
         return chat
     }
 }

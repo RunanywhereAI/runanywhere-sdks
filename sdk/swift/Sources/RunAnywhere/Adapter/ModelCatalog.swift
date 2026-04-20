@@ -393,9 +393,14 @@ internal extension InferenceFramework {
         case .llamaCpp:         return .gguf
         case .onnx, .sherpa:    return .onnx
         case .whisperKit:       return .whisperKit
-        case .coreML:           return .coreML
+        case .coreML:           return .coreml
         case .mlx:              return .mlxSafetensors
         default:                return .unknown
         }
     }
+}
+
+// Public alias since the legacy enum case was capitalised .coreML.
+public extension ModelFormat {
+    static var coreML: ModelFormat { .coreml }
 }

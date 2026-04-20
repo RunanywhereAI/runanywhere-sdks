@@ -25,6 +25,14 @@
 extern "C" {
 #endif
 
+// Forward-declared for vtable slots wired up in ra_vlm.h / ra_diffusion.h.
+typedef struct ra_vlm_session_s       ra_vlm_session_t;
+typedef struct ra_diffusion_session_s ra_diffusion_session_t;
+typedef struct ra_vlm_image_s         ra_vlm_image_t;
+typedef struct ra_vlm_options_s       ra_vlm_options_t;
+typedef struct ra_diffusion_config_s  ra_diffusion_config_t;
+typedef struct ra_diffusion_options_s ra_diffusion_options_t;
+
 // ---------------------------------------------------------------------------
 // Engine metadata — returned by every plugin.
 // ---------------------------------------------------------------------------
@@ -133,6 +141,61 @@ typedef struct {
                                               ra_error_callback_t on_error,
                                               void* user_data);
     ra_status_t (*llm_clear_context)(ra_llm_session_t*);
+
+    // ----------------------------------------------------------------
+    // Phase A3 — grammar-constrained sampling (optional).
+    // Lets the frontend pass a GBNF/lark grammar that the engine
+    // applies to its sampler so generation is guaranteed to be valid
+    // JSON / call a specific tool / etc. Engines without grammar
+    // support return RA_ERR_CAPABILITY_UNSUPPORTED.
+    // grammar_text: GBNF source. Pass NULL to clear the active grammar.
+    // ----------------------------------------------------------------
+    ra_status_t (*llm_set_grammar)(ra_llm_session_t* session,
+                                    const char*       grammar_text);
+
+    // ----------------------------------------------------------------
+    // Phase A4 — VLM (vision-language model) slots.
+    // Engines that don't serve VLM leave these NULL.
+    // ----------------------------------------------------------------
+    ra_status_t (*vlm_create)(const ra_model_spec_t*     spec,
+                              const ra_session_config_t* cfg,
+                              ra_vlm_session_t**         out_session);
+    void        (*vlm_destroy)(ra_vlm_session_t* session);
+    ra_status_t (*vlm_process)(ra_vlm_session_t*       session,
+                                const ra_vlm_image_t*  image,
+                                const char*            prompt,
+                                const ra_vlm_options_t* options,
+                                char**                 out_text);
+    ra_status_t (*vlm_process_stream)(ra_vlm_session_t*      session,
+                                        const ra_vlm_image_t* image,
+                                        const char*           prompt,
+                                        const ra_vlm_options_t* options,
+                                        ra_token_callback_t   on_token,
+                                        ra_error_callback_t   on_error,
+                                        void*                 user_data);
+    ra_status_t (*vlm_cancel)(ra_vlm_session_t* session);
+
+    // ----------------------------------------------------------------
+    // Phase A6 — Diffusion slots (text→image).
+    // ----------------------------------------------------------------
+    ra_status_t (*diffusion_create)(const ra_model_spec_t*       spec,
+                                     const ra_diffusion_config_t* cfg,
+                                     ra_diffusion_session_t**     out_session);
+    void        (*diffusion_destroy)(ra_diffusion_session_t* session);
+    ra_status_t (*diffusion_generate)(ra_diffusion_session_t*       session,
+                                       const char*                   prompt,
+                                       const ra_diffusion_options_t* options,
+                                       uint8_t**                     out_png_bytes,
+                                       int32_t*                      out_size);
+    ra_status_t (*diffusion_generate_with_progress)(
+        ra_diffusion_session_t*        session,
+        const char*                    prompt,
+        const ra_diffusion_options_t*  options,
+        void (*progress_cb)(int32_t step, int32_t total, void* user),
+        void*                          user_data,
+        uint8_t**                      out_png_bytes,
+        int32_t*                       out_size);
+    ra_status_t (*diffusion_cancel)(ra_diffusion_session_t* session);
 } ra_engine_vtable_t;
 
 // ---------------------------------------------------------------------------
