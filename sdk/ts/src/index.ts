@@ -16,3 +16,5 @@ export * from './adapter/ToolCalling.js';
 export * from './adapter/StructuredOutput.js';
 export * from './adapter/PublicAPI.js';
 export * from './adapter/PublicCatalog.js';
+export * from './adapter/PlatformBridge.js';
+export * from './adapter/Telemetry.js';

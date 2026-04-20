@@ -14,3 +14,4 @@ export 'adapter/chat_session.dart';
 export 'adapter/tool_calling.dart';
 export 'adapter/structured_output.dart';
 export 'adapter/public_api.dart';
+export 'src/ffi/ext_bindings.dart' show Auth, Telemetry, ModelHelpers, FileIntegrity;
