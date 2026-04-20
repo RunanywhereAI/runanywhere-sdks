@@ -174,7 +174,7 @@ internal enum RAGRegistry {
 @MainActor
 public extension RunAnywhere {
 
-    static func ragCreatePipeline(config: RAGConfiguration) throws {
+    static func ragCreatePipeline(config: RAGConfiguration) async throws {
         guard let embedInfo = ModelCatalog.model(id: config.embeddingModelId) else {
             throw RunAnywhereError.invalidArgument("embed model not registered: \(config.embeddingModelId)")
         }
@@ -187,7 +187,7 @@ public extension RunAnywhere {
         RAGRegistry.current = pipeline
     }
 
-    static func ragIngest(text: String) throws {
+    static func ragIngest(text: String) async throws {
         guard let pipeline = RAGRegistry.current else {
             throw RunAnywhereError.backendUnavailable("call ragCreatePipeline first")
         }
@@ -201,7 +201,7 @@ public extension RunAnywhere {
         return try await pipeline.query(question)
     }
 
-    static func ragDestroyPipeline() {
+    static func ragDestroyPipeline() async {
         RAGRegistry.current?.destroy()
         RAGRegistry.current = nil
     }

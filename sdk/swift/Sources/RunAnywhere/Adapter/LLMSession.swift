@@ -54,7 +54,9 @@ public final class LLMSession: @unchecked Sendable {
     private var continuation: AsyncThrowingStream<Token, Error>.Continuation?
 
     // Keep strings alive for the C call duration.
-    private let modelId: String
+    /// Loaded model identifier. Exposed publicly so hosts can query
+    /// `RunAnywhere.isModelLoaded` / `getCurrentModelId()`.
+    public let modelId: String
     private let modelPath: String
 
     public init(modelId: String, modelPath: String, config: Config = .init()) throws {

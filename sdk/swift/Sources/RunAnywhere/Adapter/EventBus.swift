@@ -83,7 +83,15 @@ public final class EventBus {
 
     /// Async stream of every SDK event. Multiple subscribers each get an
     /// independent stream.
-    public var events: AsyncStream<SDKEvent> {
+    ///
+    /// Two property names are exposed for the same underlying firehose:
+    ///
+    /// - `eventStream`: this AsyncStream. Use from modern `for-await`
+    ///   consumers.
+    /// - `events` (see `SampleAppCompat.swift`): a Combine `AnyPublisher`
+    ///   that republishes every emission. Use from Combine `.sink` /
+    ///   `.receive(on:)` callers.
+    public var eventStream: AsyncStream<SDKEvent> {
         AsyncStream { continuation in
             final class Ctx {
                 let cont: AsyncStream<SDKEvent>.Continuation
