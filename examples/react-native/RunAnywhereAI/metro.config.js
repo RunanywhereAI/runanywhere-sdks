@@ -1,12 +1,9 @@
 const path = require('path');
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 
-// Path to the SDK package (symlinked via node_modules)
-const sdkPath = path.resolve(__dirname, '../../../sdk/runanywhere-react-native');
-const sdkPackagesPath = path.join(sdkPath, 'packages');
-const sdkCorePath = path.join(sdkPackagesPath, 'core');
-const sdkLlamaPath = path.join(sdkPackagesPath, 'llamacpp');
-const sdkOnnxPath = path.join(sdkPackagesPath, 'onnx');
+// Path to the SDK package (single TS package post-v2 cutover; backend
+// register entry points + native bindings live in @runanywhere/core).
+const sdkCorePath = path.resolve(__dirname, '../../../sdk/ts');
 
 // Genie package — consumed from npm (@runanywhere/genie)
 const geniePkgPath = path.resolve(__dirname, 'node_modules/@runanywhere/genie');
@@ -18,13 +15,10 @@ const geniePkgPath = path.resolve(__dirname, 'node_modules/@runanywhere/genie');
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
-  watchFolders: [sdkPackagesPath, geniePkgPath],
+  watchFolders: [sdkCorePath, geniePkgPath],
   resolver: {
-    // Ensure Metro resolves SDK packages from the workspace (symlinks can be flaky)
     extraNodeModules: {
       '@runanywhere/core': sdkCorePath,
-      '@runanywhere/llamacpp': sdkLlamaPath,
-      '@runanywhere/onnx': sdkOnnxPath,
       '@runanywhere/genie': geniePkgPath,
       // Force single instances of shared peer dependencies (avoid version conflicts)
       'react-native': path.resolve(__dirname, 'node_modules/react-native'),
@@ -34,7 +28,6 @@ const config = {
     // Allow Metro to resolve modules from the SDK and genie package
     nodeModulesPaths: [
       path.resolve(__dirname, 'node_modules'),
-      path.resolve(sdkPath, 'node_modules'),
     ],
     // Don't hoist packages from the SDK - ensure local node_modules takes precedence
     disableHierarchicalLookup: false,

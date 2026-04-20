@@ -10,21 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # RunAnywhere SDK - Core
+  # RunAnywhere SDK - single Dart package post-v2 cutover. Backend
+  # register entry points (LlamaCpp.register / Onnx.register / Genie.register
+  # / WhisperKit.register) live in the main package; native libs ship
+  # bundled in libracommons_core.so.
   runanywhere:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere
-
-  # RunAnywhere SDK - LlamaCpp Backend (LLM)
-  runanywhere_llamacpp:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_llamacpp
-
-  # RunAnywhere SDK - Genie NPU Backend (Android/Snapdragon only)
-  runanywhere_genie:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
-
-  # RunAnywhere SDK - ONNX Backend (STT/TTS/VAD/Embeddings)
-  runanywhere_onnx:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+    path: ../../../sdk/dart
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
   record: ^6.1.0
@@ -61,14 +52,10 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.0
 
-# Force all packages to use local path dependencies during development
+# Force the SDK to use the local path dependency during development.
 dependency_overrides:
   runanywhere:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere
-  runanywhere_genie:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_genie
-  runanywhere_onnx:
-    path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
+    path: ../../../sdk/dart
 
 flutter:
   uses-material-design: true

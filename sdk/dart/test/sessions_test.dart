@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-import 'package:runanywhere_core/adapter/chat_session.dart';
-import 'package:runanywhere_core/adapter/tool_calling.dart';
-import 'package:runanywhere_core/adapter/structured_output.dart';
-import 'package:runanywhere_core/adapter/types.dart';
+import 'package:runanywhere/adapter/chat_session.dart';
+import 'package:runanywhere/adapter/tool_calling.dart';
+import 'package:runanywhere/adapter/structured_output.dart';
+import 'package:runanywhere/adapter/types.dart';
 import 'package:test/test.dart';
 
 void main() {

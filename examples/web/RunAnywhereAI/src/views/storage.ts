@@ -7,7 +7,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager } from '../services/model-manager';
 import { showToast, showConfirmDialog } from '../components/dialogs';
-import { RunAnywhere } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import { RunAnywhere } from '../../../../../sdk/web/src/index';
 
 let container: HTMLElement;
 

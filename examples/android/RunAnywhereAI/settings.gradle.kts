@@ -34,24 +34,15 @@ rootProject.name = "RunAnywhereAI"
 include(":app")
 
 // SDK (local project dependency)
+//
+// Post-v2-cutover layout: the canonical Kotlin SDK lives at sdk/kotlin/
+// (single Gradle project, no sub-modules). The legacy per-backend
+// modules (runanywhere-core-llamacpp / runanywhere-core-onnx) collapsed
+// into the main SDK — backend register entry points (LlamaCPP.register(),
+// ONNX.register(), Genie.register(), WhisperKit.register()) are now
+// regular calls on the main `com.runanywhere.sdk.public` package.
 include(":runanywhere-kotlin")
-project(":runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
-
-// =============================================================================
-// Backend Adapter Modules (Pure Kotlin - no native libs)
-// =============================================================================
-// These modules provide Kotlin adapters for specific AI backends.
-// Native libraries are bundled in the main SDK (runanywhere-kotlin).
-
-// LlamaCPP module - LLM text generation adapter
-include(":runanywhere-core-llamacpp")
-project(":runanywhere-core-llamacpp").projectDir =
-    file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
-
-// ONNX module - STT, TTS, VAD adapter
-include(":runanywhere-core-onnx")
-project(":runanywhere-core-onnx").projectDir =
-    file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
+project(":runanywhere-kotlin").projectDir = file("../../../sdk/kotlin")
 
 // RAG pipeline is now part of the core SDK (not a separate module).
 // Registration is handled by ragCreatePipeline(). See: RunAnywhere+RAG.jvmAndroid.kt

@@ -9,9 +9,10 @@ const __dir = path.dirname(fileURLToPath(import.meta.url));
 // Absolute path to the workspace root (runanywhere-sdks/)
 const workspaceRoot = path.resolve(__dir, '../../..');
 
-// SDK WASM directories (each backend ships its own WASM)
-const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/llamacpp/wasm');
-const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/onnx/wasm/sherpa');
+// SDK WASM directories — single sdk/web package post-v2 cutover.
+// Backend WASM blobs live under sdk/web/wasm/{llamacpp,onnx}/.
+const llamacppWasmDir = path.resolve(workspaceRoot, 'sdk/web/wasm/llamacpp');
+const onnxWasmDir = path.resolve(workspaceRoot, 'sdk/web/wasm/onnx');
 
 /**
  * Vite plugin to copy WASM binaries into the build output.
@@ -55,7 +56,7 @@ export default defineConfig({
       // Ensure all packages resolve to the same source modules during development.
       // Without this, @runanywhere/web imports from llamacpp/onnx packages resolve
       // to dist/ while main.ts imports from src/, creating duplicate singletons.
-      '@runanywhere/web': path.resolve(workspaceRoot, 'sdk/runanywhere-web/packages/core/src/index.ts'),
+      '@runanywhere/web': path.resolve(workspaceRoot, 'sdk/web/src/index.ts'),
     },
   },
   server: {

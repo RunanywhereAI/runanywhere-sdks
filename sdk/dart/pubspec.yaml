@@ -1,4 +1,4 @@
-name: runanywhere_core
+name: runanywhere
 description: RunAnywhere core — Dart/Flutter frontend adapter (thin FFI wrapper around the C++ core).
 version: 2.0.0-dev.1
 homepage: https://runanywhere.ai

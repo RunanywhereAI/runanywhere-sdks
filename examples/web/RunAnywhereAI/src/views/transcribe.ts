@@ -4,8 +4,8 @@
  */
 
 import type { TabLifecycle } from '../app';
-import { AudioCapture, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
-import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
+import { AudioCapture, SpeechActivity } from '../../../../../sdk/web/src/index';
+import { VAD } from '../../../../../sdk/web/src/index';
 import { ModelManager, ModelCategory, ensureVADLoaded, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
 
@@ -283,7 +283,7 @@ async function transcribeAudio(pcmFloat32: Float32Array, sampleRate?: number): P
     throw new Error('No STT model available. Tap the model button (top right) to download one.');
   }
 
-  const { STT } = await import('../../../../../sdk/runanywhere-web/packages/onnx/src/index');
+  const { STT } = await import('../../../../../sdk/web/src/index');
   if (!STT.isModelLoaded) {
     throw new Error('STT model not loaded. Select and load a model first.');
   }
@@ -401,7 +401,7 @@ async function transcribeFromFile(file: File): Promise<void> {
     const model = await ModelManager.ensureLoaded(ModelCategory.SpeechRecognition);
     if (!model) throw new Error('No STT model loaded. Tap the model button to download one.');
 
-    const { STT } = await import('../../../../../sdk/runanywhere-web/packages/onnx/src/index');
+    const { STT } = await import('../../../../../sdk/web/src/index');
     if (!STT.isModelLoaded) throw new Error('STT model not loaded. Select a model first.');
 
     // SDK handles all decoding, resampling, and transcription
