@@ -557,26 +557,24 @@ jobs:
       - name: Sync Package.swift checksums from freshly-built XCFrameworks
         # Updates the SHA-256 checksum lines in Package.swift so SPM consumers
         # who pin to v${VERSION} can resolve the binary targets against the
-        # zips we're about to attach to this Release. No-op if only native_ios
-        # failed earlier.
+        # zips we're attaching to this Release. The iOS zips are suffixed
+        # `-ios-` since v0.19.0.
         run: |
-          if ls release-flat/RACommons-v*.zip >/dev/null 2>&1; then
+          if ls release-flat/RACommons-ios-v*.zip >/dev/null 2>&1; then
             ./scripts/sync-checksums.sh release-flat
             if ! git diff --quiet Package.swift; then
               echo "Package.swift checksums updated:"
               git diff Package.swift | head -40
-              # Commit the checksum bump on a detached ref; don't push here —
-              # the engineer pushed the tag already; we just fold the fresh
-              # checksum commit onto main via a scheduled follow-up PR, or
-              # they update it manually after the Release is cut.
-              # For now, attach the updated Package.swift as a release asset
-              # so it's auditable; deeper auto-commit flow is a follow-up.
+              # Attach the updated Package.swift as a release asset so
+              # consumers can see the correct checksums for this tag; also
+              # attach it locally so the next step can open a PR that folds
+              # these checksums back into main.
               cp Package.swift release-flat/Package.swift.updated
             else
               echo "Package.swift checksums already match (no changes)"
             fi
           else
-            echo "::warning::No RACommons-v*.zip in release-flat — skipping checksum sync"
+            echo "::warning::No RACommons-ios-v*.zip in release-flat — skipping checksum sync"
           fi
       - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
