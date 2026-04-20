@@ -79,6 +79,16 @@ build_slice() {
             )
             ;;
         macos)
+            # All Apple slices delegate HTTP + download + extraction to the
+            # platform adapter (URLSession / NSFileManager / NSTask unzip).
+            # Dropping the curl/libarchive deps keeps the XCFramework
+            # self-contained without requiring host apps to link system
+            # libraries.
+            extra_args=(
+                -DRA_BUILD_HTTP_CLIENT=OFF
+                -DRA_BUILD_MODEL_DOWNLOADER=OFF
+                -DRA_BUILD_EXTRACTION=OFF
+            )
             targets_list="$targets_list llamacpp_engine onnx_engine whisperkit_engine metalrt_engine diffusion_coreml_engine"
             ;;
     esac

@@ -492,6 +492,54 @@ public extension RunAnywhere {
         }
     }
 
+    // --- Framework × category matrix ---------------------------------
+    //
+    // Thin pass-through wrappers over `ra_model.h`. Useful for sample-app
+    // UI that needs to gate buttons on "is this (framework, category)
+    // combo supported by any engine?" without hard-coding the matrix.
+
+    /// Returns true if `framework` has an engine slot implementing `category`.
+    /// Matches the curated table in `core/abi/ra_model.cpp` shipped with
+    /// the XCFramework — consistent across Swift/Kotlin/Dart/TS/Web.
+    static func frameworkSupports(_ framework: InferenceFramework,
+                                     category: ModelCategory) -> Bool {
+        framework.rawValue.withCString { fw in
+            category.rawValue.withCString { cat in
+                ra_framework_supports(fw, cat) != 0
+            }
+        }
+    }
+
+    /// Detect a model format from a URL or local path (extension-based).
+    static func detectModelFormat(from urlOrPath: String) -> ModelFormat {
+        let raw = urlOrPath.withCString { ra_model_detect_format($0) }
+        switch Int(raw) {
+        case Int(RA_FORMAT_GGUF):             return .gguf
+        case Int(RA_FORMAT_ONNX):              return .onnx
+        case Int(RA_FORMAT_COREML):            return .coreml
+        case Int(RA_FORMAT_MLX_SAFETENSORS):   return .mlxSafetensors
+        case Int(RA_FORMAT_WHISPERKIT):        return .whisperKit
+        default:                               return .unknown
+        }
+    }
+
+    /// Infer the semantic category of a model from its id (heuristic).
+    static func inferModelCategory(from modelId: String) -> ModelCategory {
+        let raw = modelId.withCString { ra_model_infer_category($0) }
+        switch Int(raw) {
+        case Int(RA_MODEL_CATEGORY_LLM):        return .llm
+        case Int(RA_MODEL_CATEGORY_STT):        return .stt
+        case Int(RA_MODEL_CATEGORY_TTS):        return .tts
+        case Int(RA_MODEL_CATEGORY_VAD):        return .vad
+        case Int(RA_MODEL_CATEGORY_EMBEDDING):  return .embedding
+        case Int(RA_MODEL_CATEGORY_VLM):        return .vlm
+        case Int(RA_MODEL_CATEGORY_DIFFUSION):  return .diffusion
+        case Int(RA_MODEL_CATEGORY_RERANK):     return .rerank
+        case Int(RA_MODEL_CATEGORY_WAKEWORD):   return .wakeword
+        default:                                return .unknown
+        }
+    }
+
     // --- Loading helpers --------------------------------------------------
 
     /// Resolves a registered modelId to its on-disk path and loads it as the

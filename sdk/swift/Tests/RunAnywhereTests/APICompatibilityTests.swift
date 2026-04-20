@@ -147,4 +147,57 @@ final class APICompatibilityTests: XCTestCase {
         await LoRAAdapterCatalog.registerAll()
         _ = LoRAAdapterCatalog.allEntries
     }
+
+    // MARK: - Phase B consumption: new C ABI helpers
+
+    func testFrameworkSupportsBackedByCoreABI() {
+        XCTAssertTrue(RunAnywhere.frameworkSupports(.llamaCpp, category: .llm))
+        XCTAssertFalse(RunAnywhere.frameworkSupports(.llamaCpp, category: .stt))
+        XCTAssertTrue(RunAnywhere.frameworkSupports(.whisperKit, category: .stt))
+        XCTAssertTrue(RunAnywhere.frameworkSupports(.onnx, category: .embedding))
+    }
+
+    func testDetectModelFormatFromURL() {
+        XCTAssertEqual(RunAnywhere.detectModelFormat(from: "x.gguf"),  .gguf)
+        XCTAssertEqual(RunAnywhere.detectModelFormat(from: "x.onnx"),  .onnx)
+        XCTAssertEqual(RunAnywhere.detectModelFormat(from: "x.xyz"),   .unknown)
+    }
+
+    func testInferModelCategoryHeuristic() {
+        XCTAssertEqual(RunAnywhere.inferModelCategory(from: "whisper-base"),     .stt)
+        XCTAssertEqual(RunAnywhere.inferModelCategory(from: "bge-small-en"),     .embedding)
+        XCTAssertEqual(RunAnywhere.inferModelCategory(from: "llava-1.5"),        .vlm)
+    }
+
+    func testTelemetryNamespaceBuildsPayload() {
+        let payload = Telemetry.defaultPayloadJson()
+        XCTAssertTrue(payload.contains("sdk_version"))
+        XCTAssertTrue(payload.contains("platform"))
+    }
+
+    func testTelemetryTrackReturnsTrue() {
+        XCTAssertTrue(Telemetry.track(event: "api-compat-test"))
+    }
+
+    func testFileIntegritySha256() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ra-test-\(UUID().uuidString).bin")
+        try "hello world".write(to: tmp, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let hex = FileIntegrity.sha256(ofFile: tmp.path)
+        XCTAssertEqual(hex,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9")
+        XCTAssertTrue(FileIntegrity.verify(path: tmp.path,
+            expectedSha256: "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"))
+        XCTAssertFalse(FileIntegrity.verify(path: tmp.path,
+            expectedSha256: String(repeating: "0", count: 64)))
+    }
+
+    func testStateSessionAuthRequestShapes() {
+        let req = SDKState.buildAuthenticateRequest(apiKey: "key-123",
+                                                      deviceId: "dev-456")
+        XCTAssertTrue(req.contains("\"api_key\":\"key-123\""))
+        XCTAssertTrue(req.contains("\"device_id\":\"dev-456\""))
+    }
 }

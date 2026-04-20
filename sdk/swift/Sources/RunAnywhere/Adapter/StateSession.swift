@@ -201,6 +201,49 @@ public enum SDKState {
     public static func validateBaseURL(_ url: String) -> Bool {
         url.withCString { ra_validate_base_url($0) }
     }
+
+    // MARK: - Auth request/response shaping (ra_auth.h)
+
+    /// Build the JSON body for a POST to the cloud authenticate endpoint.
+    public static func buildAuthenticateRequest(apiKey: String, deviceId: String) -> String {
+        var out: UnsafeMutablePointer<CChar>?
+        let rc = apiKey.withCString { ak in
+            deviceId.withCString { di in
+                ra_auth_build_authenticate_request(ak, di, &out)
+            }
+        }
+        guard rc == RA_OK, let raw = out else { return "{}" }
+        defer { ra_auth_string_free(out) }
+        return String(cString: raw)
+    }
+
+    /// Build the JSON body for a token-refresh POST using the stored refresh token.
+    public static func buildRefreshRequest() -> String {
+        var out: UnsafeMutablePointer<CChar>?
+        let rc = ra_auth_build_refresh_request(&out)
+        guard rc == RA_OK, let raw = out else { return "{}" }
+        defer { ra_auth_string_free(out) }
+        return String(cString: raw)
+    }
+
+    /// Parse an authenticate response (JSON string) and persist the returned
+    /// tokens into the core `AuthManager` singleton. Returns true on success.
+    @discardableResult
+    public static func handleAuthenticateResponse(_ json: String) -> Bool {
+        json.withCString { ra_auth_handle_authenticate_response($0) == RA_OK }
+    }
+
+    /// Parse a token-refresh response and update the stored access token.
+    @discardableResult
+    public static func handleRefreshResponse(_ json: String) -> Bool {
+        json.withCString { ra_auth_handle_refresh_response($0) == RA_OK }
+    }
+
+    /// Access token, or nil if not authenticated or token is expired.
+    public static var validAccessToken: String? {
+        guard let ptr = ra_auth_get_valid_token() else { return nil }
+        return String(cString: ptr)
+    }
 }
 
 // MARK: - C-string interop

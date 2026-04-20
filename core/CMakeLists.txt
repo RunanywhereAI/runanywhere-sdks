@@ -106,6 +106,10 @@ option(RA_BUILD_MODEL_DOWNLOADER
     "Build the libcurl-backed model downloader (requires libcurl)" ON)
 if(RA_BUILD_MODEL_DOWNLOADER)
     list(APPEND _ra_core_model_registry_sources model_registry/model_downloader.cpp)
+else()
+    # Stub ModelDownloader::create() that returns nullptr so downstream
+    # callers (ra_download.cpp) fall through to the platform-adapter path.
+    list(APPEND _ra_core_model_registry_sources model_registry/model_downloader_stub.cpp)
 endif()
 add_library(ra_core_model_registry STATIC ${_ra_core_model_registry_sources})
 if(RA_BUILD_MODEL_DOWNLOADER AND NOT APPLE AND NOT WIN32)
@@ -173,6 +177,10 @@ option(RA_BUILD_HTTP_CLIENT
 set(_ra_core_net_sources net/environment.cpp)
 if(RA_BUILD_HTTP_CLIENT)
     list(APPEND _ra_core_net_sources net/http_client.cpp net/telemetry.cpp)
+else()
+    # Stub TelemetryManager so ra_core_abi_ext (telemetry.cpp) links
+    # without pulling in the libcurl-backed uploader.
+    list(APPEND _ra_core_net_sources net/telemetry_stub.cpp)
 endif()
 add_library(ra_core_net STATIC ${_ra_core_net_sources})
 target_include_directories(ra_core_net PUBLIC

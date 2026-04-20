@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 //
-// RAG (retrieval-augmented generation) session — wraps the C++ RAG
-// solution from `solutions/rag/`. The current implementation is a
-// pure-Swift coordinator over EmbedSession + LLMSession + an in-memory
-// HNSW-style index; the C ABI exposes the engine pieces but no
-// `ra_rag_*` namespace today (RAG lives at the solution layer).
+// RAG (retrieval-augmented generation) session — wraps the core
+// `ra_rag_*` C ABI (chunker + in-memory vector store) + EmbedSession
+// + ChatSession. Vector storage and chunking happen in C++ core for
+// consistency across SDKs.
 
 import Foundation
 import CRACommonsCore
@@ -47,55 +46,121 @@ public struct RAGResult: Sendable {
 @MainActor
 internal final class RAGPipeline {
     let config: RAGConfiguration
-    var corpus: [(text: String, vec: [Float])] = []
     let embed: EmbedSession
     let chat: ChatSession
+    var store: OpaquePointer?  // ra_rag_vector_store_t
+    var chunkTexts: [String] = []  // Kept Swift-side to return citations
 
     init(config: RAGConfiguration,
-         embedModelPath: String, llmModelPath: String) throws {
+         embedModelPath: String, llmModelPath: String,
+         embeddingDim: Int32 = 384) throws {
         self.config = config
         self.embed = try EmbedSession(modelId: config.embeddingModelId,
                                        modelPath: embedModelPath)
         self.chat = try ChatSession(modelId: config.llmModelId,
                                      modelPath: llmModelPath,
                                      systemPrompt: nil)
+        var s: OpaquePointer?
+        let rc = ra_rag_store_create(embeddingDim, &s)
+        guard rc == RA_OK, s != nil else {
+            throw RunAnywhereError.internalError("ra_rag_store_create failed: \(rc)")
+        }
+        self.store = s
+    }
+
+    deinit {
+        // MainActor-isolated cleanup can't run in deinit; callers must
+        // invoke `destroy()` to release the native vector store.
+    }
+
+    func destroy() {
+        if let s = store { ra_rag_store_destroy(s) }
+        store = nil
+        chunkTexts.removeAll()
     }
 
     func ingest(_ text: String) throws {
-        // Naive char-window chunking; production RAG would use a sentence
-        // splitter (solutions/rag/SentenceSplitter handles this).
-        let chunkSize = max(64, config.chunkSize)
-        var i = text.startIndex
-        while i < text.endIndex {
-            let j = text.index(i, offsetBy: chunkSize, limitedBy: text.endIndex) ?? text.endIndex
-            let chunk = String(text[i..<j])
-            let vec = try embed.embed(chunk)
-            corpus.append((text: chunk, vec: vec))
-            i = j
+        guard let store = store else {
+            throw RunAnywhereError.backendUnavailable("RAG store destroyed")
+        }
+        // Use the core chunker so every SDK uses identical chunking logic.
+        var chunks: UnsafeMutablePointer<ra_rag_chunk_t>?
+        var count: Int32 = 0
+        let rc = text.withCString { cstr in
+            ra_rag_chunk_text(cstr,
+                                Int32(config.chunkSize),
+                                Int32(config.chunkOverlap),
+                                &chunks, &count)
+        }
+        guard rc == RA_OK else {
+            throw RunAnywhereError.internalError("ra_rag_chunk_text failed: \(rc)")
+        }
+        defer { if let c = chunks { ra_rag_chunks_free(c, count) } }
+
+        for idx in 0..<Int(count) {
+            let chunk = chunks![idx]
+            let chunkText = String(cString: chunk.text)
+            let vec = try embed.embed(chunkText)
+            let rowId = "chunk-\(chunkTexts.count)"
+            let rc2 = rowId.withCString { id in
+                "".withCString { meta in
+                    vec.withUnsafeBufferPointer { ptr in
+                        ra_rag_store_add(store, id, meta,
+                                           ptr.baseAddress,
+                                           Int32(vec.count))
+                    }
+                }
+            }
+            guard rc2 == RA_OK else {
+                throw RunAnywhereError.internalError("ra_rag_store_add failed: \(rc2)")
+            }
+            chunkTexts.append(chunkText)
         }
     }
 
     func query(_ question: String) async throws -> RAGResult {
+        guard let store = store else {
+            throw RunAnywhereError.backendUnavailable("RAG store destroyed")
+        }
         let qvec = try embed.embed(question)
-        let scored = corpus.map { ($0.text, cosine($0.vec, qvec)) }
-                            .sorted { $0.1 > $1.1 }
-                            .prefix(config.topK)
-                            .filter { $0.1 >= config.similarityThreshold }
-        let context = scored.map { "- \($0.0)" }.joined(separator: "\n")
+        var ids: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+        var metas: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+        var scores: UnsafeMutablePointer<Float>?
+        var count: Int32 = 0
+        let rc = qvec.withUnsafeBufferPointer { ptr in
+            ra_rag_store_search(store, ptr.baseAddress,
+                                  Int32(qvec.count),
+                                  Int32(config.topK),
+                                  &ids, &metas, &scores, &count)
+        }
+        guard rc == RA_OK else {
+            throw RunAnywhereError.internalError("ra_rag_store_search failed: \(rc)")
+        }
+        defer {
+            if let i = ids { ra_rag_strings_free(i, count) }
+            if let m = metas { ra_rag_strings_free(m, count) }
+            if let s = scores { ra_rag_floats_free(s) }
+        }
+
+        var hits: [(String, Float)] = []
+        for i in 0..<Int(count) {
+            let idPtr = ids![i]
+            let score = scores![i]
+            guard score >= config.similarityThreshold, let idRaw = idPtr else { continue }
+            let idStr = String(cString: idRaw)
+            if let idx = Int(idStr.dropFirst("chunk-".count)),
+               idx >= 0, idx < chunkTexts.count {
+                hits.append((chunkTexts[idx], score))
+            }
+        }
+
+        let context = hits.map { "- \($0.0)" }.joined(separator: "\n")
         let messages: [ChatSession.Message] = [
             .system("Use the following context to answer concisely.\n\n\(context)"),
             .user(question)
         ]
         let answer = try await chat.generateText(messages: messages)
-        return RAGResult(answer: answer, citations: scored.map { $0.0 })
-    }
-
-    private func cosine(_ a: [Float], _ b: [Float]) -> Float {
-        guard a.count == b.count, !a.isEmpty else { return 0 }
-        var dot: Float = 0, na: Float = 0, nb: Float = 0
-        for i in 0..<a.count { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
-        let denom = (na.squareRoot() * nb.squareRoot())
-        return denom > 0 ? dot / denom : 0
+        return RAGResult(answer: answer, citations: hits.map { $0.0 })
     }
 }
 
@@ -136,5 +201,8 @@ public extension RunAnywhere {
         return try await pipeline.query(question)
     }
 
-    static func ragDestroyPipeline() { RAGRegistry.current = nil }
+    static func ragDestroyPipeline() {
+        RAGRegistry.current?.destroy()
+        RAGRegistry.current = nil
+    }
 }

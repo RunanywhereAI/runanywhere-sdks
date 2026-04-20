@@ -7,6 +7,31 @@
 // callback and for the `RunAnywhere.downloadModel` async stream.
 
 import Foundation
+import CRACommonsCore
+
+/// File integrity helpers backed by the core `ra_download_*` C ABI.
+/// Exposed as namespaced statics so sample-app code can verify a
+/// downloaded file without pulling in CryptoKit.
+public enum FileIntegrity {
+
+    /// Compute the hex SHA-256 of a file on disk. Returns nil on I/O error.
+    public static func sha256(ofFile path: String) -> String? {
+        var hex: UnsafeMutablePointer<CChar>?
+        let rc = path.withCString { ra_download_sha256_file($0, &hex) }
+        guard rc == RA_OK, let raw = hex else { return nil }
+        defer { ra_download_string_free(hex) }
+        return String(cString: raw)
+    }
+
+    /// Verify `path` matches `expectedSha256`. Returns true on match.
+    public static func verify(path: String, expectedSha256: String) -> Bool {
+        path.withCString { p in
+            expectedSha256.withCString { e in
+                ra_download_verify_sha256(p, e) == RA_OK
+            }
+        }
+    }
+}
 
 @MainActor
 public final class DownloadService: NSObject, URLSessionDownloadDelegate {

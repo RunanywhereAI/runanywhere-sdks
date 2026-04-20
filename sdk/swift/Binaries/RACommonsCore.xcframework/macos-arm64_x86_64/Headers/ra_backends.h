@@ -92,6 +92,75 @@ ra_status_t ra_diffusion_coreml_set_callbacks(
 
 uint8_t ra_diffusion_coreml_has_callbacks(void);
 
+// ---------------------------------------------------------------------------
+// MetalRT Swift bridge. Defined in engines/metalrt/. MetalRT is an
+// Apple-internal closed-source SDK (`MetalRT.framework`); when
+// unavailable, the plugin no-ops. Swift side is optional.
+// ---------------------------------------------------------------------------
+
+typedef struct ra_metalrt_llm_session_s* ra_metalrt_llm_handle_t;
+
+typedef struct ra_metalrt_callbacks_s {
+    ra_metalrt_llm_handle_t (*create)(const char* model_path, void* user_data);
+    void        (*destroy)(ra_metalrt_llm_handle_t handle, void* user_data);
+    ra_status_t (*generate)(ra_metalrt_llm_handle_t handle,
+                              const char* prompt,
+                              void (*on_token)(const char* text, int32_t is_final, void* ud),
+                              void* on_token_ud,
+                              void* user_data);
+    ra_status_t (*cancel)(ra_metalrt_llm_handle_t handle, void* user_data);
+    void* user_data;
+} ra_metalrt_callbacks_t;
+
+ra_status_t ra_metalrt_set_callbacks(const ra_metalrt_callbacks_t* callbacks);
+uint8_t     ra_metalrt_has_callbacks(void);
+
+// ---------------------------------------------------------------------------
+// ONNX Runtime Swift/Kotlin bridge. Defined in engines/onnx/. When the
+// native ORT library isn't linked, frontends can still provide LLM /
+// embedding / STT via this callback table.
+// ---------------------------------------------------------------------------
+
+typedef struct ra_onnx_llm_session_s*   ra_onnx_llm_handle_t;
+typedef struct ra_onnx_embed_session_s* ra_onnx_embed_handle_t;
+typedef struct ra_onnx_stt_session_s*   ra_onnx_stt_handle_t;
+
+typedef struct ra_onnx_callbacks_s {
+    // LLM slot.
+    ra_onnx_llm_handle_t (*llm_create)(const char* model_path, void* user_data);
+    void                 (*llm_destroy)(ra_onnx_llm_handle_t handle, void* user_data);
+    ra_status_t          (*llm_generate)(ra_onnx_llm_handle_t handle,
+                                           const char* prompt,
+                                           void (*on_token)(const char* text, int32_t is_final, void* ud),
+                                           void* on_token_ud,
+                                           void* user_data);
+    ra_status_t          (*llm_cancel)(ra_onnx_llm_handle_t handle, void* user_data);
+
+    // Embedding slot.
+    ra_onnx_embed_handle_t (*embed_create)(const char* model_path, void* user_data);
+    void                   (*embed_destroy)(ra_onnx_embed_handle_t handle, void* user_data);
+    ra_status_t            (*embed_encode)(ra_onnx_embed_handle_t handle,
+                                              const char* text,
+                                              float** out_vector, int32_t* out_dim,
+                                              void* user_data);
+    void                   (*embed_floats_free)(float* v, void* user_data);
+
+    // STT slot — optional. Null fields report CAPABILITY_UNSUPPORTED.
+    ra_onnx_stt_handle_t (*stt_create)(const char* model_path, void* user_data);
+    void                 (*stt_destroy)(ra_onnx_stt_handle_t handle, void* user_data);
+    ra_status_t          (*stt_transcribe)(ra_onnx_stt_handle_t handle,
+                                              const float* audio, size_t samples,
+                                              int32_t sample_rate,
+                                              char** out_utf8_text,
+                                              void* user_data);
+    void                 (*stt_string_free)(char* str, void* user_data);
+
+    void* user_data;
+} ra_onnx_callbacks_t;
+
+ra_status_t ra_onnx_set_callbacks(const ra_onnx_callbacks_t* callbacks);
+uint8_t     ra_onnx_has_callbacks(void);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif
