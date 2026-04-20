@@ -1,0 +1,45 @@
+{
+  "name": "@runanywhere/core",
+  "version": "2.0.0",
+  "description": "RunAnywhere SDK core — React Native TurboModule/JSI bindings over the v2 C ABI",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "source": "src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "ios",
+    "android",
+    "cpp",
+    "runanywhere-core.podspec"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf lib"
+  },
+  "keywords": [
+    "runanywhere",
+    "react-native",
+    "llm",
+    "on-device-ai",
+    "turbomodule",
+    "jsi"
+  ],
+  "repository": "https://github.com/RunanywhereAI/runanywhere-sdks",
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "react-native-nitro-modules": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "codegenConfig": {
+    "name": "RNRunAnywhereCoreSpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  }
+}
