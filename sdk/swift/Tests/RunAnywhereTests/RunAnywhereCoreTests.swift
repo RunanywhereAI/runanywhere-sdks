@@ -226,4 +226,35 @@ final class RunAnywhereCoreTests: XCTestCase {
             "Just a plain assistant response with no tool calls.")
         XCTAssertTrue(calls.isEmpty)
     }
+
+    // MARK: - StructuredOutput
+
+    func testStructuredOutputExtractsFromFencedBlock() throws {
+        let raw = """
+        Sure, here's the JSON:
+        ```json
+        {"name": "Alice", "age": 30}
+        ```
+        Let me know if you need more!
+        """
+        let json = try StructuredOutput.extractJSON(from: raw)
+        XCTAssertEqual(json, #"{"name": "Alice", "age": 30}"#)
+    }
+
+    func testStructuredOutputExtractsFromBareObject() throws {
+        let raw = #"The answer is {"result": 42, "unit": "ms"}, good luck."#
+        let json = try StructuredOutput.extractJSON(from: raw)
+        XCTAssertEqual(json, #"{"result": 42, "unit": "ms"}"#)
+    }
+
+    func testStructuredOutputHandlesNestedBraces() throws {
+        let raw = #"Output: {"person": {"name": "Bob"}, "ok": true}"#
+        let json = try StructuredOutput.extractJSON(from: raw)
+        XCTAssertEqual(json, #"{"person": {"name": "Bob"}, "ok": true}"#)
+    }
+
+    func testStructuredOutputThrowsWhenNoJSON() {
+        XCTAssertThrowsError(try StructuredOutput.extractJSON(from:
+            "no json here at all, just prose"))
+    }
 }
