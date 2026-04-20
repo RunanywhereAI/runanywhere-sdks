@@ -178,4 +178,52 @@ final class RunAnywhereCoreTests: XCTestCase {
         XCTAssertFalse(rendered.contains("<|im_start|>system"))
         XCTAssertTrue(rendered.contains("<|im_start|>user"))
     }
+
+    // MARK: - Tool calling
+
+    func testToolFormatterProducesValidSystemPrompt() {
+        let tools = [
+            ToolDefinition(name: "get_weather",
+                           description: "Get current weather for a city",
+                           parameters: [
+                            ToolParameter(name: "city", type: "string",
+                                           description: "City name"),
+                            ToolParameter(name: "unit", type: "string",
+                                           description: "C or F",
+                                           required: false),
+                           ])
+        ]
+        let prompt = ToolFormatter.systemPrompt(for: tools)
+        XCTAssertTrue(prompt.contains("get_weather"))
+        XCTAssertTrue(prompt.contains("city"))
+        XCTAssertTrue(prompt.contains("optional"))
+        XCTAssertTrue(prompt.contains("<tool_call>"))
+    }
+
+    func testToolFormatterParsesCallBlock() throws {
+        let raw = """
+        Sure, I'll check the weather.
+        <tool_call>{"name":"get_weather","arguments":{"city":"Paris"}}</tool_call>
+        """
+        let calls = try ToolFormatter.parseToolCalls(from: raw)
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(calls[0].name, "get_weather")
+        XCTAssertEqual(calls[0].arguments["city"] as? String, "Paris")
+    }
+
+    func testToolFormatterIgnoresMalformed() throws {
+        let raw = """
+        <tool_call>not json</tool_call>
+        <tool_call>{"name":"valid","arguments":{}}</tool_call>
+        """
+        let calls = try ToolFormatter.parseToolCalls(from: raw)
+        XCTAssertEqual(calls.count, 1)
+        XCTAssertEqual(calls[0].name, "valid")
+    }
+
+    func testToolFormatterHandlesNoCalls() throws {
+        let calls = try ToolFormatter.parseToolCalls(from:
+            "Just a plain assistant response with no tool calls.")
+        XCTAssertTrue(calls.isEmpty)
+    }
 }
