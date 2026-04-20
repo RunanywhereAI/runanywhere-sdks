@@ -33,6 +33,7 @@
 #include "ra_version.h"
 #include "ra_plugin.h"
 #include "ra_errors.h"
+#include "ra_platform_adapter.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -162,6 +163,29 @@ typedef ra_audio_callback_t      rac_audio_callback_t;
 #define rac_abi_version        ra_abi_version
 #define rac_plugin_api_version ra_plugin_api_version
 #define rac_build_info         ra_build_info
+
+/* --- Platform adapter --------------------------------------------------- */
+typedef ra_platform_adapter_t          rac_platform_adapter_t;
+typedef ra_log_level_t                 rac_log_level_t;
+typedef ra_memory_info_t               rac_memory_info_t;
+typedef ra_http_progress_callback_fn   rac_http_progress_callback_fn;
+typedef ra_http_complete_callback_fn   rac_http_complete_callback_fn;
+typedef ra_extract_progress_callback_fn rac_extract_progress_callback_fn;
+
+#define RAC_LOG_LEVEL_TRACE RA_LOG_LEVEL_TRACE
+#define RAC_LOG_LEVEL_DEBUG RA_LOG_LEVEL_DEBUG
+#define RAC_LOG_LEVEL_INFO  RA_LOG_LEVEL_INFO
+#define RAC_LOG_LEVEL_WARN  RA_LOG_LEVEL_WARN
+#define RAC_LOG_LEVEL_ERROR RA_LOG_LEVEL_ERROR
+#define RAC_LOG_LEVEL_FATAL RA_LOG_LEVEL_FATAL
+
+#define rac_set_platform_adapter    ra_set_platform_adapter
+#define rac_get_platform_adapter    ra_get_platform_adapter
+#define rac_log                     ra_log
+#define rac_get_current_time_ms     ra_get_current_time_ms
+#define rac_http_download           ra_http_download
+#define rac_http_download_cancel    ra_http_download_cancel
+#define rac_extract_archive         ra_extract_archive_via_adapter
 
 /* --- Gaps not yet bridged --------------------------------------------
  *

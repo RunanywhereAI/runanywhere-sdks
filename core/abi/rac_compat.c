@@ -28,6 +28,7 @@ const int ra_compat_disabled_marker = 1;
 #include "ra_version.h"
 #include "ra_errors.h"
 #include "ra_lifecycle.h"
+#include "ra_platform_adapter.h"
 
 #ifdef __cplusplus
 extern "C" {
