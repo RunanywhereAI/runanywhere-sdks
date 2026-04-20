@@ -63,12 +63,10 @@ build_slice() {
     local slice="$1"; shift
     local build_dir="${BUILD_ROOT}/${slice}"
 
-    # iOS slices skip libcurl / libarchive / rac_compat because neither
-    # is available in the iOS sysroot and no legacy commons binaries
-    # consume rac_* on iOS anyway. macOS keeps all of them.
-    # iOS also skips RA_BUILD_ENGINES because llama.cpp uses try_run()
-    # which doesn't cross-compile; engines ship as a separate iOS slice
-    # built via llama.cpp's native xcframework later.
+    # iOS slices skip libcurl / libarchive because neither is available
+    # in the iOS sysroot. iOS also skips RA_BUILD_ENGINES because llama.cpp
+    # uses try_run() which doesn't cross-compile; engines ship as a
+    # separate iOS slice built via llama.cpp's native xcframework later.
     local extra_args=("")
     local targets_list="ra_core_abi ra_core_graph ra_core_registry ra_core_router ra_core_voice_pipeline ra_core_model_registry ra_core_net ra_core_util ra_core_pipeline_abi ra_core_llm_dispatch ra_core_state_abi ra_core_abi_ext ra_solution_voice_agent ra_solution_rag"
     case "$slice" in
@@ -77,7 +75,6 @@ build_slice() {
                 -DRA_BUILD_HTTP_CLIENT=OFF
                 -DRA_BUILD_MODEL_DOWNLOADER=OFF
                 -DRA_BUILD_EXTRACTION=OFF
-                -DRA_BUILD_RAC_COMPAT=OFF
                 -DRA_BUILD_ENGINES=OFF
             )
             ;;
@@ -181,7 +178,6 @@ module CRACommonsCore {
     header "ra_platform_llm.h"
     header "ra_benchmark.h"
     header "ra_server.h"
-    header "rac_compat.h"
     link "RACommonsCore"
     export *
 }

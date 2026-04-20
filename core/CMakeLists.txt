@@ -8,16 +8,9 @@
 #                     solutions link against this.
 
 # --- L0: C ABI ---------------------------------------------------------------
-# `rac_compat` is the ABI-level rac_* → ra_* binary bridge for pre-
-# compiled legacy binaries. It's only wired on platforms where legacy
-# commons binaries actually exist (macOS, Linux desktop builds). On
-# Android NDK / iOS / WASM nothing links against rac_* symbols so we
-# skip the forwarders, which would otherwise need the ra_llm_*/... engine
-# primitives to be linkable at static-lib time.
-option(RA_BUILD_RAC_COMPAT
-    "Build the rac_* → ra_* ABI forwarders (needs engine symbols at link)"
-    ON)
-
+# Pure C glue for the public ra_* surface. No legacy compatibility shims —
+# every consumer (sdk/{swift,kotlin,dart,ts,web}, engines/*, solutions/*)
+# calls ra_* directly.
 set(_ra_core_abi_sources
     abi/ra_version.c
     abi/ra_status.c
@@ -25,12 +18,8 @@ set(_ra_core_abi_sources
     abi/ra_lifecycle.c
     abi/ra_platform_adapter.c
     abi/ra_core_init.c
-    abi/rac_compat.c
 )
 add_library(ra_core_abi STATIC ${_ra_core_abi_sources})
-if(NOT RA_BUILD_RAC_COMPAT)
-    target_compile_definitions(ra_core_abi PRIVATE RA_NO_RAC_COMPAT=1)
-endif()
 target_include_directories(ra_core_abi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/abi>
     $<INSTALL_INTERFACE:include>
