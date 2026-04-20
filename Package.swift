@@ -44,7 +44,7 @@ let useLocalNatives = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.11"
+let sdkVersion = "0.19.12"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip
@@ -129,13 +129,16 @@ let package = Package(
 
         // =================================================================
         // C Bridge Module - ONNX Backend Headers
+        //
+        // ONNX Runtime is now statically linked into RABackendONNX.a — no
+        // separate ONNXRuntime{iOS,macOS}Binary targets needed. They were
+        // previously distributed as separate xcframeworks but are bundled
+        // since v0.19.0.
         // =================================================================
         .target(
             name: "ONNXBackend",
             dependencies: [
                 "RABackendONNXBinary",
-                .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
-                .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
@@ -175,8 +178,6 @@ let package = Package(
                 "RunAnywhere",
                 "ONNXBackend",
                 "RABackendONNXBinary",
-                .target(name: "ONNXRuntimeiOSBinary", condition: .when(platforms: [.iOS])),
-                .target(name: "ONNXRuntimemacOSBinary", condition: .when(platforms: [.macOS])),
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include"],
@@ -304,7 +305,9 @@ func binaryTargets() -> [Target] {
         // For macOS support, build with --include-macos:
         //   ./scripts/build-swift.sh --setup --include-macos
         // =====================================================================
-        var targets: [Target] = [
+        // ONNX Runtime is statically linked into RABackendONNX — no separate
+        // local xcframework targets needed (v0.19.0+).
+        return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 path: "sdk/runanywhere-swift/Binaries/RACommons.xcframework"
@@ -322,22 +325,6 @@ func binaryTargets() -> [Target] {
                 path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
             ),
         ]
-
-        // ONNX Runtime xcframeworks - split by platform
-        // iOS: static library format (not embedded in app bundle)
-        // macOS: dynamic framework format (embedded in app bundle)
-        targets.append(contentsOf: [
-            .binaryTarget(
-                name: "ONNXRuntimeiOSBinary",
-                path: "sdk/runanywhere-swift/Binaries/onnxruntime-ios.xcframework"
-            ),
-            .binaryTarget(
-                name: "ONNXRuntimemacOSBinary",
-                path: "sdk/runanywhere-swift/Binaries/onnxruntime-macos.xcframework"
-            ),
-        ])
-
-        return targets
     } else {
         // =====================================================================
         // PRODUCTION MODE (for external SPM consumers)
@@ -359,16 +346,6 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
                 checksum: "809e2510da49f71f6d019e77bcc0a7e12e967f3b739ba0b9eea7adb77936edc0"
-            ),
-            .binaryTarget(
-                name: "ONNXRuntimeiOSBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-ios-v\(sdkVersion).zip",
-                checksum: "310022d76a16b2d2d106577a1aa84a9e608c721bb6221c4ba47bf962a88bd9fd"
-            ),
-            .binaryTarget(
-                name: "ONNXRuntimemacOSBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/onnxruntime-macos-v\(sdkVersion).zip",
-                checksum: "f73db9dc09012325b35fd3da74de794a75f4e9971d9b923af0805d6ab1dfc243"
             ),
         ]
 
