@@ -417,7 +417,8 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
     if(JNI_FOUND)
         list(APPEND RA_SHARED_SOURCES
             ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
-            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_sessions.cpp)
+            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_sessions.cpp
+            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_extensions.cpp)
         set(RA_HAVE_JNI ON)
     endif()
 endif()
