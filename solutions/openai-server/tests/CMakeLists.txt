@@ -1,10 +1,12 @@
 add_executable(ra_solution_openai_server_tests
     http_server_smoke_test.cpp
+    openai_routes_test.cpp
 )
 
 target_link_libraries(ra_solution_openai_server_tests
     PRIVATE
         ra_solution_openai_server
+        ra_core_abi_ext
         GTest::gtest
         GTest::gtest_main
 )
