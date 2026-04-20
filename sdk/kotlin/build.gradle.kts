@@ -19,6 +19,7 @@ repositories {
 dependencies {
     implementation("com.squareup.wire:wire-runtime:5.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.json:json:20240303")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

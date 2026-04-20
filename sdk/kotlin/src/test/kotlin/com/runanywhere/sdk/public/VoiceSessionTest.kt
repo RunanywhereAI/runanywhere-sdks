@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-package com.runanywhere.adapter
+package com.runanywhere.sdk.`public`
 
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest

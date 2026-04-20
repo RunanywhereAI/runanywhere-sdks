@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
-package com.runanywhere.adapter
+package com.runanywhere.sdk.`public`
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow

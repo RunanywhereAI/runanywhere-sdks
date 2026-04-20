@@ -3,7 +3,7 @@
 //
 // RunAnywhere v2 — public Kotlin entry point.
 
-package com.runanywhere.adapter
+package com.runanywhere.sdk.`public`
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow

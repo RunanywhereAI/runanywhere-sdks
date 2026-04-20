@@ -95,7 +95,7 @@ const char* safe(JNIEnv* env, jstring s, std::vector<std::string>& hold) {
 extern "C" {
 
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeCreate(
+Java_com_runanywhere_sdk_public_VoiceSession_nativeCreate(
     JNIEnv* env, jobject /*self*/,
     jobject emitter,
     jstring llm, jstring stt, jstring tts, jstring vad,
@@ -146,21 +146,21 @@ Java_com_runanywhere_adapter_VoiceSession_nativeCreate(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeRun(JNIEnv*, jobject, jlong ptr) {
+Java_com_runanywhere_sdk_public_VoiceSession_nativeRun(JNIEnv*, jobject, jlong ptr) {
     auto* h = reinterpret_cast<Handle*>(ptr);
     if (!h || !h->pipeline) return RA_ERR_INVALID_ARGUMENT;
     return ra_pipeline_run(h->pipeline);
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeCancel(JNIEnv*, jobject, jlong ptr) {
+Java_com_runanywhere_sdk_public_VoiceSession_nativeCancel(JNIEnv*, jobject, jlong ptr) {
     auto* h = reinterpret_cast<Handle*>(ptr);
     if (!h || !h->pipeline) return RA_ERR_INVALID_ARGUMENT;
     return ra_pipeline_cancel(h->pipeline);
 }
 
 JNIEXPORT void JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeDestroy(JNIEnv* env, jobject, jlong ptr) {
+Java_com_runanywhere_sdk_public_VoiceSession_nativeDestroy(JNIEnv* env, jobject, jlong ptr) {
     auto* h = reinterpret_cast<Handle*>(ptr);
     if (!h) return;
     if (h->ref && h->ref->global_emitter) {
@@ -171,7 +171,7 @@ Java_com_runanywhere_adapter_VoiceSession_nativeDestroy(JNIEnv* env, jobject, jl
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeFeedAudio(
+Java_com_runanywhere_sdk_public_VoiceSession_nativeFeedAudio(
     JNIEnv* env, jobject, jlong ptr,
     jfloatArray samples, jint sample_rate_hz) {
     auto* h = reinterpret_cast<Handle*>(ptr);
@@ -184,7 +184,7 @@ Java_com_runanywhere_adapter_VoiceSession_nativeFeedAudio(
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_adapter_VoiceSession_nativeBargeIn(JNIEnv*, jobject, jlong ptr) {
+Java_com_runanywhere_sdk_public_VoiceSession_nativeBargeIn(JNIEnv*, jobject, jlong ptr) {
     auto* h = reinterpret_cast<Handle*>(ptr);
     if (!h || !h->pipeline) return RA_ERR_INVALID_ARGUMENT;
     return ra_pipeline_inject_barge_in(h->pipeline);
@@ -197,7 +197,7 @@ extern ra_status_t ra_registry_load_plugin(const char* library_path);
 extern int32_t     ra_registry_plugin_count(void);
 
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_adapter_PluginBridge_loadPlugin(JNIEnv* env, jobject, jstring jpath) {
+Java_com_runanywhere_sdk_public_PluginBridge_loadPlugin(JNIEnv* env, jobject, jstring jpath) {
     if (!jpath) return JNI_FALSE;
     const char* path = env->GetStringUTFChars(jpath, nullptr);
     const ra_status_t rc = ra_registry_load_plugin(path ? path : "");
@@ -206,7 +206,7 @@ Java_com_runanywhere_adapter_PluginBridge_loadPlugin(JNIEnv* env, jobject, jstri
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_adapter_PluginBridge_pluginCount(JNIEnv*, jobject) {
+Java_com_runanywhere_sdk_public_PluginBridge_pluginCount(JNIEnv*, jobject) {
     return ra_registry_plugin_count();
 }
 

@@ -3,9 +3,9 @@
 
 package com.runanywhere.demo
 
-import com.runanywhere.adapter.RunAnywhere
-import com.runanywhere.adapter.VoiceAgentConfig
-import com.runanywhere.adapter.VoiceEvent
+import com.runanywhere.sdk.`public`.RunAnywhere
+import com.runanywhere.sdk.`public`.VoiceAgentConfig
+import com.runanywhere.sdk.`public`.VoiceEvent
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 

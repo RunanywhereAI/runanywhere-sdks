@@ -369,7 +369,8 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
     find_package(JNI QUIET)
     if(JNI_FOUND)
         list(APPEND RA_SHARED_SOURCES
-            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp)
+            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_bridge.cpp
+            ${CMAKE_SOURCE_DIR}/sdk/kotlin/src/main/cpp/jni_sessions.cpp)
         set(RA_HAVE_JNI ON)
     endif()
 endif()
