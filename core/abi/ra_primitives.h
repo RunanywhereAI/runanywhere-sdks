@@ -210,6 +210,43 @@ ra_status_t ra_llm_cancel(ra_llm_session_t* session);
 ra_status_t ra_llm_reset(ra_llm_session_t* session);
 
 // ---------------------------------------------------------------------------
+// LLM context injection (optional capability, engine-dependent)
+//
+// Lets the frontend build persistent conversation state across turns without
+// re-prefilling the system prompt each call. Ports the capability surface
+// from legacy `rac_llm_inject_system_prompt / append_context /
+// generate_from_context / clear_context`.
+//
+// Engines that don't implement these (sherpa-onnx has no LLM; remote-only
+// engines may lack KV cache) return RA_ERR_CAPABILITY_UNSUPPORTED.
+// ---------------------------------------------------------------------------
+
+// Inject a persistent system prompt into the KV cache. Unlike passing the
+// system prompt on every ra_llm_generate call, this is tokenized once and
+// stays resident, so subsequent generations avoid re-prefilling.
+ra_status_t ra_llm_inject_system_prompt(ra_llm_session_t* session,
+                                         const char*       prompt);
+
+// Append additional context (tool output, retrieval hit, etc.) to the
+// existing KV cache without clearing prior state. Accumulative —
+// subsequent generations see the full running context.
+ra_status_t ra_llm_append_context(ra_llm_session_t* session,
+                                   const char*       text);
+
+// Generate a response from the accumulated KV-cache state. Does NOT clear
+// the cache first (differs from ra_llm_generate which starts fresh). Use
+// after inject_system_prompt / append_context to continue the conversation.
+ra_status_t ra_llm_generate_from_context(ra_llm_session_t*   session,
+                                          const char*         query,
+                                          ra_token_callback_t on_token,
+                                          ra_error_callback_t on_error,
+                                          void*               user_data);
+
+// Clear the KV cache + sampling state. Equivalent to ra_llm_reset but
+// named for symmetry with the context-injection API above.
+ra_status_t ra_llm_clear_context(ra_llm_session_t* session);
+
+// ---------------------------------------------------------------------------
 // L3: transcribe
 // ---------------------------------------------------------------------------
 ra_status_t ra_stt_create(const ra_model_spec_t*     spec,

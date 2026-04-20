@@ -113,6 +113,26 @@ typedef struct {
     // Plugin teardown — called when the core unloads the plugin.
     // Optional; may be NULL.
     void (*plugin_shutdown)(void);
+
+    // ----------------------------------------------------------------
+    // Extension slots (appended to preserve binary compat with plugins
+    // built against older vtable layouts). Plugins that do not implement
+    // these leave the pointer NULL — the core returns
+    // RA_ERR_CAPABILITY_UNSUPPORTED when the frontend calls into them.
+    // ----------------------------------------------------------------
+
+    // LLM context injection — port of legacy
+    // rac_llm_{inject_system_prompt,append_context,generate_from_context,
+    // clear_context}. Lets the frontend build persistent KV-cache state
+    // across turns without re-prefilling the system prompt each time.
+    // Useful for adaptive-query patterns (chat with RAG context).
+    ra_status_t (*llm_inject_system_prompt)(ra_llm_session_t*, const char* prompt);
+    ra_status_t (*llm_append_context)(ra_llm_session_t*, const char* text);
+    ra_status_t (*llm_generate_from_context)(ra_llm_session_t*, const char* query,
+                                              ra_token_callback_t on_token,
+                                              ra_error_callback_t on_error,
+                                              void* user_data);
+    ra_status_t (*llm_clear_context)(ra_llm_session_t*);
 } ra_engine_vtable_t;
 
 // ---------------------------------------------------------------------------

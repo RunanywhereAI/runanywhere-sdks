@@ -47,6 +47,11 @@ extern ra_status_t ra_llm_generate(ra_llm_session_t*, const ra_prompt_t*,
                                     ra_token_callback_t, ra_error_callback_t, void*);
 extern ra_status_t ra_llm_cancel(ra_llm_session_t*);
 extern ra_status_t ra_llm_reset(ra_llm_session_t*);
+extern ra_status_t ra_llm_inject_system_prompt(ra_llm_session_t*, const char*);
+extern ra_status_t ra_llm_append_context(ra_llm_session_t*, const char*);
+extern ra_status_t ra_llm_generate_from_context(ra_llm_session_t*, const char*,
+                                                 ra_token_callback_t, ra_error_callback_t, void*);
+extern ra_status_t ra_llm_clear_context(ra_llm_session_t*);
 
 extern ra_status_t ra_stt_create(const ra_model_spec_t*, const ra_session_config_t*,
                                   ra_stt_session_t**);
@@ -94,6 +99,24 @@ RA_COMPAT_EXPORT ra_status_t rac_llm_generate(ra_llm_session_t* s, const ra_prom
 }
 RA_COMPAT_EXPORT ra_status_t rac_llm_cancel(ra_llm_session_t* s) { return ra_llm_cancel(s); }
 RA_COMPAT_EXPORT ra_status_t rac_llm_reset(ra_llm_session_t* s)  { return ra_llm_reset(s); }
+RA_COMPAT_EXPORT ra_status_t rac_llm_inject_system_prompt(ra_llm_session_t* s,
+                                                            const char* p) {
+    return ra_llm_inject_system_prompt(s, p);
+}
+RA_COMPAT_EXPORT ra_status_t rac_llm_append_context(ra_llm_session_t* s,
+                                                     const char* t) {
+    return ra_llm_append_context(s, t);
+}
+RA_COMPAT_EXPORT ra_status_t rac_llm_generate_from_context(ra_llm_session_t* s,
+                                                            const char* q,
+                                                            ra_token_callback_t tcb,
+                                                            ra_error_callback_t ecb,
+                                                            void* ud) {
+    return ra_llm_generate_from_context(s, q, tcb, ecb, ud);
+}
+RA_COMPAT_EXPORT ra_status_t rac_llm_clear_context(ra_llm_session_t* s) {
+    return ra_llm_clear_context(s);
+}
 
 /* --- STT ---------------------------------------------------------------- */
 RA_COMPAT_EXPORT ra_status_t rac_stt_create(const ra_model_spec_t* s,
