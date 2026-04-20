@@ -121,6 +121,7 @@ endif()
 if(RA_BUILD_SOLUTIONS)
     add_subdirectory(solutions/voice-agent)
     add_subdirectory(solutions/rag)
+    add_subdirectory(solutions/openai-server)
 endif()
 
 if(RA_BUILD_FRONTENDS)
