@@ -9,7 +9,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "RunAnywhereCore",
+    name: "RunAnywhere",
     platforms: [
         .iOS(.v16),
         .macOS(.v13),
@@ -18,8 +18,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "RunAnywhereCore",
-            targets: ["RunAnywhereCore"]
+            name: "RunAnywhere",
+            targets: ["RunAnywhere"]
         ),
     ],
     targets: [
@@ -30,7 +30,7 @@ let package = Package(
             path: "Binaries/RACommonsCore.xcframework"
         ),
         .target(
-            name: "RunAnywhereCore",
+            name: "RunAnywhere",
             dependencies: [
                 "RACommonsCoreBinary",
             ],
@@ -46,8 +46,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "RunAnywhereCoreTests",
-            dependencies: ["RunAnywhereCore"],
+            name: "RunAnywhereTests",
+            dependencies: ["RunAnywhere"],
             path: "Tests/RunAnywhereTests"
         ),
     ]

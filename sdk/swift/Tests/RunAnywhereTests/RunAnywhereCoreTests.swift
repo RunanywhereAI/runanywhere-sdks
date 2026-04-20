@@ -2,7 +2,7 @@
 // Copyright (c) 2026 RunAnywhere AI, Inc.
 
 import XCTest
-@testable import RunAnywhereCore
+@testable import RunAnywhere
 
 final class RunAnywhereCoreTests: XCTestCase {
 
