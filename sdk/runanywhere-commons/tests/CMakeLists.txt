@@ -18,6 +18,53 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+# --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
+# No backend dependency; all three link directly against rac_commons.
+add_executable(test_engine_vtable test_engine_vtable.cpp)
+target_include_directories(test_engine_vtable PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_engine_vtable PRIVATE rac_commons)
+rac_link_archive_deps(test_engine_vtable)
+target_compile_features(test_engine_vtable PRIVATE cxx_std_17)
+add_test(NAME engine_vtable_tests COMMAND test_engine_vtable)
+
+add_executable(test_legacy_coexistence test_legacy_coexistence.cpp)
+target_include_directories(test_legacy_coexistence PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_legacy_coexistence PRIVATE rac_commons)
+rac_link_archive_deps(test_legacy_coexistence)
+target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
+add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
+
+# Per-backend plugin entry tests — only built when the respective backend is on.
+if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
+    add_executable(test_plugin_entry_llamacpp test_plugin_entry_llamacpp.cpp)
+    target_include_directories(test_plugin_entry_llamacpp PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_plugin_entry_llamacpp PRIVATE rac_commons rac_backend_llamacpp)
+    rac_link_archive_deps(test_plugin_entry_llamacpp)
+    target_compile_features(test_plugin_entry_llamacpp PRIVATE cxx_std_17)
+    add_test(NAME plugin_entry_llamacpp_tests COMMAND test_plugin_entry_llamacpp)
+endif()
+
+if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
+    add_executable(test_plugin_entry_onnx test_plugin_entry_onnx.cpp)
+    target_include_directories(test_plugin_entry_onnx PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_plugin_entry_onnx PRIVATE rac_commons rac_backend_onnx)
+    rac_link_archive_deps(test_plugin_entry_onnx)
+    target_compile_features(test_plugin_entry_onnx PRIVATE cxx_std_17)
+    add_test(NAME plugin_entry_onnx_tests COMMAND test_plugin_entry_onnx)
+endif()
+
 # --- test_core: Always built (no backend dependency) ---
 add_executable(test_core test_core.cpp)
 target_include_directories(test_core PRIVATE
