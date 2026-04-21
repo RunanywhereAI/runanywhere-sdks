@@ -11,6 +11,7 @@
  */
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <mutex>
@@ -23,6 +24,7 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
+#include "plugin_registry_internal.h"
 
 namespace {
 
@@ -41,6 +43,10 @@ struct State {
     std::unordered_map<rac_primitive_t, std::vector<Entry>> by_primitive;
     /** Name → vtable, used for dedup + unregister. */
     std::unordered_map<std::string, const rac_engine_vtable_t*> by_name;
+    /** GAP 03: name → dlopen handle for plugins loaded via
+     *  `rac_registry_load_plugin()`. Statically-registered plugins have no
+     *  entry here. Populated by the loader, drained by `rac_plugin_unregister`. */
+    std::unordered_map<std::string, void*> dl_handles;
 };
 
 State& state() {
@@ -213,6 +219,54 @@ size_t rac_plugin_count(void) {
     auto& s = state();
     std::lock_guard<std::mutex> lock(s.mu);
     return s.by_name.size();
+}
+
+// =============================================================================
+// GAP 03 internal: dl_handle bookkeeping (plugin_registry_internal.h)
+// =============================================================================
+
+void rac_plugin_registry_set_dl_handle(const char* name, void* handle) {
+    if (name == nullptr) return;
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    if (handle == nullptr) {
+        s.dl_handles.erase(name);
+    } else {
+        s.dl_handles[name] = handle;
+    }
+}
+
+void* rac_plugin_registry_take_dl_handle(const char* name) {
+    if (name == nullptr) return nullptr;
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    auto it = s.dl_handles.find(name);
+    if (it == s.dl_handles.end()) return nullptr;
+    void* h = it->second;
+    s.dl_handles.erase(it);
+    return h;
+}
+
+size_t rac_plugin_registry_snapshot_names(const char*** out_names) {
+    if (out_names == nullptr) return 0;
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    size_t n = s.by_name.size();
+    if (n == 0) {
+        *out_names = nullptr;
+        return 0;
+    }
+    auto* arr = static_cast<const char**>(std::malloc(n * sizeof(const char*)));
+    if (arr == nullptr) {
+        *out_names = nullptr;
+        return 0;
+    }
+    size_t i = 0;
+    for (auto& kv : s.by_name) {
+        arr[i++] = strdup(kv.first.c_str());
+    }
+    *out_names = arr;
+    return n;
 }
 
 // =============================================================================

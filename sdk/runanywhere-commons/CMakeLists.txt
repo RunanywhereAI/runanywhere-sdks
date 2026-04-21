@@ -415,6 +415,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/registry/service_registry.cpp
     # GAP 02 Phase 7: unified engine plugin registry (rac_engine_vtable_t).
     src/plugin/rac_plugin_registry.cpp
+    # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
+    src/plugin/plugin_loader.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
@@ -585,6 +587,37 @@ if(RAC_PLATFORM_WINDOWS)
     target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_WINDOWS=1)
     # ws2_32 = Winsock, shlwapi = path utilities
     target_link_libraries(rac_commons PUBLIC ws2_32 shlwapi)
+endif()
+
+# =============================================================================
+# GAP 03: Plugin Loading Mode (static vs. dynamic)
+# =============================================================================
+# Two paths share one plugin entry-point convention:
+#   - STATIC: plugin TUs compiled directly into rac_commons; registration
+#     happens at process start via RAC_STATIC_PLUGIN_REGISTER(<name>).
+#     iOS App Store + WebAssembly forbid dlopen, so they MUST use this path.
+#   - SHARED: plugin TUs build standalone *.so / *.dylib / *.dll loaded at
+#     runtime via rac_registry_load_plugin(path) (dlopen + dlsym).
+#
+# RAC_STATIC_PLUGINS:
+#   ON  → STATIC mode (default on iOS / Emscripten / forced)
+#   OFF → SHARED mode (default on Android / Linux / macOS / Windows)
+if(RAC_PLATFORM_IOS OR EMSCRIPTEN)
+    set(RAC_STATIC_PLUGINS ON CACHE BOOL
+        "Link engine plugins statically into rac_commons (forced ON on iOS/WASM)" FORCE)
+else()
+    option(RAC_STATIC_PLUGINS
+        "Link engine plugins statically into rac_commons (default OFF: use dlopen)" OFF)
+endif()
+
+if(RAC_STATIC_PLUGINS)
+    target_compile_definitions(rac_commons PUBLIC RAC_PLUGIN_MODE_STATIC=1)
+    message(STATUS "Plugin mode: STATIC (engine plugins linked into rac_commons)")
+else()
+    target_compile_definitions(rac_commons PUBLIC RAC_PLUGIN_MODE_SHARED=1)
+    message(STATUS "Plugin mode: SHARED (engine plugins loaded via rac_registry_load_plugin)")
+    # ${CMAKE_DL_LIBS} expands to -ldl on Linux/Android, empty on macOS/Win.
+    target_link_libraries(rac_commons PUBLIC ${CMAKE_DL_LIBS})
 endif()
 
 set_target_properties(rac_commons PROPERTIES
