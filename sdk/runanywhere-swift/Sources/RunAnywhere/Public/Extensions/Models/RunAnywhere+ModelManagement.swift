@@ -194,7 +194,7 @@ extension RunAnywhere {
         }
 
         // Find files with the expected extension in model folder
-        let expectedExtension = model.format.rawValue.lowercased()
+        let expectedExtension = model.format.wireString.lowercased()
         if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
             logger.info("Found model file: \(modelFile.lastPathComponent)")
             return modelFile

@@ -23,7 +23,7 @@ public extension RunAnywhere {
         let models = try await availableModels()
         logger.info("Available models count: \(models.count)")
         for candidate in models where candidate.id == modelId {
-            logger.info("Found model \(candidate.id) with framework: \(candidate.framework.rawValue) (\(candidate.framework.displayName))")
+            logger.info("Found model \(candidate.id) with framework: \(candidate.framework.wireString) (\(candidate.framework.displayName))")
         }
         guard let model = models.first(where: { $0.id == modelId }) else {
             throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")

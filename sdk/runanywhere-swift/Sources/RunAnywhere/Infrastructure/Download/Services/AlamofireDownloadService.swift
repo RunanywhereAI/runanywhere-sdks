@@ -151,7 +151,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
         }
 
         // Get destination path from C++ path utilities
-        logger.info("Computing download path for model: \(model.id), framework: \(model.framework.rawValue) (\(model.framework.displayName))")
+        logger.info("Computing download path for model: \(model.id), framework: \(model.framework.wireString) (\(model.framework.displayName))")
         let destinationFolder = try CppBridge.ModelPaths.getModelFolder(modelId: model.id, framework: model.framework)
         logger.info("Destination folder: \(destinationFolder.path)")
 
@@ -356,7 +356,7 @@ public class AlamofireDownloadService: @unchecked Sendable {
         }
 
         // Fallback: download directly to model folder
-        return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.rawValue)")
+        return modelFolderURL.appendingPathComponent("\(model.id).\(model.format.wireString)")
     }
 
     /// Log download start information

@@ -19,9 +19,10 @@ extension CppBridge {
         /// Convert Swift environment to C++ type
         public static func toC(_ env: SDKEnvironment) -> rac_environment_t {
             switch env {
-            case .development: return RAC_ENV_DEVELOPMENT
-            case .staging: return RAC_ENV_STAGING
-            case .production: return RAC_ENV_PRODUCTION
+            case .development:   return RAC_ENV_DEVELOPMENT
+            case .staging:       return RAC_ENV_STAGING
+            case .production:    return RAC_ENV_PRODUCTION
+            default:             return RAC_ENV_DEVELOPMENT
             }
         }
 

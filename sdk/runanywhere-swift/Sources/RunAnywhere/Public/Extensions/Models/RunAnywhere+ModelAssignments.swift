@@ -80,7 +80,7 @@ public extension RunAnywhere {
         )
 
         let logger = SDKLogger(category: "RunAnywhere.Models")
-        logger.info("Registering model: \(modelId), framework: \(framework.rawValue) (\(framework.displayName))")
+        logger.info("Registering model: \(modelId), framework: \(framework.wireString) (\(framework.displayName))")
         let task = Task {
             do {
                 try await CppBridge.ModelRegistry.shared.save(modelInfo)

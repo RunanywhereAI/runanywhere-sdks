@@ -486,6 +486,11 @@ public enum RunAnywhere {
             // Authenticate via CppBridge.Auth
             try await CppBridge.Auth.authenticate(apiKey: params.apiKey)
             logger.info("Authenticated for \(environment.description)")
+
+        default:
+            // .unspecified / UNRECOGNIZED — treat like development (no auth).
+            await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+            logger.warning("HTTP: unknown environment \(environment.wireString); defaulting to development behavior")
         }
     }
 

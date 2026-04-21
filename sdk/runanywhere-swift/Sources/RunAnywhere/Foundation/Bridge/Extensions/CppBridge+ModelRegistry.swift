@@ -81,7 +81,7 @@ extension CppBridge {
                 throw SDKError.general(.initializationFailed, "Registry not initialized")
             }
 
-            logger.info("Saving model: \(model.id), Swift framework: \(model.framework.rawValue) (\(model.framework.displayName))")
+            logger.info("Saving model: \(model.id), Swift framework: \(model.framework.wireString) (\(model.framework.displayName))")
             var cModel = model.toCModelInfo()
             logger.info("Converted to C++: framework=\(cModel.framework) (expected CoreML=8, Unknown=99)")
             defer { freeCModelInfo(&cModel) }
@@ -125,7 +125,7 @@ extension CppBridge {
                 if let model = models[i] {
                     let cFramework = model.pointee.framework
                     let modelInfo = ModelInfo(from: model.pointee)
-                    logger.debug("Retrieved model: \(modelInfo.id), C++ framework=\(cFramework), Swift framework=\(modelInfo.framework.rawValue)")
+                    logger.debug("Retrieved model: \(modelInfo.id), C++ framework=\(cFramework), Swift framework=\(modelInfo.framework.wireString)")
                     modelInfos.append(modelInfo)
                 }
             }

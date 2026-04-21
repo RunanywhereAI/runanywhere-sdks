@@ -314,9 +314,10 @@ public final class Logging: @unchecked Sendable {
 extension LoggingConfiguration {
     static func forEnvironment(_ environment: SDKEnvironment) -> LoggingConfiguration {
         switch environment {
-        case .development: return .development
-        case .staging: return .staging
-        case .production: return .production
+        case .development:  return .development
+        case .staging:      return .staging
+        case .production:   return .production
+        default:            return .development
         }
     }
 }

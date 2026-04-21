@@ -128,7 +128,7 @@ extension AlamofireDownloadService {
         // Archive type detection is now in C++ — use artifact type if known, otherwise "unknown"
         let archiveTypeString: String
         if case .archive(let type, _, _) = model.artifactType {
-            archiveTypeString = type.rawValue
+            archiveTypeString = type.fileExtension
         } else {
             archiveTypeString = "unknown"
         }

@@ -105,6 +105,10 @@ let package = Package(
         .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
         // WhisperKit for Neural Engine STT
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
+        // swift-protobuf for idl/*.proto generated types consumed by
+        // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift
+        // (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md for rationale)
+        .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.27.0"),
     ],
     targets: [
         // =================================================================
@@ -156,6 +160,7 @@ let package = Package(
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
                 .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",
             ],

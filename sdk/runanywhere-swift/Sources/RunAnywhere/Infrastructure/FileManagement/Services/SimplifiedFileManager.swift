@@ -71,7 +71,7 @@ public class SimplifiedFileManager {
         guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
             throw SDKError.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
         }
-        logger.info("Deleted model: \(modelId) from \(framework.rawValue)")
+        logger.info("Deleted model: \(modelId) from \(framework.wireString)")
     }
 
     // MARK: - Model Discovery
@@ -88,7 +88,7 @@ public class SimplifiedFileManager {
 
         for frameworkFolder in contents {
             // Check if it's a known framework folder
-            guard let framework = InferenceFramework.allCases.first(where: { $0.rawValue == frameworkFolder.lastPathComponent }),
+            guard let framework = InferenceFramework.knownCases.first(where: { $0.wireString == frameworkFolder.lastPathComponent }),
                   isDirectory(at: frameworkFolder) else {
                 continue
             }
