@@ -30,10 +30,18 @@ interface ComponentOutput {
 }
 
 // MARK: - Audio Format
+//
+// GAP 01 Phase 3: canonical AudioFormat. The duplicate definition previously
+// living at `com.runanywhere.sdk.core.AudioFormat` (AudioTypes.kt) has been
+// deleted — there is now exactly one Kotlin AudioFormat.
+// The `toProto()` / `fromProto()` bridges to `ai.runanywhere.proto.v1.AudioFormat`
+// enforce drift-prevention: adding a case requires updating both sides.
 
 /**
- * Audio format enumeration.
- * Mirrors Swift's AudioFormat enum.
+ * Audio format enumeration. Superset of every format historically defined
+ * across the SDK (the old `AudioTypes.kt` flavor added OGG + PCM_16BIT).
+ *
+ * Mirrors the IDL enum `runanywhere.v1.AudioFormat` in `idl/model_types.proto`.
  */
 @Serializable
 enum class AudioFormat(
@@ -42,18 +50,49 @@ enum class AudioFormat(
     PCM("pcm"),
     WAV("wav"),
     MP3("mp3"),
-    AAC("aac"),
-    OGG("ogg"),
     OPUS("opus"),
+    AAC("aac"),
     FLAC("flac"),
+    OGG("ogg"),
+    PCM_16BIT("pcm_16bit"), // Android-specific raw PCM (signed 16-bit LE)
     ;
 
+    /** File extension for this format. */
+    val fileExtension: String get() = rawValue
+
     companion object {
-        fun fromRawValue(value: String): AudioFormat? {
-            return entries.find { it.rawValue.equals(value, ignoreCase = true) }
-        }
+        fun fromRawValue(value: String): AudioFormat? =
+            entries.find { it.rawValue.equals(value, ignoreCase = true) }
     }
+
+    /** Convert to the IDL-generated Wire enum. Drift-preventing bijection. */
+    fun toProto(): ai.runanywhere.proto.v1.AudioFormat =
+        when (this) {
+            PCM       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM
+            WAV       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV
+            MP3       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3
+            OPUS      -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS
+            AAC       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC
+            FLAC      -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC
+            OGG       -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG
+            PCM_16BIT -> ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE
+        }
 }
+
+/** Decode from the IDL-generated Wire enum. Unknown proto cases → null. */
+fun audioFormatFromProto(proto: ai.runanywhere.proto.v1.AudioFormat): AudioFormat? =
+    when (proto) {
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM        -> AudioFormat.PCM
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_WAV        -> AudioFormat.WAV
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_MP3        -> AudioFormat.MP3
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OPUS       -> AudioFormat.OPUS
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_AAC        -> AudioFormat.AAC
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_FLAC       -> AudioFormat.FLAC
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_OGG        -> AudioFormat.OGG
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_PCM_S16LE  -> AudioFormat.PCM_16BIT
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_M4A        -> null // iOS/Dart container, not exposed in Kotlin yet
+        ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED -> null
+    }
 
 // MARK: - SDK Component
 
@@ -117,7 +156,13 @@ enum class SDKComponent(
 /**
  * Supported inference frameworks/runtimes for executing models.
  *
- * Matches iOS InferenceFramework exactly.
+ * GAP 01 Phase 3: this Kotlin enum is a subset of the IDL
+ * `runanywhere.v1.InferenceFramework`; Apple-only frameworks (`CoreML`, `MLX`,
+ * `WhisperKitCoreML`, `MetalRT`) and secondary runtimes (`TFLite`,
+ * `ExecuTorch`, etc.) are present in the proto but intentionally omitted here
+ * until the Kotlin SDK ships support. Adding a case here requires a
+ * corresponding IDL update; the `toProto()` bijection forces the mapping to
+ * stay in sync.
  */
 enum class InferenceFramework(
     val rawValue: String,
@@ -166,18 +211,41 @@ enum class InferenceFramework(
                 UNKNOWN -> "unknown"
             }
 
+    /** Convert to the IDL-generated Wire enum. */
+    fun toProto(): ai.runanywhere.proto.v1.InferenceFramework =
+        when (this) {
+            ONNX               -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+            LLAMA_CPP          -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+            FOUNDATION_MODELS  -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS
+            SYSTEM_TTS         -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+            FLUID_AUDIO        -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
+            GENIE              -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE
+            BUILT_IN           -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN
+            NONE               -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE
+            UNKNOWN            -> ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN
+        }
+
     companion object {
         /** Create from raw string value, matching case-insensitively */
         fun fromRawValue(value: String): InferenceFramework {
             val lowercased = value.lowercase()
-
-            // Try exact match
             entries.find { it.rawValue.equals(value, ignoreCase = true) }?.let { return it }
-
-            // Try analytics key match
             entries.find { it.analyticsKey == lowercased }?.let { return it }
-
             return UNKNOWN
         }
+
+        /** Decode from the IDL-generated Wire enum; unsupported → UNKNOWN. */
+        fun fromProto(proto: ai.runanywhere.proto.v1.InferenceFramework): InferenceFramework =
+            when (proto) {
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_ONNX               -> ONNX
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP          -> LLAMA_CPP
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS  -> FOUNDATION_MODELS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS         -> SYSTEM_TTS
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO        -> FLUID_AUDIO
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_GENIE              -> GENIE
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN           -> BUILT_IN
+                ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_NONE               -> NONE
+                else                                                                              -> UNKNOWN
+            }
     }
 }

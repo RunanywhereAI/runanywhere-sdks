@@ -10,6 +10,16 @@ plugins {
     signing
 }
 
+// GAP 01 Phase 3 note:
+// Wire-generated Kotlin bindings under
+// `src/commonMain/kotlin/com/runanywhere/sdk/generated/` are committed to git
+// and refreshed by `./idl/codegen/generate_kotlin.sh`. The CI drift-check
+// (`.github/workflows/idl-drift-check.yml`) runs the same script and fails on
+// any diff, so a Gradle Wire plugin is not required for correctness. Adding
+// the plugin here causes the Kotlin DSL to clash with `kotlin { jvm() }`
+// source-set resolution under the current `agp 8.11 / kotlin 2.1 / gradle 8.x`
+// combo; revisit once Wire 5.x ships with full KMP DSL support.
+
 // Detekt
 detekt {
     buildUponDefaultConfig = true
@@ -154,6 +164,10 @@ kotlin {
 
                 // Okio for file system operations (replaces Files library from iOS)
                 implementation(libs.okio)
+
+                // Square Wire runtime — used by generated proto bindings
+                // under `com.runanywhere.sdk.generated.ai.runanywhere.proto.v1`.
+                api(libs.wire.runtime)
             }
         }
 

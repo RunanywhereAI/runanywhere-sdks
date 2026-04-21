@@ -27,6 +27,9 @@ composeBom = "2025.08.01"
 coroutines = "1.10.2"
 datetime = "0.7.1"
 kotlinxSerialization = "1.8.0"
+# Square Wire — runtime types + code generator for idl/*.proto consumed by
+# sdk/runanywhere-kotlin (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).
+wire = "4.9.9"
 
 # ============================================================================
 # Testing
@@ -275,6 +278,11 @@ commons-compress = { group = "org.apache.commons", name = "commons-compress", ve
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
+# Square Wire runtime — required by `sdk/runanywhere-kotlin/src/commonMain/
+# kotlin/com/runanywhere/sdk/generated/**` (code emitted by idl/codegen/
+# generate_kotlin.sh or the Wire Gradle plugin).
+wire-runtime = { group = "com.squareup.wire", name = "wire-runtime", version.ref = "wire" }
+
 # ----------------------------------------------------------------------------
 # AI/ML - Speech Recognition
 # ----------------------------------------------------------------------------
@@ -375,3 +383,8 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 # IDE Plugin Development
 # ----------------------------------------------------------------------------
 intellij = { id = "org.jetbrains.intellij", version.ref = "intellij" }
+
+# ----------------------------------------------------------------------------
+# IDL / Codegen (see idl/codegen/generate_kotlin.sh)
+# ----------------------------------------------------------------------------
+wire = { id = "com.squareup.wire", version.ref = "wire" }

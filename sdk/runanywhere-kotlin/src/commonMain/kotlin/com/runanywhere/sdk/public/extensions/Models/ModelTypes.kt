@@ -19,6 +19,9 @@ import kotlinx.serialization.Serializable
 /**
  * Source of model data (where the model info came from).
  * Mirrors Swift ModelSource exactly.
+ *
+ * GAP 01 Phase 3: `toProto()` / `fromProto()` keep this in lock-step with
+ * `runanywhere.v1.ModelSource` in `idl/model_types.proto`.
  */
 @Serializable
 enum class ModelSource(
@@ -29,13 +32,34 @@ enum class ModelSource(
 
     /** Model info was provided locally via SDK input (addModel calls) */
     LOCAL("local"),
+    ;
+
+    fun toProto(): ai.runanywhere.proto.v1.ModelSource =
+        when (this) {
+            REMOTE -> ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_REMOTE
+            LOCAL  -> ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL
+        }
+
+    companion object {
+        fun fromProto(proto: ai.runanywhere.proto.v1.ModelSource): ModelSource =
+            when (proto) {
+                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_REMOTE      -> REMOTE
+                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_LOCAL       -> LOCAL
+                ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_UNSPECIFIED -> LOCAL
+            }
+    }
 }
 
 // MARK: - Model Format
 
 /**
  * Model formats supported.
- * Mirrors Swift ModelFormat exactly.
+ *
+ * GAP 01 Phase 3: subset of the IDL `runanywhere.v1.ModelFormat`; the proto
+ * superset additionally declares {GGML, COREML, MLMODEL, MLPACKAGE, TFLITE,
+ * SAFETENSORS, ZIP, FOLDER, PROPRIETARY}. Adding any of those here requires
+ * no IDL edit; dropping a case here requires the IDL to drop it first (Wire
+ * codegen fails otherwise).
  */
 @Serializable
 enum class ModelFormat(
@@ -47,6 +71,29 @@ enum class ModelFormat(
     BIN("bin"),
     QNN_CONTEXT("qnn_context"),
     UNKNOWN("unknown"),
+    ;
+
+    fun toProto(): ai.runanywhere.proto.v1.ModelFormat =
+        when (this) {
+            ONNX        -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX
+            ORT         -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT
+            GGUF        -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF
+            BIN         -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN
+            QNN_CONTEXT -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_QNN_CONTEXT
+            UNKNOWN     -> ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_UNKNOWN
+        }
+
+    companion object {
+        fun fromProto(proto: ai.runanywhere.proto.v1.ModelFormat): ModelFormat =
+            when (proto) {
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ONNX        -> ONNX
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_ORT         -> ORT
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_GGUF        -> GGUF
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_BIN         -> BIN
+                ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_QNN_CONTEXT -> QNN_CONTEXT
+                else                                                         -> UNKNOWN
+            }
+    }
 }
 
 // MARK: - Model Selection Context
@@ -141,7 +188,10 @@ enum class ModelSelectionContext(
 
 /**
  * Defines the category/type of a model based on its input/output modality.
- * Mirrors Swift ModelCategory exactly.
+ *
+ * GAP 01 Phase 3: the proto superset adds `VOICE_ACTIVITY_DETECTION`; Kotlin
+ * does not yet expose VAD as its own category (uses AUDIO) but the bijection
+ * is kept up-to-date for future expansion without an IDL change.
  */
 @Serializable
 enum class ModelCategory(
@@ -164,6 +214,34 @@ enum class ModelCategory(
     /** Whether this category typically supports thinking/reasoning */
     val supportsThinking: Boolean
         get() = this == LANGUAGE || this == MULTIMODAL
+
+    fun toProto(): ai.runanywhere.proto.v1.ModelCategory =
+        when (this) {
+            LANGUAGE           -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE
+            SPEECH_RECOGNITION -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+            SPEECH_SYNTHESIS   -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            VISION             -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION
+            IMAGE_GENERATION   -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION
+            MULTIMODAL         -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL
+            AUDIO              -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO
+            EMBEDDING          -> ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING
+        }
+
+    companion object {
+        fun fromProto(proto: ai.runanywhere.proto.v1.ModelCategory): ModelCategory =
+            when (proto) {
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_LANGUAGE                 -> LANGUAGE
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION       -> SPEECH_RECOGNITION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS         -> SPEECH_SYNTHESIS
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VISION                   -> VISION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION         -> IMAGE_GENERATION
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_MULTIMODAL               -> MULTIMODAL
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_AUDIO                    -> AUDIO
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_EMBEDDING                -> EMBEDDING
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION -> AUDIO // collapse into AUDIO for now
+                ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED              -> AUDIO // defensive
+            }
+    }
 }
 
 // MARK: - Archive Types
@@ -185,6 +263,14 @@ enum class ArchiveType(
     /** File extension for this archive type */
     val fileExtension: String get() = value
 
+    fun toProto(): ai.runanywhere.proto.v1.ArchiveType =
+        when (this) {
+            ZIP     -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP
+            TAR_BZ2 -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_BZ2
+            TAR_GZ  -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ
+            TAR_XZ  -> ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ
+        }
+
     companion object {
         /** Detect archive type from URL path */
         fun from(path: String): ArchiveType? {
@@ -197,6 +283,15 @@ enum class ArchiveType(
                 else -> null
             }
         }
+
+        fun fromProto(proto: ai.runanywhere.proto.v1.ArchiveType): ArchiveType? =
+            when (proto) {
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_ZIP         -> ZIP
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_BZ2     -> TAR_BZ2
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_GZ      -> TAR_GZ
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_TAR_XZ      -> TAR_XZ
+                ai.runanywhere.proto.v1.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED -> null
+            }
     }
 }
 
@@ -212,6 +307,25 @@ enum class ArchiveStructure(
     DIRECTORY_BASED("directoryBased"),
     NESTED_DIRECTORY("nestedDirectory"),
     UNKNOWN("unknown"),
+    ;
+
+    fun toProto(): ai.runanywhere.proto.v1.ArchiveStructure =
+        when (this) {
+            SINGLE_FILE_NESTED -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED
+            DIRECTORY_BASED    -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED
+            NESTED_DIRECTORY   -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY
+            UNKNOWN            -> ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN
+        }
+
+    companion object {
+        fun fromProto(proto: ai.runanywhere.proto.v1.ArchiveStructure): ArchiveStructure =
+            when (proto) {
+                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED -> SINGLE_FILE_NESTED
+                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED    -> DIRECTORY_BASED
+                ai.runanywhere.proto.v1.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY   -> NESTED_DIRECTORY
+                else                                                                          -> UNKNOWN
+            }
+    }
 }
 
 // MARK: - Expected Model Files

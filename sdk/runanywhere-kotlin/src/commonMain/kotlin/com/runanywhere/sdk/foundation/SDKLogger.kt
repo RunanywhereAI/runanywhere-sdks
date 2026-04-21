@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.foundation
 
+import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -153,14 +154,11 @@ data class LoggingConfiguration(
     }
 }
 
-/**
- * SDK Environment for configuration selection.
- */
-enum class SDKEnvironment {
-    DEVELOPMENT,
-    STAGING,
-    PRODUCTION,
-}
+// GAP 01 Phase 3: the local `enum class SDKEnvironment` that used to live
+// here (3 unlabelled cases) has been removed. The single source of truth is
+// `com.runanywhere.sdk.public.SDKEnvironment`, which carries the
+// `cEnvironment: Int` value used by the C ABI and is driftproofed against
+// `idl/model_types.proto :: SDKEnvironment`.
 
 // =============================================================================
 // LOGGING (CENTRAL SERVICE)

@@ -9,7 +9,7 @@
 package com.runanywhere.sdk.foundation.bridge
 
 import com.runanywhere.sdk.foundation.Logging
-import com.runanywhere.sdk.foundation.SDKEnvironment
+import com.runanywhere.sdk.public.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
