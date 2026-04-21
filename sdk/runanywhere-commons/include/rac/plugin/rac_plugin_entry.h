@@ -37,13 +37,25 @@ extern "C" {
  * Bump when:
  *   - `rac_engine_vtable_t` field layout changes (e.g. a reserved slot is
  *     promoted).
+ *   - `rac_engine_metadata_t` field layout changes.
  *   - A new primitive lands in `rac_primitive.h`.
  *   - Any existing per-domain ops struct (llm_service_ops etc.) grows or
  *     shrinks.
  *
  * Do NOT bump for additive metadata (new flags in `capability_flags`).
+ *
+ * Version history:
+ *   1u (GAP 02) — initial release. 8 primitive slots + 10 reserved slots.
+ *                 Metadata = abi_version, name, display_name, engine_version,
+ *                 priority, capability_flags, reserved_0, reserved_1.
+ *   2u (GAP 04) — replaced metadata.reserved_0/_1 (8 bytes total) with the
+ *                 routing extension: runtimes[] + runtimes_count +
+ *                 formats[] + formats_count (48 bytes total). Plugins built
+ *                 against v1 will be rejected at register time with
+ *                 RAC_ERROR_ABI_VERSION_MISMATCH (the safe outcome — the
+ *                 router would otherwise read garbage for the new fields).
  */
-#define RAC_PLUGIN_API_VERSION 1u
+#define RAC_PLUGIN_API_VERSION 2u
 
 /* ===========================================================================
  * Plugin entry-point signature

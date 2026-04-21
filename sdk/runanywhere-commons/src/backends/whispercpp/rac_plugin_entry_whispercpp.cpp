@@ -13,6 +13,18 @@ extern "C" {
 
 extern const rac_stt_service_ops_t g_whispercpp_stt_ops;
 
+static const rac_runtime_id_t k_whispercpp_runtimes[] = {
+    RAC_RUNTIME_CPU,
+#if defined(__APPLE__)
+    RAC_RUNTIME_METAL,
+#endif
+};
+
+static const uint32_t k_whispercpp_formats[] = {
+    1,  /* MODEL_FORMAT_GGUF */
+    2,  /* MODEL_FORMAT_GGML */
+};
+
 static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
@@ -21,8 +33,10 @@ static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
         .engine_version   = nullptr,
         .priority         = 90,
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = k_whispercpp_runtimes,
+        .runtimes_count   = sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
+        .formats          = k_whispercpp_formats,
+        .formats_count    = sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,

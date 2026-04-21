@@ -32,6 +32,17 @@ static rac_result_t metalrt_capability_check(void) {
 #endif
 }
 
+static const rac_runtime_id_t k_metalrt_runtimes[] = {
+    RAC_RUNTIME_METAL,
+    RAC_RUNTIME_ANE,
+};
+
+static const uint32_t k_metalrt_formats[] = {
+    6,  /* MODEL_FORMAT_COREML    */
+    8,  /* MODEL_FORMAT_MLPACKAGE */
+    1,  /* MODEL_FORMAT_GGUF      — for the LLM ops slot */
+};
+
 static const rac_engine_vtable_t g_metalrt_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
@@ -40,8 +51,10 @@ static const rac_engine_vtable_t g_metalrt_engine_vtable = {
         .engine_version   = nullptr,
         .priority         = 120,  /* Highest — hand-tuned Metal shaders. */
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = k_metalrt_runtimes,
+        .runtimes_count   = sizeof(k_metalrt_runtimes) / sizeof(k_metalrt_runtimes[0]),
+        .formats          = k_metalrt_formats,
+        .formats_count    = sizeof(k_metalrt_formats) / sizeof(k_metalrt_formats[0]),
     },
     /* capability_check */ metalrt_capability_check,
     /* on_unload        */ nullptr,

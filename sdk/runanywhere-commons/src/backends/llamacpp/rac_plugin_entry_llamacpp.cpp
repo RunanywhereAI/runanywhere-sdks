@@ -25,6 +25,30 @@ extern "C" {
 /* Defined in rac_backend_llamacpp_register.cpp (non-static since Phase 8). */
 extern const rac_llm_service_ops_t g_llamacpp_ops;
 
+/* GAP 04 Phase 11: declare which runtimes + model formats this plugin serves
+ * so the EngineRouter can score it against the caller's preferred_runtime
+ * and model format. Apple-only entries are gated by __APPLE__ at the array
+ * level so the table actually shrinks on non-Apple builds. */
+static const rac_runtime_id_t k_llamacpp_runtimes[] = {
+    RAC_RUNTIME_CPU,
+#if defined(__APPLE__)
+    RAC_RUNTIME_METAL,
+#endif
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+    /* Linux / Windows desktop builds may have CUDA. */
+    RAC_RUNTIME_CUDA,
+    RAC_RUNTIME_VULKAN,
+#endif
+};
+
+/* Model formats — proto enum values (runanywhere.v1.ModelFormat) cast to uint32_t.
+ * Reusing the GAP 01 IDL avoids a duplicate enum definition. */
+static const uint32_t k_llamacpp_formats[] = {
+    1,  /* MODEL_FORMAT_GGUF */
+    2,  /* MODEL_FORMAT_GGML */
+    5,  /* MODEL_FORMAT_BIN  */
+};
+
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* metadata */ {
@@ -34,8 +58,10 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
         .engine_version   = nullptr,   /* filled by llama_cpp's own header */
         .priority         = 100,
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = k_llamacpp_runtimes,
+        .runtimes_count   = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
+        .formats          = k_llamacpp_formats,
+        .formats_count    = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,

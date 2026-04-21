@@ -57,6 +57,11 @@ struct rac_diffusion_service_ops;        /* rac/features/diffusion/rac_diffusion
 
 /**
  * @brief Plugin metadata carried in every vtable.
+ *
+ * Layout note: bumped to ABI v2 in GAP 04 Phase 11 — the previous
+ * `reserved_0/_1` (8 bytes) were promoted into the routing-extension fields
+ * below. See `RAC_PLUGIN_API_VERSION` in `rac_plugin_entry.h` for the version
+ * policy.
  */
 typedef struct rac_engine_metadata {
     /** Must equal RAC_PLUGIN_API_VERSION. Mismatch = plugin rejected. */
@@ -85,9 +90,20 @@ typedef struct rac_engine_metadata {
      * decoding, …). See rac_backend_caps.h. */
     uint64_t capability_flags;
 
-    /** Reserved — must be zero. */
-    uint32_t reserved_0;
-    uint32_t reserved_1;
+    /* ─────── GAP 04 routing extension ─────── */
+
+    /** Runtimes this engine can serve (CPU / Metal / CUDA / QNN / …).
+     *  MAY be NULL when the plugin doesn't care about hardware-aware routing
+     *  — the router falls back to priority-only scoring. The pointer must
+     *  reference plugin-owned .rodata; the registry does not copy. */
+    const rac_runtime_id_t* runtimes;
+    size_t                  runtimes_count;
+
+    /** Model file formats this engine accepts (proto-encoded
+     *  `runanywhere.v1.ModelFormat` values cast to uint32_t). MAY be NULL.
+     *  Frontends pass the proto enum value directly via `RouteRequest.format`. */
+    const uint32_t*         formats;
+    size_t                  formats_count;
 } rac_engine_metadata_t;
 
 /**

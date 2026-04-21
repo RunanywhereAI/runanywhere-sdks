@@ -26,6 +26,16 @@ static rac_result_t whisperkit_coreml_capability_check(void) {
 #endif
 }
 
+static const rac_runtime_id_t k_whisperkit_coreml_runtimes[] = {
+    RAC_RUNTIME_COREML,
+    RAC_RUNTIME_ANE,
+};
+
+static const uint32_t k_whisperkit_coreml_formats[] = {
+    6,  /* MODEL_FORMAT_COREML    */
+    8,  /* MODEL_FORMAT_MLPACKAGE */
+};
+
 static const rac_engine_vtable_t g_whisperkit_coreml_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
@@ -34,8 +44,10 @@ static const rac_engine_vtable_t g_whisperkit_coreml_engine_vtable = {
         .engine_version   = nullptr,
         .priority         = 110,  /* Hardware-accelerated, beats CPU backends. */
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = k_whisperkit_coreml_runtimes,
+        .runtimes_count   = sizeof(k_whisperkit_coreml_runtimes) / sizeof(k_whisperkit_coreml_runtimes[0]),
+        .formats          = k_whisperkit_coreml_formats,
+        .formats_count    = sizeof(k_whisperkit_coreml_formats) / sizeof(k_whisperkit_coreml_formats[0]),
     },
     /* capability_check */ whisperkit_coreml_capability_check,
     /* on_unload        */ nullptr,

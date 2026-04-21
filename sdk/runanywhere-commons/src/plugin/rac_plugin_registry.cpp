@@ -288,6 +288,25 @@ const char* rac_primitive_name(rac_primitive_t p) {
     }
 }
 
+const char* rac_runtime_name(rac_runtime_id_t r) {
+    switch (r) {
+        case RAC_RUNTIME_CPU:         return "cpu";
+        case RAC_RUNTIME_METAL:       return "metal";
+        case RAC_RUNTIME_COREML:      return "coreml";
+        case RAC_RUNTIME_ANE:         return "ane";
+        case RAC_RUNTIME_CUDA:        return "cuda";
+        case RAC_RUNTIME_VULKAN:      return "vulkan";
+        case RAC_RUNTIME_OPENCL:      return "opencl";
+        case RAC_RUNTIME_HIPBLAS:     return "hipblas";
+        case RAC_RUNTIME_QNN:         return "qnn";
+        case RAC_RUNTIME_NNAPI:       return "nnapi";
+        case RAC_RUNTIME_WEBGPU:      return "webgpu";
+        case RAC_RUNTIME_WASM_SIMD:   return "wasm_simd";
+        case RAC_RUNTIME_UNSPECIFIED: return "unspecified";
+        default:                      return "unknown";
+    }
+}
+
 const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt,
                                    rac_primitive_t primitive) {
     if (vt == nullptr) return nullptr;

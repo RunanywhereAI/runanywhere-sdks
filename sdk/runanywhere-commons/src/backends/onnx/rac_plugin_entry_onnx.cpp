@@ -23,6 +23,25 @@ extern const rac_stt_service_ops_t g_onnx_stt_ops;
 extern const rac_tts_service_ops_t g_onnx_tts_ops;
 extern const rac_vad_service_ops_t g_onnx_vad_ops;
 
+static const rac_runtime_id_t k_onnx_runtimes[] = {
+    RAC_RUNTIME_CPU,
+#if defined(__APPLE__)
+    RAC_RUNTIME_COREML,
+#endif
+#if !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__EMSCRIPTEN__)
+    RAC_RUNTIME_CUDA,
+#endif
+#if defined(__ANDROID__)
+    RAC_RUNTIME_NNAPI,
+    RAC_RUNTIME_QNN,
+#endif
+};
+
+static const uint32_t k_onnx_formats[] = {
+    3,  /* MODEL_FORMAT_ONNX */
+    4,  /* MODEL_FORMAT_ORT  */
+};
+
 static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
@@ -31,8 +50,10 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
         .engine_version   = nullptr,
         .priority         = 80,          /* STT/TTS second-choice after hardware-accelerated engines */
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = k_onnx_runtimes,
+        .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
+        .formats          = k_onnx_formats,
+        .formats_count    = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,

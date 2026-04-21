@@ -417,6 +417,9 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/plugin/rac_plugin_registry.cpp
     # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
+    # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
+    src/router/rac_hardware_profile.cpp
+    src/router/rac_engine_router.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp

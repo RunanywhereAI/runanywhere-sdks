@@ -65,6 +65,51 @@ typedef enum rac_primitive {
  */
 const char* rac_primitive_name(rac_primitive_t p);
 
+/* ===========================================================================
+ * GAP 04: Runtime identifier (which compute target an engine uses)
+ *
+ * Distinct from rac_primitive_t (which models WHAT the engine does) and from
+ * idl/model_types.proto::ModelFormat (which models the file format). Plugins
+ * declare which runtimes they can serve via the `runtimes[]` metadata field
+ * (added in GAP 04 Phase 11). The router scores plugins higher when the
+ * caller's `preferred_runtime` matches one of the plugin's declared runtimes.
+ *
+ * Order is wire-stable. Add new runtimes in the reserved range only and bump
+ * RAC_PLUGIN_API_VERSION when promoting a reserved value.
+ * =========================================================================== */
+typedef enum rac_runtime_id {
+    RAC_RUNTIME_UNSPECIFIED = 0,
+
+    RAC_RUNTIME_CPU         = 1,   /**< Plain CPU (SIMD ok). */
+    RAC_RUNTIME_METAL       = 2,   /**< Apple Metal compute shaders. */
+    RAC_RUNTIME_COREML      = 3,   /**< Apple Core ML (CPU/GPU/ANE chosen by CoreML). */
+    RAC_RUNTIME_ANE         = 4,   /**< Apple Neural Engine (when explicitly requested). */
+    RAC_RUNTIME_CUDA        = 5,   /**< NVIDIA CUDA. */
+    RAC_RUNTIME_VULKAN      = 6,   /**< Vulkan compute. */
+    RAC_RUNTIME_OPENCL      = 7,   /**< OpenCL. */
+    RAC_RUNTIME_HIPBLAS     = 8,   /**< AMD HIP / ROCm. */
+    RAC_RUNTIME_QNN         = 9,   /**< Qualcomm Hexagon (QNN). */
+    RAC_RUNTIME_NNAPI       = 10,  /**< Android Neural Networks API. */
+    RAC_RUNTIME_WEBGPU      = 11,  /**< Browser WebGPU. */
+    RAC_RUNTIME_WASM_SIMD   = 12,  /**< Browser WebAssembly + SIMD. */
+
+    /* Reserved slots — promote in order, never reorder. */
+    RAC_RUNTIME_RESERVED_13 = 13,
+    RAC_RUNTIME_RESERVED_14 = 14,
+    RAC_RUNTIME_RESERVED_15 = 15,
+    RAC_RUNTIME_RESERVED_16 = 16,
+    RAC_RUNTIME_RESERVED_17 = 17,
+    RAC_RUNTIME_RESERVED_18 = 18,
+    RAC_RUNTIME_RESERVED_19 = 19,
+
+    RAC_RUNTIME_LAST        = 31   /**< Sentinel; never assigned. */
+} rac_runtime_id_t;
+
+/**
+ * Human-readable short name for a runtime. Never returns NULL.
+ */
+const char* rac_runtime_name(rac_runtime_id_t r);
+
 #ifdef __cplusplus
 }
 #endif

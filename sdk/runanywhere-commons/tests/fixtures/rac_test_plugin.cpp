@@ -42,8 +42,10 @@ static const rac_engine_vtable_t g_test_plugin_vtable = {
         .engine_version   = "0.0.0",
         .priority         = 1,
         .capability_flags = 0,
-        .reserved_0       = 0,
-        .reserved_1       = 0,
+        .runtimes         = nullptr,   /* fixture cares about routing-agnostic registration */
+        .runtimes_count   = 0,
+        .formats          = nullptr,
+        .formats_count    = 0,
     },
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
