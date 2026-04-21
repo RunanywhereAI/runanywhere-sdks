@@ -213,7 +213,7 @@ public final class Logging: @unchecked Sendable {
         let entry = LogEntry(
             level: level,
             category: category,
-            message: message,
+            message: sanitizeMessage(message),
             metadata: sanitizeMetadata(metadata),
             deviceInfo: config.includeDeviceMetadata ? DeviceInfo.current : nil
         )
@@ -281,15 +281,41 @@ public final class Logging: @unchecked Sendable {
             output += " | \(metaStr)"
         }
 
-        // Always print when local logging is enabled (controlled by configuration)
-        // The enableLocalLogging flag already controls whether this method is called
-        // swiftlint:disable:next no_print_statements
-        print(output)
+        // Route through os.Logger so the system log privacy controls apply.
+        // Message is already sanitized by sanitizeMessage(); mark .public so it
+        // appears in release Console.app captures without double-redaction.
+        let osLog = Logger(subsystem: "com.runanywhere.sdk", category: entry.category)
+        switch entry.level {
+        case .debug:   osLog.debug("\(output, privacy: .public)")
+        case .info:    osLog.info("\(output, privacy: .public)")
+        case .warning: osLog.warning("\(output, privacy: .public)")
+        case .error:   osLog.error("\(output, privacy: .public)")
+        case .fault:   osLog.fault("\(output, privacy: .public)")
+        }
     }
 
-    // MARK: - Metadata Sanitization
+    // MARK: - Sanitization
 
     private static let sensitivePatterns = ["key", "secret", "password", "token", "auth", "credential"]
+
+    /// Redacts credential values embedded directly in a log message string.
+    /// Handles `key=value`, `key: value`, and HTTP Authorization schemes (`Bearer <token>`).
+    private static let sensitiveMessagePattern: NSRegularExpression? = {
+        // Group 1: keyword  Group 2: separator  Group 3: value (redacted)
+        let pattern = #"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|credential|bearer|basic)(\s*[=:\s]\s*)(\S+)"#
+        return try? NSRegularExpression(pattern: pattern, options: [])
+    }()
+
+    private func sanitizeMessage(_ message: String) -> String {
+        guard let pattern = Self.sensitiveMessagePattern else { return message }
+        let range = NSRange(message.startIndex..., in: message)
+        return pattern.stringByReplacingMatches(
+            in: message,
+            options: [],
+            range: range,
+            withTemplate: "$1$2[REDACTED]"
+        )
+    }
 
     private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         guard let metadata = metadata else { return nil }
