@@ -154,7 +154,12 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
 }
 
 // Static vtable for LlamaCpp
-static const rac_llm_service_ops_t g_llamacpp_ops = {
+//
+// GAP 02 Phase 8: this ops-struct is now also consumed by the unified engine
+// plugin entry point in rac_plugin_entry_llamacpp.cpp. The `static` qualifier
+// has been dropped so the entry point TU can `extern` it; visibility is still
+// limited to the backend library via symbol hiding (the struct is `const`).
+const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
     .generate = llamacpp_vtable_generate,
     .generate_stream = llamacpp_vtable_generate_stream,

@@ -111,7 +111,9 @@ static void llamacpp_vlm_vtable_destroy(void* impl) {
 }
 
 // Static vtable for LlamaCpp VLM
-static const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
+// GAP 02 Phase 8: exposed non-static so rac_plugin_entry_llamacpp_vlm.cpp
+// can extern-reference it when filling the unified engine vtable.
+const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .initialize = llamacpp_vlm_vtable_initialize,
     .process = llamacpp_vlm_vtable_process,
     .process_stream = llamacpp_vlm_vtable_process_stream,

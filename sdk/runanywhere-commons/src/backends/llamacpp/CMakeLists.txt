@@ -126,6 +126,10 @@ set(LLAMACPP_BACKEND_SOURCES
     llamacpp_backend.cpp
     rac_llm_llamacpp.cpp
     rac_backend_llamacpp_register.cpp
+    # GAP 02 Phase 8: unified engine plugin entry point. Coexists with the
+    # legacy rac_backend_llamacpp_register() bootstrap; both wrap the same
+    # ops-struct. See docs/engine_plugin_authoring.md.
+    rac_plugin_entry_llamacpp.cpp
 )
 
 set(LLAMACPP_BACKEND_HEADERS
@@ -140,6 +144,8 @@ if(RAC_VLM_USE_MTMD)
     list(APPEND LLAMACPP_BACKEND_SOURCES
         rac_vlm_llamacpp.cpp
         rac_backend_llamacpp_vlm_register.cpp
+        # GAP 02 Phase 8: unified engine plugin entry point for VLM.
+        rac_plugin_entry_llamacpp_vlm.cpp
     )
     # Add mtmd sources from llama.cpp tools directory
     list(APPEND LLAMACPP_BACKEND_SOURCES
