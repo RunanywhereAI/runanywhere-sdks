@@ -17,12 +17,14 @@
 #include <jni.h>
 
 #include <atomic>
+#include <cmath>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
 #include <new>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <nlohmann/json.hpp>
 
 #ifdef __ANDROID__
@@ -38,6 +40,9 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/routing/rac_router.h"
+#include "rac/routing/rac_routing_types.h"
 #include "rac/features/tts/rac_tts_component.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vlm/rac_vlm_component.h"
@@ -1489,13 +1494,21 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
         return nullptr;
     }
 
-    // Build JSON result
+    // Build JSON result.
+    // Confidence may be NaN when the backend (e.g. Whisper) does not emit a
+    // log-prob signal. JSON has no NaN token, and nlohmann will throw at dump()
+    // unless we normalize it. Serialize NaN as JSON null so the Kotlin side
+    // can distinguish "no signal" from a real low score like 0.0.
     nlohmann::json json_obj;
     json_obj["text"] = result.text ? std::string(result.text) : "";
     json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
     json_obj["duration_ms"] = result.processing_time_ms;
     json_obj["completion_reason"] = 1;  // END_OF_AUDIO
-    json_obj["confidence"] = result.confidence;
+    if (std::isnan(result.confidence) || std::isinf(result.confidence)) {
+        json_obj["confidence"] = nullptr;
+    } else {
+        json_obj["confidence"] = result.confidence;
+    }
     std::string json_result = json_obj.dump();
 
     rac_stt_result_free(&result);
@@ -1568,6 +1581,198 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDetectLa
 JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttSetCallbacks(
     JNIEnv* env, jclass clazz, jobject partialCallback, jobject progressCallback) {
     // TODO: Implement callback registration
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Hybrid Router
+// =============================================================================
+//
+// The router selects one STT backend per request from a set of registered
+// candidates. Each backend is a loaded rac_stt_component; we pull its
+// underlying rac_stt_service_t and hand it to the router. The router then
+// dispatches via that service's existing vtable (ops->transcribe) and
+// reads confidence off the STT result (populated by the backend).
+
+namespace {
+
+// Build a routing descriptor for an STT backend. `conditions` is populated
+// from the scalar flags (local_only / needs_network / cost) so Kotlin does
+// not need to construct condition unions across the JNI boundary.
+void build_stt_descriptor(const char* module_id, const char* module_name, int32_t priority,
+                          const char* inference_framework, bool local_only, bool needs_network,
+                          float cost_cents_per_minute,
+                          std::vector<rac_routing_condition_t>& out_conditions,
+                          rac_backend_descriptor_t& out_descriptor) {
+    out_conditions.clear();
+    if (local_only) {
+        rac_routing_condition_t c = {};
+        c.kind = RAC_COND_LOCAL_ONLY;
+        out_conditions.push_back(c);
+    }
+    if (needs_network) {
+        rac_routing_condition_t c = {};
+        c.kind = RAC_COND_NETWORK_REQUIRED;
+        out_conditions.push_back(c);
+    }
+    if (cost_cents_per_minute > 0.0f) {
+        rac_routing_condition_t c = {};
+        c.kind = RAC_COND_COST_MODEL;
+        c.data.cost_per_minute_cents = cost_cents_per_minute;
+        out_conditions.push_back(c);
+    }
+
+    std::memset(&out_descriptor, 0, sizeof(out_descriptor));
+    std::strncpy(out_descriptor.module_id, module_id ? module_id : "",
+                 sizeof(out_descriptor.module_id) - 1);
+    std::strncpy(out_descriptor.module_name, module_name ? module_name : "",
+                 sizeof(out_descriptor.module_name) - 1);
+    if (inference_framework) {
+        std::strncpy(out_descriptor.inference_framework, inference_framework,
+                     sizeof(out_descriptor.inference_framework) - 1);
+    }
+    out_descriptor.capability      = RAC_ROUTED_CAP_STT;
+    out_descriptor.base_priority   = priority;
+    out_descriptor.conditions      = out_conditions.data();
+    out_descriptor.condition_count = static_cast<int32_t>(out_conditions.size());
+}
+
+}  // namespace
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterRegisterStt(
+    JNIEnv* env, jclass clazz, jlong componentHandle, jstring moduleId, jstring moduleName,
+    jint priority, jboolean isLocalOnly, jboolean needsNetwork, jfloat costCentsPerMinute,
+    jstring inferenceFramework) {
+    if (componentHandle == 0 || moduleId == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    rac_stt_service_t* service =
+        rac_stt_component_get_service(reinterpret_cast<rac_handle_t>(componentHandle));
+    if (!service) {
+        LOGe("racRouterRegisterStt: component has no loaded service");
+        return RAC_ERROR_MODEL_NOT_LOADED;
+    }
+
+    std::string id   = getCString(env, moduleId);
+    std::string name = getCString(env, moduleName);
+    std::string fw   = getCString(env, inferenceFramework);
+
+    std::vector<rac_routing_condition_t> conditions;
+    rac_backend_descriptor_t             descriptor;
+    build_stt_descriptor(id.c_str(), name.c_str(), priority,
+                         fw.empty() ? nullptr : fw.c_str(),
+                         isLocalOnly == JNI_TRUE, needsNetwork == JNI_TRUE,
+                         static_cast<float>(costCentsPerMinute), conditions, descriptor);
+
+    rac_result_t rc = rac_router_register_stt(rac_router_global(), &descriptor, service);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racRouterRegisterStt('%s') failed with %d", id.c_str(), rc);
+    } else {
+        LOGi("racRouterRegisterStt('%s') OK — priority=%d local=%d network=%d", id.c_str(),
+             priority, isLocalOnly == JNI_TRUE ? 1 : 0, needsNetwork == JNI_TRUE ? 1 : 0);
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterUnregisterStt(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jstring moduleId) {
+    if (moduleId == nullptr) return RAC_ERROR_INVALID_PARAMETER;
+    std::string  id = getCString(env, moduleId);
+    rac_result_t rc = rac_router_unregister_stt(rac_router_global(), id.c_str());
+    LOGi("racRouterUnregisterStt('%s') -> %d", id.c_str(), rc);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterSttCount(JNIEnv* env,
+                                                                           jclass clazz) {
+    return static_cast<jint>(rac_router_stt_count(rac_router_global()));
+}
+
+JNIEXPORT jstring JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRouterRunStt(
+    JNIEnv* env, jclass clazz, jboolean isOnline, jint policy, jstring preferredFramework,
+    jbyteArray audioData, jstring optionsJson) {
+    if (audioData == nullptr) return nullptr;
+
+    jsize  len  = env->GetArrayLength(audioData);
+    jbyte* data = env->GetByteArrayElements(audioData, nullptr);
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+
+    // Option parsing mirrors racSttComponentTranscribe. Kept inline (no shared
+    // helper yet) to keep this JNI layer self-contained and auditable.
+    if (optionsJson != nullptr) {
+        const char* json_str = env->GetStringUTFChars(optionsJson, nullptr);
+        if (json_str != nullptr) {
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                if (json.contains("sample_rate") && json["sample_rate"].is_number()) {
+                    int sr = json["sample_rate"].get<int>();
+                    if (sr > 0) options.sample_rate = sr;
+                }
+                if (json.contains("language") && json["language"].is_string()) {
+                    static thread_local std::string lang_buf;
+                    lang_buf         = json["language"].get<std::string>();
+                    options.language = lang_buf.c_str();
+                }
+            } catch (const nlohmann::json::exception& e) {
+                LOGe("racRouterRunStt: failed to parse options JSON: %s", e.what());
+            }
+            env->ReleaseStringUTFChars(optionsJson, json_str);
+        }
+    }
+
+    rac_routing_context_t context = {};
+    context.is_online             = isOnline == JNI_TRUE;
+    context.policy                = static_cast<rac_routing_policy_t>(policy);
+    if (preferredFramework != nullptr) {
+        std::string fw = getCString(env, preferredFramework);
+        std::strncpy(context.preferred_framework, fw.c_str(),
+                     sizeof(context.preferred_framework) - 1);
+    }
+
+    rac_stt_result_t      result = {};
+    rac_routed_metadata_t meta   = {};
+
+    rac_result_t status = rac_router_run_stt(rac_router_global(), &context, data,
+                                             static_cast<size_t>(len), &options, &result, &meta);
+
+    env->ReleaseByteArrayElements(audioData, data, JNI_ABORT);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("racRouterRunStt failed with status=%d", status);
+        rac_stt_result_free(&result);
+        return nullptr;
+    }
+
+    // Serialize result. NaN confidence → JSON null (see racSttComponentTranscribe
+    // for the same handling).
+    nlohmann::json json_obj;
+    json_obj["text"]     = result.text ? std::string(result.text) : "";
+    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["duration_ms"]       = result.processing_time_ms;
+    json_obj["completion_reason"] = 1;  // END_OF_AUDIO
+    if (std::isnan(result.confidence) || std::isinf(result.confidence)) {
+        json_obj["confidence"] = nullptr;
+    } else {
+        json_obj["confidence"] = result.confidence;
+    }
+    json_obj["was_fallback"]     = meta.was_fallback;
+    json_obj["chosen_module_id"] = std::string(meta.chosen_module_id);
+    if (std::isnan(meta.primary_confidence) || std::isinf(meta.primary_confidence)) {
+        json_obj["primary_confidence"] = nullptr;
+    } else {
+        json_obj["primary_confidence"] = meta.primary_confidence;
+    }
+    json_obj["attempt_count"] = meta.attempt_count;
+
+    std::string json_result = json_obj.dump();
+    rac_stt_result_free(&result);
+
+    return env->NewStringUTF(json_result.c_str());
 }
 
 // =============================================================================

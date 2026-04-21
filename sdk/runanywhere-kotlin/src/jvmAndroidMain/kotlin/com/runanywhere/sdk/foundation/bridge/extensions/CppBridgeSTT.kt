@@ -625,6 +625,15 @@ object CppBridgeSTT {
                 "Model loaded successfully: $modelId",
             )
 
+            // Hand the freshly loaded service to the C++ hybrid router so it
+            // becomes a routable backend candidate. Done here (not in the
+            // app) so every consumer of the SDK gets routing for free.
+            // Skipped for the cloud "sarvam:..." pseudo-model since
+            // RouterRegistration owns its own dedicated component for that.
+            if (!modelId.startsWith("sarvam:", ignoreCase = true)) {
+                RouterRegistration.registerLocal(handle, modelName ?: modelId)
+            }
+
             // Update model assignment status
             CppBridgeModelAssignment.setAssignmentStatusCallback(
                 CppBridgeModelRegistry.ModelType.STT,
@@ -882,6 +891,13 @@ object CppBridgeSTT {
                 TAG,
                 "Unloading model: $previousModelId",
             )
+
+            // Drop the router's reference BEFORE the native unload —
+            // otherwise the router would hold a service ptr whose backing
+            // model is gone.
+            if (!previousModelId.startsWith("sarvam:", ignoreCase = true)) {
+                RouterRegistration.unregisterLocal()
+            }
 
             RunAnywhereBridge.racSttComponentUnload(handle)
 
@@ -1279,14 +1295,19 @@ object CppBridgeSTT {
                 ?.toLongOrNull() ?: 0L
         }
 
+        // Returns Float.NaN when the key is missing, explicitly null, or
+        // unparseable. Callers that want "0 when unknown" must check isNaN
+        // themselves — this function never silently substitutes 0 for
+        // "no signal", which would be indistinguishable from a real score
+        // of 0.0.
         fun extractFloat(key: String): Float {
-            val pattern = "\"$key\"\\s*:\\s*(-?[\\d.]+)"
-            val regex = Regex(pattern)
-            return regex
-                .find(json)
-                ?.groupValues
-                ?.get(1)
-                ?.toFloatOrNull() ?: 0f
+            // Match either a numeric value (including scientific notation and
+            // negative exponents) or the literal JSON token `null`.
+            val pattern = "\"$key\"\\s*:\\s*(null|-?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)"
+            val match = Regex(pattern).find(json) ?: return Float.NaN
+            val raw = match.groupValues[1]
+            if (raw == "null") return Float.NaN
+            return raw.toFloatOrNull() ?: Float.NaN
         }
 
         val text = extractString("text")

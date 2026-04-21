@@ -24,6 +24,11 @@ constexpr size_t kMaxAudioBytes = 16000 * 2 * 120;
 // Returns the model string for the API request
 const char* model_string(rac_stt_sarvam_model_t model);
 
+// Normalize a user-provided language code into a Sarvam-accepted value.
+// Accepts "auto"/null/"" -> "unknown"; "en" -> "en-IN"; passes through already
+// qualified codes like "en-IN"; unknown inputs -> "unknown".
+std::string normalize_language_code(const char* in);
+
 // WAV encoding: wraps raw PCM Int16 data in a WAV header
 std::vector<uint8_t> encode_wav(const void* pcm_data, size_t pcm_size, int32_t sample_rate,
                                 int16_t channels, int16_t bits_per_sample);

@@ -3,6 +3,7 @@ package com.runanywhere.sdk.cloud.sarvam
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.core.types.SDKComponent
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.bridge.extensions.RouterRegistration
 
 /**
  * Sarvam AI cloud backend for STT.
@@ -77,6 +78,11 @@ object Sarvam {
 
         isRegistered = true
         logger.info("Sarvam backend registered (STT, cloud)")
+
+        // Now that the C service registry knows how to create a Sarvam STT
+        // service, spin up a dedicated component for it and add it to the
+        // hybrid router as a long-lived candidate.
+        RouterRegistration.registerSarvam()
     }
 
     /**
@@ -84,6 +90,7 @@ object Sarvam {
      */
     fun unregister() {
         if (!isRegistered) return
+        RouterRegistration.unregisterSarvam()
         SarvamBridge.nativeUnregister()
         isRegistered = false
         logger.info("Sarvam backend unregistered")

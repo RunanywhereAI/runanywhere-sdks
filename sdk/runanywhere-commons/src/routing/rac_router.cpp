@@ -130,15 +130,36 @@ extern "C" rac_result_t rac_router_run_stt(rac_router_t*                router,
         out_meta->attempt_count       = 0;
     }
 
-    return cascade(router->stt, *context, out_meta,
-                   [&](const Entry<rac_stt_service_t>& e, float* out_conf) -> rac_result_t {
-                       auto* svc = static_cast<rac_stt_service_t*>(e.impl);
-                       rac_result_t rc =
-                           svc->ops->transcribe(svc->impl, audio_data, audio_size, options,
-                                                out_result);
-                       if (rc == RAC_SUCCESS && out_conf) {
-                           *out_conf = out_result->confidence;
-                       }
-                       return rc;
-                   });
+    // Checkpoint storage for low-confidence fallback preservation.
+    // rac_stt_result_t owns heap strings (text, detected_language) and a words
+    // array — on keep(), move them out of out_result into checkpoint; on
+    // restore(), move back; on drop(), free checkpoint via rac_stt_result_free.
+    rac_stt_result_t checkpoint = {};
+
+    return cascade(
+        router->stt, *context, out_meta,
+        [&](const Entry<rac_stt_service_t>& e, float* out_conf) -> rac_result_t {
+            auto* svc = static_cast<rac_stt_service_t*>(e.impl);
+            // Zero out_result before invoke so a failed call can't leak the
+            // previous candidate's strings into the next attempt.
+            *out_result = rac_stt_result_t{};
+            rac_result_t rc =
+                svc->ops->transcribe(svc->impl, audio_data, audio_size, options, out_result);
+            if (rc == RAC_SUCCESS && out_conf) {
+                *out_conf = out_result->confidence;
+            }
+            return rc;
+        },
+        /*on_keep*/ [&] {
+            checkpoint  = *out_result;
+            *out_result = rac_stt_result_t{};
+        },
+        /*on_restore*/ [&] {
+            *out_result = checkpoint;
+            checkpoint  = rac_stt_result_t{};
+        },
+        /*on_drop*/ [&] {
+            rac_stt_result_free(&checkpoint);
+            checkpoint = rac_stt_result_t{};
+        });
 }

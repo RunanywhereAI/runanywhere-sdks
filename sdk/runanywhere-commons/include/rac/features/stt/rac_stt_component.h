@@ -155,6 +155,25 @@ RAC_API rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
  */
 RAC_API void rac_stt_component_destroy(rac_handle_t handle);
 
+// =============================================================================
+// ROUTER INTEGRATION
+// =============================================================================
+
+/**
+ * @brief Expose the component's underlying STT service instance.
+ *
+ * Returned pointer is owned by the component. Callers use it to hand the
+ * service to the hybrid router (rac_router_register_stt). The pointer is
+ * only valid while the component holds a loaded model — on unload or
+ * destroy, the service is released by the component's lifecycle manager,
+ * so the router MUST be unregistered before either call.
+ *
+ * @param handle Component handle (must have a loaded model)
+ * @return Non-owning pointer to rac_stt_service_t, or NULL if no model is
+ *         loaded or the handle is invalid.
+ */
+RAC_API struct rac_stt_service* rac_stt_component_get_service(rac_handle_t handle);
+
 #ifdef __cplusplus
 }
 #endif

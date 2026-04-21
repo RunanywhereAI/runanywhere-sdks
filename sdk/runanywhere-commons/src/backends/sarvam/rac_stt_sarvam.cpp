@@ -29,6 +29,29 @@ std::mutex& global_api_key_mutex() {
     return mtx;
 }
 
+// Sarvam API accepts only BCP-47-ish codes with -IN suffix, or "unknown".
+// Map common short codes (e.g. "en", "hi") to their Sarvam variants; pass
+// through already-qualified codes; fall back to "unknown" for unrecognized
+// input so the server auto-detects rather than 400s.
+std::string normalize_language_code(const char* in) {
+    if (!in || in[0] == '\0') return "unknown";
+    std::string s(in);
+    if (s == "auto" || s == "unknown") return "unknown";
+    if (s.size() >= 4 && s[2] == '-') return s;  // already "xx-YY"
+    static const std::pair<const char*, const char*> kMap[] = {
+        {"en", "en-IN"},  {"hi", "hi-IN"},  {"bn", "bn-IN"},  {"kn", "kn-IN"},
+        {"ml", "ml-IN"},  {"mr", "mr-IN"},  {"od", "od-IN"},  {"or", "od-IN"},
+        {"pa", "pa-IN"},  {"ta", "ta-IN"},  {"te", "te-IN"},  {"gu", "gu-IN"},
+        {"as", "as-IN"},  {"ur", "ur-IN"},  {"ne", "ne-IN"},  {"kok", "kok-IN"},
+        {"ks", "ks-IN"},  {"sd", "sd-IN"},  {"sa", "sa-IN"},  {"sat", "sat-IN"},
+        {"mni", "mni-IN"},{"brx", "brx-IN"},{"mai", "mai-IN"},{"doi", "doi-IN"},
+    };
+    for (const auto& m : kMap) {
+        if (s == m.first) return m.second;
+    }
+    return "unknown";
+}
+
 const char* model_string(rac_stt_sarvam_model_t model) {
     switch (model) {
         case RAC_STT_SARVAM_MODEL_SAARIKA_V1: return "saarika:v1";
@@ -222,10 +245,13 @@ rac_result_t rac_stt_sarvam_transcribe(rac_handle_t handle, const void* audio_da
     model_field.value = rac::sarvam::model_string(ctx->config.model);
     fields.push_back(std::move(model_field));
 
-    // Language
+    // Language — Sarvam requires "unknown" or BCP-47 with -IN suffix.
+    const std::string normalized_lang = rac::sarvam::normalize_language_code(language);
+    RAC_LOG_INFO(LOG_CAT, "Language normalized: '%s' -> '%s'",
+                 language ? language : "(null)", normalized_lang.c_str());
     rac::sarvam::multipart_field lang_field;
     lang_field.name = "language_code";
-    lang_field.value = language ? language : "en-IN";
+    lang_field.value = normalized_lang;
     fields.push_back(std::move(lang_field));
 
     // Optional: timestamps

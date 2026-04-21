@@ -256,6 +256,92 @@ object RunAnywhereBridge {
     external fun racSttSetCallbacks(frameCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
+    // HYBRID ROUTER (rac_router.h)
+    // ========================================================================
+    //
+    // The router selects one STT backend per request from a set of registered
+    // candidates, applying eligibility conditions, a routing policy, and a
+    // confidence cascade. Backends are plain rac_stt_component handles that
+    // have a model loaded; their underlying service is handed to the router.
+    //
+    // Typical flow:
+    //   1. Create a component per backend, load the model:
+    //        val local = racSttComponentCreate()
+    //        racSttComponentLoadModel(local, whisperPath, "whisper", "Whisper")
+    //   2. Register the component with the router:
+    //        racRouterRegisterStt(local, "whisper-local", "Whisper (local)",
+    //                             priority = 100, isLocalOnly = true,
+    //                             needsNetwork = false, costCentsPerMinute = 0.0f)
+    //   3. Transcribe via the router (picks a candidate, cascades on low
+    //      local confidence, returns JSON with routing metadata):
+    //        val json = racRouterRunStt(
+    //            isOnline = true, policy = 0, preferredFramework = null,
+    //            audioData = bytes, optionsJson = null)
+    //   4. On unload / shutdown, unregister before destroying the component:
+    //        racRouterUnregisterStt("whisper-local")
+
+    /**
+     * Register an STT component's loaded service with the global router.
+     *
+     * @param componentHandle Pointer returned by racSttComponentCreate after a
+     *   successful racSttComponentLoadModel.
+     * @param moduleId Unique identifier (e.g. "whisper-local", "sarvam-cloud").
+     * @param moduleName Human-readable name for logs/UI.
+     * @param priority Base priority; higher wins when both are eligible.
+     * @param isLocalOnly Backend runs on-device; triggers cascade on low
+     *   confidence.
+     * @param needsNetwork Backend requires network connectivity; skipped when
+     *   `isOnline=false` in the routing context.
+     * @param costCentsPerMinute Advisory cost signal; 0 for free/local.
+     * @param inferenceFramework Optional framework name for PREFER_FRAMEWORK
+     *   scoring (e.g. "onnx", "sarvam").
+     * @return rac_result_t; 0 on success.
+     */
+    @JvmStatic
+    external fun racRouterRegisterStt(
+        componentHandle: Long,
+        moduleId: String,
+        moduleName: String,
+        priority: Int,
+        isLocalOnly: Boolean,
+        needsNetwork: Boolean,
+        costCentsPerMinute: Float,
+        inferenceFramework: String?,
+    ): Int
+
+    /** Unregister a previously-registered STT backend. */
+    @JvmStatic
+    external fun racRouterUnregisterStt(moduleId: String): Int
+
+    /** @return count of STT backends currently registered with the router. */
+    @JvmStatic
+    external fun racRouterSttCount(): Int
+
+    /**
+     * Run STT transcription through the router.
+     *
+     * @param isOnline Whether network is available; gates NetworkRequired
+     *   backends.
+     * @param policy Routing policy, matching rac_routing_policy_t:
+     *   0 AUTO, 1 LOCAL_ONLY, 2 CLOUD_ONLY, 3 PREFER_LOCAL,
+     *   4 PREFER_ACCURACY, 5 FRAMEWORK_PREFERRED.
+     * @param preferredFramework Framework name for FRAMEWORK_PREFERRED, else
+     *   null.
+     * @return JSON object on success with keys: `text`, `language`,
+     *   `duration_ms`, `confidence` (number or null for NaN), and routing
+     *   metadata `was_fallback`, `primary_confidence` (number or null),
+     *   `chosen_module_id`. Null on failure.
+     */
+    @JvmStatic
+    external fun racRouterRunStt(
+        isOnline: Boolean,
+        policy: Int,
+        preferredFramework: String?,
+        audioData: ByteArray,
+        optionsJson: String?,
+    ): String?
+
+    // ========================================================================
     // TTS COMPONENT (rac_tts_component.h)
     // ========================================================================
 

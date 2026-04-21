@@ -448,6 +448,14 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
     return RAC_SUCCESS;
 }
 
+extern "C" rac_stt_service_t* rac_stt_component_get_service(rac_handle_t handle) {
+    if (!handle) return nullptr;
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
+    return static_cast<rac_stt_service_t*>(service);
+}
+
 extern "C" rac_bool_t rac_stt_component_supports_streaming(rac_handle_t handle) {
     if (!handle)
         return RAC_FALSE;

@@ -517,8 +517,9 @@ private fun TranscriptionMetricsBar(metrics: TranscriptionMetrics) {
                     label = "RTF",
                     color = if (rtf < 1.0) AppColors.primaryGreen else AppColors.primaryOrange,
                 )
-            } else if (metrics.confidence > 0) {
-                // Show confidence for live mode
+            } else if (!metrics.confidence.isNaN() && metrics.confidence > 0f) {
+                // Show confidence for live mode. NaN = backend emits no signal
+                // (Whisper/CTC); treat like "not available" rather than 0%.
                 MetricItem(
                     icon = Icons.Outlined.CheckCircle,
                     value = "${(metrics.confidence * 100).toInt()}%",
@@ -1122,11 +1123,16 @@ private fun RoutingInfoRow(
                 )
             }
             Column(horizontalAlignment = Alignment.End) {
+                // NaN confidence means "backend did not emit a signal" — e.g.
+                // Whisper/CTC models that skip ys_log_probs. Render as em dash
+                // so it reads differently from a genuine low score.
+                val hasConfidence = !confidence.isNaN()
                 Text(
-                    text = "${(confidence * 100).toInt()}%",
+                    text = if (hasConfidence) "${(confidence * 100).toInt()}%" else "—",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = when {
+                        !hasConfidence -> AppColors.textSecondary
                         confidence >= 0.5f -> AppColors.primaryGreen
                         else -> AppColors.primaryOrange
                     },

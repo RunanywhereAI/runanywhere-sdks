@@ -3,21 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Speech-to-Text operations.
+ *
+ * Routing decisions live in C++ (rac_router_*). This layer only marshals
+ * the request, calls the router, and unpacks the JSON response. There is
+ * no Kotlin-side cascade and no model swap on fallback — concurrent
+ * components are registered with the router by RouterRegistration.
  */
 
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRouter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.RouterPolicy
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.routing.isNetworkAvailable
 import com.runanywhere.sdk.public.extensions.STT.STTOptions
 import com.runanywhere.sdk.public.extensions.STT.STTOutput
 import com.runanywhere.sdk.public.extensions.STT.STTTranscriptionResult
 import com.runanywhere.sdk.public.extensions.STT.TranscriptionMetadata
-import com.runanywhere.sdk.routing.HybridRouterRegistry
-import com.runanywhere.sdk.routing.RoutingContext
+import com.runanywhere.sdk.routing.RoutingPolicy
+import com.runanywhere.sdk.routing.isNetworkAvailable
 
 private val sttLogger = SDKLogger.stt
 
@@ -52,86 +58,52 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
     }
 
     val audioLengthSec = estimateAudioLength(audioData.size)
-    sttLogger.debug("Transcribing audio: ${audioData.size} bytes (${String.format("%.2f", audioLengthSec)}s)")
-
-    val context = RoutingContext(
-        isNetworkAvailable = isNetworkAvailable(),
-        routingPolicy = options.routingPolicy,
-        preferredFramework = options.preferredFramework,
+    sttLogger.debug(
+        "Transcribing audio: ${audioData.size} bytes (${String.format("%.2f", audioLengthSec)}s)"
     )
 
-    val candidates = HybridRouterRegistry.resolveSTT(context)
-    if (candidates.isEmpty()) {
-        throw SDKError.stt(
-            "No STT backend available (network=${context.isNetworkAvailable}, policy=${context.routingPolicy})"
-        )
-    }
-
-    val confidenceThreshold = 0.5f
-
-    var lastError: Throwable? = null
-    for ((index, descriptor) in candidates.withIndex()) {
-        val backend = HybridRouterRegistry.sttBackendFor(descriptor.moduleId) ?: continue
-        try {
-            sttLogger.debug("Routing STT to '${descriptor.moduleId}'")
-            val result = backend.transcribe(audioData, options)
-
-            val confidence = result.confidence
-            val resultWithRouting = result.copy(
-                routingBackendId = descriptor.moduleId,
-                routingBackendName = descriptor.moduleName,
-            )
-
-            sttLogger.info(
-                "Transcription via '${descriptor.moduleId}': " +
-                    "confidence=${"%.2f".format(confidence)}, " +
-                    "text=${result.text.take(50)}${if (result.text.length > 50) "..." else ""}"
-            )
-
-            // Confidence cascade: if local backend scored below threshold and there
-            // are cloud fallbacks available, hand off to the next candidate.
-            // NaN confidence means "no signal available" — do not cascade.
-            if (!confidence.isNaN() &&
-                confidence < confidenceThreshold &&
-                descriptor.isLocalOnly &&
-                index < candidates.lastIndex) {
-                sttLogger.info(
-                    "Confidence ${"%.2f".format(confidence)} < $confidenceThreshold — " +
-                        "cascading to next backend"
-                )
-                val fallbackDescriptor = candidates[index + 1]
-                val fallbackBackend = HybridRouterRegistry.sttBackendFor(fallbackDescriptor.moduleId)
-                if (fallbackBackend != null) {
-                    // Remember the local model so we can restore it after cloud fallback
-                    val previousModelId = CppBridgeSTT.getLoadedModelId()
-                    val previousModelPath = CppBridgeSTT.getLoadedModelPath()
-                    try {
-                        sttLogger.debug("Fallback routing to '${fallbackDescriptor.moduleId}'")
-                        val fallbackResult = fallbackBackend.transcribe(audioData, options)
-                        // Restore the local model after cloud fallback
-                        restoreLocalModel(previousModelId, previousModelPath)
-                        return fallbackResult.copy(
-                            routingBackendId = fallbackDescriptor.moduleId,
-                            routingBackendName = fallbackDescriptor.moduleName,
-                            wasFallback = true,
-                            primaryConfidence = confidence,
-                        )
-                    } catch (e: Exception) {
-                        sttLogger.warn("Fallback '${fallbackDescriptor.moduleId}' failed: ${e.message}")
-                        // Restore the local model even on failure
-                        restoreLocalModel(previousModelId, previousModelPath)
-                    }
-                }
-            }
-
-            return resultWithRouting
-        } catch (e: Exception) {
-            sttLogger.warn("Backend '${descriptor.moduleId}' failed, trying next: ${e.message}")
-            lastError = e
+    val optionsJson = buildString {
+        append('{')
+        append("\"sample_rate\":").append(options.sampleRate)
+        options.language?.let {
+            append(",\"language\":\"").append(escapeJson(it)).append('"')
         }
+        append('}')
     }
 
-    throw lastError ?: SDKError.stt("All STT backends failed")
+    val routed = try {
+        CppBridgeRouter.runStt(
+            isOnline = isNetworkAvailable(),
+            policy = options.routingPolicy.toRouterPolicy(),
+            preferredFramework = options.preferredFramework?.name?.lowercase(),
+            audioData = audioData,
+            optionsJson = optionsJson,
+        )
+    } catch (e: IllegalStateException) {
+        throw SDKError.stt(e.message ?: "Router returned no result")
+    }
+
+    val confStr = if (routed.confidence.isNaN()) "n/a" else "%.2f".format(routed.confidence)
+    sttLogger.info(
+        "Routed to '${routed.chosenModuleId}': confidence=$confStr, " +
+            "fallback=${routed.wasFallback}, attempts=${routed.attemptCount}, " +
+            "text=${routed.text.take(50)}${if (routed.text.length > 50) "..." else ""}"
+    )
+
+    return STTOutput(
+        text = routed.text,
+        confidence = routed.confidence,
+        detectedLanguage = routed.language,
+        metadata = TranscriptionMetadata(
+            modelId = routed.chosenModuleId,
+            processingTime = routed.durationMs / 1000.0,
+            audioLength = audioLengthSec,
+        ),
+        routingBackendId = routed.chosenModuleId,
+        routingBackendName = routed.chosenModuleId,
+        wasFallback = routed.wasFallback,
+        primaryConfidence = if (routed.primaryConfidence.isNaN()) null else routed.primaryConfidence,
+    )
 }
 
 actual suspend fun RunAnywhere.transcribeStream(
@@ -143,6 +115,10 @@ actual suspend fun RunAnywhere.transcribeStream(
         throw SDKError.notInitialized("SDK not initialized")
     }
 
+    // Streaming intentionally bypasses the router. Streaming-cascade across
+    // backends with mid-utterance handoff isn't a meaningful operation —
+    // the cascade only fires on a final confidence score. Streaming uses
+    // whichever local component is currently loaded.
     val audioLengthSec = estimateAudioLength(audioData.size)
 
     val config =
@@ -152,9 +128,9 @@ actual suspend fun RunAnywhere.transcribeStream(
         )
 
     val result =
-        CppBridgeSTT.transcribeStream(audioData, config) { partialText, isFinal ->
+        CppBridgeSTT.transcribeStream(audioData, config) { partialText, _ ->
             onPartialResult(STTTranscriptionResult(transcript = partialText))
-            true // Continue processing
+            true
         }
 
     val metadata =
@@ -188,21 +164,15 @@ actual suspend fun RunAnywhere.stopStreamingTranscription() {
     CppBridgeSTT.cancel()
 }
 
-// Restore local model after cloud fallback so next request can route locally again
-private fun restoreLocalModel(modelId: String?, modelPath: String?) {
-    if (modelId != null && modelPath != null &&
-        (modelId.contains("whisper", ignoreCase = true) || modelId.contains("sherpa", ignoreCase = true))
-    ) {
-        try {
-            sttLogger.debug("Restoring local model: $modelId")
-            CppBridgeSTT.loadModel(modelPath = modelPath, modelId = modelId, modelName = modelId)
-        } catch (e: Exception) {
-            sttLogger.warn("Failed to restore local model: ${e.message}")
-        }
-    }
+private fun RoutingPolicy.toRouterPolicy(): RouterPolicy = when (this) {
+    RoutingPolicy.AUTO                 -> RouterPolicy.AUTO
+    RoutingPolicy.LOCAL_ONLY           -> RouterPolicy.LOCAL_ONLY
+    RoutingPolicy.CLOUD_ONLY           -> RouterPolicy.CLOUD_ONLY
+    RoutingPolicy.PREFER_LOCAL         -> RouterPolicy.PREFER_LOCAL
+    RoutingPolicy.PREFER_ACCURACY      -> RouterPolicy.PREFER_ACCURACY
+    RoutingPolicy.FRAMEWORK_PREFERRED  -> RouterPolicy.FRAMEWORK_PREFERRED
 }
 
-// Private helper
 private fun estimateAudioLength(dataSize: Int): Double {
     val bytesPerSample = 2 // 16-bit
     val sampleRate = 16000.0
@@ -216,3 +186,6 @@ private fun FloatArray.toByteArray(): ByteArray {
     buffer.asFloatBuffer().put(this)
     return buffer.array()
 }
+
+private fun escapeJson(value: String): String =
+    value.replace("\\", "\\\\").replace("\"", "\\\"")

@@ -157,22 +157,45 @@ std::vector<Entry<Vtable>> resolve(Registry<Vtable>& reg, const rac_routing_cont
 }
 
 // Generic cascade. Invoker runs one candidate and reports its confidence.
-// Returns RAC_SUCCESS once a candidate returns a trusted result; fills
-// out_meta when provided.
-template <typename Vtable, typename Invoker>
+//
+// Semantics:
+//   - Stops at the first candidate returning a trusted high-confidence result.
+//   - If a local candidate returns SUCCESS with low confidence, tries more
+//     candidates to improve accuracy. Result slots are owned by the caller and
+//     reused across invokes, so a low-confidence local success is "checkpointed"
+//     via on_keep() before the next attempt; if every later attempt fails,
+//     on_restore() brings the checkpoint back and we return SUCCESS.
+//   - If NO candidate ever returns SUCCESS, returns the last backend's error.
+//
+// Callbacks (all optional, but on_keep/on_restore must be provided together
+// to enable low-confidence fallback preservation):
+//   - on_keep():    save caller-owned result into internal checkpoint storage
+//                   (must take ownership — cascade will not touch it again
+//                   except via on_restore/on_drop)
+//   - on_restore(): write checkpoint back into caller-owned result slot
+//   - on_drop():    free checkpoint storage (called when a later high-conf
+//                   success supersedes the checkpoint)
+template <typename Vtable, typename Invoker, typename OnKeep, typename OnRestore,
+          typename OnDrop>
 rac_result_t cascade(Registry<Vtable>&            reg,
                      const rac_routing_context_t& ctx,
                      rac_routed_metadata_t*       out_meta,
-                     Invoker                      invoke) {
+                     Invoker                      invoke,
+                     OnKeep                       on_keep,
+                     OnRestore                    on_restore,
+                     OnDrop                       on_drop) {
     auto candidates = resolve(reg, ctx);
     if (candidates.empty()) {
         return RAC_ERROR_SERVICE_NOT_AVAILABLE;
     }
 
-    rac_result_t last_error       = RAC_ERROR_SERVICE_NOT_AVAILABLE;
-    float        primary_conf     = std::numeric_limits<float>::quiet_NaN();
-    bool         have_primary     = false;
-    int32_t      attempts         = 0;
+    rac_result_t last_error        = RAC_ERROR_SERVICE_NOT_AVAILABLE;
+    float        primary_conf      = std::numeric_limits<float>::quiet_NaN();
+    bool         have_primary      = false;
+    int32_t      attempts          = 0;
+    bool         have_checkpoint   = false;
+    size_t       checkpoint_index  = 0;
+    float        checkpoint_conf   = std::numeric_limits<float>::quiet_NaN();
 
     for (size_t i = 0; i < candidates.size(); ++i) {
         const auto& e    = candidates[i];
@@ -196,6 +219,7 @@ rac_result_t cascade(Registry<Vtable>&            reg,
         const bool can_cascade = local && low && (i + 1 < candidates.size());
 
         if (!can_cascade) {
+            if (have_checkpoint) on_drop();
             if (out_meta) {
                 std::strncpy(out_meta->chosen_module_id, e.descriptor.module_id,
                              sizeof(out_meta->chosen_module_id) - 1);
@@ -207,12 +231,50 @@ rac_result_t cascade(Registry<Vtable>&            reg,
             return RAC_SUCCESS;
         }
 
+        // Low-confidence local — checkpoint current result and try next.
+        if (have_checkpoint) on_drop();
+        on_keep();
+        have_checkpoint  = true;
+        checkpoint_index = i;
+        checkpoint_conf  = conf;
+
         RAC_LOG_INFO("RAC.ROUTER", "confidence %.2f below threshold, cascading from '%s'",
                      conf, e.descriptor.module_id);
         last_error = RAC_ERROR_SERVICE_NOT_AVAILABLE;
     }
 
+    // Every post-checkpoint attempt failed. Restore the checkpoint if we have
+    // one — a low-confidence answer beats no answer.
+    if (have_checkpoint) {
+        on_restore();
+        const auto& e = candidates[checkpoint_index];
+        RAC_LOG_INFO("RAC.ROUTER",
+                     "cascade exhausted; returning checkpoint '%s' (conf=%.2f)",
+                     e.descriptor.module_id, checkpoint_conf);
+        if (out_meta) {
+            std::strncpy(out_meta->chosen_module_id, e.descriptor.module_id,
+                         sizeof(out_meta->chosen_module_id) - 1);
+            out_meta->chosen_module_id[sizeof(out_meta->chosen_module_id) - 1] = '\0';
+            out_meta->was_fallback       = (checkpoint_index > 0);
+            out_meta->primary_confidence = primary_conf;
+            out_meta->attempt_count      = attempts;
+        }
+        return RAC_SUCCESS;
+    }
+
     return last_error;
+}
+
+// Convenience overload for callers that don't need checkpointing (e.g. ops
+// where the result is trivial to recompute, or where low-confidence fallback
+// doesn't apply).
+template <typename Vtable, typename Invoker>
+rac_result_t cascade(Registry<Vtable>&            reg,
+                     const rac_routing_context_t& ctx,
+                     rac_routed_metadata_t*       out_meta,
+                     Invoker                      invoke) {
+    auto noop = [] {};
+    return cascade(reg, ctx, out_meta, invoke, noop, noop, noop);
 }
 
 }  // namespace rac::routing
