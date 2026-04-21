@@ -399,6 +399,15 @@ extern "C" {
 /** Internal error */
 #define RAC_ERROR_INTERNAL ((rac_result_t) - 805)
 
+/* ─────────── GAP 02: engine plugin errors ─────────── */
+/** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
+#define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
+/** Plugin's `capability_check()` returned non-zero (silent reject; engine
+ *  does not run on this host — e.g. MetalRT on Linux). */
+#define RAC_ERROR_CAPABILITY_UNSUPPORTED ((rac_result_t) - 811)
+/** Plugin registration rejected due to duplicate `metadata.name`. */
+#define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)
+
 // =============================================================================
 // ERROR MESSAGE API
 // =============================================================================

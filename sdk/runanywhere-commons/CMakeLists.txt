@@ -413,6 +413,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
     src/infrastructure/registry/service_registry.cpp
+    # GAP 02 Phase 7: unified engine plugin registry (rac_engine_vtable_t).
+    src/plugin/rac_plugin_registry.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
