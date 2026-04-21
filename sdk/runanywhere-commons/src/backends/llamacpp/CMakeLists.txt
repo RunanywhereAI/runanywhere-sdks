@@ -177,6 +177,30 @@ if(RAC_VLM_USE_MTMD)
     )
 endif()
 
+# GAP 03 Phase 5: dual-mode build of the llama.cpp backend.
+#
+# Two distinct outputs share the same source list:
+#
+#   * `rac_backend_llamacpp`  (existing, legacy) — the per-domain
+#     `rac_service_register_provider()` path, linked PUBLIC against
+#     `rac_commons`. Always built; nothing changes for legacy callers.
+#
+#   * `runanywhere_llamacpp`  (new, GAP 03)      — the same TUs PLUS one
+#     extra .cpp that calls `RAC_STATIC_PLUGIN_REGISTER(llamacpp)` so the
+#     plugin self-registers when (a) statically linked into the host on
+#     iOS / WASM, or (b) loaded as a SHARED library at runtime via
+#     `rac_registry_load_plugin("librunanywhere_llamacpp.so")` on Android /
+#     Linux / macOS / Windows.
+#
+# Build modes:
+#   - RAC_STATIC_PLUGINS=ON:  runanywhere_llamacpp is OBJECT — its sources
+#                             land directly in rac_commons via the `engine`
+#                             target_link path.
+#   - RAC_STATIC_PLUGINS=OFF (default off-iOS): runanywhere_llamacpp is
+#                             SHARED. Installed under the conventional
+#                             librunanywhere_llamacpp.so name so the loader's
+#                             `entry_symbol_from_path()` heuristic resolves
+#                             `rac_plugin_entry_llamacpp`.
 if(RAC_BUILD_SHARED)
     add_library(rac_backend_llamacpp SHARED
         ${LLAMACPP_BACKEND_SOURCES}
@@ -187,6 +211,37 @@ else()
         ${LLAMACPP_BACKEND_SOURCES}
         ${LLAMACPP_BACKEND_HEADERS}
     )
+endif()
+
+if(RAC_STATIC_PLUGINS)
+    # Static-plugins path: add the static-register TU directly to rac_commons.
+    # rac_commons already PUBLIC-links rac_backend_llamacpp (further down this
+    # file) so the static-register symbol resolves at link time.
+    target_sources(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
+    )
+    target_include_directories(rac_commons PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RAC_COMMONS_ROOT_DIR}/include
+    )
+else()
+    # Shared-plugin path: ship a thin SHARED library whose only job is to
+    # carry the rac_plugin_entry_llamacpp symbol + the static-register stub.
+    # The actual op functions live in rac_backend_llamacpp.
+    add_library(runanywhere_llamacpp SHARED
+        ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
+    )
+    set_target_properties(runanywhere_llamacpp PROPERTIES
+        OUTPUT_NAME      runanywhere_llamacpp
+        # Default-visibility on the entry symbol; everything else hidden.
+        C_VISIBILITY_PRESET   hidden
+        CXX_VISIBILITY_PRESET hidden
+    )
+    target_link_libraries(runanywhere_llamacpp PUBLIC
+        rac_backend_llamacpp
+        rac_commons
+    )
+    install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
 endif()
 
 # Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)

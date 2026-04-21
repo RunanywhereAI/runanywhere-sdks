@@ -40,6 +40,85 @@ rac_link_archive_deps(test_legacy_coexistence)
 target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
 add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
 
+# GAP 03 Phase 6: static registration test (always built — exercises the
+# RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
+add_executable(test_static_registration test_static_registration.cpp)
+target_include_directories(test_static_registration PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_static_registration PRIVATE rac_commons)
+rac_link_archive_deps(test_static_registration)
+target_compile_features(test_static_registration PRIVATE cxx_std_17)
+add_test(NAME static_registration_tests COMMAND test_static_registration)
+
+# GAP 03 Phase 6: dynamic loader tests — only meaningful in SHARED-plugins
+# mode. iOS / WASM / RAC_STATIC_PLUGINS=ON skip these targets entirely.
+if(NOT RAC_STATIC_PLUGINS)
+    # Two fixture libraries from one source — the BAD_ABI variant flips a
+    # compile-time toggle so its metadata.abi_version equals host + 99.
+    add_library(rac_test_plugin SHARED fixtures/rac_test_plugin.cpp)
+    set_target_properties(rac_test_plugin PROPERTIES
+        OUTPUT_NAME runanywhere_test_plugin
+        C_VISIBILITY_PRESET hidden
+        CXX_VISIBILITY_PRESET hidden)
+    target_include_directories(rac_test_plugin PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_features(rac_test_plugin PRIVATE cxx_std_17)
+
+    add_library(rac_test_plugin_bad_abi SHARED fixtures/rac_test_plugin.cpp)
+    set_target_properties(rac_test_plugin_bad_abi PROPERTIES
+        OUTPUT_NAME runanywhere_test_plugin_bad_abi
+        C_VISIBILITY_PRESET hidden
+        CXX_VISIBILITY_PRESET hidden)
+    target_include_directories(rac_test_plugin_bad_abi PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_definitions(rac_test_plugin_bad_abi PRIVATE RAC_TEST_PLUGIN_FORCE_BAD_ABI=1)
+    target_compile_features(rac_test_plugin_bad_abi PRIVATE cxx_std_17)
+
+    # Path the test can dlopen at runtime — uses generator expression so it
+    # works in single- and multi-config generators.
+    set(_GAP03_FIXTURE_GOOD "$<TARGET_FILE:rac_test_plugin>")
+    set(_GAP03_FIXTURE_BAD  "$<TARGET_FILE:rac_test_plugin_bad_abi>")
+
+    add_executable(test_plugin_loader test_plugin_loader.cpp)
+    target_include_directories(test_plugin_loader PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_plugin_loader PRIVATE rac_commons)
+    rac_link_archive_deps(test_plugin_loader)
+    target_compile_features(test_plugin_loader PRIVATE cxx_std_17)
+    target_compile_definitions(test_plugin_loader PRIVATE
+        "RAC_TEST_PLUGIN_PATH=\"${_GAP03_FIXTURE_GOOD}\"")
+    add_dependencies(test_plugin_loader rac_test_plugin)
+    add_test(NAME plugin_loader_tests COMMAND test_plugin_loader)
+
+    add_executable(test_plugin_loader_abi_mismatch test_plugin_loader_abi_mismatch.cpp)
+    target_include_directories(test_plugin_loader_abi_mismatch PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_plugin_loader_abi_mismatch PRIVATE rac_commons)
+    rac_link_archive_deps(test_plugin_loader_abi_mismatch)
+    target_compile_features(test_plugin_loader_abi_mismatch PRIVATE cxx_std_17)
+    target_compile_definitions(test_plugin_loader_abi_mismatch PRIVATE
+        "RAC_TEST_PLUGIN_BAD_ABI_PATH=\"${_GAP03_FIXTURE_BAD}\"")
+    add_dependencies(test_plugin_loader_abi_mismatch rac_test_plugin_bad_abi)
+    add_test(NAME plugin_loader_abi_mismatch_tests COMMAND test_plugin_loader_abi_mismatch)
+
+    add_executable(test_plugin_loader_double_load test_plugin_loader_double_load.cpp)
+    target_include_directories(test_plugin_loader_double_load PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_plugin_loader_double_load PRIVATE rac_commons)
+    rac_link_archive_deps(test_plugin_loader_double_load)
+    target_compile_features(test_plugin_loader_double_load PRIVATE cxx_std_17)
+    target_compile_definitions(test_plugin_loader_double_load PRIVATE
+        "RAC_TEST_PLUGIN_PATH=\"${_GAP03_FIXTURE_GOOD}\"")
+    add_dependencies(test_plugin_loader_double_load rac_test_plugin)
+    add_test(NAME plugin_loader_double_load_tests COMMAND test_plugin_loader_double_load)
+endif()
+
 # Per-backend plugin entry tests — only built when the respective backend is on.
 if(RAC_BACKEND_LLAMACPP AND TARGET rac_backend_llamacpp)
     add_executable(test_plugin_entry_llamacpp test_plugin_entry_llamacpp.cpp)

@@ -95,28 +95,68 @@ typedef const rac_engine_vtable_t* (*rac_plugin_entry_fn)(void);
  *
  * Prefer this over manual registration when a static-lib plugin is linked
  * into the host binary. For dynamic plugins (`dlopen`) the host calls
- * `rac_plugin_register_by_symbol()` explicitly.
+ * `rac_registry_load_plugin(path)` from `rac_plugin_loader.h` explicitly.
  *
- * Note: relies on function-local static init order (C++17). C callers
- * using `-std=c99` or `-std=c17` should fall back to calling
- * `rac_plugin_register(rac_plugin_entry_<name>())` from their existing
- * `rac_backend_<name>_register()` bootstrap for ordering control.
+ * ## Linker survival (the iOS / macOS gotcha)
+ *
+ * Apple's linker strips unreferenced TUs from a static archive (.a). The
+ * `Registrar` global below is unreferenced from the host binary's perspective
+ * — so without help, the entire plugin TU vanishes and registration never
+ * runs. Two layers of defense:
+ *
+ *   1. The `[[gnu::used]]` / `__attribute__((used))` attribute on `g_registrar`
+ *      tells the COMPILER to keep the symbol in the object file.
+ *   2. The host binary must additionally tell the LINKER to keep the object
+ *      file. Pick one:
+ *        - macOS / iOS:   `-Wl,-force_load,libplugin.a`
+ *        - GNU / Android: `-Wl,--whole-archive libplugin.a -Wl,--no-whole-archive`
+ *        - MSVC:          add `/INCLUDE:_g_rac_plugin_autoreg_<name>` per plugin
+ *      `cmake/plugins.cmake` (introduced in GAP 07) wraps these into a single
+ *      `rac_force_load(plugin_target)` helper.
+ *
+ * ## Init ordering
+ *
+ * `g_registrar` is a namespace-scope object with non-trivial initialization,
+ * so it runs in its TU's static-init phase before `main()`. `rac_plugin_register`
+ * uses a Meyers singleton (function-local static) for the registry state, so
+ * static-init order across TUs does not matter — the registry materializes
+ * lazily on first use.
+ *
+ * ## C linkage
+ *
+ * Because the macro defines a C++ struct, only C++ TUs may use it. C plugin
+ * authors should put a single C++ shim TU in their plugin (one line:
+ * `RAC_STATIC_PLUGIN_REGISTER(myplugin);`) and keep the rest of the engine in C.
  */
 #ifdef __cplusplus
+
+#  if defined(__GNUC__) || defined(__clang__)
+#    define RAC_STATIC_REGISTRAR_USED_ATTR __attribute__((used))
+#  else
+#    define RAC_STATIC_REGISTRAR_USED_ATTR /* unsupported */
+#  endif
+
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
     namespace rac_plugin_autoreg_##name {                                      \
-        /* Use the constructor/destructor pair so we join at shutdown too. */  \
         struct Registrar {                                                     \
             Registrar() noexcept {                                             \
                 (void)::rac_plugin_register(::rac_plugin_entry_##name());      \
             }                                                                  \
         };                                                                     \
-        static Registrar g_registrar;                                          \
-    }
+        /* `used` keeps the symbol after compiler dead-code analysis; the host \
+         * still has to ask the linker not to drop the .o file (see header     \
+         * docs above for the per-platform link flag). */                      \
+        RAC_STATIC_REGISTRAR_USED_ATTR static Registrar g_registrar;           \
+    }                                                                          \
+    /* Force at least one externally-visible symbol per plugin so the linker  \
+     * can be asked to keep the TU by name without `-force_load`. */          \
+    extern "C" RAC_STATIC_REGISTRAR_USED_ATTR                                  \
+    const char* const rac_plugin_static_marker_##name = #name
+
 #else
 #define RAC_STATIC_PLUGIN_REGISTER(name)                                       \
-    /* Static registration requires C++ linkage — use the C bootstrap         \
-     * helper in rac_backend_<name>_register.cpp instead. */
+    /* Static registration requires C++ linkage — put a one-line C++ shim TU \
+     * in your plugin that calls RAC_STATIC_PLUGIN_REGISTER(<name>). */
 #endif
 
 /* ===========================================================================
