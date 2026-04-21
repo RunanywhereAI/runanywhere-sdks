@@ -214,6 +214,8 @@ set(ONNX_BACKEND_SOURCES
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
     wakeword_onnx.cpp
+    # GAP 02 Phase 9: unified engine plugin entry point.
+    rac_plugin_entry_onnx.cpp
 )
 
 # ONNX embedding provider lives in src/features/rag/ but is compiled here

@@ -156,7 +156,7 @@ static rac_result_t llm_vtable_clear_context(void* impl) {
     return rac_llm_metalrt_clear_context(impl);
 }
 
-static const rac_llm_service_ops_t g_metalrt_llm_ops = {
+const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .initialize = llm_vtable_initialize,
     .generate = llm_vtable_generate,
     .generate_stream = llm_vtable_generate_stream,
@@ -206,7 +206,7 @@ static void stt_vtable_destroy(void* impl) {
     rac_stt_metalrt_destroy(impl);
 }
 
-static const rac_stt_service_ops_t g_metalrt_stt_ops = {
+const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .initialize = stt_vtable_initialize,
     .transcribe = stt_vtable_transcribe,
     .transcribe_stream = nullptr,
@@ -251,7 +251,7 @@ static void tts_vtable_destroy(void* impl) {
     rac_tts_metalrt_destroy(impl);
 }
 
-static const rac_tts_service_ops_t g_metalrt_tts_ops = {
+const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .initialize = tts_vtable_initialize,
     .synthesize = tts_vtable_synthesize,
     .synthesize_stream = nullptr,
@@ -311,7 +311,7 @@ static void vlm_vtable_destroy(void* impl) {
     rac_vlm_metalrt_destroy(impl);
 }
 
-static const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
+const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .initialize = vlm_vtable_initialize,
     .process = vlm_vtable_process,
     .process_stream = vlm_vtable_process_stream,

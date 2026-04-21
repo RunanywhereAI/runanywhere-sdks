@@ -144,7 +144,7 @@ static void onnx_stt_vtable_destroy(void* impl) {
 }
 
 // Static vtable for ONNX STT
-static const rac_stt_service_ops_t g_onnx_stt_ops = {
+const rac_stt_service_ops_t g_onnx_stt_ops = {
     .initialize = onnx_stt_vtable_initialize,
     .transcribe = onnx_stt_vtable_transcribe,
     .transcribe_stream = onnx_stt_vtable_transcribe_stream,
@@ -210,7 +210,7 @@ static void onnx_tts_vtable_destroy(void* impl) {
     }
 }
 
-static const rac_tts_service_ops_t g_onnx_tts_ops = {
+const rac_tts_service_ops_t g_onnx_tts_ops = {
     .initialize = onnx_tts_vtable_initialize,
     .synthesize = onnx_tts_vtable_synthesize,
     .synthesize_stream = onnx_tts_vtable_synthesize_stream,
@@ -373,7 +373,7 @@ static void onnx_vad_vtable_destroy(void* impl) {
     }
 }
 
-static const rac_vad_service_ops_t g_onnx_vad_ops = {
+const rac_vad_service_ops_t g_onnx_vad_ops = {
     .process = onnx_vad_vtable_process,
     .start = onnx_vad_vtable_start,
     .stop = onnx_vad_vtable_stop,

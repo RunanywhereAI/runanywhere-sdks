@@ -103,7 +103,7 @@ static void whispercpp_stt_vtable_destroy(void* impl) {
 }
 
 // Static vtable for WhisperCPP STT
-static const rac_stt_service_ops_t g_whispercpp_stt_ops = {
+const rac_stt_service_ops_t g_whispercpp_stt_ops = {
     .initialize = whispercpp_stt_vtable_initialize,
     .transcribe = whispercpp_stt_vtable_transcribe,
     .transcribe_stream = whispercpp_stt_vtable_transcribe_stream,

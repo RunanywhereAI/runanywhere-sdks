@@ -88,7 +88,7 @@ static void whisperkit_coreml_stt_vtable_destroy(void* impl) {
     }
 }
 
-static const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
+const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
     .initialize = whisperkit_coreml_stt_vtable_initialize,
     .transcribe = whisperkit_coreml_stt_vtable_transcribe,
     .transcribe_stream = whisperkit_coreml_stt_vtable_transcribe_stream,

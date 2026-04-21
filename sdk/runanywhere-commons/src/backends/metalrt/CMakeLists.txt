@@ -30,6 +30,8 @@ set(METALRT_WRAPPER_SOURCES
     rac_tts_metalrt.cpp
     rac_vlm_metalrt.cpp
     rac_backend_metalrt_register.cpp
+    # GAP 02 Phase 9: unified engine plugin entry point.
+    rac_plugin_entry_metalrt.cpp
 )
 
 # Folded into rac_commons as an OBJECT library — no separate artifact to ship.

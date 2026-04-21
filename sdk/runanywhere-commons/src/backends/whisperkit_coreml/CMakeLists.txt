@@ -15,6 +15,8 @@ message(STATUS "Configuring WhisperKit CoreML backend...")
 set(WHISPERKIT_COREML_BACKEND_SOURCES
     rac_stt_whisperkit_coreml.cpp
     rac_backend_whisperkit_coreml_register.cpp
+    # GAP 02 Phase 9: unified engine plugin entry point.
+    rac_plugin_entry_whisperkit_coreml.cpp
 )
 
 if(RAC_BUILD_SHARED)

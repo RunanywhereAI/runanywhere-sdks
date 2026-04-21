@@ -101,6 +101,8 @@ set(WHISPERCPP_BACKEND_SOURCES
     whispercpp_backend.cpp
     rac_stt_whispercpp.cpp
     rac_backend_whispercpp_register.cpp
+    # GAP 02 Phase 9: unified engine plugin entry point.
+    rac_plugin_entry_whispercpp.cpp
 )
 
 set(WHISPERCPP_BACKEND_HEADERS
