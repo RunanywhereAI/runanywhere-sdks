@@ -35,6 +35,10 @@
   "publishConfig": {"access": "public"},
   "engines": {"node": ">=18.0.0"},
   "peerDependencies": {},
+  "dependencies": {
+    "long": "^5.2.3",
+    "protobufjs": "^7.2.6"
+  },
   "tsd": {
     "directory": "src/__tests__"
   },

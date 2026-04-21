@@ -46,6 +46,10 @@
     "expo"
   ],
   "license": "MIT",
+  "dependencies": {
+    "long": "^5.2.3",
+    "protobufjs": "^7.2.6"
+  },
   "peerDependencies": {
     "react": ">=18.0.0",
     "react-native": ">=0.74.0",
