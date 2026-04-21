@@ -1,0 +1,141 @@
+// RunAnywhere v2 IDL — ergonomic solution configs.
+//
+// Solution configs are sugar on top of PipelineSpec. The core converts each
+// solution config into a PipelineSpec internally. Frontends use these for
+// the "20-line developer API" — callers never construct PipelineSpec directly
+// for common use cases.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "SolutionsProto";
+option objc_class_prefix         = "RAV1";
+option swift_prefix              = "RA";
+
+// Top-level union dispatched to the matching solution loader.
+message SolutionConfig {
+    oneof config {
+        VoiceAgentConfig voice_agent = 1;
+        RAGConfig        rag         = 2;
+        WakeWordConfig   wake_word   = 3;
+        AgentLoopConfig  agent_loop  = 4;
+        TimeSeriesConfig time_series = 5;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// VoiceAgent — the canonical streaming voice AI loop.
+// ---------------------------------------------------------------------------
+message VoiceAgentConfig {
+    // Model identifiers — resolved against the model registry.
+    string llm_model_id = 1;     // e.g. "qwen3-4b-q4_k_m"
+    string stt_model_id = 2;     // e.g. "whisper-base"
+    string tts_model_id = 3;     // e.g. "kokoro"
+    string vad_model_id = 4;     // e.g. "silero-v5"
+
+    // Audio configuration.
+    int32  sample_rate_hz = 5;   // default 16000
+    int32  chunk_ms       = 6;   // default 20
+    AudioSource audio_source = 7;
+
+    // Absolute path to an audio file. Required when `audio_source` is
+    // `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
+    string audio_file_path = 15;
+
+    // Barge-in behavior.
+    bool   enable_barge_in = 8;  // default true
+    int32  barge_in_threshold_ms = 9;  // default 200
+
+    // LLM behavior.
+    string system_prompt = 10;
+    int32  max_context_tokens = 11;
+    float  temperature = 12;
+
+    // Emit partial transcripts as UserSaidEvent{is_final=false}.
+    bool   emit_partials = 13;
+
+    // Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
+    bool   emit_thoughts = 14;
+}
+
+enum AudioSource {
+    AUDIO_SOURCE_UNSPECIFIED = 0;
+    AUDIO_SOURCE_MICROPHONE  = 1;   // Platform mic (default)
+    AUDIO_SOURCE_FILE        = 2;   // Path supplied in audio_file_path
+    AUDIO_SOURCE_CALLBACK    = 3;   // Frontend feeds frames via C ABI
+}
+
+// ---------------------------------------------------------------------------
+// RAG — retrieve → rerank → prompt → LLM.
+// ---------------------------------------------------------------------------
+message RAGConfig {
+    string embed_model_id  = 1;    // e.g. "bge-small-en-v1.5"
+    string rerank_model_id = 2;    // e.g. "bge-reranker-v2-m3"
+    string llm_model_id    = 3;
+
+    // Vector store — USearch (in-process HNSW, default) or remote pgvector.
+    VectorStore vector_store = 4;
+    string      vector_store_path = 5;   // Local path for USearch index
+
+    int32  retrieve_k = 6;         // default 24
+    int32  rerank_top = 7;         // default 6
+
+    // BM25 parameters.
+    float  bm25_k1 = 8;            // default 1.2
+    float  bm25_b  = 9;            // default 0.75
+
+    // RRF fusion parameter.
+    int32  rrf_k   = 10;           // default 60
+
+    // Prompt template. Supports {{context}} and {{query}} placeholders.
+    string prompt_template = 11;
+}
+
+enum VectorStore {
+    VECTOR_STORE_UNSPECIFIED = 0;
+    VECTOR_STORE_USEARCH     = 1;  // default, in-process HNSW
+    VECTOR_STORE_PGVECTOR    = 2;  // remote, server deployments only
+}
+
+// ---------------------------------------------------------------------------
+// Wake word — always-on listener that emits a pulse on keyword detection.
+// ---------------------------------------------------------------------------
+message WakeWordConfig {
+    string model_id = 1;           // e.g. "hey-mycroft-v1", "kws-zipformer-gigaspeech"
+    string keyword  = 2;           // Phrase to detect
+    float  threshold = 3;          // 0.0..1.0, engine-dependent
+    int32  pre_roll_ms = 4;        // How much audio to emit before the trigger
+    int32  sample_rate_hz = 5;     // default 16000
+}
+
+// ---------------------------------------------------------------------------
+// Agent loop — multi-turn LLM with tool calling.
+// ---------------------------------------------------------------------------
+message AgentLoopConfig {
+    string llm_model_id = 1;
+    string system_prompt = 2;
+    repeated ToolSpec tools = 3;
+    int32  max_iterations = 4;     // default 10
+    int32  max_context_tokens = 5;
+}
+
+message ToolSpec {
+    string name        = 1;
+    string description = 2;
+    string json_schema = 3;        // Parameters schema, OpenAI-compatible
+}
+
+// ---------------------------------------------------------------------------
+// Time series — window + anomaly_detect + generate_text.
+// ---------------------------------------------------------------------------
+message TimeSeriesConfig {
+    string anomaly_model_id = 1;
+    string llm_model_id     = 2;
+    int32  window_size      = 3;   // Samples per window
+    int32  stride           = 4;
+    float  anomaly_threshold = 5;
+}
