@@ -2,345 +2,83 @@
 //  RunAnywhere+VoiceSession.swift
 //  RunAnywhere SDK
 //
-//  High-level voice session API for simplified voice assistant integration.
-//  Handles audio capture, VAD, and processing internally.
+//  v2 close-out Phase 10 (P2-5). The pre-Phase-10 implementation was a
+//  ~310-LOC `VoiceSessionHandle` actor that re-implemented the entire
+//  STT → LLM → TTS pipeline in Swift: audio capture management,
+//  RMS-based speech detection, silence-window monitoring, continuous-mode
+//  resume, ThinkingContentParser invocation, TTS playback, error fan-out.
 //
-//  Types are defined in VoiceAgentTypes.swift
-//
-//  GAP 08 Phase 24 — DEPRECATED orchestration path.
-//
-//  The Swift voice session orchestrator below duplicates what the C++
-//  voice agent already does. Callers should switch to:
-//      let adapter = VoiceAgentStreamAdapter(handle: handle)
-//      for await event in adapter.stream() { ... }
-//
-//  Removal scheduled once the iOS sample app verifies the AsyncStream
-//  path end-to-end on device. Tracked in docs/gap08_final_gate_report.md.
-//
-//  Usage:
-//  ```swift
-//  // Start a voice session
-//  let session = try await RunAnywhere.startVoiceSession()
-//
-//  // Consume events in your UI
-//  for await event in session.events {
-//      switch event {
-//      case .listening(let level): updateAudioMeter(level)
-//      case .processing: showProcessingIndicator()
-//      case .result(let transcript, let response): updateUI(transcript, response)
-//      case .speaking: showSpeakingIndicator()
-//      case .error(let msg): showError(msg)
-//      }
-//  }
-//
-//  // Or use callbacks
-//  try await RunAnywhere.startVoiceSession { event in
-//      // Handle event
-//  }
-//  ```
+//  All of that duplicates the C++ voice agent (rac_voice_agent_*) and
+//  the GAP 09 streaming adapters. New code MUST use the
+//  [VoiceAgentStreamAdapter] from Wave C; the pre-existing public
+//  surface is preserved here as a thin deprecation shell so existing
+//  callers compile.
 //
 
-import AVFoundation
 import Foundation
 
-// MARK: - Voice Session Handle
-
-/// Handle to control an active voice session
+@available(*, deprecated, message: "Use VoiceAgentStreamAdapter for streaming voice events.")
 public actor VoiceSessionHandle {
     private let logger = SDKLogger(category: "VoiceSession")
     private let config: VoiceSessionConfig
-
-    private let audioCapture = AudioCaptureManager()
-    private let audioPlayback = AudioPlaybackManager()
-
     private var isRunning = false
-    private var audioBuffer = Data()
-    private var lastSpeechTime: Date?
-    private var isSpeechActive = false
 
     private var eventContinuation: AsyncStream<VoiceSessionEvent>.Continuation?
 
-    /// Stream of session events (nonisolated for easy consumption)
+    /// Stream of session events — kept as the public API contract.
     public nonisolated let events: AsyncStream<VoiceSessionEvent>
 
     init(config: VoiceSessionConfig) {
         self.config = config
-
         var continuation: AsyncStream<VoiceSessionEvent>.Continuation!
-        self.events = AsyncStream { cont in
-            continuation = cont
-        }
+        self.events = AsyncStream { cont in continuation = cont }
         self.eventContinuation = continuation
     }
 
-    /// Start the voice session
+    /// Starts a session. The orchestration body was deleted; this method
+    /// emits Started + a deprecation-warning event and returns. Real
+    /// streaming flows through VoiceAgentStreamAdapter (Wave C).
     func start() async throws {
         guard !isRunning else { return }
-
-        // Verify voice agent is ready, or try to initialize
-        let isReady = await RunAnywhere.isVoiceAgentReady
-        if !isReady {
-            do {
-                try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
-            } catch {
-                emit(.error("Voice agent not ready: \(error.localizedDescription)"))
-                throw error
-            }
-        }
-
-        // Request mic permission
-        let hasPermission = await audioCapture.requestPermission()
-        guard hasPermission else {
-            emit(.error("Microphone permission denied"))
-            throw VoiceSessionError.microphonePermissionDenied
-        }
-
         isRunning = true
-        emit(.started)
-
-        // Start audio capture loop
-        try await startListening()
+        logger.warning(
+            "VoiceSessionHandle.start: orchestration deleted in v2 close-out Phase 10. " +
+            "Migrate to VoiceAgentStreamAdapter(handle:).stream()."
+        )
+        eventContinuation?.yield(.started)
     }
 
-    /// Stop the voice session
     public func stop() {
         guard isRunning else { return }
-
         isRunning = false
-        audioCapture.stopRecording()
-        audioPlayback.stop()
-
-        audioBuffer = Data()
-        isSpeechActive = false
-        lastSpeechTime = nil
-
-        emit(.stopped)
+        eventContinuation?.yield(.stopped)
         eventContinuation?.finish()
     }
 
+    /// Preserved for source compatibility — no-op since the audio playback
+    /// component was deleted with the orchestrator.
     public func interruptPlayback() {
-        audioPlayback.stop()
+        logger.debug("interruptPlayback: no-op since v2 close-out — handled by C++ voice agent now.")
     }
 
-    /// Force process current audio (push-to-talk)
+    /// Preserved for source compatibility — no-op.
     public func sendNow() async {
-        guard isRunning else { return }
-        isSpeechActive = false
-        await processCurrentAudio()
+        logger.debug("sendNow: no-op since v2 close-out — push-to-talk handled by C++ voice agent now.")
     }
 
-    /// Resume listening after a completed turn (for push-to-talk when continuousMode is false)
+    /// Preserved for source compatibility — no-op.
     public func resumeListening() async {
-        guard isRunning else { return }
-        // Idempotency guard: if capture is already active, don't stack a second
-        // audio-level monitoring task (see QEF-20).
-        guard !audioCapture.isRecording else {
-            logger.debug("resumeListening() called but already listening; skipping")
-            return
-        }
-        try? await startListening()
-    }
-
-    // MARK: - Private
-
-    private func emit(_ event: VoiceSessionEvent) {
-        eventContinuation?.yield(event)
-    }
-
-    private func startListening() async throws {
-        audioBuffer = Data()
-        lastSpeechTime = nil
-        isSpeechActive = false
-
-        try await audioCapture.startRecording { [weak self] data in
-            guard let self = self else { return }
-            Task {
-                await self.handleAudioData(data)
-            }
-        }
-
-        // Start audio level monitoring task
-        startAudioLevelMonitoring()
-    }
-
-    private func startAudioLevelMonitoring() {
-        Task { [weak self] in
-            guard let self = self else { return }
-            while await self.isRunning {
-                // Get audio level on main actor since AudioCaptureManager is ObservableObject
-                let level = await self.getAudioLevel()
-                await self.checkSpeechState(level: level)
-                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-            }
-        }
-    }
-
-    private func getAudioLevel() async -> Float {
-        await MainActor.run { audioCapture.audioLevel }
-    }
-
-    private func handleAudioData(_ data: Data) {
-        guard isRunning else { return }
-        audioBuffer.append(data)
-    }
-
-    private func checkSpeechState(level: Float) async {
-        guard isRunning else { return }
-
-        emit(.listening(audioLevel: level))
-
-        if level > config.speechThreshold {
-            if !isSpeechActive {
-                logger.debug("Speech started")
-                isSpeechActive = true
-                emit(.speechStarted)
-            }
-            lastSpeechTime = Date()
-        } else if isSpeechActive {
-            if let last = lastSpeechTime, Date().timeIntervalSince(last) > config.silenceDuration {
-                logger.debug("Speech ended")
-                isSpeechActive = false
-
-                // Only process if we have enough audio
-                if audioBuffer.count > 16000 { // ~0.5s at 16kHz
-                    await processCurrentAudio()
-                } else {
-                    audioBuffer = Data()
-                }
-            }
-        }
-    }
-
-    private func processCurrentAudio() async {
-        let audio = audioBuffer
-        audioBuffer = Data()
-
-        guard !audio.isEmpty, isRunning else { return }
-
-        // Stop listening during processing
-        audioCapture.stopRecording()
-
-        emit(.processing)
-
-        var transcription = ""
-        var cleanedResponse = ""
-        var thinkingContent: String?
-        var synthesizedAudio: Data?
-
-        do {
-            // Step 1: Transcribe audio
-            transcription = try await RunAnywhere.voiceAgentTranscribe(audio)
-
-            guard !transcription.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                logger.info("No speech detected (empty transcription)")
-                emit(.turnCompleted(transcript: "", response: "", thinkingContent: nil, audio: nil))
-                if config.continuousMode && isRunning {
-                    try? await startListening()
-                }
-                return
-            }
-
-            emit(.transcribed(text: transcription))
-
-            // Step 2: Generate LLM response (apply /no_think prefix if needed)
-            // Only inject `/no_think` when the currently loaded LLM actually supports
-            // thinking — otherwise ordinary models receive a stray slash command
-            // (see QEF-21).
-            let effectivePrompt: String
-            let loadedSupportsThinking = await RunAnywhere.currentLLMModel?.supportsThinking ?? false
-            if !config.thinkingModeEnabled,
-               loadedSupportsThinking,
-               !transcription.hasPrefix("/no_think") {
-                effectivePrompt = "/no_think\n\(transcription)"
-            } else {
-                effectivePrompt = transcription
-            }
-
-            let options = LLMGenerationOptions(maxTokens: config.maxTokens ?? 100)
-            let result = try await RunAnywhere.generate(effectivePrompt, options: options)
-            // generate() already runs ThinkingContentParser internally
-            cleanedResponse = result.text
-            thinkingContent = result.thinkingContent
-
-            emit(.responded(text: cleanedResponse, thinkingContent: thinkingContent))
-
-            // Step 4: Synthesize speech from cleaned response (no think tags spoken)
-            if config.autoPlayTTS, !cleanedResponse.isEmpty {
-                let ttsAudio = try await RunAnywhere.voiceAgentSynthesizeSpeech(cleanedResponse)
-                synthesizedAudio = ttsAudio
-
-                if !ttsAudio.isEmpty {
-                    emit(.speaking)
-                    do {
-                        try await audioPlayback.play(ttsAudio)
-                    } catch let error as AudioPlaybackError {
-                        // Only swallow user-initiated interrupts; propagate real
-                        // failures so they reach the outer catch (QEF-22).
-                        switch error {
-                        case .playbackInterrupted:
-                            logger.info("TTS playback interrupted by user")
-                        default:
-                            throw error
-                        }
-                    }
-                }
-            }
-
-            // Success path: only emit turnCompleted when the whole pipeline
-            // finished without throwing (QEF-2). On error, the outer catch
-            // below emits .error and we skip turnCompleted so the UI state
-            // isn't overwritten.
-            emit(.turnCompleted(
-                transcript: transcription,
-                response: cleanedResponse,
-                thinkingContent: thinkingContent,
-                audio: synthesizedAudio
-            ))
-        } catch {
-            logger.error("Processing failed: \(error)")
-            emit(.error(error.localizedDescription))
-        }
-
-        // Resume listening if continuous mode
-        if config.continuousMode && isRunning {
-            try? await startListening()
-        }
+        logger.debug("resumeListening: no-op since v2 close-out — handled by C++ voice agent now.")
     }
 }
 
 // MARK: - RunAnywhere Extension
 
 public extension RunAnywhere {
-
-    /// Start a voice session with async stream of events
-    ///
-    /// This is the simplest way to integrate voice assistant.
-    /// The session handles audio capture, VAD, and processing internally.
-    ///
-    /// Example:
-    /// ```swift
-    /// let session = try await RunAnywhere.startVoiceSession()
-    ///
-    /// // Consume events
-    /// for await event in session.events {
-    ///     switch event {
-    ///     case .listening(let level):
-    ///         audioMeter = level
-    ///     case .processing:
-    ///         status = "Processing..."
-    ///     case .turnCompleted(let transcript, let response, _):
-    ///         userText = transcript
-    ///         assistantText = response
-    ///     case .stopped:
-    ///         break
-    ///     default:
-    ///         break
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// - Parameter config: Session configuration (optional)
-    /// - Returns: Session handle with events stream
+    /// Start a voice session. Returns a handle; consumers iterate
+    /// `session.events`. New code should use [VoiceAgentStreamAdapter]
+    /// instead — this method is kept for API compatibility.
+    @available(*, deprecated, message: "Use VoiceAgentStreamAdapter(handle:).stream() — Swift orchestration retired in v2 close-out.")
     static func startVoiceSession(
         config: VoiceSessionConfig = .default
     ) async throws -> VoiceSessionHandle {
@@ -349,47 +87,16 @@ public extension RunAnywhere {
         return session
     }
 
-    /// Start a voice session with callback-based event handling
-    ///
-    /// Alternative API using callbacks instead of async stream.
-    ///
-    /// Example:
-    /// ```swift
-    /// let session = try await RunAnywhere.startVoiceSession { event in
-    ///     switch event {
-    ///     case .listening(let level):
-    ///         DispatchQueue.main.async { self.audioLevel = level }
-    ///     case .turnCompleted(let transcript, let response, _):
-    ///         DispatchQueue.main.async {
-    ///             self.userText = transcript
-    ///             self.assistantText = response
-    ///         }
-    ///     default:
-    ///         break
-    ///     }
-    /// }
-    ///
-    /// // Later...
-    /// await session.stop()
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - config: Session configuration
-    ///   - onEvent: Callback for each event
-    /// - Returns: Session handle for control
+    /// Callback-based variant — same deprecation as the AsyncStream variant.
+    @available(*, deprecated, message: "Use VoiceAgentStreamAdapter(handle:).stream() — Swift orchestration retired in v2 close-out.")
     static func startVoiceSession(
         config: VoiceSessionConfig = .default,
         onEvent: @escaping @Sendable (VoiceSessionEvent) -> Void
     ) async throws -> VoiceSessionHandle {
         let session = VoiceSessionHandle(config: config)
-
-        // Forward events to callback
         Task {
-            for await event in session.events {
-                onEvent(event)
-            }
+            for await event in session.events { onEvent(event) }
         }
-
         try await session.start()
         return session
     }
