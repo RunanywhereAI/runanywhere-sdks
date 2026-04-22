@@ -129,6 +129,10 @@ endif()
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
     enable_testing()
+    # GAP 09 / v2 close-out Phase 4 — cross-SDK parity test harness.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/streaming/CMakeLists.txt")
+        add_subdirectory(tests/streaming)
+    endif()
 endif()
 
 # =============================================================================
