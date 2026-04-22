@@ -72,18 +72,28 @@ class VoiceAgentStreamAdapter(private val handle: Long) {
         private const val INVALID_CALLBACK_ID: Long = 0L
 
         init {
-            System.loadLibrary("rac_commons")
+            // Load the same JNI .so that RunAnywhereBridge uses
+            // (runanywhere_commons_jni → libruneanywhere_jni.so on Android).
+            // The nativeRegister/Unregister thunks live in
+            // sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp.
+            System.loadLibrary("runanywhere_jni")
         }
 
         /**
-         * JNI bridge: registers a Kotlin function as the proto-byte
-         * callback for [handle], returning an opaque callbackId used to
-         * deregister.
+         * JNI bridge: registers a Kotlin lambda as the proto-byte callback
+         * for [handle]. The thunk stores the lambda in a global ref +
+         * context object, then calls `rac_voice_agent_set_proto_callback`
+         * with a C trampoline that re-dispatches bytes back to the JVM.
          *
-         * Implementation lives in the JNI bridge .cpp under
-         * `sdk/runanywhere-commons/src/infrastructure/jni_bridge/`. Until
-         * the bridge ships, this declaration links against an `external`
-         * symbol provided by the JNI .so loaded above.
+         * Returns an opaque `callbackId` (the context pointer cast to jlong);
+         * [nativeUnregisterCallback] uses it to null the C callback and
+         * release the global ref. Returns 0 on failure.
+         *
+         * Note: the underlying C ABI keeps exactly **one** proto callback
+         * slot per handle. Multiple concurrent stream() calls on the same
+         * handle will therefore REPLACE each other, not fan out. True
+         * multi-subscriber fan-out would require an ABI extension (not in
+         * v2 scope).
          */
         @JvmStatic
         external fun nativeRegisterCallback(
