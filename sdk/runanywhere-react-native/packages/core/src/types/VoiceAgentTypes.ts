@@ -6,6 +6,16 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/
  */
 
+// Proto types from the canonical ts-proto output. The mappers below
+// (voiceSessionEventFromProto, voiceSessionEventKindFromProto) are
+// derived views — they take a VoiceEvent and project it into the
+// legacy UX-shaped enums.
+import {
+  PipelineState,
+  VADEventType,
+  VoiceEvent,
+} from '../generated/voice_events';
+
 /**
  * Component load state
  */
@@ -128,21 +138,140 @@ export interface VoiceSessionEvent {
  *
  * Returns `null` for proto events that don't have a UX-visible
  * counterpart — see `docs/migrations/VoiceSessionEvent.md` for the
- * full dropout list (metrics, interrupted, low-level VAD, state=thinking).
+ * full dropout list (metrics, interrupted, low-level VAD BARGE_IN/
+ * SILENCE, state=THINKING).
  *
- * **v2.1-1 SCAFFOLD**: parameter type is `unknown` (not `VoiceEvent`)
- * because importing the generated proto type here would couple this
- * public-API file to the codegen output layout. The v2.1-1d per-SDK
- * cleanup PR tightens the parameter type when it implements the mapper
- * body. Today this returns null for every input; new code should use
- * the proto stream directly via `VoiceAgentStreamAdapter.stream()`.
+ * v3-readiness Phase A7: ported 1:1 from the Swift template at
+ * `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`
+ * `VoiceSessionEvent.from(_:)`.
+ *
+ * Note on RN-vs-Swift shape divergence: this SDK's `VoiceSessionEvent`
+ * is a flat `{ type, timestamp, data }` interface (legacy RN style),
+ * not the 10-case discriminated union Swift/Kotlin/Dart use. The
+ * mapping therefore maps to the RN-specific `VoiceSessionEventType`
+ * values:
+ *   userSaid         → 'transcriptionComplete'
+ *   assistantToken   → 'responseGenerated'
+ *   audio            → 'speechSynthesized'
+ *   vad VOICE_START  → 'speechDetected'
+ *   state IDLE       → 'started'
+ *   state STOPPED    → 'ended'
+ *   error            → 'error'
+ *   others           → null
+ *
+ * Use {@link voiceSessionEventKindFromProto} if you want the richer
+ * `VoiceSessionEventKind` discriminated-union shape that matches Swift.
  *
  * @deprecated v2.1-1: Use the codegen'd `VoiceEvent` proto directly.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function voiceSessionEventFromProto(event: unknown): VoiceSessionEvent | null {
-  // TODO(v2.1-1d): implement per the Swift template at
-  // sdk/runanywhere-swift/.../VoiceAgentTypes.swift
+export function voiceSessionEventFromProto(
+  event: VoiceEvent,
+): VoiceSessionEvent | null {
+  const timestamp =
+    typeof event.timestampUs === 'number' && event.timestampUs > 0
+      ? Math.floor(event.timestampUs / 1000)
+      : Date.now();
+
+  if (event.userSaid !== undefined) {
+    return {
+      type: 'transcriptionComplete',
+      timestamp,
+      data: { transcription: event.userSaid.text },
+    };
+  }
+  if (event.assistantToken !== undefined) {
+    return {
+      type: 'responseGenerated',
+      timestamp,
+      data: { response: event.assistantToken.text },
+    };
+  }
+  if (event.audio !== undefined) {
+    return { type: 'speechSynthesized', timestamp };
+  }
+  if (event.vad !== undefined) {
+    if (event.vad.type === VADEventType.VAD_EVENT_VOICE_START) {
+      return { type: 'speechDetected', timestamp };
+    }
+    // VOICE_END_OF_UTTERANCE, BARGE_IN, SILENCE, UNSPECIFIED have no
+    // UX counterpart in this flat interface.
+    return null;
+  }
+  if (event.state !== undefined) {
+    if (event.state.current === PipelineState.PIPELINE_STATE_IDLE) {
+      return { type: 'started', timestamp };
+    }
+    if (event.state.current === PipelineState.PIPELINE_STATE_STOPPED) {
+      return { type: 'ended', timestamp };
+    }
+    // LISTENING, SPEAKING, THINKING have no counterpart in this flat
+    // interface (use voiceSessionEventKindFromProto instead).
+    return null;
+  }
+  if (event.error !== undefined) {
+    return {
+      type: 'error',
+      timestamp,
+      data: { error: event.error.message },
+    };
+  }
+  // interrupted, metrics, or no-payload → null.
+  return null;
+}
+
+/**
+ * Derive the richer {@link VoiceSessionEventKind} discriminated-union
+ * from the canonical `VoiceEvent` proto.
+ *
+ * Unlike {@link voiceSessionEventFromProto} (which maps to the flat
+ * legacy interface), this variant matches the 10-case shape Swift +
+ * Kotlin + Dart all use so cross-SDK consumers can share the same
+ * exhaustive-switch pattern.
+ *
+ * @deprecated v2.1-1: Use the codegen'd `VoiceEvent` proto directly.
+ */
+export function voiceSessionEventKindFromProto(
+  event: VoiceEvent,
+): VoiceSessionEventKind | null {
+  if (event.userSaid !== undefined) {
+    return { type: 'transcribed', text: event.userSaid.text };
+  }
+  if (event.assistantToken !== undefined) {
+    return { type: 'responded', text: event.assistantToken.text };
+  }
+  if (event.audio !== undefined) {
+    return { type: 'speaking' };
+  }
+  if (event.vad !== undefined) {
+    if (event.vad.type === VADEventType.VAD_EVENT_VOICE_START) {
+      return { type: 'speechStarted' };
+    }
+    if (event.vad.type === VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+      return { type: 'processing' };
+    }
+    return null; // BARGE_IN, SILENCE, UNSPECIFIED
+  }
+  if (event.state !== undefined) {
+    switch (event.state.current) {
+      case PipelineState.PIPELINE_STATE_IDLE:
+        return { type: 'started' };
+      case PipelineState.PIPELINE_STATE_LISTENING:
+        return { type: 'listening', audioLevel: 0 };
+      case PipelineState.PIPELINE_STATE_SPEAKING:
+        return { type: 'speaking' };
+      case PipelineState.PIPELINE_STATE_STOPPED:
+        return { type: 'stopped' };
+      default:
+        return null; // THINKING, UNSPECIFIED
+    }
+  }
+  if (event.error !== undefined) {
+    return { type: 'error', message: event.error.message };
+  }
+  // interrupted, metrics, or no-payload → null. The 'turnCompleted'
+  // kind is intentionally unreachable here — it aggregates multiple
+  // proto events across a turn and cannot be derived from a single
+  // VoiceEvent.
   return null;
 }
 
