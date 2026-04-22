@@ -166,14 +166,52 @@ static void onnx_embed_vtable_destroy(void* impl) {
     }
 }
 
-static const rac_embeddings_service_ops_t g_onnx_embeddings_ops = {
+// v3 Phase B7: ONNX embeddings `create` adapter. Allocates an
+// onnx_embeddings_handle wrapping ONNXEmbeddingProvider. Called by
+// commons rac_embeddings_create() via rac_plugin_route → g_onnx_engine_vtable
+// (embedding_ops slot).
+static rac_result_t onnx_embed_create_impl(const char* model_id,
+                                           const char* config_json,
+                                           void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "onnx_embed_create_impl: model=%s", model_id);
+    try {
+        auto handle = std::make_unique<onnx_embeddings_handle>();
+        const char* cfg = (config_json && config_json[0] != '\0') ? config_json : "";
+        handle->provider =
+            std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_id, cfg);
+        if (!handle->provider->is_ready()) {
+            RAC_LOG_ERROR(LOG_CAT, "ONNX embedding provider not ready after init");
+            return RAC_ERROR_BACKEND_NOT_READY;
+        }
+        RAC_LOG_INFO(LOG_CAT, "ONNX embeddings backend created (dim=%zu)",
+                     handle->provider->dimension());
+        *out_impl = handle.release();
+        return RAC_SUCCESS;
+    } catch (const std::exception& e) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX embeddings: %s", e.what());
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+}
+
+}  // namespace
+
+// Exposed non-static so rac_plugin_entry_onnx.cpp can extern-reference it
+// to fill the unified g_onnx_engine_vtable.embedding_ops slot. Follows
+// the same pattern as g_onnx_{stt,tts,vad}_ops in the sibling
+// engines/onnx/rac_backend_onnx_register.cpp.
+extern "C" const rac_embeddings_service_ops_t g_onnx_embeddings_ops = {
     .initialize = onnx_embed_vtable_initialize,
     .embed = onnx_embed_vtable_embed,
     .embed_batch = onnx_embed_vtable_embed_batch,
     .get_info = onnx_embed_vtable_get_info,
     .cleanup = onnx_embed_vtable_cleanup,
     .destroy = onnx_embed_vtable_destroy,
+    .create = onnx_embed_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // REGISTRY STATE
@@ -191,87 +229,12 @@ OnnxEmbeddingsRegistryState& get_onnx_embed_state() {
     return state;
 }
 
-// =============================================================================
-// SERVICE PROVIDER IMPLEMENTATION
-// =============================================================================
-
-rac_bool_t onnx_embeddings_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (!request)
-        return RAC_FALSE;
-
-    if (request->framework == RAC_FRAMEWORK_ONNX)
-        return RAC_TRUE;
-
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN)
-        return RAC_FALSE;
-
-    const char* path = request->model_path ? request->model_path : request->identifier;
-    if (!path || path[0] == '\0')
-        return RAC_FALSE;
-
-    size_t len = strlen(path);
-    if (len >= 5) {
-        const char* ext = path + len - 5;
-        if (strcmp(ext, ".onnx") == 0 || strcmp(ext, ".ONNX") == 0)
-            return RAC_TRUE;
-    }
-
-    if (std::filesystem::is_directory(path)) {
-        auto model_file = std::filesystem::path(path) / "model.onnx";
-        if (std::filesystem::exists(model_file))
-            return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
-}
-
-rac_handle_t onnx_embeddings_create_service(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (!request)
-        return nullptr;
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (!model_path || model_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "No model path provided");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX embeddings service for: %s", model_path);
-
-    try {
-        auto* handle = new onnx_embeddings_handle();
-        const char* cfg = request->config_json ? request->config_json : "";
-        handle->provider =
-            std::make_unique<runanywhere::rag::ONNXEmbeddingProvider>(model_path, cfg);
-
-        if (!handle->provider->is_ready()) {
-            RAC_LOG_ERROR(LOG_CAT, "ONNX embedding provider not ready after init");
-            delete handle;
-            return nullptr;
-        }
-
-        auto* service =
-            static_cast<rac_embeddings_service_t*>(malloc(sizeof(rac_embeddings_service_t)));
-        if (!service) {
-            delete handle;
-            return nullptr;
-        }
-
-        service->ops = &g_onnx_embeddings_ops;
-        service->impl = handle;
-        service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-        RAC_LOG_INFO(LOG_CAT, "ONNX embeddings service created (dim=%zu)",
-                     handle->provider->dimension());
-        return service;
-    } catch (const std::exception& e) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX embeddings: %s", e.what());
-        return nullptr;
-    }
-}
+// v3 Phase B7: legacy rac_service_request_t factories removed.
+// Model-format gating (.onnx / directory containing model.onnx /
+// RAC_FRAMEWORK_ONNX) lives in g_onnx_engine_vtable.metadata.formats
+// in engines/onnx/rac_plugin_entry_onnx.cpp. Backend impl allocation
+// goes through g_onnx_embeddings_ops.create (onnx_embed_create_impl
+// defined above).
 
 }  // namespace
 
@@ -302,22 +265,12 @@ rac_result_t rac_backend_onnx_embeddings_register(void) {
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED)
         return result;
 
-    rac_service_provider_t provider = {};
-    provider.name = state.provider_name;
-    provider.capability = RAC_CAPABILITY_EMBEDDINGS;
-    provider.priority = 100;
-    provider.can_handle = onnx_embeddings_can_handle;
-    provider.create = onnx_embeddings_create_service;
-    provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-
+    // v3 Phase B7: embeddings plugin registration flows through the
+    // unified g_onnx_engine_vtable (embedding_ops slot) in
+    // rac_plugin_entry_onnx.cpp.
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX embeddings backend registered");
+    RAC_LOG_INFO(LOG_CAT, "ONNX embeddings backend registered (module_register only; "
+                          "plugin registration via rac_plugin_entry_onnx)");
     return RAC_SUCCESS;
 }
 
@@ -328,7 +281,6 @@ rac_result_t rac_backend_onnx_embeddings_unregister(void) {
     if (!state.registered)
         return RAC_ERROR_MODULE_NOT_FOUND;
 
-    rac_service_unregister_provider(state.provider_name, RAC_CAPABILITY_EMBEDDINGS);
     rac_module_unregister(state.module_id);
 
     state.registered = false;

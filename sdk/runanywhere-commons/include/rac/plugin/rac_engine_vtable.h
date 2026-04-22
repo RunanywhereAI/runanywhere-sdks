@@ -50,7 +50,7 @@ struct rac_llm_service_ops;              /* rac/features/llm/rac_llm_service.h *
 struct rac_stt_service_ops;              /* rac/features/stt/rac_stt_service.h */
 struct rac_tts_service_ops;              /* rac/features/tts/rac_tts_service.h */
 struct rac_vad_service_ops;              /* rac/features/vad/rac_vad_service.h */
-struct rac_embedding_service_ops;        /* rac/features/embedding/rac_embedding_service.h */
+struct rac_embeddings_service_ops;       /* rac/features/embeddings/rac_embeddings_service.h */
 struct rac_rerank_service_ops;           /* rac/features/rerank/rac_rerank_service.h (future) */
 struct rac_vlm_service_ops;              /* rac/features/vlm/rac_vlm_service.h */
 struct rac_diffusion_service_ops;        /* rac/features/diffusion/rac_diffusion_service.h */
@@ -146,7 +146,7 @@ typedef struct rac_engine_vtable {
     const struct rac_vad_service_ops*       vad_ops;
 
     /** Text / multimodal embeddings (`RAC_PRIMITIVE_EMBED`). */
-    const struct rac_embedding_service_ops* embedding_ops;
+    const struct rac_embeddings_service_ops* embedding_ops;
 
     /** Cross-encoder reranking (`RAC_PRIMITIVE_RERANK`). */
     const struct rac_rerank_service_ops*    rerank_ops;

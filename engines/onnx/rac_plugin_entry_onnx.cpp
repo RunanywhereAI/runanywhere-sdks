@@ -15,6 +15,7 @@
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/features/embeddings/rac_embeddings_service.h"
 
 extern "C" {
 
@@ -22,6 +23,11 @@ extern "C" {
 extern const rac_stt_service_ops_t g_onnx_stt_ops;
 extern const rac_tts_service_ops_t g_onnx_tts_ops;
 extern const rac_vad_service_ops_t g_onnx_vad_ops;
+/* v3 Phase B7: embeddings ops live in sdk/runanywhere-commons/src/features/rag/
+ * rac_onnx_embeddings_register.cpp but are plugged into this engine's
+ * vtable since onnx naturally owns the embedding primitive alongside
+ * STT/TTS/VAD on the same ONNX Runtime infrastructure. */
+extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 
 static const rac_runtime_id_t k_onnx_runtimes[] = {
     RAC_RUNTIME_CPU,
@@ -62,7 +68,7 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
     /* stt_ops          */ &g_onnx_stt_ops,
     /* tts_ops          */ &g_onnx_tts_ops,
     /* vad_ops          */ &g_onnx_vad_ops,
-    /* embedding_ops    */ nullptr,
+    /* embedding_ops    */ &g_onnx_embeddings_ops,
     /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,

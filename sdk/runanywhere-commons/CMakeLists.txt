@@ -502,6 +502,7 @@ if(APPLE AND RAC_BUILD_PLATFORM)
         src/features/platform/rac_tts_platform.cpp
         src/features/platform/rac_diffusion_platform.cpp
         src/features/platform/rac_backend_platform_register.cpp
+        src/features/platform/rac_plugin_entry_platform.cpp
     )
     message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
 else()
