@@ -143,7 +143,22 @@ static void onnx_stt_vtable_destroy(void* impl) {
     }
 }
 
-// Static vtable for ONNX STT
+// v3 Phase B3: ONNX STT `create` adapter called by commons rac_stt_create()
+// through rac_plugin_route. Replaces the legacy rac_service_provider_t factory.
+static rac_result_t onnx_stt_create_impl(const char* model_id,
+                                         const char* /*config_json*/,
+                                         void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "onnx_stt_create_impl: model=%s",
+                 model_id ? model_id : "(default)");
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_stt_onnx_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_stt_service_ops_t g_onnx_stt_ops = {
     .initialize = onnx_stt_vtable_initialize,
     .transcribe = onnx_stt_vtable_transcribe,
@@ -151,6 +166,7 @@ const rac_stt_service_ops_t g_onnx_stt_ops = {
     .get_info = onnx_stt_vtable_get_info,
     .cleanup = onnx_stt_vtable_cleanup,
     .destroy = onnx_stt_vtable_destroy,
+    .create = onnx_stt_create_impl,
 };
 
 // =============================================================================
@@ -210,6 +226,21 @@ static void onnx_tts_vtable_destroy(void* impl) {
     }
 }
 
+// v3 Phase B3: ONNX TTS `create` adapter.
+static rac_result_t onnx_tts_create_impl(const char* model_id,
+                                         const char* /*config_json*/,
+                                         void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "onnx_tts_create_impl: model=%s",
+                 model_id ? model_id : "(default)");
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_tts_onnx_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_tts_service_ops_t g_onnx_tts_ops = {
     .initialize = onnx_tts_vtable_initialize,
     .synthesize = onnx_tts_vtable_synthesize,
@@ -218,124 +249,22 @@ const rac_tts_service_ops_t g_onnx_tts_ops = {
     .get_info = onnx_tts_vtable_get_info,
     .cleanup = onnx_tts_vtable_cleanup,
     .destroy = onnx_tts_vtable_destroy,
+    .create = onnx_tts_create_impl,
 };
 
 // =============================================================================
-// SERVICE PROVIDERS
+// MODULE IDENTITY
 // =============================================================================
 
 const char* const MODULE_ID = "onnx";
-const char* const STT_PROVIDER_NAME = "ONNXSTTService";
-const char* const TTS_PROVIDER_NAME = "ONNXTTSService";
-const char* const VAD_PROVIDER_NAME = "ONNXVADService";
 
-// STT can_handle
-rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle called");
-
-    if (request == nullptr) {
-        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: request is null -> FALSE");
-        return RAC_FALSE;
-    }
-
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
-        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: no identifier -> TRUE (default)");
-        return RAC_TRUE;
-    }
-
-    const char* path = request->identifier;
-    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
-
-    if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
-        strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
-        strstr(path, "nemo") != nullptr || strstr(path, "moonshine") != nullptr ||
-        strstr(path, ".onnx") != nullptr) {
-        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path matches -> TRUE");
-        return RAC_TRUE;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: path doesn't match -> FALSE");
-    return RAC_FALSE;
-}
-
-// STT create with vtable
-rac_handle_t onnx_stt_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    RAC_LOG_INFO(LOG_CAT, "onnx_stt_create ENTRY - provider create callback invoked");
-
-    if (request == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "onnx_stt_create: request is null");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX STT service for: %s",
-                 request->identifier ? request->identifier : "(default)");
-
-    rac_handle_t backend_handle = nullptr;
-    RAC_LOG_INFO(LOG_CAT, "Calling rac_stt_onnx_create...");
-    rac_result_t result = rac_stt_onnx_create(request->identifier, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_stt_onnx_create failed with result: %d", result);
-        return nullptr;
-    }
-    RAC_LOG_INFO(LOG_CAT, "rac_stt_onnx_create succeeded, backend_handle=%p", backend_handle);
-
-    auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
-    if (!service) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate rac_stt_service_t");
-        rac_stt_onnx_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_onnx_stt_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "ONNX STT service created successfully, service=%p", service);
-    return service;
-}
-
-// TTS can_handle — ONNX is the sole TTS backend, accept all requests
-rac_bool_t onnx_tts_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-    (void)request;
-    return RAC_TRUE;
-}
-
-// TTS create with vtable
-rac_handle_t onnx_tts_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating ONNX TTS service for: %s",
-                 request->identifier ? request->identifier : "(default)");
-
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_tts_onnx_create(request->identifier, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX TTS backend: %d", result);
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
-    if (!service) {
-        rac_tts_onnx_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_onnx_tts_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "ONNX TTS service created successfully");
-    return service;
-}
+// v3 Phase B3: The legacy rac_service_request_t factories
+// (onnx_stt_can_handle, onnx_stt_create, onnx_tts_can_handle,
+// onnx_tts_create, onnx_vad_can_handle, onnx_vad_create) and their
+// PROVIDER_NAME constants have been removed. Model/framework gating is
+// handled by the router through rac_plugin_entry_onnx.cpp's
+// g_onnx_engine_vtable.metadata.formats table; impl allocation goes
+// through the per-primitive g_onnx_*_ops.create adapters defined above.
 
 // =============================================================================
 // VAD VTABLE OPERATIONS
@@ -373,6 +302,32 @@ static void onnx_vad_vtable_destroy(void* impl) {
     }
 }
 
+// v3 Phase B3: ONNX VAD `initialize` — Silero-style VAD models require
+// per-instance model loading. When the backend's rac_vad_onnx_create
+// already accepts model_path (it does), initialize here is a no-op
+// success. Kept explicitly to honor the new ABI.
+static rac_result_t onnx_vad_vtable_initialize(void* /*impl*/, const char* /*model_path*/) {
+    return RAC_SUCCESS;
+}
+
+// v3 Phase B3: ONNX VAD `create` adapter.
+static rac_result_t onnx_vad_create_impl(const char* model_id,
+                                         const char* /*config_json*/,
+                                         void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "onnx_vad_create_impl: model=%s",
+                 model_id ? model_id : "(default)");
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_vad_onnx_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS || !backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_vad_onnx_create failed: %d", rc);
+        return (rc == RAC_SUCCESS) ? RAC_ERROR_UNKNOWN : rc;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_vad_service_ops_t g_onnx_vad_ops = {
     .process = onnx_vad_vtable_process,
     .start = onnx_vad_vtable_start,
@@ -381,45 +336,9 @@ const rac_vad_service_ops_t g_onnx_vad_ops = {
     .set_threshold = onnx_vad_vtable_set_threshold,
     .is_speech_active = onnx_vad_vtable_is_speech_active,
     .destroy = onnx_vad_vtable_destroy,
+    .initialize = onnx_vad_vtable_initialize,
+    .create = onnx_vad_create_impl,
 };
-
-// VAD can_handle
-rac_bool_t onnx_vad_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-    (void)request;
-    return RAC_TRUE;
-}
-
-// VAD create — wraps ONNX VAD handle in rac_vad_service_t vtable (matching STT pattern)
-rac_handle_t onnx_vad_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    const char* model_path = nullptr;
-    if (request != nullptr) {
-        model_path = request->identifier;
-    }
-
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_vad_onnx_create(model_path, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS || !backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create ONNX VAD backend");
-        return nullptr;
-    }
-
-    // Wrap in rac_vad_service_t (matching STT service wrapping pattern)
-    auto* service = static_cast<rac_vad_service_t*>(malloc(sizeof(rac_vad_service_t)));
-    if (!service) {
-        rac_vad_onnx_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_onnx_vad_ops;
-    service->impl = backend_handle;
-    service->model_id = model_path ? strdup(model_path) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "ONNX VAD service created successfully");
-    return service;
-}
 
 // =============================================================================
 // STORAGE AND DOWNLOAD STRATEGIES
@@ -548,7 +467,6 @@ rac_result_t rac_backend_onnx_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module (STT, TTS, VAD only; diffusion is CoreML-only in Swift SDK)
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "ONNX Runtime";
@@ -563,63 +481,17 @@ rac_result_t rac_backend_onnx_register(void) {
         return result;
     }
 
-    // Register strategies
     rac_storage_strategy_register(RAC_FRAMEWORK_ONNX, &g_onnx_storage_strategy);
     rac_download_strategy_register(RAC_FRAMEWORK_ONNX, &g_onnx_download_strategy);
 
-    // Register STT provider
-    rac_service_provider_t stt_provider = {};
-    stt_provider.name = STT_PROVIDER_NAME;
-    stt_provider.capability = RAC_CAPABILITY_STT;
-    stt_provider.priority = 100;
-    stt_provider.can_handle = onnx_stt_can_handle;
-    stt_provider.create = onnx_stt_create;
-
-    result = rac_service_register_provider(&stt_provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
-    // Register TTS provider
-    rac_service_provider_t tts_provider = {};
-    tts_provider.name = TTS_PROVIDER_NAME;
-    tts_provider.capability = RAC_CAPABILITY_TTS;
-    tts_provider.priority = 100;
-    tts_provider.can_handle = onnx_tts_can_handle;
-    tts_provider.create = onnx_tts_create;
-
-    result = rac_service_register_provider(&tts_provider);
-    if (result != RAC_SUCCESS) {
-        rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
-    // Register VAD provider
-    rac_service_provider_t vad_provider = {};
-    vad_provider.name = VAD_PROVIDER_NAME;
-    vad_provider.capability = RAC_CAPABILITY_VAD;
-    vad_provider.priority = 100;
-    vad_provider.can_handle = onnx_vad_can_handle;
-    vad_provider.create = onnx_vad_create;
-
-    result = rac_service_register_provider(&vad_provider);
-    if (result != RAC_SUCCESS) {
-        rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);
-        rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
-    // Register ONNX embeddings provider (for RAG pipeline).
-    // The provider code is compiled into this backend; registration was
-    // previously done by rac_backend_rag_register() when the sources lived
-    // in the RAG OBJECT library.
+    // v3 Phase B3: per-primitive plugin registration happens via
+    // rac_plugin_entry_onnx() (see rac_plugin_entry_onnx.cpp). We still
+    // register the commons-side embeddings provider here — B7 migrates it.
     rac_backend_onnx_embeddings_register();
 
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD + Embeddings)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (module + strategies + embeddings; "
+                          "STT/TTS/VAD plugin registration via rac_plugin_entry_onnx)");
     return RAC_SUCCESS;
 }
 
@@ -630,9 +502,6 @@ rac_result_t rac_backend_onnx_unregister(void) {
 
     rac_backend_onnx_embeddings_unregister();
     rac_model_strategy_unregister(RAC_FRAMEWORK_ONNX);
-    rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
-    rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);
-    rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
     rac_module_unregister(MODULE_ID);
 
     g_registered = false;
