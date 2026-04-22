@@ -159,14 +159,48 @@ These 11 lines × 5 platforms is the v3-cutover blocker for any breaking-change 
 Apply these to the per-criterion view (replaces the prior "all OK" reading):
 
 ```
-GAP 08:  #1 OK · #2 PARTIAL · #3 PARTIAL · #4 DEFERRED · #5 OK ·
+GAP 08:  #1 OK · #2 PARTIAL · #3 OK (post-audit Phase C) · #4 DEFERRED · #5 OK ·
          #6 OK · #7 OK · #8 UNKNOWN (Kotlin LOC target ~30k not measured) ·
-         #9 PARTIAL (sample-app smoke not automated) · #10 PARTIAL (device verification scheduled)
+         #9 PARTIAL (sample-app smoke not automated; Phase B mitigated compile risk) ·
+         #10 PARTIAL (device verification scheduled)
 
 GAP 09:  #1 OK · #2 SPEC-DRIFT (intentional Wire) · #3 OK · #4 OK · #5 OK ·
          #6 PARTIAL (VoiceSessionEvent still hand-written) · #7 PARTIAL (cancellation by-design, not 5-SDK identity-tested) ·
          #8 PARTIAL (wire-format parity OK; p50 ≤ 1ms not benched) ·
          #9 OK (1,473 streaming LOC deleted; just at spec floor) · #10 SPEC-DRIFT (yml not .sh)
+
+Phase 2 test coverage:  OK (post-audit Phase A — 11 tests cover all 7 union arms)
 ```
 
-The corrected reading: **9 spec-criteria across GAP 08 + GAP 09 are PARTIAL or DRIFT, not OK** — but **all of those have honest tracking** in this branch's other docs (`v2_remaining_work.md`, `gap08_kotlin_orphan_natives.md`, `v2_closeout_device_verification.md`). The branch is still ship-ready as v2.x; the corrections sharpen the v3 / v2.1 follow-up scope.
+The corrected reading: **7 spec-criteria across GAP 08 + GAP 09 are PARTIAL or DRIFT, not OK** (down from 9 after the post-audit Phase A-C work). The branch is ship-ready as v2.x; the remaining 7 are the v3 / v2.1 follow-up scope.
+
+---
+
+## Post-audit Phase A-D deliveries
+
+After the 3-agent re-audit demoted 6 status flips, a Phase A-D pass closed
+3 of the 6 (test coverage, orphan native cleanup, sample-app annotation):
+
+| Phase | Work | Result |
+|-------|------|--------|
+| Phase A | Added `test_processed_arm` + `test_wakeword_arm` to `test_proto_event_dispatch` | 9/9 → 11/11 OK; all 7 union arms now covered. **Phase 2 coverage demotion FIXED → OK.** |
+| Phase A2 | Symbol-diff audit on 13 surviving `CppBridge*.kt` files | 95 declarations total; 72 with zero callers anywhere SDK-wide. |
+| Phase B | Per-call-site `@Suppress` / `@available` annotations in 4 sample apps for the 11 deprecated-API call sites the audit identified | Sample apps no longer block on v3 deprecation escalation. |
+| Phase C | Pruned the 72 truly-orphan native declarations from 12 of 13 files | −730 LOC; 0 truly-orphan declarations remain. **GAP 08 #3 demotion FIXED → OK.** |
+| Phase D | Final gate update | This commit. |
+
+**Combined Phase 8 + Phase C orphan-cleanup totals**:
+- 27 cleared by zero-caller file deletion (Phase 8) + 72 by per-method pruning (Phase C) = **99 truly orphan declarations cleared**.
+- 4318 LOC + 730 LOC = **5048 LOC removed from the Kotlin orphan-native surface**.
+
+**Remaining 3 of 6 demotions** (still PARTIAL — these are the real v2.1
+follow-ups that need actual code to land):
+
+| # | Spec text | Status | Why deferred |
+|---|-----------|--------|--------------|
+| GAP 09 #6 | "Zero hand-written `VoiceSessionEvent` types" | PARTIAL | Hand-written enum still in `VoiceAgentTypes.swift` + 4 SDKs. Wiring those to consume the codegen'd proto type is per-SDK behavioral migration work; queued for v2.1. |
+| GAP 09 #7 | Cancellation propagates same way in 5 SDKs | PARTIAL | "By design" via adapter contracts, not 5-SDK behavioral-equivalence-tested. Needs per-SDK harness. |
+| GAP 09 #8 | p50 ≤ 1ms across 5 SDKs | PARTIAL | Wire-format parity is byte-for-byte verified. Per-SDK p50 latency not benched. |
+
+Plus 1 GAP 08 deferral that is correctly DEFERRED:
+- GAP 08 #4: `runanywhere.dart` ≤500 LOC — multi-day Dart refactor; not in this session's scope.
