@@ -207,8 +207,6 @@ export type {
 export {
   AudioCaptureManager,
   AudioPlaybackManager,
-  VoiceSessionHandle,
-  DEFAULT_VOICE_SESSION_CONFIG,
 } from './Features';
 export type {
   AudioDataCallback,
@@ -219,12 +217,9 @@ export type {
   PlaybackCompletionCallback,
   PlaybackErrorCallback,
   PlaybackConfig,
-  VoiceSessionConfig,
-  VoiceSessionEvent,
-  VoiceSessionEventType,
-  VoiceSessionEventCallback,
-  VoiceSessionState,
 } from './Features';
+// v3.1: VoiceSessionHandle + DEFAULT_VOICE_SESSION_CONFIG +
+// VoiceSessionConfig/Event/EventType/EventCallback/State DELETED.
 
 // v3.1: proto-stream VoiceAgentStreamAdapter (canonical path).
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';

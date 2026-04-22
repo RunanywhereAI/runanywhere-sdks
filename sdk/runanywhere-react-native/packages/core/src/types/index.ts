@@ -82,9 +82,8 @@ export type {
   VoiceAgentComponentStates,
   VoiceAgentConfig,
   VoiceTurnResult,
-  VoiceSessionEventType,
-  VoiceSessionEvent,
-  VoiceSessionCallback,
+  // v3.1: VoiceSessionEventType / VoiceSessionEvent / VoiceSessionCallback
+  // DELETED. Use VoiceEvent (ts-proto) from '../generated/voice_events'.
   VoiceAgentMetrics,
 } from './VoiceAgentTypes';
 

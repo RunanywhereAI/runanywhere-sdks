@@ -45,7 +45,7 @@ import * as Storage from './Extensions/RunAnywhere+Storage';
 import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
-import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
+// v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
@@ -591,13 +591,8 @@ export const RunAnywhere = {
   voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
 
-  // ============================================================================
-  // Voice Session (Delegated to Extension)
-  // ============================================================================
-
-  startVoiceSession: VoiceSession.startVoiceSession,
-  startVoiceSessionWithCallback: VoiceSession.startVoiceSessionWithCallback,
-  createVoiceSession: VoiceSession.createVoiceSession,
+  // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter
+  // for streaming; compose STT/LLM/TTS directly for one-shot turns.
 
   // ============================================================================
   // Structured Output (Delegated to Extension)

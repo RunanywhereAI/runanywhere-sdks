@@ -392,16 +392,8 @@ export async function stopSpeaking(): Promise<void> {
 }
 
 // ============================================================================
-// Legacy APIs
+// v3.1: getTTSVoices DELETED. Use availableTTSVoices() directly.
 // ============================================================================
-
-/**
- * Get available TTS voices (legacy)
- * @deprecated Use availableTTSVoices() instead
- */
-export async function getTTSVoices(): Promise<string[]> {
-  return availableTTSVoices();
-}
 
 /**
  * Cancel ongoing TTS synthesis

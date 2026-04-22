@@ -362,43 +362,8 @@ export async function transcribeFile(
 // Streaming STT (Real-time)
 // ============================================================================
 
-/**
- * Start streaming speech-to-text transcription
- * @deprecated Use transcribeStream() for better API parity with Swift SDK
- */
-export async function startStreamingSTT(
-  language: string = 'en',
-  onPartial?: (text: string, confidence: number) => void,
-  onFinal?: (text: string, confidence: number) => void,
-  onError?: (error: string) => void
-): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for startStreamingSTT');
-    return false;
-  }
-  const native = requireNativeModule();
-
-  if (onPartial || onFinal || onError) {
-    EventBus.onVoice((event) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const evt = event as any;
-      if (evt.type === 'sttPartialResult' && onPartial) {
-        onPartial(evt.text || '', evt.confidence || 0);
-      } else if (evt.type === 'sttCompleted' && onFinal) {
-        onFinal(evt.text || '', evt.confidence || 0);
-      } else if (evt.type === 'sttFailed' && onError) {
-        onError(evt.error || 'Unknown error');
-      }
-    });
-  }
-
-  const streamingNative = native as unknown as StreamingSTTNativeModule;
-  if (!streamingNative.startStreamingSTT) {
-    logger.warning('startStreamingSTT not available');
-    return false;
-  }
-  return streamingNative.startStreamingSTT(language);
-}
+// v3.1: startStreamingSTT DELETED. Use transcribeStream() which provides
+// the same callback-based streaming via the canonical proto path.
 
 /**
  * Stop streaming speech-to-text transcription

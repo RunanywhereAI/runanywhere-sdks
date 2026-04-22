@@ -83,18 +83,8 @@ export {
   cleanupVoiceAgent,
 } from './RunAnywhere+VoiceAgent';
 
-// Voice Session
-export {
-  startVoiceSession,
-  startVoiceSessionWithCallback,
-  createVoiceSession,
-  DEFAULT_VOICE_SESSION_CONFIG,
-} from './RunAnywhere+VoiceSession';
-export type {
-  VoiceSessionConfig,
-  VoiceSessionEvent,
-  VoiceSessionEventCallback
-} from './RunAnywhere+VoiceSession';
+// v3.1: Voice Session exports DELETED. Use VoiceAgentStreamAdapter from
+// the package root (`@runanywhere/core`) for streaming voice events.
 
 // Structured Output
 export {
