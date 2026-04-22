@@ -17,7 +17,11 @@
 
 package com.runanywhere.sdk.adapters
 
-import com.runanywhere.sdk.generated.VoiceEvent  // Wire-generated; see GAP 01.
+// Wire-generated from idl/voice_events.proto — see GAP 01. Real Kotlin
+// package emitted by Wire is ai.runanywhere.proto.v1 (the files live
+// physically under src/commonMain/.../com/runanywhere/sdk/generated/
+// but their `package` declaration matches the proto java_package).
+import ai.runanywhere.proto.v1.VoiceEvent
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking

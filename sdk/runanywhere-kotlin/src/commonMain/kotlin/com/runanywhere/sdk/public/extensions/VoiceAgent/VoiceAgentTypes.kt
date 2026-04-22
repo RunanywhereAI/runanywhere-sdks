@@ -268,20 +268,55 @@ sealed class VoiceSessionEvent {
          * (proto3 via Wire, generated from `idl/voice_events.proto`).
          *
          * Returns `null` for proto events that don't have a UX-visible
-         * counterpart — see `docs/migrations/VoiceSessionEvent.md` for
-         * the full dropout list.
+         * counterpart in the legacy enum (Metrics, Interrupted, low-level
+         * VAD arms like BARGE_IN/SILENCE, state=THINKING). See
+         * `docs/migrations/VoiceSessionEvent.md` for the full table.
          *
-         * **v2.1-1 SCAFFOLD**: Swift has the full implementation at
-         * `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. This Kotlin
-         * stub returns null for every input — full implementation is
-         * the v2.1-1b per-SDK cleanup PR (requires adding
-         * `import com.runanywhere.v1.VoiceEvent` + per-payload matching).
-         *
-         * New code should subscribe to `VoiceAgentStreamAdapter.stream()`
-         * directly instead of going through this mapper.
+         * v3-readiness Phase A5: ported 1:1 from the Swift template at
+         * `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`
+         * `VoiceSessionEvent.from(_:)`.
          */
-        @Suppress("UNUSED_PARAMETER")
-        fun from(event: Any /* TODO(v2.1-1b): com.runanywhere.v1.VoiceEvent */): VoiceSessionEvent? = null
+        fun from(event: ai.runanywhere.proto.v1.VoiceEvent): VoiceSessionEvent? {
+            event.user_said?.let {
+                return Transcribed(text = it.text)
+            }
+            event.assistant_token?.let {
+                return Responded(text = it.text)
+            }
+            event.audio?.let {
+                return Speaking
+            }
+            event.vad?.let { v ->
+                return when (v.type) {
+                    ai.runanywhere.proto.v1.VADEventType.VAD_EVENT_VOICE_START ->
+                        SpeechStarted
+                    ai.runanywhere.proto.v1.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE ->
+                        Processing
+                    // BARGE_IN, SILENCE, UNSPECIFIED have no UX counterpart.
+                    else -> null
+                }
+            }
+            event.state?.let { s ->
+                return when (s.current) {
+                    ai.runanywhere.proto.v1.PipelineState.PIPELINE_STATE_IDLE ->
+                        Started
+                    ai.runanywhere.proto.v1.PipelineState.PIPELINE_STATE_LISTENING ->
+                        Listening(audioLevel = 0f)
+                    ai.runanywhere.proto.v1.PipelineState.PIPELINE_STATE_SPEAKING ->
+                        Speaking
+                    ai.runanywhere.proto.v1.PipelineState.PIPELINE_STATE_STOPPED ->
+                        Stopped
+                    // THINKING / UNSPECIFIED have no UX counterpart.
+                    else -> null
+                }
+            }
+            event.error?.let {
+                return Error(message = it.message)
+            }
+            // .interrupted, .metrics, or empty payload → no legacy counterpart.
+            // New code should read these directly via VoiceAgentStreamAdapter.stream().
+            return null
+        }
     }
 }
 
