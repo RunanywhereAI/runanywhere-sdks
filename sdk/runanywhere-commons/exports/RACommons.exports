@@ -205,10 +205,8 @@ _rac_module_list
 _rac_module_register
 _rac_module_unregister
 _rac_modules_for_capability
-_rac_service_create
-_rac_service_list_providers
-_rac_service_register_provider
-_rac_service_unregister_provider
+# v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_* /
+# rac_plugin_route / rac_plugin_list from rac/plugin/* and rac/router/*.
 
 # LLM Component
 # LLM Thinking (<think>...</think> parsing, GAP 08 #6 / v3 Phase A11).

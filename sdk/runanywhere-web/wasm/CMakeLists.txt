@@ -219,10 +219,8 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_module_get_info"
 
     # Service registry
-    "_rac_service_register_provider"
-    "_rac_service_unregister_provider"
-    "_rac_service_create"
-    "_rac_service_list_providers"
+    # v3.0.0 (C1): rac_service_* legacy exports DELETED. Use rac_plugin_*
+    # from rac/plugin/rac_plugin_entry.h and rac/router/rac_route.h.
 
     # Events
     "_rac_event_subscribe"

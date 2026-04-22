@@ -412,8 +412,8 @@ set(RAC_CORE_SOURCES
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
-    src/infrastructure/registry/service_registry.cpp
-    # GAP 02 Phase 7: unified engine plugin registry (rac_engine_vtable_t).
+    # v3.0.0 (C1): legacy service_registry.cpp DELETED. Plugin registration
+    # now flows exclusively through rac_plugin_registry.cpp below.
     src/plugin/rac_plugin_registry.cpp
     # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp

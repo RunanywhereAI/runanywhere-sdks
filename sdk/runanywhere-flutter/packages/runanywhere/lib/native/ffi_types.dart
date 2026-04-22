@@ -358,25 +358,10 @@ typedef RacModuleListDart = int Function(
 );
 
 // =============================================================================
-// Service Provider API (from rac_core.h)
+// v3.0.0 (C1): legacy rac_service_{register_provider,create,...} typedefs
+// DELETED. New code uses rac_plugin_{register,route,list} via
+// RacBindings in lib/core/native/rac_native.dart.
 // =============================================================================
-
-/// rac_result_t rac_service_register_provider(const rac_service_provider_t* provider)
-typedef RacServiceRegisterProviderNative = Int32 Function(
-    Pointer<Void> provider);
-typedef RacServiceRegisterProviderDart = int Function(Pointer<Void> provider);
-
-/// rac_result_t rac_service_create(rac_capability_t capability, const rac_service_request_t* request, rac_handle_t* out_handle)
-typedef RacServiceCreateNative = Int32 Function(
-  Int32 capability,
-  Pointer<Void> request,
-  Pointer<RacHandle> outHandle,
-);
-typedef RacServiceCreateDart = int Function(
-  int capability,
-  Pointer<Void> request,
-  Pointer<RacHandle> outHandle,
-);
 
 // =============================================================================
 // LLM API Function Signatures (from rac_llm_llamacpp.h)

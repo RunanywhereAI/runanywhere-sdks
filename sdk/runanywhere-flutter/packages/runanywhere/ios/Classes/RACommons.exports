@@ -342,10 +342,7 @@ _rac_sdk_get_environment
 _rac_sdk_init
 _rac_sdk_is_initialized
 _rac_sdk_reset
-_rac_service_create
-_rac_service_list_providers
-_rac_service_register_provider
-_rac_service_unregister_provider
+# v3.0.0 (C1): rac_service_* legacy exports DELETED.
 _rac_set_error
 _rac_set_last_error
 _rac_set_platform_adapter
