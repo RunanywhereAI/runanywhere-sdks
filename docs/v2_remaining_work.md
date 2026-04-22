@@ -20,12 +20,19 @@
 > - **P4** (spec-drift cleanups, NDK pin hoist, etc.)
 > - **P5** (Wave E — still optional/deferred)
 >
-> Plus the remaining 3 v2.1-tier follow-ups (the 3 post-audit demotions
-> that NEEDED real code, not annotations):
-> - Wire `VoiceSessionEvent` to use the codegen'd proto type (close GAP 09 #6)
-> - Per-bridge JNI thunk implementation for the surviving 23 declarations + auth bridge (close GAP 09 #7 cancellation parity + finish GAP 08 #2 auth)
-> - Sample-app E2E smoke automation (close GAP 08 #9)
-> - p50 latency benchmarking on 5 SDKs (close GAP 09 #8)
+> Plus the v2.1-tier follow-ups (the 3 post-audit demotions that need real
+> code, not annotations — separated from the auth/sample-app work which is
+> orthogonal):
+>
+> | # | Item | Closes | Effort |
+> |---|------|--------|--------|
+> | v2.1-1 | Wire `VoiceSessionEvent` to use the codegen'd proto type in 5 SDKs (Kotlin `VoiceAgentTypes.kt`, Swift `VoiceAgentTypes.swift`, Dart `voice_session.dart`, RN `VoiceAgentTypes.ts` + `VoiceSessionHandle.ts`) | GAP 09 #6 | ~1-2 wk |
+> | v2.1-2 | 5-SDK behavioral cancellation parity test harness (asserts cancellation propagates identically: Swift `AsyncStream.onTermination`, Kotlin `awaitClose`, Dart `StreamController.onCancel`, TS `AsyncIterator.return()`) | GAP 09 #7 | ~1 wk |
+> | v2.1-3 | Per-SDK p50 latency benchmark for VoiceEvent streaming (30-second harness × 5 SDKs) | GAP 09 #8 | ~3 days |
+> | v2.1-4 | Implement 16 `rac_auth_*` JNI thunks in `sdk/runanywhere-commons/src/jni/`; `git rm CppBridgeAuth.kt` (currently 182 LOC of HTTP/JSON state) | GAP 08 #2 | ~2 days |
+> | v2.1-5 | Sample-app E2E smoke automation (Detox for RN, Maestro for Flutter, XCUITest for iOS, Espresso for Android) | GAP 08 #9 | ~1 wk |
+> | v2.1-6 | `wc -l` measurement of per-SDK total LOC vs spec targets (Kotlin ~30k, Swift ~24k, Dart ~30k); document deltas | GAP 08 #6/#7/#8 | ~30 min |
+> | v2.1-7 | Real-device behavioral parity verification (60-sec auth refresh, voice barge-in latency, download resume after disconnect) per `v2_closeout_device_verification.md` | GAP 08 #10 | ~1 wk QA |
 
 _Synthesis of the post-Wave-F audit (3 independent code-reality + spec-vs-gate + build-state passes)._
 
@@ -63,7 +70,7 @@ Each row is one PR. Estimates from the original plan budget.
 |---|----------|---------------------------|-------------|--------|-----------|
 | P2-1 | **Kotlin voice** | Delete `streamVoiceSession` + `processVoice` orchestration in `RunAnywhere+VoiceAgent.jvmAndroid.kt` (~270 LOC). **The `streamVoiceSession` function lacks even the marker today — add `@Deprecated` first, then delete.** | `VoiceAgentStreamAdapter(handle).stream()` | 2 wk | GAP 08 #1, #6 |
 | P2-2 | **Kotlin auth** | `git rm CppBridgeAuth.kt` (~568 LOC). Spec #2: literally "auth client gone". | `rac_auth_*` C ABI via JNI bridge | 1 wk | GAP 08 #2 |
-| P2-3 | **Kotlin orphans** | Run the symbol-diff procedure from `gap08_kotlin_orphan_natives.md`; delete the unbound `external fun native*` declarations across the 14 `CppBridge*.kt` files. 88 candidates today. | None — pure delete | 1 wk | GAP 08 #3 |
+| ~~P2-3~~ | ~~**Kotlin orphans**~~ **SUPERSEDED by post-audit Phase C (commit `dd9155e5`)**: 72 truly-orphan declarations pruned across 12 of 13 surviving CppBridge*.kt files (−730 LOC). 23 declarations remain, all with at least one in-file caller (verified by 2-layer scan). GAP 08 #3 → OK. | — | DONE | GAP 08 #3 |
 | P2-4 | **Swift TextGen** | Delete `ThinkingContentParser` block in `RunAnywhere+TextGeneration.swift`. | `rac_llm_split_thinking_tokens()` C ABI (needs to be added to commons) | 1 wk + 3 days for C ABI | GAP 08 #6, #7 |
 | P2-5 | **Swift VoiceSession** | Delete orchestration in `RunAnywhere+VoiceSession.swift` (currently 396 LOC). | `VoiceAgentStreamAdapter` (Swift) | 1 wk | GAP 08 #6, #7 |
 | P2-6 | **Swift Download** | Delete retry/progress in `AlamofireDownloadService.swift`. | `rac_download_*` C ABI + `DownloadServiceStreamAdapter` (mechanical follow-up to VoiceAgent adapter) | 1 wk | GAP 08 #6, #7 |

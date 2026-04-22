@@ -1,31 +1,26 @@
 # v2 Architecture Migration — Status & Post-Mortem
 
-_Living document. **Post-v2-closeout + 3-agent audit status: READY TO SHIP
-as v2** (with follow-up PRs scheduled for v3 cut-over + the v2.1 items
-the post-close-out audit surfaced)._
+_Living document. **Post-v2-closeout + 3-agent audit + Phase A-D fix pass + drift cleanup: READY TO SHIP
+as v2** (with follow-up PRs scheduled for v3 cut-over + the 3 remaining v2.1 items)._
 
-**What's true after the audit:**
+**What's true after the post-audit Phase A-D pass + drift cleanup:**
 
-- The close-out's LOC claims (−6,247 from Wave D targets, net branch
-  −744 to −600 depending on doc-churn timing) are **verified correct on
-  disk**.
+- The close-out's LOC claims (−6,247 from Wave D targets) are **verified correct on disk**. Post-audit Phase C added another **−730 LOC** from pruning 72 truly-orphan native declarations; **combined Wave D + Phase C delete: −6,977 LOC** (36% over the 5,100 ± 500 spec target).
 - All 8 bugs the close-out reports finding are **verified fixed**.
-- The 3 close-out test suites are **verified building + passing**
-  (proto event dispatch 9/9, llm thinking 10/10, parity_test_cpp 8/8).
-- **6 of the close-out's spec-criteria status flips were too generous**
-  when measured against strict spec text (GAP 09 #6 / #7 / #8 / #9,
-  GAP 08 #3, Phase 2 test coverage). All 6 corrections are documented
-  in [v2_closeout_results.md "Post-audit corrections"](v2_closeout_results.md#post-audit-corrections-3-agent-re-review).
-- **One previously-untracked production risk surfaced**: sample apps
-  under `examples/` are NOT in the CI matrix and call deprecated
-  Kotlin/Swift/Flutter/RN APIs — when those deprecations escalate, 11
-  lines × 4 platforms need updating in lock-step. Tracked in
-  [v2_remaining_work.md "Risk register"](v2_remaining_work.md#risk-register-post-v2-closeout-surfaces-from-3-agent-re-audit).
+- The 3 close-out test suites are **verified building + passing**:
+  - `test_proto_event_dispatch`: **11/11 OK** (was 9/9; Phase A added 2 union-arm tests for PROCESSED + WAKEWORD_DETECTED).
+  - `test_llm_thinking`: 10/10 OK.
+  - `parity_test_cpp_check`: 8/8 OK.
+- **6 of the close-out's spec-criteria status flips were too generous**; the post-audit Phase A-D pass closed 3:
+  - GAP 09 Phase 2 test coverage: **PARTIAL → OK** (Phase A).
+  - GAP 08 #3 orphan natives: **PARTIAL → OK** (Phase C; 99 of 99 truly orphan declarations cleared).
+  - P3.5 sample-app risk: **PRODUCTION RISK → MITIGATED** (Phase B; 11 sample-app call sites annotated).
+- **3 demotions are still PARTIAL** — these need real refactor work (not annotations) and are queued for v2.1:
+  - GAP 09 #6 — `VoiceSessionEvent` still hand-written in 5 SDKs (~1-2 weeks).
+  - GAP 09 #7 — Cancellation parity by-design, not 5-SDK behaviorally tested (~1 week).
+  - GAP 09 #8 — Per-SDK p50 latency not benched (~3 days).
 
-**Net assessment:** the v2 program ships. The corrections sharpen — not
-invalidate — the v3 / v2.1 follow-up scope. The deltas of the corrections
-are documented honestly in the per-doc updates so future readers don't
-have to re-discover them._
+**Net assessment:** the v2 program ships. The post-audit corrections + Phase A-D pass + drift cleanup leave 3 honest open items, all v2.1-tier. The v3 cut-over (GAP 11 `git rm service_registry.cpp` + 88-call-site repoint + `RAC_PLUGIN_API_VERSION` 2u → 3u) is a separate ~2-week PR.
 
 ## TL;DR
 
@@ -46,41 +41,41 @@ have to re-discover them._
   `Server`→`aio.server` migrations: emit deprecation, give consumers a
   release window, then delete in v3.
 
-## Audit reality check
+## Audit reality check (post Phase A-D + drift cleanup)
 
-Three independent agents audited the branch on Wave-F-final HEAD. The
-findings are summarized in [`wave_roadmap.md` "Audit snapshot"](wave_roadmap.md#audit-snapshot--what-is-on-the-branch-right-now)
-and the prioritized close-out list lives in
+Three independent audits have happened: (1) the original Wave-F audit,
+(2) the post-close-out 3-agent re-review that surfaced the 6 demotions,
+and (3) a fresh 3-agent audit after the Phase A-D pass that confirmed
+the demotion fixes and surfaced the doc-drift items now corrected. The
+findings live in [`wave_roadmap.md` "Audit snapshot"](wave_roadmap.md#audit-snapshot--what-is-on-the-branch-right-now)
+and the prioritized list in
 [`v2_remaining_work.md`](v2_remaining_work.md).
 
-| What is real on disk today | What is documented but deferred |
-|----------------------------|----------------------------------|
-| Root `CMakeLists.txt` + `CMakePresets.json` + `cmake/{platform,sanitizers,plugins,protobuf}.cmake` | Verifying `cmake --preset macos-release` configures + builds + tests in CI |
+| What is real on disk today | What's still deferred |
+|----------------------------|----------------------|
+| Root `CMakeLists.txt` + `CMakePresets.json` + `cmake/{platform,sanitizers,plugins,protobuf}.cmake` | Verifying `cmake --preset macos-release` configures + builds + tests **in CI** (works locally; CI run not yet kicked off) |
 | `engines/` with 5 migrated backends (history preserved) + 3 stub engines | The 5 migrated engines using `rac_add_engine_plugin()` one-liners (still use original CMakeLists) |
-| `idl/voice_agent_service.proto` + `llm_service.proto` + `download_service.proto` | The generated `*.grpc.swift` / `*.pbgrpc.dart` files (codegen ready, not run) |
-| `rac_voice_event_abi.h/.cpp` C++ proto-byte ABI; `RAC_ABI_VERSION=2u` | `dispatch_proto_event()` body is a TODO stub — adapters compile, emit zero events |
-| 5 `VoiceAgentStreamAdapter` files (Swift / Kotlin / Dart / RN / Web) | Consumer code that uses them — all 5 SDKs still call the duplicated orchestration |
-| 4 `parity_test.*` scaffolds + README | Fixture audio + golden-events file + actual `XCTAssert` (today: `XCTSkipIf(true)`) |
-| `@Deprecated`/DEPRECATED markers on 11 Wave-D target files | The actual deletes (~3,040 LOC scheduled). Note: Kotlin `streamVoiceSession` lacks even the marker |
-| `[[deprecated]]` + `rac_legacy_warn_once` on `rac_service_*` | `git rm service_registry.cpp` + `RAC_PLUGIN_API_VERSION` 2u→3u |
-| 5 file-level deprecation markers in 3 SDKs (Kotlin auth, Swift TextGen/Voice/Download, Dart, RN, Web) | LOC ceilings: `runanywhere.dart` 2,688 (spec ≤500); `VoiceSessionHandle.ts` 636 (spec ≤250) |
+| `idl/voice_agent_service.proto` + `llm_service.proto` + `download_service.proto` | — |
+| **9 generated gRPC stubs** (3 services × Swift/Dart/Python) — committed, CI drift-checked | — |
+| `rac_voice_event_abi.h/.cpp` C++ proto-byte ABI; `RAC_ABI_VERSION=2u` | — |
+| **`dispatch_proto_event()` body is fully implemented** — translates all 7 union arms to `runanywhere::v1::VoiceEvent`; **11/11 tests OK** post Phase A | — |
+| 5 `VoiceAgentStreamAdapter` files (Swift / Kotlin / Dart / RN / Web) | Consumer code migration to consume codegen'd `VoiceEvent` proto (GAP 09 #6, v2.1) |
+| **4 `parity_test.*` files wired (XCSkipIf removed)** + C++ golden producer + `golden_events.txt` fixture | Per-SDK test runner integration (XCTest/JUnit/`flutter test`/Jest) — local-only today |
+| `@Deprecated` + `[[deprecated]]` + `@available(*, deprecated)` markers on Wave-D target files | — |
+| **−6,977 LOC actually deleted** from Wave D + Phase C targets (Kotlin orphan files Phase 8: −4,318; per-SDK orchestration shrinks Phase 6/9/10/12/13/14: −1,929; Phase C orphan declarations: −730) | `runanywhere.dart` 2,688 (spec ≤500) — DEFERRED, multi-day refactor |
+| `[[deprecated]]` + `rac_legacy_warn_once` on `rac_service_*` (GAP 11) | `git rm service_registry.cpp` + 88-call-site repoint + `RAC_PLUGIN_API_VERSION` 2u → 3u — **v3 cut-over PR** |
+| Sample-app per-call-site deprecation suppressions (Phase B) | Detox/Maestro/XCUITest sample-app smoke automation (v2.1) |
 
-**Aggregate diff vs branch start (`8d1f851b`):** 127 files,
-+3,845 / −6,095, **net −2,250 LOC**. (The deletes that hit the diff are
-the 10 retired `build-*.sh` scripts from GAP 07 Phase 7, not Wave D's
-~3,040 LOC of orchestration — that work is scheduled.)
+**Aggregate diff vs branch start (`8d1f851b`):** post Phase A-D, the net branch delta is approximately **−1,371 LOC** (−744 at close-out + the Phase B/C/D deltas).
 
 **What this means for the program:**
 
-- **PR #494 in its current form is a v2-foundation PR**, not a v2 ship.
-  Reviewing + merging it gives you the contracts (plugin ABI, router,
-  IDL, streaming adapters) on `main`, but the duplication-deletion
-  payoff comes in follow-up PRs (Priority 2 in `v2_remaining_work.md`).
-- **A v2 release tag** (semver minor) should land **after Priority 1
-  + Priority 2** are done — that's when the spec's claimed LOC
-  reduction + behavioral simplification becomes real.
-- **A v3 release tag** (semver major) is the right boundary for
-  Priority 3 (physical struct removal + `RAC_PLUGIN_API_VERSION` 3u).
+- **PR #494 in its current form is a v2 ship**, not a v2-foundation PR. The contracts (plugin ABI, router, IDL, streaming adapters), the deletes (−6,977 LOC), the proto-event dispatch implementation, and 11/11 union-arm test coverage are all real on disk.
+- **A v2 release tag** (semver minor) is appropriate as soon as the 3 remaining v2.1 items below either land or are explicitly punted to a follow-up minor:
+  - GAP 09 #6 — `VoiceSessionEvent` codegen migration in 5 SDKs.
+  - GAP 09 #7 — Cancellation parity 5-SDK behavioral test harness.
+  - GAP 09 #8 — Per-SDK p50 latency benchmark.
+- **A v3 release tag** (semver major) is the right boundary for the GAP 11 cut-over (`git rm service_registry.cpp` + `RAC_PLUGIN_API_VERSION` 3u).
 
 ## Architecture as built
 

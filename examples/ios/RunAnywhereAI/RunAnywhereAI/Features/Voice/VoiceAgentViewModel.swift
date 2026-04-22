@@ -168,8 +168,17 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // v2 close-out: VoiceSessionHandle is @available(*, deprecated) since
     // the Wave D Phase 10 cleanup. The sample keeps using it until
-    // VoiceAgentStreamAdapter wiring + the C++ voice agent handle JNI
-    // arrives in v3. Tracked under v2_remaining_work.md "Risk register".
+    // VoiceAgentStreamAdapter wiring arrives in v3. Tracked under
+    // v2_remaining_work.md "Risk register".
+    //
+    // Swift has no per-line deprecation suppression like Kotlin's
+    // @Suppress("DEPRECATION") or Dart's // ignore: deprecated_member_use.
+    // The idiomatic chain-suppression is to mark the *calling* function
+    // @available(*, deprecated) — which we do on `startConversation()`
+    // below. The property declaration here will still emit a single
+    // deprecation warning at build time; that's accepted noise until
+    // v3 migration removes VoiceSessionHandle entirely.
+    @available(*, deprecated, message: "Sample-app holdover; migrates with startConversation() in v3")
     private var session: VoiceSessionHandle?
     private var eventTask: Task<Void, Never>?
 
@@ -375,7 +384,15 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
-    /// Start a voice conversation session
+    /// Start a voice conversation session.
+    ///
+    /// v2 close-out: this function uses `RunAnywhere.startVoiceSession` and
+    /// `VoiceSessionHandle`, both `@available(*, deprecated)` since the
+    /// Wave D Phase 10 cleanup. The function is itself marked deprecated
+    /// to chain-suppress the inner warnings (Swift's idiomatic pattern in
+    /// the absence of per-call `@Suppress`). Migrates to
+    /// `VoiceAgentStreamAdapter` in v3.
+    @available(*, deprecated, message: "Awaits v3 migration to VoiceAgentStreamAdapter")
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")

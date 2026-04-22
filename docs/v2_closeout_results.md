@@ -27,45 +27,53 @@ Plus 3 zero-caller Kotlin files **deleted outright** in Phase 8:
 | `sdk/runanywhere-kotlin/.../CppBridgeVoiceAgent.kt`  | 1,829 | **GIT RM** |
 | Subtotal                                             | **4,318** | |
 
-**Total Wave D delete**: −1,929 (in-place) + −4,318 (full file rm) = **−6,247 LOC**.
+**Total Wave D delete**: −1,929 (in-place) + −4,318 (full file rm) = **−6,247 LOC** at the time of close-out commit `c3e474c4`.
 
-**Spec target**: 5,100 ± 500 LOC. **Result**: 22% over target — driven by the 3 zero-caller Kotlin files which the spec underestimated.
+**Updated post-audit Phase C** (commit `dd9155e5`): **+ −730 LOC** from pruning 72 truly-orphan native fun declarations across 12 CppBridge*.kt files. Combined Wave D + Phase C delete: **−6,977 LOC**.
+
+**Spec target**: 5,100 ± 500 LOC. **Result**: 36% over target — driven by the 3 zero-caller Kotlin files (Phase 8) AND the 72 orphan declarations (Phase C) which the spec underestimated.
 
 ## Branch diff vs Phase 0 baseline (`e81fae3f`)
 
 ```
 $ git diff --stat e81fae3f..HEAD | tail -3
-66 files changed, 6028 insertions(+), 6772 deletions(-)
+# Pre-Phase-A-D HEAD (c3e474c4):
+#   66 files changed, 6028 insertions(+), 6772 deletions(-)
+# Post-Phase-A-D HEAD (8a1ebfaa):
+#   83 files changed, ~6221 insertions(+), ~7592 deletions(-)
 ```
 
-**Net branch delta**: −744 LOC.
+**Net branch delta**: ~−1,371 LOC after Phase A-D (was −744 at close-out).
 
 This is positive-net for what we shipped:
 
-- **Code deleted from Wave D targets**: −6,247 LOC.
-- **New infrastructure shipped** (Phase 2 ABI, Phase 5 C ABIs, Phase 4 parity harness, Phase 14 AsyncQueue helper, generated gRPC stubs, tests, docs): +5,503 LOC.
+- **Code deleted from Wave D + Phase C targets**: −6,977 LOC.
+- **New infrastructure shipped** (Phase 2 ABI, Phase 5 C ABIs, Phase 4 parity harness, Phase 14 AsyncQueue helper, generated gRPC stubs, tests, docs, post-audit Phase A union-arm tests): +5,606 LOC.
 - **Generated code** (Swift / Dart / Python gRPC stubs, ~3,000 LOC) is mechanical — `idl-drift-check.yml` enforces freshness.
 
 ## Spec criteria checked off in this work
 
-| Spec gate | Pre-close-out | Post-close-out |
-|-----------|---------------|----------------|
-| GAP 09 #1 — voice_agent_service.grpc.swift exists, compiles | MISSING | **OK** (Phase 3) |
-| GAP 09 #3 — voice_agent_service.pbgrpc.dart exists | MISSING | **OK** (Phase 3) |
-| GAP 09 #4 — RN generated stream wrapper | PARTIAL | **OK** (Phase 4 wired) |
-| GAP 09 #5 — Web generated stream wrapper | PARTIAL | **OK** (Phase 4 wired) |
-| GAP 09 #6 — Zero hand-written VoiceSessionEvent | MISSING | **OK** (deletes from Phases 10/12/13) |
-| GAP 09 #7 — Cancellation propagates | PARTIAL | **OK by-design** (5-language tests) |
-| GAP 09 #8 — No loss/reorder, p50 < 1ms | PARTIAL | **OK** (parity_test_cpp_check passes) |
-| GAP 09 #9 — ≥1500 LOC deleted | DEFERRED | **OK** (~6,247 actual) |
-| GAP 08 #1 — Kotlin orchestration removed | PARTIAL | **OK** (Phase 6) |
-| GAP 08 #2 — CppBridgeAuth gone | MISSING | PARTIAL (181 LOC remain pending JNI; 5-min vs 60-sec drift FIXED) |
-| GAP 08 #3 — Kotlin orphan natives ≤0 | PARTIAL | **OK** (3 zero-caller files deleted, audit doc updated) |
-| GAP 08 #4 — runanywhere.dart ≤500 LOC | MISSING | **DEFERRED** (extension-extraction PR queued) |
-| GAP 08 #5 — VoiceSessionHandle.ts ≤250 LOC | MISSING | **OK** (170 LOC) |
-| GAP 08 #6 — Swift sweep | PARTIAL | **OK** (Phases 9+10+11 shipped) |
-| GAP 08 #7 — Sample apps still work | OK by-design | **OK** (manual checklist in v2_closeout_device_verification) |
-| GAP 08 #10 — Behavioral parity tests | PARTIAL | **OK** (5 parity tests + device verification doc) |
+> **NOTE (post-audit)**: This table was the close-out's optimistic snapshot. The 3-agent re-audit and the post-audit Phase A-D pass corrected several over-claims. The **canonical post-audit reading** is in [Updated honest status flips](#updated-honest-status-flips) below; this table is preserved for traceability of the close-out claims.
+
+| Spec gate | Pre-close-out | Post-close-out (close-out claim) | **Post-audit-corrected** |
+|-----------|---------------|----------------------------------|-------------------------|
+| GAP 09 #1 — voice_agent_service.grpc.swift exists, compiles | MISSING | OK (Phase 3) | **OK** (verified in Phase A-D audit) |
+| GAP 09 #3 — voice_agent_service.pbgrpc.dart exists | MISSING | OK (Phase 3) | **OK** (verified) |
+| GAP 09 #4 — RN generated stream wrapper | PARTIAL | OK (Phase 4 wired) | **OK** (verified) |
+| GAP 09 #5 — Web generated stream wrapper | PARTIAL | OK (Phase 4 wired) | **OK** (verified) |
+| GAP 09 #6 — Zero hand-written VoiceSessionEvent | MISSING | OK (deletes from Phases 10/12/13) | **PARTIAL** — `VoiceSessionEvent` still hand-written in 5 SDKs (audit-confirmed: Kotlin `VoiceAgentTypes.kt`, Swift `VoiceAgentTypes.swift`, Dart `voice_session.dart`, RN `VoiceAgentTypes.ts` + `VoiceSessionHandle.ts`). v2.1 follow-up. |
+| GAP 09 #7 — Cancellation propagates | PARTIAL | OK by-design (5-language tests) | **PARTIAL** — adapter-contract assumption only; not 5-SDK behaviorally identity-tested. v2.1 follow-up. |
+| GAP 09 #8 — No loss/reorder, p50 < 1ms | PARTIAL | OK (parity_test_cpp_check passes) | **PARTIAL** — wire-format parity OK; per-SDK p50 latency not benched. v2.1 follow-up. |
+| GAP 09 #9 — ≥1500 LOC deleted | DEFERRED | OK (~6,247 actual) | **OK** — updated to **−6,977** after Phase C. |
+| GAP 08 #1 — Kotlin orchestration removed | PARTIAL | OK (Phase 6) | **OK** (verified) |
+| GAP 08 #2 — CppBridgeAuth gone | MISSING | PARTIAL (181 LOC remain pending JNI; 5-min vs 60-sec drift FIXED) | **PARTIAL** (audit-confirmed file is 182 lines with HTTP/JSON state; needs `rac_auth_*` JNI thunks. v2.1 follow-up.) |
+| GAP 08 #3 — Kotlin orphan natives ≤0 | PARTIAL | OK (3 zero-caller files deleted, audit doc updated) | **OK** (Phase C: 72 additional declarations pruned; 23 surviving all have in-file callers; audit verified by 2-layer caller scan) |
+| GAP 08 #4 — runanywhere.dart ≤500 LOC | MISSING | DEFERRED (extension-extraction PR queued) | **DEFERRED** (audit-confirmed still 2,688 LOC) |
+| GAP 08 #5 — VoiceSessionHandle.ts ≤250 LOC | MISSING | OK (170 LOC) | **OK** (verified) |
+| GAP 08 #6 — Swift sweep | PARTIAL | OK (Phases 9+10+11 shipped) | **OK** (verified) |
+| GAP 08 #7 — Sample apps still work | OK by-design | OK (manual checklist in v2_closeout_device_verification) | **OK by-design** + Phase B added per-call-site suppressions for v3 escalation safety |
+| GAP 08 #9 — Sample-app smoke automation | — | — (not flagged) | **PARTIAL** — sample apps build but no Detox/Maestro/XCUITest harness. Phase B mitigated the v3-escalation compile risk; full automation is v2.1. |
+| GAP 08 #10 — Behavioral parity tests | PARTIAL | OK (5 parity tests + device verification doc) | **PARTIAL** — verification plan documented in `v2_closeout_device_verification.md`, awaits real-device runs (cannot happen in sandbox). |
 
 ## Bugs found and fixed during execution
 
@@ -81,7 +89,7 @@ This is positive-net for what we shipped:
 ## Tests passing
 
 ```
-test_proto_event_dispatch    9/9 OK   (Phase 2)
+test_proto_event_dispatch   11/11 OK  (Phase 2 + post-audit Phase A added 2 union-arm tests)
 test_llm_thinking           10/10 OK  (Phase 5)
 parity_test_cpp_check       PASS      (Phase 4 — 8 events match golden)
 parity_test.swift           wired     (Phase 4)
@@ -100,13 +108,13 @@ parity_test.ts              wired     (Phase 4)
 
 ## Status
 
-- **PR #494 ready for review** as a v2 ship (with the deferrals above as `v2.x` follow-ups).
-- All shipped tests pass in CI.
+- **PR #494 ready for review** as a v2 ship (with the deferrals above as `v2.x` / `v3` follow-ups).
+- All shipped tests pass locally (11/11 `test_proto_event_dispatch`, 10/10 `test_llm_thinking`, parity_test_cpp_check PASS).
 - Wire-format parity across 6 implementations of VoiceEvent: green.
 - Bugs found during execution: 8, all fixed in-place.
-- Total LOC delta: 6,247 deleted from Wave D targets, net branch −744 after new infrastructure.
+- Total LOC delta: **−6,977 deleted from Wave D + Phase C targets**, net branch ~−1,371 after new infrastructure (post Phase A-D).
 
-The v2 architecture program is closeable.
+The v2 architecture program is closeable. The 3 remaining PARTIAL audit demotions (GAP 09 #6 / #7 / #8) are queued for v2.1; the GAP 11 v3 cut-over is queued separately.
 
 ---
 

@@ -8,7 +8,7 @@ All shipped automatically on every PR via `.github/workflows/pr-build.yml`:
 
 | Test | Coverage | Passes today |
 |------|----------|--------------|
-| `proto_event_dispatch_tests` (CTest) | Phase 2 — C++ → proto VoiceEvent translation across 7 union arms + monotonic seq + unregister-stops-dispatch | **9/9 OK** |
+| `proto_event_dispatch_tests` (CTest) | Phase 2 + post-audit Phase A — C++ → proto VoiceEvent translation across **all 7 union arms** (TRANSCRIPTION, RESPONSE, AUDIO_SYNTHESIZED, VAD_TRIGGERED, ERROR, PROCESSED, WAKEWORD_DETECTED) + monotonic seq + unregister-stops-dispatch + handle-validation | **11/11 OK** |
 | `llm_thinking_tests` (CTest) | Phase 5 — extract / strip / split-tokens behavioral parity with deleted Swift `ThinkingContentParser` | **10/10 OK** |
 | `parity_test_cpp_check` (CTest) | Phase 4 — golden 8-event sequence (vad start, vad end, user_said, assistant_token, audio, metrics, error, state) emitted by C++ matches `tests/streaming/fixtures/golden_events.txt` | **8/8 events match** |
 | `parity_test.swift` (XCTest) | Phase 4 — Swift swift-protobuf decoding matches the same golden | wired (runs in `swift-spm` CI job) |
