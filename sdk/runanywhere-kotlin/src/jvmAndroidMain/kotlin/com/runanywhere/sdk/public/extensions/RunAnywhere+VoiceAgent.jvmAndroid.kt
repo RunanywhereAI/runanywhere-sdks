@@ -183,7 +183,8 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
  * — it emits Started + Stopped and tells the caller to migrate to
  * [VoiceAgentStreamAdapter]. The full streaming pipeline now lives in:
  *
- *     val handle = /* obtain via CppBridgeVoiceAgent.create when JNI lands */
+ *     // The voice agent handle is obtained via the upcoming JNI thunk
+ *     // for rac_voice_agent_create() (see docs/v2_remaining_work.md P3-1).
  *     for (event in VoiceAgentStreamAdapter(handle).stream())
  *         handleEvent(event)
  */

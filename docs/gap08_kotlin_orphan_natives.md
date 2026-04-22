@@ -43,13 +43,51 @@ diff /tmp/jni-defined.txt /tmp/kt-declared.txt
 
 ## Status
 
-GAP 08 Phase 23 ships the audit doc + the deprecation marker on the
-worst offender (`CppBridgeVoiceAgent.kt`) plus a tracking issue.
-Per-symbol pruning needs the JNI .so build artifact + automated symbol
-diff in CI; queued as a follow-up PR after the Wave D adapters have
-soaked in production.
+**v2 close-out Phase 8 update — 27 orphan declarations deleted (4,318 LOC).**
 
-The legacy spec estimated 131 orphans; the count today is 88, so 43
-have been incidentally cleaned by the Wave A/B/C work (mostly in the
-`CppBridgeAuth.kt` deprecation, which itself has zero `external fun
-native` decls — the auth path is pure Kotlin/HTTP).
+Symbol-diff result on the actual shipped `librunanywhere_jni.so`
+(arm64-v8a from `sdk/runanywhere-kotlin/src/androidMain/jniLibs/`):
+
+```
+$ nm -gU librunanywhere_jni.so | grep "Java_com_runanywhere" | wc -l
+147   # all defined JNI symbols
+
+$ nm -gU librunanywhere_jni.so | grep "Java_com_runanywhere" | \
+    awk '{print $NF}' | sort -u | grep "Java_com_runanywhere_sdk_foundation_bridge_extensions"
+0     # ZERO symbols under the foundation/bridge/extensions/ class path
+```
+
+Every `external fun native*` declaration inside a CppBridge*.kt object
+binds to a symbol named `Java_com_runanywhere_sdk_foundation_bridge_extensions_CppBridgeFoo_nativeBar` — but the `.so` only ships symbols
+under `RunAnywhereBridge` (the legacy class). **Every** native
+declaration in a `CppBridge*.kt` object is therefore an orphan that
+would throw `UnsatisfiedLinkError` on first call.
+
+Phase 8 deleted the 3 zero-caller files outright:
+
+| File                        | LOC  | `external fun native*` count | External callers |
+|-----------------------------|------|------------------------------|------------------|
+| `CppBridgeServices.kt`      | 1285 |  8 | **0** |
+| `CppBridgeStrategy.kt`      | 1204 |  5 | **0** |
+| `CppBridgeVoiceAgent.kt`    | 1829 | 14 | 1 (just the doc comment from Phase 6, fixed in same commit) |
+| **Total deleted**           | **4318** | **27** | — |
+
+The remaining `CppBridge*.kt` files (Auth, Device, Download, Events,
+FileManager, HTTP, LLM, LoraRegistry, ModelAssignment, ModelPaths,
+ModelRegistry, Platform, PlatformAdapter, State, Storage, STT,
+Telemetry, ToolCalling, TTS, VAD, VLM) all have ≥1 external caller and
+some have many — pruning their orphan native declarations requires
+either:
+
+  - **Per-method analysis**: trace each `nativeFoo()` call inside the
+    CppBridge to see if it's reachable from a public method that any
+    consumer calls. Removing only the unreachable paths is mechanical
+    but file-by-file work.
+  - **Bulk wait**: keep them in place until the JNI .so adds the
+    matching symbols (the C++ side of the bridge is tracked under the
+    eventual JNI-thunk PR — see `docs/v2_closeout_phase5_cabis.md`).
+
+Today's commit takes the first option for the 3 files where ALL paths
+are unreachable. The remaining ~95 declarations across the 21 surviving
+files are queued for the per-bridge cleanup that ships with each JNI
+implementation.
