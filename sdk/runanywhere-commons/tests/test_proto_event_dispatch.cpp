@@ -224,6 +224,61 @@ int test_error_arm() {
     return 0;
 }
 
+int test_processed_arm() {
+    // Post-audit (3-agent re-review) gap: dispatch_proto_event maps
+    // RAC_VOICE_AGENT_EVENT_PROCESSED → metrics oneof, but no dedicated
+    // test asserted that round-trip. Closes that hole.
+    reset_capture();
+    rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
+
+    rac_voice_agent_event_t event = {};
+    event.type = RAC_VOICE_AGENT_EVENT_PROCESSED;
+    rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
+
+    ASSERT_EQ(g_capture.call_count, 1U);
+    runanywhere::v1::VoiceEvent decoded;
+    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
+                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(decoded.has_metrics());
+    // Per-primitive latencies are not yet captured in the C struct; the
+    // implementation fills the metrics submessage with proto defaults. The
+    // test asserts the arm is selected, not specific values that depend on
+    // future C-struct extension.
+    ASSERT_EQ(decoded.metrics().tokens_generated(), 0);
+    ASSERT_EQ(decoded.metrics().is_over_budget(), false);
+    ASSERT_TRUE(decoded.seq() > 0);
+
+    rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);
+    return 0;
+}
+
+int test_wakeword_arm() {
+    // Post-audit gap: WAKEWORD_DETECTED maps to a state-change event
+    // (IDLE → LISTENING) since the proto schema has no native wakeword
+    // arm. This test locks in that behavior so a future schema change
+    // doesn't silently lose the signal.
+    reset_capture();
+    rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
+
+    rac_voice_agent_event_t event = {};
+    event.type = RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED;
+    event.data.wakeword.wake_word = "hey jarvis";
+    event.data.wakeword.confidence = 0.95f;
+    event.data.wakeword.timestamp_ms = 12345;
+    rac::voice_agent::dispatch_proto_event(fake_handle(), &event);
+
+    ASSERT_EQ(g_capture.call_count, 1U);
+    runanywhere::v1::VoiceEvent decoded;
+    ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
+                                       static_cast<int>(g_capture.bytes.size())));
+    ASSERT_TRUE(decoded.has_state());
+    ASSERT_EQ(decoded.state().previous(), runanywhere::v1::PIPELINE_STATE_IDLE);
+    ASSERT_EQ(decoded.state().current(),  runanywhere::v1::PIPELINE_STATE_LISTENING);
+
+    rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);
+    return 0;
+}
+
 int test_unregister_stops_dispatch() {
     reset_capture();
     rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
@@ -290,6 +345,8 @@ int main() {
     RUN(test_audio_arm);
     RUN(test_vad_arm);
     RUN(test_error_arm);
+    RUN(test_processed_arm);          // Post-audit coverage gap fix.
+    RUN(test_wakeword_arm);           // Post-audit coverage gap fix.
     RUN(test_unregister_stops_dispatch);
     RUN(test_seq_monotonic);
 #else
