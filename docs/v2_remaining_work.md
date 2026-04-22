@@ -1,8 +1,14 @@
 # v2 — Remaining Work to Ship
 
+> **STATUS UPDATE (post-v2-closeout)**: P0, P1, and P2 are **DONE** as of the
+> v2 close-out (Phases 0 through 16 on `feat/v2-architecture`). See
+> [`docs/v2_closeout_results.md`](v2_closeout_results.md) for the LOC delta
+> tables and per-criterion status flips. **What remains: P3 (v3 cut-over),
+> P4 (spec-drift cleanups), P5 (Wave E — still optional/deferred).**
+
 _Synthesis of the post-Wave-F audit (3 independent code-reality + spec-vs-gate + build-state passes)._
 
-This is the **single prioritized list** of what still needs to happen before the v2 architecture is shippable. Read this together with [`wave_roadmap.md`](wave_roadmap.md) (state map) and [`v2_migration_complete.md`](v2_migration_complete.md) (post-mortem). Each item below cites the spec criterion and the file(s) that need to change.
+This was the prioritized list at the end of Wave F. Sections P0-P2 below are now **historical** — they're crossed through to keep the spec-traceability while documenting that they actually shipped. Read this together with [`wave_roadmap.md`](wave_roadmap.md) (state map) and [`v2_migration_complete.md`](v2_migration_complete.md) (post-mortem). Each item below cites the spec criterion and the file(s) that needed to change.
 
 ## Priority 0 — Build sanity
 

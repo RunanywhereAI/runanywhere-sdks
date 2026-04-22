@@ -2,6 +2,26 @@
 
 _Closes [`v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md`](../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md) Success Criteria._
 
+> **POST-CLOSE-OUT UPDATE**: the original "scaffold + adapter" deliverable
+> was followed by the **v2 close-out** which:
+>
+> - **Phase 2** wired the previously-stub `dispatch_proto_event()` to actually
+>   serialize each C event union arm into a `runanywhere::v1::VoiceEvent`
+>   (test_proto_event_dispatch: 9/9 OK).
+> - **Phase 3** generated the `*.grpc.swift` / `*.pbgrpc.dart` /
+>   `*_pb2_grpc.py` files the gate's #1, #3 criteria called for (committed
+>   to the tree; CI drift-checked).
+> - **Phase 4** added the C++ golden producer + wired the 4 per-language
+>   parity tests so #6, #7, #8 are now green via byte-for-byte
+>   `tests/streaming/fixtures/golden_events.txt` compare.
+> - **Phase 9** + **Phase 10** + **Phase 12** + **Phase 13** + **Phase 14**
+>   deleted the hand-written `VoiceSessionEvent` / `tokenQueue` consumers
+>   the gate's #6 + #9 criteria depended on (~6,247 LOC across 5 SDKs).
+>
+> See [`docs/v2_closeout_results.md`](v2_closeout_results.md) for the
+> per-criterion status flips. PARTIAL → OK on rows #1, #3, #4, #5, #6,
+> #7, #8, #9.
+
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
 | 1 | All streaming surfaces driven from idl/*_service.proto | OK | 3 service .protos shipped: [`idl/voice_agent_service.proto`](../idl/voice_agent_service.proto), [`idl/llm_service.proto`](../idl/llm_service.proto), [`idl/download_service.proto`](../idl/download_service.proto). All are part of the rac_idl target and CI drift-check. |

@@ -1,10 +1,12 @@
 # v2 Architecture Migration — Status & Post-Mortem
 
-_Living document. Updated post-Wave-F audit. The branch on
-`feat/v2-architecture` is **not yet shippable as v2**; see the
-[Audit reality check](#audit-reality-check) section below for what's
-real vs deferred, and [`v2_remaining_work.md`](v2_remaining_work.md)
-for the prioritized closing list._
+_Living document. **Post-v2-closeout status: READY TO SHIP as v2** (with
+follow-up PRs scheduled for v3 cut-over + minor spec-drift cleanup).
+The audit gap that the post-Wave-F version of this doc flagged is
+closed: [`docs/v2_closeout_results.md`](v2_closeout_results.md) shows
+the actual LOC delta delivered (−6,247 from Wave D targets), per-criterion
+status flips for GAP 08 + GAP 09, and the bug list found + fixed
+during the close-out._
 
 ## TL;DR
 

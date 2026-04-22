@@ -2,6 +2,13 @@
 
 _Closes [`v2_gap_specs/GAP_08_FRONTEND_DUPLICATION.md`](../v2_gap_specs/GAP_08_FRONTEND_DUPLICATION.md) Success Criteria._
 
+> **POST-CLOSE-OUT UPDATE**: the markers-only Wave D work was followed by the
+> **v2 close-out** (Phases 6 through 16) which executed the actual physical
+> deletes. See [`docs/v2_closeout_results.md`](v2_closeout_results.md) for the
+> measured LOC delta (`−6,247` from Wave D targets vs the spec's 5,100 ± 500
+> target) and the per-criterion status flips below. The "marker only" rows in
+> the original table are now backed by real deletes.
+
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
 | 1 | All voice-session orchestration delegated to C++ voice agent in every SDK | OK partial | Wave C delivered the streaming adapter contract in all 5 SDKs (Phase 16-19). Wave D scheduled the orchestration deletion against that contract. This commit batch ships the **deprecation markers + removal-PR scheduling** on the 7 target files; the actual `git rm` of orchestration bodies happens in the soak follow-up after sample apps prove the adapters end-to-end. See `Files marked for deletion` table below. |
