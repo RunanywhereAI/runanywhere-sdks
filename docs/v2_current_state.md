@@ -33,7 +33,7 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | `parity_test_cpp_check` | 8/8 events match golden | Wire-format parity across 6 implementations |
 | Sample-app deprecated-API call sites annotated | **11 sites × 4 platforms** | Per-call-site suppressions; v3 escalation safe |
 | GAP 08 spec criteria | 8 OK · 2 PARTIAL · 1 DEFERRED · 2 PARTIAL | #2 auth flipped to OK (v2.1 Item 4); #4 dart (DEFERRED), #6 kotlin LOC over (PARTIAL), #9 sample-smoke (PARTIAL), #10 device (PARTIAL) |
-| GAP 09 spec criteria | 6 OK · 3 PARTIAL · 1 SPEC-DRIFT (intentional) | #6 hand-written event, #7 cancellation parity, #8 p50 |
+| GAP 09 spec criteria | 7 OK · 2 PARTIAL · 1 SPEC-DRIFT (intentional) | #6 closed in v2.1-1 (Swift full + 3 scaffolds + Web trivially-satisfied); #7 cancellation parity, #8 p50 still PARTIAL |
 
 ## Architecture as built (1-line per layer)
 
@@ -57,7 +57,7 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | GAP 06 — Engines top-level reorg | 5 backends `git mv`'d; 3 stubs added | OK partial (5 migrated still use original CMakeLists; one-liner only on stubs) |
 | GAP 07 — Single root CMake | Root + presets + 4 helper modules + slim CI | OK partial (second `CMakePresets.json` under commons/ — v3 cleanup) |
 | GAP 08 — Frontend duplication delete | −6,977 LOC across 11 files in 5 SDKs + 16 JNI thunks for auth (v2.1 Item 4) | 8 OK · 2 PARTIAL · 1 DEFERRED · 1 PARTIAL |
-| GAP 09 — Streaming consistency | 3 service .protos + 9 gRPC stubs + 5 adapters + golden producer | 6 OK · 3 PARTIAL · 1 intentional spec-drift |
+| GAP 09 — Streaming consistency | 3 service .protos + 9 gRPC stubs + 5 adapters + golden producer + VoiceSessionEvent derived-view migration (v2.1-1) | 7 OK · 2 PARTIAL · 1 intentional spec-drift |
 | GAP 11 — Legacy cleanup | `[[deprecated]]` markers + runtime `rac_legacy_warn_once` | DEFERRED to v3 (`git rm` requires 88-call-site repoint) |
 
 ## What's TRULY remaining
@@ -98,7 +98,7 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 |------|-------------------|
 | Sample-app regression invisible to CI | OPEN — needs v2.1-5 |
 | ~~Auth divergence if backend changes refresh policy~~ | **CLOSED** by v2.1 quick-wins Item 4 (commits `bd7da766` → `52e9e48d`): refresh-window math (60-sec) is now sourced from `rac_auth_needs_refresh()` C ABI; cannot drift again because Kotlin no longer carries its own `REFRESH_WINDOW_MS` constant. State + token + JSON parsing moved to native. |
-| `VoiceSessionEvent` schema drift | OPEN — needs v2.1-1 |
+| ~~`VoiceSessionEvent` schema drift~~ | **CLOSED** by v2.1-1 (commits `540deec2` → `64661d07`): codegen'd `VoiceEvent` proto is the canonical source of truth across all 5 SDKs. Swift full migration shipped; Kotlin/Dart/RN scaffolds (`@Deprecated` + mapper stubs awaiting per-SDK body in v2.1-1b/c/d follow-ups); Web trivially satisfied (never had a parallel type). See `docs/migrations/VoiceSessionEvent.md`. |
 | v3 cut-over needs 88-call-site repoint | OPEN — Tier 3 prerequisite |
 | ~~Per-SDK total-LOC criteria unmeasured~~ | **CLOSED** by Item 1 of v2.1 quick-wins PR — see "Per-SDK LOC measurement" section below. Headline: Kotlin 60% over target (PARTIAL), Swift+Dart at target (OK). |
 | `p50 ≤ 1ms` claim unproven | PARTIAL — harness DONE in v2.1 quick-wins Item 3 (`tests/streaming/perf_bench/` with C++ producer + 4-language consumer scaffolds + Python aggregator); per-SDK runner integration is the v2.1-2 follow-up. C++ producer measures 362 ns/event locally. |
@@ -117,13 +117,16 @@ landed 4 items closing additional spec criteria and v2.1 follow-ups:
 | Item 1: Per-SDK LOC measurement | `0156ec77` | GAP 08 #6/#7/#8 (v2.1-6) | +33 doc |
 | Item 2: 6 P4 spec-drift fixes (CMakeLists comment, plugin doc rename, second `CMakePresets.json` deletion, IDL drift-check substitution, retroactive `GAP_11` spec, NDK pin hoist) | `3f7eadb0` | P0-3, P4-1, P4-4, P4-5, P4-6, P4-8 | −54 net |
 | Item 3: p50 latency bench harness (`tests/streaming/perf_bench/`) | `016ead14` | GAP 09 #8 measurement infra (v2.1-3 partial) | +600 |
-| Item 4: 16 `rac_auth_*` JNI thunks + `CppBridgeAuth.kt` shrink | `bd7da766` `13e79d3c` `52e9e48d` | GAP 08 #2 (v2.1-4) | +207 native, −30 Kotlin |
+| Item 4: 16 `rac_auth_*` JNI thunks + `CppBridgeAuth.kt` shrink | `bd7da766` `13e79d3c` `52e9e48d` `ba145f25` | GAP 08 #2 (v2.1-4) | +207 native, −30 Kotlin |
+| **v2.1-1**: `VoiceSessionEvent` → codegen'd proto across 5 SDKs (Swift full + 3 scaffolds + Web audit) | `540deec2` `52ae409d` `47c3f36d` `6b4e3cb3` `64661d07` | GAP 09 #6 (v2.1-1) | +80 Swift mapper, +131 migration doc, ~+180 LOC of scaffolds across Kotlin/Dart/RN/Web |
 
-After v2.1 quick-wins:
+After v2.1 quick-wins + v2.1-1:
 - **8 of 9** P4 spec-drift items closed (P4-3, P4-7 explicitly scoped out — engine CMake one-liner rewrites and end-to-end ModelFormat propagation test, both warrant their own PRs).
 - **GAP 08 #2 OK**, **#6 OK**, **#7 OK**, **#8 OK** (was UNKNOWN/PARTIAL).
+- **GAP 09 #6 OK** (was PARTIAL — flipped in v2.1-1).
 - **GAP 09 #8 measurement infra DONE**; per-SDK runner integration is the v2.1-2 follow-up.
-- **3 of 7 v2.1 follow-ups DONE** (v2.1-3 partial, v2.1-4, v2.1-6); 4 still open (v2.1-1, v2.1-2, v2.1-5, v2.1-7).
+- **4 of 7 v2.1 follow-ups DONE** (v2.1-1 with per-SDK-runtime-completion caveat, v2.1-3 partial, v2.1-4, v2.1-6); 3 still open (v2.1-2, v2.1-5, v2.1-7).
+- **GAP 09 at 7/10 OK · 2 PARTIAL · 1 intentional SPEC-DRIFT** (best state achievable without per-SDK runtime rewiring).
 
 ## Per-SDK LOC measurement (post Phase A-D + drift cleanup)
 
