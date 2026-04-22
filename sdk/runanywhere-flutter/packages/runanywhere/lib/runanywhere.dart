@@ -3,8 +3,14 @@
 /// Privacy-first, on-device AI SDK for Flutter.
 library runanywhere;
 
+// v3.1: voice-session types are deprecated; kept exported for the
+// v3.0.x deprecation window. Deleted in Phase 4.3.
 export 'capabilities/voice/models/voice_session.dart';
 export 'capabilities/voice/models/voice_session_handle.dart';
+// v3.1: proto-stream voice-agent APIs (canonical path).
+export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
+export 'generated/voice_events.pb.dart' show VoiceEvent, StateChangeEvent, VADEvent, VoiceEvent_Payload;
+export 'native/dart_bridge_voice_agent.dart' show DartBridgeVoiceAgent;
 export 'core/module/runanywhere_module.dart';
 export 'core/types/component_state.dart';
 export 'core/types/model_types.dart';
