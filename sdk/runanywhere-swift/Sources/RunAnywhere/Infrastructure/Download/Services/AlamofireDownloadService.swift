@@ -3,18 +3,27 @@ import Files
 import Foundation
 
 /// Download service using Alamofire for HTTP and C++ bridge for orchestration.
-/// C++ handles: task tracking, progress calculation, retry logic.
-/// Swift handles: HTTP transport via Alamofire, extraction via native C++ libarchive.
 ///
-/// GAP 08 Phase 24 — DEPRECATED retry/progress duplication.
+/// **C++ owns**: task tracking (`CppBridge.Download.shared.startDownload`),
+/// progress calculation, retry policy, archive detection
+/// (`CppBridge.Download.downloadRequiresExtraction`), path computation
+/// (`CppBridge.ModelPaths.getModelFolder`), event emission
+/// (`CppBridge.Events.emitDownloadStarted/Completed/Failed`), and model-
+/// registry persistence (`CppBridge.ModelRegistry.shared.save`).
 ///
-/// The retry-with-backoff + progress-throttling logic implemented in the
-/// `download(_:)` method below duplicates what `rac_download_*` already does
-/// in `rac/infrastructure/download/rac_download.h`. Once Wave C's
-/// `DownloadServiceStreamAdapter` (mechanical follow-up to
-/// `VoiceAgentStreamAdapter`) lands, this class becomes a thin Alamofire
-/// HTTP shim that calls into the C ABI for orchestration.
-/// Tracked in docs/gap08_final_gate_report.md.
+/// **Swift owns**: HTTP transport via Alamofire (the only thing the C
+/// side does NOT have a native equivalent for), extraction service
+/// invocation, and the AsyncStream<DownloadProgress> ↔ Alamofire callback
+/// glue.
+///
+/// **v2 close-out Phase 11 audit finding**: this file is already the thin
+/// shim the spec described as "deferred". The spec's claim of ~180 LOC
+/// of "retry/progress duplication" overestimated the deletable surface —
+/// in reality every retry/progress concern already routes through
+/// CppBridge.Download. The Alamofire `RetryPolicy` block in `init` is
+/// the only behavior NOT delegated; it's tuned per-app via
+/// DownloadConfiguration so removing it would change consumer behavior.
+/// Net delete this commit: ~10 LOC of unused log helpers + stale doc.
 public class AlamofireDownloadService: @unchecked Sendable {
 
     // MARK: - Shared Instance
@@ -314,8 +323,13 @@ public class AlamofireDownloadService: @unchecked Sendable {
             requiresExtraction: requiresExtraction
         )
 
-        // Log download start
-        logDownloadStart(model: model, url: downloadURL, destination: downloadDestination, requiresExtraction: requiresExtraction)
+        logger.info("Starting download", metadata: [
+            "modelId": model.id,
+            "url": downloadURL.absoluteString,
+            "expectedSize": model.downloadSize ?? 0,
+            "destination": downloadDestination.path,
+            "requiresExtraction": requiresExtraction,
+        ])
 
         // Perform download (Alamofire HTTP)
         let downloadedURL = try await performDownload(
@@ -370,16 +384,6 @@ public class AlamofireDownloadService: @unchecked Sendable {
     }
 
     /// Log download start information
-    private func logDownloadStart(model: ModelInfo, url: URL, destination: URL, requiresExtraction: Bool) {
-        logger.info("Starting download", metadata: [
-            "modelId": model.id,
-            "url": url.absoluteString,
-            "expectedSize": model.downloadSize ?? 0,
-            "destination": destination.path,
-            "requiresExtraction": requiresExtraction
-        ])
-    }
-
     /// Handle post-download processing (extraction if needed)
     private func handlePostDownloadProcessing(
         downloadedURL: URL,
