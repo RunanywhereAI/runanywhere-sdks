@@ -8,12 +8,13 @@
  * filled with the existing `g_llamacpp_ops` (non-static since Phase 8) as the
  * LLM slot. All other primitive slots remain NULL.
  *
- * Coexistence with legacy path:
- *   The existing `rac_backend_llamacpp_register()` entry point continues to
- *   register the llama.cpp LLM service via `rac_service_register_provider()`.
- *   The new entry point registers the same ops-struct into the unified plugin
- *   registry. Both paths can be active simultaneously; callers selecting via
- *   the new registry get the same code, but zero legacy behavior is disturbed.
+ * v3.0.0: this is the SOLE llama.cpp registration path. The legacy
+ * `rac_backend_llamacpp_register()` function now only does
+ * `rac_module_register(...)`; it no longer calls
+ * `rac_service_register_provider(...)` (removed in Phase B1). Plugin
+ * registration flows through `RAC_STATIC_PLUGIN_REGISTER(llamacpp)`
+ * (see `rac_static_register_llamacpp.cpp`) or through `dlopen` +
+ * `rac_plugin_entry_llamacpp` symbol lookup.
  */
 
 #include "rac/plugin/rac_engine_vtable.h"

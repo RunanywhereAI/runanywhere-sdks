@@ -54,75 +54,76 @@ deferred to a focused v3.1 follow-up PR — see
 
 ## Architecture as built (1-line per layer)
 
-- **C ABI** (`rac_*` opaque handles, struct-based) — replaces legacy `rac_*` (still present, deprecated, removed in v3).
-- **Plugin ABI** (`rac_engine_vtable_t` + central registry + dynamic `dlopen`) — `RAC_PLUGIN_API_VERSION = 2u`.
-- **Engines** under `engines/` (5 migrated + 3 stubs) — built via `rac_add_engine_plugin()`.
+- **C ABI** (`rac_*` opaque handles, struct-based) — legacy `rac_service_*` DELETED in v3.0.0 (Phase C1). Sole registry surface is `rac_plugin_*`.
+- **Plugin ABI** (`rac_engine_vtable_t` + central registry + dynamic `dlopen`) — **`RAC_PLUGIN_API_VERSION = 3u`** (v3.0.0).
+- **Engines** under `engines/` (6 migrated: llamacpp, llamacpp_vlm, onnx, whispercpp, whisperkit_coreml, metalrt + 3 stubs) — register via `RAC_STATIC_PLUGIN_REGISTER` / `rac_plugin_register` only.
 - **IDL** (`idl/*_service.proto`) — single source of truth; codegen → 9 gRPC stubs in 3 langs + Nunjucks-templated TS AsyncIterable wrappers.
 - **Streaming adapters** (5 langs) — wrap C proto-event callbacks as `AsyncStream` / `Flow` / `Stream` / `AsyncIterable`.
 - **CMake** — single root + 9 preset families; 6 native + 5 frontend CI jobs in `pr-build.yml` (151 lines, was 601).
-- **Hardware Profile + Engine Router** — scores plugins by primitive × format × HW × hints.
+- **Hardware Profile + Engine Router** — scores plugins by primitive × format × HW × hints; commons consumers (`rac_llm_create` etc.) go through `rac_plugin_route + vt->ops->create`.
 
 ## What shipped per gap
 
 | Gap | What shipped | Status |
 |-----|--------------|--------|
 | GAP 01 — IDL & codegen | 7 protos + 5-language codegen + drift-check CI | OK |
-| GAP 02 — Unified engine plugin ABI | `rac_engine_vtable_t` + registry + version check | OK |
+| GAP 02 — Unified engine plugin ABI | `rac_engine_vtable_t` + registry + version check; `RAC_PLUGIN_API_VERSION` bumped `2u→3u` in v3.0.0 | OK |
 | GAP 03 — Dynamic plugin loading | `dlopen` + `RAC_STATIC_PLUGIN_REGISTER` + plugin-loader-smoke test | OK (spec-drift on doc filename — minor) |
-| GAP 04 — Engine router + HW profile | `rac::router::HardwareProfile` + scoring + 6 engines populate metadata | OK (engine roster differs from spec — accepted deviation) |
+| GAP 04 — Engine router + HW profile | `rac::router::HardwareProfile` + scoring + 6 engines populate metadata; `rac_plugin_route` is now the SOLE routing API | OK (engine roster differs from spec — accepted deviation) |
 | GAP 05 — DAG runtime | — | **DEFERRED** per spec gate |
-| GAP 06 — Engines top-level reorg | 5 backends `git mv`'d; 3 stubs added | OK partial (5 migrated still use original CMakeLists; one-liner only on stubs) |
-| GAP 07 — Single root CMake | Root + presets + 4 helper modules + slim CI | OK partial (second `CMakePresets.json` under commons/ — v3 cleanup) |
+| GAP 06 — Engines top-level reorg | 6 backends `git mv`'d; 3 stubs added | OK partial (5 migrated still use original CMakeLists; one-liner only on stubs) |
+| GAP 07 — Single root CMake | Root + presets + 4 helper modules + slim CI | OK (v2.1 quick-wins removed commons/CMakePresets.json — single preset file now canonical) |
 | GAP 08 — Frontend duplication delete | −6,977 LOC across 11 files in 5 SDKs + 16 JNI thunks for auth (v2.1 Item 4) | 8 OK · 2 PARTIAL · 1 DEFERRED · 1 PARTIAL |
-| GAP 09 — Streaming consistency | 3 service .protos + 9 gRPC stubs + 5 adapters + golden producer + VoiceSessionEvent derived-view migration (v2.1-1) | 7 OK · 2 PARTIAL · 1 intentional spec-drift |
-| GAP 11 — Legacy cleanup | `[[deprecated]]` markers + runtime `rac_legacy_warn_once` | DEFERRED to v3 (`git rm` requires 88-call-site repoint) |
+| GAP 09 — Streaming consistency | 3 service .protos + 9 gRPC stubs + 5 adapters + golden producer + VoiceSessionEvent derived-view migration (v2.1-1 + v3 Phase A) | 7 OK · 2 PARTIAL · 1 intentional spec-drift |
+| GAP 11 — Legacy cleanup | v3.0.0 C1: `service_registry.cpp` physically deleted; v3.0.0 C3: API version bumped to `3u`, semver 3.0.0 on 7 packages | **OK** (v3.0.0) |
 
-## What's TRULY remaining
+## What's TRULY remaining (post v3.0.0)
 
-**Tier 1 — Spec-criterion closures** (mechanical, 1 PR each):
-
-1. CI proof — kick off `pr-build.yml` against new presets — `~0.5 day`.
-2. Doc/spec hygiene — fix stale CMakeLists.txt comment (L114-115), rename `plugin_loader_authoring.md` → `plugins/PLUGIN_AUTHORING.md`, retroactively write `GAP_11_*.md` spec, add ModelFormat propagation test PR — `~1 day batched`.
-3. NDK pin single source of truth — hoist to root `gradle.properties` — `~1 day`.
-
-**Tier 2 — v2.1 follow-ups** (the 3 remaining post-audit demotions + 4 orthogonal items):
+**Tier 1 — v3.1 follow-up PR** (committed-to scope, 1 PR):
 
 | # | Item | Closes | Effort |
 |---|------|--------|--------|
-| v2.1-1 | Wire `VoiceSessionEvent` to use codegen'd proto type in 5 SDKs | GAP 09 #6 | 1-2 wk |
-| v2.1-2 | 5-SDK behavioral cancellation parity test harness | GAP 09 #7 | 1 wk |
-| v2.1-3 | Per-SDK p50 latency benchmark (30-sec harness × 5 SDKs) | GAP 09 #8 | 3 days |
-| v2.1-4 | Implement 16 `rac_auth_*` JNI thunks + `git rm CppBridgeAuth.kt` (182 LOC) | GAP 08 #2 | 2 days |
-| v2.1-5 | Sample-app E2E smoke automation (Detox/Maestro/XCUITest/Espresso) | GAP 08 #9 | 1 wk |
-| v2.1-6 | `wc -l` measurement of per-SDK total LOC vs spec targets | GAP 08 #6/#7/#8 | 30 min |
-| v2.1-7 | Real-device behavioral parity verification | GAP 08 #10 | 1 wk QA |
+| v3.1-1 | Migrate 4 sample-app voice-assistant views to `VoiceAgentStreamAdapter` + proto events (iOS, Android, Flutter, RN) | C2 prerequisite | 3-5 days |
+| v3.1-2 | Delete `VoiceSessionEvent` + `VoiceSessionHandle` + `startVoiceSession` / `streamVoiceSession` / `processVoice` + `startStreamingTranscription` across Swift / Kotlin / Dart / RN | C2 backlog | 1 day (after v3.1-1) |
+| v3.1-3 | Audit & delete remaining RN deprecations (`getTTSVoices`, `getLogLevel`, `SDKErrorCode`) | C2 backlog | 0.5 day |
 
-**Tier 3 — v3 cut-over** (irreversible, semver major):
+See `docs/v3_phaseC2_scope.md` for full disposition table.
 
-- 88 call-site repoint per `gap11_audit_repoint.md` — `2 wk`.
-- `git rm sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp` + `rac_capability_t` + `rac_service_provider_t` — `1 day` after repoint.
-- Bump `RAC_PLUGIN_API_VERSION` `2u` → `3u` — `5 min`.
-- Bump library to v3.0.0 (semver major) — `5 min`.
+**Tier 2 — Remaining spec-criterion closures** (mechanical, 1 PR each):
 
-**Tier 4 — Optional / deferred**:
+| # | Item | Closes | Effort |
+|---|------|--------|--------|
+| T2-1 | 5-SDK behavioral cancellation parity test harness | GAP 09 #7 | 1 wk |
+| T2-2 | Per-SDK p50 latency benchmark (30-sec harness × 5 SDKs) | GAP 09 #8 | 3 days |
+| T2-3 | Sample-app E2E smoke automation (Detox/Maestro/XCUITest/Espresso) | GAP 08 #9 | 1 wk |
+| T2-4 | Real-device behavioral parity verification | GAP 08 #10 | 1 wk QA |
+| T2-5 | NDK pin single source of truth — hoist to root `gradle.properties` | GAP 07 #11 | 1 day |
+| T2-6 | Swift `Package.swift` gRPC-Swift dep wiring (OR remove committed `.grpc.swift` files) — `GRPCCore` imports currently don't resolve via SPM | Swift build hygiene | 0.5 day |
 
-- Wave E / GAP 05 — DAG runtime; defer until a second pipeline (multi-modal RAG, agent loop) commits to using the primitives.
-- `runanywhere.dart` 2,688 → ≤500 LOC — multi-day refactor, not blocking.
+**Tier 3 — Large refactors**:
+
+- `runanywhere.dart` 2,688 → ≤500 LOC — GAP 08 #4 DEFERRED, multi-day refactor; not release-blocking.
+- Kotlin LOC trim — GAP 08 PARTIAL (60% over target); multi-day refactor.
+
+**Tier 4 — Optional / deferred indefinitely**:
+
+- GAP 05 — DAG runtime; defer until a second pipeline (multi-modal RAG, agent loop) commits to using the primitives.
 
 ## Risk register (still-open items)
 
 | Risk | Mitigation status |
 |------|-------------------|
-| Sample-app regression invisible to CI | OPEN — needs v2.1-5 |
-| ~~Auth divergence if backend changes refresh policy~~ | **CLOSED** by v2.1 quick-wins Item 4 (commits `bd7da766` → `52e9e48d`): refresh-window math (60-sec) is now sourced from `rac_auth_needs_refresh()` C ABI; cannot drift again because Kotlin no longer carries its own `REFRESH_WINDOW_MS` constant. State + token + JSON parsing moved to native. |
-| ~~`VoiceSessionEvent` schema drift~~ | **CLOSED** by v2.1-1 (commits `540deec2` → `64661d07`): codegen'd `VoiceEvent` proto is the canonical source of truth across all 5 SDKs. Swift full migration shipped; Kotlin/Dart/RN scaffolds (`@Deprecated` + mapper stubs awaiting per-SDK body in v2.1-1b/c/d follow-ups); Web trivially satisfied (never had a parallel type). See `docs/migrations/VoiceSessionEvent.md`. |
-| v3 cut-over needs 88-call-site repoint | OPEN — Tier 3 prerequisite |
-| ~~Per-SDK total-LOC criteria unmeasured~~ | **CLOSED** by Item 1 of v2.1 quick-wins PR — see "Per-SDK LOC measurement" section below. Headline: Kotlin 60% over target (PARTIAL), Swift+Dart at target (OK). |
-| `p50 ≤ 1ms` claim unproven | PARTIAL — harness DONE in v2.1 quick-wins Item 3 (`tests/streaming/perf_bench/` with C++ producer + 4-language consumer scaffolds + Python aggregator); per-SDK runner integration is the v2.1-2 follow-up. C++ producer measures 362 ns/event locally. |
+| Sample-app regression invisible to CI | OPEN — needs T2-3 |
+| ~~Auth divergence if backend changes refresh policy~~ | **CLOSED** by v2.1 quick-wins Item 4 |
+| ~~`VoiceSessionEvent` schema drift~~ | **CLOSED** by v2.1-1 + v3 Phase A (all 4 SDKs have real mapper bodies now — Swift/Kotlin/Dart/RN; Web trivially satisfied) |
+| ~~v3 cut-over needs 88-call-site repoint~~ | **CLOSED** by v3.0.0 Phase B (consumer reroute) + Phase C1 (registry deletion) |
+| ~~Per-SDK total-LOC criteria unmeasured~~ | **CLOSED** by v2.1 quick-wins Item 1 |
+| `p50 ≤ 1ms` claim unproven | PARTIAL — harness shipped; per-SDK runner integration is the T2-2 follow-up. C++ producer measures 362 ns/event locally. |
 | CI environment drift | OPEN — pin Homebrew/NDK/Flutter versions |
-| ~~Sample apps fail to build on v3 escalation~~ | **MITIGATED** by Phase B |
+| ~~Sample apps fail to build on v3 escalation~~ | **MITIGATED** — deprecated shims retained in v3.0.0; deletion in v3.1 with sample-app migration |
 | ~~Kotlin orphan native UnsatisfiedLinkError~~ | **CLOSED** by Phase C (99/99 cleared) |
 | ~~Test coverage gap on 2 voice union arms~~ | **CLOSED** by Phase A (11/11 OK) |
+| Swift SPM `GRPCCore` import fails | OPEN — `Package.swift` ships committed `.grpc.swift` sources but doesn't declare grpc-swift as a dep; SPM resolution fails for external consumers. T2-6 closes. |
 
 ## v3-readiness PR — Phase A complete (cross-SDK consumption)
 
@@ -154,19 +155,41 @@ remaining audit items (rac_plugin_route / rac_registry_load_plugin
 not exposed through SDK FFI) are scoped separately to v3.x since app
 code generally doesn't need them — backend packages register at init.
 
-### What remains after Phase A
+### Phase A, B, C — ALL SHIPPED in v3.0.0
 
-Phase B — migrate C++ first-party code off `rac_service_*` so the
-legacy registry can be physically deleted. 10 files under
-`sdk/runanywhere-commons/src/features/` + the JNI's 2 list-provider
-call sites. After B, every `rac_service_*` caller in first-party code
-is gone.
+Phase B (12 commits `c721a9c6` → `fd8c9e7c`) — migrated C++ first-party
+code off `rac_service_*`:
+  - B0: ABI extension (added `create` op to 7 per-primitive ops structs)
+  - B1-B7: 6 engines + 2 commons registers migrated to the unified
+    plugin registry
+  - B8: 7 commons consumers rerouted through `rac_plugin_route +
+    vt->ops->create`
+  - B9-B10: 6 JNI sites + Swift CppBridge+Services migrated to
+    `rac_plugin_list`
+  - B11: grep audit confirms zero `rac_service_*` CODE references in
+    first-party trees (only historical comments remain)
 
-Phase C — `git rm service_registry.cpp`, delete deprecated public APIs
-(VoiceSessionEvent, VoiceSessionHandle, startVoiceSession /
-streamVoiceSession / processVoice, and the other DELETE-READY items
-the audit identified), bump `RAC_PLUGIN_API_VERSION` 2u → 3u, release
-as v3.0.0.
+Phase C1 (`7dc2cbdc`) — physically deleted `service_registry.cpp` (311
+LOC) + `rac_core.h` legacy block (163 LOC) + Swift CRACommons mirror
+(118 LOC) + Dart ffi_types typedefs + 12 export entries across 3
+lists. Net `-604` LOC.
+
+Phase C2 (`eee8fe79`) — deleted `buildRegistrationJSON` helper; scope-
+narrowed the broader deprecated-SDK-surface cleanup (VoiceSessionEvent,
+VoiceSessionHandle, startVoiceSession, etc.) to a v3.1 follow-up PR
+because the 4 sample apps still consume those types. See
+`docs/v3_phaseC2_scope.md`.
+
+Phase C3 (`b55d41ff`) — `RAC_PLUGIN_API_VERSION` bumped `2u → 3u`;
+semver 3.0.0 shipped across all 7 SDK package manifests. GAP 11 final-
+gate criteria #5 and #6 flipped to **OK**.
+
+Verification:
+  - `cmake --preset macos-release` + `rac_commons` + 3 engine targets
+    build cleanly under the v3 ABI.
+  - `test_proto_event_dispatch` 11/11 OK.
+  - Grep audit: zero first-party `rac_service_*` function calls
+    (only historical comments in 6 files).
 
 ## v2.1 quick-wins PR — what landed (post drift cleanup)
 

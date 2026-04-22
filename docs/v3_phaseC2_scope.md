@@ -18,10 +18,10 @@ The items originally listed in C2 fall into two categories:
 | Item | Status |
 |------|--------|
 | `voiceSessionEventFromProto` / `voiceSessionEventKindFromProto` (RN) | Safe to delete — helpers never called from sample apps. |
-| `VoiceAgentEventData` export (Web) | Stays — it's the Web SDK's idiomatic event type (no parallel `VoiceSessionEvent` ever existed); deletion would be an unrelated UX breakage. |
-| `postTelemetryEvent` (Web HTTPService) | Stays — not a deprecated API; it's actively used by the telemetry layer. |
+| `VoiceAgentEventData` (Web `VoiceAgentTypes.ts:41`) | **@deprecated** (post-audit correction). Points at the canonical proto `VoiceEvent`. Deletion is straightforward once callers migrate — not sample-app-coupled like the other SDKs' `VoiceSessionEvent`. |
+| `postTelemetryEvent` (Web `HTTPService.ts:97`) | **@deprecated** (post-audit correction). Points at the `AnalyticsEmitter` path; actively used by telemetry but should migrate. |
 | `getTTSVoices`, `getLogLevel`, `SDKErrorCode` (RN) | Need per-item audit (some are deprecated placeholders with real replacements; others are mislabeled). |
-| `buildRegistrationJSON` (Swift CppBridge+Device) | Safe to delete — internal helper, no public consumers. |
+| `buildRegistrationJSON` (Swift `CppBridge+Device.swift`) | **DELETED** in v3.0.0 Phase C2 (commit `eee8fe79`). |
 
 ### Category 2 — Deep cross-SDK + sample-app coupling
 

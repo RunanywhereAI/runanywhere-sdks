@@ -4,10 +4,12 @@
  *
  * GAP 02 Phase 7 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
  *
- * Coexists with the pre-existing `service_registry.cpp` without any behavior
- * change to legacy callers: legacy `rac_service_register_provider()` callers
- * continue to work; new plugins registered here go into a parallel table.
- * Tests in GAP 02 Phase 10 verify the two paths compose cleanly.
+ * v3.0.0: this is the SOLE plugin registration path. The legacy
+ * `service_registry.cpp` / `rac_service_register_provider()` path was
+ * removed in Phase C1. All engine backends (llamacpp, onnx, whispercpp,
+ * whisperkit_coreml, metalrt, platform) register via
+ * `rac_plugin_register(rac_plugin_entry_<name>())`, and commons consumers
+ * route through `rac_plugin_route` + `vt->ops->create`.
  */
 
 #include <algorithm>

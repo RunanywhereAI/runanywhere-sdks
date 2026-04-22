@@ -4,50 +4,54 @@ _Closes [`v2_gap_specs/GAP_11_LEGACY_CLEANUP.md`](../v2_gap_specs/GAP_11_LEGACY_
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | `rac_service_*` declarations carry `[[deprecated]]` | OK | [`sdk/runanywhere-commons/include/rac/core/rac_core.h`](../sdk/runanywhere-commons/include/rac/core/rac_core.h) — all 4 entry points marked with the new `RAC_DEPRECATED_LEGACY_SVC` macro (C++14 `[[deprecated]]` + GCC/Clang/MSVC fallbacks). |
-| 2 | One-time runtime warning on first call | OK | `rac_legacy_warn_once(...)` helper in [`service_registry.cpp`](../sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp) emits a single `RAC_LOG_WARNING("legacy_svc", ...)` per entry point on first invocation. Thread-safe via `std::atomic<bool>` flag in a guarded map. |
+| 1 | `rac_service_*` declarations carry `[[deprecated]]` | **SUPERSEDED** (v3.0.0 C1) | v2 shipped `RAC_DEPRECATED_LEGACY_SVC` markers on the 4 `rac_service_*` entry points. v3.0.0 Phase C1 DELETED those declarations + the macro entirely. There is nothing left to mark deprecated. |
+| 2 | One-time runtime warning on first call | **SUPERSEDED** (v3.0.0 C1) | v2 shipped a `rac_legacy_warn_once(...)` helper inside `service_registry.cpp`. v3.0.0 Phase C1 deleted `service_registry.cpp` entirely — first-time-caller warnings are no longer needed because the entry points don't exist. |
 | 3 | `engine_plugin_authoring.md` documents migration | OK | New §"Migrating off the legacy service registry (GAP 11 Phase 29)" in [`docs/engine_plugin_authoring.md`](engine_plugin_authoring.md) with the full call-site translation table. |
 | 4 | All call sites identified | OK | [`docs/gap11_audit_repoint.md`](gap11_audit_repoint.md) — 88 references across 30 files, broken down by SDK / commons / engines. |
 | 5 | `service_registry.cpp` `git rm` + headers gone | **OK** (v3.0.0 C1) | Phase v3-C1 physically deleted `sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp` (311 LOC) + the 163-LOC legacy block in `rac/core/rac_core.h` + 118-LOC Swift CRACommons mirror + Dart ffi_types typedef block + 4 exports × 3 export lists. Zero references remain in first-party code. Build verified: cmake --preset macos-release + rac_commons + 3 engine targets link cleanly. |
 | 6 | `RAC_PLUGIN_API_VERSION` bumped to `3u` | **OK** (v3.0.0 C3) | Phase v3-C3 bumped `RAC_PLUGIN_API_VERSION` from `2u` to `3u` in `rac/plugin/rac_plugin_entry.h`. Version-history entry documents the `create(...)` op addition to 7 per-primitive ops structs + VAD `initialize` + legacy service-registry removal. Plugins built against v2 are now rejected at register time (the new `create` slot is unreachable otherwise — safe failure mode). Semver 3.0.0 shipped across all 7 package manifests (Package.swift / runanywhere-commons VERSION / runanywhere-swift VERSION / 4 pubspec.yaml / 4 package.json / Kotlin build.gradle.kts fallback). |
 | 7 | Post-mortem covering all gaps shipped | OK | [`docs/v2_migration_complete.md`](v2_migration_complete.md) (this commit). |
 
-## Why deprecation, not delete
+## History (v2 → v3 progression)
 
-The spec calls Phase 31 the "final v2 gate" — and the gate's exit
-criterion is "single PR #494 ready to merge to main". That PR ships the
-entire **deprecation pressure** (compile-time `[[deprecated]]` + runtime
-warning + audit + migration doc) but **not** the actual `git rm`,
-because:
+This gap shipped in two waves:
 
-1. The `git rm` would break 30 files that still call `rac_service_*`.
-2. Each of those callers needs per-platform behavioral verification,
-   which the soak window provides.
-3. A struct-layout-incompatible change (removing `rac_service_provider_t`)
-   is by convention a **major** version event — `v3.0`. v2 is the
-   "deprecation release"; v3 is the "delete release".
+**v2 (original gate)** — deprecation pressure only. Added
+`[[deprecated]]` markers on the 4 `rac_service_*` entry points, a
+one-time runtime warning helper, a migration doc, and a call-site
+audit. No `git rm`; no API-version bump. Rationale at the time: "the
+`git rm` would break 30 files that still call `rac_service_*`; each
+needs per-platform behavioral verification; a struct-layout-incompatible
+change is a major-version event."
 
-This matches Square's Wire 3.x → 4.x and gRPC `Server` → `aio.server`
-migration shapes documented in the GAP 08 final gate.
+**v3.0.0 (this release)** — delete + bump. 15 commits
+`c721a9c6` → `b55d41ff` executed the full deletion:
 
-## Commits in this series
+1. **Phase B0** — added `create(model_id, config_json, out_impl)` op to
+   all 7 per-primitive ops structs + `initialize(impl, model_path)` on
+   VAD (ABI extension prerequisite).
+2. **Phase B1-B7** — migrated 6 engines (llamacpp, llamacpp_vlm, onnx,
+   whispercpp, whisperkit_coreml, metalrt) + 2 commons-side registers
+   (onnx_embeddings, platform) off `rac_service_register_provider`.
+3. **Phase B8** — rerouted 7 commons consumers
+   (`rac_{llm,stt,tts,vlm,embeddings,diffusion}_create` + `vad_component`)
+   off `rac_service_create` to `rac_plugin_route + vt->ops->create`.
+4. **Phase B9-B10** — migrated 6 JNI sites + Swift `CppBridge+Services`
+   off `rac_service_list_providers`.
+5. **Phase C1** — `git rm service_registry.cpp` (311 LOC) + `rac_core.h`
+   legacy block (163 LOC) + Swift CRACommons mirror (118 LOC) + Dart
+   `ffi_types.dart` typedefs + 12 export entries across 3 lists.
+6. **Phase C3** — `RAC_PLUGIN_API_VERSION` 2u → 3u + semver 3.0.0 across
+   all 7 SDK packages.
 
-| # | Subject |
-|---|---------|
-| 1 | `feat(gap11-phase29-30-31): deprecate rac_service_*, audit, final v2 gate` (this commit) |
+See `docs/v3_phaseB_complete.md` for the per-commit audit trail.
 
-## What's in PR #494 (v2 ship)
+## Nothing remains in this gap
 
-All of GAP 01 through GAP 11 + the deferred Wave E (GAP 05). 33 phases
-across 6 waves. See `docs/v2_migration_complete.md` for the
-architecture-as-built diagram and total LOC delta.
-
-## What's deferred to v3
-
-- `git rm sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp`
-- `git rm` of related headers (`rac_capability_t`, `rac_service_provider_t`)
-- `RAC_PLUGIN_API_VERSION` 2u → 3u
-- Per-call-site repoint of 30 files (per `docs/gap11_audit_repoint.md`)
+Every criterion is OK. The deferred-deprecation-delete (VoiceSessionEvent
+etc.) scope tracked in `docs/v3_phaseC2_scope.md` is **outside** GAP 11
+— those are SDK-level deprecated APIs, not the `rac_service_*` legacy
+registry surface that GAP 11 covered.
 - Physical deletion of the Wave D deprecation-marked orchestration
   bodies (per `docs/gap08_final_gate_report.md` "Files marked for
   deletion" table)

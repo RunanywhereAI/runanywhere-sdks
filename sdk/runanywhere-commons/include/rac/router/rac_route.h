@@ -9,10 +9,12 @@
  * class directly. The wrapper internally uses `HardwareProfile::cached()` so
  * the per-host probe runs once per process.
  *
- * This API is parallel to the legacy `rac_service_create()` (which lives in
- * service_registry.cpp); both can be active simultaneously. The legacy path
- * remains the default for the existing C ABI surface; new code paths that
- * want hardware-aware routing call `rac_plugin_route` instead.
+ * v3.0.0: this is now the ONLY routing API. The legacy `rac_service_create()`
+ * / `service_registry.cpp` path was removed in Phase C1. All commons consumers
+ * (rac_llm_create, rac_stt_create, rac_tts_create, rac_vlm_create,
+ *  rac_embeddings_create, rac_diffusion_create, vad_component.load_model)
+ * go through `rac_plugin_route(primitive, format, hints, &vt)` followed by
+ * `vt->ops->create(model_id, config_json, &impl)`.
  */
 
 #ifndef RAC_ROUTER_ROUTE_H

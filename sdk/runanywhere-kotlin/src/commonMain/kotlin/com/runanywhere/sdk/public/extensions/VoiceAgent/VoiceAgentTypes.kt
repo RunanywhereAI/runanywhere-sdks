@@ -179,12 +179,15 @@ data class VoiceAgentConfiguration(
  * See `docs/migrations/VoiceSessionEvent.md` for the 10-case → 8-payload
  * mapping table, the full dropout list, and the migration guide.
  *
- * **v2.1-1 Kotlin status**: SCAFFOLD. The `companion object { from(event) }`
- * mapper returns null for every input today — Swift is the template
- * at `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. Full Kotlin
- * implementation is the v2.1-1b per-SDK cleanup PR (requires importing
- * Wire-generated com.runanywhere.v1.VoiceEvent + per-Kotlin-idiom
- * sealed-subclass matching).
+ * **v3 Phase A status (shipped)**: the `companion object { from(event) }`
+ * mapper is FULLY IMPLEMENTED — it switches on `VoiceEvent.payload` and
+ * returns the matching subclass (or null for dropout payloads like
+ * MetricsEvent / InterruptedEvent). Source: `Companion.from(...)` below.
+ *
+ * **v3.1 follow-up**: this entire sealed class (and its `from()` mapper)
+ * is scheduled for deletion once sample apps migrate off
+ * `RunAnywhere.processVoice` / `startVoiceSession` / `streamVoiceSession`.
+ * See `docs/v3_phaseC2_scope.md` for the deferred-deletion plan.
  */
 @Deprecated(
     message = "Use VoiceEvent via VoiceAgentStreamAdapter.stream(). " +

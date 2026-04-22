@@ -13,11 +13,74 @@
 #define RAC_VAD_SERVICE_H
 
 #include "rac_error.h"
-#include "rac_vad_types.h"
+#include "vad/rac_vad_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// =============================================================================
+// SERVICE VTABLE - Backend implementations provide this
+// =============================================================================
+
+/**
+ * VAD Service operations vtable.
+ * Each backend implements these functions and provides a static vtable.
+ * Mirrors the STT service vtable pattern (rac_stt_service.h).
+ */
+typedef struct rac_vad_service_ops {
+    /** Process audio samples and detect speech */
+    rac_result_t (*process)(void* impl, const float* samples, size_t num_samples,
+                            rac_bool_t* out_is_speech);
+
+    /** Start VAD processing session */
+    rac_result_t (*start)(void* impl);
+
+    /** Stop VAD processing session */
+    rac_result_t (*stop)(void* impl);
+
+    /** Reset VAD internal state */
+    rac_result_t (*reset)(void* impl);
+
+    /** Set detection threshold */
+    rac_result_t (*set_threshold)(void* impl, float threshold);
+
+    /** Query whether speech is currently active */
+    rac_bool_t (*is_speech_active)(void* impl);
+
+    /** Destroy the backend service */
+    void (*destroy)(void* impl);
+
+    /**
+     * Initialize with a model path (v3: added for symmetry with other
+     * primitives). Optional — NULL means the backend doesn't require
+     * per-model initialization (e.g. energy-based VAD). Model-based
+     * VAD engines (ONNX Silero, etc.) MUST implement this.
+     */
+    rac_result_t (*initialize)(void* impl, const char* model_path);
+
+    /**
+     * Allocate a backend-specific impl for a new VAD service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
+} rac_vad_service_ops_t;
+
+/**
+ * VAD Service instance.
+ * Contains vtable pointer and backend-specific implementation.
+ */
+typedef struct rac_vad_service {
+    /** Vtable with backend operations */
+    const rac_vad_service_ops_t* ops;
+
+    /** Backend-specific implementation handle */
+    void* impl;
+
+    /** Model ID for reference */
+    const char* model_id;
+} rac_vad_service_t;
 
 // =============================================================================
 // SERVICE INTERFACE - Mirrors Swift's VADService protocol

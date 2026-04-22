@@ -43,8 +43,14 @@ import Foundation
 let useLocalNatives = false //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
-// Updated automatically by CI/CD during releases
-let sdkVersion = "0.19.13"
+// Updated automatically by CI/CD during releases.
+//
+// v3.0.0 audit-fix: bumped from 0.19.13 to match VERSION / Package manifests
+// now that semver 3.0.0 shipped in Phase C3. Remote XCFramework URLs expect
+// `RACommons-ios-v3.0.0.zip` at the v3.0.0 GitHub release; consumers should
+// set `useLocalNatives = true` until release automation publishes the v3.0.0
+// artifacts.
+let sdkVersion = "3.0.0"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip

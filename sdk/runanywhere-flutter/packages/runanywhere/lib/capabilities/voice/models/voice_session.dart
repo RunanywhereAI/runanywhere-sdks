@@ -57,10 +57,14 @@ class STTOutput {
 /// See `docs/migrations/VoiceSessionEvent.md` for the 10-case →
 /// 8-payload mapping table and migration guide.
 ///
-/// **v2.1-1 Dart status**: SCAFFOLD. The static `fromProto(event)`
-/// mapper returns null for every input today — Swift is the template
-/// at `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. Full Dart
-/// implementation is the v2.1-1c per-SDK cleanup PR.
+/// **v3 Phase A status (shipped)**: the static `fromProto(event)` mapper is
+/// FULLY IMPLEMENTED — it switches on `VoiceEvent.whichPayload()` and
+/// returns the matching subclass (or null for dropout payloads). See
+/// `VoiceSessionEvent.fromProto` below.
+///
+/// **v3.1 follow-up**: this sealed class (and its `fromProto` mapper) is
+/// scheduled for deletion once sample apps migrate off
+/// `RunAnywhere.startVoiceSession`. See `docs/v3_phaseC2_scope.md`.
 @Deprecated(
   'Use VoiceEvent via VoiceAgentStreamAdapter.stream(). '
   'VoiceSessionEvent is a derived view — see docs/migrations/VoiceSessionEvent.md',

@@ -10,8 +10,9 @@
 #ifndef RAC_LLM_SERVICE_H
 #define RAC_LLM_SERVICE_H
 
+#include "rac_benchmark.h"
 #include "rac_error.h"
-#include "rac_llm_types.h"
+#include "llm/rac_llm_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,6 +38,22 @@ typedef struct rac_llm_service_ops {
     rac_result_t (*generate_stream)(void* impl, const char* prompt,
                                     const rac_llm_options_t* options,
                                     rac_llm_stream_callback_fn callback, void* user_data);
+
+    /**
+     * Generate text with streaming callback and benchmark timing.
+     * Optional: backends that don't support timing can leave this NULL.
+     * If NULL, rac_llm_generate_stream_with_timing falls back to generate_stream.
+     *
+     * Backends that implement this should capture:
+     * - t2: Before prefill (llama_decode for prompt)
+     * - t3: After prefill completes
+     * - t5: When decode loop exits (last token)
+     */
+    rac_result_t (*generate_stream_with_timing)(void* impl, const char* prompt,
+                                                const rac_llm_options_t* options,
+                                                rac_llm_stream_callback_fn callback,
+                                                void* user_data,
+                                                rac_benchmark_timing_t* timing_out);
 
     /** Get service info */
     rac_result_t (*get_info)(void* impl, rac_llm_info_t* out_info);
@@ -78,6 +95,26 @@ typedef struct rac_llm_service_ops {
 
     /** Clear all KV cache state (optional, NULL if not supported) */
     rac_result_t (*clear_context)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new service instance.
+     *
+     * v3 (RAC_PLUGIN_API_VERSION=3u): replaces the legacy
+     * rac_service_provider_t::create callback from the deleted
+     * service_registry.cpp. Called by commons rac_llm_create() after
+     * rac_plugin_route picks this plugin; the returned impl is passed
+     * to every other ops method (initialize, generate, ..., destroy).
+     *
+     * @param model_id    Model ID or filesystem path. Caller-owned; copy if retaining.
+     * @param config_json Optional JSON config (NULL = backend defaults). Plugins
+     *                    that don't understand config_json MUST ignore it and
+     *                    succeed with defaults.
+     * @param out_impl    Receives heap-allocated backend handle.
+     *                    NULL on failure.
+     *
+     * @return RAC_SUCCESS on success; out_impl is NULL on failure.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_llm_service_ops_t;
 
 /**
@@ -145,6 +182,32 @@ RAC_API rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
 RAC_API rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
                                              const rac_llm_options_t* options,
                                              rac_llm_stream_callback_fn callback, void* user_data);
+
+/**
+ * @brief Stream generate text with benchmark timing
+ *
+ * Same as rac_llm_generate_stream but with optional benchmark timing.
+ * If timing_out is non-NULL and the backend supports timing, captures:
+ * - t2: Before prefill
+ * - t3: After prefill
+ * - t5: Last token generated
+ *
+ * If the backend doesn't implement generate_stream_with_timing, falls back
+ * to generate_stream (timing_out will have t2/t3/t5 as zeros).
+ *
+ * @param handle Service handle
+ * @param prompt Input prompt
+ * @param options Generation options (can be NULL for defaults)
+ * @param callback Callback for each token
+ * @param user_data User context passed to callback
+ * @param timing_out Output: Benchmark timing (can be NULL for no timing)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_llm_generate_stream_with_timing(rac_handle_t handle, const char* prompt,
+                                                         const rac_llm_options_t* options,
+                                                         rac_llm_stream_callback_fn callback,
+                                                         void* user_data,
+                                                         rac_benchmark_timing_t* timing_out);
 
 /**
  * @brief Get service information
@@ -227,8 +290,8 @@ RAC_API rac_result_t rac_llm_append_context(rac_handle_t handle, const char* tex
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_llm_generate_from_context(rac_handle_t handle, const char* query,
-                                                    const rac_llm_options_t* options,
-                                                    rac_llm_result_t* out_result);
+                                                   const rac_llm_options_t* options,
+                                                   rac_llm_result_t* out_result);
 
 /**
  * @brief Clear all KV cache state
