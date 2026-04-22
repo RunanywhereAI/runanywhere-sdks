@@ -1,0 +1,53 @@
+// RunAnywhere IDL — LLM token streaming service.
+//
+// GAP 09 Phase 12. Server-streaming rpc returning per-token deltas during
+// LLM generation. Replaces the 5 hand-written token-stream implementations
+// (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
+// RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LLMServiceProto";
+option objc_class_prefix     = "RAV1";
+option swift_prefix          = "RA";
+
+message LLMGenerateRequest {
+    string prompt           = 1;
+    int32  max_tokens       = 2;
+    float  temperature      = 3;
+    float  top_p            = 4;
+    int32  top_k            = 5;
+    string system_prompt    = 6;
+    bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
+}
+
+// One token delta. Matches AssistantTokenEvent in voice_events.proto so
+// callers that already speak that type can reuse decoders.
+message LLMToken {
+    string text          = 1;
+    bool   is_final      = 2;
+    LLMTokenKind kind    = 3;
+    // Optional per-token logprob, populated when the engine supports it.
+    // 0.0 = no logprob available (proto3 scalar default).
+    float  logprob       = 4;
+    int64  emit_us       = 5;  // wall-clock timestamp at C++ edge
+}
+
+enum LLMTokenKind {
+    LLM_TOKEN_KIND_UNSPECIFIED = 0;
+    LLM_TOKEN_KIND_ANSWER      = 1;
+    LLM_TOKEN_KIND_THOUGHT     = 2;
+    LLM_TOKEN_KIND_TOOL_CALL   = 3;
+}
+
+service LLM {
+    // Server-streaming: emits one LLMToken per generated token until
+    // is_final=true. Cancellation aborts the underlying generation via
+    // the existing rac_llm_cancel() C ABI.
+    rpc Generate(LLMGenerateRequest) returns (stream LLMToken);
+}

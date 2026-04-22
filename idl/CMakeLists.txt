@@ -21,6 +21,10 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/voice_events.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/pipeline.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/solutions.proto
+    # GAP 09 Phase 12 — streaming service definitions (gRPC-style).
+    ${CMAKE_CURRENT_SOURCE_DIR}/voice_agent_service.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/llm_service.proto
+    ${CMAKE_CURRENT_SOURCE_DIR}/download_service.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

@@ -37,4 +37,13 @@ echo "▶ Python proto codegen"
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"
 
+# GAP 09 Phase 14: AsyncIterable<T> stream wrappers for RN + Web. The
+# template-based renderer is intentionally separate from generate_ts.sh
+# (which uses ts-proto for messages) — different tools, different outputs.
+echo "▶ RN AsyncIterable streams (GAP 09)"
+"${SCRIPT_DIR}/generate_rn_streams.sh"
+
+echo "▶ Web AsyncIterable streams (GAP 09)"
+"${SCRIPT_DIR}/generate_web_streams.sh"
+
 echo "✓ All proto codegen complete."

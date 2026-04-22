@@ -29,9 +29,17 @@ if ! command -v protoc-gen-dart >/dev/null 2>&1; then
     exit 127
 fi
 
+# Message types — always emitted.
 protoc \
     --proto_path="${PROTO_DIR}" \
     --dart_out="${OUT_DIR}" \
     model_types.proto voice_events.proto pipeline.proto solutions.proto
 
-echo "✓ Dart proto codegen → ${OUT_DIR}"
+# GAP 09 service definitions — protoc_plugin emits both message types AND
+# `Stream<T>` gRPC client stubs (*.pbgrpc.dart) when --dart_out=grpc:<dir>.
+protoc \
+    --proto_path="${PROTO_DIR}" \
+    --dart_out="grpc:${OUT_DIR}" \
+    voice_agent_service.proto llm_service.proto download_service.proto
+
+echo "✓ Dart proto codegen + gRPC stubs → ${OUT_DIR}"

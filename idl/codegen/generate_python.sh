@@ -26,13 +26,27 @@ if ! command -v protoc >/dev/null 2>&1; then
     exit 127
 fi
 
+# Message types — always emitted (protoc handles all 7 .proto files).
 protoc \
     --proto_path="${PROTO_DIR}" \
     --python_out="${OUT_DIR}" \
     --pyi_out="${OUT_DIR}" \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto
+    model_types.proto voice_events.proto pipeline.proto solutions.proto \
+    voice_agent_service.proto llm_service.proto download_service.proto
+
+# GAP 09: gRPC client stubs (AsyncIterator[T]) via grpcio-tools. Optional —
+# emits *_pb2_grpc.py only when the python -m grpc_tools.protoc plugin is
+# available. Frontends consume these via grpc.aio.
+if python3 -c "import grpc_tools.protoc" >/dev/null 2>&1; then
+    python3 -m grpc_tools.protoc \
+        --proto_path="${PROTO_DIR}" \
+        --grpc_python_out="${OUT_DIR}" \
+        voice_agent_service.proto llm_service.proto download_service.proto
+    echo "✓ Python proto codegen + gRPC stubs → ${OUT_DIR}"
+else
+    echo "note: grpc_tools.protoc not installed; skipping streaming stubs."
+    echo "      Install via: python3 -m pip install grpcio-tools"
+fi
 
 # Ensure the package is importable.
 touch "${OUT_DIR}/__init__.py"
-
-echo "✓ Python proto codegen → ${OUT_DIR}"

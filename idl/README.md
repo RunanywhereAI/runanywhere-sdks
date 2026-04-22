@@ -4,12 +4,15 @@
 struct, streaming event, and pipeline/solution config across every SDK.**
 No frontend hand-defines its own copy; every language consumes codegen output.
 
-| File                | Purpose                                                                  |
-|---------------------|--------------------------------------------------------------------------|
-| `model_types.proto` | Model / framework / audio / category / environment / artifact enums + `ModelInfo` struct |
-| `voice_events.proto`| Streaming events emitted by the VoiceAgent pipeline                      |
-| `pipeline.proto`    | General DAG specification (operators + edges + options)                  |
-| `solutions.proto`   | Ergonomic configs for VoiceAgent, RAG, WakeWord, AgentLoop, TimeSeries   |
+| File                       | Purpose                                                                  |
+|----------------------------|--------------------------------------------------------------------------|
+| `model_types.proto`        | Model / framework / audio / category / environment / artifact enums + `ModelInfo` struct |
+| `voice_events.proto`       | Streaming events emitted by the VoiceAgent pipeline                      |
+| `pipeline.proto`           | General DAG specification (operators + edges + options)                  |
+| `solutions.proto`          | Ergonomic configs for VoiceAgent, RAG, WakeWord, AgentLoop, TimeSeries   |
+| `voice_agent_service.proto`| **GAP 09**: gRPC-style streaming service for VoiceAgent (yields VoiceEvent) |
+| `llm_service.proto`        | **GAP 09**: gRPC-style streaming service for LLM token deltas             |
+| `download_service.proto`   | **GAP 09**: gRPC-style streaming service for model download progress     |
 
 ## Regenerating bindings
 

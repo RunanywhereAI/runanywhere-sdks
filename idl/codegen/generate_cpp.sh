@@ -32,7 +32,8 @@ fi
 protoc \
     --proto_path="${PROTO_DIR}" \
     --cpp_out="${OUT_DIR}" \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto
+    model_types.proto voice_events.proto pipeline.proto solutions.proto \
+    voice_agent_service.proto llm_service.proto download_service.proto
 
 echo "✓ C++ proto codegen → ${OUT_DIR}"
 ls -1 "${OUT_DIR}"

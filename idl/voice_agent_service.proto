@@ -1,0 +1,41 @@
+// RunAnywhere IDL — voice agent streaming service.
+//
+// GAP 09 Phase 12 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
+//
+// gRPC-style service whose `Stream` rpc returns a server-streaming sequence
+// of `VoiceEvent` messages (defined in voice_events.proto). This is NOT
+// transported over network gRPC — frontends use the codegen-emitted client
+// stub purely for its idiomatic streaming type (AsyncStream / Flow / Stream
+// / AsyncIterable) and wire it to the in-process C callback via a thin
+// adapter (~150 LOC per language).
+//
+// The service definition is the abstract contract; the per-language
+// adapter is the only hand-written piece (see GAP 09 Phases 16-19).
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "voice_events.proto";
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "VoiceAgentServiceProto";
+option objc_class_prefix     = "RAV1";
+option swift_prefix          = "RA";
+
+// Empty request type — the voice agent already has its config set via
+// `rac_voice_agent_init()` at handle creation time. The Stream rpc just
+// opens a new event subscription on an existing handle.
+message VoiceAgentRequest {
+    // Optional: filter the stream to only certain VoiceEvent.payload arms
+    // (e.g. "user_said,assistant_token"). Empty = all events.
+    string event_filter = 1;
+}
+
+service VoiceAgent {
+    // Server-streaming: the agent emits VoiceEvents until the client
+    // cancels the stream or the agent reaches its terminal state.
+    rpc Stream(VoiceAgentRequest) returns (stream VoiceEvent);
+}

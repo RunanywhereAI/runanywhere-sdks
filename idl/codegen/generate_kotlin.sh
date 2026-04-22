@@ -23,11 +23,24 @@ OUT_DIR="${REPO_ROOT}/sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhe
 mkdir -p "${OUT_DIR}"
 
 if command -v wire-compiler >/dev/null 2>&1; then
+    # Wire emits pure Kotlin data classes for messages. GAP 09 service
+    # definitions are passed too — Wire treats `service { rpc ... }` blocks
+    # as informational and emits the message types only. The streaming
+    # client wrapper is hand-written in
+    # sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/.../adapters/
+    # using kotlinx.coroutines Flow + the Wire-generated message types.
     wire-compiler \
         --proto_path="${PROTO_DIR}" \
         --kotlin_out="${OUT_DIR}" \
-        model_types.proto voice_events.proto pipeline.proto solutions.proto
+        model_types.proto voice_events.proto pipeline.proto solutions.proto \
+        voice_agent_service.proto llm_service.proto download_service.proto
     echo "✓ Kotlin proto codegen → ${OUT_DIR}"
+
+    # Note: protoc-gen-grpckt (grpc-kotlin official plugin) emits
+    # com.google.protobuf-style Java messages + Flow client stubs. We do
+    # NOT use it here because it would force a Java protobuf runtime
+    # dependency in commonMain (breaks KMP). The hand-written ~150 LOC
+    # adapter (Wave C Phase 17) is the bridge.
 else
     echo "warning: wire-compiler not on PATH." >&2
     echo "         The Gradle Wire plugin in sdk/runanywhere-kotlin/build.gradle.kts" >&2

@@ -13,9 +13,15 @@
 #   protoc                 25.x     (shared, all languages)
 #   protoc-gen-swift       1.27.x   (swift-protobuf)
 #   wire-compiler          4.9.x    (Kotlin via Square Wire)
-#   protoc_plugin          21.1.2   (Dart)
-#   ts-proto               1.181.x  (TypeScript)
-#   google-protobuf Python 4.25.x   (Python)
+#   protoc_plugin          21.1.2   (Dart — emits *.pb.dart and *.pbgrpc.dart)
+#   ts-proto               1.181.x  (TypeScript message types)
+#   google-protobuf Python 4.25.x   (Python message types)
+#
+# GAP 09 streaming services (server-streaming gRPC client stubs):
+#   protoc-gen-grpc-swift  1.21.x   (Swift AsyncStream client wrappers)
+#   grpcio-tools           1.65.x   (Python AsyncIterator client wrappers)
+#   protoc-gen-grpckt      NOT installed by default — see generate_kotlin.sh
+#                                    note about KMP commonMain incompatibility.
 #
 # Usage:
 #   ./scripts/setup-toolchain.sh          # install / upgrade
@@ -41,6 +47,9 @@ WIRE_EXPECTED="4.9"
 PROTOC_PLUGIN_DART_EXPECTED="21.1.2"
 TS_PROTO_EXPECTED="1.181"
 PYTHON_PROTOBUF_EXPECTED="4.25"
+# GAP 09 streaming additions:
+GRPC_SWIFT_EXPECTED="1.21"
+GRPCIO_TOOLS_EXPECTED="1.65"
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
@@ -121,9 +130,26 @@ install_ts_proto() {
 
 install_python_protobuf() {
     if have python3; then
-        python3 -m pip install --user --upgrade "protobuf>=${PYTHON_PROTOBUF_EXPECTED},<5" grpcio-tools
+        python3 -m pip install --user --upgrade \
+            "protobuf>=${PYTHON_PROTOBUF_EXPECTED},<5" \
+            "grpcio-tools>=${GRPCIO_TOOLS_EXPECTED}"   # GAP 09: AsyncIterator client stubs
     else
         echo "warning: python3 not on PATH — skipping pip install." >&2
+    fi
+}
+
+install_grpc_swift() {
+    if have protoc-gen-grpc-swift; then
+        echo "• protoc-gen-grpc-swift already present."
+        return 0
+    fi
+    if [ "${OS}" = "mac" ]; then
+        # grpc-swift v1 ships protoc-gen-grpc-swift via Homebrew.
+        brew install grpc-swift 2>/dev/null || \
+            echo "warning: 'brew install grpc-swift' failed — install from https://github.com/grpc/grpc-swift" >&2
+    else
+        echo "warning: GAP 09 Swift streaming codegen needs protoc-gen-grpc-swift on Linux/Win." >&2
+        echo "         Build from https://github.com/grpc/grpc-swift (release/1.x) and put on PATH." >&2
     fi
 }
 
@@ -175,6 +201,7 @@ install_wire
 install_dart_plugin
 install_ts_proto
 install_python_protobuf
+install_grpc_swift   # GAP 09 streaming codegen for Swift (Apple-only Homebrew bottle).
 
 echo ""
 echo "▶ Verifying installed versions:"
