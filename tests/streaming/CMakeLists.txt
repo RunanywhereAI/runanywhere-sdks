@@ -55,3 +55,23 @@ target_link_libraries(perf_producer PRIVATE rac_commons)
 target_compile_features(perf_producer PRIVATE cxx_std_17)
 set_target_properties(perf_producer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/streaming/perf_bench")
+
+# =============================================================================
+# cancel_parity/ — GAP 09 #7 cancellation-parity harness (v3.1 Phase 5.1)
+#
+# cancel_producer.cpp emits N=1000 VoiceEvent frames with an
+# InterruptedEvent (reason=APP_STOP) injected at index 500. Per-SDK
+# consumers subscribe, count events received up to the interrupted
+# marker, call their cancel path, and verify the stream stops within
+# 50ms. compare_cancel_traces.py aggregates per-SDK traces and asserts
+# wire-level parity (all 5 SDKs observe the cancel at the same ordinal).
+# =============================================================================
+
+add_executable(cancel_producer cancel_parity/cancel_producer.cpp)
+target_include_directories(cancel_producer PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(cancel_producer PRIVATE rac_commons)
+target_compile_features(cancel_producer PRIVATE cxx_std_17)
+set_target_properties(cancel_producer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/streaming/cancel_parity")
