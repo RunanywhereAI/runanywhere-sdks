@@ -91,6 +91,22 @@ public class MetricsEvent(
     schemaIndex = 6,
   )
   public val is_over_budget: Boolean = false,
+  /**
+   * v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+   * producer (C++ dispatcher) at event-emit time; read by consumers
+   * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
+   * latency without relying on wall-clock sync. Encoded as int64 so
+   * std::chrono::steady_clock::now().time_since_epoch() values fit
+   * directly (2^63 ns ≈ 292 years of runtime headroom).
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "createdAtNs",
+    schemaIndex = 7,
+  )
+  public val created_at_ns: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<MetricsEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -111,6 +127,7 @@ public class MetricsEvent(
     if (tokens_generated != other.tokens_generated) return false
     if (audio_samples_played != other.audio_samples_played) return false
     if (is_over_budget != other.is_over_budget) return false
+    if (created_at_ns != other.created_at_ns) return false
     return true
   }
 
@@ -125,6 +142,7 @@ public class MetricsEvent(
       result = result * 37 + tokens_generated.hashCode()
       result = result * 37 + audio_samples_played.hashCode()
       result = result * 37 + is_over_budget.hashCode()
+      result = result * 37 + created_at_ns.hashCode()
       super.hashCode = result
     }
     return result
@@ -139,6 +157,7 @@ public class MetricsEvent(
     result += """tokens_generated=$tokens_generated"""
     result += """audio_samples_played=$audio_samples_played"""
     result += """is_over_budget=$is_over_budget"""
+    result += """created_at_ns=$created_at_ns"""
     return result.joinToString(prefix = "MetricsEvent{", separator = ", ", postfix = "}")
   }
 
@@ -150,9 +169,11 @@ public class MetricsEvent(
     tokens_generated: Long = this.tokens_generated,
     audio_samples_played: Long = this.audio_samples_played,
     is_over_budget: Boolean = this.is_over_budget,
+    created_at_ns: Long = this.created_at_ns,
     unknownFields: ByteString = this.unknownFields,
   ): MetricsEvent = MetricsEvent(stt_final_ms, llm_first_token_ms, tts_first_audio_ms,
-      end_to_end_ms, tokens_generated, audio_samples_played, is_over_budget, unknownFields)
+      end_to_end_ms, tokens_generated, audio_samples_played, is_over_budget, created_at_ns,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -180,6 +201,8 @@ public class MetricsEvent(
             value.audio_samples_played)
         if (value.is_over_budget != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
             value.is_over_budget)
+        if (value.created_at_ns != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.created_at_ns)
         return size
       }
 
@@ -198,11 +221,15 @@ public class MetricsEvent(
             value.audio_samples_played)
         if (value.is_over_budget != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
             value.is_over_budget)
+        if (value.created_at_ns != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.created_at_ns)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: MetricsEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.created_at_ns != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.created_at_ns)
         if (value.is_over_budget != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
             value.is_over_budget)
         if (value.audio_samples_played != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
@@ -227,6 +254,7 @@ public class MetricsEvent(
         var tokens_generated: Long = 0L
         var audio_samples_played: Long = 0L
         var is_over_budget: Boolean = false
+        var created_at_ns: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> stt_final_ms = ProtoAdapter.DOUBLE.decode(reader)
@@ -236,6 +264,7 @@ public class MetricsEvent(
             5 -> tokens_generated = ProtoAdapter.INT64.decode(reader)
             6 -> audio_samples_played = ProtoAdapter.INT64.decode(reader)
             7 -> is_over_budget = ProtoAdapter.BOOL.decode(reader)
+            8 -> created_at_ns = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -247,6 +276,7 @@ public class MetricsEvent(
           tokens_generated = tokens_generated,
           audio_samples_played = audio_samples_played,
           is_over_budget = is_over_budget,
+          created_at_ns = created_at_ns,
           unknownFields = unknownFields
         )
       }

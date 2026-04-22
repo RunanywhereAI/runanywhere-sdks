@@ -259,6 +259,7 @@ const MetricsEvent$json = {
     {'1': 'tokens_generated', '3': 5, '4': 1, '5': 3, '10': 'tokensGenerated'},
     {'1': 'audio_samples_played', '3': 6, '4': 1, '5': 3, '10': 'audioSamplesPlayed'},
     {'1': 'is_over_budget', '3': 7, '4': 1, '5': 8, '10': 'isOverBudget'},
+    {'1': 'created_at_ns', '3': 8, '4': 1, '5': 3, '10': 'createdAtNs'},
   ],
 };
 
@@ -269,5 +270,6 @@ final $typed_data.Uint8List metricsEventDescriptor = $convert.base64Decode(
     'b19tcxgDIAEoAVIPdHRzRmlyc3RBdWRpb01zEiEKDWVuZF90b19lbmRfbXMYBCABKAFSCmVuZF'
     'RvRW5kTXMSKQoQdG9rZW5zX2dlbmVyYXRlZBgFIAEoA1IPdG9rZW5zR2VuZXJhdGVkEjAKFGF1'
     'ZGlvX3NhbXBsZXNfcGxheWVkGAYgASgDUhJhdWRpb1NhbXBsZXNQbGF5ZWQSJAoOaXNfb3Zlcl'
-    '9idWRnZXQYByABKAhSDGlzT3ZlckJ1ZGdldA==');
+    '9idWRnZXQYByABKAhSDGlzT3ZlckJ1ZGdldBIiCg1jcmVhdGVkX2F0X25zGAggASgDUgtjcmVh'
+    'dGVkQXROcw==');
 

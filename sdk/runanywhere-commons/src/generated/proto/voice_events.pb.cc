@@ -124,6 +124,7 @@ inline constexpr MetricsEvent::Impl_::Impl_(
         end_to_end_ms_{0},
         tokens_generated_{::int64_t{0}},
         audio_samples_played_{::int64_t{0}},
+        created_at_ns_{::int64_t{0}},
         is_over_budget_{false} {}
 
 template <typename>
@@ -398,7 +399,7 @@ const ::uint32_t
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_._has_bits_),
-        10, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.stt_final_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.llm_first_token_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.tts_first_audio_ms_),
@@ -406,12 +407,14 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.tokens_generated_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.audio_samples_played_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.is_over_budget_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.created_at_ns_),
         0,
         1,
         2,
         3,
         4,
         5,
+        7,
         6,
 };
 
@@ -470,39 +473,40 @@ const char descriptor_table_protodef_voice_5fevents_2eproto[] ABSL_ATTRIBUTE_SEC
     "urrent\030\002 \001(\0162\035.runanywhere.v1.PipelineSt"
     "ate\"V\n\nErrorEvent\022\014\n\004code\030\001 \001(\005\022\017\n\007messa"
     "ge\030\002 \001(\t\022\021\n\tcomponent\030\003 \001(\t\022\026\n\016is_recove"
-    "rable\030\004 \001(\010\"\303\001\n\014MetricsEvent\022\024\n\014stt_fina"
+    "rable\030\004 \001(\010\"\332\001\n\014MetricsEvent\022\024\n\014stt_fina"
     "l_ms\030\001 \001(\001\022\032\n\022llm_first_token_ms\030\002 \001(\001\022\032"
     "\n\022tts_first_audio_ms\030\003 \001(\001\022\025\n\rend_to_end"
     "_ms\030\004 \001(\001\022\030\n\020tokens_generated\030\005 \001(\003\022\034\n\024a"
     "udio_samples_played\030\006 \001(\003\022\026\n\016is_over_bud"
-    "get\030\007 \001(\010*p\n\tTokenKind\022\032\n\026TOKEN_KIND_UNS"
-    "PECIFIED\020\000\022\025\n\021TOKEN_KIND_ANSWER\020\001\022\026\n\022TOK"
-    "EN_KIND_THOUGHT\020\002\022\030\n\024TOKEN_KIND_TOOL_CAL"
-    "L\020\003*m\n\rAudioEncoding\022\036\n\032AUDIO_ENCODING_U"
-    "NSPECIFIED\020\000\022\035\n\031AUDIO_ENCODING_PCM_F32_L"
-    "E\020\001\022\035\n\031AUDIO_ENCODING_PCM_S16_LE\020\002*\231\001\n\014V"
-    "ADEventType\022\031\n\025VAD_EVENT_UNSPECIFIED\020\000\022\031"
-    "\n\025VAD_EVENT_VOICE_START\020\001\022$\n VAD_EVENT_V"
-    "OICE_END_OF_UTTERANCE\020\002\022\026\n\022VAD_EVENT_BAR"
-    "GE_IN\020\003\022\025\n\021VAD_EVENT_SILENCE\020\004*\275\001\n\017Inter"
-    "ruptReason\022 \n\034INTERRUPT_REASON_UNSPECIFI"
-    "ED\020\000\022\"\n\036INTERRUPT_REASON_USER_BARGE_IN\020\001"
-    "\022\035\n\031INTERRUPT_REASON_APP_STOP\020\002\022\'\n#INTER"
-    "RUPT_REASON_AUDIO_ROUTE_CHANGE\020\003\022\034\n\030INTE"
-    "RRUPT_REASON_TIMEOUT\020\004*\274\001\n\rPipelineState"
-    "\022\036\n\032PIPELINE_STATE_UNSPECIFIED\020\000\022\027\n\023PIPE"
-    "LINE_STATE_IDLE\020\001\022\034\n\030PIPELINE_STATE_LIST"
-    "ENING\020\002\022\033\n\027PIPELINE_STATE_THINKING\020\003\022\033\n\027"
-    "PIPELINE_STATE_SPEAKING\020\004\022\032\n\026PIPELINE_ST"
-    "ATE_STOPPED\020\005BM\n\027ai.runanywhere.proto.v1"
-    "B\020VoiceEventsProtoP\001\370\001\001\242\002\004RAV1\252\002\016Runanyw"
-    "here.V1\272\002\002RAb\006proto3"
+    "get\030\007 \001(\010\022\025\n\rcreated_at_ns\030\010 \001(\003*p\n\tToke"
+    "nKind\022\032\n\026TOKEN_KIND_UNSPECIFIED\020\000\022\025\n\021TOK"
+    "EN_KIND_ANSWER\020\001\022\026\n\022TOKEN_KIND_THOUGHT\020\002"
+    "\022\030\n\024TOKEN_KIND_TOOL_CALL\020\003*m\n\rAudioEncod"
+    "ing\022\036\n\032AUDIO_ENCODING_UNSPECIFIED\020\000\022\035\n\031A"
+    "UDIO_ENCODING_PCM_F32_LE\020\001\022\035\n\031AUDIO_ENCO"
+    "DING_PCM_S16_LE\020\002*\231\001\n\014VADEventType\022\031\n\025VA"
+    "D_EVENT_UNSPECIFIED\020\000\022\031\n\025VAD_EVENT_VOICE"
+    "_START\020\001\022$\n VAD_EVENT_VOICE_END_OF_UTTER"
+    "ANCE\020\002\022\026\n\022VAD_EVENT_BARGE_IN\020\003\022\025\n\021VAD_EV"
+    "ENT_SILENCE\020\004*\275\001\n\017InterruptReason\022 \n\034INT"
+    "ERRUPT_REASON_UNSPECIFIED\020\000\022\"\n\036INTERRUPT"
+    "_REASON_USER_BARGE_IN\020\001\022\035\n\031INTERRUPT_REA"
+    "SON_APP_STOP\020\002\022\'\n#INTERRUPT_REASON_AUDIO"
+    "_ROUTE_CHANGE\020\003\022\034\n\030INTERRUPT_REASON_TIME"
+    "OUT\020\004*\274\001\n\rPipelineState\022\036\n\032PIPELINE_STAT"
+    "E_UNSPECIFIED\020\000\022\027\n\023PIPELINE_STATE_IDLE\020\001"
+    "\022\034\n\030PIPELINE_STATE_LISTENING\020\002\022\033\n\027PIPELI"
+    "NE_STATE_THINKING\020\003\022\033\n\027PIPELINE_STATE_SP"
+    "EAKING\020\004\022\032\n\026PIPELINE_STATE_STOPPED\020\005BM\n\027"
+    "ai.runanywhere.proto.v1B\020VoiceEventsProt"
+    "oP\001\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
+    "to3"
 };
 static ::absl::once_flag descriptor_table_voice_5fevents_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fevents_2eproto = {
     false,
     false,
-    2260,
+    2283,
     descriptor_table_protodef_voice_5fevents_2eproto,
     "voice_events.proto",
     &descriptor_table_voice_5fevents_2eproto_once,
@@ -3824,16 +3828,16 @@ MetricsEvent::GetClassData() const {
   return MetricsEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 7, 0, 0, 2>
+const ::_pbi::TcParseTable<3, 8, 0, 0, 2>
 MetricsEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_._has_bits_),
     0, // no _extensions_
-    7, 56,  // max_field_number, fast_idx_mask
+    8, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967168,  // skipmap
+    4294967040,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    7,  // num_field_entries
+    8,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     MetricsEvent_class_data_.base(),
@@ -3843,7 +3847,10 @@ MetricsEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::MetricsEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // int64 created_at_ns = 8;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(MetricsEvent, _impl_.created_at_ns_), 6>(),
+     {64, 6, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.created_at_ns_)}},
     // double stt_final_ms = 1;
     {::_pbi::TcParser::FastF64S1,
      {9, 0, 0,
@@ -3869,8 +3876,8 @@ MetricsEvent::_table_ = {
      {48, 5, 0,
       PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.audio_samples_played_)}},
     // bool is_over_budget = 7;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(MetricsEvent, _impl_.is_over_budget_), 6>(),
-     {56, 6, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(MetricsEvent, _impl_.is_over_budget_), 7>(),
+     {56, 7, 0,
       PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_)}},
   }}, {{
     65535, 65535
@@ -3888,7 +3895,9 @@ MetricsEvent::_table_ = {
     // int64 audio_samples_played = 6;
     {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.audio_samples_played_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // bool is_over_budget = 7;
-    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // int64 created_at_ns = 8;
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.created_at_ns_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
   }},
   // no aux_entries
   {{
@@ -3902,7 +3911,7 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     ::memset(&_impl_.stt_final_ms_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.is_over_budget_) -
         reinterpret_cast<char*>(&_impl_.stt_final_ms_)) + sizeof(_impl_.is_over_budget_));
@@ -3985,11 +3994,20 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
   }
 
   // bool is_over_budget = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_is_over_budget() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           7, this_._internal_is_over_budget(), target);
+    }
+  }
+
+  // int64 created_at_ns = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_created_at_ns() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
+              stream, this_._internal_created_at_ns(), target);
     }
   }
 
@@ -4018,7 +4036,7 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // double stt_final_ms = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (::absl::bit_cast<::uint64_t>(this_._internal_stt_final_ms()) != 0) {
@@ -4057,8 +4075,15 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
             this_._internal_audio_samples_played());
       }
     }
-    // bool is_over_budget = 7;
+    // int64 created_at_ns = 8;
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_created_at_ns() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_created_at_ns());
+      }
+    }
+    // bool is_over_budget = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_is_over_budget() != 0) {
         total_size += 2;
       }
@@ -4082,7 +4107,7 @@ void MetricsEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (::absl::bit_cast<::uint64_t>(from._internal_stt_final_ms()) != 0) {
         _this->_impl_.stt_final_ms_ = from._impl_.stt_final_ms_;
@@ -4114,6 +4139,11 @@ void MetricsEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_created_at_ns() != 0) {
+        _this->_impl_.created_at_ns_ = from._impl_.created_at_ns_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_is_over_budget() != 0) {
         _this->_impl_.is_over_budget_ = from._impl_.is_over_budget_;
       }

@@ -826,6 +826,7 @@ class MetricsEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? tokensGenerated,
     $fixnum.Int64? audioSamplesPlayed,
     $core.bool? isOverBudget,
+    $fixnum.Int64? createdAtNs,
   }) {
     final $result = create();
     if (sttFinalMs != null) {
@@ -849,6 +850,9 @@ class MetricsEvent extends $pb.GeneratedMessage {
     if (isOverBudget != null) {
       $result.isOverBudget = isOverBudget;
     }
+    if (createdAtNs != null) {
+      $result.createdAtNs = createdAtNs;
+    }
     return $result;
   }
   MetricsEvent._() : super();
@@ -863,6 +867,7 @@ class MetricsEvent extends $pb.GeneratedMessage {
     ..aInt64(5, _omitFieldNames ? '' : 'tokensGenerated')
     ..aInt64(6, _omitFieldNames ? '' : 'audioSamplesPlayed')
     ..aOB(7, _omitFieldNames ? '' : 'isOverBudget')
+    ..aInt64(8, _omitFieldNames ? '' : 'createdAtNs')
     ..hasRequiredFields = false
   ;
 
@@ -952,6 +957,21 @@ class MetricsEvent extends $pb.GeneratedMessage {
   $core.bool hasIsOverBudget() => $_has(6);
   @$pb.TagNumber(7)
   void clearIsOverBudget() => clearField(7);
+
+  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+  /// producer (C++ dispatcher) at event-emit time; read by consumers
+  /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
+  /// latency without relying on wall-clock sync. Encoded as int64 so
+  /// std::chrono::steady_clock::now().time_since_epoch() values fit
+  /// directly (2^63 ns ≈ 292 years of runtime headroom).
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get createdAtNs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set createdAtNs($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasCreatedAtNs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCreatedAtNs() => clearField(8);
 }
 
 

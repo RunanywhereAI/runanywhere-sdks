@@ -133,23 +133,14 @@ void stamp_timestamps(int64_t base_ns, int64_t per_event_ns_increment) {
                                static_cast<int>(g_captured[i].bytes.size()))) {
             continue;
         }
-        // Re-add metrics arm with the synthetic timestamp. If the
-        // event already has a different oneof set, this wipes it —
-        // but the v2.1-3 consumer side knows to look ONLY at the
-        // metrics arm for the latency timestamp.
+        // v3.1: write the monotonic producer-side timestamp into
+        // MetricsEvent.created_at_ns (field 8, added in the v3.1 proto
+        // bump). Wipes any existing oneof — consumers read the metrics
+        // arm exclusively for the latency timestamp.
         auto* metrics = ev.mutable_metrics();
-        metrics->set_tokens_generated(static_cast<int32_t>(i));
-        // metrics has no created_at_ns field in v1 schema; encode the
-        // monotonic-clock delta in tokens_generated for now (lossy but
-        // unambiguous for bench purposes). v2.1-2 PR adds a proper
-        // created_at_ns field to voice_events.proto.
+        metrics->set_tokens_generated(static_cast<int64_t>(i));
         metrics->set_is_over_budget(false);
-        const int64_t ts = base_ns + i * per_event_ns_increment;
-        // Pack ts into tokens_generated low 31 bits + is_over_budget
-        // high bit. Lossy modulo (2^31 ns ≈ 2.1 sec) but the bench
-        // runs < 1 sec so it's acceptable. Remove this hack when
-        // voice_events.proto adds created_at_ns.
-        metrics->set_tokens_generated(static_cast<int32_t>(ts & 0x7FFFFFFF));
+        metrics->set_created_at_ns(base_ns + static_cast<int64_t>(i) * per_event_ns_increment);
         std::string serialized;
         if (ev.SerializeToString(&serialized)) {
             g_captured[i].bytes.assign(serialized.begin(), serialized.end());

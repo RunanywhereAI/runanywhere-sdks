@@ -515,6 +515,14 @@ public struct RAMetricsEvent: Sendable {
   /// dashboards without re-computing the threshold themselves.
   public var isOverBudget: Bool = false
 
+  /// v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+  /// producer (C++ dispatcher) at event-emit time; read by consumers
+  /// (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
+  /// latency without relying on wall-clock sync. Encoded as int64 so
+  /// std::chrono::steady_clock::now().time_since_epoch() values fit
+  /// directly (2^63 ns ≈ 292 years of runtime headroom).
+  public var createdAtNs: Int64 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -1010,7 +1018,7 @@ extension RAErrorEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MetricsEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_final_ms\0\u{3}llm_first_token_ms\0\u{3}tts_first_audio_ms\0\u{3}end_to_end_ms\0\u{3}tokens_generated\0\u{3}audio_samples_played\0\u{3}is_over_budget\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_final_ms\0\u{3}llm_first_token_ms\0\u{3}tts_first_audio_ms\0\u{3}end_to_end_ms\0\u{3}tokens_generated\0\u{3}audio_samples_played\0\u{3}is_over_budget\0\u{3}created_at_ns\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1025,6 +1033,7 @@ extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.tokensGenerated) }()
       case 6: try { try decoder.decodeSingularInt64Field(value: &self.audioSamplesPlayed) }()
       case 7: try { try decoder.decodeSingularBoolField(value: &self.isOverBudget) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.createdAtNs) }()
       default: break
       }
     }
@@ -1052,6 +1061,9 @@ extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if self.isOverBudget != false {
       try visitor.visitSingularBoolField(value: self.isOverBudget, fieldNumber: 7)
     }
+    if self.createdAtNs != 0 {
+      try visitor.visitSingularInt64Field(value: self.createdAtNs, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1063,6 +1075,7 @@ extension RAMetricsEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
     if lhs.tokensGenerated != rhs.tokensGenerated {return false}
     if lhs.audioSamplesPlayed != rhs.audioSamplesPlayed {return false}
     if lhs.isOverBudget != rhs.isOverBudget {return false}
+    if lhs.createdAtNs != rhs.createdAtNs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

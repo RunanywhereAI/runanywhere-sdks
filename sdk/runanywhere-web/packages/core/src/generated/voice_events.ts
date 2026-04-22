@@ -367,6 +367,15 @@ export interface MetricsEvent {
    * dashboards without re-computing the threshold themselves.
    */
   isOverBudget: boolean;
+  /**
+   * v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+   * producer (C++ dispatcher) at event-emit time; read by consumers
+   * (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
+   * latency without relying on wall-clock sync. Encoded as int64 so
+   * std::chrono::steady_clock::now().time_since_epoch() values fit
+   * directly (2^63 ns ≈ 292 years of runtime headroom).
+   */
+  createdAtNs: number;
 }
 
 function createBaseVoiceEvent(): VoiceEvent {
@@ -1235,6 +1244,7 @@ function createBaseMetricsEvent(): MetricsEvent {
     tokensGenerated: 0,
     audioSamplesPlayed: 0,
     isOverBudget: false,
+    createdAtNs: 0,
   };
 }
 
@@ -1260,6 +1270,9 @@ export const MetricsEvent = {
     }
     if (message.isOverBudget !== false) {
       writer.uint32(56).bool(message.isOverBudget);
+    }
+    if (message.createdAtNs !== 0) {
+      writer.uint32(64).int64(message.createdAtNs);
     }
     return writer;
   },
@@ -1320,6 +1333,13 @@ export const MetricsEvent = {
 
           message.isOverBudget = reader.bool();
           continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.createdAtNs = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1338,6 +1358,7 @@ export const MetricsEvent = {
       tokensGenerated: isSet(object.tokensGenerated) ? globalThis.Number(object.tokensGenerated) : 0,
       audioSamplesPlayed: isSet(object.audioSamplesPlayed) ? globalThis.Number(object.audioSamplesPlayed) : 0,
       isOverBudget: isSet(object.isOverBudget) ? globalThis.Boolean(object.isOverBudget) : false,
+      createdAtNs: isSet(object.createdAtNs) ? globalThis.Number(object.createdAtNs) : 0,
     };
   },
 
@@ -1364,6 +1385,9 @@ export const MetricsEvent = {
     if (message.isOverBudget !== false) {
       obj.isOverBudget = message.isOverBudget;
     }
+    if (message.createdAtNs !== 0) {
+      obj.createdAtNs = Math.round(message.createdAtNs);
+    }
     return obj;
   },
 
@@ -1379,6 +1403,7 @@ export const MetricsEvent = {
     message.tokensGenerated = object.tokensGenerated ?? 0;
     message.audioSamplesPlayed = object.audioSamplesPlayed ?? 0;
     message.isOverBudget = object.isOverBudget ?? false;
+    message.createdAtNs = object.createdAtNs ?? 0;
     return message;
   },
 };

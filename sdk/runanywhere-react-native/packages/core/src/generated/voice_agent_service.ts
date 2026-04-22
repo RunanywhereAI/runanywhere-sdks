@@ -3,47 +3,16 @@
 //   protoc-gen-ts_proto  v1.181.1
 //   protoc               v7.34.1
 // source: voice_agent_service.proto
-//
-// v3-readiness Phase A3 / GAP 09 #6. This file was hand-authored to match
-// the exact shape ts-proto would emit, so consumers that import
-// `{ VoiceEvent, VoiceAgentRequest } from '../generated/voice_agent_service'`
-// resolve. When `idl/codegen/generate_rn_streams.sh` runs in CI the file
-// regenerates identically — the hand-written edition matches the tool's
-// output so the drift check stays green.
 
 /* eslint-disable */
-import Long from 'long';
-import _m0 from 'protobufjs/minimal';
+import _m0 from "protobufjs/minimal";
 
-// VoiceEvent + all payload arm types come from the other generated file
-// (voice_events.proto shares the same package runanywhere.v1). Re-exporting
-// here keeps the adapter's 2-symbol import tidy.
-export {
-  VoiceEvent,
-  UserSaidEvent,
-  AssistantTokenEvent,
-  AudioFrameEvent,
-  VADEvent,
-  InterruptedEvent,
-  StateChangeEvent,
-  ErrorEvent,
-  MetricsEvent,
-  TokenKind,
-  AudioEncoding,
-  VADEventType,
-  InterruptReason,
-  PipelineState,
-} from './voice_events';
-
-export const protobufPackage = 'runanywhere.v1';
+export const protobufPackage = "runanywhere.v1";
 
 /**
- * Empty-ish request type — the voice agent already has its config set via
+ * Empty request type — the voice agent already has its config set via
  * `rac_voice_agent_init()` at handle creation time. The Stream rpc just
  * opens a new event subscription on an existing handle.
- *
- * Matches `idl/voice_agent_service.proto`:
- *     message VoiceAgentRequest { string event_filter = 1; }
  */
 export interface VoiceAgentRequest {
   /**
@@ -54,24 +23,18 @@ export interface VoiceAgentRequest {
 }
 
 function createBaseVoiceAgentRequest(): VoiceAgentRequest {
-  return { eventFilter: '' };
+  return { eventFilter: "" };
 }
 
 export const VoiceAgentRequest = {
-  encode(
-    message: VoiceAgentRequest,
-    writer: _m0.Writer = _m0.Writer.create(),
-  ): _m0.Writer {
-    if (message.eventFilter !== '') {
+  encode(message: VoiceAgentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.eventFilter !== "") {
       writer.uint32(10).string(message.eventFilter);
     }
     return writer;
   },
 
-  decode(
-    input: _m0.Reader | Uint8Array,
-    length?: number,
-  ): VoiceAgentRequest {
+  decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentRequest {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
     const message = createBaseVoiceAgentRequest();
@@ -79,78 +42,54 @@ export const VoiceAgentRequest = {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1:
-          if (tag !== 10) break;
+          if (tag !== 10) {
+            break;
+          }
+
           message.eventFilter = reader.string();
           continue;
       }
-      if ((tag & 7) === 4 || tag === 0) break;
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
       reader.skipType(tag & 7);
     }
     return message;
   },
 
   fromJSON(object: any): VoiceAgentRequest {
-    return {
-      eventFilter: isSet(object.eventFilter) ? globalThis.String(object.eventFilter) : '',
-    };
+    return { eventFilter: isSet(object.eventFilter) ? globalThis.String(object.eventFilter) : "" };
   },
 
   toJSON(message: VoiceAgentRequest): unknown {
     const obj: any = {};
-    if (message.eventFilter !== '') {
+    if (message.eventFilter !== "") {
       obj.eventFilter = message.eventFilter;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(
-    base?: I,
-  ): VoiceAgentRequest {
+  create<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(base?: I): VoiceAgentRequest {
     return VoiceAgentRequest.fromPartial(base ?? ({} as any));
   },
-
-  fromPartial<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(
-    object: I,
-  ): VoiceAgentRequest {
+  fromPartial<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(object: I): VoiceAgentRequest {
     const message = createBaseVoiceAgentRequest();
-    message.eventFilter = object.eventFilter ?? '';
+    message.eventFilter = object.eventFilter ?? "";
     return message;
   },
 };
 
-type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin
-  ? T
-  : T extends Long
-    ? string | number | Long
-    : T extends globalThis.Array<infer U>
-      ? globalThis.Array<DeepPartial<U>>
-      : T extends ReadonlyArray<infer U>
-        ? ReadonlyArray<DeepPartial<U>>
-        : T extends {}
-          ? { [K in keyof T]?: DeepPartial<T[K]> }
-          : Partial<T>;
+export type DeepPartial<T> = T extends Builtin ? T
+  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
+  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
+  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
+  : Partial<T>;
 
 type KeysOfUnion<T> = T extends T ? keyof T : never;
-export type Exact<P, I extends P> =
-  P extends Builtin
-    ? P
-    : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
-        [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
-      };
-
-if (_m0.util.Long !== Long) {
-  _m0.util.Long = Long as any;
-  _m0.configure();
-}
+export type Exact<P, I extends P> = P extends Builtin ? P
+  : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

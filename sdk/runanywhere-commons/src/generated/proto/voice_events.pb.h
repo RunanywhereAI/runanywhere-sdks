@@ -1162,6 +1162,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MetricsEvent final : public ::googl
     kEndToEndMsFieldNumber = 4,
     kTokensGeneratedFieldNumber = 5,
     kAudioSamplesPlayedFieldNumber = 6,
+    kCreatedAtNsFieldNumber = 8,
     kIsOverBudgetFieldNumber = 7,
   };
   // double stt_final_ms = 1;
@@ -1224,6 +1225,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MetricsEvent final : public ::googl
   void _internal_set_audio_samples_played(::int64_t value);
 
   public:
+  // int64 created_at_ns = 8;
+  void clear_created_at_ns() ;
+  [[nodiscard]] ::int64_t created_at_ns() const;
+  void set_created_at_ns(::int64_t value);
+
+  private:
+  ::int64_t _internal_created_at_ns() const;
+  void _internal_set_created_at_ns(::int64_t value);
+
+  public:
   // bool is_over_budget = 7;
   void clear_is_over_budget() ;
   [[nodiscard]] bool is_over_budget() const;
@@ -1238,7 +1249,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MetricsEvent final : public ::googl
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 7,
+  static const ::google::protobuf::internal::TcParseTable<3, 8,
                                    0, 0,
                                    2>
       _table_;
@@ -1268,6 +1279,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MetricsEvent final : public ::googl
     double end_to_end_ms_;
     ::int64_t tokens_generated_;
     ::int64_t audio_samples_played_;
+    ::int64_t created_at_ns_;
     bool is_over_budget_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -4314,7 +4326,7 @@ inline void MetricsEvent::clear_is_over_budget() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_over_budget_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000080U);
 }
 inline bool MetricsEvent::is_over_budget() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.MetricsEvent.is_over_budget)
@@ -4322,7 +4334,7 @@ inline bool MetricsEvent::is_over_budget() const {
 }
 inline void MetricsEvent::set_is_over_budget(bool value) {
   _internal_set_is_over_budget(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.MetricsEvent.is_over_budget)
 }
 inline bool MetricsEvent::_internal_is_over_budget() const {
@@ -4332,6 +4344,31 @@ inline bool MetricsEvent::_internal_is_over_budget() const {
 inline void MetricsEvent::_internal_set_is_over_budget(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_over_budget_ = value;
+}
+
+// int64 created_at_ns = 8;
+inline void MetricsEvent::clear_created_at_ns() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.created_at_ns_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline ::int64_t MetricsEvent::created_at_ns() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.MetricsEvent.created_at_ns)
+  return _internal_created_at_ns();
+}
+inline void MetricsEvent::set_created_at_ns(::int64_t value) {
+  _internal_set_created_at_ns(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.MetricsEvent.created_at_ns)
+}
+inline ::int64_t MetricsEvent::_internal_created_at_ns() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.created_at_ns_;
+}
+inline void MetricsEvent::_internal_set_created_at_ns(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.created_at_ns_ = value;
 }
 
 #ifdef __GNUC__
