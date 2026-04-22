@@ -107,6 +107,50 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | ~~Kotlin orphan native UnsatisfiedLinkError~~ | **CLOSED** by Phase C (99/99 cleared) |
 | ~~Test coverage gap on 2 voice union arms~~ | **CLOSED** by Phase A (11/11 OK) |
 
+## v3-readiness PR — Phase A complete (cross-SDK consumption)
+
+The v3-readiness plan has 3 phases; Phase A closed the audit-flagged
+"broken replacement path" blockers + achieved cross-SDK parity for
+the LLM thinking C ABI. 11 commits `c95608e6` → `8038c141`.
+
+### Audit demotion closures (all 4 broken replacement paths FIXED)
+
+| # | Symbol | Before Phase A | After Phase A |
+|---|--------|----------------|---------------|
+| 1 | Kotlin `VoiceAgentStreamAdapter.nativeRegisterCallback` | declared, no JNI → `UnsatisfiedLinkError` at runtime | **FIXED** (commit `c95608e6` — JNI trampoline wraps `rac_voice_agent_set_proto_callback`) |
+| 2 | Dart `../core/native/rac_native.dart` | imported but file missing | **FIXED** (commit `65e7fee8` — created with typed `RacBindings` facade) |
+| 3 | RN `../generated/NitroVoiceAgentSpec` + `voice_agent_service` | imports unresolvable → doesn't compile | **FIXED** (commits for A3 — Nitro spec + HybridVoiceAgent.{cpp,hpp} + 3 generated TS files) |
+| 4 | Web `_rac_voice_agent_set_proto_callback` | calls the symbol but WASM export list didn't include it | **FIXED** (commit for A4 — added to RAC_EXPORTED_FUNCTIONS + RACommons.exports + created EmscriptenModule.ts runtime) |
+
+### Per-SDK × new-API matrix — AFTER Phase A
+
+| API | Swift | Kotlin | Dart | RN | Web |
+|-----|:-----:|:------:|:----:|:---:|:---:|
+| `rac_voice_agent_set_proto_callback` | ✓ | ✓ (A1) | ✓ (A2) | ✓ (A3) | ✓ (A4) |
+| `VoiceSessionEvent.from/fromProto` mappers (no more null stubs) | ✓ | ✓ (A5) | ✓ (A6) | ✓ (A7) | ✓ (shared with RN) |
+| `rac_llm_extract_thinking` | ✓ | ✓ (A8) | ✓ (A9) | ✓ (A10) | ✓ (A11) |
+| `rac_llm_strip_thinking` | ✓ | ✓ (A8) | ✓ (A9) | ✓ (A10) | ✓ (A11) |
+| `rac_llm_split_thinking_tokens` | ✓ | ✓ (A8) | ✓ (A9) | ✓ (A10) | ✓ (A11) |
+
+All 5 SDKs now consume the new v2 commons C ABIs symmetrically. The
+remaining audit items (rac_plugin_route / rac_registry_load_plugin
+not exposed through SDK FFI) are scoped separately to v3.x since app
+code generally doesn't need them — backend packages register at init.
+
+### What remains after Phase A
+
+Phase B — migrate C++ first-party code off `rac_service_*` so the
+legacy registry can be physically deleted. 10 files under
+`sdk/runanywhere-commons/src/features/` + the JNI's 2 list-provider
+call sites. After B, every `rac_service_*` caller in first-party code
+is gone.
+
+Phase C — `git rm service_registry.cpp`, delete deprecated public APIs
+(VoiceSessionEvent, VoiceSessionHandle, startVoiceSession /
+streamVoiceSession / processVoice, and the other DELETE-READY items
+the audit identified), bump `RAC_PLUGIN_API_VERSION` 2u → 3u, release
+as v3.0.0.
+
 ## v2.1 quick-wins PR — what landed (post drift cleanup)
 
 After the post-audit Phase A-D + drift cleanup, a v2.1 quick-wins PR
