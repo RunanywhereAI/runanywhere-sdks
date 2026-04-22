@@ -36,6 +36,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -4986,6 +4987,106 @@ JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthSaveTokens(
     JNIEnv* /*env*/, jclass /*cls*/) {
     return static_cast<jint>(rac_auth_save_tokens());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLM Thinking (rac_llm_thinking.h)
+// =============================================================================
+//
+// v3-readiness Phase A8 / GAP 08 #6. 3 thunks wrapping the C ABI
+// `rac_llm_extract_thinking` / `rac_llm_strip_thinking` /
+// `rac_llm_split_thinking_tokens`. These give the Kotlin SDK the same
+// <think>-tag parsing behavior Swift's CppBridge+LLMThinking.swift
+// already has (commit a8cc072c's post-audit baseline matrix had Kotlin
+// / Dart / RN / Web all missing this).
+//
+// Return style: Object[] / long[] wrappers so Kotlin can destructure
+// the multi-out-param C shape into a tuple cleanly. The same approach
+// as racAuthGetValidToken (Phase A1 predecessor).
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmExtractThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_response      = nullptr;
+    size_t      out_response_len  = 0;
+    const char* out_thinking      = nullptr;
+    size_t      out_thinking_len  = 0;
+
+    rac_result_t rc = rac_llm_extract_thinking(
+        textStr.c_str(),
+        &out_response, &out_response_len,
+        &out_thinking, &out_thinking_len);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    // Return String[2]: [response, thinking-or-null].
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+
+    // Response is never NULL on success (empty string at minimum).
+    if (out_response) {
+        // Copy into a stable NUL-terminated buffer (C ABI only guarantees
+        // the pointer + length; the buffer may not be NUL-terminated on
+        // its own even though the implementation happens to NUL-terminate
+        // today).
+        std::string resp(out_response, out_response_len);
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(resp.c_str()));
+    } else {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(""));
+    }
+
+    if (out_thinking) {
+        std::string think(out_thinking, out_thinking_len);
+        env->SetObjectArrayElement(arr, 1, env->NewStringUTF(think.c_str()));
+    } else {
+        // Index 1 stays null — Kotlin reads as `String?`.
+    }
+    return arr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmStripThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_stripped     = nullptr;
+    size_t      out_stripped_len = 0;
+    rac_result_t rc = rac_llm_strip_thinking(
+        textStr.c_str(), &out_stripped, &out_stripped_len);
+    if (RAC_FAILED(rc) || !out_stripped) return nullptr;
+
+    std::string stripped(out_stripped, out_stripped_len);
+    return env->NewStringUTF(stripped.c_str());
+}
+
+// Returns int[2]: [thinking_tokens, response_tokens]. Kotlin unpacks
+// into a Pair<Int, Int>.
+JNIEXPORT jintArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSplitThinkingTokens(
+    JNIEnv* env, jclass /*cls*/,
+    jint totalCompletionTokens,
+    jstring responseText,
+    jstring thinkingText) {
+    std::string respStr  = responseText ? getCString(env, responseText) : "";
+    std::string thinkStr = thinkingText ? getCString(env, thinkingText) : "";
+
+    int32_t thinking_tokens = 0;
+    int32_t response_tokens = 0;
+    rac_result_t rc = rac_llm_split_thinking_tokens(
+        totalCompletionTokens,
+        respStr.empty()  ? nullptr : respStr.c_str(),
+        thinkStr.empty() ? nullptr : thinkStr.c_str(),
+        &thinking_tokens, &response_tokens);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    jintArray arr = env->NewIntArray(2);
+    jint buf[2] = { static_cast<jint>(thinking_tokens),
+                    static_cast<jint>(response_tokens) };
+    env->SetIntArrayRegion(arr, 0, 2, buf);
+    return arr;
 }
 
 // =============================================================================
