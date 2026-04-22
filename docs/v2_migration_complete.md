@@ -1,12 +1,31 @@
 # v2 Architecture Migration — Status & Post-Mortem
 
-_Living document. **Post-v2-closeout status: READY TO SHIP as v2** (with
-follow-up PRs scheduled for v3 cut-over + minor spec-drift cleanup).
-The audit gap that the post-Wave-F version of this doc flagged is
-closed: [`docs/v2_closeout_results.md`](v2_closeout_results.md) shows
-the actual LOC delta delivered (−6,247 from Wave D targets), per-criterion
-status flips for GAP 08 + GAP 09, and the bug list found + fixed
-during the close-out._
+_Living document. **Post-v2-closeout + 3-agent audit status: READY TO SHIP
+as v2** (with follow-up PRs scheduled for v3 cut-over + the v2.1 items
+the post-close-out audit surfaced)._
+
+**What's true after the audit:**
+
+- The close-out's LOC claims (−6,247 from Wave D targets, net branch
+  −744 to −600 depending on doc-churn timing) are **verified correct on
+  disk**.
+- All 8 bugs the close-out reports finding are **verified fixed**.
+- The 3 close-out test suites are **verified building + passing**
+  (proto event dispatch 9/9, llm thinking 10/10, parity_test_cpp 8/8).
+- **6 of the close-out's spec-criteria status flips were too generous**
+  when measured against strict spec text (GAP 09 #6 / #7 / #8 / #9,
+  GAP 08 #3, Phase 2 test coverage). All 6 corrections are documented
+  in [v2_closeout_results.md "Post-audit corrections"](v2_closeout_results.md#post-audit-corrections-3-agent-re-review).
+- **One previously-untracked production risk surfaced**: sample apps
+  under `examples/` are NOT in the CI matrix and call deprecated
+  Kotlin/Swift/Flutter/RN APIs — when those deprecations escalate, 11
+  lines × 4 platforms need updating in lock-step. Tracked in
+  [v2_remaining_work.md "Risk register"](v2_remaining_work.md#risk-register-post-v2-closeout-surfaces-from-3-agent-re-audit).
+
+**Net assessment:** the v2 program ships. The corrections sharpen — not
+invalidate — the v3 / v2.1 follow-up scope. The deltas of the corrections
+are documented honestly in the per-doc updates so future readers don't
+have to re-discover them._
 
 ## TL;DR
 

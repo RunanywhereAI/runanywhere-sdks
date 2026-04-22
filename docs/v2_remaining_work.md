@@ -1,10 +1,24 @@
 # v2 — Remaining Work to Ship
 
-> **STATUS UPDATE (post-v2-closeout)**: P0, P1, and P2 are **DONE** as of the
-> v2 close-out (Phases 0 through 16 on `feat/v2-architecture`). See
-> [`docs/v2_closeout_results.md`](v2_closeout_results.md) for the LOC delta
-> tables and per-criterion status flips. **What remains: P3 (v3 cut-over),
-> P4 (spec-drift cleanups), P5 (Wave E — still optional/deferred).**
+> **STATUS UPDATE (post-v2-closeout + 3-agent re-audit)**: P0, P1, and P2 are
+> **structurally DONE** as of the v2 close-out (17 commits between
+> `e81fae3f` and `c3e474c4` on `feat/v2-architecture`). LOC deltas and tests
+> verified by re-audit. However, **6 of the close-out's spec-criteria flips
+> were too generous** when measured against strict spec text — see the
+> [Post-audit corrections section in v2_closeout_results.md](v2_closeout_results.md#post-audit-corrections-3-agent-re-review)
+> for the demoted statuses. The corrections do NOT change ship readiness;
+> they sharpen the v2.1 / v3 follow-up scope.
+>
+> **What remains in priority order:**
+> - **P3** (v3 cut-over — `git rm service_registry.cpp`, bump `RAC_PLUGIN_API_VERSION`)
+> - **P3.5** (NEW — sample-app deprecated-API updates BEFORE v3 escalation, see "Risk register" below)
+> - **P4** (spec-drift cleanups, NDK pin hoist, etc.)
+> - **P5** (Wave E — still optional/deferred)
+>
+> Plus 3 v2.1-tier follow-ups surfaced by the audit:
+> - Wire `VoiceSessionEvent` to use the codegen'd proto type (close GAP 09 #6)
+> - Per-bridge JNI thunk implementation to delete remaining ~95 orphan `external fun native*` declarations (close GAP 08 #3)
+> - Sample-app E2E smoke automation (close GAP 08 #9)
 
 _Synthesis of the post-Wave-F audit (3 independent code-reality + spec-vs-gate + build-state passes)._
 
@@ -99,3 +113,34 @@ Three parallel agents on `feat/v2-architecture` HEAD:
 3. **Build sanity**: `cmake --preset` smoke + per-file LOC + parity-test wiring + concrete remaining-work synthesis.
 
 All three found the same story: build infra and contracts shipped real; deletes are deferred. This doc is the merged action list.
+
+---
+
+## Risk register (post-v2-closeout, surfaces from 3-agent re-audit)
+
+What could go wrong in the next 30 days if v2 ships as-is. Each row is "what breaks → which file/line → mitigation".
+
+| Risk | Trigger | Affected | Mitigation |
+|------|---------|----------|------------|
+| **Sample apps fail to build** if any deprecated API is escalated to error | Bumping `DeprecationLevel.WARNING` → `ERROR` (Kotlin) or `@available(*, deprecated, .obsoleted)` (Swift) | `examples/android/.../VoiceAssistantViewModel.kt` (lines 23-24, 319, 795, 1029); `examples/ios/.../VoiceAgentViewModel.swift` (169, 398); `examples/flutter/.../voice_assistant_view.dart` (29, 159-160); `examples/react-native/.../VoiceAssistantScreen.tsx` (41, 71, 237) | **Update the 11 lines × 4 platforms BEFORE the escalation** (P3.5 in priority list). |
+| **Sample-app regression invisible to CI** | Any close-out change introduces a runtime bug only visible at app level | `pr-build.yml` builds the SDKs but NOT `examples/*/RunAnywhereAI/` apps | Add per-platform sample-app build job (Detox/Maestro/XCUITest); track as v2.1 task. |
+| **`UnsatisfiedLinkError` at runtime** if anyone calls a Kotlin orphan native | Production code path that touches one of the ~95 unbound `external fun native*` declarations across 13 surviving CppBridge*.kt files | `gap08_kotlin_orphan_natives.md` audit; the 13 files: VAD (13), TTS (13), STT (12), LLM (11), Download (7), ModelPaths (7), ModelAssignment (7), Storage (6), Platform (6), State (4), Device (4), HTTP (3), PlatformAdapter (2) | Per-bridge cleanup PR pattern (Phase 8 was the template); each ~1 day. |
+| **Auth divergence** if backend changes refresh policy | Kotlin `CppBridgeAuth.kt` still maintains its own state references (181 LOC) instead of delegating to `rac_auth_*` C ABI | `sdk/runanywhere-kotlin/.../CppBridgeAuth.kt` | Implement 16 `rac_auth_*` JNI thunks in `sdk/runanywhere-commons/src/jni/`; `git rm` the file. ~2 days. |
+| **`VoiceSessionEvent` schema drift** | Hand-written `VoiceSessionEvent` (in `VoiceAgentTypes.swift` + corresponding files in 4 other SDKs) silently diverges from the codegen'd `VoiceEvent` proto | Spec GAP 09 #6 "zero hand-written `VoiceSessionEvent`" still unmet | Have voice session API consume the codegen'd proto type directly; mechanical follow-up. |
+| **v3 cut-over needs 88-call-site repoint** | `RAC_PLUGIN_API_VERSION` 2u → 3u + `git rm service_registry.cpp` would require 88 references (per `gap11_audit_repoint.md`) to be repointed first | engines/*, JNI, Swift/Flutter ffi declarations | Track as P3 prerequisite work; cannot bump until done. |
+| **Kotlin/Swift/Dart total-LOC spec criteria unmeasured** | GAP 08 #6, #7, #8 (Kotlin ~30k, Swift ~24k, Dart ~30k) — never re-measured post-close-out | Spec compliance unprovable | `wc -l` over each SDK and document; ~30 minutes. |
+| **`p50 ≤ 1ms` claim unproven** for streaming on all 5 SDKs | GAP 09 #8 spec line not benched | None — wire-format parity is verified; per-SDK perf is the open question | Add a 30-second perf bench per SDK; track as v2.1. |
+| **CI environment drift** breaks `pr-build.yml` | Homebrew flake, NDK r27c download URL change, Flutter 3.38.x removal from `subosito/flutter-action`, grpc-swift v2 brew formula change | All 11 jobs in `.github/workflows/pr-build.yml` | Pin Homebrew commits; vendor NDK; track Flutter pin upgrades. |
+| **Test coverage gap on 2 voice union arms** | `RAC_VOICE_AGENT_EVENT_PROCESSED` and `RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED` are dispatched in code but not asserted in `test_proto_event_dispatch.cpp` | `sdk/runanywhere-commons/tests/test_proto_event_dispatch.cpp` | Add 2 tests, ~30 minutes. |
+
+---
+
+## What's NOT a risk (audit confirmation)
+
+The audit also explicitly cleared these worries:
+
+- **`runanywhere.dart` 2,688 LOC**: confirmed as a real multi-day refactor, not a hidden quick win. Honest deferral.
+- **`AlamofireDownloadService.swift` 474 LOC**: confirmed already a thin shim; the spec's "180 LOC of duplication" was wrong.
+- **`EventBus.ts` 206 LOC**: confirmed has no legacy `NativeEventEmitter` block to delete (Web SDK never had one — RN-only API).
+- **Auth refresh window bug fix**: `REFRESH_WINDOW_MS = 60L * 1000L` confirmed in `CppBridgeAuth.kt` line 65 with the `rac_auth_needs_refresh()` reference.
+- **gRPC stub generation**: 9 stubs (3 services × 3 langs) confirmed on disk. The original "12+" claim was loose phrasing; actual is 9.

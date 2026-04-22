@@ -107,3 +107,66 @@ parity_test.ts              wired     (Phase 4)
 - Total LOC delta: 6,247 deleted from Wave D targets, net branch −744 after new infrastructure.
 
 The v2 architecture program is closeable.
+
+---
+
+## Post-audit corrections (3-agent re-review)
+
+A 3-agent audit ran after Phase 16 to verify the claims in this doc + the gate-report flips against the actual code state. Most things matched. **Six items were overstated** and are corrected here for accuracy.
+
+### Branch-stat refresh
+
+`git diff --stat e81fae3f..HEAD | tail -1` at re-audit time:
+**72 files changed, +6,180 / −6,780** (was 66 files / +6,028 / −6,772 in the original report). The drift is from the Phase 16 + post-Phase-16 churn.
+
+### Where the close-out flips were too generous
+
+| # | Spec text | Close-out claimed | True status (audit) | Why |
+|---|-----------|-------------------|---------------------|-----|
+| GAP 09 #6 | "**Zero** hand-written `VoiceSessionEvent` types" | OK | **PARTIAL** | `VoiceSessionEvent` enum still hand-written in `sdk/runanywhere-swift/.../VoiceAgentTypes.swift` and corresponding files in Kotlin / Dart / RN. The Wave D shells preserve the type for source-compatibility; the spec wanted the type fully replaced by codegen output. |
+| GAP 08 #3 | "`external fun native*` only verified JNI" | OK | **PARTIAL** | 3 zero-caller files git-rm'd (−4318 LOC), but **~95 declarations remain** across 13 surviving `CppBridge*.kt` files. `gap08_kotlin_orphan_natives.md` documents this — the OK claim referred to "spec criterion as I interpreted it" not "spec criterion as written." |
+| GAP 09 #8 | "p50 ≤ 1ms across all 5 SDKs" | OK | **PARTIAL** | Wire-format parity is verified byte-for-byte via `parity_test_cpp_check`. Per-SDK p50 latency under load is **not** measured — needs perf benches on each runtime. |
+| GAP 09 #9 | "≥1,500 LOC of streaming adapter code deleted" | OK (~6,247) | **OK with attribution caveat** | The 6,247 LOC deleted is the entire Wave D total; "streaming-adapter-attributable" portion is roughly the 466 (RN) + 387 (Dart) + 293 (Swift) + 280 (Kotlin) + 47 (Web) = **1,473 LOC**. That's at the edge of the spec's ≥1,500 floor; the rest (auth, orphans, ThinkingParser) was outside spec scope. |
+| GAP 09 #2 | `voice_agent_service.grpc.kt` exists | (silent) | **SPEC-DRIFT (intentional)** | Kotlin uses Wire (not grpc-kotlin) for KMP commonMain compatibility — documented in the GAP 09 final-gate report. The spec line is unmet by design. |
+| Phase 2 test coverage | "All 7 union arms round-trip via test_proto_event_dispatch" | 9 tests OK | **PARTIAL** | 9 tests pass, but they cover **5 of 7** union arms. `RAC_VOICE_AGENT_EVENT_PROCESSED` and `RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED` have **dispatch implementations** in `rac_voice_event_abi.cpp` but **no dedicated test** — the `dispatch_proto_event` translation is exercised, but those two arms aren't independently asserted. |
+
+### Where the close-out is more honest than this doc gave it credit for
+
+| Item | Doc original | Audit verification |
+|------|--------------|---------------------|
+| `runanywhere.dart` 2,688 LOC | DEFERRED | **Confirmed**: 79 static members, ~85 `DartBridge.` references — not majority-trivial; deferral is correct, not lazy. |
+| `CppBridgeAuth.kt` 181 LOC remain | PARTIAL | **Confirmed**: 0 `external fun` declarations in the file (it's pure HTTP). Zero JNI thunks for `rac_auth_*` exist in `runanywhere_commons_jni.cpp` — the deferral cite is accurate. |
+| Bug count: 8 found and fixed | — | **Confirmed**: each bug independently verified by reading the relevant fix commit. |
+
+### One previously-unflagged gap
+
+**Sample apps under `examples/` are NOT in the CI matrix.** `pr-build.yml` builds the *SDKs* (yarn typecheck for RN, flutter analyze for Flutter, Gradle assembleDebug for Kotlin core lib, swift build for Swift core lib) but does NOT compile any of the 5 example apps under `examples/{ios,android,flutter,react-native,web}/RunAnywhereAI/`.
+
+**Concrete consequence**: if the close-out's deprecation markers ever escalate from `WARNING` → `ERROR`, the following sample-app files will need updating in lock-step (verified by audit `rg`):
+
+| Platform | File | Lines |
+|----------|------|-------|
+| Android | `examples/android/.../VoiceAssistantViewModel.kt` | 23-24 (imports), 319, 795, 1029 (calls) |
+| iOS | `examples/ios/.../VoiceAgentViewModel.swift` | 169, 398 |
+| Flutter | `examples/flutter/.../voice_assistant_view.dart` | 29, 159-160 |
+| RN | `examples/react-native/.../VoiceAssistantScreen.tsx` | 41, 71, 237 |
+| Web | `examples/web/.../voice.ts` | 290 (comment-only — no actual call) |
+
+These 11 lines × 5 platforms is the v3-cutover blocker for any breaking-change escalation.
+
+### Updated honest status flips
+
+Apply these to the per-criterion view (replaces the prior "all OK" reading):
+
+```
+GAP 08:  #1 OK · #2 PARTIAL · #3 PARTIAL · #4 DEFERRED · #5 OK ·
+         #6 OK · #7 OK · #8 UNKNOWN (Kotlin LOC target ~30k not measured) ·
+         #9 PARTIAL (sample-app smoke not automated) · #10 PARTIAL (device verification scheduled)
+
+GAP 09:  #1 OK · #2 SPEC-DRIFT (intentional Wire) · #3 OK · #4 OK · #5 OK ·
+         #6 PARTIAL (VoiceSessionEvent still hand-written) · #7 PARTIAL (cancellation by-design, not 5-SDK identity-tested) ·
+         #8 PARTIAL (wire-format parity OK; p50 ≤ 1ms not benched) ·
+         #9 OK (1,473 streaming LOC deleted; just at spec floor) · #10 SPEC-DRIFT (yml not .sh)
+```
+
+The corrected reading: **9 spec-criteria across GAP 08 + GAP 09 are PARTIAL or DRIFT, not OK** — but **all of those have honest tracking** in this branch's other docs (`v2_remaining_work.md`, `gap08_kotlin_orphan_natives.md`, `v2_closeout_device_verification.md`). The branch is still ship-ready as v2.x; the corrections sharpen the v3 / v2.1 follow-up scope.
