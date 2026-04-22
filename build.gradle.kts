@@ -59,7 +59,7 @@ fun resolveAndroidHome(): String =
 
 fun resolveNdkHome(androidHome: String): String =
     System.getenv("ANDROID_NDK_HOME")
-        ?: "$androidHome/ndk/27.0.12077973"
+        ?: "$androidHome/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}"
 
 fun ensureLocalProperties(dir: java.io.File, includeNdk: Boolean = false) {
     val localProps = dir.resolve("local.properties")

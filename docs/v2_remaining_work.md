@@ -98,14 +98,14 @@ Items where the spec was specific and we drifted. Either backfill or document th
 
 | # | Item | Recommendation |
 |---|------|----------------|
-| P4-1 | GAP 03: spec called for `docs/plugins/PLUGIN_AUTHORING.md`; we shipped `docs/plugin_loader_authoring.md`. | Rename or symlink — trivial. |
+| ~~P4-1~~ | ~~GAP 03: spec called for `docs/plugins/PLUGIN_AUTHORING.md`; we shipped `docs/plugin_loader_authoring.md`.~~ **DONE in v2.1 quick-wins Item 2**: `git mv` to spec path; 4 backlinks updated. |
 | P4-2 | GAP 04: spec listed `fluid_audio`, `foundation_models`, `system_tts` as router targets. Branch ships `llamacpp`, `onnx`, `whispercpp`, `whisperkit_coreml`, `metalrt` + 3 stubs. | Accept the deviation; update spec to match the actual engine roster. |
 | P4-3 | GAP 06: 5 migrated engines kept their original CMakeLists. Spec criterion #2 wants every engine to use `rac_add_engine_plugin()` one-liner. | Rewrite per engine in a follow-up cleanup PR; not blocking. |
-| P4-4 | GAP 07: a second `CMakePresets.json` remains under commons. | `git rm` after engine reorg cleanup. |
-| P4-5 | GAP 09: spec demanded `idl/codegen/check-drift.sh` extension; we use `.github/workflows/idl-drift-check.yml`. | Document the substitution in the gate report. |
-| P4-6 | GAP 11: no `v2_gap_specs/GAP_11_LEGACY_CLEANUP.md` exists in the repo. The gate report cites it. | Either write the spec retroactively or remove the citation. |
+| ~~P4-4~~ | ~~GAP 07: a second `CMakePresets.json` remains under commons.~~ **DONE in v2.1 quick-wins Item 2**: deleted; root `CMakePresets.json` is canonical. |
+| ~~P4-5~~ | ~~GAP 09: spec demanded `idl/codegen/check-drift.sh` extension; we use `.github/workflows/idl-drift-check.yml`.~~ **DONE in post-audit drift cleanup**: documented as accepted deviation in `gap09_final_gate_report.md` criterion #10 (SPEC-DRIFT). |
+| ~~P4-6~~ | ~~GAP 11: no `v2_gap_specs/GAP_11_LEGACY_CLEANUP.md` exists in the repo. The gate report cites it.~~ **DONE in v2.1 quick-wins Item 2**: spec written retroactively at `v2_gap_specs/GAP_11_LEGACY_CLEANUP.md` reverse-engineered from the gate report. |
 | P4-7 | GAP 01 #11: spec wanted a "test PR proves single-commit propagation" of a new `ModelFormat` field. Never executed. | One short PR adding a no-op enum value end-to-end would close it. |
-| P4-8 | NDK pin (GAP 07 criterion #11) lives in 3 places (root preset env var + Kotlin `gradle.properties` + Flutter Android Gradle). Spec wants single source of truth. | Hoist to a top-level `gradle.properties` shared variable. |
+| ~~P4-8~~ | ~~NDK pin (GAP 07 criterion #11) lives in 3 places (root preset env var + Kotlin `gradle.properties` + Flutter Android Gradle). Spec wants single source of truth.~~ **PARTIAL DONE in v2.1 quick-wins Item 2**: hoisted to root `gradle.properties` (`racNdkVersion=27.0.12077973`); 5 sites read from it (3 in Kotlin SDK build.gradle.kts, 1 in root, 1 in Android sample). Flutter packages still pin 25.2.9519653 (intentional Flutter-plugin compat); convergence to single version is a v3 task. Documented as `racFlutterNdkVersion` separately. |
 
 ## Priority 5 — Optional (Wave E / GAP 05)
 

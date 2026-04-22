@@ -100,8 +100,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Subdirectories
 # =============================================================================
 
-# Commons — always built. Owns its own option block (kept for now to avoid
-# duplicating every backend toggle here; GAP 06 Phase 9 will retire that block).
+# Commons — always built. Owns its own backend-toggle option block.
 add_subdirectory(sdk/runanywhere-commons)
 
 # IDL — built when Protobuf is available; commons skips the rac_idl target
@@ -111,9 +110,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/idl/CMakeLists.txt")
     add_subdirectory(idl)
 endif()
 
-# engines/ — top-level engine plugin directory (post-GAP-06). 5 migrated
-# backends (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) plus 3
-# Phase 10 stubs (sherpa, genie, diffusion-coreml) live here.
+# engines/ — top-level engine plugin directory. 5 migrated backends
+# (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) plus 3 stubs
+# (sherpa, genie, diffusion-coreml) live here.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
 endif()

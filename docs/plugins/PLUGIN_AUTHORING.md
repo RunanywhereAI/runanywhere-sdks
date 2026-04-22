@@ -1,6 +1,6 @@
 # Third-party engine plugin authoring guide
 
-_Closes GAP 03 Phase 7. The companion to [`engine_plugin_authoring.md`](./engine_plugin_authoring.md) (GAP 02) — that doc explains the **vtable contract**; this doc explains how to **package and load** your plugin._
+_Closes GAP 03 Phase 7. The companion to [`engine_plugin_authoring.md`](../engine_plugin_authoring.md) (GAP 02) — that doc explains the **vtable contract**; this doc explains how to **package and load** your plugin._
 
 After GAP 02 + GAP 03, RunAnywhere supports two delivery models for engine plugins. Both share the same `rac_engine_vtable_t` contract and the same `rac_plugin_entry_<name>()` symbol. Pick based on platform constraints, not preference.
 
@@ -187,7 +187,7 @@ The in-tree fixture (`tests/fixtures/rac_test_plugin.cpp`) is a 60-line proof of
 
 ## Bumping `RAC_PLUGIN_API_VERSION`
 
-The host bumps the version when the vtable layout or the per-domain ops structs change in a binary-incompatible way (see `docs/engine_plugin_authoring.md`). When you ship against an older host:
+The host bumps the version when the vtable layout or the per-domain ops structs change in a binary-incompatible way (see [`docs/engine_plugin_authoring.md`](../engine_plugin_authoring.md)). When you ship against an older host:
 
 - Plugin v1, host v2: load fails with `RAC_ERROR_ABI_VERSION_MISMATCH` and a single log line `plugin '<name>' ABI mismatch: plugin=1 core=2`. Recompile against the new host headers.
 - Plugin v2, host v1: same outcome with reversed numbers.

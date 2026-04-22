@@ -284,7 +284,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
     // Set environment
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {
@@ -374,7 +374,7 @@ tasks.register<Exec>("setupLocalDevelopment") {
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {
@@ -411,7 +411,7 @@ tasks.register<Exec>("rebuildCommons") {
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {

@@ -252,7 +252,7 @@ repoint from Wave F land in v3.
 - `docs/v2_migration_complete.md` (this file).
 - `docs/wave_roadmap.md` (running map of remaining waves).
 - `docs/voice_event_proto_handoff.md` (GAP 01 → GAP 09 contract).
-- `docs/engine_plugin_authoring.md` + `docs/plugin_loader_authoring.md`.
+- `docs/engine_plugin_authoring.md` + `docs/plugins/PLUGIN_AUTHORING.md`.
 - `docs/gap08_kotlin_orphan_natives.md` + `docs/gap11_audit_repoint.md`.
 
 Reviewers should start with `docs/wave_roadmap.md` for the high-level
