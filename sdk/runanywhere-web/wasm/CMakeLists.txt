@@ -437,6 +437,14 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_voice_agent_detect_speech"
     "_rac_voice_agent_result_free"
 
+    # Voice Agent — proto-byte streaming ABI (GAP 09 Phase 15 / v3 Phase A4)
+    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # VoiceAgentStreamAdapter.ts, which calls it through
+    # m._rac_voice_agent_set_proto_callback(handle, cbPtr, 0). Pair with
+    # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
+    # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
+    "_rac_voice_agent_set_proto_callback"
+
     # VLM service
     "_rac_vlm_get_builtin_template"
     "_rac_vlm_result_free"

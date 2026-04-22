@@ -425,6 +425,11 @@ _rac_voice_agent_load_tts_voice
 _rac_voice_agent_process_stream
 _rac_voice_agent_process_voice_turn
 _rac_voice_agent_result_free
+# GAP 09 Phase 15 / v3 Phase A4 — proto-byte streaming ABI.
+# Consumed by Swift CppBridge (via CRACommons), Kotlin
+# (VoiceAgentStreamAdapter JNI thunks), Dart (RacNative FFI),
+# RN (HybridVoiceAgent C++), and Web (VoiceAgentStreamAdapter TS).
+_rac_voice_agent_set_proto_callback
 _rac_voice_agent_synthesize_speech
 _rac_voice_agent_transcribe
 
