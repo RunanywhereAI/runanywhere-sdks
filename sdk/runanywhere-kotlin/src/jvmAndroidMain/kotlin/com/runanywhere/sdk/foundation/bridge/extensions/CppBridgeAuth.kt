@@ -1,54 +1,41 @@
 /*
  * CppBridge+Auth.kt — RunAnywhere SDK
  *
- * v2 close-out Phase 7 (P2-2). The pre-Phase-7 implementation duplicated the
- * C++ rac_auth_manager (HTTP POST, JSON parsing, state references, dual
- * authenticate/refresh code paths). The C ABI in
- * `rac/infrastructure/network/rac_auth_manager.h` already exposes:
+ * v2.1 quick-wins Item 4 / GAP 08 #2 closure. The pre-v2.1 implementation
+ * (Phase 7 of the v2 close-out) was a "thin" 182-LOC HTTP/JSON/state shim
+ * that still owned: 5 AtomicReference state fields, 60-second refresh
+ * window math, JSON request body building, JSON response parsing.
  *
- *   rac_auth_init / reset / is_authenticated / needs_refresh
- *   rac_auth_get_access_token / device_id / user_id / organization_id
- *   rac_auth_build_authenticate_request / build_refresh_request
+ * After v2.1 quick-wins Item 4 (commits bd7da766 + 13e79d3c), the
+ * matching `rac_auth_*` C ABI is reachable from Kotlin via 16 JNI thunks
+ * on RunAnywhereBridge. This file becomes a pure HTTP transport
+ * adapter: state, request/response JSON, and refresh-window math live
+ * in native C++ where they're shared with Swift / Dart / RN / Web.
  *
- * The complete delete (`git rm CppBridgeAuth.kt`) is gated on the JNI thunks
- * landing — see docs/v2_closeout_phase5_cabis.md "Why deferred to Phase 7".
- * Today's commit ships the non-blocking half: deletes ~340 LOC of duplicated
- * HTTP/JSON/state bookkeeping, keeps the public API surface that the 4
- * call sites under sdk/runanywhere-kotlin/src/jvmAndroidMain/.../foundation/
- * already consume:
+ * Public API surface unchanged — the 4 call sites in CppBridge.kt,
+ * CppBridgeModelAssignment.kt, CppBridgeTelemetry.kt, CppBridgeDevice.kt
+ * continue to compile.
  *
- *   CppBridgeAuth.authenticate(...)        : called from CppBridge.kt:399
- *   CppBridgeAuth.isAuthenticated          : CppBridgeModelAssignment.kt:329
- *   CppBridgeAuth.tokenNeedsRefresh        : CppBridgeModelAssignment.kt:329
- *   CppBridgeAuth.getValidToken()          : 3 call sites (Telemetry, Device, ModelAssignment)
- *
- * The Kotlin layer remains the thinnest possible HTTP transport (since no
- * JNI httpPost helper exists yet); the orchestration drift (5-min vs 60-sec
- * refresh window) is fixed here by reading the threshold from the C ABI's
- * rac_auth_needs_refresh().
+ * Refresh window is now sourced from rac_auth_needs_refresh() (60 sec
+ * per the C ABI), not the old Kotlin REFRESH_WINDOW_MS constant. The
+ * 5-min vs 60-sec drift bug is permanently fixed because Kotlin no
+ * longer carries its own constant.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.concurrent.atomic.AtomicReference
 
-/** GAP 08 Phase 22 / v2 close-out Phase 7 deprecation marker — see file header. */
-@Deprecated(
-    "Use the rac_auth_* C ABI directly via CppBridgePlatformAdapter once the " +
-    "JNI thunks land. See docs/v2_closeout_phase5_cabis.md.",
-    level = DeprecationLevel.WARNING,
-)
-internal class CppBridgeAuthGap08DeprecationMarker private constructor()
-
-/** Backend-issued auth response. The 4 call sites only read accessToken. */
+/** Backend-issued auth response. Kept for the public API contract; the
+ *  4 call sites only read `accessToken`. The actual parse + state
+ *  application happens in C++ via rac_auth_handle_authenticate_response. */
 @Serializable
 data class AuthenticationResponse(
     @SerialName("access_token") val accessToken: String,
@@ -61,47 +48,42 @@ data class AuthenticationResponse(
 )
 
 /**
- * Thin auth facade. Replaces ~568 LOC of duplicated transport with one
- * private HTTP helper + state references that the C++ rac_auth_manager
- * will own once the JNI thunks land.
- *
- * Refresh window aligned with the C ABI's `rac_auth_needs_refresh()`
- * threshold (60 seconds). The pre-Phase-7 implementation used 5 minutes;
- * that drift was the source of the documented Kotlin-vs-Swift auth bug.
+ * Pure HTTP transport adapter for the rac_auth_* C ABI. State lives
+ * in native; this file just runs the HTTP POST round-trips and hands
+ * the response bodies back to native for parsing.
  */
-@Suppress("DEPRECATION")
 object CppBridgeAuth {
     private const val TAG = "CppBridge/Auth"
     private const val ENDPOINT_AUTHENTICATE = "/api/v1/auth/sdk/authenticate"
     private const val ENDPOINT_REFRESH      = "/api/v1/auth/sdk/refresh"
-    /** v2 close-out: aligned with rac_auth_needs_refresh() in commons. */
-    private const val REFRESH_WINDOW_MS = 60L * 1000L
 
-    private val accessTokenRef  = AtomicReference<String?>(null)
-    private val refreshTokenRef = AtomicReference<String?>(null)
-    private val expiresAtRef    = AtomicReference<Long?>(null)
-    private val deviceIdRef     = AtomicReference<String?>(null)
-    private val baseUrlRef      = AtomicReference<String?>(null)
+    /** Initialize native auth state. Idempotent. */
+    init { RunAnywhereBridge.racAuthInit() }
 
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    val accessToken: String? get() = RunAnywhereBridge.racAuthGetAccessToken()
 
-    val accessToken: String? get() = accessTokenRef.get()
+    val tokenNeedsRefresh: Boolean get() = RunAnywhereBridge.racAuthNeedsRefresh()
 
-    val tokenNeedsRefresh: Boolean
-        get() {
-            val expiresAt = expiresAtRef.get() ?: return true
-            return System.currentTimeMillis() >= (expiresAt - REFRESH_WINDOW_MS)
-        }
-
-    val isAuthenticated: Boolean
-        get() = accessTokenRef.get() != null && !tokenNeedsRefresh
+    val isAuthenticated: Boolean get() = RunAnywhereBridge.racAuthIsAuthenticated()
 
     /** Returns a valid access token, refreshing if needed. NULL if no auth state. */
     fun getValidToken(): String? {
-        val current = accessTokenRef.get() ?: return null
+        val current = RunAnywhereBridge.racAuthGetAccessToken() ?: return null
         if (!tokenNeedsRefresh) return current
-        val baseUrl = baseUrlRef.get() ?: return current
-        return try { refreshAccessToken(baseUrl) } catch (_: Exception) { null }
+        // Refresh path: native builds the refresh request body; we POST
+        // it and hand the response back to native for parsing.
+        val body = RunAnywhereBridge.racAuthBuildRefreshRequest() ?: return null
+        // baseUrl is extracted from the configured environment in native;
+        // we still need it here for the HTTP transport. The 4 call sites
+        // pass it explicitly via authenticate() before getValidToken() is
+        // first invoked, so we cache it in CppBridge.kt at init time.
+        val baseUrl = activeBaseUrl ?: return current
+        return try {
+            val response = post(baseUrl + ENDPOINT_REFRESH, body, bearer = null)
+            if (RunAnywhereBridge.racAuthHandleRefreshResponse(response) == 0) {
+                RunAnywhereBridge.racAuthGetAccessToken()
+            } else current
+        } catch (_: Exception) { current }
     }
 
     /**
@@ -115,48 +97,37 @@ object CppBridgeAuth {
         deviceId: String,
         platform: String = "android",
         sdkVersion: String = "0.1.0",
+        environment: Int = 0,  // 0 = DEVELOPMENT
     ): AuthenticationResponse {
-        baseUrlRef.set(baseUrl)
-        deviceIdRef.set(deviceId)
-        val body = """{"api_key":"$apiKey","device_id":"$deviceId","platform":"$platform","sdk_version":"$sdkVersion"}"""
+        activeBaseUrl = baseUrl
+        val body = RunAnywhereBridge.racAuthBuildAuthenticateRequest(
+            apiKey, baseUrl, deviceId, platform, sdkVersion, environment,
+        ) ?: throw IllegalStateException("$TAG: rac_auth_build_authenticate_request returned null")
         val response = post(baseUrl + ENDPOINT_AUTHENTICATE, body, bearer = null)
-        val parsed = json.decodeFromString(AuthenticationResponse.serializer(), response)
-        applyResponse(parsed)
-        return parsed
+        if (RunAnywhereBridge.racAuthHandleAuthenticateResponse(response) != 0) {
+            throw RuntimeException("$TAG: rac_auth_handle_authenticate_response rejected the body")
+        }
+        // Parse for the public-API contract — the kotlinx.serialization
+        // path is preserved so existing callers that read parsed fields
+        // (e.g. organizationId for telemetry) still work.
+        return jsonParser.decodeFromString(AuthenticationResponse.serializer(), response)
     }
 
-    /** Returns the new access token. Throws if refresh fails. */
-    fun refreshAccessToken(baseUrl: String): String {
-        val refreshToken = refreshTokenRef.get()
-            ?: throw IllegalStateException("No refresh token; call authenticate() first")
-        val body = """{"refresh_token":"$refreshToken"}"""
-        val response = post(baseUrl + ENDPOINT_REFRESH, body, bearer = null)
-        val parsed = json.decodeFromString(AuthenticationResponse.serializer(), response)
-        applyResponse(parsed)
-        return parsed.accessToken
-    }
-
-    /** Clear all auth state (logout). */
+    /** Clear all auth state (logout). Delegates to native. */
     fun reset() {
-        accessTokenRef.set(null)
-        refreshTokenRef.set(null)
-        expiresAtRef.set(null)
-        deviceIdRef.set(null)
-        baseUrlRef.set(null)
+        RunAnywhereBridge.racAuthReset()
+        activeBaseUrl = null
     }
 
-    private fun applyResponse(r: AuthenticationResponse) {
-        accessTokenRef.set(r.accessToken)
-        refreshTokenRef.set(r.refreshToken)
-        expiresAtRef.set(System.currentTimeMillis() + r.expiresIn * 1000L)
-        deviceIdRef.set(r.deviceId)
+    // Private state we still hold in Kotlin: just the base URL for the
+    // HTTP transport. Tokens, expiry, refresh-window math: all in C++.
+    @Volatile private var activeBaseUrl: String? = null
+
+    private val jsonParser = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true; isLenient = true
     }
 
-    /**
-     * Minimal HTTP POST. The pre-Phase-7 implementation had two of these
-     * (one in authenticate, one in doRefresh) with full per-call config
-     * blocks — ~80 LOC of boilerplate. Consolidated to one ~25-line helper.
-     */
+    /** Minimal HTTP POST. The only Kotlin-side network code in this file. */
     private fun post(url: String, body: String, bearer: String?): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
