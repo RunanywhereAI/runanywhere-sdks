@@ -648,6 +648,16 @@ export interface RunAnywhereCore
   initializeVoiceAgentWithLoadedModels(): Promise<boolean>;
 
   /**
+   * Get the native voice-agent handle as a JS number. Pass to
+   * `VoiceAgent.subscribeProtoEvents(handle, ...)` to subscribe to
+   * streaming events. v3.1 addition — exposes the underlying
+   * `rac_voice_agent_handle_t` so the adapter pattern works.
+   *
+   * @returns handle as number (0 if voice agent not yet initialized).
+   */
+  getVoiceAgentHandle(): Promise<number>;
+
+  /**
    * Check if voice agent is ready
    */
   isVoiceAgentReady(): Promise<boolean>;

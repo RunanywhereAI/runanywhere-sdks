@@ -35,18 +35,15 @@ import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
 
 // Import RunAnywhere SDK
-// v2 close-out: VoiceSessionHandle is @deprecated since the Wave D
-// Phase 13 cleanup. Sample keeps using it until VoiceAgentStreamAdapter
-// + the RN bridge handle wiring lands. See
-// docs/v2_remaining_work.md "Risk register".
-/* eslint-disable @typescript-eslint/no-deprecated, deprecation/deprecation */
+// v3.1: migrated off deprecated VoiceSessionHandle / VoiceSessionEvent.
+// Now uses the proto-stream adapter with a handle obtained via the
+// RunAnywhereCore.getVoiceAgentHandle() Nitro method (v3.1 addition).
 import {
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
-  type VoiceSessionHandle,
-  type VoiceSessionEvent,
+  VoiceAgentStreamAdapter,
 } from '@runanywhere/core';
-/* eslint-enable @typescript-eslint/no-deprecated, deprecation/deprecation */
+import { VoiceEvent } from '@runanywhere/core/src/generated/voice_events';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -73,9 +70,10 @@ export const VoiceAssistantScreen: React.FC = () => {
     'stt' | 'llm' | 'tts'
   >('stt');
 
-  // Voice session handle ref — see VoiceSessionHandle @deprecated note in imports above.
-  // eslint-disable-next-line @typescript-eslint/no-deprecated, deprecation/deprecation
-  const sessionRef = useRef<VoiceSessionHandle | null>(null);
+  // v3.1: voice-agent adapter ref + unsubscribe. Replaces the deprecated
+  // VoiceSessionHandle. The unsubscribe is returned by the adapter's
+  // AsyncIterable consumer; calling it deregisters the C-side callback.
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   // Check if all models are loaded
   const allModelsLoaded = sttModel && llmModel && ttsModel;
@@ -89,9 +87,9 @@ export const VoiceAssistantScreen: React.FC = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (sessionRef.current) {
-        sessionRef.current.stop();
-        sessionRef.current = null;
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
     };
   }, []);
@@ -141,94 +139,134 @@ export const VoiceAssistantScreen: React.FC = () => {
   };
 
   /**
-   * Handle voice session events from the SDK
+   * Drive UI state from canonical VoiceEvent proto messages (v3.1).
+   *
+   * Switches on `event.payload.$case` (ts-proto oneof tag). See
+   * docs/migrations/VoiceSessionEvent.md for the full mapping guide.
+   * Turn-completion aggregation (was 'turnCompleted') is rebuilt locally
+   * from state transitions.
    */
-  const handleVoiceEvent = useCallback((event: VoiceSessionEvent) => {
-    switch (event.type) {
-      case 'listening':
-        setStatus(VoicePipelineStatus.Listening);
-        setAudioLevel(event.audioLevel ?? 0);
-        break;
+  const handleProtoEvent = useCallback((event: VoiceEvent) => {
+    if (!event.payload) {
+      return;
+    }
 
-      case 'speechStarted':
-        console.warn('[VoiceAssistant] 🎙️ Speech started');
+    switch (event.payload.$case) {
+      case 'state': {
+        const state = event.payload.state;
+        switch (state.current) {
+          case 1: // STATE_LISTENING
+            setStatus(VoicePipelineStatus.Listening);
+            break;
+          case 2: // STATE_THINKING
+            setStatus(VoicePipelineStatus.Thinking);
+            break;
+          case 3: // STATE_SPEAKING
+            setStatus(VoicePipelineStatus.Speaking);
+            break;
+          case 4: // STATE_STOPPED
+            setStatus(VoicePipelineStatus.Idle);
+            setIsSessionActive(false);
+            setAudioLevel(0);
+            break;
+          default: // IDLE / unknown
+            break;
+        }
         break;
+      }
 
-      case 'speechEnded':
-        console.warn('[VoiceAssistant] 🔇 Speech ended - processing...');
+      case 'vad': {
+        const vad = event.payload.vad;
+        if (vad.type === 1) {
+          // VAD_EVENT_VOICE_START
+          console.warn('[VoiceAssistant] 🎙️ Speech started');
+        } else if (vad.type === 2) {
+          // VAD_EVENT_VOICE_END_OF_UTTERANCE
+          console.warn('[VoiceAssistant] 🔇 Speech ended — processing');
+          setStatus(VoicePipelineStatus.Processing);
+        }
         break;
+      }
 
-      case 'processing':
-        setStatus(VoicePipelineStatus.Processing);
-        break;
-
-      case 'transcribed':
-        if (event.transcription) {
-          console.warn('[VoiceAssistant] User said:', event.transcription);
+      case 'userSaid': {
+        const text = event.payload.userSaid.text;
+        if (text) {
+          console.warn('[VoiceAssistant] User said:', text);
           const userEntry: VoiceConversationEntry = {
             id: generateId(),
             speaker: 'user',
-            text: event.transcription,
+            text,
             timestamp: new Date(),
           };
           setConversation((prev) => [...prev, userEntry]);
-        }
-        setStatus(VoicePipelineStatus.Thinking);
-        break;
-
-      case 'responded':
-        if (event.response) {
-          console.warn('[VoiceAssistant] Assistant:', event.response);
-          const assistantEntry: VoiceConversationEntry = {
-            id: generateId(),
-            speaker: 'assistant',
-            text: event.response,
-            timestamp: new Date(),
-          };
-          setConversation((prev) => [...prev, assistantEntry]);
+          setStatus(VoicePipelineStatus.Thinking);
         }
         break;
+      }
 
-      case 'speaking':
+      case 'assistantToken': {
+        // Streaming token append — append the last message if it's from
+        // the assistant, otherwise push a new assistant entry.
+        const token = event.payload.assistantToken.text;
+        if (token) {
+          setConversation((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.speaker === 'assistant') {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                text: last.text + token,
+              };
+              return updated;
+            }
+            return [
+              ...prev,
+              {
+                id: generateId(),
+                speaker: 'assistant',
+                text: token,
+                timestamp: new Date(),
+              },
+            ];
+          });
+        }
+        break;
+      }
+
+      case 'audio':
         setStatus(VoicePipelineStatus.Speaking);
         break;
 
-      case 'turnCompleted':
-        console.warn('[VoiceAssistant] ✅ Turn completed');
-        setStatus(VoicePipelineStatus.Listening);
-        break;
-
-      case 'stopped':
-        console.warn('[VoiceAssistant] Session stopped');
-        setStatus(VoicePipelineStatus.Idle);
-        setIsSessionActive(false);
-        setAudioLevel(0);
-        break;
-
-      case 'error':
-        console.error('[VoiceAssistant] Error:', event.error);
+      case 'error': {
+        const err = event.payload.error;
+        console.error('[VoiceAssistant] Error:', err.message);
         setStatus(VoicePipelineStatus.Error);
-        Alert.alert('Error', event.error || 'An error occurred');
+        Alert.alert('Error', err.message || 'An error occurred');
         setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
         setIsSessionActive(false);
+        break;
+      }
+
+      case 'interrupted':
+      case 'metrics':
+        // No UX impact today.
         break;
     }
   }, []);
 
   /**
-   * Start or stop the voice session
+   * Start or stop the voice session (v3.1: uses proto-stream adapter).
    */
   const handleToggleSession = useCallback(async () => {
     if (isSessionActive) {
-      // Stop the session
-      if (sessionRef.current) {
-        sessionRef.current.stop();
-        sessionRef.current = null;
+      // Stop: deregister the C-side callback via the adapter's unsubscribe.
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
       setIsSessionActive(false);
       setStatus(VoicePipelineStatus.Idle);
     } else {
-      // Start the session
       if (!allModelsLoaded) {
         Alert.alert(
           'Models Required',
@@ -238,31 +276,52 @@ export const VoiceAssistantScreen: React.FC = () => {
       }
 
       try {
-        console.warn('[VoiceAssistant] Starting voice session...');
+        console.warn('[VoiceAssistant] Starting voice agent...');
 
-        // Use the SDK's voice session API
-        // v2 close-out: see VoiceSessionHandle @deprecated note in imports above.
-        // eslint-disable-next-line @typescript-eslint/no-deprecated, deprecation/deprecation
-        const session = await RunAnywhere.startVoiceSession({
-          silenceDuration: 1.5,
-          speechThreshold: 0.1,
-          autoPlayTTS: true,
-          continuousMode: true,
-          language: 'en',
-          onEvent: handleVoiceEvent,
-        });
+        // v3.1: initialize voice agent against loaded models + subscribe
+        // to the proto event stream.
+        await RunAnywhere.initializeVoiceAgentWithLoadedModels();
+        const handle = await RunAnywhere.getVoiceAgentHandle();
+        if (handle === 0) {
+          throw new Error(
+            'Voice agent handle is 0 — initializeVoiceAgentWithLoadedModels did not allocate.'
+          );
+        }
 
-        sessionRef.current = session;
+        const adapter = new VoiceAgentStreamAdapter(handle);
+        const iterable = adapter.stream();
+
+        // Spin a background consumer. The async iterable throws
+        // AbortError on unsubscribe; we treat that as a normal stop.
+        (async () => {
+          try {
+            for await (const event of iterable) {
+              handleProtoEvent(event);
+            }
+          } catch (err) {
+            if ((err as Error).name !== 'AbortError') {
+              console.error('[VoiceAssistant] Stream error:', err);
+            }
+          }
+        })();
+
+        unsubscribeRef.current = () => {
+          // VoiceAgentStreamAdapter exposes cancel via AsyncIterable
+          // termination; calling .return() on the iterator triggers
+          // onCancel → Nitro unsubscribe.
+          iterable.return?.(undefined as never).catch(() => {});
+        };
+
         setIsSessionActive(true);
         setStatus(VoicePipelineStatus.Listening);
 
-        console.warn('[VoiceAssistant] Voice session started');
+        console.warn('[VoiceAssistant] Voice agent started');
       } catch (error) {
-        console.error('[VoiceAssistant] Failed to start session:', error);
-        Alert.alert('Error', `Failed to start voice session: ${error}`);
+        console.error('[VoiceAssistant] Failed to start voice agent:', error);
+        Alert.alert('Error', `Failed to start voice agent: ${error}`);
       }
     }
-  }, [isSessionActive, allModelsLoaded, handleVoiceEvent]);
+  }, [isSessionActive, allModelsLoaded, handleProtoEvent]);
 
   /**
    * Handle model selection - opens model selection sheet

@@ -269,6 +269,7 @@ public:
 
   std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
+  std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
   std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
   std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) override;

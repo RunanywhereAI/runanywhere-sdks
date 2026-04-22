@@ -2543,6 +2543,21 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initializeVoiceAgent(
     });
 }
 
+// v3.1: Expose the global voice-agent handle as a JS number. The
+// VoiceAgent.subscribeProtoEvents(handle, ...) Nitro method casts it
+// back to rac_voice_agent_handle_t on the C side. 0 means the handle
+// isn't allocated yet (pre-initializeVoiceAgentWithLoadedModels).
+std::shared_ptr<Promise<double>> HybridRunAnywhereCore::getVoiceAgentHandle() {
+    return Promise<double>::async([this]() -> double {
+        rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
+        // reinterpret_cast to uintptr_t then widen to double. JS numbers
+        // are 64-bit double, safe for 53 bits of integer precision —
+        // more than enough for a 64-bit process pointer on macOS/Linux
+        // and 32-bit pointers on iOS/Android ABIs.
+        return static_cast<double>(reinterpret_cast<uintptr_t>(handle));
+    });
+}
+
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initializeVoiceAgentWithLoadedModels() {
     return Promise<bool>::async([this]() -> bool {
         LOGI("Initializing voice agent with loaded models...");

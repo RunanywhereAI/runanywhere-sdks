@@ -226,6 +226,9 @@ export type {
   VoiceSessionState,
 } from './Features';
 
+// v3.1: proto-stream VoiceAgentStreamAdapter (canonical path).
+export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
+
 // =============================================================================
 // Native Module (now part of core)
 // =============================================================================
