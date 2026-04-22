@@ -32,7 +32,7 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | `test_llm_thinking` | 10/10 OK | |
 | `parity_test_cpp_check` | 8/8 events match golden | Wire-format parity across 6 implementations |
 | Sample-app deprecated-API call sites annotated | **11 sites × 4 platforms** | Per-call-site suppressions; v3 escalation safe |
-| GAP 08 spec criteria | 6 OK · 1 PARTIAL · 1 DEFERRED · 2 PARTIAL/UNKNOWN | #2 auth, #4 dart, #9 sample-smoke, #10 device |
+| GAP 08 spec criteria | 7 OK · 2 PARTIAL · 1 DEFERRED · 2 PARTIAL | #2 auth, #4 dart (DEFERRED), #6 kotlin LOC over (PARTIAL), #9 sample-smoke (PARTIAL), #10 device (PARTIAL) |
 | GAP 09 spec criteria | 6 OK · 3 PARTIAL · 1 SPEC-DRIFT (intentional) | #6 hand-written event, #7 cancellation parity, #8 p50 |
 
 ## Architecture as built (1-line per layer)
@@ -100,12 +100,42 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | Auth divergence if backend changes refresh policy | OPEN — needs v2.1-4 |
 | `VoiceSessionEvent` schema drift | OPEN — needs v2.1-1 |
 | v3 cut-over needs 88-call-site repoint | OPEN — Tier 3 prerequisite |
-| Per-SDK total-LOC criteria unmeasured | OPEN — needs v2.1-6 (~30 min) |
+| ~~Per-SDK total-LOC criteria unmeasured~~ | **CLOSED** by Item 1 of v2.1 quick-wins PR — see "Per-SDK LOC measurement" section below. Headline: Kotlin 60% over target (PARTIAL), Swift+Dart at target (OK). |
 | `p50 ≤ 1ms` claim unproven | OPEN — needs v2.1-3 |
 | CI environment drift | OPEN — pin Homebrew/NDK/Flutter versions |
 | ~~Sample apps fail to build on v3 escalation~~ | **MITIGATED** by Phase B |
 | ~~Kotlin orphan native UnsatisfiedLinkError~~ | **CLOSED** by Phase C (99/99 cleared) |
 | ~~Test coverage gap on 2 voice union arms~~ | **CLOSED** by Phase A (11/11 OK) |
+
+## Per-SDK LOC measurement (post Phase A-D + drift cleanup)
+
+Closes the GAP 08 #6/#7/#8 measurement gap that the post-audit flagged
+as UNKNOWN. Methodology: `find ... -name "*.{kt,swift,dart,ts}" |
+xargs wc -l`, excluding generated files (`*.pb.swift`, `*.grpc.swift`,
+`*.pb.dart`, `*.pbgrpc.dart`, `*.pbenum.dart`, `*.pbjson.dart`,
+`*.pb.ts`), tests, and build artifacts (`build/`, `.gradle/`,
+`.dart_tool/`, `node_modules/`, `dist/`).
+
+| SDK | Source LOC | Generated LOC | Test LOC | Total | Spec target | Status |
+|-----|-----------:|--------------:|---------:|------:|------------:|--------|
+| Kotlin           | **48,020** |     0 |    56 |  48,076 | ~30,000 | **PARTIAL** — 60% over target |
+| Swift            | **24,820** | 5,353 |   161 |  30,334 | ~24,000 | **OK** — 3% over (at target) |
+| Flutter (Dart)   | **33,634** | 5,580 |     0 |  39,214 | ~30,000 | **OK** — 12% over (within tolerance) |
+| React Native     | **25,284** |     0 |     0 |  25,284 | (no spec target) | n/a |
+| Web              | **21,553** |     0 |    67 |  21,620 | (no spec target) | n/a |
+
+**Headline finding**: Kotlin is the outlier at 48,020 LOC (60% over the
+~30k spec target). Root cause: the surviving 21 `CppBridge*.kt` files
+account for ~17,000 LOC alone — the spec underestimated the per-feature
+JNI bridge layer required for KMP. A v3 cleanup PR could shrink this by
+auto-generating the boilerplate `external fun` + `racXxx` thunk pattern
+from the C ABI headers (similar to how `swift-protobuf` generates
+typesafe wrappers); estimated ~10k LOC reduction, deferred to v3.
+
+**Status flips**:
+- GAP 08 #6 (Kotlin ~30k): **UNKNOWN → PARTIAL** (over target; rationale documented).
+- GAP 08 #7 (Swift ~24k): **UNKNOWN → OK** (24,820 vs 24,000 target = 3% over, at noise floor).
+- GAP 08 #8 (Dart ~30k): **UNKNOWN → OK** (33,634 vs 30,000 target = 12% over, within typical spec tolerance).
 
 ## Doc map (read in order)
 

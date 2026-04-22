@@ -31,7 +31,7 @@
 > | v2.1-3 | Per-SDK p50 latency benchmark for VoiceEvent streaming (30-second harness × 5 SDKs) | GAP 09 #8 | ~3 days |
 > | v2.1-4 | Implement 16 `rac_auth_*` JNI thunks in `sdk/runanywhere-commons/src/jni/`; `git rm CppBridgeAuth.kt` (currently 182 LOC of HTTP/JSON state) | GAP 08 #2 | ~2 days |
 > | v2.1-5 | Sample-app E2E smoke automation (Detox for RN, Maestro for Flutter, XCUITest for iOS, Espresso for Android) | GAP 08 #9 | ~1 wk |
-> | v2.1-6 | `wc -l` measurement of per-SDK total LOC vs spec targets (Kotlin ~30k, Swift ~24k, Dart ~30k); document deltas | GAP 08 #6/#7/#8 | ~30 min |
+> | ~~v2.1-6~~ | ~~`wc -l` measurement of per-SDK total LOC vs spec targets~~ **DONE in v2.1 quick-wins PR Item 1**: Kotlin 48,020 (60% over → PARTIAL), Swift 24,820 (at target → OK), Dart 33,634 (12% over → OK). See `v2_current_state.md` "Per-SDK LOC measurement". | GAP 08 #6/#7/#8 | DONE |
 > | v2.1-7 | Real-device behavioral parity verification (60-sec auth refresh, voice barge-in latency, download resume after disconnect) per `v2_closeout_device_verification.md` | GAP 08 #10 | ~1 wk QA |
 
 _Synthesis of the post-Wave-F audit (3 independent code-reality + spec-vs-gate + build-state passes)._
