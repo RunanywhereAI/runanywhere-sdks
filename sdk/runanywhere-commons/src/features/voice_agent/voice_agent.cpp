@@ -30,6 +30,21 @@
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 
+// v2 close-out Phase 2 — fan-out to GAP 09 proto-byte event ABI alongside
+// the legacy struct callback. No-op when no proto callback is registered
+// or when the build was configured without Protobuf.
+#include "rac_voice_event_abi_internal.h"
+
+namespace {
+inline void rac_va_emit(rac_voice_agent_handle_t          handle,
+                        const rac_voice_agent_event_t*    event,
+                        rac_voice_agent_event_callback_fn cb,
+                        void*                             user_data) {
+    if (cb) cb(event, user_data);
+    rac::voice_agent::dispatch_proto_event(handle, event);
+}
+}  // namespace
+
 // Forward declare event helpers from events.cpp
 namespace rac::events {
 void emit_voice_agent_stt_state_changed(rac_voice_agent_component_state_t state,
@@ -680,7 +695,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = RAC_ERROR_NOT_INITIALIZED;
-        callback(&error_event, user_data);
+        rac_va_emit(handle, &error_event, callback, user_data);
         return RAC_ERROR_NOT_INITIALIZED;
     }
 
@@ -690,7 +705,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = validation_result;
-        callback(&error_event, user_data);
+        rac_va_emit(handle, &error_event, callback, user_data);
         return validation_result;
     }
 
@@ -704,7 +719,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = result;
-        callback(&error_event, user_data);
+        rac_va_emit(handle, &error_event, callback, user_data);
         return result;
     }
 
@@ -712,7 +727,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     rac_voice_agent_event_t transcription_event = {};
     transcription_event.type = RAC_VOICE_AGENT_EVENT_TRANSCRIPTION;
     transcription_event.data.transcription = stt_result.text;
-    callback(&transcription_event, user_data);
+    rac_va_emit(handle, &transcription_event, callback, user_data);
 
     // Step 2: Generate response
     rac_llm_result_t llm_result = {};
@@ -723,7 +738,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = result;
-        callback(&error_event, user_data);
+        rac_va_emit(handle, &error_event, callback, user_data);
         return result;
     }
 
@@ -731,7 +746,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     rac_voice_agent_event_t response_event = {};
     response_event.type = RAC_VOICE_AGENT_EVENT_RESPONSE;
     response_event.data.response = llm_result.text;
-    callback(&response_event, user_data);
+    rac_va_emit(handle, &response_event, callback, user_data);
 
     // Step 3: Synthesize
     rac_tts_result_t tts_result = {};
@@ -744,7 +759,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         rac_voice_agent_event_t error_event = {};
         error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
         error_event.data.error_code = result;
-        callback(&error_event, user_data);
+        rac_va_emit(handle, &error_event, callback, user_data);
         return result;
     }
     // Step 4: Convert Float32 PCM to WAV — no lock needed (pure computation)
@@ -764,7 +779,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
             rac_voice_agent_event_t error_event = {};
             error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
             error_event.data.error_code = result;
-            callback(&error_event, user_data);
+            rac_va_emit(handle, &error_event, callback, user_data);
             return result;
         }
     }
@@ -774,7 +789,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     audio_event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
     audio_event.data.audio.audio_data = wav_data;
     audio_event.data.audio.audio_size = wav_size;
-    callback(&audio_event, user_data);
+    rac_va_emit(handle, &audio_event, callback, user_data);
 
     // Copy wav_data for the processed event so each callback gets independent memory
     void* wav_copy = nullptr;
@@ -793,7 +808,7 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
     processed_event.data.result.response = rac_strdup(llm_result.text);
     processed_event.data.result.synthesized_audio = wav_copy;
     processed_event.data.result.synthesized_audio_size = wav_copy ? wav_size : 0;
-    callback(&processed_event, user_data);
+    rac_va_emit(handle, &processed_event, callback, user_data);
 
     // Free event-owned allocations (callback has consumed the data)
     free(processed_event.data.result.transcription);

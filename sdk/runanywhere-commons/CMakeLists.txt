@@ -575,6 +575,48 @@ else()
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
+# =============================================================================
+# Protobuf — optional, gates RAC_HAVE_PROTOBUF
+#
+# v2 close-out Phase 2: when Protobuf is available, link the generated
+# voice_events / model_types / pipeline / solutions C++ classes into
+# rac_commons + define RAC_HAVE_PROTOBUF so rac_voice_event_abi.cpp can
+# serialize VoiceEvent and dispatch the proto-byte callback wired up by
+# the GAP 09 Phase 15 ABI. When Protobuf is missing, the same source files
+# fall back to the FEATURE_NOT_AVAILABLE path declared in the header.
+# =============================================================================
+
+find_package(Protobuf QUIET)
+if(Protobuf_FOUND)
+    set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
+    if(EXISTS ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc)
+        target_sources(rac_commons PRIVATE
+            ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/model_types.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/pipeline.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/solutions.pb.cc
+        )
+        target_include_directories(rac_commons PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        # Prefer the modern imported target when available so transitive deps
+        # (absl, etc.) flow through without us listing them by hand.
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(rac_commons PUBLIC protobuf::libprotobuf)
+        else()
+            target_link_libraries(rac_commons PUBLIC ${Protobuf_LIBRARIES})
+        endif()
+        target_compile_definitions(rac_commons PUBLIC RAC_HAVE_PROTOBUF=1)
+        message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")
+    else()
+        message(STATUS "Protobuf found but src/generated/proto/*.pb.cc absent — proto event ABI inactive")
+    endif()
+else()
+    message(STATUS "Protobuf not found — rac_voice_agent_set_proto_callback returns FEATURE_NOT_AVAILABLE")
+endif()
+
 # Platform-specific linking
 if(APPLE)
     target_link_libraries(rac_commons PUBLIC

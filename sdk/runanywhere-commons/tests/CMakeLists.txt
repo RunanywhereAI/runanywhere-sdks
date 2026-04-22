@@ -18,6 +18,21 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+# --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
+# Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
+# VoiceEvent → SerializeToArray → callback path that GAP 09 Phase 15 declared
+# but left as a stub. Tests round-trip per oneof arm + monotonic seq +
+# unregister-stops-dispatch. SKIP-style when RAC_HAVE_PROTOBUF is undefined.
+add_executable(test_proto_event_dispatch test_proto_event_dispatch.cpp)
+target_include_directories(test_proto_event_dispatch PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_proto_event_dispatch PRIVATE rac_commons)
+rac_link_archive_deps(test_proto_event_dispatch)
+target_compile_features(test_proto_event_dispatch PRIVATE cxx_std_17)
+add_test(NAME proto_event_dispatch_tests COMMAND test_proto_event_dispatch)
+
 # --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
 # No backend dependency; all three link directly against rac_commons.
 add_executable(test_engine_vtable test_engine_vtable.cpp)
