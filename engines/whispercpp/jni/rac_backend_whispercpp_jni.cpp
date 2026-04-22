@@ -18,6 +18,9 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
 // Route JNI logging through unified RAC_LOG_* system
 static const char* LOG_TAG = "JNI.WhisperCpp";
@@ -55,12 +58,15 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_core_whispercpp_WhisperCPPBridge
         return static_cast<jint>(result);
     }
 
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result =
-        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("After WhisperCPP registration - STT providers: count=%zu, result=%d", provider_count,
-         list_result);
+    // v3 Phase B9: list TRANSCRIBE plugins for debug visibility.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result =
+            rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+        LOGi("After WhisperCPP registration - TRANSCRIBE plugins: count=%zu, result=%d",
+             plugin_count, list_result);
+    }
 
     LOGi("WhisperCPP backend registered successfully (STT)");
     return RAC_SUCCESS;
@@ -89,20 +95,19 @@ Java_com_runanywhere_sdk_core_whispercpp_WhisperCPPBridge_nativeIsRegistered(JNI
     (void)env;
     (void)clazz;
 
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-
+    // v3 Phase B9: check plugin registry for a plugin named "whispercpp".
+    const rac_engine_vtable_t* plugins[16] = {};
+    size_t plugin_count = 0;
     rac_result_t result =
-        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-
-    if (result == RAC_SUCCESS && provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            if (provider_names[i] && strstr(provider_names[i], "WhisperCPP") != nullptr) {
+        rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+    if (result == RAC_SUCCESS) {
+        for (size_t i = 0; i < plugin_count; ++i) {
+            if (plugins[i] && plugins[i]->metadata.name &&
+                strcmp(plugins[i]->metadata.name, "whispercpp") == 0) {
                 return JNI_TRUE;
             }
         }
     }
-
     return JNI_FALSE;
 }
 

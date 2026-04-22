@@ -46,6 +46,9 @@
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -496,19 +499,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadMode
     LOGi("racLlmComponentLoadModel path=%s, id=%s, name=%s", path.c_str(), id.c_str(),
          name.c_str());
 
-    // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_TEXT_GENERATION,
-                                                          &provider_names, &provider_count);
-    LOGi("Before load_model - TEXT_GENERATION providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    // rac_service_list_providers deleted; rac_plugin_list fills an
+    // array of vtables sorted by priority.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result = rac_plugin_list(RAC_PRIMITIVE_GENERATE_TEXT, plugins, 16,
+                                                   &plugin_count);
+        LOGi("Before load_model - GENERATE_TEXT plugins: count=%zu, list_result=%d",
+             plugin_count, list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for GENERATE_TEXT!");
         }
-    } else {
-        LOGw("NO providers registered for TEXT_GENERATION!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
@@ -1612,18 +1620,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadMode
          name.c_str());
 
     // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result =
-        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("Before load_model - STT providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result =
+            rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+        LOGi("Before load_model - TRANSCRIBE plugins: count=%zu, list_result=%d", plugin_count,
+             list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for TRANSCRIBE!");
         }
-    } else {
-        LOGw("NO providers registered for STT!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
