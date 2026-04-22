@@ -159,6 +159,30 @@ static rac_result_t llamacpp_vtable_clear_context(void* impl) {
 // plugin entry point in rac_plugin_entry_llamacpp.cpp. The `static` qualifier
 // has been dropped so the entry point TU can `extern` it; visibility is still
 // limited to the backend library via symbol hiding (the struct is `const`).
+// v3 Phase B1: `create` adapter called by commons rac_llm_create() after
+// rac_plugin_route picks this plugin. Replaces the legacy factory that was
+// registered via rac_service_provider_t::create. The config_json parameter is
+// reserved for future engine-specific tuning (num_threads, gpu_layers, etc.);
+// today we pass nullptr to rac_llm_llamacpp_create to use defaults.
+rac_result_t llamacpp_llm_create_impl(const char* model_id,
+                                      const char* /*config_json*/,
+                                      void** out_impl) {
+    if (!model_id || !out_impl) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "llamacpp_llm_create_impl: model=%s", model_id);
+
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_llm_llamacpp_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_llm_llamacpp_create failed: %d", rc);
+        return rc;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
     .generate = llamacpp_vtable_generate,
@@ -176,6 +200,7 @@ const rac_llm_service_ops_t g_llamacpp_ops = {
     .append_context = llamacpp_vtable_append_context,
     .generate_from_context = llamacpp_vtable_generate_from_context,
     .clear_context = llamacpp_vtable_clear_context,
+    .create = llamacpp_llm_create_impl,
 };
 
 // =============================================================================
@@ -194,99 +219,12 @@ LlamaCPPRegistryState& get_state() {
     return state;
 }
 
-// =============================================================================
-// SERVICE PROVIDER IMPLEMENTATION
-// =============================================================================
-
-rac_bool_t llamacpp_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: request is NULL");
-        return RAC_FALSE;
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: framework=%d, model_path=%s, identifier=%s",
-                  static_cast<int>(request->framework),
-                  request->model_path ? request->model_path : "NULL",
-                  request->identifier ? request->identifier : "NULL");
-
-    // Framework hint from model registry
-    if (request->framework == RAC_FRAMEWORK_LLAMACPP) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (framework match)");
-        return RAC_TRUE;
-    }
-
-    // If framework is explicitly set to something else, don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
-        RAC_LOG_DEBUG(
-            LOG_CAT,
-            "can_handle: NO (framework mismatch, expected LLAMACPP=%d or UNKNOWN=%d, got %d)",
-            RAC_FRAMEWORK_LLAMACPP, RAC_FRAMEWORK_UNKNOWN, static_cast<int>(request->framework));
-        return RAC_FALSE;
-    }
-
-    // Framework unknown - check file extension
-    const char* path = request->model_path ? request->model_path : request->identifier;
-    if (path == nullptr || path[0] == '\0') {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no path)");
-        return RAC_FALSE;
-    }
-
-    size_t len = strlen(path);
-    if (len >= 5) {
-        const char* ext = path + len - 5;
-        if (strcmp(ext, ".gguf") == 0 || strcmp(ext, ".GGUF") == 0) {
-            RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (gguf extension)");
-            return RAC_TRUE;
-        }
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no gguf extension in path: %s)", path);
-    return RAC_FALSE;
-}
-
-/**
- * Create a LlamaCPP LLM service with vtable.
- * Returns an rac_llm_service_t* that the generic API can dispatch through.
- */
-rac_handle_t llamacpp_create_service(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return nullptr;
-    }
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (model_path == nullptr || model_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "No model path provided");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating LlamaCPP service for: %s", model_path);
-
-    // Create backend-specific handle
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_llm_llamacpp_create(model_path, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create LlamaCPP backend: %d", result);
-        return nullptr;
-    }
-
-    // Allocate service struct with vtable
-    auto* service = static_cast<rac_llm_service_t*>(malloc(sizeof(rac_llm_service_t)));
-    if (!service) {
-        rac_llm_llamacpp_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_llamacpp_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "LlamaCPP service created successfully");
-    return service;
-}
+// v3 Phase B1: `llamacpp_can_handle` (rac_service_can_handle_fn) and
+// `llamacpp_create_service` (rac_service_create_fn) removed. The commons
+// consumer (rac_llm_create) now goes through rac_plugin_route → g_llamacpp_ops.create
+// which calls llamacpp_llm_create_impl (defined above). Model-format
+// gating is handled by the router via g_llamacpp_engine_vtable's
+// metadata.formats table in rac_plugin_entry_llamacpp.cpp.
 
 }  // namespace
 
@@ -304,7 +242,9 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
+    // Module registration stays (independent of the deleted service registry;
+    // rac_module_info_t + rac_capability_t are retained in v3 for the module
+    // registry which app-level capability discovery still uses).
     rac_module_info_t module_info = {};
     module_info.id = state.module_id;
     module_info.name = "LlamaCPP";
@@ -320,23 +260,17 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return result;
     }
 
-    // Register service provider
-    rac_service_provider_t provider = {};
-    provider.name = state.provider_name;
-    provider.capability = RAC_CAPABILITY_TEXT_GENERATION;
-    provider.priority = 100;
-    provider.can_handle = llamacpp_can_handle;
-    provider.create = llamacpp_create_service;
-    provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-
+    // v3 Phase B1: plugin registration now happens via the unified
+    // rac_plugin_registry (see rac_plugin_entry_llamacpp.cpp). Static
+    // builds wire it through RAC_STATIC_PLUGIN_REGISTER (see
+    // rac_static_register_llamacpp.cpp); dynamic loads go through
+    // plugin_loader.cpp calling rac_plugin_register(rac_plugin_entry_llamacpp()).
+    // Backend registration function remains a no-op-ish entry point for
+    // callers that import RABackendLlamaCPP and expect a module_register
+    // side-effect.
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully");
+    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module_register only; "
+                          "plugin registration via rac_plugin_entry_llamacpp)");
     return RAC_SUCCESS;
 }
 
@@ -348,7 +282,9 @@ rac_result_t rac_backend_llamacpp_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(state.provider_name, RAC_CAPABILITY_TEXT_GENERATION);
+    // v3: plugin unregistration is the registry's responsibility
+    // (rac_plugin_unregister("llamacpp") called by the host). Module
+    // registration is the only leftover to tear down here.
     rac_module_unregister(state.module_id);
 
     state.registered = false;
