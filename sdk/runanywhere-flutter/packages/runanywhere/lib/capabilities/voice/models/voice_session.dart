@@ -2,9 +2,23 @@
 ///
 /// Matches iOS VoiceSession.swift from Capabilities/Voice/Models/
 /// and RunAnywhere+VoiceSession.swift from Public/Extensions/
+///
+/// The whole VoiceSessionEvent hierarchy is `@Deprecated` since v2.1-1,
+/// so the in-file self-references (subclass constructors inside the
+/// `fromProto` mapper, etc.) all trigger `deprecated_member_use_from_same_package`.
+/// Suppressed at file scope because the deprecated-returning shape is
+/// the public contract of this file by design — the ENTIRE file will
+/// be `git rm`-d in v3's Phase C2.
+// ignore_for_file: deprecated_member_use_from_same_package
+
 library voice_session;
 
 import 'dart:typed_data';
+
+import 'package:runanywhere/generated/voice_events.pb.dart'
+    show VoiceEvent, VoiceEvent_Payload;
+import 'package:runanywhere/generated/voice_events.pbenum.dart'
+    show VADEventType, PipelineState;
 
 /// Output from Speech-to-Text transcription
 /// Matches Swift STTOutput from Public/Extensions/STT/STTTypes.swift
@@ -58,18 +72,59 @@ sealed class VoiceSessionEvent {
   /// (proto3 via protoc_plugin, generated from `idl/voice_events.proto`).
   ///
   /// Returns `null` for proto events that don't have a UX-visible
-  /// counterpart — see `docs/migrations/VoiceSessionEvent.md` for
-  /// the full dropout list (metrics, interrupted, low-level VAD,
-  /// state=thinking, etc.).
+  /// counterpart in the legacy enum (metrics, interrupted, low-level
+  /// VAD arms like BARGE_IN/SILENCE, state=THINKING). See
+  /// `docs/migrations/VoiceSessionEvent.md` for the full dropout list.
   ///
-  /// **v2.1-1 SCAFFOLD**: the parameter type is `Object` (not
-  /// `VoiceEvent`) because importing the generated proto here would
-  /// couple this public-API file to the codegen output layout. The
-  /// v2.1-1c follow-up PR tightens the parameter type + implements
-  /// the body. Today this returns null for every input; new code
-  /// should use the proto stream directly.
-  // ignore: deprecated_member_use_from_same_package
-  static VoiceSessionEvent? fromProto(Object event) => null;
+  /// v3-readiness Phase A6: ported 1:1 from the Swift template at
+  /// `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`
+  /// `VoiceSessionEvent.from(_:)`.
+  static VoiceSessionEvent? fromProto(VoiceEvent event) {
+    switch (event.whichPayload()) {
+      case VoiceEvent_Payload.userSaid:
+        return VoiceSessionTranscribed(text: event.userSaid.text);
+
+      case VoiceEvent_Payload.assistantToken:
+        return VoiceSessionResponded(text: event.assistantToken.text);
+
+      case VoiceEvent_Payload.audio:
+        return const VoiceSessionSpeaking();
+
+      case VoiceEvent_Payload.vad:
+        final vadType = event.vad.type;
+        if (vadType == VADEventType.VAD_EVENT_VOICE_START) {
+          return const VoiceSessionSpeechStarted();
+        } else if (vadType == VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+          return const VoiceSessionProcessing();
+        }
+        // BARGE_IN, SILENCE, UNSPECIFIED have no UX counterpart.
+        return null;
+
+      case VoiceEvent_Payload.state:
+        final cur = event.state.current;
+        if (cur == PipelineState.PIPELINE_STATE_IDLE) {
+          return const VoiceSessionStarted();
+        } else if (cur == PipelineState.PIPELINE_STATE_LISTENING) {
+          return const VoiceSessionListening(audioLevel: 0.0);
+        } else if (cur == PipelineState.PIPELINE_STATE_SPEAKING) {
+          return const VoiceSessionSpeaking();
+        } else if (cur == PipelineState.PIPELINE_STATE_STOPPED) {
+          return const VoiceSessionStopped();
+        }
+        // THINKING, UNSPECIFIED have no UX counterpart.
+        return null;
+
+      case VoiceEvent_Payload.error:
+        return VoiceSessionError(message: event.error.message);
+
+      case VoiceEvent_Payload.interrupted:
+      case VoiceEvent_Payload.metrics:
+      case VoiceEvent_Payload.notSet:
+        // No legacy UX counterpart. Consumers that need these should
+        // read proto events directly via VoiceAgentStreamAdapter.stream().
+        return null;
+    }
+  }
 }
 
 /// Session started and ready. v2.1-1: maps from `VoiceEvent.state { current = IDLE }`.
