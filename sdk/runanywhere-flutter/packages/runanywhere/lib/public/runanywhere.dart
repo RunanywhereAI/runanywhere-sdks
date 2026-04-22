@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
-import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
+// v3.1: voice_session.dart + voice_session_handle.dart deleted
+// (Phase 4.3). Proto-stream voice API now lives in
+// adapters/voice_agent_stream_adapter.dart (exported from the package
+// barrel). Imports updated below.
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/data/network/http_service.dart';
