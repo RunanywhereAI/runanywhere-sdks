@@ -1,0 +1,173 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+    "_comment": "GAP 07 Phase 2 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md. Nine preset families covering host (macOS / Linux / Windows) + cross-compile (Android / iOS / WASM). Configure presets share inheritance via 'base-*' hidden presets so per-platform tweaks stay short.",
+
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "base-debug",
+            "hidden": true,
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "RAC_BUILD_TESTS": "ON"
+            }
+        },
+        {
+            "name": "base-release",
+            "hidden": true,
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "RAC_BUILD_TESTS": "OFF"
+            }
+        },
+
+        {
+            "name": "macos-debug",
+            "displayName": "macOS — Debug + tests",
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "ON",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "macos-release",
+            "displayName": "macOS — Release",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "ON",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+
+        {
+            "name": "linux-debug",
+            "displayName": "Linux — Debug + tests",
+            "inherits": "base-debug",
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_BUILD_PLUGIN_SMOKE": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
+            "name": "linux-release",
+            "displayName": "Linux — Release",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON",
+                "RAC_BUILD_PLUGIN_SMOKE": "ON"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+        },
+        {
+            "name": "linux-asan",
+            "displayName": "Linux — Debug + AddressSanitizer",
+            "inherits": "linux-debug",
+            "cacheVariables": {
+                "RAC_SANITIZER": "asan"
+            }
+        },
+
+        {
+            "name": "android-arm64",
+            "displayName": "Android arm64-v8a (cross-compile)",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+                "ANDROID_ABI": "arm64-v8a",
+                "ANDROID_PLATFORM": "android-26",
+                "ANDROID_STL": "c++_shared",
+                "RAC_BUILD_JNI": "ON",
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "ON"
+            }
+        },
+        {
+            "name": "android-armv7",
+            "displayName": "Android armeabi-v7a (cross-compile)",
+            "inherits": "android-arm64",
+            "cacheVariables": { "ANDROID_ABI": "armeabi-v7a" }
+        },
+        {
+            "name": "android-x86_64",
+            "displayName": "Android x86_64 emulator (cross-compile)",
+            "inherits": "android-arm64",
+            "cacheVariables": { "ANDROID_ABI": "x86_64" }
+        },
+
+        {
+            "name": "ios-device",
+            "displayName": "iOS arm64 device (cross-compile)",
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "17.0",
+                "CMAKE_OSX_SYSROOT": "iphoneos",
+                "CMAKE_BUILD_TYPE": "Release",
+                "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_PLATFORM": "ON",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" }
+        },
+        {
+            "name": "ios-simulator",
+            "displayName": "iOS arm64 simulator (cross-compile)",
+            "inherits": "ios-device",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_OSX_SYSROOT": "iphonesimulator"
+            }
+        },
+
+        {
+            "name": "wasm",
+            "displayName": "WebAssembly (Emscripten)",
+            "inherits": "base-release",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "OFF"
+            }
+        }
+    ],
+
+    "buildPresets": [
+        { "name": "macos-debug",      "configurePreset": "macos-debug" },
+        { "name": "macos-release",    "configurePreset": "macos-release" },
+        { "name": "linux-debug",      "configurePreset": "linux-debug" },
+        { "name": "linux-release",    "configurePreset": "linux-release" },
+        { "name": "linux-asan",       "configurePreset": "linux-asan" },
+        { "name": "android-arm64",    "configurePreset": "android-arm64" },
+        { "name": "android-armv7",    "configurePreset": "android-armv7" },
+        { "name": "android-x86_64",   "configurePreset": "android-x86_64" },
+        { "name": "ios-device",       "configurePreset": "ios-device" },
+        { "name": "ios-simulator",    "configurePreset": "ios-simulator" },
+        { "name": "wasm",             "configurePreset": "wasm" }
+    ],
+
+    "testPresets": [
+        { "name": "macos-debug",   "configurePreset": "macos-debug",   "output": { "outputOnFailure": true } },
+        { "name": "linux-debug",   "configurePreset": "linux-debug",   "output": { "outputOnFailure": true } },
+        { "name": "linux-asan",    "configurePreset": "linux-asan",    "output": { "outputOnFailure": true } }
+    ]
+}
