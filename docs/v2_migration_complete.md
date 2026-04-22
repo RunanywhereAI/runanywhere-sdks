@@ -1,21 +1,65 @@
-# v2 Architecture Migration — Complete
+# v2 Architecture Migration — Status & Post-Mortem
 
-_Closes the v2 architecture rearchitecture program. Single-PR diff hits
-`main` as PR #494._
+_Living document. Updated post-Wave-F audit. The branch on
+`feat/v2-architecture` is **not yet shippable as v2**; see the
+[Audit reality check](#audit-reality-check) section below for what's
+real vs deferred, and [`v2_remaining_work.md`](v2_remaining_work.md)
+for the prioritized closing list._
 
 ## TL;DR
 
-- **33 phases** across **6 waves** delivered on `feat/v2-architecture`.
-- **9 architectural gaps** (`v2_gap_specs/GAP_0[1-9].md` + GAP 11)
-  closed with one final-gate report each.
-- **Wave E (GAP 05 DAG runtime)** explicitly deferred per spec:
-  no second pipeline yet justifies the 4-6 wk build cost.
-- All gates shipped with bundled commits — one logical phase per
-  commit, except where a phase only made sense as part of a larger
-  unit (e.g. GAP 06 Phase 8+9 had to land together to keep the build
-  green during the engines/ move).
-- Final commit deprecates the legacy `rac_service_*` surface; physical
-  delete + `RAC_PLUGIN_API_VERSION` 2u → 3u is the v3 cut-over event.
+- **33 phases** across **6 waves** committed to `feat/v2-architecture`.
+- **9 architectural gaps** (`v2_gap_specs/GAP_0[1-9].md` + the
+  reverse-engineered "GAP 11") have final-gate reports under
+  `docs/gap0*_final_gate_report.md`.
+- **Wave E (GAP 05 DAG runtime)** explicitly deferred per spec.
+- **Waves A, B, C are substantively shipped** — IDL + codegen, plugin
+  ABI + dynamic loading + router, root CMake + presets + engines/
+  reorg, and the streaming adapter contract across all 5 SDKs.
+- **Wave D (GAP 08 frontend deletion sweep) and Wave F (GAP 11 legacy
+  removal) shipped *deprecation pressure*, not the *physical deletes*
+  the gate-report tables initially claimed.** The orchestration bodies
+  marked `@Deprecated` in Wave D still execute; `service_registry.cpp`
+  is still on disk; `RAC_PLUGIN_API_VERSION` is still `2u`.
+- This is the same shape as Square Wire 3.x→4.x and gRPC
+  `Server`→`aio.server` migrations: emit deprecation, give consumers a
+  release window, then delete in v3.
+
+## Audit reality check
+
+Three independent agents audited the branch on Wave-F-final HEAD. The
+findings are summarized in [`wave_roadmap.md` "Audit snapshot"](wave_roadmap.md#audit-snapshot--what-is-on-the-branch-right-now)
+and the prioritized close-out list lives in
+[`v2_remaining_work.md`](v2_remaining_work.md).
+
+| What is real on disk today | What is documented but deferred |
+|----------------------------|----------------------------------|
+| Root `CMakeLists.txt` + `CMakePresets.json` + `cmake/{platform,sanitizers,plugins,protobuf}.cmake` | Verifying `cmake --preset macos-release` configures + builds + tests in CI |
+| `engines/` with 5 migrated backends (history preserved) + 3 stub engines | The 5 migrated engines using `rac_add_engine_plugin()` one-liners (still use original CMakeLists) |
+| `idl/voice_agent_service.proto` + `llm_service.proto` + `download_service.proto` | The generated `*.grpc.swift` / `*.pbgrpc.dart` files (codegen ready, not run) |
+| `rac_voice_event_abi.h/.cpp` C++ proto-byte ABI; `RAC_ABI_VERSION=2u` | `dispatch_proto_event()` body is a TODO stub — adapters compile, emit zero events |
+| 5 `VoiceAgentStreamAdapter` files (Swift / Kotlin / Dart / RN / Web) | Consumer code that uses them — all 5 SDKs still call the duplicated orchestration |
+| 4 `parity_test.*` scaffolds + README | Fixture audio + golden-events file + actual `XCTAssert` (today: `XCTSkipIf(true)`) |
+| `@Deprecated`/DEPRECATED markers on 11 Wave-D target files | The actual deletes (~3,040 LOC scheduled). Note: Kotlin `streamVoiceSession` lacks even the marker |
+| `[[deprecated]]` + `rac_legacy_warn_once` on `rac_service_*` | `git rm service_registry.cpp` + `RAC_PLUGIN_API_VERSION` 2u→3u |
+| 5 file-level deprecation markers in 3 SDKs (Kotlin auth, Swift TextGen/Voice/Download, Dart, RN, Web) | LOC ceilings: `runanywhere.dart` 2,688 (spec ≤500); `VoiceSessionHandle.ts` 636 (spec ≤250) |
+
+**Aggregate diff vs branch start (`8d1f851b`):** 127 files,
++3,845 / −6,095, **net −2,250 LOC**. (The deletes that hit the diff are
+the 10 retired `build-*.sh` scripts from GAP 07 Phase 7, not Wave D's
+~3,040 LOC of orchestration — that work is scheduled.)
+
+**What this means for the program:**
+
+- **PR #494 in its current form is a v2-foundation PR**, not a v2 ship.
+  Reviewing + merging it gives you the contracts (plugin ABI, router,
+  IDL, streaming adapters) on `main`, but the duplication-deletion
+  payoff comes in follow-up PRs (Priority 2 in `v2_remaining_work.md`).
+- **A v2 release tag** (semver minor) should land **after Priority 1
+  + Priority 2** are done — that's when the spec's claimed LOC
+  reduction + behavioral simplification becomes real.
+- **A v3 release tag** (semver major) is the right boundary for
+  Priority 3 (physical struct removal + `RAC_PLUGIN_API_VERSION` 3u).
 
 ## Architecture as built
 

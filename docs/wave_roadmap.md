@@ -1,8 +1,44 @@
 # v2 architecture roadmap
 
-_Last updated: at the close of Wave A (GAP 03 + GAP 04). All work happens on the **single long-lived branch** [`feat/v2-architecture`](https://github.com/RunanywhereAI/runanywhere-sdks/tree/feat/v2-architecture) tracked by **PR #494**._
+_Last updated: post-Wave-F audit. All work happens on the **single long-lived branch** [`feat/v2-architecture`](https://github.com/RunanywhereAI/runanywhere-sdks/tree/feat/v2-architecture) tracked by **PR #494**._
 
-The seven-gap migration on `runanywhere-sdks-main` is structured as five waves. **Two waves done, three remain (one optional).** This doc captures the **scope, dependency, and rationale** for each remaining wave at a level deep enough to start a detailed plan; full per-phase plans get written one wave at a time as the prior wave merges.
+The seven-gap migration on `runanywhere-sdks-main` is structured as six waves. **All six waves have shipped commits to the branch; deeper audit (below) shows that Waves D and F shipped *deprecation pressure*, not the *physical deletes* the gate-report prose described.** This doc captures the **scope, dependency, rationale, and ground-truth state** for each wave + the concrete remaining work to ship v2 to production.
+
+---
+
+## Audit snapshot — what is on the branch right now
+
+Three independent agents audited the branch on `feat/v2-architecture` (HEAD = Wave F final-gate commit). Findings:
+
+| Wave / GAP | Spec target | Branch reality | Verdict |
+|------------|-------------|-----------------|---------|
+| **GAP 01** (IDL + codegen) | 4 protos + 6 gen scripts + drift CI | 7 protos (incl. GAP-09 services) + 9 gen scripts + path-scoped drift CI | **Shipped**. Spec criteria #10–#11 (FFI ≤45k LOC, single-commit propagation test PR) **not measured / not delivered**. |
+| **GAP 02** (unified plugin ABI) | `rac_engine_vtable_t` + 7 backends register both legacy + new | Vtable + 5 dirs / 6 plugin entries (llamacpp + llamacpp_vlm count as 2). Embedding/rerank slots present; `ww` slot renamed | **Shipped** with naming drift vs spec. |
+| **GAP 03** (dynamic loading) | `rac_registry_load_plugin` + ABI guard + plugin author guide | All present. Spec wanted `docs/plugins/PLUGIN_AUTHORING.md`, shipped at `docs/plugin_loader_authoring.md` | **Shipped** with doc-path drift. Real-GGUF E2E load test deferred. |
+| **GAP 04** (engine router + HW profile) | Router + scoring + 7 engines populate metadata; CI lint | Router + scoring + 6 engines populate; tests cover scoring, no CI lint job | **Shipped**. Engine-list mismatch with spec (spec listed `fluid_audio`, `foundation_models`, `system_tts` as targets — not in branch). |
+| **GAP 05** (DAG runtime) | Phase 1–2 primitives | **Not started.** Wave E deferred per spec gate ("real consumer or merge blocked") | **Deferred** — confirmed. |
+| **GAP 06** (engines/ reorg) | 5 backends moved + each CMake one-liner via `rac_add_engine_plugin` | All 5 moved (history preserved via `git mv`) + 3 stubs added (sherpa/genie/diffusion-coreml). **Migrated 5 still use their original multi-line CMakeLists; one-liner only on the 3 stubs** | **Shipped partial.** |
+| **GAP 07** (single root CMake) | Root CMake + presets + 4 cmake/ helpers + ≤4 build scripts + slim pr-build.yml | All present. `pr-build.yml` 601→150 lines. **A second `CMakePresets.json` remains under commons/** (gate admits) | **Shipped partial** — second presets file is a v3 cleanup. |
+| **GAP 08** (frontend duplication delete) | ~5,100±500 LOC of orchestration **physically deleted** from 11 files across 5 SDKs | **Markers + audits only.** Every "deleted" file still has its full body — only top-of-file `@Deprecated` / DEPRECATED comments. The largest target (Kotlin `streamVoiceSession`) **lacks even the marker**. Two spec LOC ceilings (`runanywhere.dart` ≤500, `VoiceSessionHandle.ts` ≤250) **violated** today (2,688 and 636 lines respectively) | **Deferred to v3 / follow-up PRs.** Spec criteria #2 (CppBridgeAuth gone), #4 (runanywhere.dart ≤500), #5 (VoiceSessionHandle ≤250) currently **MISSING**. |
+| **GAP 09** (streaming consistency) | Generated gRPC stubs for Swift/Kotlin/Dart; `VoiceSessionEvent` gone; parity test green; ≥1,500 LOC deleted | 3 service protos + 5 adapters + parity scaffolds (all `XCTSkipIf(true)` / skip-style); **no `*.grpc.swift` / `*.pbgrpc.dart` files generated yet**; **`VoiceSessionEvent` types still present** (used by undeprecated orchestration in GAP 08); LOC deletion deferred to GAP 08 | **Shipped partial.** Streaming infrastructure ready; **consumers haven't switched** (depends on GAP 08 finish). |
+| **GAP 11** (legacy cleanup) | `git rm service_registry.cpp` + headers; `RAC_PLUGIN_API_VERSION` 2u → 3u | `[[deprecated]]` on 4 entry points + `rac_legacy_warn_once` runtime warning + audit doc. **`service_registry.cpp` still present**; **`RAC_PLUGIN_API_VERSION` still 2u**. **No `v2_gap_specs/GAP_11_*.md`** spec file exists in repo (criteria reverse-engineered from gate report) | **Deferred to v3** — explicit in gate. |
+
+**Aggregate diff vs branch start (`8d1f851b`):** 127 files, +3,845 / −6,095, **net −2,250 LOC**.
+
+**Specs not in repo:** `GAP_00_*.md`, `GAP_10_*.md`, `GAP_11_*.md` — none exist in `v2_gap_specs/`. Numbering jumps `09` → `11` in gate reports.
+
+---
+
+## What this means in practice
+
+- **Cross-language types, plugin loading, engine routing, build system, and the streaming adapter contracts** are real on the branch. PR #494 ships those today.
+- **Wave D / GAP 08 deletes** were rebranded mid-execution as "deprecation markers + scheduled-for-v3"; the diff doesn't carry the LOC delta the gate-report tables initially claimed. **`docs/gap08_final_gate_report.md` is honest about this**; the *plan YAML* status (`completed`) overstates it.
+- **GAP 11 physical removal** is the same story: the deprecation pressure is shipped, the `git rm` waits for v3 because removing `rac_capability_t`/`rac_service_provider_t` is layout-incompatible.
+- **Wave E (GAP 05)** is properly deferred per spec gate.
+
+For the prioritized remaining-work list — what concretely needs to happen before any of this can ship to a customer — see [`docs/v2_remaining_work.md`](v2_remaining_work.md).
+
+---
 
 ## Branch + PR contract
 
