@@ -156,6 +156,27 @@ static rac_result_t llm_vtable_clear_context(void* impl) {
     return rac_llm_metalrt_clear_context(impl);
 }
 
+// v3 Phase B6: MetalRT LLM `create` adapter. Resolves nested tar.gz
+// extraction directories before calling rac_llm_metalrt_create.
+static rac_result_t metalrt_llm_create_impl(const char* model_id,
+                                            const char* /*config_json*/,
+                                            void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    RAC_LOG_DEBUG(LOG_CAT, "LLM create: MetalRT engine not available — stub build");
+    return RAC_ERROR_NOT_SUPPORTED;
+#else
+    std::string resolved = resolve_metalrt_model_path(model_id);
+    RAC_LOG_INFO(LOG_CAT, "metalrt_llm_create_impl: model=%s", resolved.c_str());
+    rac_handle_t backend = nullptr;
+    rac_result_t rc = rac_llm_metalrt_create(resolved.c_str(), &backend);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend;
+    return RAC_SUCCESS;
+#endif
+}
+
 const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .initialize = llm_vtable_initialize,
     .generate = llm_vtable_generate,
@@ -172,6 +193,7 @@ const rac_llm_service_ops_t g_metalrt_llm_ops = {
     .append_context = llm_vtable_append_context,
     .generate_from_context = llm_vtable_generate_from_context,
     .clear_context = llm_vtable_clear_context,
+    .create = metalrt_llm_create_impl,
 };
 
 // =============================================================================
@@ -206,6 +228,26 @@ static void stt_vtable_destroy(void* impl) {
     rac_stt_metalrt_destroy(impl);
 }
 
+// v3 Phase B6: MetalRT STT `create` adapter.
+static rac_result_t metalrt_stt_create_impl(const char* model_id,
+                                            const char* /*config_json*/,
+                                            void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    RAC_LOG_DEBUG(LOG_CAT, "STT create: MetalRT engine not available — stub build");
+    return RAC_ERROR_NOT_SUPPORTED;
+#else
+    std::string resolved = resolve_metalrt_model_path(model_id);
+    RAC_LOG_INFO(LOG_CAT, "metalrt_stt_create_impl: model=%s", resolved.c_str());
+    rac_handle_t backend = nullptr;
+    rac_result_t rc = rac_stt_metalrt_create(resolved.c_str(), &backend);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend;
+    return RAC_SUCCESS;
+#endif
+}
+
 const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .initialize = stt_vtable_initialize,
     .transcribe = stt_vtable_transcribe,
@@ -213,6 +255,7 @@ const rac_stt_service_ops_t g_metalrt_stt_ops = {
     .get_info = stt_vtable_get_info,
     .cleanup = stt_vtable_cleanup,
     .destroy = stt_vtable_destroy,
+    .create = metalrt_stt_create_impl,
 };
 
 // =============================================================================
@@ -251,6 +294,26 @@ static void tts_vtable_destroy(void* impl) {
     rac_tts_metalrt_destroy(impl);
 }
 
+// v3 Phase B6: MetalRT TTS `create` adapter.
+static rac_result_t metalrt_tts_create_impl(const char* model_id,
+                                            const char* /*config_json*/,
+                                            void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    RAC_LOG_DEBUG(LOG_CAT, "TTS create: MetalRT engine not available — stub build");
+    return RAC_ERROR_NOT_SUPPORTED;
+#else
+    std::string resolved = resolve_metalrt_model_path(model_id);
+    RAC_LOG_INFO(LOG_CAT, "metalrt_tts_create_impl: model=%s", resolved.c_str());
+    rac_handle_t backend = nullptr;
+    rac_result_t rc = rac_tts_metalrt_create(resolved.c_str(), &backend);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend;
+    return RAC_SUCCESS;
+#endif
+}
+
 const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .initialize = tts_vtable_initialize,
     .synthesize = tts_vtable_synthesize,
@@ -259,6 +322,7 @@ const rac_tts_service_ops_t g_metalrt_tts_ops = {
     .get_info = tts_vtable_get_info,
     .cleanup = tts_vtable_cleanup,
     .destroy = tts_vtable_destroy,
+    .create = metalrt_tts_create_impl,
 };
 
 // =============================================================================
@@ -311,6 +375,29 @@ static void vlm_vtable_destroy(void* impl) {
     rac_vlm_metalrt_destroy(impl);
 }
 
+// v3 Phase B6: MetalRT VLM `create` adapter. config_json MAY carry a
+// "mmproj_path" field but the MetalRT VLM backend (rac_vlm_metalrt_create)
+// takes a single path and loads mmproj from within the model folder;
+// we intentionally ignore config_json here.
+static rac_result_t metalrt_vlm_create_impl(const char* model_id,
+                                            const char* /*config_json*/,
+                                            void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
+    RAC_LOG_DEBUG(LOG_CAT, "VLM create: MetalRT engine not available — stub build");
+    return RAC_ERROR_NOT_SUPPORTED;
+#else
+    std::string resolved = resolve_metalrt_model_path(model_id);
+    RAC_LOG_INFO(LOG_CAT, "metalrt_vlm_create_impl: model=%s", resolved.c_str());
+    rac_handle_t backend = nullptr;
+    rac_result_t rc = rac_vlm_metalrt_create(resolved.c_str(), &backend);
+    if (rc != RAC_SUCCESS) return rc;
+    *out_impl = backend;
+    return RAC_SUCCESS;
+#endif
+}
+
 const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .initialize = vlm_vtable_initialize,
     .process = vlm_vtable_process,
@@ -319,6 +406,7 @@ const rac_vlm_service_ops_t g_metalrt_vlm_ops = {
     .cancel = vlm_vtable_cancel,
     .cleanup = vlm_vtable_cleanup,
     .destroy = vlm_vtable_destroy,
+    .create = metalrt_vlm_create_impl,
 };
 
 // =============================================================================
@@ -329,10 +417,6 @@ struct MetalRTRegistryState {
     std::mutex mutex;
     bool registered = false;
     char module_id[16] = "metalrt";
-    char llm_provider[32] = "MetalRTLLM";
-    char stt_provider[32] = "MetalRTSTT";
-    char tts_provider[32] = "MetalRTTTS";
-    char vlm_provider[32] = "MetalRTVLM";
 };
 
 MetalRTRegistryState& get_state() {
@@ -340,161 +424,14 @@ MetalRTRegistryState& get_state() {
     return state;
 }
 
-// =============================================================================
-// CAN_HANDLE — framework-hint only (RAC_FRAMEWORK_METALRT)
-// =============================================================================
-
-rac_bool_t metalrt_can_handle(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request)
-        return RAC_FALSE;
-
-#if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    // Stub build: the private MetalRT engine binary is not linked. Refuse to
-    // handle any request so the service registry surfaces BACKEND_NOT_FOUND
-    // at the loadModel call site instead of silently dispatching to stubs.
-    (void)request;
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (MetalRT engine not available — stub build)");
-    return RAC_FALSE;
-#else
-    if (request->framework == RAC_FRAMEWORK_METALRT) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (framework=METALRT)");
-        return RAC_TRUE;
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (framework=%d, want METALRT=%d)",
-                  static_cast<int>(request->framework), RAC_FRAMEWORK_METALRT);
-    return RAC_FALSE;
-#endif
-}
-
-// =============================================================================
-// SERVICE FACTORIES
-// =============================================================================
-
-rac_handle_t metalrt_llm_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request)
-        return nullptr;
-
-    const char* raw_path = request->model_path ? request->model_path : request->identifier;
-    if (!raw_path || raw_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "LLM: no model path");
-        return nullptr;
-    }
-
-    std::string resolved = resolve_metalrt_model_path(raw_path);
-    const char* model_path = resolved.c_str();
-    RAC_LOG_INFO(LOG_CAT, "Creating LLM service for: %s", model_path);
-
-    rac_handle_t backend = nullptr;
-    if (rac_llm_metalrt_create(model_path, &backend) != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "LLM: failed to create backend");
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_llm_service_t*>(malloc(sizeof(rac_llm_service_t)));
-    if (!service) {
-        rac_llm_metalrt_destroy(backend);
-        return nullptr;
-    }
-
-    service->ops = &g_metalrt_llm_ops;
-    service->impl = backend;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-    return service;
-}
-
-rac_handle_t metalrt_stt_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request)
-        return nullptr;
-
-    const char* raw_path = request->model_path ? request->model_path : request->identifier;
-    if (!raw_path || raw_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "STT: no model path");
-        return nullptr;
-    }
-
-    std::string resolved = resolve_metalrt_model_path(raw_path);
-    const char* model_path = resolved.c_str();
-    RAC_LOG_INFO(LOG_CAT, "Creating STT service for: %s", model_path);
-
-    rac_handle_t backend = nullptr;
-    if (rac_stt_metalrt_create(model_path, &backend) != RAC_SUCCESS) {
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
-    if (!service) {
-        rac_stt_metalrt_destroy(backend);
-        return nullptr;
-    }
-
-    service->ops = &g_metalrt_stt_ops;
-    service->impl = backend;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-    return service;
-}
-
-rac_handle_t metalrt_tts_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request)
-        return nullptr;
-
-    const char* raw_path = request->model_path ? request->model_path : request->identifier;
-    if (!raw_path || raw_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "TTS: no model path");
-        return nullptr;
-    }
-
-    std::string resolved = resolve_metalrt_model_path(raw_path);
-    const char* model_path = resolved.c_str();
-    RAC_LOG_INFO(LOG_CAT, "Creating TTS service for: %s", model_path);
-
-    rac_handle_t backend = nullptr;
-    if (rac_tts_metalrt_create(model_path, &backend) != RAC_SUCCESS) {
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
-    if (!service) {
-        rac_tts_metalrt_destroy(backend);
-        return nullptr;
-    }
-
-    service->ops = &g_metalrt_tts_ops;
-    service->impl = backend;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-    return service;
-}
-
-rac_handle_t metalrt_vlm_create(const rac_service_request_t* request, void* /*user_data*/) {
-    if (!request)
-        return nullptr;
-
-    const char* raw_path = request->model_path ? request->model_path : request->identifier;
-    if (!raw_path || raw_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "VLM: no model path");
-        return nullptr;
-    }
-
-    std::string resolved = resolve_metalrt_model_path(raw_path);
-    const char* model_path = resolved.c_str();
-    RAC_LOG_INFO(LOG_CAT, "Creating VLM service for: %s", model_path);
-
-    rac_handle_t backend = nullptr;
-    if (rac_vlm_metalrt_create(model_path, &backend) != RAC_SUCCESS) {
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_vlm_service_t*>(malloc(sizeof(rac_vlm_service_t)));
-    if (!service) {
-        rac_vlm_metalrt_destroy(backend);
-        return nullptr;
-    }
-
-    service->ops = &g_metalrt_vlm_ops;
-    service->impl = backend;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-    return service;
-}
+// v3 Phase B6: metalrt_can_handle + 4 metalrt_*_create legacy factories
+// (LLM/STT/TTS/VLM using rac_service_request_t) removed. Model format
+// + framework (RAC_FRAMEWORK_METALRT) gating is encoded in
+// g_metalrt_engine_vtable.metadata.{formats,runtimes} in
+// rac_plugin_entry_metalrt.cpp; per-primitive impl allocation flows
+// through each ops struct's `.create` adapter defined above. Stub-build
+// gating (RAC_METALRT_ENGINE_AVAILABLE=0) short-circuits inside each
+// create_impl by returning RAC_ERROR_NOT_SUPPORTED.
 
 }  // namespace
 
@@ -513,18 +450,18 @@ rac_result_t rac_backend_metalrt_register(void) {
     }
 
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    // Stub build: the private MetalRT engine binary is not linked. Log clearly
-    // and skip provider registration entirely so the registry never dispatches
-    // a model load into no-op stubs.
+    // Stub build: MetalRT engine binary not linked. Skip module
+    // registration as well — loadModel(framework: .metalrt) surfaces
+    // BACKEND_NOT_FOUND via the router when no plugin_entry_metalrt
+    // plugin claims the framework.
     RAC_LOG_WARNING(LOG_CAT,
                     "MetalRT backend compiled without engine binary — skipping "
-                    "provider registration. loadModel(..., framework: .metalrt) "
-                    "will fail with BACKEND_NOT_FOUND until the engine is installed.");
+                    "registration. loadModel(..., framework: .metalrt) will "
+                    "fail with BACKEND_NOT_FOUND until the engine is installed.");
     state.registered = true;
     return RAC_SUCCESS;
 #endif
 
-    // Register module
     rac_module_info_t module_info = {};
     module_info.id = state.module_id;
     module_info.name = "MetalRT";
@@ -546,72 +483,10 @@ rac_result_t rac_backend_metalrt_register(void) {
         return result;
     }
 
-    // Register LLM provider
-    {
-        rac_service_provider_t provider = {};
-        provider.name = state.llm_provider;
-        provider.capability = RAC_CAPABILITY_TEXT_GENERATION;
-        provider.priority = 100;
-        provider.can_handle = metalrt_can_handle;
-        provider.create = metalrt_llm_create;
-        provider.user_data = nullptr;
-
-        result = rac_service_register_provider(&provider);
-        if (result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to register LLM provider: %d", result);
-        }
-    }
-
-    // Register STT provider
-    {
-        rac_service_provider_t provider = {};
-        provider.name = state.stt_provider;
-        provider.capability = RAC_CAPABILITY_STT;
-        provider.priority = 100;
-        provider.can_handle = metalrt_can_handle;
-        provider.create = metalrt_stt_create;
-        provider.user_data = nullptr;
-
-        result = rac_service_register_provider(&provider);
-        if (result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to register STT provider: %d", result);
-        }
-    }
-
-    // Register TTS provider
-    {
-        rac_service_provider_t provider = {};
-        provider.name = state.tts_provider;
-        provider.capability = RAC_CAPABILITY_TTS;
-        provider.priority = 100;
-        provider.can_handle = metalrt_can_handle;
-        provider.create = metalrt_tts_create;
-        provider.user_data = nullptr;
-
-        result = rac_service_register_provider(&provider);
-        if (result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to register TTS provider: %d", result);
-        }
-    }
-
-    // Register VLM provider
-    {
-        rac_service_provider_t provider = {};
-        provider.name = state.vlm_provider;
-        provider.capability = RAC_CAPABILITY_VISION_LANGUAGE;
-        provider.priority = 100;
-        provider.can_handle = metalrt_can_handle;
-        provider.create = metalrt_vlm_create;
-        provider.user_data = nullptr;
-
-        result = rac_service_register_provider(&provider);
-        if (result != RAC_SUCCESS) {
-            RAC_LOG_ERROR(LOG_CAT, "Failed to register VLM provider: %d", result);
-        }
-    }
-
+    // v3 Phase B6: plugin registration via rac_plugin_entry_metalrt().
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (LLM, STT, TTS, VLM)");
+    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module_register only; "
+                          "plugin registration via rac_plugin_entry_metalrt)");
     return RAC_SUCCESS;
 }
 
@@ -623,10 +498,6 @@ rac_result_t rac_backend_metalrt_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(state.llm_provider, RAC_CAPABILITY_TEXT_GENERATION);
-    rac_service_unregister_provider(state.stt_provider, RAC_CAPABILITY_STT);
-    rac_service_unregister_provider(state.tts_provider, RAC_CAPABILITY_TTS);
-    rac_service_unregister_provider(state.vlm_provider, RAC_CAPABILITY_VISION_LANGUAGE);
     rac_module_unregister(state.module_id);
 
     state.registered = false;
