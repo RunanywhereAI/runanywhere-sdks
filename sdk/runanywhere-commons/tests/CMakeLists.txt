@@ -18,6 +18,19 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+# --- v3.1 Phase 9: DAG graph primitives unit tests --------------------------
+# CancelToken + RingBuffer + StreamEdge (GAP 05 skeleton). Header-only
+# primitives; no backend dependency. Always built.
+add_executable(test_graph_primitives test_graph_primitives.cpp)
+target_include_directories(test_graph_primitives PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_graph_primitives PRIVATE rac_commons)
+rac_link_archive_deps(test_graph_primitives)
+target_compile_features(test_graph_primitives PRIVATE cxx_std_17)
+add_test(NAME graph_primitives_tests COMMAND test_graph_primitives)
+
 # --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
 # Behavioral parity with Swift ThinkingContentParser. 10 scenarios covering
 # extract / strip / split-tokens incl. malformed inputs.
