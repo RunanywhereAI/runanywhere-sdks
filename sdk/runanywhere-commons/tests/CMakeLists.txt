@@ -18,6 +18,19 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+# --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
+# Behavioral parity with Swift ThinkingContentParser. 10 scenarios covering
+# extract / strip / split-tokens incl. malformed inputs.
+add_executable(test_llm_thinking test_llm_thinking.cpp)
+target_include_directories(test_llm_thinking PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_llm_thinking PRIVATE rac_commons)
+rac_link_archive_deps(test_llm_thinking)
+target_compile_features(test_llm_thinking PRIVATE cxx_std_17)
+add_test(NAME llm_thinking_tests COMMAND test_llm_thinking)
+
 # --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
 # Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
 # VoiceEvent → SerializeToArray → callback path that GAP 09 Phase 15 declared
