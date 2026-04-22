@@ -25,7 +25,12 @@ class VoiceAssistantView extends StatefulWidget {
 class _VoiceAssistantViewState extends State<VoiceAssistantView>
     with SingleTickerProviderStateMixin {
   // Session state
+  // v2 close-out: VoiceSessionHandle is @Deprecated since the Wave D
+  // Phase 12 cleanup. Will migrate to VoiceAgentStreamAdapter once the
+  // FFI handle wiring lands. See docs/v2_remaining_work.md "Risk register".
+  // ignore: deprecated_member_use
   VoiceSessionState _sessionState = VoiceSessionState.disconnected;
+  // ignore: deprecated_member_use
   sdk.VoiceSessionHandle? _voiceSession;
   StreamSubscription<sdk.VoiceSessionEvent>? _eventSubscription;
 
@@ -157,6 +162,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       }
 
       // Use SDK's startVoiceSession API (matches Swift: RunAnywhere.startVoiceSession())
+      // v2 close-out: see VoiceSessionHandle deprecation note above.
+      // ignore: deprecated_member_use
       _voiceSession = await sdk.RunAnywhere.startVoiceSession(
         config: const sdk.VoiceSessionConfig(),
       );

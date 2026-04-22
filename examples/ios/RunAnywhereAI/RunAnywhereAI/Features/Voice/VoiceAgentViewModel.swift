@@ -166,6 +166,10 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Private State
 
+    // v2 close-out: VoiceSessionHandle is @available(*, deprecated) since
+    // the Wave D Phase 10 cleanup. The sample keeps using it until
+    // VoiceAgentStreamAdapter wiring + the C++ voice agent handle JNI
+    // arrives in v3. Tracked under v2_remaining_work.md "Risk register".
     private var session: VoiceSessionHandle?
     private var eventTask: Task<Void, Never>?
 
@@ -395,6 +399,7 @@ final class VoiceAgentViewModel: ObservableObject {
                 thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled,
                 maxTokens: settings.maxTokens
             )
+            // v2 close-out: see VoiceSessionHandle deprecation note above.
             session = try await RunAnywhere.startVoiceSession(config: voiceConfig)
             sessionState = .listening
             currentStatus = "Listening..."

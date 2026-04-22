@@ -35,12 +35,18 @@ import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
 
 // Import RunAnywhere SDK
+// v2 close-out: VoiceSessionHandle is @deprecated since the Wave D
+// Phase 13 cleanup. Sample keeps using it until VoiceAgentStreamAdapter
+// + the RN bridge handle wiring lands. See
+// docs/v2_remaining_work.md "Risk register".
+/* eslint-disable @typescript-eslint/no-deprecated, deprecation/deprecation */
 import {
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
   type VoiceSessionHandle,
   type VoiceSessionEvent,
 } from '@runanywhere/core';
+/* eslint-enable @typescript-eslint/no-deprecated, deprecation/deprecation */
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -67,7 +73,8 @@ export const VoiceAssistantScreen: React.FC = () => {
     'stt' | 'llm' | 'tts'
   >('stt');
 
-  // Voice session handle ref
+  // Voice session handle ref — see VoiceSessionHandle @deprecated note in imports above.
+  // eslint-disable-next-line @typescript-eslint/no-deprecated, deprecation/deprecation
   const sessionRef = useRef<VoiceSessionHandle | null>(null);
 
   // Check if all models are loaded
@@ -234,6 +241,8 @@ export const VoiceAssistantScreen: React.FC = () => {
         console.warn('[VoiceAssistant] Starting voice session...');
 
         // Use the SDK's voice session API
+        // v2 close-out: see VoiceSessionHandle @deprecated note in imports above.
+        // eslint-disable-next-line @typescript-eslint/no-deprecated, deprecation/deprecation
         const session = await RunAnywhere.startVoiceSession({
           silenceDuration: 1.5,
           speechThreshold: 0.1,

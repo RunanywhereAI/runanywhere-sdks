@@ -314,6 +314,12 @@ class VoiceAssistantViewModel(
 
                     // Process audio through STT → LLM → TTS pipeline
                     // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
+                    // v2 close-out: processVoice is @Deprecated since the
+                    // Wave D Phase 6 cleanup; the C++ voice agent now owns
+                    // the orchestration via VoiceAgentStreamAdapter once the
+                    // matching JNI handle thunk lands. Until then this
+                    // sample suppresses the deprecation explicitly.
+                    @Suppress("DEPRECATION")
                     val result =
                         withContext(Dispatchers.Default) {
                             RunAnywhere.processVoice(audioData)
@@ -792,6 +798,11 @@ class VoiceAssistantViewModel(
                 }
 
                 // Start voice session (for SDK state tracking)
+                // v2 close-out: startVoiceSession is @Deprecated since the
+                // Wave D Phase 6 cleanup; will migrate to
+                // VoiceAgentStreamAdapter once the JNI thunk for the agent
+                // handle ships. See docs/v2_remaining_work.md "Risk register".
+                @Suppress("DEPRECATION")
                 val sessionFlow = RunAnywhere.startVoiceSession(VoiceSessionConfig.DEFAULT)
                 voiceSessionFlow = sessionFlow
 
@@ -1024,6 +1035,8 @@ class VoiceAssistantViewModel(
 
                     // Process audio through STT → LLM → TTS pipeline
                     // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
+                    // v2 close-out: see processVoice deprecation note above.
+                    @Suppress("DEPRECATION")
                     val result =
                         withContext(Dispatchers.Default) {
                             RunAnywhere.processVoice(audioData)
