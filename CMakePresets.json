@@ -1,7 +1,6 @@
 {
     "version": 6,
     "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
-    "_comment": "GAP 07 Phase 2 — see v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md. Nine preset families covering host (macOS / Linux / Windows) + cross-compile (Android / iOS / WASM). Configure presets share inheritance via 'base-*' hidden presets so per-platform tweaks stay short.",
 
     "configurePresets": [
         {
