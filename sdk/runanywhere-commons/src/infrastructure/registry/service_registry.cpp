@@ -10,14 +10,48 @@
  *
  * Uses function-local statics to avoid static initialization order issues
  * when called from Swift.
+ *
+ * GAP 11 Phase 29 — DEPRECATED. This entire registry is the pre-GAP-02
+ * surface. Each entry point logs a one-time deprecation warning on first
+ * call (see rac_legacy_warn_once helper) and is scheduled for `git rm` in
+ * GAP 11 Phase 31. Migrate to `rac_plugin_route()` + `rac_plugin_registry_*`.
+ * Deprecation rationale + migration path documented in
+ * docs/engine_plugin_authoring.md §"Migrating off the legacy service registry".
  */
 
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "rac/core/rac_logger.h"
+
+namespace {
+
+/* GAP 11 Phase 29: emit a one-time RAC_LOG_WARNING per legacy entry point
+ * on first call, so consumers see runtime pressure to migrate even if the
+ * compile-time [[deprecated]] attribute on the header was suppressed. */
+void rac_legacy_warn_once(const char* fn_name) {
+    static std::unordered_map<std::string, std::atomic<bool>> warned;
+    static std::mutex                                          warn_mu;
+    bool emit = false;
+    {
+        std::lock_guard<std::mutex> lk(warn_mu);
+        auto& flag = warned[fn_name];
+        if (!flag.exchange(true)) emit = true;
+    }
+    if (emit) {
+        RAC_LOG_WARNING("legacy_svc",
+                        "GAP 11 deprecated: %s — use rac_plugin_route() / "
+                        "rac_plugin_registry_register() instead. Removed in v3.",
+                        fn_name);
+    }
+}
+
+}  // namespace
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -80,6 +114,7 @@ ServiceRegistryState& get_state() {
 extern "C" {
 
 rac_result_t rac_service_register_provider(const rac_service_provider_t* provider) {
+    rac_legacy_warn_once("rac_service_register_provider");
     RAC_LOG_DEBUG(LOG_CAT, "rac_service_register_provider() - ENTRY");
 
     if (provider == nullptr || provider->name == nullptr) {
@@ -120,6 +155,7 @@ rac_result_t rac_service_register_provider(const rac_service_provider_t* provide
 }
 
 rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability) {
+    rac_legacy_warn_once("rac_service_unregister_provider");
     RAC_LOG_DEBUG(LOG_CAT, "rac_service_unregister_provider() - name=%s", name ? name : "NULL");
 
     if (name == nullptr) {
@@ -157,6 +193,7 @@ rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t 
 
 rac_result_t rac_service_create(rac_capability_t capability, const rac_service_request_t* request,
                                 rac_handle_t* out_handle) {
+    rac_legacy_warn_once("rac_service_create");
     RAC_LOG_INFO(LOG_CAT, "rac_service_create called for capability=%d, identifier=%s",
                  static_cast<int>(capability),
                  request ? (request->identifier ? request->identifier : "(null)")
@@ -222,6 +259,7 @@ rac_result_t rac_service_create(rac_capability_t capability, const rac_service_r
 
 rac_result_t rac_service_list_providers(rac_capability_t capability, const char*** out_names,
                                         size_t* out_count) {
+    rac_legacy_warn_once("rac_service_list_providers");
     if (out_names == nullptr || out_count == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }

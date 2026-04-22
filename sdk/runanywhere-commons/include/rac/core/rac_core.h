@@ -248,6 +248,36 @@ typedef struct rac_service_provider {
     void* user_data;
 } rac_service_provider_t;
 
+/* =============================================================================
+ * GAP 11 Phase 29 — DEPRECATED legacy service registry surface.
+ *
+ * The 4 functions below (`rac_service_register_provider`,
+ * `rac_service_unregister_provider`, `rac_service_create`,
+ * `rac_service_list_providers`) are the pre-GAP-02 service registry path.
+ * They have been superseded by the unified plugin registry from GAP 02
+ * (`rac_plugin_registry_register` in `rac/plugin/rac_plugin_entry.h`)
+ * and the routing API from GAP 04 (`rac_plugin_route` in
+ * `rac/router/rac_route.h`).
+ *
+ * Removal scheduled for v3 (RAC_PLUGIN_API_VERSION 3u). This header keeps
+ * the declarations + emits a `[[deprecated]]` warning so consumers see
+ * compile-time pressure to migrate. The implementations log a one-time
+ * warning on first call (`engine_plugin_authoring.md` §"Migrating off
+ * the legacy service registry" details the migration path).
+ * ============================================================================= */
+
+#if defined(__cplusplus) && __cplusplus >= 201402L
+#  define RAC_DEPRECATED_LEGACY_SVC \
+       [[deprecated("Legacy GAP-02 surface; use rac_plugin_registry_register / rac_plugin_route. Removed in v3.")]]
+#elif defined(__GNUC__) || defined(__clang__)
+#  define RAC_DEPRECATED_LEGACY_SVC \
+       __attribute__((deprecated("Legacy GAP-02 surface; use rac_plugin_registry_register / rac_plugin_route.")))
+#elif defined(_MSC_VER)
+#  define RAC_DEPRECATED_LEGACY_SVC __declspec(deprecated("Legacy GAP-02 surface; use rac_plugin_route."))
+#else
+#  define RAC_DEPRECATED_LEGACY_SVC
+#endif
+
 /**
  * Registers a service provider.
  *
@@ -256,7 +286,11 @@ typedef struct rac_service_provider {
  *
  * @param provider Provider information (copied internally)
  * @return RAC_SUCCESS on success, or an error code on failure
+ *
+ * @deprecated GAP 11. Use rac_plugin_registry_register() from
+ *             rac/plugin/rac_plugin_entry.h. Removed in v3.
  */
+RAC_DEPRECATED_LEGACY_SVC
 RAC_API rac_result_t rac_service_register_provider(const rac_service_provider_t* provider);
 
 /**
@@ -265,7 +299,10 @@ RAC_API rac_result_t rac_service_register_provider(const rac_service_provider_t*
  * @param name The name of the provider to unregister
  * @param capability The capability the provider was registered for
  * @return RAC_SUCCESS on success, or an error code on failure
+ *
+ * @deprecated GAP 11. Use rac_plugin_registry_unregister(). Removed in v3.
  */
+RAC_DEPRECATED_LEGACY_SVC
 RAC_API rac_result_t rac_service_unregister_provider(const char* name, rac_capability_t capability);
 
 /**
@@ -278,7 +315,11 @@ RAC_API rac_result_t rac_service_unregister_provider(const char* name, rac_capab
  * @param request The service request (can have identifier and config)
  * @param out_handle Pointer to receive the service handle
  * @return RAC_SUCCESS on success, or an error code on failure
+ *
+ * @deprecated GAP 11. Use rac_plugin_route() from rac/router/rac_route.h.
+ *             Removed in v3.
  */
+RAC_DEPRECATED_LEGACY_SVC
 RAC_API rac_result_t rac_service_create(rac_capability_t capability,
                                         const rac_service_request_t* request,
                                         rac_handle_t* out_handle);
@@ -290,7 +331,11 @@ RAC_API rac_result_t rac_service_create(rac_capability_t capability,
  * @param out_names Pointer to receive array of provider names
  * @param out_count Pointer to receive count
  * @return RAC_SUCCESS on success
+ *
+ * @deprecated GAP 11. Use rac_registry_list_plugins() from
+ *             rac/plugin/rac_plugin_loader.h. Removed in v3.
  */
+RAC_DEPRECATED_LEGACY_SVC
 RAC_API rac_result_t rac_service_list_providers(rac_capability_t capability,
                                                 const char*** out_names, size_t* out_count);
 

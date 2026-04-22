@@ -208,6 +208,35 @@ Every existing backend (`llamacpp`, `onnx`, `whispercpp`, `whisperkit_coreml`,
     the unified registry.
 
 Both paths share the same ops-struct (e.g. `g_llamacpp_ops`); a bug fix in
-that struct shows up in both registries automatically. The legacy path will
-stay around for two release cycles; GAP 06 deprecates it and GAP 11 deletes
-it once every SDK frontend has cut over.
+that struct shows up in both registries automatically.
+
+## Migrating off the legacy service registry (GAP 11 Phase 29)
+
+The legacy `rac_service_*` API in `rac/core/rac_core.h`
+(`rac_service_register_provider`, `rac_service_unregister_provider`,
+`rac_service_create`, `rac_service_list_providers`) is **deprecated as of
+GAP 11** and will be removed in v3 (`RAC_PLUGIN_API_VERSION 3u`). Both
+the compile-time `[[deprecated]]` attribute and a runtime one-time
+`RAC_LOG_WARNING` from `service_registry.cpp` flag every call.
+
+### Migration map
+
+| Legacy call                                | Replacement                                                |
+|--------------------------------------------|------------------------------------------------------------|
+| `rac_service_register_provider(provider)`  | `rac_plugin_registry_register(vtable)` (`rac_plugin_entry.h`) |
+| `rac_service_unregister_provider(name)`    | `rac_plugin_registry_unregister(name)`                     |
+| `rac_service_create(cap, req, &handle)`    | `rac_plugin_route(&request, &result)` (`rac/router/rac_route.h`) |
+| `rac_service_list_providers(cap, ...)`     | `rac_registry_list_plugins(...)` (`rac/plugin/rac_plugin_loader.h`) |
+
+The unified path is **strictly more capable**: per-primitive metadata,
+runtime/format hints for the GAP 04 router, ABI version validation, and
+dynamic loading via the GAP 03 `rac_registry_load_plugin()` API.
+
+### Removal timing
+
+- **v2 (GAP 11 Phase 29, this commit):** `[[deprecated]]` warning +
+  one-time runtime log.
+- **v2 (GAP 11 Phase 30):** every call site repointed to the unified
+  API; SDKs verified to NOT call the legacy entry points.
+- **v3 (GAP 11 Phase 31):** `git rm sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp`
+  + `RAC_PLUGIN_API_VERSION` bumped to `3u`.
