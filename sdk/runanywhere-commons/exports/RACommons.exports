@@ -211,6 +211,14 @@ _rac_service_register_provider
 _rac_service_unregister_provider
 
 # LLM Component
+# LLM Thinking (<think>...</think> parsing, GAP 08 #6 / v3 Phase A11).
+# Consumed by Swift (CppBridge+LLMThinking), Kotlin (CppBridgeLlmThinking),
+# Dart (LlmThinking), RN (HybridRunAnywhereCore::llmExtractThinking), Web
+# (LlmThinking.ts via ccall).
+_rac_llm_extract_thinking
+_rac_llm_split_thinking_tokens
+_rac_llm_strip_thinking
+
 _rac_llm_component_cancel
 _rac_llm_component_cleanup
 _rac_llm_component_configure

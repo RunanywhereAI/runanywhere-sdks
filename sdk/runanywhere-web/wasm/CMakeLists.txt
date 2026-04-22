@@ -289,6 +289,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_llm_destroy"
     "_rac_llm_result_free"
 
+    # LLM Thinking (<think>...</think> parsing) — v3 Phase A11 / GAP 08 #6.
+    # Wrapped by sdk/runanywhere-web/packages/core/src/Features/LLM/LlmThinking.ts
+    # via ccall. Pair with -sEXPORTED_RUNTIME_METHODS=['ccall','UTF8ToString',
+    # 'stringToUTF8','_malloc','_free'] (already enabled in this target for
+    # other ccall users).
+    "_rac_llm_extract_thinking"
+    "_rac_llm_strip_thinking"
+    "_rac_llm_split_thinking_tokens"
+
     # LLM component
     "_rac_llm_component_create"
     "_rac_llm_component_configure"

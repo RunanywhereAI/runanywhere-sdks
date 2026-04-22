@@ -50,6 +50,54 @@ export interface EmscriptenRunanywhereModule {
     userData: number,
   ): number;
 
+  // -----------------------------------------------------------------------------
+  // LLM Thinking (v3 Phase A11 / GAP 08 #6)
+  // -----------------------------------------------------------------------------
+  // Reach these via ccall wrappers in LlmThinking.ts — they take char*
+  // pointers via _malloc + stringToUTF8 and out-pointers via _malloc for
+  // out-char** / out-size_t / out-int32_t slots.
+
+  /**
+   * `rac_result_t rac_llm_extract_thinking(
+   *    const char* text,
+   *    const char** out_response, size_t* out_response_len,
+   *    const char** out_thinking, size_t* out_thinking_len);`
+   */
+  _rac_llm_extract_thinking(
+    textPtr: number,
+    outRespPtrPtr: number,
+    outRespLenPtr: number,
+    outThinkPtrPtr: number,
+    outThinkLenPtr: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_llm_strip_thinking(
+   *    const char* text,
+   *    const char** out_stripped, size_t* out_stripped_len);`
+   */
+  _rac_llm_strip_thinking(
+    textPtr: number,
+    outPtrPtr: number,
+    outLenPtr: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_llm_split_thinking_tokens(
+   *    int32_t total_completion_tokens,
+   *    const char* response_text,
+   *    const char* thinking_text,
+   *    int32_t* out_thinking_tokens,
+   *    int32_t* out_response_tokens);`
+   */
+  _rac_llm_split_thinking_tokens(
+    totalCompletionTokens: number,
+    respTextPtr: number,
+    thinkTextPtr: number,
+    outThinkingTokensPtr: number,
+    outResponseTokensPtr: number,
+  ): number;
+
   // =============================================================================
   // Emscripten runtime helpers
   // =============================================================================
@@ -72,6 +120,22 @@ export interface EmscriptenRunanywhereModule {
 
   /** Remove a previously-installed JS callback. Idempotent. */
   removeFunction(ptr: number): void;
+
+  /** Allocate `size` bytes in the WASM heap. Returns a pointer. */
+  _malloc(size: number): number;
+  /** Free a pointer previously returned by `_malloc` / equivalent. */
+  _free(ptr: number): void;
+
+  /** Read a UTF-8 C string at `ptr` into a JS string. Stops at NUL. */
+  UTF8ToString(ptr: number, maxBytesToRead?: number): string;
+
+  /** Write a UTF-8 string into the WASM heap at `ptr`, NUL-terminated.
+   *  Requires `ptr` to point at a buffer of at least
+   *  `lengthBytesUTF8(str) + 1` bytes. */
+  stringToUTF8(str: string, ptr: number, maxBytesToWrite: number): number;
+
+  /** UTF-8 byte-length of a JS string (excluding the trailing NUL). */
+  lengthBytesUTF8(str: string): number;
 
   /** Emscripten's main-thread invocation helper (ccall). Rarely used. */
   ccall?: (
