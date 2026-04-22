@@ -111,8 +111,9 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/idl/CMakeLists.txt")
     add_subdirectory(idl)
 endif()
 
-# engines/ — populated in GAP 06 Phase 8. Until then the backends live under
-# sdk/runanywhere-commons/src/backends/ and are pulled in transitively.
+# engines/ — top-level engine plugin directory (post-GAP-06). 5 migrated
+# backends (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) plus 3
+# Phase 10 stubs (sherpa, genie, diffusion-coreml) live here.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
 endif()
