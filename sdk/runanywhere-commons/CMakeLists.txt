@@ -503,13 +503,15 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# WhisperKit CoreML backend (Apple-only, no external deps → compiled into rac_commons)
+# GAP 06 Phase 9: WhisperKit CoreML moved to engines/whisperkit_coreml/.
+# Build hook stays here (paths shifted to the new location) until the
+# engines/ subdirectory's per-engine CMakeLists owns the wiring directly.
 if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML)
     set(RAC_WHISPERKIT_COREML_SOURCES
-        src/backends/whisperkit_coreml/rac_stt_whisperkit_coreml.cpp
-        src/backends/whisperkit_coreml/rac_backend_whisperkit_coreml_register.cpp
+        ${CMAKE_SOURCE_DIR}/engines/whisperkit_coreml/rac_stt_whisperkit_coreml.cpp
+        ${CMAKE_SOURCE_DIR}/engines/whisperkit_coreml/rac_backend_whisperkit_coreml_register.cpp
     )
-    message(STATUS "Building WhisperKit CoreML backend (compiled into rac_commons)")
+    message(STATUS "Building WhisperKit CoreML backend (sources from engines/whisperkit_coreml/)")
 else()
     set(RAC_WHISPERKIT_COREML_SOURCES "")
 endif()
@@ -668,40 +670,61 @@ if(RAC_BUILD_JNI)
 endif()
 
 # =============================================================================
-# BACKENDS (LlamaCPP, ONNX, WhisperCPP)
+# BACKENDS (LlamaCPP, ONNX, WhisperCPP, MetalRT)
+#
+# GAP 06 Phase 9: per-engine CMakeLists were `git mv`-d to engines/<name>/
+# at the repo root. The ROOT CMakeLists.txt (runanywhere-sdks-main/) now
+# add_subdirectory(engines) which descends into each engine. This block is
+# kept ONLY for the standalone "build commons by itself" workflow (some
+# external consumers configure the commons subdir directly without the
+# root CMake) — it forwards to the new locations via add_subdirectory with
+# absolute paths so per-engine CMakeLists need no edit per consumer.
+#
+# When configured via the root CMake, this block is a no-op because the
+# root has already added engines/ before commons descends here (engines/
+# adds its own subdirectory targets, and CMake silently no-ops re-adds).
 # =============================================================================
 
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "Building ML backends...")
+    message(STATUS "Building ML backends (paths forwarded to engines/<name>/)...")
 
-    if(RAC_BACKEND_LLAMACPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/llamacpp/CMakeLists.txt")
-        message(STATUS "  - LlamaCPP backend")
-        add_subdirectory(src/backends/llamacpp)
+    # Resolve the engines/ root: prefer the repo root if we were configured
+    # via the root CMake; fall back to ../../engines/ for standalone commons
+    # configures.
+    if(DEFINED CMAKE_SOURCE_DIR AND EXISTS "${CMAKE_SOURCE_DIR}/engines/llamacpp/CMakeLists.txt")
+        set(_ENGINES_ROOT "${CMAKE_SOURCE_DIR}/engines")
+    else()
+        set(_ENGINES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../engines")
     endif()
 
-    if(RAC_BACKEND_ONNX AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/onnx/CMakeLists.txt")
-        message(STATUS "  - ONNX backend")
-        add_subdirectory(src/backends/onnx)
+    if(RAC_BACKEND_LLAMACPP AND EXISTS "${_ENGINES_ROOT}/llamacpp/CMakeLists.txt"
+       AND NOT TARGET rac_backend_llamacpp)
+        message(STATUS "  - LlamaCPP backend (engines/llamacpp)")
+        add_subdirectory("${_ENGINES_ROOT}/llamacpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_llamacpp")
     endif()
 
-    if(RAC_BACKEND_WHISPERCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/whispercpp/CMakeLists.txt")
-        message(STATUS "  - WhisperCPP backend")
-        add_subdirectory(src/backends/whispercpp)
+    if(RAC_BACKEND_ONNX AND EXISTS "${_ENGINES_ROOT}/onnx/CMakeLists.txt"
+       AND NOT TARGET rac_backend_onnx)
+        message(STATUS "  - ONNX backend (engines/onnx)")
+        add_subdirectory("${_ENGINES_ROOT}/onnx" "${CMAKE_CURRENT_BINARY_DIR}/_engine_onnx")
     endif()
 
-    if(RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/metalrt/CMakeLists.txt")
-        message(STATUS "  - MetalRT backend — folded into rac_commons")
-        add_subdirectory(src/backends/metalrt)
+    if(RAC_BACKEND_WHISPERCPP AND EXISTS "${_ENGINES_ROOT}/whispercpp/CMakeLists.txt"
+       AND NOT TARGET rac_backend_whispercpp)
+        message(STATUS "  - WhisperCPP backend (engines/whispercpp)")
+        add_subdirectory("${_ENGINES_ROOT}/whispercpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_whispercpp")
+    endif()
+
+    if(RAC_BACKEND_METALRT AND EXISTS "${_ENGINES_ROOT}/metalrt/CMakeLists.txt"
+       AND NOT TARGET rac_backend_metalrt)
+        message(STATUS "  - MetalRT backend (engines/metalrt) — folded into rac_commons")
+        add_subdirectory("${_ENGINES_ROOT}/metalrt" "${CMAKE_CURRENT_BINARY_DIR}/_engine_metalrt")
 
         # MetalRT is an OBJECT library. Fold its compiled objects into
         # rac_commons so there is no separate rac_backend_metalrt artifact
-        # to distribute — mirrors how RAG is integrated. Public builds ship
-        # stub implementations; engine-enabled builds link the private
-        # libmetalrt_engine.a via RAC_METALRT_ENGINE_LIB propagated from
-        # the subdirectory.
+        # to distribute — mirrors how RAG is integrated.
         target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
 
-        # Apple frameworks are needed wherever the wrappers are compiled.
         if(APPLE)
             target_link_libraries(rac_commons PUBLIC
                 "-framework Metal"
@@ -710,9 +733,6 @@ if(RAC_BUILD_BACKENDS)
             )
         endif()
 
-        # If the engine is available, link the private static lib onto
-        # rac_commons so the OBJECT target's unresolved metalrt_* symbols
-        # resolve in the final archive.
         if(RAC_METALRT_ENGINE_LIB)
             target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
         endif()

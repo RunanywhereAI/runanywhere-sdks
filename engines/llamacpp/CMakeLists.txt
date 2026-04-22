@@ -245,7 +245,9 @@ else()
 endif()
 
 # Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+# GAP 06 Phase 9: was sdk/runanywhere-commons/src/backends/<name>/ → ../../.. = commons.
+# Now engines/<name>/ → ../../sdk/runanywhere-commons.
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 target_include_directories(rac_backend_llamacpp PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

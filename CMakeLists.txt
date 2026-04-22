@@ -72,7 +72,10 @@ set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 # Shared cmake/ helpers
 # =============================================================================
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+list(APPEND CMAKE_MODULE_PATH
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/cmake"  # LoadVersions, FetchONNXRuntime, ... — kept for engine subdirs after the GAP 06 reorg
+)
 
 # These four helpers ship in subsequent phases of GAP 07; the includes are
 # tolerant so this CMakeLists works incrementally as the helpers land.
