@@ -4,13 +4,12 @@
  * Adds LLM text generation capabilities to RunAnywhere.
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
  *
- * GAP 08 Phase 27 — DEPRECATED token queue.
- *
- * The `tokenQueue: string[]` + `resolveNext` pattern in `generateStream()`
- * below duplicates what the Wave C `LLMTokenStream` adapter does once
- * wired to `idl/llm_service.proto`. Mechanical follow-up replaces this
- * block with a thin call into the codegen'd AsyncIterable wrapper.
- * Tracked in docs/gap08_final_gate_report.md.
+ * v2 close-out Phase 14: the inline `tokenQueue: string[] + resolveNext`
+ * async-iterator pattern in `generateStream()` was replaced by the
+ * shared `AsyncQueue<T>` helper from `@runanywhere/web` (Foundation/AsyncQueue).
+ * Behavior is identical; the dedup means future stream-style call sites
+ * (STT, TTS, future LLM variants) get the same battle-tested mechanics
+ * for free.
  *
  * Usage:
  *   import { RunAnywhere } from '@runanywhere/web';
@@ -25,7 +24,7 @@
  *   }
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, LLMFramework } from '@runanywhere/web';
+import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, LLMFramework, AsyncQueue } from '@runanywhere/web';
 import type { ModelLoadContext , HardwareAcceleration } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
@@ -383,11 +382,10 @@ class TextGenerationImpl {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
-    // Token queue for async iteration
-    const tokenQueue: string[] = [];
-    let resolveNext: ((value: IteratorResult<string>) => void) | null = null;
-    let isDone = false;
-    let streamError: Error | null = null;
+    // v2 close-out Phase 14: shared AsyncQueue<T> producer/consumer
+    // replaces the inline tokenQueue/resolveNext pattern (~50 LOC of
+    // boilerplate across 3 places — see Foundation/AsyncQueue.ts).
+    const tokens = new AsyncQueue<string>();
 
     // Result promise
     let resolveResult: ((result: LLMGenerationResult) => void) | null = null;
@@ -408,34 +406,19 @@ class TextGenerationImpl {
       const token = m.UTF8ToString(tokenPtr);
       tokenCount++;
       fullText += token;
-
       if (timeToFirstToken === undefined) {
         timeToFirstToken = performance.now() - startTime;
       }
-
-      if (resolveNext) {
-        const resolve = resolveNext;
-        resolveNext = null;
-        resolve({ value: token, done: false });
-      } else {
-        tokenQueue.push(token);
-      }
-
+      tokens.push(token);
       return 1; // RAC_TRUE = continue
     }, 'iii');
 
     // Register complete callback
     const completeCbPtr = m.addFunction((_resultPtr: number, _userData: number): void => {
-      isDone = true;
-      if (resolveNext) {
-        const resolve = resolveNext;
-        resolveNext = null;
-        resolve({ value: undefined as unknown as string, done: true });
-      }
+      tokens.complete();
 
       const latencyMs = performance.now() - startTime;
       const tokensPerSecond = tokenCount > 0 ? (tokenCount / (latencyMs / 1000)) : 0;
-
       resolveResult?.({
         text: fullText,
         inputTokens: 0,
@@ -450,7 +433,6 @@ class TextGenerationImpl {
         responseTokens: tokenCount,
       });
 
-      // Cleanup callback pointers
       m.removeFunction(tokenCbPtr);
       m.removeFunction(completeCbPtr);
       m.removeFunction(errorCbPtr);
@@ -458,17 +440,10 @@ class TextGenerationImpl {
 
     // Register error callback
     const errorCbPtr = m.addFunction((errorCode: number, errorMsgPtr: number, _userData: number): void => {
-      isDone = true;
       const errorMsg = m.UTF8ToString(errorMsgPtr);
-      streamError = SDKError.fromRACResult(errorCode, errorMsg);
-
-      if (resolveNext) {
-        const resolve = resolveNext;
-        resolveNext = null;
-        resolve({ value: undefined as unknown as string, done: true });
-      }
-
-      rejectResult?.(streamError!);
+      const err = SDKError.fromRACResult(errorCode, errorMsg);
+      tokens.fail(err);
+      rejectResult?.(err);
 
       m.removeFunction(tokenCbPtr);
       m.removeFunction(completeCbPtr);
@@ -546,30 +521,8 @@ class TextGenerationImpl {
       throw SDKError.fromRACResult(startResult, 'Failed to start streaming generation');
     }
 
-    // Create async iterable
-    const stream: AsyncIterable<string> = {
-      [Symbol.asyncIterator](): AsyncIterator<string> {
-        return {
-          next(): Promise<IteratorResult<string>> {
-            if (streamError) {
-              return Promise.reject(streamError);
-            }
-            if (tokenQueue.length > 0) {
-              return Promise.resolve({ value: tokenQueue.shift()!, done: false });
-            }
-            if (isDone) {
-              return Promise.resolve({ value: undefined as unknown as string, done: true });
-            }
-            return new Promise((resolve) => {
-              resolveNext = resolve;
-            });
-          },
-        };
-      },
-    };
-
     return {
-      stream,
+      stream: tokens,
       result: resultPromise,
       cancel: () => {
         m._rac_llm_component_cancel(handle);

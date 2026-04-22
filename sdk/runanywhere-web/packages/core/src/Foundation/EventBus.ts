@@ -4,13 +4,16 @@
  * Central event system matching the pattern across all SDKs.
  * Provides typed event subscription and publishing.
  *
- * GAP 08 Phase 27 — legacy NativeEventEmitter compat block scheduled for
- * removal once Wave C's per-feature AsyncIterable adapters cover all
- * subscriber call sites. Today's EventBus retains a single-tenant
- * `BroadcastChannel`-style fan-out; the spec calls for replacing the
- * legacy NativeEventEmitter block once the Web adapters subsume the last
- * consumer (LLM tokens + download progress). Tracked in
- * docs/gap08_final_gate_report.md.
+ * v2 close-out Phase 14 audit: the previous file header described a
+ * "legacy NativeEventEmitter compat block scheduled for removal" —
+ * inspection found NO such block in this file. The Web SDK never
+ * shipped a NativeEventEmitter shim (that's an RN-only API). The
+ * stale comment was added in Wave D as defensive scheduling and is
+ * removed in this commit.
+ *
+ * The actual EventBus implementation is a pure-TS BroadcastChannel-style
+ * fan-out — the same pattern Swift / Kotlin / Dart / RN use, just
+ * adapted to the Web SDK's no-bridge environment.
  */
 
 import type { SDKEventType } from '../types/enums';
