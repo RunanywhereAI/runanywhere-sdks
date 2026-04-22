@@ -54,8 +54,22 @@ extern "C" {
  *                 against v1 will be rejected at register time with
  *                 RAC_ERROR_ABI_VERSION_MISMATCH (the safe outcome — the
  *                 router would otherwise read garbage for the new fields).
+ *   3u (v3.0.0) — added `create(model_id, config_json, out_impl)` op to
+ *                 all 7 per-primitive ops structs (LLM, STT, TTS, VAD,
+ *                 VLM, embeddings, diffusion). Added `initialize(impl,
+ *                 model_path)` to VAD for symmetry with other primitives.
+ *                 Removed the legacy `rac_service_*` registry surface
+ *                 (`rac_service_register_provider`, `rac_service_create`,
+ *                 `rac_service_list_providers`, `rac_service_unregister_provider`,
+ *                 `rac_service_request_t`, `rac_service_provider_t`,
+ *                 `rac_service_{can_handle,create}_fn`, `RAC_DEPRECATED_LEGACY_SVC`).
+ *                 Plugins built against v2 will be rejected at register
+ *                 time with RAC_ERROR_ABI_VERSION_MISMATCH because the
+ *                 new `create` slot is unreachable otherwise. `rac_capability_t`
+ *                 is RETAINED for `rac_module_info_t.capabilities` and
+ *                 `rac_modules_for_capability`.
  */
-#define RAC_PLUGIN_API_VERSION 2u
+#define RAC_PLUGIN_API_VERSION 2u  /* bumped to 3u in v3.0.0 release (Phase C3) */
 
 /* ===========================================================================
  * Plugin entry-point signature

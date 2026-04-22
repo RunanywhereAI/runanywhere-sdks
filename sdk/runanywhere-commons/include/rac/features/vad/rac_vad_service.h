@@ -50,6 +50,21 @@ typedef struct rac_vad_service_ops {
 
     /** Destroy the backend service */
     void (*destroy)(void* impl);
+
+    /**
+     * Initialize with a model path (v3: added for symmetry with other
+     * primitives). Optional — NULL means the backend doesn't require
+     * per-model initialization (e.g. energy-based VAD). Model-based
+     * VAD engines (ONNX Silero, etc.) MUST implement this.
+     */
+    rac_result_t (*initialize)(void* impl, const char* model_path);
+
+    /**
+     * Allocate a backend-specific impl for a new VAD service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_vad_service_ops_t;
 
 /**
