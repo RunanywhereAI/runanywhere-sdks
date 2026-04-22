@@ -19,11 +19,15 @@ import com.runanywhere.sdk.public.events.STTEvent
 import com.runanywhere.sdk.public.events.TTSEvent
 import com.runanywhere.sdk.public.extensions.VoiceAgent.ComponentLoadState
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
-import com.runanywhere.sdk.public.extensions.processVoice
-import com.runanywhere.sdk.public.extensions.startVoiceSession
-import com.runanywhere.sdk.public.extensions.stopVoiceSession
 import com.runanywhere.sdk.public.extensions.voiceAgentComponentStates
+// v3.1 P3.2: migrated off deprecated VoiceSessionEvent / processVoice /
+// startVoiceSession / stopVoiceSession. Pipeline now flows through the
+// proto-stream VoiceAgentStreamAdapter backed by a voice-agent handle.
+import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+import ai.runanywhere.proto.v1.VoiceEvent
+import ai.runanywhere.proto.v1.StateChangeEvent
+import ai.runanywhere.proto.v1.VADEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -127,8 +131,9 @@ class VoiceAssistantViewModel(
     private val audioBuffer = ByteArrayOutputStream()
     private val audioBufferLock = Any()
 
-    // Voice session flow
-    private var voiceSessionFlow: Flow<VoiceSessionEvent>? = null
+    // v3.1: voice-agent stream adapter (proto-backed). Replaces the
+    // deprecated `voiceSessionFlow: Flow<VoiceSessionEvent>?` field.
+    private var voiceAgentFlow: Flow<VoiceEvent>? = null
 
     // Jobs for coroutine management
     private var pipelineJob: Job? = null
@@ -312,17 +317,12 @@ class VoiceAssistantViewModel(
 
                     Timber.i("🔄 Processing ${audioData.size} bytes through voice pipeline...")
 
-                    // Process audio through STT → LLM → TTS pipeline
-                    // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
-                    // v2 close-out: processVoice is @Deprecated since the
-                    // Wave D Phase 6 cleanup; the C++ voice agent now owns
-                    // the orchestration via VoiceAgentStreamAdapter once the
-                    // matching JNI handle thunk lands. Until then this
-                    // sample suppresses the deprecation explicitly.
-                    @Suppress("DEPRECATION")
+                    // v3.1: direct CppBridge composition replaces the
+                    // deprecated RunAnywhere.processVoice wrapper. Same
+                    // STT → LLM → TTS flow, no deprecated surface.
                     val result =
                         withContext(Dispatchers.Default) {
-                            RunAnywhere.processVoice(audioData)
+                            processVoiceTurnDirect(audioData)
                         }
 
                     val transcription = result.transcription
@@ -797,24 +797,22 @@ class VoiceAssistantViewModel(
                     return@launch
                 }
 
-                // Start voice session (for SDK state tracking)
-                // v2 close-out: startVoiceSession is @Deprecated since the
-                // Wave D Phase 6 cleanup; will migrate to
-                // VoiceAgentStreamAdapter once the JNI thunk for the agent
-                // handle ships. See docs/v2_remaining_work.md "Risk register".
-                @Suppress("DEPRECATION")
-                val sessionFlow = RunAnywhere.startVoiceSession(VoiceSessionConfig.DEFAULT)
-                voiceSessionFlow = sessionFlow
+                // v3.1: initialize voice-agent handle against already-loaded
+                // models + subscribe to the proto event stream.
+                val agentHandle = CppBridgeVoiceAgent.getHandle()
+                val adapter = VoiceAgentStreamAdapter(agentHandle)
+                val agentFlow = adapter.stream()
+                voiceAgentFlow = agentFlow
 
-                // Consume voice session events in background
+                // Consume voice-agent proto events in background
                 pipelineJob =
                     viewModelScope.launch {
                         try {
-                            sessionFlow.collect { event ->
-                                handleVoiceSessionEvent(event)
+                            agentFlow.collect { event ->
+                                handleProtoEvent(event)
                             }
                         } catch (e: Exception) {
-                            Timber.e(e, "Session event error")
+                            Timber.e(e, "Voice agent event error")
                         }
                     }
 
@@ -892,85 +890,117 @@ class VoiceAssistantViewModel(
     }
 
     /**
-     * Handle VoiceSession events (new API matching iOS)
+     * Handle canonical VoiceEvent proto messages (v3.1 — replaces the
+     * deprecated handleVoiceSessionEvent).
+     *
+     * Switches on the oneof `payload` field. See
+     * `docs/migrations/VoiceSessionEvent.md` for the 10-case → 8-payload
+     * mapping guide.
      */
-    private fun handleVoiceSessionEvent(event: VoiceSessionEvent) {
-        when (event) {
-            is VoiceSessionEvent.Started -> {
-                Timber.i("Voice session started")
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.LISTENING,
-                        isListening = true,
-                    )
+    private fun handleProtoEvent(event: VoiceEvent) {
+        when {
+            event.state != null -> {
+                val state = event.state!!
+                when (state.current) {
+                    StateChangeEvent.State.IDLE -> {
+                        Timber.i("Voice agent idle → listening")
+                        _uiState.update {
+                            it.copy(
+                                sessionState = SessionState.LISTENING,
+                                isListening = true,
+                            )
+                        }
+                    }
+                    StateChangeEvent.State.LISTENING -> {
+                        // Audio level isn't in the proto state event; audio
+                        // level comes from the local AudioCaptureService RMS
+                        // calculation, already updated separately.
+                        _uiState.update { current ->
+                            if (current.sessionState != SessionState.LISTENING &&
+                                current.sessionState != SessionState.SPEAKING &&
+                                current.sessionState != SessionState.PROCESSING) {
+                                current.copy(
+                                    sessionState = SessionState.LISTENING,
+                                    isListening = true,
+                                )
+                            } else {
+                                current
+                            }
+                        }
+                    }
+                    StateChangeEvent.State.THINKING -> {
+                        Timber.i("Processing speech...")
+                        _uiState.update {
+                            it.copy(
+                                sessionState = SessionState.PROCESSING,
+                                isSpeechDetected = false,
+                            )
+                        }
+                    }
+                    StateChangeEvent.State.SPEAKING -> {
+                        Timber.d("Playing TTS audio")
+                        _uiState.update { it.copy(sessionState = SessionState.SPEAKING) }
+                    }
+                    StateChangeEvent.State.STOPPED -> {
+                        Timber.i("Voice agent stopped")
+                        _uiState.update {
+                            it.copy(
+                                sessionState = SessionState.DISCONNECTED,
+                                isListening = false,
+                            )
+                        }
+                    }
+                    else -> { /* unspecified / unknown — no UI change */ }
                 }
             }
 
-            is VoiceSessionEvent.Listening -> {
-                _uiState.update { it.copy(audioLevel = event.audioLevel) }
-            }
-
-            is VoiceSessionEvent.SpeechStarted -> {
-                Timber.d("Speech detected")
-                _uiState.update { it.copy(isSpeechDetected = true) }
-            }
-
-            is VoiceSessionEvent.Processing -> {
-                Timber.i("Processing speech...")
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.PROCESSING,
-                        isSpeechDetected = false,
-                    )
+            event.vad != null -> {
+                when (event.vad!!.type) {
+                    VADEvent.Type.VAD_EVENT_VOICE_START -> {
+                        Timber.d("Speech detected")
+                        _uiState.update { it.copy(isSpeechDetected = true) }
+                    }
+                    VADEvent.Type.VAD_EVENT_VOICE_END_OF_UTTERANCE -> {
+                        Timber.i("Processing speech...")
+                        _uiState.update {
+                            it.copy(
+                                sessionState = SessionState.PROCESSING,
+                                isSpeechDetected = false,
+                            )
+                        }
+                    }
+                    else -> { /* barge-in / silence / unknown — no-op */ }
                 }
             }
 
-            is VoiceSessionEvent.Transcribed -> {
-                Timber.i("Transcription: ${event.text}")
-                _uiState.update { it.copy(currentTranscript = event.text) }
+            event.user_said != null -> {
+                val text = event.user_said!!.text
+                Timber.i("Transcription: $text")
+                _uiState.update { it.copy(currentTranscript = text) }
             }
 
-            is VoiceSessionEvent.Responded -> {
-                Timber.i("Response: ${event.text.take(50)}...")
-                _uiState.update { it.copy(assistantResponse = event.text) }
+            event.assistant_token != null -> {
+                val token = event.assistant_token!!.text
+                Timber.d("Response token: ${token.take(20)}...")
+                // Streaming: append per-token for typewriter UX. Was batched
+                // as .Responded(fullText) in the legacy VoiceSessionEvent.
+                _uiState.update { it.copy(assistantResponse = it.assistantResponse + token) }
             }
 
-            is VoiceSessionEvent.Speaking -> {
-                Timber.d("Playing TTS audio")
+            event.audio != null -> {
+                // TTS is playing; the audio frames are dispatched to the
+                // AudioTrack via a separate path. UI only needs state.
                 _uiState.update { it.copy(sessionState = SessionState.SPEAKING) }
             }
 
-            is VoiceSessionEvent.TurnCompleted -> {
-                Timber.i("Turn completed")
-                _uiState.update {
-                    it.copy(
-                        currentTranscript = event.transcript,
-                        assistantResponse = event.response,
-                        sessionState = SessionState.LISTENING,
-                        isListening = true,
-                    )
-                }
+            event.error != null -> {
+                val err = event.error!!
+                Timber.e("Voice agent error: ${err.message}")
+                _uiState.update { it.copy(errorMessage = err.message) }
             }
 
-            is VoiceSessionEvent.Stopped -> {
-                Timber.i("Voice session stopped")
-                _uiState.update {
-                    it.copy(
-                        sessionState = SessionState.DISCONNECTED,
-                        isListening = false,
-                    )
-                }
-            }
-
-            is VoiceSessionEvent.Error -> {
-                Timber.e("Voice session error: ${event.message}")
-                _uiState.update {
-                    it.copy(
-                        errorMessage = event.message,
-                        // Don't change state to error - session can continue
-                    )
-                }
-            }
+            // interrupted / metrics / no payload → no UX impact
+            else -> { /* no-op */ }
         }
     }
 
@@ -1033,13 +1063,10 @@ class VoiceAssistantViewModel(
                 try {
                     Timber.i("Processing audio through voice pipeline...")
 
-                    // Process audio through STT → LLM → TTS pipeline
-                    // Run on Default dispatcher to avoid blocking main thread (fixes ANR)
-                    // v2 close-out: see processVoice deprecation note above.
-                    @Suppress("DEPRECATION")
+                    // v3.1: direct CppBridge composition (see L319 for rationale).
                     val result =
                         withContext(Dispatchers.Default) {
-                            RunAnywhere.processVoice(audioData)
+                            processVoiceTurnDirect(audioData)
                         }
 
                     val transcription = result.transcription
@@ -1098,9 +1125,10 @@ class VoiceAssistantViewModel(
                 }
             }
 
-            // Stop voice session
-            RunAnywhere.stopVoiceSession()
-            voiceSessionFlow = null
+            // v3.1: tear down voice-agent handle (unregisters proto callback,
+            // releases owned component handles).
+            CppBridgeVoiceAgent.destroy()
+            voiceAgentFlow = null
 
             Timber.i("Conversation stopped")
         }
@@ -1207,15 +1235,64 @@ class VoiceAssistantViewModel(
         stopAudioPlayback()
         audioCaptureService?.release()
         audioCaptureService = null
-        // Fire-and-forget on IO — viewModelScope is dead after super.onCleared()
-        @Suppress("OPT_IN_USAGE")
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-            try {
-                RunAnywhere.stopVoiceSession()
-            } catch (_: Exception) {
-                // best-effort cleanup
-            }
+        // v3.1: synchronous handle teardown; no JNI cross-thread issue.
+        try {
+            CppBridgeVoiceAgent.destroy()
+        } catch (_: Exception) {
+            // best-effort cleanup
         }
         super.onCleared()
+    }
+
+    // ========================================================================
+    // Voice pipeline composition (v3.1 replacement for deprecated
+    // RunAnywhere.processVoice)
+    // ========================================================================
+
+    private data class VoicePipelineResult(
+        val speechDetected: Boolean,
+        val transcription: String?,
+        val response: String?,
+        val synthesizedAudio: ByteArray?,
+    )
+
+    /**
+     * One-shot STT → LLM → TTS composition using direct CppBridge calls.
+     * Replaces the deprecated RunAnywhere.processVoice wrapper. Pure
+     * composition — same semantics as the SDK's wrapper but no
+     * deprecated surface.
+     */
+    private suspend fun processVoiceTurnDirect(audioData: ByteArray): VoicePipelineResult {
+        return try {
+            val transcription = com.runanywhere.sdk.foundation.bridge.extensions
+                .CppBridgeSTT.transcribe(audioData).text
+            if (transcription.isBlank()) {
+                return VoicePipelineResult(
+                    speechDetected = false, transcription = null,
+                    response = null, synthesizedAudio = null,
+                )
+            }
+            val prompt = "You are a helpful voice assistant.\n\nUser: $transcription\n\nAssistant:"
+            val response = com.runanywhere.sdk.foundation.bridge.extensions
+                .CppBridgeLLM.generate(prompt).text
+            val audio = if (response.isNotBlank()) {
+                com.runanywhere.sdk.foundation.bridge.extensions
+                    .CppBridgeTTS.synthesize(response).audioData
+            } else {
+                null
+            }
+            VoicePipelineResult(
+                speechDetected = true,
+                transcription = transcription,
+                response = response,
+                synthesizedAudio = audio,
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Voice pipeline error")
+            VoicePipelineResult(
+                speechDetected = false, transcription = null,
+                response = "Processing error: ${e.message}", synthesizedAudio = null,
+            )
+        }
     }
 }

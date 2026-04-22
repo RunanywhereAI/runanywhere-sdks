@@ -1232,6 +1232,31 @@ object RunAnywhereBridge {
     ): IntArray?
 
     // ========================================================================
+    // VOICE AGENT (rac_voice_agent.h)
+    // ========================================================================
+    //
+    // v3.1 P3.2: 4 thunks exposing the voice-agent handle lifecycle to
+    // Kotlin. Mirrors Swift's CppBridge.VoiceAgent.shared.getHandle()
+    // pattern. The handle is what VoiceAgentStreamAdapter(handle).stream()
+    // subscribes to for proto event streaming.
+
+    /** Create a standalone voice-agent handle that owns its STT/LLM/TTS/VAD
+     *  component handles. Returns 0 on failure. */
+    @JvmStatic external fun racVoiceAgentCreateStandalone(): Long
+
+    /** Initialize a voice-agent handle against already-loaded STT/LLM/TTS
+     *  models in the singleton component handles. Returns rac_result_t
+     *  (0 = success). */
+    @JvmStatic external fun racVoiceAgentInitializeWithLoadedModels(handle: Long): Int
+
+    /** Check if the voice agent is ready (all required models loaded). */
+    @JvmStatic external fun racVoiceAgentIsReady(handle: Long): Boolean
+
+    /** Destroy the voice-agent handle and release owned component handles
+     *  (when created via standalone). */
+    @JvmStatic external fun racVoiceAgentDestroy(handle: Long)
+
+    // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)
     // ========================================================================
     //

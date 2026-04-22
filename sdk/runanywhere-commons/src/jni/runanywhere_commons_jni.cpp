@@ -5239,6 +5239,53 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeUnregisterCallba
     delete ctx;
 }
 
+// =============================================================================
+// Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
+// handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
+// CppBridge.VoiceAgent.shared.getHandle() pattern.)
+// =============================================================================
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreateStandalone(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_voice_agent_handle_t handle = nullptr;
+    rac_result_t result = rac_voice_agent_create_standalone(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("racVoiceAgentCreateStandalone failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentInitializeWithLoadedModels(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_voice_agent_initialize_with_loaded_models(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle)));
+}
+
+JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentIsReady(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    rac_result_t result = rac_voice_agent_is_ready(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), &is_ready);
+    return (result == RAC_SUCCESS && is_ready == RAC_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_voice_agent_destroy(reinterpret_cast<rac_voice_agent_handle_t>(handle));
+}
+
 }  // extern "C"
 
 // =============================================================================
