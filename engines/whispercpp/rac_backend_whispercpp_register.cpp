@@ -102,7 +102,26 @@ static void whispercpp_stt_vtable_destroy(void* impl) {
     }
 }
 
-// Static vtable for WhisperCPP STT
+// v3 Phase B4: whispercpp STT `create` adapter. Called by commons
+// rac_stt_create() via rac_plugin_route (whisper-ggml priority is
+// encoded in g_whispercpp_engine_vtable.metadata.priority in
+// rac_plugin_entry_whispercpp.cpp; model-format gating via metadata.formats).
+static rac_result_t whispercpp_stt_create_impl(const char* model_id,
+                                               const char* /*config_json*/,
+                                               void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+    RAC_LOG_INFO(LOG_CAT, "whispercpp_stt_create_impl: model=%s", model_id);
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_stt_whispercpp_create(model_id, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_stt_whispercpp_create failed: %d", rc);
+        return rc;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_stt_service_ops_t g_whispercpp_stt_ops = {
     .initialize = whispercpp_stt_vtable_initialize,
     .transcribe = whispercpp_stt_vtable_transcribe,
@@ -110,78 +129,18 @@ const rac_stt_service_ops_t g_whispercpp_stt_ops = {
     .get_info = whispercpp_stt_vtable_get_info,
     .cleanup = whispercpp_stt_vtable_cleanup,
     .destroy = whispercpp_stt_vtable_destroy,
+    .create = whispercpp_stt_create_impl,
 };
 
 // =============================================================================
-// SERVICE PROVIDERS
+// MODULE IDENTITY
 // =============================================================================
 
 const char* const MODULE_ID = "whispercpp";
-const char* const STT_PROVIDER_NAME = "WhisperCPPSTTService";
 
-// STT can_handle
-rac_bool_t whispercpp_stt_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return RAC_FALSE;
-    }
-
-    // Don't be the default STT provider (let ONNX handle that)
-    if (request->identifier == nullptr || request->identifier[0] == '\0') {
-        return RAC_FALSE;
-    }
-
-    // Check for whisper GGML model patterns
-    const char* path = request->identifier;
-    size_t len = strlen(path);
-
-    // Check for .bin extension (whisper GGML format)
-    if (len >= 4) {
-        const char* ext = path + len - 4;
-        if (strcmp(ext, ".bin") == 0 || strcmp(ext, ".BIN") == 0) {
-            if (strstr(path, "whisper") != nullptr || strstr(path, "ggml") != nullptr) {
-                RAC_LOG_INFO(LOG_CAT, "whispercpp_stt_can_handle: path matches -> TRUE");
-                return RAC_TRUE;
-            }
-        }
-    }
-
-    return RAC_FALSE;
-}
-
-// STT create with vtable
-rac_handle_t whispercpp_stt_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating WhisperCPP STT service for: %s",
-                 request->identifier ? request->identifier : "(default)");
-
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_stt_whispercpp_create(request->identifier, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_stt_whispercpp_create failed with result: %d", result);
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
-    if (!service) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to allocate rac_stt_service_t");
-        rac_stt_whispercpp_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_whispercpp_stt_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "WhisperCPP STT service created successfully");
-    return service;
-}
+// v3 Phase B4: legacy rac_service_request_t factories removed. Model-file
+// gating lives in g_whispercpp_engine_vtable.metadata.formats; backend
+// priority (50, lower than ONNX 100) lives in metadata.priority.
 
 bool g_registered = false;
 
@@ -198,7 +157,6 @@ rac_result_t rac_backend_whispercpp_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "WhisperCPP";
@@ -214,23 +172,10 @@ rac_result_t rac_backend_whispercpp_register(void) {
         return result;
     }
 
-    // Register STT provider with lower priority than ONNX
-    // (to avoid GGML symbol conflicts when LlamaCPP is also loaded)
-    rac_service_provider_t stt_provider = {};
-    stt_provider.name = STT_PROVIDER_NAME;
-    stt_provider.capability = RAC_CAPABILITY_STT;
-    stt_provider.priority = 50;  // Lower than ONNX (100)
-    stt_provider.can_handle = whispercpp_stt_can_handle;
-    stt_provider.create = whispercpp_stt_create;
-
-    result = rac_service_register_provider(&stt_provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
+    // v3 Phase B4: plugin registration via rac_plugin_entry_whispercpp().
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (STT)");
+    RAC_LOG_INFO(LOG_CAT, "WhisperCPP backend registered (module_register only; "
+                          "plugin registration via rac_plugin_entry_whispercpp)");
     return RAC_SUCCESS;
 }
 
@@ -239,7 +184,6 @@ rac_result_t rac_backend_whispercpp_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
     rac_module_unregister(MODULE_ID);
 
     g_registered = false;
