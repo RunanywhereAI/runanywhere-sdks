@@ -154,4 +154,14 @@
 #include "rac_telemetry_types.h"
 #include "rac_telemetry_manager.h"
 
+// =============================================================================
+// PLUGIN REGISTRY + ROUTER (v3 Phase B10 — replaces rac_service_* legacy)
+// =============================================================================
+
+#include "rac_primitive.h"
+#include "rac_engine_vtable.h"
+#include "rac_plugin_entry.h"
+#include "rac_routing_hints.h"
+#include "rac_route.h"
+
 #endif /* CRACOMMONS_H */
