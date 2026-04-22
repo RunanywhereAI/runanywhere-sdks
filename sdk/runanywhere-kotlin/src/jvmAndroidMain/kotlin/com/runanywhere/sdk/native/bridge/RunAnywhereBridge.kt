@@ -1202,6 +1202,69 @@ object RunAnywhereBridge {
     external fun nativeFileManagerGetStorageInfo(): String?
 
     // ========================================================================
+    // AUTH MANAGER (rac_auth_manager.h)
+    // ========================================================================
+    //
+    // v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks delegating to the
+    // matching rac_auth_* C ABI in runanywhere_commons_jni.cpp. The
+    // higher-level CppBridgeAuth facade calls these instead of doing its
+    // own HTTP/JSON state bookkeeping. The HTTP transport stays in Kotlin
+    // (no JNI httpPost helper); native owns request building + response
+    // parsing + state.
+
+    /** Initialize auth state with in-memory storage. KeyStore-backed
+     *  variant is the v2.1-2 follow-up. */
+    @JvmStatic external fun racAuthInit()
+
+    /** Reset auth state (clears in-memory tokens + IDs). */
+    @JvmStatic external fun racAuthReset()
+
+    /** Clear all auth state including secure storage (if wired). */
+    @JvmStatic external fun racAuthClear()
+
+    /** Restore tokens from secure storage. Returns 0 on success, -1 if
+     *  not found or storage callbacks not wired. */
+    @JvmStatic external fun racAuthLoadStoredTokens(): Int
+
+    /** Persist current tokens to secure storage. Returns 0 on success. */
+    @JvmStatic external fun racAuthSaveTokens(): Int
+
+    @JvmStatic external fun racAuthIsAuthenticated(): Boolean
+    @JvmStatic external fun racAuthNeedsRefresh(): Boolean
+
+    @JvmStatic external fun racAuthGetAccessToken(): String?
+    @JvmStatic external fun racAuthGetDeviceId(): String?
+    @JvmStatic external fun racAuthGetUserId(): String?
+    @JvmStatic external fun racAuthGetOrganizationId(): String?
+
+    /** Build the JSON body for POST /api/v1/auth/sdk/authenticate.
+     *  Returns null on error. The 6-arg signature mirrors rac_sdk_config_t.
+     *  environment: 0 = DEVELOPMENT, 1 = STAGING, 2 = PRODUCTION. */
+    @JvmStatic external fun racAuthBuildAuthenticateRequest(
+        apiKey: String,
+        baseUrl: String,
+        deviceId: String,
+        platform: String,
+        sdkVersion: String,
+        environment: Int,
+    ): String?
+
+    /** Build the JSON body for POST /api/v1/auth/sdk/refresh.
+     *  Returns null if no refresh token is available. */
+    @JvmStatic external fun racAuthBuildRefreshRequest(): String?
+
+    /** Parse + store an authenticate response. Returns 0 on success, -1 on parse error. */
+    @JvmStatic external fun racAuthHandleAuthenticateResponse(json: String): Int
+
+    /** Parse + store a refresh response. Returns 0 on success, -1 on parse error. */
+    @JvmStatic external fun racAuthHandleRefreshResponse(json: String): Int
+
+    /** Returns String[2] = [token-or-null, "true"/"false"-needs-refresh] or null on error.
+     *  Java has no clean tuple type so this avoids out-param games; the typed
+     *  CppBridgeAuth wrapper unpacks it into a Pair<String?, Boolean>?. */
+    @JvmStatic external fun racAuthGetValidToken(): Array<String?>?
+
+    // ========================================================================
     // CONSTANTS
     // ========================================================================
 
