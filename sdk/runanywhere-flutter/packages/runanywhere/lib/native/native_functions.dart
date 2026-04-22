@@ -297,6 +297,32 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_voice_agent_destroy');
 
+  // ---------------------------------------------------------------------------
+  // Voice Agent Proto-Byte Callback ABI (v3-readiness Phase A2 / GAP 09 #6)
+  //
+  // `rac_voice_agent_set_proto_callback` is the canonical streaming entry
+  // point for VoiceEvent. The typed instance-method-style facade lives in
+  // `lib/core/native/rac_native.dart`; this `Function` alias is exposed
+  // here for callers that use the `NativeFunctions.voiceAgentSetProtoCallback`
+  // pattern consistent with the rest of this file.
+  // ---------------------------------------------------------------------------
+
+  static final int Function(
+    RacHandle,
+    Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+    Pointer<Void>,
+  ) voiceAgentSetProtoCallback = _lib.lookupFunction<
+      Int32 Function(
+        RacHandle,
+        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<Void>,
+      ),
+      int Function(
+        RacHandle,
+        Pointer<NativeFunction<Void Function(Pointer<Uint8>, Size, Pointer<Void>)>>,
+        Pointer<Void>,
+      )>('rac_voice_agent_set_proto_callback');
+
   static final void Function(Pointer<Void>)? racFree = (() {
     try {
       return _lib.lookupFunction<Void Function(Pointer<Void>),

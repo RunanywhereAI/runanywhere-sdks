@@ -18,16 +18,15 @@
 
 import 'dart:async';
 import 'dart:ffi' as ffi;
-import 'dart:isolate' show NativeCallable;
+// NativeCallable moved from dart:isolate to dart:ffi in Dart 3.1+.
+import 'dart:ffi' show NativeCallable;
 import 'dart:typed_data' show Uint8List;
 
 import 'package:ffi/ffi.dart' show calloc;
-
 // Wire-via-protoc generated VoiceEvent — see GAP 01 codegen output at
 // sdk/runanywhere-flutter/packages/runanywhere/lib/generated/voice_events.pb.dart.
-import '../generated/voice_events.pb.dart' show VoiceEvent;
-
-import '../core/native/rac_native.dart' show RacNative;
+import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
+import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 
 /// Streams [VoiceEvent]s from a C++ voice agent handle.
 ///
