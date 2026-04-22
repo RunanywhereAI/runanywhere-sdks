@@ -173,7 +173,22 @@ public struct VoiceAgentConfiguration: Sendable {
 
 // MARK: - Voice Session Events
 
-/// Events emitted during a voice session
+/// Events emitted during a voice session.
+///
+/// **v2.1-1 deprecation (GAP 09 #6)**: This enum is now a *derived view*
+/// over the canonical `RAVoiceEvent` proto (codegen'd from
+/// `idl/voice_events.proto`). The codegen'd type is the single source
+/// of truth; this UX-shaped enum is kept as a backward-compatibility
+/// shim so v2.x consumers don't break. New code should subscribe to
+/// `VoiceAgentStreamAdapter.stream()` and switch on
+/// `event.payload` directly.
+///
+/// See `docs/migrations/VoiceSessionEvent.md` for the mapping table
+/// and migration guide.
+@available(*, deprecated,
+    message: "Use RAVoiceEvent via VoiceAgentStreamAdapter.stream(). " +
+             "VoiceSessionEvent is a derived view — see " +
+             "docs/migrations/VoiceSessionEvent.md")
 public enum VoiceSessionEvent: Sendable {
     /// Session started and ready
     case started
@@ -204,6 +219,70 @@ public enum VoiceSessionEvent: Sendable {
 
     /// Error occurred
     case error(String)
+}
+
+// MARK: - VoiceSessionEvent ← RAVoiceEvent mapper (v2.1-1)
+
+@available(*, deprecated, message: "Derived view over RAVoiceEvent; prefer the proto directly.")
+extension VoiceSessionEvent {
+    /// Derive a `VoiceSessionEvent` from the canonical `RAVoiceEvent`
+    /// (proto3, codegen'd from `idl/voice_events.proto`).
+    ///
+    /// Returns `nil` for proto events that don't have a UX-visible
+    /// counterpart in the legacy enum (e.g. `MetricsEvent`, low-level
+    /// VAD `.bargeIn` / `.silence`, most `InterruptedEvent` reasons).
+    /// Callers that need the full event surface should subscribe to
+    /// `VoiceAgentStreamAdapter.stream()` and inspect `payload` directly.
+    ///
+    /// **Dropout cases** (documented honestly in the migration doc):
+    /// - `MetricsEvent` → no UX counterpart; nil.
+    /// - `InterruptedEvent` (all reasons) → no UX counterpart; nil.
+    /// - `VAD_EVENT_BARGE_IN` / `VAD_EVENT_SILENCE` → nil
+    ///   (legacy enum only knew `speechStarted` / `processing`).
+    /// - `.turnCompleted` aggregates multiple proto events across a
+    ///   turn and CANNOT be derived from a single `RAVoiceEvent` —
+    ///   callers that need turn-level aggregation should buffer
+    ///   proto events themselves.
+    public static func from(_ event: RAVoiceEvent) -> VoiceSessionEvent? {
+        switch event.payload {
+        case let .userSaid(e):
+            return .transcribed(text: e.text)
+
+        case let .assistantToken(e):
+            return .responded(text: e.text, thinkingContent: nil)
+
+        case .audio:
+            return .speaking
+
+        case let .vad(v):
+            switch v.type {
+            case .vadEventVoiceStart:          return .speechStarted
+            case .vadEventVoiceEndOfUtterance: return .processing
+            default:                           return nil
+            }
+
+        case let .state(s):
+            switch s.current {
+            case .idle:      return .started
+            case .listening: return .listening(audioLevel: 0)
+            case .speaking:  return .speaking
+            case .stopped:   return .stopped
+            // .thinking / .unspecified / UNRECOGNIZED have no UX counterpart
+            default:         return nil
+            }
+
+        case let .error(e):
+            return .error(e.message)
+
+        case .interrupted, .metrics, .none:
+            // No legacy UX counterpart. New code should read these
+            // directly via VoiceAgentStreamAdapter.stream().
+            return nil
+
+        @unknown default:
+            return nil
+        }
+    }
 }
 
 // MARK: - Voice Session Configuration
