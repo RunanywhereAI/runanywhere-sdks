@@ -483,6 +483,8 @@ set(RAC_FEATURES_SOURCES
     src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
+    # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
+    src/features/voice_agent/rac_voice_event_abi.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
