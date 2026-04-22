@@ -88,6 +88,40 @@ static void whisperkit_coreml_stt_vtable_destroy(void* impl) {
     }
 }
 
+// v3 Phase B5: WhisperKit CoreML `create` adapter. Delegates to the
+// Swift-side create callback (whisperkit_coreml is driven via Swift
+// callbacks registered through rac_whisperkit_coreml_stt_get_callbacks).
+// Called by commons rac_stt_create() via rac_plugin_route on Apple
+// platforms where WhisperKit CoreML is available. For `create`, we use
+// model_id as both the model path and the model id — the legacy factory
+// used request->model_path ?: request->identifier, both of which mapped
+// to the same value in the consumer path.
+static rac_result_t whisperkit_coreml_stt_create_impl(const char* model_id,
+                                                      const char* /*config_json*/,
+                                                      void** out_impl) {
+    if (!out_impl) return RAC_ERROR_NULL_POINTER;
+    *out_impl = nullptr;
+
+    const auto* callbacks = rac_whisperkit_coreml_stt_get_callbacks();
+    if (!callbacks || !callbacks->create) {
+        RAC_LOG_ERROR(LOG_CAT, "create: Swift callbacks not registered");
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    RAC_LOG_INFO(LOG_CAT,
+                 "whisperkit_coreml_stt_create_impl: model=%s",
+                 model_id ? model_id : "(default)");
+
+    rac_handle_t backend_handle =
+        callbacks->create(model_id, model_id, callbacks->user_data);
+    if (!backend_handle) {
+        RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
+        return RAC_ERROR_UNKNOWN;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
     .initialize = whisperkit_coreml_stt_vtable_initialize,
     .transcribe = whisperkit_coreml_stt_vtable_transcribe,
@@ -95,79 +129,18 @@ const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops = {
     .get_info = whisperkit_coreml_stt_vtable_get_info,
     .cleanup = whisperkit_coreml_stt_vtable_cleanup,
     .destroy = whisperkit_coreml_stt_vtable_destroy,
+    .create = whisperkit_coreml_stt_create_impl,
 };
 
 // =============================================================================
-// SERVICE PROVIDER
+// MODULE IDENTITY
 // =============================================================================
 
 const char* const MODULE_ID = "whisperkit_coreml";
-const char* const STT_PROVIDER_NAME = "WhisperKitCoreMLSTTService";
 
-rac_bool_t whisperkit_coreml_stt_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr)
-        return RAC_FALSE;
-
-    if (request->framework == RAC_FRAMEWORK_WHISPERKIT_COREML) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: framework match -> TRUE");
-        return RAC_TRUE;
-    }
-
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN)
-        return RAC_FALSE;
-
-    if (!rac_whisperkit_coreml_stt_is_available())
-        return RAC_FALSE;
-
-    const auto* callbacks = rac_whisperkit_coreml_stt_get_callbacks();
-    if (callbacks && callbacks->can_handle) {
-        return callbacks->can_handle(request->identifier, callbacks->user_data);
-    }
-
-    return RAC_FALSE;
-}
-
-rac_handle_t whisperkit_coreml_stt_create(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        RAC_LOG_ERROR(LOG_CAT, "create: null request");
-        return nullptr;
-    }
-
-    const auto* callbacks = rac_whisperkit_coreml_stt_get_callbacks();
-    if (!callbacks || !callbacks->create) {
-        RAC_LOG_ERROR(LOG_CAT, "create: Swift callbacks not registered");
-        return nullptr;
-    }
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    const char* model_id = request->identifier;
-
-    RAC_LOG_INFO(LOG_CAT, "Creating WhisperKit CoreML STT service for: %s",
-                 model_id ? model_id : "(default)");
-
-    rac_handle_t backend_handle = callbacks->create(model_path, model_id, callbacks->user_data);
-    if (!backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "Swift create callback returned null");
-        return nullptr;
-    }
-
-    auto* service = static_cast<rac_stt_service_t*>(malloc(sizeof(rac_stt_service_t)));
-    if (!service) {
-        callbacks->destroy(backend_handle, callbacks->user_data);
-        return nullptr;
-    }
-
-    service->ops = &g_whisperkit_coreml_stt_ops;
-    service->impl = backend_handle;
-    service->model_id = model_id ? strdup(model_id) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML STT service created successfully");
-    return service;
-}
+// v3: legacy rac_service_request_t factories removed. Framework gating
+// (RAC_FRAMEWORK_WHISPERKIT_COREML) + availability check is now in
+// g_whisperkit_coreml_engine_vtable.metadata in the plugin-entry TU.
 
 bool g_registered = false;
 
@@ -199,22 +172,10 @@ rac_result_t rac_backend_whisperkit_coreml_register(void) {
         return result;
     }
 
-    rac_service_provider_t stt_provider = {};
-    stt_provider.name = STT_PROVIDER_NAME;
-    stt_provider.capability = RAC_CAPABILITY_STT;
-    stt_provider.priority = 200;
-    stt_provider.can_handle = whisperkit_coreml_stt_can_handle;
-    stt_provider.create = whisperkit_coreml_stt_create;
-    stt_provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&stt_provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(MODULE_ID);
-        return result;
-    }
-
+    // v3 Phase B5: plugin registration via rac_plugin_entry_whisperkit_coreml().
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML backend registered (STT, priority=200)");
+    RAC_LOG_INFO(LOG_CAT, "WhisperKit CoreML backend registered (module_register only; "
+                          "plugin registration via rac_plugin_entry_whisperkit_coreml)");
     return RAC_SUCCESS;
 }
 
@@ -223,7 +184,6 @@ rac_result_t rac_backend_whisperkit_coreml_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
     rac_module_unregister(MODULE_ID);
 
     g_registered = false;
