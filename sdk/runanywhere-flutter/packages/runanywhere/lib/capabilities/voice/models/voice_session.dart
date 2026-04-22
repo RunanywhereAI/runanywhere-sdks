@@ -29,51 +29,99 @@ class STTOutput {
   });
 }
 
-/// Events emitted during a voice session
-/// Matches iOS VoiceSessionEvent from RunAnywhere+VoiceSession.swift
+/// Events emitted during a voice session.
+///
+/// **v2.1-1 deprecation (GAP 09 #6)**: This sealed class is now a
+/// *derived view* over the canonical `VoiceEvent` proto (codegen'd
+/// via protoc_plugin from `idl/voice_events.proto`). The codegen'd
+/// type is the single source of truth; this UX-shaped sealed class
+/// is kept as a backward-compatibility shim.
+///
+/// New code should subscribe to the voice agent stream adapter and
+/// match on `event.whichPayload()` directly.
+///
+/// See `docs/migrations/VoiceSessionEvent.md` for the 10-case →
+/// 8-payload mapping table and migration guide.
+///
+/// **v2.1-1 Dart status**: SCAFFOLD. The static `fromProto(event)`
+/// mapper returns null for every input today — Swift is the template
+/// at `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. Full Dart
+/// implementation is the v2.1-1c per-SDK cleanup PR.
+@Deprecated(
+  'Use VoiceEvent via VoiceAgentStreamAdapter.stream(). '
+  'VoiceSessionEvent is a derived view — see docs/migrations/VoiceSessionEvent.md',
+)
 sealed class VoiceSessionEvent {
   const VoiceSessionEvent();
+
+  /// Derive a [VoiceSessionEvent] from the canonical `VoiceEvent`
+  /// (proto3 via protoc_plugin, generated from `idl/voice_events.proto`).
+  ///
+  /// Returns `null` for proto events that don't have a UX-visible
+  /// counterpart — see `docs/migrations/VoiceSessionEvent.md` for
+  /// the full dropout list (metrics, interrupted, low-level VAD,
+  /// state=thinking, etc.).
+  ///
+  /// **v2.1-1 SCAFFOLD**: the parameter type is `Object` (not
+  /// `VoiceEvent`) because importing the generated proto here would
+  /// couple this public-API file to the codegen output layout. The
+  /// v2.1-1c follow-up PR tightens the parameter type + implements
+  /// the body. Today this returns null for every input; new code
+  /// should use the proto stream directly.
+  // ignore: deprecated_member_use_from_same_package
+  static VoiceSessionEvent? fromProto(Object event) => null;
 }
 
-/// Session started and ready
+/// Session started and ready. v2.1-1: maps from `VoiceEvent.state { current = IDLE }`.
 class VoiceSessionStarted extends VoiceSessionEvent {
   const VoiceSessionStarted();
 }
 
-/// Listening for speech with current audio level (0.0 - 1.0)
+/// Listening for speech with current audio level (0.0 - 1.0).
+/// v2.1-1: maps from `VoiceEvent.state { current = LISTENING }`; audioLevel
+/// is not in the proto and will be 0 when derived.
 class VoiceSessionListening extends VoiceSessionEvent {
   final double audioLevel;
   const VoiceSessionListening({required this.audioLevel});
 }
 
-/// Speech detected, started accumulating audio
+/// Speech detected, started accumulating audio.
+/// v2.1-1: maps from `VoiceEvent.vad { type = VOICE_START }`.
 class VoiceSessionSpeechStarted extends VoiceSessionEvent {
   const VoiceSessionSpeechStarted();
 }
 
-/// Speech ended, processing audio
+/// Speech ended, processing audio.
+/// v2.1-1: maps from `VoiceEvent.vad { type = VOICE_END_OF_UTTERANCE }`.
 class VoiceSessionProcessing extends VoiceSessionEvent {
   const VoiceSessionProcessing();
 }
 
-/// Got transcription from STT
+/// Got transcription from STT.
+/// v2.1-1: maps from `VoiceEvent.userSaid { text }`.
 class VoiceSessionTranscribed extends VoiceSessionEvent {
   final String text;
   const VoiceSessionTranscribed({required this.text});
 }
 
-/// Got response from LLM
+/// Got response from LLM.
+/// v2.1-1: maps from `VoiceEvent.assistantToken { text }`.
 class VoiceSessionResponded extends VoiceSessionEvent {
   final String text;
   const VoiceSessionResponded({required this.text});
 }
 
-/// Playing TTS audio
+/// Playing TTS audio.
+/// v2.1-1: maps from `VoiceEvent.audio { pcm, ... }`.
 class VoiceSessionSpeaking extends VoiceSessionEvent {
   const VoiceSessionSpeaking();
 }
 
-/// Complete turn result
+/// Complete turn result.
+///
+/// v2.1-1: **CANNOT be derived** from a single `VoiceEvent` — this case
+/// aggregates multiple proto events across a turn. Callers needing
+/// turn-level aggregation should buffer proto events themselves.
 class VoiceSessionTurnCompleted extends VoiceSessionEvent {
   final String transcript;
   final String response;
@@ -85,12 +133,12 @@ class VoiceSessionTurnCompleted extends VoiceSessionEvent {
   });
 }
 
-/// Session stopped
+/// Session stopped. v2.1-1: maps from `VoiceEvent.state { current = STOPPED }`.
 class VoiceSessionStopped extends VoiceSessionEvent {
   const VoiceSessionStopped();
 }
 
-/// Error occurred
+/// Error occurred. v2.1-1: maps from `VoiceEvent.error { message }`.
 class VoiceSessionError extends VoiceSessionEvent {
   final String message;
   const VoiceSessionError({required this.message});
