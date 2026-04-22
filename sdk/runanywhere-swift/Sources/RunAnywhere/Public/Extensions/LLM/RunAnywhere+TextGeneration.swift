@@ -6,14 +6,10 @@
 //  Calls C++ directly via CppBridge.LLM for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
-//  GAP 08 Phase 24 — Swift sweep target.
-//
-//  This file contains a `ThinkingContentParser` block that the spec
-//  schedules for relocation to the C ABI as `rac_llm_split_thinking_tokens()`.
-//  Once the C ABI lands and rounds the same fixture inputs to the same
-//  outputs as the Swift parser, this block becomes a thin Swift trampoline.
-//  Tracked for the follow-up cleanup PR after Wave C adapters have soaked
-//  in production. See docs/gap08_final_gate_report.md.
+//  v2 close-out Phase 9: the ~80-LOC `ThinkingContentParser` enum that
+//  used to live at the bottom of this file was deleted; the public
+//  surface now lives in `CppBridge+LLMThinking.swift` and delegates to
+//  the `rac_llm_*` C ABI for byte-equivalent behavior across all SDKs.
 //
 
 import CRACommons
@@ -335,87 +331,13 @@ private final class LLMStreamCallbackContext: @unchecked Sendable {
     }
 }
 
-// MARK: - Thinking Content Parser
-
-public enum ThinkingContentParser {
-    /// Extracts `<think>...</think>` content from generated text.
-    /// - NOTE: Only the first `<think>` block is extracted; additional blocks are left inline in the response text.
-    /// - Returns: Tuple of (responseText, thinkingContent). If no tags found, responseText = original text, thinkingContent = nil.
-    public static func extract(from text: String) -> (text: String, thinking: String?) {
-        guard let startRange = text.range(of: "<think>"),
-              let endRange = text.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound else {
-            return (text: text, thinking: nil)
-        }
-        let thinkingContent = String(text[startRange.upperBound..<endRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        // Include any text before <think> and after </think>
-        let textBefore = String(text[..<startRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let textAfter = String(text[endRange.upperBound...])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let responseText = [textBefore, textAfter]
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-        return (
-            text: responseText,
-            thinking: thinkingContent.isEmpty ? nil : thinkingContent
-        )
-    }
-
-    /// Apportions the total completion token count between the thinking segment
-    /// and the visible response segment using character-length ratios.
-    ///
-    /// The C++ layer reports only a total `completion_tokens` count — it does
-    /// not break it down by segment. Rather than guessing with an independent
-    /// word-count heuristic (which would not sum to the reported total), we
-    /// split the known total proportionally by character length. This keeps
-    /// `thinkingTokens + responseTokens == totalCompletionTokens`.
-    ///
-    /// - Returns: `(thinkingTokens, responseTokens)`. If there is no thinking
-    ///   content, `thinkingTokens` is 0 and all tokens are attributed to the
-    ///   response.
-    public static func splitTokens(
-        totalCompletionTokens: Int,
-        responseText: String,
-        thinkingContent: String?
-    ) -> (thinkingTokens: Int, responseTokens: Int) {
-        guard let thinking = thinkingContent, !thinking.isEmpty else {
-            return (0, totalCompletionTokens)
-        }
-        let thinkingChars = thinking.count
-        let responseChars = responseText.count
-        let totalChars = thinkingChars + responseChars
-        guard totalChars > 0, totalCompletionTokens > 0 else {
-            return (0, totalCompletionTokens)
-        }
-        let thinkingTokens = Int(
-            (Double(thinkingChars) / Double(totalChars)) * Double(totalCompletionTokens)
-        )
-        let clamped = max(0, min(thinkingTokens, totalCompletionTokens))
-        return (clamped, totalCompletionTokens - clamped)
-    }
-
-    /// Strips all `<think>...</think>` blocks (including multiple blocks) and trailing unclosed
-    /// `<think>` tags from the given text, returning only the response portion.
-    /// - Parameter text: Raw text potentially containing thinking blocks.
-    /// - Returns: Text with all thinking blocks removed, trimmed of surrounding whitespace.
-    public static func strip(from text: String) -> String {
-        var result = text
-        // Remove all complete <think>...</think> blocks
-        while let startRange = result.range(of: "<think>"),
-              let endRange = result.range(of: "</think>"),
-              startRange.upperBound <= endRange.lowerBound {
-            result.removeSubrange(startRange.lowerBound..<endRange.upperBound)
-        }
-        // Drop any trailing unclosed <think> ... (still streaming)
-        if let trailingStart = result.range(of: "<think>", options: .backwards),
-           result.range(of: "</think>", range: trailingStart.upperBound..<result.endIndex) == nil {
-            result = String(result[result.startIndex..<trailingStart.lowerBound])
-        }
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
+// v2 close-out Phase 9 (P2-4): the in-Swift `ThinkingContentParser` enum
+// was deleted from this file (~80 LOC). The replacement, with the same
+// public API and byte-equivalent behavior, lives in
+// `Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+LLMThinking.swift`
+// and delegates to the `rac_llm_*` C ABI in
+// `rac/features/llm/rac_llm_thinking.h` so all 5 SDKs render
+// `<think>...</think>` blocks identically.
 
 // MARK: - Streaming Metrics Collector
 
