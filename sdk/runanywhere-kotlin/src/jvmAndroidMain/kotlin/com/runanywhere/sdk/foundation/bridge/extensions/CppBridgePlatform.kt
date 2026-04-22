@@ -1129,36 +1129,6 @@ object CppBridgePlatform {
     @JvmStatic
     external fun nativeOnStreamingToken(token: String, isFinal: Boolean): Boolean
 
-    /**
-     * Native method to check if platform LLM is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_llm_available()
-     */
-    @JvmStatic
-    external fun nativeIsLLMAvailable(): Int
-
-    /**
-     * Native method to check if platform TTS is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_tts_available()
-     */
-    @JvmStatic
-    external fun nativeIsTTSAvailable(): Int
-
-    /**
-     * Native method to check if platform STT is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_stt_available()
-     */
-    @JvmStatic
-    external fun nativeIsSTTAvailable(): Int
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================

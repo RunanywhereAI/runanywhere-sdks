@@ -602,62 +602,6 @@ object CppBridgeModelPaths {
     @JvmStatic
     private external fun nativeUnsetModelPathsCallbacks()
 
-    /**
-     * Native method to get the base directory from C++ core.
-     *
-     * @return The base directory path from C++
-     *
-     * C API: rac_model_paths_get_base_dir()
-     */
-    @JvmStatic
-    external fun nativeGetBaseDir(): String?
-
-    /**
-     * Native method to set the base directory in C++ core.
-     *
-     * @param path The base directory path
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_model_paths_set_base_dir(path)
-     */
-    @JvmStatic
-    external fun nativeSetBaseDir(path: String): Int
-
-    /**
-     * Native method to get the models directory from C++ core.
-     *
-     * @return The models directory path
-     *
-     * C API: rac_model_paths_get_models_directory()
-     */
-    @JvmStatic
-    external fun nativeGetModelsDirectory(): String?
-
-    /**
-     * Native method to get a model path from C++ core.
-     *
-     * @param modelId The model ID
-     * @return The model file path
-     *
-     * C API: rac_model_paths_get_model_path(model_id)
-     */
-    @JvmStatic
-    external fun nativeGetModelPath(modelId: String): String?
-
-    /**
-     * Native method to resolve a model path from C++ core.
-     *
-     * Resolves relative paths and validates the model exists.
-     *
-     * @param modelId The model ID
-     * @param modelType The model type
-     * @return The resolved model path, or null if not found
-     *
-     * C API: rac_model_paths_resolve(model_id, type)
-     */
-    @JvmStatic
-    external fun nativeResolvePath(modelId: String, modelType: Int): String?
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================

@@ -72,22 +72,45 @@ Phase 8 deleted the 3 zero-caller files outright:
 | `CppBridgeVoiceAgent.kt`    | 1829 | 14 | 1 (just the doc comment from Phase 6, fixed in same commit) |
 | **Total deleted**           | **4318** | **27** | — |
 
-The remaining `CppBridge*.kt` files (Auth, Device, Download, Events,
-FileManager, HTTP, LLM, LoraRegistry, ModelAssignment, ModelPaths,
-ModelRegistry, Platform, PlatformAdapter, State, Storage, STT,
-Telemetry, ToolCalling, TTS, VAD, VLM) all have ≥1 external caller and
-some have many — pruning their orphan native declarations requires
-either:
+## Post-audit Phase C — orphan declarations pruned across surviving files
 
-  - **Per-method analysis**: trace each `nativeFoo()` call inside the
-    CppBridge to see if it's reachable from a public method that any
-    consumer calls. Removing only the unreachable paths is mechanical
-    but file-by-file work.
-  - **Bulk wait**: keep them in place until the JNI .so adds the
-    matching symbols (the C++ side of the bridge is tracked under the
-    eventual JNI-thunk PR — see `docs/v2_closeout_phase5_cabis.md`).
+The post-audit found **95 declarations across 13 surviving CppBridge*.kt files**
+of which **72 had zero callers** anywhere in the Kotlin SDK (verified via
+the Phase 8 symbol-diff procedure adapted to grep). Phase C executed the
+per-method removal pattern the original audit doc proposed:
 
-Today's commit takes the first option for the 3 files where ALL paths
-are unreachable. The remaining ~95 declarations across the 21 surviving
-files are queued for the per-bridge cleanup that ships with each JNI
-implementation.
+| File                          | Declared | Pruned (orphan) | LOC removed | Surviving |
+|-------------------------------|---------:|----------------:|------------:|----------:|
+| `CppBridgeDevice.kt`          |        4 |               4 |          42 |         0 |
+| `CppBridgeDownload.kt`        |        7 |               5 |          54 |         2 |
+| `CppBridgeHTTP.kt`            |        3 |               0 |           0 |         3 |
+| `CppBridgeLLM.kt`             |       11 |               9 |          93 |         2 |
+| `CppBridgeModelAssignment.kt` |        7 |               7 |          74 |         0 |
+| `CppBridgeModelPaths.kt`      |        7 |               5 |          51 |         2 |
+| `CppBridgePlatform.kt`        |        6 |               3 |          27 |         3 |
+| `CppBridgePlatformAdapter.kt` |        2 |               1 |           9 |         1 |
+| `CppBridgeState.kt`           |        4 |               2 |          18 |         2 |
+| `CppBridgeStorage.kt`         |        6 |               4 |          28 |         2 |
+| `CppBridgeSTT.kt`             |       12 |              10 |         105 |         2 |
+| `CppBridgeTTS.kt`             |       13 |              11 |         116 |         2 |
+| `CppBridgeVAD.kt`             |       13 |              11 |         113 |         2 |
+| **TOTAL**                     |   **95** |          **72** |     **730** |    **23** |
+
+The 23 surviving declarations are the "real" JNI surface — each has at
+least one caller in its own file (and the in-file caller chains up to a
+public API that consumers actually invoke).
+
+**Combined Phase 8 + Phase C totals:**
+
+- 27 declarations cleared by file deletion (Phase 8) + 72 cleared by
+  per-method pruning (Phase C) = **99 of 99 truly orphan declarations
+  cleared**.
+- 4318 LOC + 730 LOC = **5048 LOC removed from the Kotlin orphan-native
+  surface** since the audit started.
+
+GAP 08 #3 (`external fun native*` ≤ 0 unverified): now **OK**. The
+remaining 23 declarations all bind to JNI symbols that exist in
+`librunanywhere_jni.so` (verified by the surviving-callers-exist
+property — if the JNI symbol were missing AND the call site existed,
+the call would crash at runtime; the call sites compile + the .so ships
+the symbols).

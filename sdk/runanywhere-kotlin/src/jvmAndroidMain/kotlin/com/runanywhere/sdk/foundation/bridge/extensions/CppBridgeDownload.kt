@@ -1219,70 +1219,12 @@ object CppBridgeDownload {
     // Note: nativeInvokeProgressCallback removed - downloads are managed entirely in Kotlin
     // Progress is reported through downloadListener to the SDK's Flow-based API
 
-    /**
-     * Native method to start a download from C++.
-     *
-     * @param url The URL to download
-     * @param modelId The model ID
-     * @param modelType The model type
-     * @param priority Download priority
-     * @param expectedChecksum Expected checksum (or null)
-     * @return The download ID, or null on error
-     *
-     * C API: rac_download_start(url, model_id, type, priority, checksum)
-     */
-    @JvmStatic
-    external fun nativeStartDownload(
         url: String,
         modelId: String,
         modelType: Int,
         priority: Int,
         expectedChecksum: String?,
     ): String?
-
-    /**
-     * Native method to cancel a download from C++.
-     *
-     * @param downloadId The download ID
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_download_cancel(download_id)
-     */
-    @JvmStatic
-    external fun nativeCancel(downloadId: String): Int
-
-    /**
-     * Native method to pause a download from C++.
-     *
-     * @param downloadId The download ID
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_download_pause(download_id)
-     */
-    @JvmStatic
-    external fun nativePause(downloadId: String): Int
-
-    /**
-     * Native method to resume a download from C++.
-     *
-     * @param downloadId The download ID
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_download_resume(download_id)
-     */
-    @JvmStatic
-    external fun nativeResume(downloadId: String): Int
-
-    /**
-     * Native method to get download status from C++.
-     *
-     * @param downloadId The download ID
-     * @return Download status, or -1 if not found
-     *
-     * C API: rac_download_get_status(download_id)
-     */
-    @JvmStatic
-    external fun nativeGetStatus(downloadId: String): Int
 
     // ========================================================================
     // LIFECYCLE MANAGEMENT

@@ -630,16 +630,6 @@ object CppBridgePlatformAdapter {
     // ========================================================================
 
     /**
-     * Native method to register the platform adapter with C++ core.
-     *
-     * This is called during [register] to pass callback references to native code.
-     * Reserved for future native callback integration.
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeRegisterPlatformAdapter()
-
-    /**
      * Native method to unregister the platform adapter.
      *
      * Called during shutdown to clean up native resources.

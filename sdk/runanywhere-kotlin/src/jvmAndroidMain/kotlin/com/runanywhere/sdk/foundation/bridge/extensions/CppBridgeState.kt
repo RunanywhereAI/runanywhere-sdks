@@ -579,26 +579,6 @@ object CppBridgeState {
     @JvmStatic
     private external fun nativeUnsetStateCallbacks()
 
-    /**
-     * Native method to get the C++ SDK state.
-     *
-     * @return The C++ SDK state
-     *
-     * C API: rac_get_state()
-     */
-    @JvmStatic
-    external fun nativeGetState(): Int
-
-    /**
-     * Native method to check if C++ SDK is initialized.
-     *
-     * @return true if initialized, false otherwise
-     *
-     * C API: rac_is_initialized()
-     */
-    @JvmStatic
-    external fun nativeIsInitialized(): Boolean
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================

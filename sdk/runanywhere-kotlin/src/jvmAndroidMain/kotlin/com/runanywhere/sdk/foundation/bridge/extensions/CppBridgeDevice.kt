@@ -904,52 +904,6 @@ object CppBridgeDevice {
     // JNI NATIVE DECLARATIONS
     // ========================================================================
 
-    /**
-     * Native method to set the device callbacks with C++ core.
-     *
-     * Registers [getDeviceInfoCallback], [getDeviceIdCallback],
-     * [isDeviceRegisteredCallback], [setRegistrationStatusCallback],
-     * and [httpPostCallback] with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_device_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetDeviceCallbacks()
-
-    /**
-     * Native method to unset the device callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_device_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetDeviceCallbacks()
-
-    /**
-     * Native method to trigger device registration with backend.
-     *
-     * @return 0 on success, error code on failure
-     *
-     * C API: rac_device_register()
-     */
-    @JvmStatic
-    external fun nativeRegisterDevice(): Int
-
-    /**
-     * Native method to check if device needs re-registration.
-     *
-     * @return true if registration is needed
-     *
-     * C API: rac_device_needs_registration()
-     */
-    @JvmStatic
-    external fun nativeNeedsRegistration(): Boolean
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================

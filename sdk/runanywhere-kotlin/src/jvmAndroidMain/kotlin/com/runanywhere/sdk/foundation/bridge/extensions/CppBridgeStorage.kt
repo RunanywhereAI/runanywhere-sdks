@@ -747,38 +747,6 @@ object CppBridgeStorage {
     @JvmStatic
     private external fun nativeUnsetStorageCallbacks()
 
-    /**
-     * Native method to store data in C++ storage.
-     *
-     * C API: rac_storage_store(namespace, key, data, size, type)
-     */
-    @JvmStatic
-    external fun nativeStore(namespace: String, key: String, data: ByteArray, storageType: Int): Int
-
-    /**
-     * Native method to retrieve data from C++ storage.
-     *
-     * C API: rac_storage_retrieve(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeRetrieve(namespace: String, key: String, storageType: Int): ByteArray?
-
-    /**
-     * Native method to delete data from C++ storage.
-     *
-     * C API: rac_storage_delete(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeDelete(namespace: String, key: String, storageType: Int): Int
-
-    /**
-     * Native method to check if data exists in C++ storage.
-     *
-     * C API: rac_storage_has(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeHas(namespace: String, key: String, storageType: Int): Boolean
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================
