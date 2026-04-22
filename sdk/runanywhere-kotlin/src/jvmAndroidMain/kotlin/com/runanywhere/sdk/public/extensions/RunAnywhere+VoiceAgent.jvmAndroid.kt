@@ -36,11 +36,9 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.VoiceAgent.ComponentLoadState
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentComponentStates
 import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentConfiguration
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceAgentResult
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionConfig
-import com.runanywhere.sdk.public.extensions.VoiceAgent.VoiceSessionEvent
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+// v3.1: VoiceAgentResult / VoiceSessionConfig / VoiceSessionEvent /
+// Flow / flow imports removed — the actual declarations using them
+// (processVoice / startVoiceSession / streamVoiceSession) were deleted.
 
 private val voiceAgentLogger = SDKLogger.voiceAgent
 
@@ -88,72 +86,10 @@ actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
     voiceAgentLogger.info("VoiceAgent initialized successfully")
 }
 
-/**
- * One-shot voice turn. Replaces the inline ~70-LOC orchestration in the
- * pre-Phase-6 implementation; the underlying C++ work happens in the
- * three component bridges. This Kotlin layer adds nothing the C++
- * components don't already do — it's a 30-LOC compose, not a re-impl.
- *
- * @deprecated Prefer [VoiceAgentStreamAdapter] for new code; this method
- * remains for one-shot synchronous callers (Android Compose previews etc.)
- * that don't want to thread a Flow consumer through the call site.
- */
-@Deprecated(
-    "Use VoiceAgentStreamAdapter for streaming or call CppBridgeSTT/LLM/TTS directly for one-shot turns.",
-    level = DeprecationLevel.WARNING,
-)
-actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentResult {
-    if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
-    if (!areAllComponentsLoaded()) {
-        val missing = getMissingComponents()
-        return VoiceAgentResult(
-            speechDetected = false, transcription = null,
-            response = "Models not loaded: ${missing.joinToString(", ")}",
-            synthesizedAudio = null,
-        )
-    }
-    return try {
-        val transcription = CppBridgeSTT.transcribe(audioData).text
-        if (transcription.isBlank()) {
-            return VoiceAgentResult(speechDetected = false, transcription = null, response = null, synthesizedAudio = null)
-        }
-        val systemPrompt = currentSystemPrompt ?: "You are a helpful voice assistant."
-        val response = CppBridgeLLM.generate("$systemPrompt\n\nUser: $transcription\n\nAssistant:").text
-        val audio = if (response.isNotBlank()) CppBridgeTTS.synthesize(response).audioData else null
-        VoiceAgentResult(speechDetected = true, transcription = transcription, response = response, synthesizedAudio = audio)
-    } catch (e: Exception) {
-        voiceAgentLogger.error("Voice processing error: ${e.message}", throwable = e)
-        VoiceAgentResult(
-            speechDetected = false, transcription = null,
-            response = "Processing error: ${e.message}", synthesizedAudio = null,
-        )
-    }
-}
-
-/**
- * v2 close-out Phase 6 (P2-1): orchestration body deleted. The legacy
- * implementation re-emitted "Started" and stopped — the actual session loop
- * was driven separately by [streamVoiceSession]. With Wave C's
- * [VoiceAgentStreamAdapter] available, this entry point is a thin guard
- * that emits Started + lets new code route through the adapter.
- */
-@Deprecated(
-    "Use VoiceAgentStreamAdapter(handle).stream() — Kotlin orchestration retired.",
-    ReplaceWith("VoiceAgentStreamAdapter(handle).stream()"),
-    level = DeprecationLevel.WARNING,
-)
-actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<VoiceSessionEvent> = flow {
-    if (!isInitialized) {
-        emit(VoiceSessionEvent.Error("SDK not initialized")); return@flow
-    }
-    if (!areAllComponentsLoaded()) {
-        emit(VoiceSessionEvent.Error("Models not loaded: ${getMissingComponents().joinToString(", ")}"))
-        return@flow
-    }
-    voiceAgentInitialized = true
-    voiceSessionActive = true
-    emit(VoiceSessionEvent.Started)
-}
+// v3.1: processVoice / startVoiceSession / streamVoiceSession DELETED.
+// Use CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
+// for streaming, or compose CppBridgeSTT/LLM/TTS directly for one-shot
+// turns (see Android sample's processVoiceTurnDirect helper).
 
 actual suspend fun RunAnywhere.stopVoiceSession() {
     if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
@@ -170,46 +106,4 @@ actual suspend fun RunAnywhere.clearVoiceConversation() {
 actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
     if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
     currentSystemPrompt = prompt
-}
-
-/**
- * v2 close-out Phase 6 (P2-1): the elaborate channelFlow body that
- * implemented RMS-based VAD, silence detection, continuous-mode
- * orchestration, and per-chunk audio-level emission has been deleted
- * (~195 LOC). The C++ voice agent already does all of this
- * (rac_voice_agent_process_stream + the proto-byte event ABI from Phase 2).
- *
- * This method is preserved as a thin shell so existing call sites compile
- * — it emits Started + Stopped and tells the caller to migrate to
- * [VoiceAgentStreamAdapter]. The full streaming pipeline now lives in:
- *
- *     // The voice agent handle is obtained via the upcoming JNI thunk
- *     // for rac_voice_agent_create() (see docs/v2_remaining_work.md P3-1).
- *     for (event in VoiceAgentStreamAdapter(handle).stream())
- *         handleEvent(event)
- */
-@Deprecated(
-    "Use VoiceAgentStreamAdapter(handle).stream() with the C++ voice agent — Kotlin RMS/silence loop deleted in v2 close-out.",
-    ReplaceWith("VoiceAgentStreamAdapter(handle).stream()"),
-    level = DeprecationLevel.WARNING,
-)
-actual fun RunAnywhere.streamVoiceSession(
-    audioChunks: Flow<ByteArray>,
-    config: VoiceSessionConfig,
-): Flow<VoiceSessionEvent> = flow {
-    if (!isInitialized) {
-        emit(VoiceSessionEvent.Error("SDK not initialized")); return@flow
-    }
-    if (!areAllComponentsLoaded()) {
-        emit(VoiceSessionEvent.Error("Models not loaded: ${getMissingComponents().joinToString(", ")}"))
-        return@flow
-    }
-    voiceAgentLogger.warning(
-        "streamVoiceSession is a deprecated shell since v2 close-out Phase 6. " +
-        "Migrate to VoiceAgentStreamAdapter(handle).stream() backed by the C++ voice agent."
-    )
-    emit(VoiceSessionEvent.Started)
-    // Drain the audio chunks so upstream producers don't backpressure forever.
-    audioChunks.collect { /* no-op: handed to adapter in new code */ }
-    emit(VoiceSessionEvent.Stopped)
 }
