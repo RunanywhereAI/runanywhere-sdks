@@ -101,7 +101,7 @@ benchmark). The v3 cut-over (`git rm service_registry.cpp` +
 | `VoiceSessionEvent` schema drift | OPEN — needs v2.1-1 |
 | v3 cut-over needs 88-call-site repoint | OPEN — Tier 3 prerequisite |
 | ~~Per-SDK total-LOC criteria unmeasured~~ | **CLOSED** by Item 1 of v2.1 quick-wins PR — see "Per-SDK LOC measurement" section below. Headline: Kotlin 60% over target (PARTIAL), Swift+Dart at target (OK). |
-| `p50 ≤ 1ms` claim unproven | OPEN — needs v2.1-3 |
+| `p50 ≤ 1ms` claim unproven | PARTIAL — harness DONE in v2.1 quick-wins Item 3 (`tests/streaming/perf_bench/` with C++ producer + 4-language consumer scaffolds + Python aggregator); per-SDK runner integration is the v2.1-2 follow-up. C++ producer measures 362 ns/event locally. |
 | CI environment drift | OPEN — pin Homebrew/NDK/Flutter versions |
 | ~~Sample apps fail to build on v3 escalation~~ | **MITIGATED** by Phase B |
 | ~~Kotlin orphan native UnsatisfiedLinkError~~ | **CLOSED** by Phase C (99/99 cleared) |

@@ -33,3 +33,25 @@ file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/tests/streaming/fixtures")
 
 add_test(NAME parity_test_cpp_check
          COMMAND parity_test_cpp --check "${_GOLDEN_PATH}")
+
+# =============================================================================
+# perf_bench/ — GAP 09 #8 latency measurement harness (v2.1 quick-wins Item 3)
+#
+# perf_producer.cpp emits N=10000 timestamped VoiceEvent frames to a binary
+# input file that per-SDK consumers (perf_bench.{swift,kt,dart,ts}) read,
+# decode, and record per-event latency for. compute_percentiles.py
+# aggregates the per-SDK logs into p50/p95/p99 and asserts p50 < 1ms.
+#
+# Today this just builds the producer; per-SDK runner integration is the
+# v2.1-2 follow-up (XCTest, JUnit, flutter test, Jest, Vitest with native
+# library loading).
+# =============================================================================
+
+add_executable(perf_producer perf_bench/perf_producer.cpp)
+target_include_directories(perf_producer PRIVATE
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+)
+target_link_libraries(perf_producer PRIVATE rac_commons)
+target_compile_features(perf_producer PRIVATE cxx_std_17)
+set_target_properties(perf_producer PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/streaming/perf_bench")
