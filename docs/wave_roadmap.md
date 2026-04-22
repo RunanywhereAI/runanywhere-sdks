@@ -1,13 +1,20 @@
-# Post-Wave-A roadmap
+# v2 architecture roadmap
 
-_Last updated: at the close of Wave A (GAP 03 + GAP 04), branch `feat/v2-gap03-gap04`._
+_Last updated: at the close of Wave A (GAP 03 + GAP 04). All work happens on the **single long-lived branch** [`feat/v2-architecture`](https://github.com/RunanywhereAI/runanywhere-sdks/tree/feat/v2-architecture) tracked by **PR #494**._
 
-The seven-gap migration on `runanywhere-sdks-main` is structured as five waves. Two are done; four remain. This doc captures the **scope, dependency, and rationale** for each remaining wave at a level deep enough to start a detailed plan; full per-phase plans get written one wave at a time as the prior wave merges.
+The seven-gap migration on `runanywhere-sdks-main` is structured as five waves. **Two waves done, three remain (one optional).** This doc captures the **scope, dependency, and rationale** for each remaining wave at a level deep enough to start a detailed plan; full per-phase plans get written one wave at a time as the prior wave merges.
+
+## Branch + PR contract
+
+- **Single branch.** Every wave commits directly to `feat/v2-architecture`. Do **not** create per-wave sub-branches (`feat/v2-gap0X-*`); the previous experiment with `feat/v2-gap01-gap02` + `feat/v2-gap03-gap04` was consolidated into one branch on review request so the diff stays in one place.
+- **Single PR.** [PR #494](https://github.com/RunanywhereAI/runanywhere-sdks/pull/494) stays open and grows commit-by-commit as each wave lands. Reviewers see the cumulative diff; per-wave breakdown is preserved by commit messages + per-wave final-gate reports under `docs/gap0X_final_gate_report.md`.
+- **Per-wave milestone discipline.** Each wave finishes with (a) its `docs/gap0X_final_gate_report.md` checked in and (b) the PR description updated with a one-line entry under "What's in this PR today". No wave merges to `main` independently — the whole migration ships when GAP 01-08 are all done (GAP 05 / DAG runtime is opt-in).
+- **Commit cadence.** One commit per phase (the discipline established in Wave A). Commit messages follow `feat(gapXX-phaseN): <subject>` so reviewers can use `git log --grep "gap0X"` to pull out a single gap's history.
 
 | Wave | Gaps                                  | Status        | Estimate (single eng) |
 |------|---------------------------------------|---------------|-----------------------|
-| Done | GAP 01 + GAP 02                       | merged        | (history)             |
-| A    | GAP 03 + GAP 04                       | this branch   | ~4–6 wk               |
+| Done | GAP 01 + GAP 02                       | merged into branch | (history)        |
+| A    | GAP 03 + GAP 04                       | merged into branch | ~4–6 wk          |
 | **B**| **GAP 07 + GAP 06**                   | next          | ~2–4 wk               |
 | **C**| **GAP 09**                            | after B       | ~3–4 wk               |
 | **D**| **GAP 08**                            | after C       | ~6–10 wk (parallel)   |
