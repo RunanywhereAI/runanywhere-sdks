@@ -193,10 +193,7 @@ public struct VoiceAgentConfiguration: Sendable {
 /// `VoiceAgentStreamAdapter` + proto events and deletes this enum
 /// along with VoiceSessionHandle. Keeping it as a deprecated derived
 /// view (unchanged since v2.1-1) is the intermediate-state commitment.
-@available(*, deprecated,
-    message: "Use RAVoiceEvent via VoiceAgentStreamAdapter.stream(). " +
-             "VoiceSessionEvent is a derived view — see " +
-             "docs/migrations/VoiceSessionEvent.md")
+@available(*, deprecated, message: "Use RAVoiceEvent via VoiceAgentStreamAdapter.stream(). VoiceSessionEvent is a derived view — see docs/migrations/VoiceSessionEvent.md")
 public enum VoiceSessionEvent: Sendable {
     /// Session started and ready
     case started

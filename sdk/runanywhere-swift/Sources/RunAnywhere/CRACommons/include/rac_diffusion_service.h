@@ -11,7 +11,7 @@
 #define RAC_DIFFUSION_SERVICE_H
 
 #include "rac_error.h"
-#include "diffusion/rac_diffusion_types.h"
+#include "rac_diffusion_types.h"
 
 #ifdef __cplusplus
 extern "C" {

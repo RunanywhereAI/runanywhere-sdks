@@ -13,7 +13,7 @@
 #define RAC_VAD_SERVICE_H
 
 #include "rac_error.h"
-#include "vad/rac_vad_types.h"
+#include "rac_vad_types.h"
 
 #ifdef __cplusplus
 extern "C" {

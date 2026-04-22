@@ -115,6 +115,15 @@ let package = Package(
         // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift
         // (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md for rationale)
         .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.27.0"),
+        //
+        // grpc-swift intentionally NOT wired. The *.grpc.swift files under
+        // Sources/RunAnywhere/Generated/ are excluded from the RunAnywhere
+        // target below — gRPC client stubs were emitted by the codegen but
+        // are not used at runtime. Frontends consume proto events via the
+        // hand-written VoiceAgentStreamAdapter that wraps the in-process C
+        // callback (see sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/
+        // VoiceAgentStreamAdapter.swift). v3.1 audit fix.
+        //
     ],
     targets: [
         // =================================================================
@@ -171,7 +180,18 @@ let package = Package(
                 "RACommonsBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
-            exclude: ["CRACommons"],
+            exclude: [
+                "CRACommons",
+                // v3.1 audit fix: *.grpc.swift imports GRPCCore/GRPCProtobuf and
+                // requires macOS 15 / iOS 18; our minimum platforms are macOS 14 /
+                // iOS 17. The hand-written VoiceAgentStreamAdapter provides the
+                // idiomatic AsyncStream path these stubs were supposed to expose,
+                // so excluding them is safe. If network gRPC is ever needed, bump
+                // platforms + wire grpc-swift v2 in dependencies above.
+                "Generated/voice_agent_service.grpc.swift",
+                "Generated/llm_service.grpc.swift",
+                "Generated/download_service.grpc.swift",
+            ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ],

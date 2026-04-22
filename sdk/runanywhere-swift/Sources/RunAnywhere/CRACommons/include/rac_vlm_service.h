@@ -11,7 +11,7 @@
 #define RAC_VLM_SERVICE_H
 
 #include "rac_error.h"
-#include "vlm/rac_vlm_types.h"
+#include "rac_vlm_types.h"
 
 #ifdef __cplusplus
 extern "C" {

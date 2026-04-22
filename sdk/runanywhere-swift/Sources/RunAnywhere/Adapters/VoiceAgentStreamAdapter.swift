@@ -16,6 +16,7 @@
 //  Cancellation: standard `for-await break` cancels the underlying
 //  AsyncStream which deregisters the C callback via `onTermination`.
 
+import CRACommons
 import Foundation
 import SwiftProtobuf
 

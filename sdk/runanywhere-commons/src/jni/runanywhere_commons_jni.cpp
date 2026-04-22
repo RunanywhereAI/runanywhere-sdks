@@ -128,7 +128,11 @@ static JNIEnv* getJNIEnv() {
     int status = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (status == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        // v3.1 (audit fix): use reinterpret_cast<void**> for cross-platform
+        // compatibility. Android NDK's jni.h expects JNIEnv**; macOS Temurin
+        // jni.h expects void**. The reinterpret_cast form compiles cleanly
+        // on both (JNIEnv** and void** are layout-compatible pointer types).
+        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
             return nullptr;
         }
     }
@@ -751,7 +755,7 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("Failed to attach thread for streaming callback");
@@ -2494,10 +2498,12 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
 
     JNIEnv* env = nullptr;
     bool did_attach = false;
-    jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    jint get_result = g_model_assignment_state.jvm->GetEnv(
+        reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (get_result == JNI_EDETACHED) {
-        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+        if (g_model_assignment_state.jvm->AttachCurrentThread(
+                reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
             did_attach = true;
         } else {
             LOGe("model_assignment_http_get_callback: failed to attach thread");
@@ -4221,7 +4227,7 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("VLM: Failed to attach thread for streaming callback");

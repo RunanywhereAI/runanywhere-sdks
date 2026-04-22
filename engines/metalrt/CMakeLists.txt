@@ -38,7 +38,7 @@ set(METALRT_WRAPPER_SOURCES
 add_library(rac_backend_metalrt OBJECT ${METALRT_WRAPPER_SOURCES})
 
 target_include_directories(rac_backend_metalrt PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

@@ -12,7 +12,7 @@
 
 #include "rac_benchmark.h"
 #include "rac_error.h"
-#include "llm/rac_llm_types.h"
+#include "rac_llm_types.h"
 
 #ifdef __cplusplus
 extern "C" {

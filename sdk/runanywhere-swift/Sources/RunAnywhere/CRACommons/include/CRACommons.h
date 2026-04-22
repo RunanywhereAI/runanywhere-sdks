@@ -43,6 +43,7 @@
 #include "rac_llm_analytics.h"
 #include "rac_llm_events.h"
 #include "rac_llm_structured_output.h"
+#include "rac_llm_thinking.h"
 #include "rac_tool_calling.h"
 
 // STT (Speech-to-Text)
@@ -88,6 +89,7 @@
 
 // Voice Agent
 #include "rac_voice_agent.h"
+#include "rac_voice_event_abi.h"
 
 // RAG (Retrieval-Augmented Generation)
 #include "rac_rag_pipeline.h"
