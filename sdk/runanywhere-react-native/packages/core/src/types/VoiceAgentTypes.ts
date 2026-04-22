@@ -93,7 +93,23 @@ export type VoiceSessionEventType =
   | 'ended';
 
 /**
- * Voice session event
+ * Voice session event.
+ *
+ * **v2.1-1 deprecation (GAP 09 #6)**: This interface is now a *derived
+ * view* over the canonical `VoiceEvent` proto (ts-proto codegen from
+ * `idl/voice_events.proto`). The codegen'd type is the single source
+ * of truth; this UX-shaped interface is kept as a backward-compat
+ * shim.
+ *
+ * New code should subscribe to `VoiceAgentStreamAdapter.stream()` and
+ * switch on `event.payload.oneofKind` directly.
+ *
+ * See `docs/migrations/VoiceSessionEvent.md` for the 10-case →
+ * 8-payload mapping table, dropout list, and migration guide.
+ *
+ * @deprecated v2.1-1: Use the codegen'd `VoiceEvent` proto via
+ *   `VoiceAgentStreamAdapter.stream()`. This UX-shaped interface is
+ *   a derived view — see docs/migrations/VoiceSessionEvent.md.
  */
 export interface VoiceSessionEvent {
   type: VoiceSessionEventType;
@@ -104,6 +120,30 @@ export interface VoiceSessionEvent {
     audio?: string;
     error?: string;
   };
+}
+
+/**
+ * Derive a {@link VoiceSessionEvent} from the canonical `VoiceEvent`
+ * (proto3 via ts-proto, generated from `idl/voice_events.proto`).
+ *
+ * Returns `null` for proto events that don't have a UX-visible
+ * counterpart — see `docs/migrations/VoiceSessionEvent.md` for the
+ * full dropout list (metrics, interrupted, low-level VAD, state=thinking).
+ *
+ * **v2.1-1 SCAFFOLD**: parameter type is `unknown` (not `VoiceEvent`)
+ * because importing the generated proto type here would couple this
+ * public-API file to the codegen output layout. The v2.1-1d per-SDK
+ * cleanup PR tightens the parameter type when it implements the mapper
+ * body. Today this returns null for every input; new code should use
+ * the proto stream directly via `VoiceAgentStreamAdapter.stream()`.
+ *
+ * @deprecated v2.1-1: Use the codegen'd `VoiceEvent` proto directly.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function voiceSessionEventFromProto(event: unknown): VoiceSessionEvent | null {
+  // TODO(v2.1-1d): implement per the Swift template at
+  // sdk/runanywhere-swift/.../VoiceAgentTypes.swift
+  return null;
 }
 
 /**
@@ -158,7 +198,24 @@ export interface VoiceSessionConfig {
 }
 
 /**
- * Voice session events (matches Swift VoiceSessionEvent)
+ * Voice session events (matches Swift VoiceSessionEvent).
+ *
+ * @deprecated v2.1-1: derived view over the canonical `VoiceEvent`
+ *   proto. Use `VoiceAgentStreamAdapter.stream()` and switch on
+ *   `event.payload.oneofKind` directly. See
+ *   `docs/migrations/VoiceSessionEvent.md`.
+ *
+ * Per-kind proto mapping (closes GAP 09 #6):
+ *   'started'       ← VoiceEvent.state { current: IDLE }
+ *   'listening'     ← VoiceEvent.state { current: LISTENING } (audioLevel 0)
+ *   'speechStarted' ← VoiceEvent.vad { type: VOICE_START }
+ *   'processing'    ← VoiceEvent.vad { type: VOICE_END_OF_UTTERANCE }
+ *   'transcribed'   ← VoiceEvent.userSaid { text }
+ *   'responded'     ← VoiceEvent.assistantToken { text }
+ *   'speaking'      ← VoiceEvent.audio { pcm, ... }
+ *   'turnCompleted' ← CANNOT be derived (aggregates multiple events)
+ *   'stopped'       ← VoiceEvent.state { current: STOPPED }
+ *   'error'         ← VoiceEvent.error { message }
  */
 export type VoiceSessionEventKind =
   | { type: 'started' }

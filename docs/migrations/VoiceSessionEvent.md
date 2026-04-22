@@ -10,20 +10,27 @@
 
 ## Why the change
 
-Before v2.1, every SDK shipped its own hand-written UX-shaped enum:
+Before v2.1, 4 of 5 SDKs shipped their own hand-written UX-shaped enum:
 
 | SDK | Hand-written type | Cases |
 |-----|-------------------|------:|
 | Swift | `enum VoiceSessionEvent` | 10 |
-| Kotlin | `sealed class VoiceSessionEvent` | ~9 |
-| Dart | `sealed class VoiceSessionEvent` | ~9 |
-| React Native | `interface VoiceSessionEvent` | ~9 |
-| Web | (shared via `@runanywhere/core`) | — |
+| Kotlin | `sealed class VoiceSessionEvent` | 10 |
+| Dart | `sealed class VoiceSessionEvent` | 10 |
+| React Native | `interface VoiceSessionEvent` + `type VoiceSessionEventKind` | ~10 (discriminated union) |
+| Web | **no parallel type** — uses a different `VoiceAgentEventData` shape (5-variant bag) | n/a |
 
-5 parallel sources of truth → schema drift was inevitable. GAP 09
+4 parallel sources of truth → schema drift was inevitable. GAP 09
 introduced a single `voice_events.proto` + codegen across all 5
 SDKs, but the hand-written enums stayed in place during v2's
 deprecation window.
+
+> **Web finding (surfaced in v2.1-1 Phase 4)**: The Web SDK never had
+> a hand-written `VoiceSessionEvent` parallel to the other SDKs — the
+> criterion "zero hand-written VoiceSessionEvent types" was trivially
+> satisfied here. Web's `VoiceAgentEventData` is a different shape
+> that predates GAP 09 and is itself now `@deprecated` pointing at
+> the canonical proto.
 
 v2.1-1 completes the migration: **the proto is canonical; the
 hand-written enum is a deprecated derived view**.
@@ -63,7 +70,7 @@ reachable via the derived view):
 | **Kotlin** | Scaffold | `@Deprecated` on `sealed class VoiceSessionEvent`; `companion object { fun from(event: VoiceEvent): VoiceSessionEvent? = null }` stub. Full implementation is the Kotlin per-SDK cleanup PR. |
 | **Dart** | Scaffold | `@Deprecated` on `sealed class VoiceSessionEvent`; `static fromProto(VoiceEvent event)` stub. Full implementation is the Dart per-SDK cleanup PR. |
 | **React Native** | Scaffold | `@deprecated` JSDoc on `interface VoiceSessionEvent`; `voiceSessionEventFromProto(event)` exported stub. Full implementation is the RN per-SDK cleanup PR. |
-| **Web** | Shared with RN | Consumed through `@runanywhere/core`; no Web-exclusive duplicate. Status inherits RN. |
+| **Web** | Trivially satisfied (no parallel type) | No `VoiceSessionEvent` was ever defined in the Web SDK. The closest shape, `VoiceAgentEventData` in `sdk/runanywhere-web/packages/core/src/Public/Extensions/VoiceAgentTypes.ts`, is `@deprecated` in v2.1-1 pointing at the canonical proto path (ts-proto `VoiceEvent`). |
 
 Why scaffolds for 4 of 5: the mapper body requires per-SDK idiom
 decisions (Kotlin sealed-subclass matching, Dart switch expressions,
