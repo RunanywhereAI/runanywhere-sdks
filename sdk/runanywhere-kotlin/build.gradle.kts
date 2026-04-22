@@ -58,10 +58,11 @@ group =
     }
 
 // Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback
+// v3.0.0 release (Phase C3): bumped fallback from 0.1.5-SNAPSHOT to 3.0.0.
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")
-        ?: "0.1.5-SNAPSHOT"
+        ?: "3.0.0"
 version = resolvedVersion
 
 logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")

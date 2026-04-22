@@ -1,6 +1,6 @@
 {
   "name": "runanywhere-react-native-monorepo",
-  "version": "0.19.13",
+  "version": "3.0.0",
   "private": true,
   "description": "RunAnywhere React Native SDK - Multi-Package Monorepo",
   "workspaces": [

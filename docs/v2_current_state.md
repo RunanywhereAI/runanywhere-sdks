@@ -18,8 +18,25 @@ fixed** (Phase A: union-arm test coverage; Phase B: sample-app
 deprecation safety; Phase C: 99/99 truly orphan Kotlin natives cleared).
 **3 remain PARTIAL** as honest v2.1 follow-ups (`VoiceSessionEvent`
 codegen migration, cancellation parity behavioral test, p50 latency
-benchmark). The v3 cut-over (`git rm service_registry.cpp` +
-`RAC_PLUGIN_API_VERSION` 2u → 3u) is a separate ~2-week PR.
+benchmark).
+
+**v3 cut-over SHIPPED (2026-04-19) — see `docs/v3_phaseB_complete.md`
+and GAP 11 final gate report (#5 + #6 flipped to OK).** The following
+are no longer deferred:
+
+- `git rm sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp` ✅
+- `RAC_PLUGIN_API_VERSION` `2u` → `3u` in `rac/plugin/rac_plugin_entry.h` ✅
+- Package-manifest bumps to 3.0.0 across 7 packages ✅
+- 5 engines migrated from `rac_service_register_provider` to
+  `rac_plugin_register` via `rac_engine_vtable_t` ✅
+- 7 commons consumers rerouted from `rac_service_create` to
+  `rac_plugin_route + vt->ops->create` ✅
+- JNI + Swift bridges migrated to `rac_plugin_list` ✅
+
+The only remaining v3 work is deprecated-SDK-surface cleanup
+(`VoiceSessionEvent`, `VoiceSessionHandle`, `startVoiceSession`, etc.),
+deferred to a focused v3.1 follow-up PR — see
+`docs/v3_phaseC2_scope.md` for the disposition table.
 
 ## Numbers that matter
 

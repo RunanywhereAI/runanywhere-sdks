@@ -69,7 +69,7 @@ extern "C" {
  *                 is RETAINED for `rac_module_info_t.capabilities` and
  *                 `rac_modules_for_capability`.
  */
-#define RAC_PLUGIN_API_VERSION 2u  /* bumped to 3u in v3.0.0 release (Phase C3) */
+#define RAC_PLUGIN_API_VERSION 3u
 
 /* ===========================================================================
  * Plugin entry-point signature
