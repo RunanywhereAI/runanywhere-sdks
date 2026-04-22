@@ -46,7 +46,7 @@ expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
  * This function checks that STT, LLM, and TTS models are loaded,
  * then initializes the VoiceAgent orchestration component with those models.
  *
- * This is automatically called by startVoiceSession() if needed,
+ * v3.1: Call before constructing a VoiceAgentStreamAdapter. In the
  * but can be called explicitly for more control.
  *
  * @throws SDKError if SDK is not initialized

@@ -93,7 +93,7 @@ enum class SDKEnvironment(
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
  * - LLM: RunAnywhere.chat(), RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: RunAnywhere.startVoiceSession()
+ * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
  *
  * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
