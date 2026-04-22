@@ -17,9 +17,21 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/router/rac_route.h"
+#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "Diffusion.Service";
 namespace fs = std::filesystem;
+
+static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
+    switch (fw) {
+        case RAC_FRAMEWORK_COREML:             return "platform";
+        case RAC_FRAMEWORK_ONNX:                return "onnx";
+        default:                               return nullptr;
+    }
+}
 
 // =============================================================================
 // INTERNAL HELPERS
@@ -113,33 +125,40 @@ static rac_result_t diffusion_create_service_internal(const char* model_id,
                      static_cast<int>(framework));
     }
 
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = model_id;
-    request.capability = RAC_CAPABILITY_DIFFUSION;
-    request.framework = framework;
-    request.model_path = model_path;
+    // v3 Phase B8: route through the plugin registry.
+    rac_routing_hints_t hints = {};
+    hints.preferred_engine_name = framework_to_plugin_name(framework);
 
-    RAC_LOG_INFO(LOG_CAT, "Diffusion service request: framework=%d (%s), model_path=%s",
-                 static_cast<int>(request.framework),
-                 framework == RAC_FRAMEWORK_COREML    ? "CoreML"
-                 : framework == RAC_FRAMEWORK_ONNX    ? "ONNX"
-                 : framework == RAC_FRAMEWORK_UNKNOWN ? "Unknown"
-                                                      : "Other",
-                 request.model_path ? request.model_path : "NULL");
-
-    // Service registry returns an rac_diffusion_service_t* with vtable already set
-    RAC_LOG_INFO(LOG_CAT, "Calling rac_service_create for DIFFUSION capability...");
-    result = rac_service_create(RAC_CAPABILITY_DIFFUSION, &request, out_handle);
-
+    const rac_engine_vtable_t* vt = nullptr;
+    result = rac_plugin_route(RAC_PRIMITIVE_DIFFUSION,
+                              /*format=*/0, &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
+        model_info = nullptr;
+    }
+    if (result != RAC_SUCCESS || !vt || !vt->diffusion_ops || !vt->diffusion_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    }
+    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
+
+    void* impl = nullptr;
+    result = vt->diffusion_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    if (result != RAC_SUCCESS || !impl) {
+        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
 
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);
-        return result;
+    auto* service =
+        static_cast<rac_diffusion_service_t*>(malloc(sizeof(rac_diffusion_service_t)));
+    if (!service) {
+        if (vt->diffusion_ops->destroy) vt->diffusion_ops->destroy(impl);
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
+    service->ops = vt->diffusion_ops;
+    service->impl = impl;
+    service->model_id = strdup(model_id);
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "Diffusion service created");
     return RAC_SUCCESS;

@@ -14,8 +14,25 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/router/rac_route.h"
+#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "TTS.Service";
+
+static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
+    switch (fw) {
+        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp";
+        case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:  return "whisperkit_coreml";
+        case RAC_FRAMEWORK_METALRT:            return "metalrt";
+        case RAC_FRAMEWORK_FOUNDATION_MODELS:  return "platform";
+        case RAC_FRAMEWORK_SYSTEM_TTS:         return "platform";
+        case RAC_FRAMEWORK_COREML:             return "platform";
+        default:                               return nullptr;
+    }
+}
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -62,24 +79,39 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
                       model_info->id ? model_info->id : "NULL", framework);
     }
 
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = voice_id;
-    request.capability = RAC_CAPABILITY_TTS;
-    request.framework = framework;
-    request.model_path = model_path;
+    // v3 Phase B8: route through the plugin registry.
+    rac_routing_hints_t hints = {};
+    hints.preferred_engine_name = framework_to_plugin_name(framework);
 
-    // Service registry returns a rac_tts_service_t* with vtable already set
-    result = rac_service_create(RAC_CAPABILITY_TTS, &request, out_handle);
-
+    const rac_engine_vtable_t* vt = nullptr;
+    result = rac_plugin_route(RAC_PRIMITIVE_SYNTHESIZE,
+                              /*format=*/0, &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
+        model_info = nullptr;
+    }
+    if (result != RAC_SUCCESS || !vt || !vt->tts_ops || !vt->tts_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    }
+    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
+
+    void* impl = nullptr;
+    result = vt->tts_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    if (result != RAC_SUCCESS || !impl) {
+        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
 
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry");
-        return result;
+    auto* service = static_cast<rac_tts_service_t*>(malloc(sizeof(rac_tts_service_t)));
+    if (!service) {
+        if (vt->tts_ops->destroy) vt->tts_ops->destroy(impl);
+        return RAC_ERROR_OUT_OF_MEMORY;
     }
+    service->ops = vt->tts_ops;
+    service->impl = impl;
+    service->model_id = strdup(voice_id);
+    *out_handle = service;
 
     RAC_LOG_INFO(LOG_CAT, "TTS service created");
     return RAC_SUCCESS;
