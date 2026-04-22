@@ -49,6 +49,7 @@
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
@@ -4817,6 +4818,172 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetSto
 
     std::string jsonStr = j.dump();
     return env->NewStringUTF(jsonStr.c_str());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Auth Manager (rac_auth_*)
+// =============================================================================
+//
+// v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks wrapping rac_auth_manager.h
+// so the Kotlin CppBridgeAuth can delegate state + token logic to native
+// instead of duplicating it. The HTTP transport stays in Kotlin (no JNI
+// httpPost helper); native owns request building + response parsing +
+// state via rac_auth_build_*_request and rac_auth_handle_*_response.
+//
+// Storage callbacks (rac_secure_storage_t) are wired through the existing
+// g_jvm pattern via a Kotlin KeyStoreBridge object — see
+// nativeAuthInitWithCallbacks for the wiring. Pass nullptr for in-memory-only
+// auth (development / unit tests).
+//
+// All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver), not
+// instance methods (jobject) — matches the racLog / racConfigureLogging
+// pattern at the top of this file rather than the nativeFooBar pattern at
+// the bottom.
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    // No-storage-callbacks variant: in-memory only. Production callers
+    // should use racAuthInitWithCallbacks once that's wired (v2.1-2 PR
+    // adds the KeyStoreBridge bridge).
+    rac_auth_init(nullptr);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthReset(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_reset();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthIsAuthenticated(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_is_authenticated() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthNeedsRefresh(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_needs_refresh() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetAccessToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token = rac_auth_get_access_token();
+    return token ? env->NewStringUTF(token) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetDeviceId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_device_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetUserId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_user_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetOrganizationId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_organization_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildAuthenticateRequest(
+    JNIEnv* env, jclass /*cls*/,
+    jstring apiKey, jstring baseUrl, jstring deviceId,
+    jstring platform, jstring sdkVersion, jint environment) {
+    // Maps Kotlin-side credentials to the C rac_sdk_config_t. Kotlin
+    // calls this with the AuthenticationRequest fields it already knows
+    // about; the C side builds the JSON request body.
+    std::string apiKeyStr     = getCString(env, apiKey);
+    std::string baseUrlStr    = getCString(env, baseUrl);
+    std::string deviceIdStr   = getCString(env, deviceId);
+    std::string platformStr   = getCString(env, platform);
+    std::string sdkVersionStr = getCString(env, sdkVersion);
+
+    rac_sdk_config_t cfg = {};
+    cfg.environment = static_cast<rac_environment_t>(environment);
+    cfg.api_key     = apiKeyStr.empty()   ? nullptr : apiKeyStr.c_str();
+    cfg.base_url    = baseUrlStr.empty()  ? nullptr : baseUrlStr.c_str();
+    cfg.device_id   = deviceIdStr.empty() ? nullptr : deviceIdStr.c_str();
+    cfg.platform    = platformStr.empty() ? nullptr : platformStr.c_str();
+    cfg.sdk_version = sdkVersionStr.empty() ? nullptr : sdkVersionStr.c_str();
+
+    char* json = rac_auth_build_authenticate_request(&cfg);
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);  // C ABI says caller frees
+    return out;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildRefreshRequest(
+    JNIEnv* env, jclass /*cls*/) {
+    char* json = rac_auth_build_refresh_request();
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);
+    return out;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleAuthenticateResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_authenticate_response(json.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleRefreshResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_refresh_response(json.c_str()));
+}
+
+// Returns a 2-element String[]: [token-or-null, "true"/"false" needs_refresh].
+// Kotlin unpacks via the existing typed wrapper; this avoids out-param games.
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token        = nullptr;
+    bool        needsRefresh = false;
+    int rc = rac_auth_get_valid_token(&token, &needsRefresh);
+    if (rc < 0) return nullptr;
+
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+    if (token) {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(token));
+    }
+    env->SetObjectArrayElement(arr, 1,
+        env->NewStringUTF(needsRefresh ? "true" : "false"));
+    return arr;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthClear(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_clear();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthLoadStoredTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_load_stored_tokens());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthSaveTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_save_tokens());
 }
 
 }  // extern "C"
