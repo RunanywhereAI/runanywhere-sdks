@@ -1016,68 +1016,19 @@ class RunAnywhere {
     );
   }
 
-  /// Start a voice session with audio capture, VAD, and full voice pipeline.
-  ///
-  /// This is the simplest way to integrate voice assistant functionality.
-  /// The session handles audio capture, VAD, and processing internally.
-  ///
-  /// Example:
-  /// ```dart
-  /// final session = await RunAnywhere.startVoiceSession();
-  ///
-  /// // Consume events
-  /// session.events.listen((event) {
-  ///   if (event is VoiceSessionListening) {
-  ///     audioMeter = event.audioLevel;
-  ///   } else if (event is VoiceSessionTurnCompleted) {
-  ///     userText = event.transcript;
-  ///     assistantText = event.response;
-  ///   }
-  /// });
-  ///
-  /// // Later...
-  /// session.stop();
-  /// ```
-  ///
-  /// Matches Swift: `RunAnywhere.startVoiceSession(config:)`
-  static Future<VoiceSessionHandle> startVoiceSession({
-    VoiceSessionConfig config = VoiceSessionConfig.defaultConfig,
-  }) async {
-    if (!_isInitialized) {
-      throw SDKError.notInitialized();
-    }
-
-    final logger = SDKLogger('RunAnywhere.VoiceSession');
-
-    // Create the session handle with all necessary callbacks
-    final session = VoiceSessionHandle(
-      config: config,
-      processAudioCallback: _processVoiceAgentAudio,
-      isVoiceAgentReadyCallback: () async => isVoiceAgentReady,
-      initializeVoiceAgentCallback: _initializeVoiceAgentWithLoadedModels,
-    );
-
-    logger.info('Voice session created with callbacks');
-
-    // Start the session (this will verify voice agent readiness)
-    try {
-      await session.start();
-      logger.info('Voice session started successfully');
-    } catch (e) {
-      logger.error('Failed to start voice session: $e');
-      rethrow;
-    }
-
-    return session;
-  }
+  // v3.1: `startVoiceSession` + `_processVoiceAgentAudio` helpers DELETED.
+  // Canonical API:
+  //   await DartBridgeVoiceAgent.shared.initializeWithLoadedModels();
+  //   final handle = await DartBridgeVoiceAgent.shared.getHandle();
+  //   final events = VoiceAgentStreamAdapter(handle).stream();
 
   /// Initialize voice agent using already-loaded models.
   ///
-  /// This is called internally by VoiceSessionHandle when starting a session.
-  /// It verifies all components (STT, LLM, TTS) are loaded.
+  /// Verifies all components (STT, LLM, TTS) are loaded, then calls
+  /// DartBridgeVoiceAgent.shared.initializeWithLoadedModels().
   ///
   /// Matches Swift: `RunAnywhere.initializeVoiceAgentWithLoadedModels()`
-  static Future<void> _initializeVoiceAgentWithLoadedModels() async {
+  static Future<void> initializeVoiceAgentWithLoadedModels() async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
 
     if (!isVoiceAgentReady) {
@@ -1095,43 +1046,9 @@ class RunAnywhere {
     }
   }
 
-  /// Process audio through the voice agent pipeline (STT -> LLM -> TTS).
-  ///
-  /// This is called internally by VoiceSessionHandle during audio processing.
-  ///
-  /// Matches Swift: `RunAnywhere.processVoiceTurn(_:)`
-  static Future<VoiceAgentProcessResult> _processVoiceAgentAudio(
-    Uint8List audioData,
-  ) async {
-    final logger = SDKLogger('RunAnywhere.VoiceAgent');
-    logger.debug('Processing ${audioData.length} bytes of audio...');
-
-    try {
-      // Use the DartBridgeVoiceAgent to process the voice turn
-      final result = await DartBridge.voiceAgent.processVoiceTurn(audioData);
-
-      // Audio is already in WAV format (C++ voice agent converts Float32 TTS to WAV)
-      // No conversion needed - pass directly to playback
-      final synthesizedAudio =
-          result.audioWavData.isNotEmpty ? result.audioWavData : null;
-
-      logger.info(
-        'Voice turn complete: transcript="${result.transcription.substring(0, result.transcription.length.clamp(0, 50))}", '
-        'response="${result.response.substring(0, result.response.length.clamp(0, 50))}", '
-        'audio=${synthesizedAudio?.length ?? 0} bytes',
-      );
-
-      return VoiceAgentProcessResult(
-        speechDetected: result.transcription.isNotEmpty,
-        transcription: result.transcription,
-        response: result.response,
-        synthesizedAudio: synthesizedAudio,
-      );
-    } catch (e) {
-      logger.error('Voice turn processing failed: $e');
-      rethrow;
-    }
-  }
+  // v3.1: _processVoiceAgentAudio DELETED. For one-shot processing, call
+  // DartBridge.voiceAgent.processVoiceTurn(audioData) directly — same
+  // semantics without the stale VoiceAgentProcessResult wrapper.
 
   /// Cleanup voice agent resources.
   ///
