@@ -24,7 +24,7 @@ _Closes [`v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md`](../v2_gap_specs/GAP_03
 
 - Third parties can ship an engine plugin as a `.so` / `.dylib` / `.dll` against the published headers, without depending on `rac_commons` source.
 - The same plugin TU compiles into either a static archive (iOS / WASM) or a shared library (Android / Linux / macOS / Windows) by flipping `RAC_STATIC_PLUGINS`.
-- `RAC_PLUGIN_API_VERSION` (still `1u` from GAP 02) is the single point of truth for binary compatibility; mismatch is loud and safe.
+- `RAC_PLUGIN_API_VERSION` (`1u` at GAP 03 ship; GAP 04 bumped to `2u` when the metadata extension landed) is the single point of truth for binary compatibility; mismatch is loud and safe.
 
 ## Tested locally
 
