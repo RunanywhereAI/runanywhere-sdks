@@ -203,73 +203,8 @@ extension CppBridge {
             return String(cString: ptr)
         }
 
-        // MARK: - Legacy API (for backward compatibility)
-
-        /// Build device registration JSON via C++ (legacy)
-        @available(*, deprecated, message: "Use registerIfNeeded() instead - all logic is now in C++")
-        public static func buildRegistrationJSON(buildToken: String? = nil) -> String? {
-            let deviceInfo = DeviceInfo.current
-            let deviceId = DeviceIdentity.persistentUUID
-            let env = CppBridge.environment
-
-            #if targetEnvironment(simulator)
-            let isSimulator = true
-            #else
-            let isSimulator = false
-            #endif
-
-            var request = rac_device_registration_request_t()
-            var cDeviceInfo = rac_device_registration_info_t()
-
-            return deviceId.withCString { did in
-                deviceInfo.deviceType.withCString { dtype in
-                    deviceInfo.deviceModel.withCString { dmodel in
-                        "iOS".withCString { osName in
-                            deviceInfo.osVersion.withCString { osVer in
-                                deviceInfo.platform.withCString { plat in
-                                    SDKConstants.version.withCString { sdkVer in
-                                        (buildToken ?? "").withCString { token in
-
-                                            cDeviceInfo.device_id = did
-                                            cDeviceInfo.device_type = dtype
-                                            cDeviceInfo.device_model = dmodel
-                                            cDeviceInfo.os_name = osName
-                                            cDeviceInfo.os_version = osVer
-                                            cDeviceInfo.platform = plat
-                                            cDeviceInfo.total_memory = Int64(deviceInfo.totalMemory)
-                                            cDeviceInfo.available_memory = Int64(deviceInfo.availableMemory)
-                                            cDeviceInfo.core_count = Int32(deviceInfo.coreCount)
-                                            cDeviceInfo.is_simulator = isSimulator ? RAC_TRUE : RAC_FALSE
-
-                                            request.device_info = cDeviceInfo
-                                            request.sdk_version = sdkVer
-                                            request.build_token = buildToken != nil ? token : nil
-                                            request.last_seen_at_ms = Int64(Date().timeIntervalSince1970 * 1000)
-
-                                            var jsonPtr: UnsafeMutablePointer<CChar>?
-                                            var jsonLen: Int = 0
-
-                                            let result = rac_device_registration_to_json(
-                                                &request,
-                                                Environment.toC(env),
-                                                &jsonPtr,
-                                                &jsonLen
-                                            )
-
-                                            if result == RAC_SUCCESS, let json = jsonPtr {
-                                                let jsonString = String(cString: json)
-                                                free(json)
-                                                return jsonString
-                                            }
-                                            return nil
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // v3.0.0 (C2): `buildRegistrationJSON` DELETED. Use registerIfNeeded()
+        // — all registration logic now lives in C++ via the rac_device_manager
+        // API; Swift no longer needs to hand-build the JSON request.
     }
 }

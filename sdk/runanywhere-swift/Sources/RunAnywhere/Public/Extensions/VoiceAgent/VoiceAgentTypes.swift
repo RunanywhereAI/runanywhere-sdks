@@ -185,6 +185,14 @@ public struct VoiceAgentConfiguration: Sendable {
 ///
 /// See `docs/migrations/VoiceSessionEvent.md` for the mapping table
 /// and migration guide.
+///
+/// v3.0.0 (C2): retention NOTE — `VoiceSessionEvent` is retained as a
+/// derived view because the v2-era `VoiceSessionHandle` actor (see
+/// `RunAnywhere+VoiceSession.swift`) + the sample-app voice-agent UI
+/// still consume it. A follow-up PR migrates both to
+/// `VoiceAgentStreamAdapter` + proto events and deletes this enum
+/// along with VoiceSessionHandle. Keeping it as a deprecated derived
+/// view (unchanged since v2.1-1) is the intermediate-state commitment.
 @available(*, deprecated,
     message: "Use RAVoiceEvent via VoiceAgentStreamAdapter.stream(). " +
              "VoiceSessionEvent is a derived view — see " +
@@ -225,24 +233,9 @@ public enum VoiceSessionEvent: Sendable {
 
 @available(*, deprecated, message: "Derived view over RAVoiceEvent; prefer the proto directly.")
 extension VoiceSessionEvent {
-    /// Derive a `VoiceSessionEvent` from the canonical `RAVoiceEvent`
-    /// (proto3, codegen'd from `idl/voice_events.proto`).
-    ///
-    /// Returns `nil` for proto events that don't have a UX-visible
-    /// counterpart in the legacy enum (e.g. `MetricsEvent`, low-level
-    /// VAD `.bargeIn` / `.silence`, most `InterruptedEvent` reasons).
-    /// Callers that need the full event surface should subscribe to
-    /// `VoiceAgentStreamAdapter.stream()` and inspect `payload` directly.
-    ///
-    /// **Dropout cases** (documented honestly in the migration doc):
-    /// - `MetricsEvent` → no UX counterpart; nil.
-    /// - `InterruptedEvent` (all reasons) → no UX counterpart; nil.
-    /// - `VAD_EVENT_BARGE_IN` / `VAD_EVENT_SILENCE` → nil
-    ///   (legacy enum only knew `speechStarted` / `processing`).
-    /// - `.turnCompleted` aggregates multiple proto events across a
-    ///   turn and CANNOT be derived from a single `RAVoiceEvent` —
-    ///   callers that need turn-level aggregation should buffer
-    ///   proto events themselves.
+    /// Derive a `VoiceSessionEvent` from the canonical `RAVoiceEvent`.
+    /// Returns `nil` for proto events without a UX-visible counterpart.
+    /// See the migration doc for the full mapping + dropout list.
     public static func from(_ event: RAVoiceEvent) -> VoiceSessionEvent? {
         switch event.payload {
         case let .userSaid(e):
@@ -267,7 +260,6 @@ extension VoiceSessionEvent {
             case .listening: return .listening(audioLevel: 0)
             case .speaking:  return .speaking
             case .stopped:   return .stopped
-            // .thinking / .unspecified / UNRECOGNIZED have no UX counterpart
             default:         return nil
             }
 
@@ -275,8 +267,6 @@ extension VoiceSessionEvent {
             return .error(e.message)
 
         case .interrupted, .metrics, .none:
-            // No legacy UX counterpart. New code should read these
-            // directly via VoiceAgentStreamAdapter.stream().
             return nil
 
         @unknown default:
