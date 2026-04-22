@@ -167,6 +167,18 @@ public:
     const std::optional<std::string>& optionsJson) override;
 
   // ============================================================================
+  // LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
+  // ============================================================================
+  std::shared_ptr<Promise<std::string>> llmExtractThinking(
+    const std::string& text) override;
+  std::shared_ptr<Promise<std::string>> llmStripThinking(
+    const std::string& text) override;
+  std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(
+    double totalCompletionTokens,
+    const std::string& responseText,
+    const std::string& thinkingText) override;
+
+  // ============================================================================
   // STT Capability (Backend-Agnostic)
   // Delegates to rac_stt_component_* APIs via STTBridge
   // ============================================================================
