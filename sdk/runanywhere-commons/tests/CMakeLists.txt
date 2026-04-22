@@ -40,6 +40,28 @@ rac_link_archive_deps(test_legacy_coexistence)
 target_compile_features(test_legacy_coexistence PRIVATE cxx_std_17)
 add_test(NAME legacy_coexistence_tests COMMAND test_legacy_coexistence)
 
+# GAP 04 Phase 12: engine router + hardware profile tests (always built;
+# pure C++, no backend dependency).
+add_executable(test_engine_router test_engine_router.cpp)
+target_include_directories(test_engine_router PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_engine_router PRIVATE rac_commons)
+rac_link_archive_deps(test_engine_router)
+target_compile_features(test_engine_router PRIVATE cxx_std_17)
+add_test(NAME engine_router_tests COMMAND test_engine_router)
+
+add_executable(test_hardware_profile test_hardware_profile.cpp)
+target_include_directories(test_hardware_profile PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_hardware_profile PRIVATE rac_commons)
+rac_link_archive_deps(test_hardware_profile)
+target_compile_features(test_hardware_profile PRIVATE cxx_std_17)
+add_test(NAME hardware_profile_tests COMMAND test_hardware_profile)
+
 # GAP 03 Phase 6: static registration test (always built — exercises the
 # RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
 add_executable(test_static_registration test_static_registration.cpp)

@@ -420,6 +420,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
     src/router/rac_hardware_profile.cpp
     src/router/rac_engine_router.cpp
+    # GAP 04 Phase 12: C ABI wrapper around EngineRouter (rac_plugin_route).
+    src/router/rac_route.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
