@@ -9,6 +9,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <string>
+
+#include <nlohmann/json.hpp>
 
 #include "rac/backends/rac_vlm_llamacpp.h"
 #include "rac/core/rac_core.h"
@@ -113,6 +116,50 @@ static void llamacpp_vlm_vtable_destroy(void* impl) {
 // Static vtable for LlamaCpp VLM
 // GAP 02 Phase 8: exposed non-static so rac_plugin_entry_llamacpp_vlm.cpp
 // can extern-reference it when filling the unified engine vtable.
+// v3 Phase B2: `create` adapter for llama.cpp VLM. Parses the optional
+// "mmproj_path" key from config_json (so VLM's 2-path create signature
+// maps cleanly into the uniform rac_vlm_service_ops_t::create slot).
+// Other VLM config fields (context_size, etc.) will be added here in a
+// future PR when the consumer starts supplying typed config.
+rac_result_t llamacpp_vlm_create_impl(const char* model_id,
+                                      const char* config_json,
+                                      void** out_impl) {
+    if (!model_id || !out_impl) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    *out_impl = nullptr;
+
+    std::string mmproj_path_owned;
+    const char* mmproj_path = nullptr;
+    if (config_json && config_json[0] != '\0') {
+        try {
+            auto json = nlohmann::json::parse(config_json);
+            if (json.contains("mmproj_path") && json["mmproj_path"].is_string()) {
+                mmproj_path_owned = json["mmproj_path"].get<std::string>();
+                mmproj_path = mmproj_path_owned.c_str();
+                RAC_LOG_DEBUG(LOG_CAT, "Parsed mmproj_path from config_json: %s", mmproj_path);
+            }
+        } catch (const std::exception& e) {
+            RAC_LOG_WARNING(LOG_CAT,
+                            "config_json parse failed (%s); using defaults", e.what());
+        }
+    }
+
+    RAC_LOG_INFO(LOG_CAT,
+                 "llamacpp_vlm_create_impl: model=%s, mmproj=%s",
+                 model_id, mmproj_path ? mmproj_path : "(none)");
+
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc =
+        rac_vlm_llamacpp_create(model_id, mmproj_path, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_vlm_llamacpp_create failed: %d", rc);
+        return rc;
+    }
+    *out_impl = backend_handle;
+    return RAC_SUCCESS;
+}
+
 const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .initialize = llamacpp_vlm_vtable_initialize,
     .process = llamacpp_vlm_vtable_process,
@@ -121,6 +168,7 @@ const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .cancel = llamacpp_vlm_vtable_cancel,
     .cleanup = llamacpp_vlm_vtable_cleanup,
     .destroy = llamacpp_vlm_vtable_destroy,
+    .create = llamacpp_vlm_create_impl,
 };
 
 // =============================================================================
@@ -139,103 +187,11 @@ LlamaCPPVLMRegistryState& get_state() {
     return state;
 }
 
-// =============================================================================
-// SERVICE PROVIDER IMPLEMENTATION
-// =============================================================================
-
-/**
- * Check if this backend can handle the service request.
- */
-rac_bool_t llamacpp_vlm_can_handle(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: request is NULL");
-        return RAC_FALSE;
-    }
-
-    // Must be VISION_LANGUAGE capability
-    if (request->capability != RAC_CAPABILITY_VISION_LANGUAGE) {
-        return RAC_FALSE;
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: framework=%d, model_path=%s, identifier=%s",
-                  static_cast<int>(request->framework),
-                  request->model_path ? request->model_path : "NULL",
-                  request->identifier ? request->identifier : "NULL");
-
-    // Framework hint from model registry
-    if (request->framework == RAC_FRAMEWORK_LLAMACPP) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (framework match)");
-        return RAC_TRUE;
-    }
-
-    // If framework is explicitly set to something else (not unknown), don't handle
-    if (request->framework != RAC_FRAMEWORK_UNKNOWN) {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (framework mismatch)");
-        return RAC_FALSE;
-    }
-
-    // Framework unknown - check file extension for GGUF
-    const char* path = request->model_path ? request->model_path : request->identifier;
-    if (path == nullptr || path[0] == '\0') {
-        RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no path)");
-        return RAC_FALSE;
-    }
-
-    size_t len = strlen(path);
-    if (len >= 5) {
-        const char* ext = path + len - 5;
-        if (strcmp(ext, ".gguf") == 0 || strcmp(ext, ".GGUF") == 0) {
-            RAC_LOG_DEBUG(LOG_CAT, "can_handle: YES (gguf extension)");
-            return RAC_TRUE;
-        }
-    }
-
-    RAC_LOG_DEBUG(LOG_CAT, "can_handle: NO (no gguf extension in path: %s)", path);
-    return RAC_FALSE;
-}
-
-/**
- * Create a LlamaCPP VLM service with vtable.
- */
-rac_handle_t llamacpp_vlm_create_service(const rac_service_request_t* request, void* user_data) {
-    (void)user_data;
-
-    if (request == nullptr) {
-        return nullptr;
-    }
-
-    const char* model_path = request->model_path ? request->model_path : request->identifier;
-    if (model_path == nullptr || model_path[0] == '\0') {
-        RAC_LOG_ERROR(LOG_CAT, "No model path provided");
-        return nullptr;
-    }
-
-    RAC_LOG_INFO(LOG_CAT, "Creating LlamaCPP VLM service for: %s", model_path);
-
-    // Create backend-specific handle
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t result = rac_vlm_llamacpp_create(model_path, nullptr, nullptr, &backend_handle);
-    if (result != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "Failed to create LlamaCPP VLM backend: %d", result);
-        return nullptr;
-    }
-
-    // Allocate service struct with vtable
-    auto* service = static_cast<rac_vlm_service_t*>(malloc(sizeof(rac_vlm_service_t)));
-    if (!service) {
-        rac_vlm_llamacpp_destroy(backend_handle);
-        return nullptr;
-    }
-
-    service->ops = &g_llamacpp_vlm_ops;
-    service->impl = backend_handle;
-    service->model_id = request->identifier ? strdup(request->identifier) : nullptr;
-
-    RAC_LOG_INFO(LOG_CAT, "LlamaCPP VLM service created successfully");
-    return service;
-}
+// v3 Phase B2: `llamacpp_vlm_can_handle` and `llamacpp_vlm_create_service`
+// removed. Model-format gating flows through the router's metadata.formats
+// in rac_plugin_entry_llamacpp_vlm.cpp; wrapper allocation moves to
+// commons rac_vlm_create() via rac_plugin_route → g_llamacpp_vlm_ops.create
+// (llamacpp_vlm_create_impl defined above).
 
 }  // namespace
 
@@ -253,7 +209,6 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
-    // Register module
     rac_module_info_t module_info = {};
     module_info.id = state.module_id;
     module_info.name = "LlamaCPP VLM";
@@ -269,23 +224,12 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
         return result;
     }
 
-    // Register service provider with priority 100 (same as LLM llamacpp)
-    rac_service_provider_t provider = {};
-    provider.name = state.provider_name;
-    provider.capability = RAC_CAPABILITY_VISION_LANGUAGE;
-    provider.priority = 100;
-    provider.can_handle = llamacpp_vlm_can_handle;
-    provider.create = llamacpp_vlm_create_service;
-    provider.user_data = nullptr;
-
-    result = rac_service_register_provider(&provider);
-    if (result != RAC_SUCCESS) {
-        rac_module_unregister(state.module_id);
-        return result;
-    }
-
+    // v3 Phase B2: plugin registration is the registry's job via
+    // rac_plugin_entry_llamacpp_vlm(). Module registration is the only
+    // remaining side-effect here (app-level capability discovery).
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully");
+    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module_register only; "
+                          "plugin registration via rac_plugin_entry_llamacpp_vlm)");
     return RAC_SUCCESS;
 }
 
@@ -297,7 +241,6 @@ rac_result_t rac_backend_llamacpp_vlm_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_service_unregister_provider(state.provider_name, RAC_CAPABILITY_VISION_LANGUAGE);
     rac_module_unregister(state.module_id);
 
     state.registered = false;
