@@ -53,9 +53,12 @@ echo "✓ Swift proto codegen → ${OUT_DIR}"
 # error out because the message-only path above is sufficient for non-streaming
 # consumers.
 if command -v protoc-gen-grpc-swift >/dev/null 2>&1; then
+    # grpc-swift 2.x dropped the v1 Server/Client/TestClient flags — it
+    # always emits both client + server. We just pass Visibility for the
+    # generated Swift access modifier so frontends can `import` the types.
     protoc \
         --proto_path="${PROTO_DIR}" \
-        --grpc-swift_out="Visibility=Public,Server=false,Client=true,TestClient=false:${OUT_DIR}" \
+        --grpc-swift_out="Visibility=Public:${OUT_DIR}" \
         "${PROTO_DIR}/voice_agent_service.proto" \
         "${PROTO_DIR}/llm_service.proto" \
         "${PROTO_DIR}/download_service.proto"

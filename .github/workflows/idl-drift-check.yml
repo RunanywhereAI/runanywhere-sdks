@@ -17,6 +17,7 @@ on:
       - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
@@ -29,6 +30,7 @@ on:
       - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
+      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
 
@@ -52,6 +54,16 @@ jobs:
       - name: Install protoc + swift-protobuf (Homebrew)
         run: |
           brew install protobuf swift-protobuf
+
+      - name: Install grpc-swift (v2 plugin → Swift AsyncStream gRPC stubs)
+        run: |
+          # v2 close-out Phase 3: grpc-swift formula installs the binary as
+          # protoc-gen-grpc-swift-2; symlink to the legacy name our codegen
+          # script expects.
+          brew install grpc-swift || echo "grpc-swift bottle unavailable; Swift gRPC stubs skipped"
+          if [ -x /opt/homebrew/bin/protoc-gen-grpc-swift-2 ]; then
+            ln -sf /opt/homebrew/bin/protoc-gen-grpc-swift-2 /opt/homebrew/bin/protoc-gen-grpc-swift
+          fi
 
       - name: Install wire-compiler (best-effort — Gradle Wire plugin is the fallback)
         run: |
