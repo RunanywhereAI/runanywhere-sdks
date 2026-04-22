@@ -166,37 +166,72 @@ data class VoiceAgentConfiguration(
 
 /**
  * Events emitted during a voice session.
- * Mirrors Swift VoiceSessionEvent exactly.
+ *
+ * **v2.1-1 deprecation (GAP 09 #6)**: This sealed class is now a
+ * *derived view* over the canonical `VoiceEvent` proto (Wire-generated
+ * from `idl/voice_events.proto`). The codegen'd type is the single
+ * source of truth; this UX-shaped sealed class is kept as a
+ * backward-compatibility shim.
+ *
+ * New code should subscribe to `VoiceAgentStreamAdapter.stream()` and
+ * match on `event.payload` directly.
+ *
+ * See `docs/migrations/VoiceSessionEvent.md` for the 10-case → 8-payload
+ * mapping table, the full dropout list, and the migration guide.
+ *
+ * **v2.1-1 Kotlin status**: SCAFFOLD. The `companion object { from(event) }`
+ * mapper returns null for every input today — Swift is the template
+ * at `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. Full Kotlin
+ * implementation is the v2.1-1b per-SDK cleanup PR (requires importing
+ * Wire-generated com.runanywhere.v1.VoiceEvent + per-Kotlin-idiom
+ * sealed-subclass matching).
  */
+@Deprecated(
+    message = "Use VoiceEvent via VoiceAgentStreamAdapter.stream(). " +
+        "VoiceSessionEvent is a derived view — see " +
+        "docs/migrations/VoiceSessionEvent.md",
+    level = DeprecationLevel.WARNING,
+)
 sealed class VoiceSessionEvent {
-    /** Session started and ready */
+    /** Session started and ready. v2.1-1: maps from `VoiceEvent.state { current = IDLE }`. */
     data object Started : VoiceSessionEvent()
 
-    /** Listening for speech with current audio level (0.0 - 1.0) */
+    /**
+     * Listening for speech with current audio level (0.0 - 1.0).
+     * v2.1-1: maps from `VoiceEvent.state { current = LISTENING }`; audioLevel
+     * is not in the proto and will be 0 when derived.
+     */
     data class Listening(
         val audioLevel: Float,
     ) : VoiceSessionEvent()
 
-    /** Speech detected, started accumulating audio */
+    /** Speech detected, started accumulating audio. v2.1-1: maps from `VoiceEvent.vad { type = VOICE_START }`. */
     data object SpeechStarted : VoiceSessionEvent()
 
-    /** Speech ended, processing audio */
+    /** Speech ended, processing audio. v2.1-1: maps from `VoiceEvent.vad { type = VOICE_END_OF_UTTERANCE }`. */
     data object Processing : VoiceSessionEvent()
 
-    /** Got transcription from STT */
+    /** Got transcription from STT. v2.1-1: maps from `VoiceEvent.userSaid { text }`. */
     data class Transcribed(
         val text: String,
     ) : VoiceSessionEvent()
 
-    /** Got response from LLM */
+    /** Got response from LLM. v2.1-1: maps from `VoiceEvent.assistantToken { text }`. */
     data class Responded(
         val text: String,
     ) : VoiceSessionEvent()
 
-    /** Playing TTS audio */
+    /** Playing TTS audio. v2.1-1: maps from `VoiceEvent.audio { pcm, ... }`. */
     data object Speaking : VoiceSessionEvent()
 
-    /** Complete turn result */
+    /**
+     * Complete turn result.
+     *
+     * v2.1-1: **CANNOT be derived** from a single `VoiceEvent` — this case
+     * aggregates multiple proto events across a turn. Callers needing
+     * turn-level aggregation should buffer `VoiceEvent`s themselves (or
+     * wait for the optional v2.1-1f turn-aggregation helper).
+     */
     data class TurnCompleted(
         val transcript: String,
         val response: String,
@@ -219,13 +254,35 @@ sealed class VoiceSessionEvent {
         }
     }
 
-    /** Session stopped */
+    /** Session stopped. v2.1-1: maps from `VoiceEvent.state { current = STOPPED }`. */
     data object Stopped : VoiceSessionEvent()
 
-    /** Error occurred */
+    /** Error occurred. v2.1-1: maps from `VoiceEvent.error { message }`. */
     data class Error(
         val message: String,
     ) : VoiceSessionEvent()
+
+    companion object {
+        /**
+         * Derive a `VoiceSessionEvent` from the canonical `VoiceEvent`
+         * (proto3 via Wire, generated from `idl/voice_events.proto`).
+         *
+         * Returns `null` for proto events that don't have a UX-visible
+         * counterpart — see `docs/migrations/VoiceSessionEvent.md` for
+         * the full dropout list.
+         *
+         * **v2.1-1 SCAFFOLD**: Swift has the full implementation at
+         * `sdk/runanywhere-swift/.../VoiceAgentTypes.swift`. This Kotlin
+         * stub returns null for every input — full implementation is
+         * the v2.1-1b per-SDK cleanup PR (requires adding
+         * `import com.runanywhere.v1.VoiceEvent` + per-payload matching).
+         *
+         * New code should subscribe to `VoiceAgentStreamAdapter.stream()`
+         * directly instead of going through this mapper.
+         */
+        @Suppress("UNUSED_PARAMETER")
+        fun from(event: Any /* TODO(v2.1-1b): com.runanywhere.v1.VoiceEvent */): VoiceSessionEvent? = null
+    }
 }
 
 // MARK: - Voice Session Configuration
