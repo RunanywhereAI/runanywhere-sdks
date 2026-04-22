@@ -6,6 +6,15 @@
 //  Calls C++ directly via CppBridge.LLM for all operations.
 //  Events are emitted by C++ layer via CppEventBridge.
 //
+//  GAP 08 Phase 24 — Swift sweep target.
+//
+//  This file contains a `ThinkingContentParser` block that the spec
+//  schedules for relocation to the C ABI as `rac_llm_split_thinking_tokens()`.
+//  Once the C ABI lands and rounds the same fixture inputs to the same
+//  outputs as the Swift parser, this block becomes a thin Swift trampoline.
+//  Tracked for the follow-up cleanup PR after Wave C adapters have soaked
+//  in production. See docs/gap08_final_gate_report.md.
+//
 
 import CRACommons
 import Foundation

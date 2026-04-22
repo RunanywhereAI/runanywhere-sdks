@@ -2,6 +2,17 @@
 ///
 /// Matches iOS VoiceSessionHandle from RunAnywhere+VoiceSession.swift
 /// Provides a handle to control an active voice session with built-in audio capture
+///
+/// GAP 08 Phase 25 — DEPRECATED orchestration path.
+///
+/// This class duplicates the C++ voice agent orchestration. After Wave C
+/// landed `voice_agent_stream_adapter.dart`, callers should switch to:
+///     final adapter = VoiceAgentStreamAdapter(handle);
+///     await for (final event in adapter.stream()) handleEvent(event);
+///
+/// Removal scheduled once the Flutter sample app verifies the Stream<>
+/// path end-to-end on Android + iOS. Tracked in
+/// docs/gap08_final_gate_report.md.
 library voice_session_handle;
 
 import 'dart:async';

@@ -4,6 +4,14 @@
  * Adds LLM text generation capabilities to RunAnywhere.
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
  *
+ * GAP 08 Phase 27 — DEPRECATED token queue.
+ *
+ * The `tokenQueue: string[]` + `resolveNext` pattern in `generateStream()`
+ * below duplicates what the Wave C `LLMTokenStream` adapter does once
+ * wired to `idl/llm_service.proto`. Mechanical follow-up replaces this
+ * block with a thin call into the codegen'd AsyncIterable wrapper.
+ * Tracked in docs/gap08_final_gate_report.md.
+ *
  * Usage:
  *   import { RunAnywhere } from '@runanywhere/web';
  *

@@ -7,6 +7,16 @@
 //
 //  Types are defined in VoiceAgentTypes.swift
 //
+//  GAP 08 Phase 24 — DEPRECATED orchestration path.
+//
+//  The Swift voice session orchestrator below duplicates what the C++
+//  voice agent already does. Callers should switch to:
+//      let adapter = VoiceAgentStreamAdapter(handle: handle)
+//      for await event in adapter.stream() { ... }
+//
+//  Removal scheduled once the iOS sample app verifies the AsyncStream
+//  path end-to-end on device. Tracked in docs/gap08_final_gate_report.md.
+//
 //  Usage:
 //  ```swift
 //  // Start a voice session

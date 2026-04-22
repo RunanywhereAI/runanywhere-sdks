@@ -3,6 +3,14 @@
  *
  * Central event system matching the pattern across all SDKs.
  * Provides typed event subscription and publishing.
+ *
+ * GAP 08 Phase 27 — legacy NativeEventEmitter compat block scheduled for
+ * removal once Wave C's per-feature AsyncIterable adapters cover all
+ * subscriber call sites. Today's EventBus retains a single-tenant
+ * `BroadcastChannel`-style fan-out; the spec calls for replacing the
+ * legacy NativeEventEmitter block once the Web adapters subsume the last
+ * consumer (LLM tokens + download progress). Tracked in
+ * docs/gap08_final_gate_report.md.
  */
 
 import type { SDKEventType } from '../types/enums';

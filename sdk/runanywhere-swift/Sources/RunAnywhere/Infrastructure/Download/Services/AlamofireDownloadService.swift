@@ -2,9 +2,19 @@ import Alamofire
 import Files
 import Foundation
 
-/// Download service using Alamofire for HTTP and C++ bridge for orchestration
-/// C++ handles: task tracking, progress calculation, retry logic
-/// Swift handles: HTTP transport via Alamofire, extraction via native C++ libarchive
+/// Download service using Alamofire for HTTP and C++ bridge for orchestration.
+/// C++ handles: task tracking, progress calculation, retry logic.
+/// Swift handles: HTTP transport via Alamofire, extraction via native C++ libarchive.
+///
+/// GAP 08 Phase 24 — DEPRECATED retry/progress duplication.
+///
+/// The retry-with-backoff + progress-throttling logic implemented in the
+/// `download(_:)` method below duplicates what `rac_download_*` already does
+/// in `rac/infrastructure/download/rac_download.h`. Once Wave C's
+/// `DownloadServiceStreamAdapter` (mechanical follow-up to
+/// `VoiceAgentStreamAdapter`) lands, this class becomes a thin Alamofire
+/// HTTP shim that calls into the C ABI for orchestration.
+/// Tracked in docs/gap08_final_gate_report.md.
 public class AlamofireDownloadService: @unchecked Sendable {
 
     // MARK: - Shared Instance

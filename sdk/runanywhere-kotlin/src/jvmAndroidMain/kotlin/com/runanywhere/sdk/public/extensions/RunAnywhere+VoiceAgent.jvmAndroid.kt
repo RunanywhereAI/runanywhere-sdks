@@ -198,6 +198,33 @@ actual suspend fun RunAnywhere.processVoice(audioData: ByteArray): VoiceAgentRes
     }
 }
 
+/**
+ * GAP 08 Phase 21 — DEPRECATED orchestration path.
+ *
+ * The legacy implementation re-implemented the STT → LLM → TTS pipeline in
+ * Kotlin (~270 LOC of orchestration below). The C++ voice agent
+ * ([rac_voice_agent_*] in `rac_voice_agent.h`) already does the same
+ * orchestration deterministically across all 5 SDKs.
+ *
+ * Wave D Phase 21 schedules this method to be replaced by a thin call to
+ * the C ABI via [VoiceAgentStreamAdapter] (Wave C Phase 17) — the legacy
+ * body is preserved here so existing consumers don't break, but new callers
+ * should use:
+ *
+ *     val handle = CppBridgeVoiceAgent.create(config.toC())
+ *     for (event in VoiceAgentStreamAdapter(handle).stream())
+ *         handleEvent(event)   // Maps VoiceEvent → VoiceSessionEvent
+ *
+ * Removal scheduled once: (a) the C++ voice agent's struct callback path
+ * fans into the proto-byte path in `rac_voice_event_abi.cpp` (TODO marker
+ * there), (b) all SDK sample apps verified end-to-end on device. Tracked
+ * in docs/gap08_final_gate_report.md.
+ */
+@Deprecated(
+    "Use VoiceAgentStreamAdapter (GAP 09 Phase 17) — Kotlin orchestration retired in v3.",
+    ReplaceWith("VoiceAgentStreamAdapter(handle).stream()"),
+    level = DeprecationLevel.WARNING,
+)
 actual fun RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Flow<VoiceSessionEvent> =
     flow {
         if (!isInitialized) {

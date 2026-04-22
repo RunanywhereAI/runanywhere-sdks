@@ -6,8 +6,33 @@
  * Handles full auth flow: JSON building, HTTP, parsing, state storage.
  *
  * Mirrors Swift SDK's CppBridge+Auth.swift implementation.
+ *
+ * GAP 08 Phase 22 — DEPRECATED (~540 LOC of duplication).
+ *
+ * The C ABI in `rac/infrastructure/network/rac_auth_manager.h` already
+ * provides the full auth flow via:
+ *   - rac_auth_authenticate(api_key, environment) → access/refresh tokens
+ *   - rac_auth_refresh_if_needed() → 60-second refresh window
+ *   - rac_auth_get_access_token() → current valid token
+ *
+ * The Kotlin implementation below uses a 5-MINUTE refresh window — drifted
+ * from the Swift impl's 60-second window (documented bug in
+ * docs/V2_MIGRATION_BEFORE_AFTER.md). Replacing this file with a thin JNI
+ * bridge to the C ABI fixes the drift.
+ *
+ * Removal scheduled once: (a) JNI thunks for rac_auth_* are exposed via
+ * CppBridgePlatformAdapter, (b) Android sample app verified to refresh
+ * tokens on the 60s cadence. Tracked in docs/gap08_final_gate_report.md.
  */
 package com.runanywhere.sdk.foundation.bridge.extensions
+
+/** GAP 08 Phase 22 deprecation marker — see file header. */
+@Deprecated(
+    "Use the rac_auth_* C ABI directly via CppBridgePlatformAdapter. " +
+    "This Kotlin implementation has a 5-min refresh window vs the C++ 60-sec window.",
+    level = DeprecationLevel.WARNING,
+)
+internal class CppBridgeAuthGap08DeprecationMarker private constructor()
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

@@ -6,6 +6,14 @@
  * Provides Voice Agent pipeline management for C++ core.
  *
  * Follows iOS CppBridge+VoiceAgent.swift architecture.
+ *
+ * GAP 08 Phase 23 — orphan-decl audit.
+ * 11 `external fun native*` declarations in this file. After the Wave D
+ * VoiceAgentStreamAdapter (GAP 09 Phase 17) lands, callers should subscribe
+ * to `VoiceAgentStreamAdapter(handle).stream()` instead of polling these
+ * native methods. Unused declarations identified via the symbol-diff
+ * procedure in docs/gap08_kotlin_orphan_natives.md will be removed in the
+ * follow-up cleanup PR.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions

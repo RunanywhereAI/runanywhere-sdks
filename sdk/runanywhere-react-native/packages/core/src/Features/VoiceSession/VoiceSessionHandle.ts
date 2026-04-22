@@ -6,6 +6,16 @@
  *
  * Matches Swift SDK: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceSession.swift
  *
+ * GAP 08 Phase 26 — DEPRECATED orchestration path (~600 LOC).
+ *
+ * The orchestration below duplicates the C++ voice agent. After Wave C
+ * landed `Adapters/VoiceAgentStreamAdapter.ts`, callers should switch to:
+ *     for await (const event of new VoiceAgentStreamAdapter(handle).stream())
+ *         handleEvent(event);
+ *
+ * Removal scheduled once the RN sample app verifies the AsyncIterable
+ * path end-to-end on iOS + Android. Tracked in docs/gap08_final_gate_report.md.
+ *
  * Usage:
  * ```typescript
  * // Start a voice session
