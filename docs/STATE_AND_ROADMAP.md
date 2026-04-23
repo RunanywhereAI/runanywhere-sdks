@@ -14,7 +14,7 @@ Updated: 2026-04-22 (v3.1.1)._
 
 ## TL;DR
 
-- **Current shipped version: v3.1.1** across all 7 packages
+- **Current shipped version: v3.1.2** across all 7 packages
   (Swift / Kotlin / Flutter `runanywhere` + 3 backend plugins / Web
   core+plugins / RN core+plugins). Tagged 2026-04-22.
 - **C ABI version: `RAC_PLUGIN_API_VERSION = 3u`** (bumped in v3.0.0).
@@ -90,10 +90,11 @@ v4.x. None are release-blocking.
    prereq, and GitHub Releases publish credentials). Until an
    operator runs it for v3.1.1+, external SPM consumers must set
    `useLocalNatives = true` in `Package.swift`.
-2. **4 engine CMakeLists migrations** to `rac_add_engine_plugin()`
-   (Sprint 2 of the post-cleanup roadmap) — onnx (365 LOC),
-   whispercpp (207), whisperkit_coreml (45), metalrt (98). Per-engine
-   PRs with platform CI matrix verification.
+2. **4 engine CMakeLists migrations** to `rac_add_engine_plugin()` —
+   DONE in v3.1.2. All 4 engines (onnx, whispercpp, whisperkit_coreml,
+   metalrt) now use the unified pattern; macro extended with
+   TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS /
+   LINK_OPTIONS to support backward-compat target names.
 3. **`engine_plugin_authoring.md` refresh** — DONE in v3.1.1.
 4. **`sdks/{flutter,kotlin,react-native}-sdk.md`** — DONE in v3.1.1.
    Voice API sections rewritten for `VoiceAgentStreamAdapter` +

@@ -4,41 +4,31 @@
 # Unlike other backends, WhisperKit CoreML has no C++ inference engine.
 # The C++ side provides callback storage, vtable dispatch, and registration.
 # Actual inference happens in Swift via registered callbacks to CoreML.
+#
+# v3.1.2: target declaration migrated to rac_add_engine_plugin().
 # =============================================================================
 
 message(STATUS "Configuring WhisperKit CoreML backend...")
 
-# =============================================================================
-# WhisperKit CoreML Backend Library
-# =============================================================================
+include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
 set(WHISPERKIT_COREML_BACKEND_SOURCES
     rac_stt_whisperkit_coreml.cpp
     rac_backend_whisperkit_coreml_register.cpp
-    # GAP 02 Phase 9: unified engine plugin entry point.
     rac_plugin_entry_whisperkit_coreml.cpp
 )
 
-if(RAC_BUILD_SHARED)
-    add_library(rac_backend_whisperkit_coreml SHARED ${WHISPERKIT_COREML_BACKEND_SOURCES})
-else()
-    add_library(rac_backend_whisperkit_coreml STATIC ${WHISPERKIT_COREML_BACKEND_SOURCES})
-endif()
-
-target_include_directories(rac_backend_whisperkit_coreml PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
+# v3.1.2: TARGET_NAME=rac_backend_whisperkit_coreml preserves the
+# historical CMake target name (referenced by the Swift xcframework
+# build + tests). CXX_STANDARD=20 matches the original.
+rac_add_engine_plugin(whisperkit_coreml
+    TARGET_NAME         rac_backend_whisperkit_coreml
+    CXX_STANDARD        20
+    SOURCES             ${WHISPERKIT_COREML_BACKEND_SOURCES}
+    INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include
+    RUNTIMES            ANE
+    FORMATS             COREML
 )
-
-target_link_libraries(rac_backend_whisperkit_coreml PUBLIC
-    rac_commons
-)
-
-target_compile_features(rac_backend_whisperkit_coreml PUBLIC cxx_std_20)
-
-# =============================================================================
-# Summary
-# =============================================================================
 
 message(STATUS "WhisperKit CoreML Backend Configuration:")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME} (Apple-only)")

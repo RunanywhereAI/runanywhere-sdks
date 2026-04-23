@@ -13,6 +13,7 @@ evidence (commit lists, LOC diffs, audit tables) lives at
 | 2026-04-19 | v3.0.0 | C ABI cut-over: delete `rac_service_*`; `RAC_PLUGIN_API_VERSION 2u → 3u` |
 | 2026-04-22 | v3.1.0 | Sample app migrations + delete deprecated shims + DAG primitives + perf/cancel parity harnesses |
 | 2026-04-22 | v3.1.1 | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
+| 2026-04-22 | v3.1.2 | 4 engine CMakeLists migrated to `rac_add_engine_plugin()` (onnx, whispercpp, whisperkit_coreml, metalrt); macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS |
 
 ---
 
@@ -211,6 +212,50 @@ L63-64 ("build when a 2nd pipeline needs them").
   `test_graph_primitives` 13/13, `perf_producer` 144 ns/event,
   `cancel_producer` clean.
 - Doc consolidation (this set of docs).
+
+---
+
+## v3.1.2 engine CMakeLists normalization (2026-04-22)
+
+Sprint 2 of the post-v3.1 cleanup roadmap. Migrated 4 hand-rolled
+engine CMakeLists to `rac_add_engine_plugin()`. Tagged 2026-04-22.
+
+**Headline deliverables:**
+- `cmake/plugins.cmake` macro extended with 5 new options:
+  `TARGET_NAME` (override default `runanywhere_<name>`),
+  `CXX_STANDARD` (default 17, can be 20),
+  `SHARED_ONLY` (skip the static-fold-into-rac_commons path),
+  `COMPILE_OPTIONS` (per-target -O3 / visibility flags),
+  `LINK_OPTIONS` (per-target linker flags incl. Android 16K alignment).
+  These were necessary to migrate engines without renaming their
+  existing `rac_backend_X` CMake targets (preserves 52+ existing
+  references across tests + sample apps + RN Android linker config).
+- Macro hidden-visibility logic fixed: only applied for SHARED+dlopen
+  builds; STATIC archives keep default visibility so cross-TU
+  symbol resolution works at the final link site.
+- 4 engines migrated: onnx (365 LOC kept its custom Sherpa-ONNX
+  cross-platform IMPORTED setup), whispercpp (whisper.cpp FetchContent
+  retained), whisperkit_coreml (down to 35 LOC), metalrt (kept
+  OBJECT-library structure + emits engine metadata via direct
+  GLOBAL properties).
+- 7 packages bumped to `3.1.2`.
+
+**Pre-existing latent bugs surfaced (NOT fixed in this sprint):**
+- `engines/whispercpp/rac_stt_whispercpp.cpp` includes
+  `rac_stt_whispercpp.h` which doesn't exist in the source tree
+  (only in v0.19.13 era xcframework). Build of `rac_backend_whispercpp`
+  fails when the engine is opted in. Tracked as separate fix.
+- `engines/onnx/CMakeLists.txt` `RAG_DIR` variable resolves to a
+  non-existent path (`features/rag` at repo root), so
+  `onnx_embedding_provider.cpp` is silently skipped from the build.
+  Bug-compat preserved per Sprint 2 scope; fixing it surfaces a
+  separate stale `#include "../../backends/onnx/onnx_backend.h"` in
+  the source. Tracked as separate fix.
+- `engines/onnx/rac_backend_onnx_register.cpp` defines `g_onnx_*_ops`
+  inside an anonymous namespace, which gives them internal linkage —
+  but `rac_plugin_entry_onnx.cpp` declares them with `extern "C"`.
+  This works for STATIC archives (deferred resolution at final link)
+  but would fail for SHARED. Same pattern in llamacpp. Tracked.
 
 ---
 

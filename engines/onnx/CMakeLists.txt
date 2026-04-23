@@ -205,78 +205,76 @@ elseif(RAC_PLATFORM_WINDOWS)
 endif()
 
 # =============================================================================
-# ONNX Backend Library (STT, TTS, VAD only)
+# ONNX Backend Library (STT, TTS, VAD + RAG embeddings)
 # =============================================================================
 # Diffusion is Apple CoreML-only; no ONNX diffusion in this backend.
+# v3.1.2: target declaration migrated to rac_add_engine_plugin() macro
+# (cmake/plugins.cmake). Sherpa-ONNX cross-platform IMPORTED setup above
+# stays inline — engine-specific.
+
+include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+
+# Resolve the runanywhere-commons root for include paths.
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 set(ONNX_BACKEND_SOURCES
     onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
     wakeword_onnx.cpp
-    # GAP 02 Phase 9: unified engine plugin entry point.
     rac_plugin_entry_onnx.cpp
 )
 
 # ONNX embedding provider lives in src/features/rag/ but is compiled here
 # to avoid a shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+#
+# Note: pre-v3.1.2, the RAG_DIR variable below pointed at a non-existent
+# path (`engines/onnx/../../features/rag` resolves to `features/rag` at
+# repo root), so the EXISTS check below silently failed and these sources
+# were NEVER compiled. Kept verbatim for bug-compat — fixing it surfaces a
+# latent stale include in onnx_embedding_provider.cpp that's a separate
+# scope from the Sprint 2 CMake-normalization. Tracked as a follow-up.
 set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../features/rag")
+set(ONNX_EXTRA_INCLUDES "")
 if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
     list(APPEND ONNX_BACKEND_SOURCES
         ${RAG_DIR}/onnx_embedding_provider.cpp
         ${RAG_DIR}/rac_onnx_embeddings_register.cpp
     )
+    list(APPEND ONNX_EXTRA_INCLUDES ${RAG_DIR})
     message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
 endif()
 
-set(ONNX_BACKEND_HEADERS
-    onnx_backend.h
-)
-
-if(RAC_BUILD_SHARED)
-    add_library(rac_backend_onnx SHARED ${ONNX_BACKEND_SOURCES} ${ONNX_BACKEND_HEADERS})
-else()
-    add_library(rac_backend_onnx STATIC ${ONNX_BACKEND_SOURCES} ${ONNX_BACKEND_HEADERS})
-endif()
-
-# Resolve the runanywhere-commons root (3 levels up from src/backends/onnx/)
-# GAP 06 Phase 9: was sdk/runanywhere-commons/src/backends/<name>/ → ../../.. = commons.
-# Now engines/<name>/ → ../../sdk/runanywhere-commons.
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
-
-target_include_directories(rac_backend_onnx PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${RAC_COMMONS_ROOT_DIR}/include
-    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
-)
-
-# RAG embedding provider headers (onnx_embedding_provider.h lives in features/rag/)
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.h")
-    target_include_directories(rac_backend_onnx PRIVATE ${RAG_DIR})
-endif()
-
-# Define RAC_ONNX_BUILDING to export symbols with visibility("default")
-# Define RAC_HAS_ONNX to enable ONNX Runtime code paths
-target_compile_definitions(rac_backend_onnx PRIVATE RAC_ONNX_BUILDING RAC_HAS_ONNX)
-
-target_link_libraries(rac_backend_onnx PUBLIC
-    rac_commons
-    onnxruntime
-    nlohmann_json::nlohmann_json
-)
-
+# Compose link libs + compile defs + sherpa-ONNX header path.
+set(ONNX_LINK_LIBS onnxruntime nlohmann_json::nlohmann_json)
+set(ONNX_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX)
 if(SHERPA_ONNX_AVAILABLE)
-    target_link_libraries(rac_backend_onnx PUBLIC sherpa_onnx)
-    target_compile_definitions(rac_backend_onnx PUBLIC SHERPA_ONNX_AVAILABLE=1)
-    target_include_directories(rac_backend_onnx PUBLIC ${SHERPA_HEADER_PATH})
+    list(APPEND ONNX_LINK_LIBS sherpa_onnx)
+    list(APPEND ONNX_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=1)
+    list(APPEND ONNX_EXTRA_INCLUDES ${SHERPA_HEADER_PATH})
 else()
-    target_compile_definitions(rac_backend_onnx PUBLIC SHERPA_ONNX_AVAILABLE=0)
+    list(APPEND ONNX_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=0)
 endif()
 
-set_target_properties(rac_backend_onnx PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
+# v3.1.2: TARGET_NAME=rac_backend_onnx preserves the historical CMake
+# target name so the 52 existing references across tests + sample apps +
+# RN Android linker config + WASM exports keep working without renaming.
+# CXX_STANDARD=20 because the ONNX backend uses std::span / concepts.
+# Default linkage (STATIC unless RAC_BUILD_SHARED=ON) — matches the
+# pre-v3.1.2 hand-rolled CMakeLists exactly. The static archive defers
+# the (pre-existing) cross-TU symbol resolution to the final link site
+# (e.g. test_plugin_entry_onnx, the Swift xcframework, Android shared lib).
+rac_add_engine_plugin(onnx
+    TARGET_NAME         rac_backend_onnx
+    CXX_STANDARD        20
+    SOURCES             ${ONNX_BACKEND_SOURCES}
+    LINK_LIBRARIES      ${ONNX_LINK_LIBS}
+    INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
+                        ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${ONNX_EXTRA_INCLUDES}
+    COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS}
+    RUNTIMES            CPU CORE_ML NNAPI
+    FORMATS             ONNX
 )
 
 # =============================================================================

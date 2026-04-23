@@ -96,79 +96,70 @@ endif()
 # =============================================================================
 # WhisperCPP Backend Library
 # =============================================================================
+# v3.1.2: target declaration migrated to rac_add_engine_plugin() macro.
+# whisper.cpp FetchContent + GGML_* platform option setup above stays
+# inline — engine-specific.
+
+include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
 set(WHISPERCPP_BACKEND_SOURCES
     whispercpp_backend.cpp
     rac_stt_whispercpp.cpp
     rac_backend_whispercpp_register.cpp
-    # GAP 02 Phase 9: unified engine plugin entry point.
     rac_plugin_entry_whispercpp.cpp
 )
 
-set(WHISPERCPP_BACKEND_HEADERS
-    whispercpp_backend.h
-)
-
-if(RAC_BUILD_SHARED)
-    add_library(rac_backend_whispercpp SHARED ${WHISPERCPP_BACKEND_SOURCES} ${WHISPERCPP_BACKEND_HEADERS})
-else()
-    add_library(rac_backend_whispercpp STATIC ${WHISPERCPP_BACKEND_SOURCES} ${WHISPERCPP_BACKEND_HEADERS})
-endif()
-
-target_include_directories(rac_backend_whispercpp PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/include/rac/backends
-    ${whispercpp_SOURCE_DIR}/include
-    ${whispercpp_SOURCE_DIR}/ggml/include
-)
-
-# Define RAC_WHISPERCPP_BUILDING to export symbols with visibility("default")
-target_compile_definitions(rac_backend_whispercpp PRIVATE RAC_WHISPERCPP_BUILDING)
-
-target_link_libraries(rac_backend_whispercpp PUBLIC
-    rac_commons
-    whisper
-    nlohmann_json::nlohmann_json
-)
-
-target_compile_features(rac_backend_whispercpp PUBLIC cxx_std_20)
-
-# =============================================================================
-# Platform-specific configuration
-# =============================================================================
+# Compose platform-specific link libs + compile defs.
+set(WHISPERCPP_LINK_LIBS whisper nlohmann_json::nlohmann_json)
+set(WHISPERCPP_COMPILE_DEFS RAC_WHISPERCPP_BUILDING)
+set(WHISPERCPP_COMPILE_OPTS "")
+set(WHISPERCPP_LINK_OPTS "")
 
 if(RAC_PLATFORM_IOS)
     message(STATUS "Configuring WhisperCPP backend for iOS")
-    target_link_libraries(rac_backend_whispercpp PUBLIC
+    list(APPEND WHISPERCPP_LINK_LIBS
         "-framework Foundation"
         "-framework Accelerate"
         "-framework Metal"
         "-framework MetalKit"
     )
-    target_compile_definitions(rac_backend_whispercpp PRIVATE GGML_USE_METAL=1)
-
+    list(APPEND WHISPERCPP_COMPILE_DEFS GGML_USE_METAL=1)
 elseif(RAC_PLATFORM_ANDROID)
     message(STATUS "Configuring WhisperCPP backend for Android")
-    target_link_libraries(rac_backend_whispercpp PRIVATE log)
+    list(APPEND WHISPERCPP_LINK_LIBS log)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
-    target_compile_options(rac_backend_whispercpp PRIVATE -O3 -ffunction-sections -fdata-sections)
-    # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-    target_link_options(rac_backend_whispercpp PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
-
+    list(APPEND WHISPERCPP_COMPILE_OPTS -O3 -ffunction-sections -fdata-sections)
+    # 16KB page alignment for Android 15+ (API 35) compliance.
+    list(APPEND WHISPERCPP_LINK_OPTS -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 elseif(RAC_PLATFORM_MACOS)
     message(STATUS "Configuring WhisperCPP backend for macOS")
-    target_link_libraries(rac_backend_whispercpp PUBLIC
+    list(APPEND WHISPERCPP_LINK_LIBS
         "-framework Foundation"
         "-framework Accelerate"
         "-framework Metal"
         "-framework MetalKit"
     )
-
 elseif(RAC_PLATFORM_WINDOWS)
     message(STATUS "Configuring WhisperCPP backend for Windows")
-    # No extra link libraries needed on Windows
 endif()
+
+# v3.1.2: TARGET_NAME=rac_backend_whispercpp preserves the historical
+# CMake target name; CXX_STANDARD=20 matches the original.
+rac_add_engine_plugin(whispercpp
+    TARGET_NAME         rac_backend_whispercpp
+    CXX_STANDARD        20
+    SOURCES             ${WHISPERCPP_BACKEND_SOURCES}
+    LINK_LIBRARIES      ${WHISPERCPP_LINK_LIBS}
+    INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include
+                        ${CMAKE_SOURCE_DIR}/include/rac/backends
+                        ${whispercpp_SOURCE_DIR}/include
+                        ${whispercpp_SOURCE_DIR}/ggml/include
+    COMPILE_DEFINITIONS ${WHISPERCPP_COMPILE_DEFS}
+    COMPILE_OPTIONS     ${WHISPERCPP_COMPILE_OPTS}
+    LINK_OPTIONS        ${WHISPERCPP_LINK_OPTS}
+    RUNTIMES            CPU METAL
+    FORMATS             GGML
+)
 
 # =============================================================================
 # JNI TARGET (Android)

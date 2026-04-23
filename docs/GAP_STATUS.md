@@ -23,7 +23,7 @@ Updated: 2026-04-22 (post v3.1.0)._
 | 03 | [Dynamic plugin loading](../v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md) | **CLOSED (PARTIAL)** | v2 | Real-model GGUF E2E + valgrind under CI is QA effort. |
 | 04 | [Engine router + HW profile](../v2_gap_specs/GAP_04_ENGINE_ROUTER_AND_HARDWARE_PROFILE.md) | **CLOSED (PARTIAL)** | v2 | iOS17 / ANE device E2E is QA effort. |
 | 05 | [DAG runtime](../v2_gap_specs/GAP_05_DAG_RUNTIME.md) | **CLOSED (PARTIAL)** | v3.1 | Skeleton (CancelToken / RingBuffer / StreamEdge) shipped. `GraphScheduler` / `PipelineNode` / `MemoryPool` deferred per spec L63-64 until a 2nd pipeline needs them. |
-| 06 | [Engines top-level reorg](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md) | **CLOSED (PARTIAL)** | v2 + v3.1 audit | Macro shipped (`cmake/plugins.cmake`); 4/9 engines adopted. 5 hand-rolled engines documented for per-engine PRs. |
+| 06 | [Engines top-level reorg](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md) | **CLOSED** | v2 + v3.1.2 | All 9 engines now use the unified pattern: 4 stubs + llamacpp + onnx + whispercpp + whisperkit_coreml via `rac_add_engine_plugin()`; metalrt records the same engine-metadata via direct GLOBAL properties (its OBJECT-library structure can't fit STATIC/SHARED branching). Macro extended in v3.1.2 with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS to support backward-compat target names. |
 | 07 | [Single root CMake](../v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md) | **CLOSED** | v3.1 | NDK pin hoisted to root `gradle.properties`. |
 | 08 | [Frontend duplication delete](../v2_gap_specs/GAP_08_FRONTEND_LOGIC_DUPLICATION.md) | **CLOSED (PARTIAL)** | v2 + v3.1 | Kotlin orchestration (#1) deleted; Dart god-class (#4) blocked on Dart language constraint (v4.x); sample-app E2E (#9) + device parity (#10) are QA effort; download orchestration (#3) deferred pending commons refactor. |
 | 09 | [Streaming consistency](../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md) | **CLOSED** | v3.1 | All 9 criteria OK — including #6 (zero hand-written `VoiceSessionEvent`), #7 (cancel parity harness), #8 (per-SDK p50 < 1ms with real proto decode). |
@@ -65,7 +65,9 @@ cascade), `RingBuffer<T>` (cache-aligned SPSC), `StreamEdge<T>`
 ### GAP 06 — Engines top-level reorg
 `engines/<name>/CMakeLists.txt` per engine + `cmake/plugins.cmake`
 exposes `rac_add_engine_plugin()` macro + `rac_force_load()`
-companion. 4/9 engines on macro; 5 with per-engine migration plan.
+companion. 8/9 engines on macro (v3.1.2); metalrt is OBJECT-library
+(structurally different) but emits the same metadata via GLOBAL
+properties.
 
 ### GAP 07 — Single root CMake
 Root `CMakeLists.txt` orchestrates entire repo; `CMakePresets.json`
