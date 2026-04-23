@@ -32,9 +32,22 @@ import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
 import 'package:runanywhere/public/types/types.dart';
 
-/// The RunAnywhere SDK entry point
+/// The RunAnywhere SDK entry point (v3.x — DEPRECATED in v4.0).
+///
+/// > **v4.0 deprecation**: This static class is the v3.x API shape.
+/// > It still works in v4.0.x (forwards to the new singleton) but
+/// > emits analyzer warnings on every reference. Migrate to
+/// > [RunAnywhereSDK.instance] for v4.1+ compatibility.
+/// >
+/// > See [`docs/migrations/v3_to_v4_flutter.md`](https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/docs/migrations/v3_to_v4_flutter.md)
+/// > for the full v3 → v4 method mapping table.
 ///
 /// Matches Swift `RunAnywhere` enum from Public/RunAnywhere.swift
+@Deprecated(
+  'v4.0: use RunAnywhereSDK.instance.{llm,stt,tts,vlm,voice,models,downloads}.method() '
+  'instead. The static class will be deleted in v4.1. See '
+  'docs/migrations/v3_to_v4_flutter.md for the full mapping table.',
+)
 class RunAnywhere {
   static SDKInitParams? _initParams;
   static SDKEnvironment? _currentEnvironment;

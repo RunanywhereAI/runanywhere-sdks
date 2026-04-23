@@ -77,9 +77,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
   }
 
-  /// Sync model state from SDK (matches Swift pattern)
+  /// Sync model state from SDK (v4.0 API).
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -91,7 +91,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool get _canSend =>
       _controller.text.isNotEmpty &&
       !_isGenerating &&
-      sdk.RunAnywhere.isModelLoaded;
+      sdk.RunAnywhereSDK.instance.llm.isLoaded;
 
   Future<void> _sendMessage() async {
     if (!_canSend) return;
@@ -322,8 +322,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      final streamingResult =
-          await sdk.RunAnywhere.generateStream(prompt, options: options);
+      final streamingResult = await sdk.RunAnywhereSDK.instance.llm
+          .generateStream(prompt, options: options);
 
       await for (final token in streamingResult.stream) {
         if (_timeToFirstToken == null && _generationStartTime != null) {
@@ -388,7 +388,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final modelName = _loadedModelName;
 
     try {
-      final result = await sdk.RunAnywhere.generate(prompt, options: options);
+      final result = await sdk.RunAnywhereSDK.instance.llm
+          .generate(prompt, options: options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -554,7 +555,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)
     LLMFramework? framework;
-    if (sdk.RunAnywhere.isModelLoaded && _loadedFramework != null) {
+    if (sdk.RunAnywhereSDK.instance.llm.isLoaded && _loadedFramework != null) {
       framework = _mapInferenceFramework(_loadedFramework);
     }
 

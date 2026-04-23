@@ -40,7 +40,17 @@ export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
 export 'public/extensions/runanywhere_lora.dart';
 export 'public/extensions/runanywhere_storage.dart';
+// v4.0: legacy static API (deprecated; deleted in v4.1).
 export 'public/runanywhere.dart';
+// v4.0: canonical instance API. Use RunAnywhereSDK.instance.{capability}.
+export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
+export 'public/capabilities/runanywhere_llm.dart' show RunAnywhereLLM;
+export 'public/capabilities/runanywhere_stt.dart' show RunAnywhereSTT;
+export 'public/capabilities/runanywhere_tts.dart' show RunAnywhereTTS;
+export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
+export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
+export 'public/capabilities/runanywhere_models.dart' show RunAnywhereModels;
+export 'public/capabilities/runanywhere_downloads.dart' show RunAnywhereDownloads;
 export 'public/runanywhere_tool_calling.dart';
 export 'public/types/tool_calling_types.dart';
 export 'public/types/types.dart' hide SupabaseConfig;

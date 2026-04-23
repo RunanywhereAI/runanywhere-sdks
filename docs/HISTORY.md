@@ -15,6 +15,7 @@ evidence (commit lists, LOC diffs, audit tables) lives at
 | 2026-04-22 | v3.1.1 | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
 | 2026-04-22 | v3.1.2 | 4 engine CMakeLists migrated to `rac_add_engine_plugin()` (onnx, whispercpp, whisperkit_coreml, metalrt); macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS |
 | 2026-04-22 | v3.1.3 | Kotlin download multi-file path DRY refactor (-27 LOC); GAP 08 #3 architectural blocker documented |
+| 2026-04-22 | Flutter v4.0.0 | BREAKING — Flutter `runanywhere` god-class split into `RunAnywhereSDK.instance.{capability}` API; static class kept as `@Deprecated` shim (deleted v4.1) |
 
 ---
 
@@ -213,6 +214,70 @@ L63-64 ("build when a 2nd pipeline needs them").
   `test_graph_primitives` 13/13, `perf_producer` 144 ns/event,
   `cancel_producer` clean.
 - Doc consolidation (this set of docs).
+
+---
+
+## Flutter v4.0.0 — instance-method API (2026-04-22)
+
+Sprint 4 of the post-v3.1 cleanup roadmap. BREAKING change to the
+Flutter `runanywhere` package only — splits the 2,607-LOC
+`RunAnywhere` god-class into the canonical Dart instance-method
+pattern (matches `supabase-dart`, `firebase_core`).
+
+> **Affected packages**: ONLY `runanywhere` (Flutter) + 3 backend
+> plugins. Swift / Kotlin / RN / Web stay on v3.1.3 (no API change).
+
+**Headline deliverables:**
+- New singleton at `lib/public/runanywhere_v4.dart` (~110 LOC):
+  `RunAnywhereSDK.instance` with lazy capability getters.
+- 7 capability classes under `lib/public/capabilities/`:
+  - `runanywhere_llm.dart` — LLM (load/unload/chat/generate/stream/cancel)
+  - `runanywhere_stt.dart` — STT (load/unload/transcribe/transcribeWithResult)
+  - `runanywhere_tts.dart` — TTS (loadVoice/unloadVoice/synthesize)
+  - `runanywhere_vlm.dart` — VLM (load/unload/processImage/stream/describe/askAbout)
+  - `runanywhere_voice.dart` — Voice Agent (initialize/cleanup/isReady)
+  - `runanywhere_models.dart` — Models (available/refresh)
+  - `runanywhere_downloads.dart` — Downloads (start/delete/storageInfo/list)
+- Deprecation shim: `class RunAnywhere` annotated `@Deprecated(...)`
+  at the class level — every reference emits an analyzer warning
+  pointing at `RunAnywhereSDK.instance` + the migration guide.
+  Static API still works in v4.0.x; deletion in v4.1.
+- Sample app migration (showcase pattern): `model_manager.dart` and
+  `chat_interface_view.dart` migrated to the new instance API.
+  Remaining sample files continue to work via the deprecation shim;
+  migrate at consumer pace.
+- New migration guide: `docs/migrations/v3_to_v4_flutter.md` with
+  full v3.x → v4.0 method mapping table for all 80+ static APIs.
+- Barrel exports: `lib/runanywhere.dart` exports both the legacy
+  `RunAnywhere` (deprecated) and the new `RunAnywhereSDK` +
+  capability classes.
+- 4 Flutter packages bumped to `4.0.0`. Other 8 packages stay on
+  `3.1.3` — this is a Flutter-only major bump.
+
+**Why instance methods (not the original "extension" plan):**
+Per the Phase 7 analysis (HISTORY.md L130+), Dart language constraints
+prevent the Swift-style extension split without breaking the API:
+1. `extension X on T { static method() }` — caller writes `X.method()`
+   not `Type.method()` (breaks consumers).
+2. `part`/`part of` — Dart parser requires class body in one file.
+3. Top-level functions + facade — preserves API but adds ~100 LOC
+   of forwarding boilerplate per method.
+4. Instance methods on singleton — canonical Dart pattern. Chosen.
+
+**API shape comparison:**
+
+```dart
+// v3.x
+await RunAnywhere.loadModel('llama-3-8b');
+await RunAnywhere.chat('Hello!');
+await RunAnywhere.transcribe(audio);
+
+// v4.0
+final ra = RunAnywhereSDK.instance;
+await ra.llm.load('llama-3-8b');
+await ra.llm.chat('Hello!');
+await ra.stt.transcribe(audio);
+```
 
 ---
 

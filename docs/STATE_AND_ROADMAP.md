@@ -14,9 +14,10 @@ Updated: 2026-04-22 (v3.1.1)._
 
 ## TL;DR
 
-- **Current shipped version: v3.1.3** across all 7 packages
-  (Swift / Kotlin / Flutter `runanywhere` + 3 backend plugins / Web
-  core+plugins / RN core+plugins). Tagged 2026-04-22.
+- **Current shipped versions** (split-version world):
+  - Flutter `runanywhere` + 3 plugins: **v4.0.0** (BREAKING — instance-method API)
+  - Swift / Kotlin / Web / RN: **v3.1.3** (unchanged)
+  - All tagged 2026-04-22.
 - **C ABI version: `RAC_PLUGIN_API_VERSION = 3u`** (bumped in v3.0.0).
   Wire-compatible IDL extension shipped in v3.1: `MetricsEvent.created_at_ns`
   field 8.
@@ -100,14 +101,14 @@ v4.x. None are release-blocking.
    Voice API sections rewritten for `VoiceAgentStreamAdapter` +
    proto event payload switch.
 
-### Architectural (v4.x / breaking)
+### Architectural (v4.x / breaking) — SHIPPED
 
-5. **Flutter `runanywhere.dart` 2,607 LOC god-class** — Dart language
-   constraints prevent a Swift-style extension split without
-   breaking the API. Recommendation: migrate to the canonical Dart
-   pattern of `RunAnywhere.instance.capability.method()` (matches
-   `supabase-dart`, `firebase_core`). Rationale + 4 explored
-   options preserved in [`HISTORY.md#flutter-split-analysis`](HISTORY.md#flutter-split-analysis).
+5. **Flutter `runanywhere.dart` god-class split** — DONE in v4.0.0.
+   New API shape: `RunAnywhereSDK.instance.{llm,stt,tts,vlm,voice,
+   models,downloads}.method()`. Static `RunAnywhere.X` API kept as
+   `@Deprecated` shim during v4.0.x window; deletion in v4.1.
+   See [`docs/migrations/v3_to_v4_flutter.md`](migrations/v3_to_v4_flutter.md)
+   for the full v3 → v4 method mapping.
 
 6. **Kotlin LOC trim — GAP 08 #3 (download orchestration)** —
    AUDITED in v3.1.3. Architectural blocker: requires choosing a
@@ -140,7 +141,8 @@ v4.x. None are release-blocking.
 |---|---|---|
 | `RAC_PLUGIN_API_VERSION` | `3u` | Breaking C ABI changes (struct field add/remove, function signature change). |
 | `rac_voice_event_abi.h` `RAC_ABI_VERSION` | `2u` | Voice-agent proto-event ABI changes specifically. |
-| Package semver (Swift/Flutter/Kotlin/RN/Web) | `3.1.0` | Sprint releases. v4.x for breaking SDK API changes. |
+| Swift / Kotlin / RN / Web semver | `3.1.3` | Sprint releases. v4.x reserved for breaking changes. |
+| Flutter `runanywhere` semver | `4.0.0` | v4.0 = instance-method API (BREAKING vs v3.x); v4.1 deletes static shim. |
 | IDL `runanywhere.v1.*` | `v1` | New proto versions only on wire-incompatible changes. |
 
 ## Doc index (post-consolidation)
