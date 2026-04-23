@@ -1,20 +1,17 @@
 # RunAnywhere React Native SDK
 
-_Refreshed for v3.1.1 (2026-04). Voice surface reflects the new Nitro
-`getVoiceAgentHandle()` method + `AsyncIterable<VoiceEvent>` adapter._
-
 React Native SDK for on-device AI inference. Uses Nitrogen/Nitro for high-performance TypeScript-to-C++ bridging.
 
 ## Installation
 
 ```bash
 # Core SDK (required)
-yarn add @runanywhere/core@^3.1.0
+yarn add @runanywhere/core@^0.19.13
 
 # Backend modules (pick what you need)
-yarn add @runanywhere/llamacpp@^3.1.0    # LLM text generation (GGUF models)
-yarn add @runanywhere/onnx@^3.1.0        # STT, TTS, VAD (ONNX Runtime)
-yarn add @runanywhere/genie@^3.1.0       # Qualcomm NPU inference (stub)
+yarn add @runanywhere/llamacpp@^0.19.13    # LLM text generation (GGUF models)
+yarn add @runanywhere/onnx@^0.19.13        # STT, TTS, VAD (ONNX Runtime)
+yarn add @runanywhere/genie@^0.19.13       # Qualcomm NPU inference (stub)
 ```
 
 ### Peer Dependencies
@@ -272,7 +269,7 @@ type VLMImage =
 
 ### Voice Agent
 
-The v3.1 voice agent uses a proto-event stream wired through Nitro.
+The voice agent uses a proto-event stream wired through Nitro.
 Subscribe via `VoiceAgentStreamAdapter` for an `AsyncIterable<VoiceEvent>`.
 
 ```typescript
@@ -334,8 +331,7 @@ const result = await RunAnywhere.processVoiceTurn(audioBase64);
 ```
 
 See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for v2.x → v3.1 migration of consumers using the deleted
-`startVoiceSession` / `VoiceSessionHandle` API.
+for migration of consumers using the deleted `startVoiceSession` / `VoiceSessionHandle` API.
 
 ### Structured Output
 

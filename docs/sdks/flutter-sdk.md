@@ -1,8 +1,5 @@
 # RunAnywhere Flutter SDK
 
-_Refreshed for v3.1.1 (2026-04). API surface reflects the proto-stream
-voice agent + the deletion of `VoiceSessionEvent` in v3.1._
-
 Cross-platform Flutter SDK for on-device AI inference. Supports iOS and Android with native C++ backends via Dart FFI.
 
 ## Installation
@@ -12,12 +9,12 @@ Cross-platform Flutter SDK for on-device AI inference. Supports iOS and Android 
 ```yaml
 dependencies:
   # Core SDK (required)
-  runanywhere: ^3.1.0
+  runanywhere: ^0.19.13
 
   # Backend modules (pick what you need)
-  runanywhere_llamacpp: ^3.1.0   # LLM text generation (GGUF models)
-  runanywhere_onnx: ^3.1.0       # STT, TTS, VAD (ONNX Runtime)
-  runanywhere_genie: ^3.1.0      # Qualcomm NPU inference (stub)
+  runanywhere_llamacpp: ^0.19.13   # LLM text generation (GGUF models)
+  runanywhere_onnx: ^0.19.13       # STT, TTS, VAD (ONNX Runtime)
+  runanywhere_genie: ^0.19.13      # Qualcomm NPU inference (stub)
 ```
 
 ## Platform Requirements
@@ -245,7 +242,7 @@ VLMImage.base64(String encoded)
 
 ### Voice Agent
 
-The v3.1 voice agent uses a proto-event stream wired through a thin
+The voice agent uses a proto-event stream wired through a thin
 adapter. There is no `VoiceSessionHandle` actor anymore — the C++
 voice agent owns the orchestration; the Dart side subscribes to its
 event stream.
@@ -310,8 +307,7 @@ await subscription.cancel();   // deregisters the C-side callback
 - `MetricsEvent` — per-turn latency breakdown (incl. `created_at_ns`)
 
 See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for v2.x → v3.1 migration of consumers using the deleted
-`VoiceSessionEvent` enum.
+for migration of consumers using the deleted `VoiceSessionEvent` enum.
 ```
 
 ### Tool Calling

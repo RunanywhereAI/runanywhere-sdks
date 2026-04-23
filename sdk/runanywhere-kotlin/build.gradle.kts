@@ -57,8 +57,7 @@ group =
         else -> "io.github.sanchitmonga22" // Currently verified namespace
     }
 
-// Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback
-// v3.1.0 release (Phase 10): bumped fallback from 3.0.0 to 3.1.0.
+// Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback (0.1.5-SNAPSHOT).
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")

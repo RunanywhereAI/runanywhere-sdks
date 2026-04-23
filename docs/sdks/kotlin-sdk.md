@@ -1,8 +1,5 @@
 # RunAnywhere Kotlin Multiplatform SDK
 
-_Refreshed for v3.1.1 (2026-04). Voice surface reflects
-`CppBridgeVoiceAgent` + the canonical `Flow<VoiceEvent>` proto stream._
-
 Cross-platform SDK for on-device AI inference with intelligent routing. Supports JVM, Android, and (planned) Native targets.
 
 ## Installation
@@ -12,12 +9,12 @@ Cross-platform SDK for on-device AI inference with intelligent routing. Supports
 ```kotlin
 dependencies {
     // Core SDK (required)
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:3.1.0")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.1.5-SNAPSHOT")
 
     // Backend modules (pick what you need)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:3.1.0")  // LLM
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:3.1.0")     // STT/TTS/VAD
-    implementation("io.github.sanchitmonga22:runanywhere-genie-android:3.1.0") // Qualcomm NPU (stub)
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.1.5-SNAPSHOT")  // LLM
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.1.5-SNAPSHOT")     // STT/TTS/VAD
+    implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.1.5-SNAPSHOT") // Qualcomm NPU (stub)
 }
 ```
 
@@ -28,7 +25,7 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 dependencies {
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:sdk-runanywhere-kotlin:v3.1.0")
+    implementation("com.github.RunanywhereAI.runanywhere-sdks:sdk-runanywhere-kotlin:main-SNAPSHOT")
 }
 ```
 
@@ -283,7 +280,7 @@ VLMImage.fromRGBPixels(data: ByteArray, width: Int, height: Int): VLMImage
 
 ### Voice Agent (Complete Pipeline)
 
-The v3.1 voice agent uses a proto-event stream backed by the C++
+The voice agent uses a proto-event stream backed by the C++
 voice agent. There is no `VoiceSessionEvent` sealed class anymore —
 consume the `VoiceEvent` proto directly via `VoiceAgentStreamAdapter`.
 
@@ -341,8 +338,7 @@ CppBridgeVoiceAgent.destroy()         // tears down the native handle
 ```
 
 See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for v2.x → v3.1 migration of consumers using the deleted
-`VoiceSessionEvent` sealed class.
+for migration of consumers using the deleted `VoiceSessionEvent` sealed class.
 
 ### Model Management
 
