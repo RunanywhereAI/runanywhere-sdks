@@ -1,10 +1,10 @@
 # GAP Status — Rolling Scoreboard
 
-_Single source of truth for the 11 GAP specs. Each GAP's full per-
-criterion final-gate report lives at
-[`archive/gap-reports/`](archive/gap-reports/) for citation. This
-file is the rolling status — update when a GAP's status changes.
-Updated: 2026-04-22 (post v3.1.0)._
+_Single source of truth for the 11 GAP specs (10 in repo; GAP 10
+spec was never written). Each GAP's full per-criterion final-gate
+report lives at [`archive/gap-reports/`](archive/gap-reports/) for
+citation. This file tracks BRANCH state — `feat/v2-architecture`,
+not yet merged or released. Updated: 2026-04-22._
 
 ## Status legend
 
@@ -16,18 +16,22 @@ Updated: 2026-04-22 (post v3.1.0)._
 
 ## Scoreboard
 
-| GAP | Spec | Status | Closed in | Residual / open |
+_All "Closed in" entries refer to **branch commits**, not released
+versions. The branch has not been tagged or merged to main yet. See
+[`HISTORY.md`](HISTORY.md) for the chronological commit ordering._
+
+| GAP | Spec | Status | Closed by | Residual / open |
 |---|---|---|---|---|
-| 01 | [IDL + codegen](../v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md) | **CLOSED** | v2 | None — drift CI active. |
-| 02 | [Unified engine plugin ABI](../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md) | **CLOSED** | v3.0.0 | None. Single-path; legacy registry deleted. |
-| 03 | [Dynamic plugin loading](../v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md) | **CLOSED (PARTIAL)** | v2 | Real-model GGUF E2E + valgrind under CI is QA effort. |
-| 04 | [Engine router + HW profile](../v2_gap_specs/GAP_04_ENGINE_ROUTER_AND_HARDWARE_PROFILE.md) | **CLOSED (PARTIAL)** | v2 | iOS17 / ANE device E2E is QA effort. |
-| 05 | [DAG runtime](../v2_gap_specs/GAP_05_DAG_RUNTIME.md) | **CLOSED (PARTIAL)** | v3.1 | Skeleton (CancelToken / RingBuffer / StreamEdge) shipped. `GraphScheduler` / `PipelineNode` / `MemoryPool` deferred per spec L63-64 until a 2nd pipeline needs them. |
-| 06 | [Engines top-level reorg](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md) | **CLOSED** | v2 + v3.1.2 | All 9 engines now use the unified pattern: 4 stubs + llamacpp + onnx + whispercpp + whisperkit_coreml via `rac_add_engine_plugin()`; metalrt records the same engine-metadata via direct GLOBAL properties (its OBJECT-library structure can't fit STATIC/SHARED branching). Macro extended in v3.1.2 with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS to support backward-compat target names. |
-| 07 | [Single root CMake](../v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md) | **CLOSED** | v3.1 | NDK pin hoisted to root `gradle.properties`. |
-| 08 | [Frontend duplication delete](../v2_gap_specs/GAP_08_FRONTEND_LOGIC_DUPLICATION.md) | **CLOSED (PARTIAL)** | v2 + v3.1 + v4.0 | Kotlin orchestration (#1) deleted; Dart god-class (#4) split into instance-method API in **v4.0** (Flutter only); sample-app E2E (#9) + device parity (#10) are QA effort; download orchestration (#3) deferred pending commons HTTP-client decision. |
-| 09 | [Streaming consistency](../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md) | **CLOSED** | v3.1 | All 9 criteria OK — including #6 (zero hand-written `VoiceSessionEvent`), #7 (cancel parity harness), #8 (per-SDK p50 < 1ms with real proto decode). |
-| 11 | [Legacy cleanup](../v2_gap_specs/GAP_11_REMOVE_LEGACY.md) | **CLOSED** | v3.0.0 | All voice-session shims also deleted in v3.1 P4. Zero `rac_service_*` references in code. |
+| 01 | [IDL + codegen](../v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md) | **DONE** | branch (commits `5ad4ebaa` … `5ce9048a`) | None — drift CI active. |
+| 02 | [Unified engine plugin ABI](../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md) | **DONE** | branch (`e3ad196b`, `7dc2cbdc`, `b55d41ff`) | Single-path; legacy registry deleted. |
+| 03 | [Dynamic plugin loading](../v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md) | **DONE (test depth deferred)** | branch (`c6aa7109`, `7e93d0fe`) | Real-model GGUF E2E + valgrind under CI = QA effort. |
+| 04 | [Engine router + HW profile](../v2_gap_specs/GAP_04_ENGINE_ROUTER_AND_HARDWARE_PROFILE.md) | **DONE (device E2E deferred)** | branch (`f2efc81d`, `b5a14b3d`) | iOS17 / ANE device E2E = QA effort. |
+| 05 | [DAG runtime](../v2_gap_specs/GAP_05_DAG_RUNTIME.md) | **DONE (skeleton; scheduler deferred)** | branch (`8e1c3ebb`) | Skeleton (CancelToken / RingBuffer / StreamEdge + 13 tests) shipped. `GraphScheduler` / `PipelineNode` / `MemoryPool` deferred per spec L63-64 until a 2nd pipeline needs them. |
+| 06 | [Engines top-level reorg](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md) | **DONE** | branch (`ece9e414`, `5d2401fd`) | All 9 engines on unified pattern; macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS. |
+| 07 | [Single root CMake](../v2_gap_specs/GAP_07_SINGLE_ROOT_CMAKE.md) | **DONE** | branch (`67463b0b`, `b1d523bc`, `3d2674cc`) | NDK pin hoisted to root `gradle.properties`. |
+| 08 | [Frontend duplication delete](../v2_gap_specs/GAP_08_FRONTEND_LOGIC_DUPLICATION.md) | **MOSTLY DONE** | branch (multiple) | Kotlin orchestration (#1) deleted; Flutter god-class (#4) split into instance-method API with deprecation shim; sample-app E2E (#9) + device parity (#10) = QA effort; download orchestration (#3) blocked on commons HTTP-client vendor decision (see [v3_2_kotlin_download_blocker.md](v3_2_kotlin_download_blocker.md)). |
+| 09 | [Streaming consistency](../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md) | **DONE** | branch (`ba3ecef1`, `99715ccd`, `dda0fd52`, `dcef1c67`) | All 9 criteria OK — including #6 (zero hand-written `VoiceSessionEvent`), #7 (cancel parity harness), #8 (per-SDK p50 < 1ms with real proto decode). |
+| 11 | [Legacy cleanup](../v2_gap_specs/GAP_11_REMOVE_LEGACY.md) | **DONE** | branch (`7dc2cbdc`, `b55d41ff`, voice-session deletes across SDKs) | `service_registry.cpp` + `rac_service_*` C ABI deleted. Voice-session shims deleted across all 5 SDKs. Migration-doc comment-only mentions remain. |
 
 ## Spec coverage gaps
 
@@ -42,11 +46,13 @@ treat it as a v3.x backlog item and write a short scoping doc.
 
 ### GAP 01 — IDL + codegen
 6 proto files + 5-language codegen (Swift/Kotlin/Dart/TS/Python/C++)
-+ `ci-drift-check.yml` workflow. v3.1 added `MetricsEvent.created_at_ns`.
++ `ci-drift-check.yml` workflow. Branch added `MetricsEvent.created_at_ns`
+field 8 for the perf_bench harness.
 
 ### GAP 02 — Unified engine plugin ABI
 `rac_engine_vtable_t` with explicit primitive slots; central registry
-+ static + dynamic registration paths; `RAC_PLUGIN_API_VERSION = 3u`.
++ static + dynamic registration paths; `RAC_PLUGIN_API_VERSION = 3u`
+(branch). Did not exist on main.
 
 ### GAP 03 — Dynamic plugin loading
 `dlopen` path with ABI version check; `RAC_STATIC_PLUGIN_REGISTER`
@@ -58,16 +64,17 @@ introspection (CPU / GPU / NPU / NEON detection); `rac_plugin_route`
 C ABI.
 
 ### GAP 05 — DAG runtime
-v3.1: header-only `CancelToken` (lock-free is_cancelled, atomic
-cascade), `RingBuffer<T>` (cache-aligned SPSC), `StreamEdge<T>`
-(3 overflow policies + cancel + close). 13-test suite.
+Branch ships header-only `CancelToken` (lock-free is_cancelled,
+atomic cascade), `RingBuffer<T>` (cache-aligned SPSC), `StreamEdge<T>`
+(3 overflow policies + cancel + close). 13-test suite. Scheduler
+deferred per spec.
 
 ### GAP 06 — Engines top-level reorg
 `engines/<name>/CMakeLists.txt` per engine + `cmake/plugins.cmake`
 exposes `rac_add_engine_plugin()` macro + `rac_force_load()`
-companion. 8/9 engines on macro (v3.1.2); metalrt is OBJECT-library
-(structurally different) but emits the same metadata via GLOBAL
-properties.
+companion. All 9 engines use the unified pattern; metalrt is
+OBJECT-library (structurally different) but emits the same metadata
+via GLOBAL properties.
 
 ### GAP 07 — Single root CMake
 Root `CMakeLists.txt` orchestrates entire repo; `CMakePresets.json`
@@ -75,19 +82,20 @@ exposes `macos-debug/release/linux-debug/release/etc`. Slim
 `pr-build.yml` runs presets; `gradle.properties` hosts NDK pins.
 
 ### GAP 08 — Frontend duplication delete
-Kotlin: voice-agent orchestration (Dup #1) deleted in v3.1 P4 (467
-LOC). Auth client (Dup #2) minimized in v2.1-2. Dart god-class (Dup
-#4) deferred (Dart lang). Download orchestration (Dup #3) deferred.
+Kotlin: voice-agent orchestration (Dup #1) deleted (467 LOC). Auth
+client (Dup #2) minimized. Dart god-class (Dup #4) split into
+instance-method API on the branch with deprecation shim. Download
+orchestration (Dup #3) blocked on commons HTTP-client vendor decision.
 
 ### GAP 09 — Streaming consistency
 6 IDL service protos + 5-SDK adapters wrapping
 `rac_voice_agent_set_proto_callback` as AsyncStream / Flow /
-Stream / AsyncIterable. v3.1: cancel parity harness + per-SDK p50
-benchmark runners.
+Stream / AsyncIterable. Branch adds cancel parity harness +
+per-SDK p50 benchmark runners.
 
 ### GAP 11 — Legacy cleanup
-v3.0.0: `service_registry.cpp` + `rac_service_*` C ABI deleted;
-`RAC_PLUGIN_API_VERSION 2u → 3u`. v3.1: deprecated SDK voice-session
+Branch deletes `service_registry.cpp` + `rac_service_*` C ABI;
+introduces `RAC_PLUGIN_API_VERSION` (3u). Deprecated SDK voice-session
 shims (`VoiceSessionEvent`, `VoiceSessionHandle`, `startVoiceSession`,
 etc.) deleted across all 5 SDKs.
 

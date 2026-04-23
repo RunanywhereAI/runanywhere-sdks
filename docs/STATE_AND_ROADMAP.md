@@ -1,9 +1,15 @@
 # State & Roadmap
 
-_Single canonical "where we are now + what's next". Reconciles the
-v2 close-out, v3.0.0 ABI cut-over, v3.1.0 architectural cleanup, and
-v3.1.1 doc/release-tooling patch.
-Updated: 2026-04-22 (v3.1.1)._
+_Single canonical "where we are now + what's next" for the
+`feat/v2-architecture` branch. **No releases have been cut yet** —
+all package versions match `main`'s baseline. This doc tracks the
+branch's architectural state, not shipped versions._
+
+> **For a 3-min status overview**, read
+> [`TEAM_STATUS.md`](TEAM_STATUS.md) instead. This doc has the
+> architectural detail.
+
+Updated: 2026-04-22.
 
 > Looking for the per-GAP scoreboard? See [`GAP_STATUS.md`](GAP_STATUS.md).
 >
@@ -14,21 +20,28 @@ Updated: 2026-04-22 (v3.1.1)._
 
 ## TL;DR
 
-- **Current shipped versions** (split-version world):
-  - Flutter `runanywhere` + 3 plugins: **v4.0.0** (BREAKING — instance-method API)
-  - Swift / Kotlin / Web / RN: **v3.1.3** (unchanged)
-  - All tagged 2026-04-22.
-- **C ABI version: `RAC_PLUGIN_API_VERSION = 3u`** (bumped in v3.0.0).
-  Wire-compatible IDL extension shipped in v3.1: `MetricsEvent.created_at_ns`
-  field 8.
-- **Architecture state**: monolithic `sdk/legacy/` C++ deleted; modular
-  `core/` (`ra_*`/`rac_*` C ABI) is the only path. All 5 SDKs are thin
-  adapters over the canonical proto event stream.
-- **Sample apps**: iOS / Android / Flutter / RN voice ViewModels all
-  migrated to `VoiceAgentStreamAdapter` + proto `VoiceEvent`.
-- **Tests**: `test_proto_event_dispatch` 11/11, `test_graph_primitives`
-  13/13, `perf_producer` 144 ns/event, `cancel_producer` clean.
-- **Zero `rac_service_*` references in code** (only historical comments).
+- **Branch**: `feat/v2-architecture`. **114 commits** ahead of `main`.
+  **Not merged. Not released.**
+- **All package versions equal main's baseline**: `0.19.13` (commons /
+  Swift / Flutter / Web / RN), `0.19.6` (Swift VERSION file),
+  `0.1.5-SNAPSHOT` (Kotlin Gradle fallback). The earlier
+  v3.0.0 / v3.1.x / v4.0.0 markers in commit history were premature
+  version-bump experiments and have been reverted to the baseline.
+- **Architectural state on this branch**:
+  - C ABI: `RAC_PLUGIN_API_VERSION = 3u` (was unset on main; first
+    introduced on this branch).
+  - `service_registry.cpp` deleted; `rac_service_*` C ABI replaced
+    with `rac_plugin_route` + plugin registry. Zero ACTIVE call
+    sites in the tree (comment-only mentions remain in migration docs).
+  - Proto IDL (`idl/*.proto`) drives 5 languages via codegen.
+  - All 5 SDKs are thin adapters over the proto event stream.
+  - Sample apps (iOS / Android / Flutter / RN) migrated off
+    deprecated `VoiceSessionEvent` → `VoiceAgentStreamAdapter`.
+- **Tests on macos-release preset**: `test_proto_event_dispatch` 11/11,
+  `test_graph_primitives` 13/13, `perf_producer` 144 ns/event,
+  `cancel_producer` clean.
+- **Release decision**: deferred. See [release sequencing](#suggested-release-sequencing)
+  below for the recommended path when the team is ready.
 
 ## What you should read
 
@@ -137,13 +150,36 @@ v4.x. None are release-blocking.
 
 ## Versioning policy
 
-| Layer | Version | Bumps when |
+| Layer | Branch value | Bumps when |
 |---|---|---|
-| `RAC_PLUGIN_API_VERSION` | `3u` | Breaking C ABI changes (struct field add/remove, function signature change). |
-| `rac_voice_event_abi.h` `RAC_ABI_VERSION` | `2u` | Voice-agent proto-event ABI changes specifically. |
-| Swift / Kotlin / RN / Web semver | `3.1.3` | Sprint releases. v4.x reserved for breaking changes. |
-| Flutter `runanywhere` semver | `4.0.0` | v4.0 = instance-method API (BREAKING vs v3.x); v4.1 deletes static shim. |
+| `RAC_PLUGIN_API_VERSION` | `3u` (branch); not present on main | Breaking C ABI changes (struct field add/remove, function signature change). |
+| `rac_voice_event_abi.h` `RAC_ABI_VERSION` | `2u` (branch) | Voice-agent proto-event ABI changes specifically. |
+| All SDK package semvers | `0.19.13` (matches main; pending release decision) | TBD — see [release sequencing](#suggested-release-sequencing). |
+| Kotlin Gradle fallback | `0.1.5-SNAPSHOT` (matches main) | TBD. |
 | IDL `runanywhere.v1.*` | `v1` | New proto versions only on wire-incompatible changes. |
+
+## Suggested release sequencing
+
+When the team decides to ship, this is one viable path. Other valid
+sequencings exist; the key constraint is that the C ABI + voice-session
+deletions are breaking and need a major-version-style bump.
+
+1. **Merge `feat/v2-architecture` → `main`** (squash or merge commit;
+   the branch is internally consistent and partial-merge would lose
+   IDL/plugin coherence).
+2. **Pick a target version**:
+   - `v0.20.0` — additive minor (0.x semver allows breaking changes
+     in minor releases).
+   - `v1.0.0` — clean break + signal "stable architecture".
+   - `v2.0.0` — matches the "v2 architecture" branch name.
+3. **Bump versions** across the 7 packages + `Package.swift sdkVersion`
+   + `runanywhere-kotlin/build.gradle.kts` fallback.
+4. **Publish artifacts**: run [`scripts/release-swift-binaries.sh`](../scripts/release-swift-binaries.sh)
+   on macOS with credentials → upload to GitHub release →
+   `pub publish` / `npm publish` / `gradle publish`.
+5. **Migration guide**: `docs/migrations/<from>_to_<to>.md` covering
+   `VoiceSessionEvent` → `VoiceAgentStreamAdapter` and `rac_service_*`
+   → plugin registry for engine plugin authors.
 
 ## Doc index (post-consolidation)
 
@@ -163,9 +199,9 @@ docs/
 ├── migrations/
 │   └── VoiceSessionEvent.md      ← v2.x → v3.1 migration
 ├── sdks/
-│   ├── flutter-sdk.md            ← API ref (needs v3.1 refresh)
-│   ├── kotlin-sdk.md             ← API ref (needs v3.1 refresh)
-│   └── react-native-sdk.md       ← API ref (needs v3.1 refresh)
+│   ├── flutter-sdk.md            ← API ref (refreshed for branch voice API)
+│   ├── kotlin-sdk.md             ← API ref (refreshed for branch voice API)
+│   └── react-native-sdk.md       ← API ref (refreshed for branch voice API)
 │
 └── archive/                      ← historical evidence (cite-only)
     ├── gap-reports/              ← 11 per-GAP final gate reports

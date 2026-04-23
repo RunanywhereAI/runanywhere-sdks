@@ -1,21 +1,29 @@
 # Engineering History
 
-_Chronological narrative of the v2 → v3.0 → v3.1 architectural
-sprints. Brief — high-signal bullets per phase. Full per-phase
-evidence (commit lists, LOC diffs, audit tables) lives at
-[`archive/`](archive/). Updated: 2026-04-22._
+_Chronological narrative of the work on `feat/v2-architecture`.
+**No releases have been cut** — version markers below refer to
+internal branch milestones, NOT shipped versions. All package
+versions match `main`'s baseline (`0.19.13` / Kotlin
+`0.1.5-SNAPSHOT`). Full per-phase evidence (commit lists, LOC diffs,
+audit tables) under [`archive/`](archive/). Updated: 2026-04-22._
 
-## Timeline at a glance
+## Branch milestones at a glance
 
-| Date | Release | Theme |
+These are internal phase markers used in commit messages — they are
+NOT shipped versions. The branch as a whole will get a single
+release version when the team decides to ship; see
+[`STATE_AND_ROADMAP.md#suggested-release-sequencing`](STATE_AND_ROADMAP.md#suggested-release-sequencing).
+
+| Date | Internal marker | Theme |
 |---|---|---|
-| 2026-04 (early) | v2 close-out | Wire-format parity + delete duplicated frontend orchestration |
-| 2026-04-19 | v3.0.0 | C ABI cut-over: delete `rac_service_*`; `RAC_PLUGIN_API_VERSION 2u → 3u` |
-| 2026-04-22 | v3.1.0 | Sample app migrations + delete deprecated shims + DAG primitives + perf/cancel parity harnesses |
-| 2026-04-22 | v3.1.1 | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
-| 2026-04-22 | v3.1.2 | 4 engine CMakeLists migrated to `rac_add_engine_plugin()` (onnx, whispercpp, whisperkit_coreml, metalrt); macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS |
-| 2026-04-22 | v3.1.3 | Kotlin download multi-file path DRY refactor (-27 LOC); GAP 08 #3 architectural blocker documented |
-| 2026-04-22 | Flutter v4.0.0 | BREAKING — Flutter `runanywhere` god-class split into `RunAnywhereSDK.instance.{capability}` API; static class kept as `@Deprecated` shim (deleted v4.1) |
+| 2026-04 (early) | "v2 close-out" | Wire-format parity + delete duplicated frontend orchestration |
+| 2026-04-19 | "v3 cut-over" | C ABI cut-over: delete `rac_service_*`; introduce `RAC_PLUGIN_API_VERSION = 3u` |
+| 2026-04-22 | "v3.1 cleanup" | Sample app migrations + delete deprecated shims + DAG primitives + perf/cancel parity harnesses |
+| 2026-04-22 | "v3.1.1 docs" | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
+| 2026-04-22 | "v3.1.2 CMake" | 4 engine CMakeLists migrated to `rac_add_engine_plugin()` (onnx, whispercpp, whisperkit_coreml, metalrt); macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS |
+| 2026-04-22 | "v3.1.3 Kotlin" | Kotlin download multi-file path DRY refactor (-27 LOC); GAP 08 #3 architectural blocker documented |
+| 2026-04-22 | "Flutter v4 design" | Flutter `runanywhere` god-class split into `RunAnywhereSDK.instance.{capability}` API on the branch; static class kept as `@Deprecated` shim. Final API-shape decision deferred to release time. |
+| 2026-04-22 | Version reset | All v3.x / v4.0 markers in package.json / pubspec.yaml / VERSION / Package.swift / build.gradle.kts reverted to main's baseline (0.19.13 / 0.1.5-SNAPSHOT). The architectural work is preserved; the versioning was premature. |
 
 ---
 

@@ -1,18 +1,19 @@
 # RunAnywhere Documentation
 
-_Updated: 2026-04-22 (post v3.1.0)._
+_Branch: `feat/v2-architecture` (114 commits ahead of `main`, not yet
+released). Updated: 2026-04-22._
 
-## Start here (3 canonical docs)
+## Start here
 
-1. **[`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md)** — where the
-   codebase is now + what's next. Single source of truth for the
-   current architecture, version, active backlog.
-2. **[`GAP_STATUS.md`](GAP_STATUS.md)** — rolling 11-GAP scoreboard
-   (closed / partial / deferred per spec). Update this when a GAP
-   ships.
-3. **[`HISTORY.md`](HISTORY.md)** — chronological narrative of the
-   v2 → v3.0 → v3.1 architectural sprints. Brief; full evidence
-   in `archive/`.
+1. **[`TEAM_STATUS.md`](TEAM_STATUS.md)** — **3-min status read** for
+   sharing in standup. Branch state + per-GAP closure + what's left
+   + suggested release sequencing.
+2. **[`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md)** — architectural
+   detail + active backlog + versioning policy + doc map.
+3. **[`GAP_STATUS.md`](GAP_STATUS.md)** — rolling 10-GAP scoreboard
+   (DONE / MOSTLY DONE / DEFERRED per spec). Update when a GAP ships.
+4. **[`HISTORY.md`](HISTORY.md)** — chronological narrative of the
+   114 branch commits. Full evidence under `archive/`.
 
 ## Reference docs (active)
 
@@ -28,11 +29,11 @@ _Updated: 2026-04-22 (post v3.1.0)._
 - **[`migrations/VoiceSessionEvent.md`](migrations/VoiceSessionEvent.md)**
   — v2.x → v3.1 voice migration guide
 
-## SDK API references (need v3.1 refresh)
+## SDK API references
 
-These docs were written pre-v2 and have version + voice-API drift.
-Useful as structural templates; consult the actual SDK source for
-current API shape.
+Refreshed for the branch's proto-stream voice API. Version examples
+in the snippets predate the version reset and will be re-swept
+when the branch ships.
 
 - [`sdks/flutter-sdk.md`](sdks/flutter-sdk.md)
 - [`sdks/kotlin-sdk.md`](sdks/kotlin-sdk.md)
