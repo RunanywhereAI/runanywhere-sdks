@@ -1,16 +1,7 @@
 # RunAnywhere Flutter SDK
 
-> ⚠️ **DOC DRIFT NOTICE**: This file's API examples and version
-> numbers reflect a pre-v2.x snapshot. Current version is `3.1.0`
-> (see `sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml`).
-> Voice APIs in this doc still describe the deleted
-> `VoiceSessionEvent` shape; the canonical voice API is
-> `VoiceAgentStreamAdapter(handle).stream()` returning
-> `Stream<VoiceEvent>` (proto). See
-> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) for current
-> state and [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md)
-> for the migration. This doc needs a v3.1 refresh pass — tracked
-> in `STATE_AND_ROADMAP.md` Active Backlog #4.
+_Refreshed for v3.1.1 (2026-04). API surface reflects the proto-stream
+voice agent + the deletion of `VoiceSessionEvent` in v3.1._
 
 Cross-platform Flutter SDK for on-device AI inference. Supports iOS and Android with native C++ backends via Dart FFI.
 
@@ -21,12 +12,12 @@ Cross-platform Flutter SDK for on-device AI inference. Supports iOS and Android 
 ```yaml
 dependencies:
   # Core SDK (required)
-  runanywhere: ^0.17.0
+  runanywhere: ^3.1.0
 
   # Backend modules (pick what you need)
-  runanywhere_llamacpp: ^0.16.0   # LLM text generation (GGUF models)
-  runanywhere_onnx: ^0.16.0       # STT, TTS, VAD (ONNX Runtime)
-  runanywhere_genie: ^0.1.2       # Qualcomm NPU inference
+  runanywhere_llamacpp: ^3.1.0   # LLM text generation (GGUF models)
+  runanywhere_onnx: ^3.1.0       # STT, TTS, VAD (ONNX Runtime)
+  runanywhere_genie: ^3.1.0      # Qualcomm NPU inference (stub)
 ```
 
 ## Platform Requirements
@@ -254,31 +245,73 @@ VLMImage.base64(String encoded)
 
 ### Voice Agent
 
+The v3.1 voice agent uses a proto-event stream wired through a thin
+adapter. There is no `VoiceSessionHandle` actor anymore — the C++
+voice agent owns the orchestration; the Dart side subscribes to its
+event stream.
+
 ```dart
-// Start interactive voice session
-static Future<VoiceSessionHandle> RunAnywhere.startVoiceSession({
-  VoiceSessionConfig config = VoiceSessionConfig.defaultConfig,
-})
+import 'package:runanywhere/runanywhere.dart';
 
-// Session config
-class VoiceSessionConfig {
-  final double silenceDuration;    // default: 1.5s
-  final double speechThreshold;    // default: 0.03
-  final bool autoPlayTTS;          // default: true
-  final bool continuousMode;       // default: true
+// 1. Models must already be loaded (loadModel for STT/LLM/TTS).
+// 2. Initialize the voice agent against currently-loaded models.
+await DartBridgeVoiceAgent.shared.initializeWithLoadedModels();
+
+// 3. Wrap the native handle as a Stream<VoiceEvent>.
+final handle = await DartBridgeVoiceAgent.shared.getHandle();
+final adapter = VoiceAgentStreamAdapter(handle);
+
+// 4. Consume proto events; switch on event.whichPayload().
+await for (final event in adapter.stream()) {
+  switch (event.whichPayload()) {
+    case VoiceEvent_Payload.userSaid:
+      print('User said: ${event.userSaid.text}');
+    case VoiceEvent_Payload.assistantToken:
+      // Streaming: per-token (typewriter UX). Append to UI buffer.
+      print('Token: ${event.assistantToken.text}');
+    case VoiceEvent_Payload.state:
+      // event.state.current ∈ STATE_LISTENING/THINKING/SPEAKING/STOPPED
+      print('State: ${event.state.current}');
+    case VoiceEvent_Payload.vad:
+      // event.vad.type ∈ VAD_EVENT_VOICE_START / VOICE_END_OF_UTTERANCE
+      print('VAD: ${event.vad.type}');
+    case VoiceEvent_Payload.audio:
+      // TTS audio frame; routed by the C++ voice agent.
+    case VoiceEvent_Payload.error:
+      print('Error: ${event.error.message}');
+    default:
+      break;
+  }
 }
+```
 
-// Session events (sealed class)
-VoiceSessionStarted
-VoiceSessionListening(double audioLevel)
-VoiceSessionSpeechStarted
-VoiceSessionProcessing
-VoiceSessionTranscribed(String text)
-VoiceSessionResponded(String text)
-VoiceSessionSpeaking
-VoiceSessionTurnCompleted(...)
-VoiceSessionStopped
-VoiceSessionError(String message)
+#### Cancellation
+
+Cancel the subscription to stop the voice agent:
+
+```dart
+final subscription = adapter.stream().listen(handleEvent);
+// Later:
+await subscription.cancel();   // deregisters the C-side callback
+```
+
+#### Proto types
+
+`VoiceEvent` and its payload arms are generated from
+[`idl/voice_events.proto`](../../idl/voice_events.proto):
+
+- `UserSaidEvent` — STT final transcript
+- `AssistantTokenEvent` — streamed LLM token
+- `AudioFrameEvent` — TTS audio chunk
+- `VADEvent` — voice activity transitions
+- `StateChangeEvent` — pipeline state machine
+- `InterruptedEvent` — barge-in / user cancel
+- `ErrorEvent` — non-recoverable error
+- `MetricsEvent` — per-turn latency breakdown (incl. `created_at_ns`)
+
+See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
+for v2.x → v3.1 migration of consumers using the deleted
+`VoiceSessionEvent` enum.
 ```
 
 ### Tool Calling

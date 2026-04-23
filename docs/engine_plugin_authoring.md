@@ -1,68 +1,87 @@
 # Engine Plugin Authoring Guide
 
-_The definitive "how do I add a new engine to RunAnywhere?" reference._
+_The definitive "how do I add a new engine to RunAnywhere?" reference.
+Updated for v3.1 (`RAC_PLUGIN_API_VERSION = 3u`)._
 
-> **v3.1 status**: `RAC_PLUGIN_API_VERSION = 3u`. The legacy
-> `rac_service_*` registry was DELETED in v3.0.0; the **unified
-> path** is now the only path. Every `rac_*_service_ops_t` struct
-> requires a `create` op pointer (added in v3.0.0). Examples below
-> using the "legacy path" / `abi_version 1` are HISTORICAL —
-> retained for archaeology only. Active engine authors should
-> follow the unified path exclusively.
->
-> See [`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md) for current
-> ABI state and [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md)
-> for third-party packaging (static vs `dlopen`).
+## Status
 
-Use this guide when you want RunAnywhere to route a new primitive (LLM, STT, TTS, VAD, embedding, reranker, VLM, diffusion) through your engine. The unified registration path is the only supported way as of v3.0.0; the legacy text below is preserved for historical context.
+- **Current ABI**: `RAC_PLUGIN_API_VERSION = 3u` (v3.0.0+)
+- **Legacy `rac_service_*` registry**: DELETED in v3.0.0. There is no
+  longer a "legacy path" — the unified plugin registry is the only path.
+- **Every per-primitive ops struct** (`rac_llm_service_ops_t`,
+  `rac_stt_service_ops_t`, `rac_tts_service_ops_t`, `rac_vad_service_ops_t`,
+  `rac_vlm_service_ops_t`, `rac_diffusion_service_ops_t`,
+  `rac_embeddings_service_ops_t`) requires a `create` op pointer.
+- **CMake**: use [`cmake/plugins.cmake`](../cmake/plugins.cmake)'s
+  `rac_add_engine_plugin()` macro for the target. See
+  [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md) for
+  third-party packaging (static archive vs `dlopen`-able shared library).
 
-## Which path should I pick?
+## When to use this guide
 
-```
-Are you adding a brand-new engine?
-│
-├─ Yes ────────────────────────────────────── Unified path (this guide).
-│
-└─ No (you're modifying an existing backend)
-   │
-   ├─ Add a NEW primitive to an existing backend?
-   │     (e.g. add `embed` to ONNX)
-   │     ────────────────────────────────────── Edit the existing
-   │                                           rac_plugin_entry_<name>.cpp.
-   │
-   ├─ Fix a bug in existing ops?
-   │     ────────────────────────────────────── Edit the existing
-   │                                           rac_backend_<name>_register.cpp.
-   │                                           Both registration paths share
-   │                                           the same ops-struct; fixing
-   │                                           there fixes both.
-   │
-   └─ Deprecate an engine?
-         ─────────────────────────────────────── Add `on_unload` hook in the
-                                                rac_plugin_entry_<name>.cpp
-                                                for cleanup, then drop the
-                                                rac_plugin_register() call at
-                                                consumer sites.
-```
+| You are... | Read |
+|---|---|
+| Adding a new engine to the in-tree set | This guide. |
+| Adding a NEW primitive to an existing backend (e.g. add `embed` to ONNX) | This guide §1 + edit existing `rac_plugin_entry_<name>.cpp`. |
+| Fixing a bug in existing primitive ops | Edit `rac_backend_<name>_register.cpp`; ops struct is shared. |
+| Packaging a third-party plugin out-of-tree | [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md). |
 
 ## Unified path — 4 steps
 
-### 1. Fill in a `rac_engine_vtable_t`
+### 1. Implement the primitive ops struct
 
-Reserve a short stable name (e.g. `mlx`). Put the vtable in a new
-`src/backends/<name>/rac_plugin_entry_<name>.cpp`:
+Each primitive has a `rac_X_service_ops_t` struct with function pointers
+including a v3.0+ mandatory `create` op:
 
 ```cpp
+// src/backends/mlx/rac_llm_mlx.cpp
+#include "rac/features/llm/rac_llm_service.h"
+
+// v3.0+: create op allocates a backend instance and returns it as
+// out_impl. The plugin registry calls this when a consumer requests
+// the LLM primitive routed to your engine.
+static rac_result_t mlx_llm_create_impl(const char* model_id,
+                                        const char* config_json,
+                                        void** out_impl) {
+    auto* mlx = new MlxLLMHandle{};
+    // ... your engine init ...
+    *out_impl = mlx;
+    return RAC_SUCCESS;
+}
+
+static rac_result_t mlx_llm_load(void* impl, const char* model_path) {
+    auto* mlx = static_cast<MlxLLMHandle*>(impl);
+    // ... load weights ...
+    return RAC_SUCCESS;
+}
+
+// ... generate, generate_stream, unload, destroy, etc.
+
+extern "C" const rac_llm_service_ops_t g_mlx_ops = {
+    .create        = mlx_llm_create_impl,   // v3.0+ mandatory
+    .load          = mlx_llm_load,
+    .generate      = mlx_llm_generate,
+    .generate_stream = mlx_llm_generate_stream,
+    .unload        = mlx_llm_unload,
+    .destroy       = mlx_llm_destroy,
+    // ... fill all required ops; nullptr only for optional ops ...
+};
+```
+
+### 2. Define the engine vtable + plugin entry point
+
+```cpp
+// src/backends/mlx/rac_plugin_entry_mlx.cpp
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/llm/rac_llm_service.h"
 
 extern "C" {
-extern const rac_llm_service_ops_t g_mlx_ops;  // <- your ops struct
+extern const rac_llm_service_ops_t g_mlx_ops;
 
 static const rac_engine_vtable_t g_mlx_engine_vtable = {
     /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
+        .abi_version      = RAC_PLUGIN_API_VERSION,  // currently 3u
         .name             = "mlx",
         .display_name     = "Apple MLX",
         .engine_version   = "0.1.0",
@@ -80,8 +99,13 @@ static const rac_engine_vtable_t g_mlx_engine_vtable = {
     },
     /* on_unload */ nullptr,
 
-    /* llm_ops       */ &g_mlx_ops,
-    /* other slots   */ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    /* llm_ops          */ &g_mlx_ops,
+    /* stt_ops          */ nullptr,
+    /* tts_ops          */ nullptr,
+    /* vad_ops          */ nullptr,
+    /* vlm_ops          */ nullptr,
+    /* diffusion_ops    */ nullptr,
+    /* embeddings_ops   */ nullptr,
 
     /* reserved_slot_0..9 */
     nullptr, nullptr, nullptr, nullptr, nullptr,
@@ -95,159 +119,174 @@ RAC_PLUGIN_ENTRY_DEF(mlx) {
 ```
 
 Rules:
-  - `metadata.abi_version` MUST equal `RAC_PLUGIN_API_VERSION` (currently 1).
-  - `metadata.name` MUST be unique across all registered engines.
-  - Fill exactly the primitive slots you serve; leave everything else NULL.
-  - `capability_check` returning non-zero rejects the plugin silently (no error log).
+- `metadata.abi_version` MUST equal `RAC_PLUGIN_API_VERSION` (currently `3u`).
+- `metadata.name` MUST be unique across all registered engines.
+- Fill exactly the primitive slots you serve; leave everything else `nullptr`.
+- `capability_check` returning non-zero rejects the plugin silently
+  (no error log) — useful for hardware/OS gating.
 
-### 2. Declare the entry in a public header
+### 3. Declare the entry in a public header
 
 `sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry_mlx.h`:
 
 ```c
 #ifndef RAC_PLUGIN_ENTRY_MLX_H
 #define RAC_PLUGIN_ENTRY_MLX_H
+
 #include "rac/plugin/rac_plugin_entry.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 RAC_PLUGIN_ENTRY_DECL(mlx);
+
 #ifdef __cplusplus
 }
 #endif
 #endif
 ```
 
-The install rule already picks it up via `install(DIRECTORY include/)`.
+### 4. Hook CMake via `rac_add_engine_plugin()`
 
-### 3. Hook CMake
-
-In `sdk/runanywhere-commons/src/backends/mlx/CMakeLists.txt`:
+The canonical macro lives at [`cmake/plugins.cmake`](../cmake/plugins.cmake)
+(landed in GAP 07 Phase 4). It handles STATIC vs SHARED branching, the
+`RAC_STATIC_PLUGINS` toggle, and emits engine metadata for tooling.
 
 ```cmake
-set(MLX_BACKEND_SOURCES
-    rac_llm_mlx.cpp
-    rac_backend_mlx_register.cpp    # optional — legacy path
-    rac_plugin_entry_mlx.cpp        # unified path
-)
+# engines/mlx/CMakeLists.txt
+include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+
+option(RAC_BACKEND_MLX "Build the Apple MLX LLM engine plugin" ON)
+
+if(RAC_BACKEND_MLX)
+    # ... engine-specific FetchContent / find_package above the macro call ...
+
+    rac_add_engine_plugin(mlx
+        SOURCES
+            rac_llm_mlx.cpp
+            rac_plugin_entry_mlx.cpp
+        LINK_LIBRARIES mlx_runtime
+        RUNTIMES METAL CPU
+        FORMATS GGUF SAFETENSORS
+    )
+endif()
 ```
 
-### 4. Register at startup
+Static-build apps additionally need `rac_force_load(my_app PLUGINS mlx)`
+to keep the static-init Registrar alive; see
+[`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md).
 
-Pick the simplest of:
+## Registering at startup
+
+Pick the simplest path:
 
 ```cpp
-// C++ app or library: uses static-init.
+// C++ app: static-init register (most common).
 #include "rac/plugin/rac_plugin_entry_mlx.h"
 RAC_STATIC_PLUGIN_REGISTER(mlx);
 ```
 
 ```c
-// C app or explicit ordering: call manually.
+// Manual register (explicit ordering).
 #include "rac/plugin/rac_plugin_entry_mlx.h"
+
 int main(void) {
-    rac_plugin_register(rac_plugin_entry_mlx());
-    // ... your code ...
+    rac_plugin_registry_register(rac_plugin_entry_mlx());
+    // ... app code ...
 }
 ```
 
 ```c
-// Dynamic plugin (dlopen): load then call by symbol name.
-void* h = dlopen("libmlx.so", RTLD_NOW);
-rac_plugin_entry_fn entry = (rac_plugin_entry_fn)dlsym(h, "rac_plugin_entry_mlx");
-rac_plugin_register(entry());
+// Dynamic load (dlopen).
+void* h = dlopen("librunanywhere_mlx.dylib", RTLD_NOW);
+rac_plugin_entry_fn entry =
+    (rac_plugin_entry_fn)dlsym(h, "rac_plugin_entry_mlx");
+rac_plugin_registry_register(entry());
 ```
 
 ## Testing your plugin
 
+Add a test that asserts ABI version, vtable shape, and registration:
+
 ```cpp
-// test_plugin_entry_mlx.cpp
+// sdk/runanywhere-commons/tests/test_plugin_entry_mlx.cpp
+#include <cassert>
 #include "rac/plugin/rac_plugin_entry_mlx.h"
+#include "rac/plugin/rac_engine_vtable.h"
+
 int main() {
     const rac_engine_vtable_t* vt = rac_plugin_entry_mlx();
-    assert(vt->metadata.abi_version == RAC_PLUGIN_API_VERSION);
+    assert(vt->metadata.abi_version == RAC_PLUGIN_API_VERSION);  // 3u
     assert(vt->llm_ops != nullptr);
-    rac_plugin_register(vt);
-    assert(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == vt);
-    rac_plugin_unregister("mlx");
+    assert(vt->llm_ops->create != nullptr);  // v3.0+ mandatory
+
+    rac_plugin_registry_register(vt);
+    // ... assert plugin appears in the registry, route to it, etc. ...
+    return 0;
 }
 ```
 
-Hook it into `sdk/runanywhere-commons/tests/CMakeLists.txt` following the
-pattern established by `test_plugin_entry_llamacpp` and
-`test_plugin_entry_onnx` in Phase 10.
+Hook into `sdk/runanywhere-commons/tests/CMakeLists.txt` following the
+pattern of `test_plugin_entry_llamacpp` and `test_plugin_entry_onnx`.
 
-## Priority ladder (as of GAP 02 Phase 9)
+## Priority ladder (current as of v3.1)
 
-| Priority | Name              | Primitives served                  | Platforms  |
-|----------|-------------------|-----------------------------------|------------|
-| 120      | metalrt            | LLM + STT + TTS + VLM             | Apple      |
-| 110      | whisperkit_coreml  | STT                               | Apple      |
-| 100      | llamacpp           | LLM  (vlm via llamacpp_vlm)       | All        |
-| 100      | llamacpp_vlm       | VLM                               | All        |
-| 90       | whispercpp         | STT                               | All        |
-| 80       | onnx               | STT + TTS + VAD                   | All        |
-| 95       | mlx (example)      | LLM                               | Apple only |
+| Priority | Name              | Primitives served            | Platforms  |
+|----------|-------------------|------------------------------|------------|
+| 120      | metalrt           | LLM + STT + TTS + VLM        | Apple      |
+| 110      | whisperkit_coreml | STT                          | Apple      |
+| 100      | llamacpp          | LLM (vlm via llamacpp_vlm)   | All        |
+| 100      | llamacpp_vlm      | VLM                          | All        |
+| 100      | platform          | LLM + TTS + Diffusion        | Apple (FoundationModels, AVSpeech, CoreML) |
+|  95      | mlx (example)     | LLM                          | Apple only |
+|  90      | whispercpp        | STT                          | All        |
+|  80      | onnx              | STT + TTS + VAD + Embeddings | All        |
+|  -       | sherpa (stub)     | STT                          | All        |
+|  -       | genie (stub)      | LLM (QNN)                    | Snapdragon |
+|  -       | diffusion-coreml (stub) | Diffusion              | Apple      |
 
-Pick your priority within the existing range. Reserve 0–40 for
-experimental / CPU fallback engines, 40–80 for standard CPU
-implementations, 80–110 for optimized / hardware-accelerated
-implementations, 110+ for Apple-specific hardware paths.
+Pick your priority within the existing range:
+- 0–40: experimental / CPU fallback engines
+- 40–80: standard CPU implementations
+- 80–110: optimized / hardware-accelerated implementations
+- 110+: Apple-specific hardware paths (Neural Engine, MetalRT)
 
 ## Bumping the plugin API version
 
 Bump `RAC_PLUGIN_API_VERSION` in
-`sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h` when any of:
+[`sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h`](../sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h)
+when any of:
 
-  - `rac_engine_vtable_t` field layout changes (reserved slot promotion, new primitive).
-  - A new primitive lands in `rac_primitive.h`.
-  - Any per-domain ops struct (`rac_llm_service_ops_t`, …) grows or shrinks.
+- `rac_engine_vtable_t` field layout changes (reserved slot promotion,
+  new primitive slot).
+- A new primitive lands in `rac_primitive.h`.
+- Any per-primitive ops struct (`rac_llm_service_ops_t`, etc.) grows or
+  shrinks an existing field.
 
-Old plugins loaded against a newer host will fail the ABI check and be
-rejected with `RAC_ERROR_ABI_VERSION_MISMATCH` — a safe outcome. Do **not**
-bump for additive metadata fields (new `capability_flags` bits).
+Old plugins loaded against a newer host fail the ABI check and are
+rejected with `RAC_ERROR_ABI_VERSION_MISMATCH` — a safe outcome.
+Do **not** bump for additive metadata fields (new `capability_flags`
+bits, etc.).
 
-## Relationship to the legacy path
+### Version history
 
-Every existing backend (`llamacpp`, `onnx`, `whispercpp`, `whisperkit_coreml`,
-`metalrt`) now exposes BOTH:
+- `1u` — pre-GAP 02; no unified vtable
+- `2u` — GAP 02 Phase 9: unified `rac_engine_vtable_t` shipped alongside
+  legacy `rac_service_*` registry
+- `3u` — v3.0.0: legacy registry deleted; `create` op added to every
+  primitive ops struct; VAD `initialize` op added for symmetry
 
-  - `rac_backend_<name>_register()` — registers via the legacy per-domain
-    `rac_service_register_provider()` path used by the C ABI + Swift /
-    Kotlin / Dart bridges pre-GAP-02.
-  - `rac_plugin_entry_<name>()` — returns a `const rac_engine_vtable_t*` for
-    the unified registry.
+## See also
 
-Both paths share the same ops-struct (e.g. `g_llamacpp_ops`); a bug fix in
-that struct shows up in both registries automatically.
-
-## Migrating off the legacy service registry (GAP 11 Phase 29)
-
-The legacy `rac_service_*` API in `rac/core/rac_core.h`
-(`rac_service_register_provider`, `rac_service_unregister_provider`,
-`rac_service_create`, `rac_service_list_providers`) is **deprecated as of
-GAP 11** and will be removed in v3 (`RAC_PLUGIN_API_VERSION 3u`). Both
-the compile-time `[[deprecated]]` attribute and a runtime one-time
-`RAC_LOG_WARNING` from `service_registry.cpp` flag every call.
-
-### Migration map
-
-| Legacy call                                | Replacement                                                |
-|--------------------------------------------|------------------------------------------------------------|
-| `rac_service_register_provider(provider)`  | `rac_plugin_registry_register(vtable)` (`rac_plugin_entry.h`) |
-| `rac_service_unregister_provider(name)`    | `rac_plugin_registry_unregister(name)`                     |
-| `rac_service_create(cap, req, &handle)`    | `rac_plugin_route(&request, &result)` (`rac/router/rac_route.h`) |
-| `rac_service_list_providers(cap, ...)`     | `rac_registry_list_plugins(...)` (`rac/plugin/rac_plugin_loader.h`) |
-
-The unified path is **strictly more capable**: per-primitive metadata,
-runtime/format hints for the GAP 04 router, ABI version validation, and
-dynamic loading via the GAP 03 `rac_registry_load_plugin()` API.
-
-### Removal timing
-
-- **v2 (GAP 11 Phase 29, this commit):** `[[deprecated]]` warning +
-  one-time runtime log.
-- **v2 (GAP 11 Phase 30):** every call site repointed to the unified
-  API; SDKs verified to NOT call the legacy entry points.
-- **v3 (GAP 11 Phase 31):** `git rm sdk/runanywhere-commons/src/infrastructure/registry/service_registry.cpp`
-  + `RAC_PLUGIN_API_VERSION` bumped to `3u`.
+- [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md) —
+  third-party plugin packaging (CMake recipes, dlopen vs static, security)
+- [`graph_primitives.md`](graph_primitives.md) — DAG primitives
+  (`CancelToken`, `RingBuffer`, `StreamEdge`) for engines that need
+  pipeline-style fan-out
+- [`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md) — current ABI state,
+  active backlog, versioning policy
+- [`v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md`](../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md)
+  — unified plugin ABI spec
+- [`v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md`](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md)
+  — `engines/<name>/` layout + `rac_add_engine_plugin()` macro spec

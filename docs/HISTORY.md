@@ -12,6 +12,7 @@ evidence (commit lists, LOC diffs, audit tables) lives at
 | 2026-04 (early) | v2 close-out | Wire-format parity + delete duplicated frontend orchestration |
 | 2026-04-19 | v3.0.0 | C ABI cut-over: delete `rac_service_*`; `RAC_PLUGIN_API_VERSION 2u → 3u` |
 | 2026-04-22 | v3.1.0 | Sample app migrations + delete deprecated shims + DAG primitives + perf/cancel parity harnesses |
+| 2026-04-22 | v3.1.1 | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
 
 ---
 
@@ -210,6 +211,29 @@ L63-64 ("build when a 2nd pipeline needs them").
   `test_graph_primitives` 13/13, `perf_producer` 144 ns/event,
   `cancel_producer` clean.
 - Doc consolidation (this set of docs).
+
+---
+
+## v3.1.1 doc + release-tooling patch (2026-04-22)
+
+Sprint 1 of the post-v3.1 cleanup roadmap. No code changes; doc
+refreshes + a release-automation script. Tagged 2026-04-22.
+
+**Headline deliverables:**
+- 3 SDK API ref docs refreshed for v3.1+ voice surface (deletion of
+  `VoiceSessionEvent` reflected in [`docs/sdks/flutter-sdk.md`](sdks/flutter-sdk.md),
+  [`docs/sdks/kotlin-sdk.md`](sdks/kotlin-sdk.md),
+  [`docs/sdks/react-native-sdk.md`](sdks/react-native-sdk.md));
+  version examples bumped from 0.x to 3.1.0.
+- `docs/engine_plugin_authoring.md` rewritten for `RAC_PLUGIN_API_VERSION = 3u`
+  (legacy `rac_service_*` text removed; `create` op added to all
+  primitive-ops examples; cross-link to `cmake/plugins.cmake`).
+- New release-automation script:
+  [`scripts/release-swift-binaries.sh`](../scripts/release-swift-binaries.sh)
+  wraps the existing `build-core-xcframework.sh` + `sync-checksums.sh`
+  + emits a `gh release create` recipe. Documents prereqs + operator
+  steps for publishing the xcframework binaries.
+- 7 packages bumped to `3.1.1`.
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "@runanywhere/web-llamacpp",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "description": "RunAnywhere Web SDK - LlamaCpp backend for on-device LLM/VLM inference",
   "type": "module",
   "main": "./dist/index.js",

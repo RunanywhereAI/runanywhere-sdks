@@ -45,12 +45,12 @@ let useLocalNatives = false //  Toggle: true for local dev, false for release
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases.
 //
-// v3.1.0: sdk minor bump. Remote XCFramework URLs expect
-// `RACommons-ios-v3.1.0.zip` at the v3.1.0 GitHub release; consumers
+// v3.1.1: sdk minor bump. Remote XCFramework URLs expect
+// `RACommons-ios-v3.1.1.zip` at the v3.1.1 GitHub release; consumers
 // should set `useLocalNatives = true` until release automation publishes
 // the v3.1.0
 // artifacts.
-let sdkVersion = "3.1.0"
+let sdkVersion = "3.1.1"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip

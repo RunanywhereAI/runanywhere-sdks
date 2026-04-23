@@ -1,13 +1,7 @@
 # RunAnywhere React Native SDK
 
-> ⚠️ **DOC DRIFT NOTICE**: Version numbers in examples reflect a
-> pre-v2.x snapshot; current version is `3.1.0` (see
-> `sdk/runanywhere-react-native/packages/core/package.json`). Voice
-> APIs now use `VoiceAgentStreamAdapter(handle).stream()` returning
-> `AsyncIterable<VoiceEvent>` (proto). See
-> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) and
-> [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md).
-> Refresh tracked in Active Backlog #4.
+_Refreshed for v3.1.1 (2026-04). Voice surface reflects the new Nitro
+`getVoiceAgentHandle()` method + `AsyncIterable<VoiceEvent>` adapter._
 
 React Native SDK for on-device AI inference. Uses Nitrogen/Nitro for high-performance TypeScript-to-C++ bridging.
 
@@ -15,12 +9,12 @@ React Native SDK for on-device AI inference. Uses Nitrogen/Nitro for high-perfor
 
 ```bash
 # Core SDK (required)
-yarn add @runanywhere/core
+yarn add @runanywhere/core@^3.1.0
 
 # Backend modules (pick what you need)
-yarn add @runanywhere/llamacpp    # LLM text generation (GGUF models)
-yarn add @runanywhere/onnx        # STT, TTS, VAD (ONNX Runtime)
-yarn add @runanywhere/genie       # Qualcomm NPU inference
+yarn add @runanywhere/llamacpp@^3.1.0    # LLM text generation (GGUF models)
+yarn add @runanywhere/onnx@^3.1.0        # STT, TTS, VAD (ONNX Runtime)
+yarn add @runanywhere/genie@^3.1.0       # Qualcomm NPU inference (stub)
 ```
 
 ### Peer Dependencies
@@ -278,20 +272,70 @@ type VLMImage =
 
 ### Voice Agent
 
+The v3.1 voice agent uses a proto-event stream wired through Nitro.
+Subscribe via `VoiceAgentStreamAdapter` for an `AsyncIterable<VoiceEvent>`.
+
 ```typescript
-// Initialize full voice pipeline
-await RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig): Promise<boolean>
-await RunAnywhere.isVoiceAgentReady(): Promise<boolean>
+import { RunAnywhere, VoiceAgentStreamAdapter } from '@runanywhere/core';
+import { VoiceEvent } from '@runanywhere/core/src/generated/voice_events';
 
-// Process a voice turn
-await RunAnywhere.processVoiceTurn(audioData: string | ArrayBuffer): Promise<VoiceTurnResult>
+// 1. Models must already be loaded (loadSTTModel/loadLLMModel/loadTTSModel).
+// 2. Initialize the voice agent against currently-loaded models.
+await RunAnywhere.initializeVoiceAgentWithLoadedModels();
 
-// Interactive session
-await RunAnywhere.startVoiceSession(config: VoiceSessionConfig): Promise<VoiceSessionHandle>
+// 3. Get the native handle (JS number; cast to rac_voice_agent_handle_t in C).
+const handle: number = await RunAnywhere.getVoiceAgentHandle();
 
-// Cleanup
-await RunAnywhere.cleanupVoiceAgent(): Promise<void>
+// 4. Wrap as an AsyncIterable<VoiceEvent>.
+const adapter = new VoiceAgentStreamAdapter(handle);
+const iterable = adapter.stream();
+
+// 5. Consume proto events via for-await-of; switch on event.payload.$case.
+for await (const event of iterable) {
+    switch (event.payload?.$case) {
+        case 'userSaid':
+            console.log('User said:', event.payload.userSaid.text);
+            break;
+        case 'assistantToken':
+            // Streaming: per-token (typewriter UX). Append to UI buffer.
+            console.log('Token:', event.payload.assistantToken.text);
+            break;
+        case 'state':
+            // event.payload.state.current ∈ STATE_LISTENING/THINKING/SPEAKING/STOPPED
+            console.log('State:', event.payload.state.current);
+            break;
+        case 'vad':
+            // event.payload.vad.type ∈ VAD_EVENT_VOICE_START / VOICE_END_OF_UTTERANCE
+            console.log('VAD:', event.payload.vad.type);
+            break;
+        case 'audio':
+            // TTS audio frame; routed by the C++ voice agent.
+            break;
+        case 'error':
+            console.error('Voice error:', event.payload.error.message);
+            break;
+    }
+}
+
+// Cancellation: call .return() on the iterator to deregister the C callback.
+await iterable.return?.(undefined as never);
+
+// Cleanup voice agent native resources when done.
+await RunAnywhere.cleanupVoiceAgent();
 ```
+
+#### One-shot voice turn (still supported)
+
+For non-streaming use:
+
+```typescript
+const result = await RunAnywhere.processVoiceTurn(audioBase64);
+// returns transcription + response + synthesized audio in one call
+```
+
+See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
+for v2.x → v3.1 migration of consumers using the deleted
+`startVoiceSession` / `VoiceSessionHandle` API.
 
 ### Structured Output
 

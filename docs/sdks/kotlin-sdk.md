@@ -1,13 +1,7 @@
 # RunAnywhere Kotlin Multiplatform SDK
 
-> ⚠️ **DOC DRIFT NOTICE**: Examples reflect a pre-v2.x snapshot
-> (`io.github...:0.1.5`); current version is `3.1.0` (see Kotlin
-> `build.gradle.kts` fallback). The voice API now uses
-> `VoiceAgentStreamAdapter(handle).stream()` returning
-> `Flow<VoiceEvent>` — see
-> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) and
-> [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md).
-> Refresh tracked in Active Backlog #4.
+_Refreshed for v3.1.1 (2026-04). Voice surface reflects
+`CppBridgeVoiceAgent` + the canonical `Flow<VoiceEvent>` proto stream._
 
 Cross-platform SDK for on-device AI inference with intelligent routing. Supports JVM, Android, and (planned) Native targets.
 
@@ -18,12 +12,12 @@ Cross-platform SDK for on-device AI inference with intelligent routing. Supports
 ```kotlin
 dependencies {
     // Core SDK (required)
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.1.5")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:3.1.0")
 
     // Backend modules (pick what you need)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.1.5")  // LLM
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.1.5")     // STT/TTS/VAD
-    implementation("io.github.sanchitmonga22:runanywhere-genie-android:0.2.1") // Qualcomm NPU
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:3.1.0")  // LLM
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:3.1.0")     // STT/TTS/VAD
+    implementation("io.github.sanchitmonga22:runanywhere-genie-android:3.1.0") // Qualcomm NPU (stub)
 }
 ```
 
@@ -34,7 +28,7 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 dependencies {
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:sdk-runanywhere-kotlin:v0.1.5")
+    implementation("com.github.RunanywhereAI.runanywhere-sdks:sdk-runanywhere-kotlin:v3.1.0")
 }
 ```
 
@@ -289,29 +283,66 @@ VLMImage.fromRGBPixels(data: ByteArray, width: Int, height: Int): VLMImage
 
 ### Voice Agent (Complete Pipeline)
 
+The v3.1 voice agent uses a proto-event stream backed by the C++
+voice agent. There is no `VoiceSessionEvent` sealed class anymore —
+consume the `VoiceEvent` proto directly via `VoiceAgentStreamAdapter`.
+
 ```kotlin
-// Configure STT + LLM + TTS pipeline
-suspend fun RunAnywhere.configureVoiceAgent(configuration: VoiceAgentConfiguration)
+import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
+import ai.runanywhere.proto.v1.VoiceEvent
+import ai.runanywhere.proto.v1.StateChangeEvent
+import ai.runanywhere.proto.v1.VADEvent
 
-// Start interactive session
-fun RunAnywhere.startVoiceSession(
-    config: VoiceSessionConfig = VoiceSessionConfig.DEFAULT
-): Flow<VoiceSessionEvent>
+// 1. Models must already be loaded (loadSTT/loadLLM/loadTTS).
+// 2. Get the native voice-agent handle (lazily creates + initializes).
+val handle: Long = CppBridgeVoiceAgent.getHandle()
 
-// Session events
-sealed class VoiceSessionEvent {
-    object Started
-    data class Listening(val audioLevel: Float)
-    object SpeechStarted
-    object Processing
-    data class Transcribed(val text: String)
-    data class Responded(val text: String)
-    object Speaking
-    data class TurnCompleted(val transcription: String?, val response: String?)
-    object Stopped
-    data class Error(val message: String)
+// 3. Wrap as a Flow<VoiceEvent>.
+val adapter = VoiceAgentStreamAdapter(handle)
+
+// 4. Collect proto events; switch on the populated payload arm.
+adapter.stream().collect { event: VoiceEvent ->
+    when {
+        event.user_said != null -> {
+            println("User said: ${event.user_said!!.text}")
+        }
+        event.assistant_token != null -> {
+            // Streaming: per-token (typewriter UX). Append to UI.
+            print(event.assistant_token!!.text)
+        }
+        event.state != null -> {
+            // event.state.current ∈ IDLE / LISTENING / THINKING / SPEAKING / STOPPED
+            println("State: ${event.state!!.current}")
+        }
+        event.vad != null -> {
+            // event.vad.type ∈ VAD_EVENT_VOICE_START / VOICE_END_OF_UTTERANCE
+            println("VAD: ${event.vad!!.type}")
+        }
+        event.audio != null -> {
+            // TTS audio frame; routed by the C++ voice agent.
+        }
+        event.error != null -> {
+            println("Error: ${event.error!!.message}")
+        }
+    }
 }
 ```
+
+#### Cancellation
+
+Cancel the Flow's collecting Job to stop the voice agent:
+
+```kotlin
+val job = scope.launch { adapter.stream().collect { /* ... */ } }
+// Later:
+job.cancel()                          // unwires the C-side callback
+CppBridgeVoiceAgent.destroy()         // tears down the native handle
+```
+
+See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
+for v2.x → v3.1 migration of consumers using the deleted
+`VoiceSessionEvent` sealed class.
 
 ### Model Management
 

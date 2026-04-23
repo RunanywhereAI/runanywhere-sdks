@@ -1,8 +1,9 @@
 # State & Roadmap
 
 _Single canonical "where we are now + what's next". Reconciles the
-v2 close-out, v3.0.0 ABI cut-over, and v3.1.0 architectural cleanup.
-Updated: 2026-04-22._
+v2 close-out, v3.0.0 ABI cut-over, v3.1.0 architectural cleanup, and
+v3.1.1 doc/release-tooling patch.
+Updated: 2026-04-22 (v3.1.1)._
 
 > Looking for the per-GAP scoreboard? See [`GAP_STATUS.md`](GAP_STATUS.md).
 >
@@ -13,7 +14,7 @@ Updated: 2026-04-22._
 
 ## TL;DR
 
-- **Current shipped version: v3.1.0** across all 7 packages
+- **Current shipped version: v3.1.1** across all 7 packages
   (Swift / Kotlin / Flutter `runanywhere` + 3 backend plugins / Web
   core+plugins / RN core+plugins). Tagged 2026-04-22.
 - **C ABI version: `RAC_PLUGIN_API_VERSION = 3u`** (bumped in v3.0.0).
@@ -81,19 +82,22 @@ v4.x. None are release-blocking.
 
 ### Engineering (post-v3.1.x patches)
 
-1. **Swift xcframework regeneration** — Required for full
-   `swift build` green by external SPM consumers. Release-automation
-   step (`scripts/build-core-xcframework.sh`); not a code issue.
-2. **5/9 engine CMakeLists migrations** to `rac_add_engine_plugin()`
-   — onnx / whispercpp / whisperkit_coreml / metalrt + one more.
-   Per-engine PRs with platform CI matrix verification. Plan in
-   the consolidated [`HISTORY.md`](HISTORY.md) appendix.
-3. **`engine_plugin_authoring.md` refresh** — Update example snippets
-   to reflect `RAC_PLUGIN_API_VERSION 3u`, deletion of
-   `rac_service_*`, and the `create` op on every primitive ops struct.
-4. **`sdks/{flutter,kotlin,react-native}-sdk.md`** — Pre-v2-era
-   API references; need a v3.1 refresh pass (versions, voice API,
-   proto types).
+1. **Swift xcframework publication** — DONE-IN-CODE in v3.1.1:
+   release script at [`scripts/release-swift-binaries.sh`](../scripts/release-swift-binaries.sh)
+   wraps `build-core-xcframework.sh` + `sync-checksums.sh` + emits a
+   `gh release create` recipe. Operator-only step (requires Xcode 15+,
+   manual `third_party/onnxruntime-ios/onnxruntime.xcframework`
+   prereq, and GitHub Releases publish credentials). Until an
+   operator runs it for v3.1.1+, external SPM consumers must set
+   `useLocalNatives = true` in `Package.swift`.
+2. **4 engine CMakeLists migrations** to `rac_add_engine_plugin()`
+   (Sprint 2 of the post-cleanup roadmap) — onnx (365 LOC),
+   whispercpp (207), whisperkit_coreml (45), metalrt (98). Per-engine
+   PRs with platform CI matrix verification.
+3. **`engine_plugin_authoring.md` refresh** — DONE in v3.1.1.
+4. **`sdks/{flutter,kotlin,react-native}-sdk.md`** — DONE in v3.1.1.
+   Voice API sections rewritten for `VoiceAgentStreamAdapter` +
+   proto event payload switch.
 
 ### Architectural (v4.x / breaking)
 
