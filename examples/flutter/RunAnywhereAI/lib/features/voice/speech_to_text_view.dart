@@ -128,8 +128,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Loading STT model: ${model.name}');
 
-      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
-      await sdk.RunAnywhere.loadSTTModel(model.id);
+      // Load STT model via v4 capability API.
+      await sdk.RunAnywhereSDK.instance.stt.load(model.id);
 
       setState(() {
         _selectedFramework =
@@ -236,15 +236,14 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     try {
       debugPrint('🔄 Transcribing ${audioData.length} bytes of audio...');
 
-      // Check if STT model is loaded via SDK (matches Swift: RunAnywhere.isSTTModelLoaded)
-      if (!sdk.RunAnywhere.isSTTModelLoaded) {
+      if (!sdk.RunAnywhereSDK.instance.stt.isLoaded) {
         throw Exception(
             'STT component not loaded. Please load an STT model first.');
       }
 
-      // Call SDK transcription API (matches Swift: RunAnywhere.transcribe(_:))
       final audioBytes = Uint8List.fromList(audioData);
-      final transcribedText = await sdk.RunAnywhere.transcribe(audioBytes);
+      final transcribedText =
+          await sdk.RunAnywhereSDK.instance.stt.transcribe(audioBytes);
 
       setState(() {
         _transcribedText = transcribedText;

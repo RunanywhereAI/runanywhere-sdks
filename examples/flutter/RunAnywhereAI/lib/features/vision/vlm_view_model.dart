@@ -102,9 +102,9 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Check if VLM model is loaded
   Future<void> checkModelStatus() async {
-    _isModelLoaded = sdk.RunAnywhere.isVLMModelLoaded;
+    _isModelLoaded = sdk.RunAnywhereSDK.instance.vlm.isLoaded;
     if (_isModelLoaded) {
-      _loadedModelName = sdk.RunAnywhere.currentVLMModelId;
+      _loadedModelName = sdk.RunAnywhereSDK.instance.vlm.currentModelId;
     } else {
       _loadedModelName = null;
     }
@@ -117,7 +117,7 @@ class VLMViewModel extends ChangeNotifier {
       String modelId, String modelName, BuildContext context) async {
     try {
       debugPrint('🎯 Loading VLM model: $modelId');
-      await sdk.RunAnywhere.loadVLMModel(modelId);
+      await sdk.RunAnywhereSDK.instance.vlm.load(modelId);
       _isModelLoaded = true;
       _loadedModelName = modelName;
       notifyListeners();
@@ -157,8 +157,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage.filePath(xFile.path);
 
-      // Process image with streaming
-      final result = await sdk.RunAnywhere.processImageStream(
+      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
         options: const sdk.VLMGenerationOptions(maxTokens: 200),
@@ -197,8 +196,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage.filePath(imagePath);
 
-      // Process image with streaming (more detailed prompt)
-      final result = await sdk.RunAnywhere.processImageStream(
+      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
         options: const sdk.VLMGenerationOptions(maxTokens: 300),
@@ -281,8 +279,7 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage.filePath(xFile.path);
 
-      // Process image with streaming (shorter prompt for live mode)
-      final result = await sdk.RunAnywhere.processImageStream(
+      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
         options: const sdk.VLMGenerationOptions(maxTokens: 100),
@@ -312,7 +309,7 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Cancel ongoing VLM generation
   Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhere.cancelVLMGeneration());
+    unawaited(sdk.RunAnywhereSDK.instance.vlm.cancel());
     debugPrint('🛑 VLM generation cancelled');
   }
 

@@ -27,7 +27,24 @@
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_stream.h"
 #include "rac/infrastructure/events/rac_events.h"
+
+// v2 close-out Phase G-2: forward-declare the proto-byte stream dispatcher
+// from rac_llm_stream.cpp. We invoke it once per token and once on terminal
+// events so any collectors registered via rac_llm_set_stream_proto_callback()
+// see the full decoded sequence. The symbol is a no-op when the build was
+// configured without Protobuf (see rac_llm_stream.cpp fallback).
+namespace rac::llm {
+void dispatch_llm_stream_event(rac_handle_t handle,
+                               const char*  token,
+                               bool         is_final,
+                               int          kind,
+                               uint32_t     token_id,
+                               float        logprob,
+                               const char*  finish_reason,
+                               const char*  error_message);
+}  // namespace rac::llm
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -525,6 +542,11 @@ struct llm_stream_context {
     std::atomic<bool>* cancel_flag;
     // Benchmark timing (optional, NULL when not benchmarking)
     rac_benchmark_timing_t* timing_out;
+
+    // v2 close-out Phase G-2: component handle for the proto-byte stream
+    // dispatcher. Each delivered token fires a LLMStreamEvent to any
+    // collector registered via rac_llm_set_stream_proto_callback().
+    rac_handle_t component_handle;
 };
 
 /**
@@ -580,6 +602,20 @@ static rac_bool_t llm_stream_token_callback(const char* token, void* user_data) 
         }
     }
 
+    // v2 close-out Phase G-2: fan-out the token as an LLMStreamEvent to
+    // any proto-byte subscribers. `is_final=false` on every per-token
+    // event; the terminal is_final=true event is emitted by the
+    // generate_stream() caller once the engine returns (below).
+    rac::llm::dispatch_llm_stream_event(
+        ctx->component_handle,
+        token ? token : "",
+        /*is_final*/ false,
+        /*kind*/ 1 /* ANSWER */,
+        /*token_id*/ 0,
+        /*logprob*/ 0.0f,
+        /*finish_reason*/ nullptr,
+        /*error_message*/ nullptr);
+
     // Call user callback
     if (ctx->token_callback) {
         return ctx->token_callback(token, ctx->user_data);
@@ -625,6 +661,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_message = "No model loaded";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
 
+        rac::llm::dispatch_llm_stream_event(
+            handle, "", /*is_final*/ true, 0, 0, 0.0f,
+            /*finish_reason*/ "error",
+            /*error_message*/ "No model loaded");
+
         if (error_callback) {
             error_callback(result, "No model loaded", user_data);
         }
@@ -647,6 +688,11 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_code = RAC_ERROR_NOT_SUPPORTED;
         event.data.llm_generation.error_message = "Streaming not supported";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
+
+        rac::llm::dispatch_llm_stream_event(
+            handle, "", /*is_final*/ true, 0, 0, 0.0f,
+            /*finish_reason*/ "error",
+            /*error_message*/ "Streaming not supported");
 
         if (error_callback) {
             error_callback(RAC_ERROR_NOT_SUPPORTED, "Streaming not supported", user_data);
@@ -696,6 +742,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     ctx.token_count = 0;
     ctx.cancel_flag = &component->cancel_requested;
     ctx.timing_out = nullptr;  // No benchmark timing for regular generate_stream
+    ctx.component_handle = handle;
     // Pre-allocate to avoid repeated reallocations during streaming
     ctx.full_text.reserve(2048);
 
@@ -717,6 +764,17 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_code = result;
         event.data.llm_generation.error_message = "Streaming generation failed";
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_FAILED, &event);
+
+        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        rac::llm::dispatch_llm_stream_event(
+            handle,
+            /*token*/ "",
+            /*is_final*/ true,
+            /*kind*/ 0 /* UNSPECIFIED */,
+            /*token_id*/ 0,
+            /*logprob*/ 0.0f,
+            /*finish_reason*/ "error",
+            /*error_message*/ "Streaming generation failed");
 
         if (error_callback) {
             error_callback(result, "Streaming generation failed", user_data);
@@ -787,6 +845,17 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         event.data.llm_generation.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
+
+    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    rac::llm::dispatch_llm_stream_event(
+        handle,
+        /*token*/ "",
+        /*is_final*/ true,
+        /*kind*/ 1 /* ANSWER */,
+        /*token_id*/ 0,
+        /*logprob*/ 0.0f,
+        /*finish_reason*/ component->cancel_requested.load() ? "cancelled" : "stop",
+        /*error_message*/ nullptr);
 
     // Free the duplicated text
     free(final_result.text);
@@ -921,6 +990,8 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     ctx.max_tokens = effective_options->max_tokens;
     ctx.token_count = 0;
     ctx.timing_out = timing_out;  // Pass timing for t4 capture in callback
+    ctx.cancel_flag = &component->cancel_requested;
+    ctx.component_handle = handle;
 
     // Perform streaming generation with timing
     // Note: Backend timing (t2, t3, t5) will be captured if backend supports it
@@ -947,6 +1018,12 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
             timing_out->error_code = result;
             timing_out->t6_request_end_ms = rac_monotonic_now_ms();
         }
+
+        // v2 close-out Phase G-2: terminal error event on the proto stream.
+        rac::llm::dispatch_llm_stream_event(
+            handle, "", /*is_final*/ true, /*kind*/ 0, 0, 0.0f,
+            /*finish_reason*/ "error",
+            /*error_message*/ "Streaming generation failed");
 
         if (error_callback) {
             error_callback(result, "Streaming generation failed", user_data);
@@ -1047,6 +1124,13 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
         event.data.llm_generation.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_LLM_GENERATION_COMPLETED, &event);
     }
+
+    // v2 close-out Phase G-2: terminal success event on the proto stream.
+    rac::llm::dispatch_llm_stream_event(
+        handle, "", /*is_final*/ true, /*kind*/ 1 /* ANSWER */,
+        0, 0.0f,
+        /*finish_reason*/ component->cancel_requested.load() ? "cancelled" : "stop",
+        /*error_message*/ nullptr);
 
     // Free the duplicated text
     free(final_result.text);

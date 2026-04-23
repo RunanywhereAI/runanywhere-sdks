@@ -14,7 +14,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../../tests/streaming/perf_bench/perf_bench.dart';
+import '../../../../../tests/streaming/perf_bench/perf_bench.dart';
 
 void main() {
   group('perf_bench (dart)', () {

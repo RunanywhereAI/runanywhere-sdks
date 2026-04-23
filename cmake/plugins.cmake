@@ -32,6 +32,26 @@
 include_guard(GLOBAL)
 
 # -----------------------------------------------------------------------------
+# Engine that intentionally does NOT use this macro:
+#
+#   metalrt — Apple-only, optional, private dependency. It is built as an
+#             OBJECT library and folded into rac_commons because:
+#               (a) the engine itself is closed-source (private vendor lib);
+#                   the public repo only carries stubs that compile to no-ops.
+#               (b) when the real engine is linked (RAC_METALRT_ENGINE_AVAILABLE
+#                   = ON), the wrappers + vtable registration must end up
+#                   inside the host commons binary so static-init runs before
+#                   main() on iOS without a separate .dylib that the App Store
+#                   would reject.
+#               (c) the OBJECT layout naturally folds; STATIC/SHARED branching
+#                   would force either a separate .a no one consumes or a
+#                   .dylib that violates (b).
+#             metalrt records the same RAC_ENGINE_* metadata GLOBAL properties
+#             this macro emits (see engines/metalrt/CMakeLists.txt) so tooling
+#             (cmake -t graphviz/json) treats it identically.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
 # rac_add_engine_plugin(name
 #                       SOURCES <s1> <s2> ...
 #                       [TARGET_NAME <override>]      # v3.1.2: e.g. rac_backend_onnx
@@ -49,10 +69,12 @@ include_guard(GLOBAL)
 #   - RAC_STATIC_PLUGINS=ON AND NOT SHARED_ONLY → SOURCES become rac_commons
 #       private sources; the plugin auto-registers via RAC_STATIC_PLUGIN_REGISTER.
 #   - Otherwise → SOURCES build into a STATIC library by default, or SHARED
-#       when RAC_BUILD_SHARED=ON (or SHARED_ONLY is set). Target name is
-#       TARGET_NAME if provided, else `runanywhere_<name>`. Hidden visibility
-#       applies for SHARED dlopen-able plugins; SHARED_ONLY engines (which
-#       expose JNI bridges or test-link surfaces) keep default visibility.
+#       when RAC_BUILD_SHARED=ON. SHARED_ONLY does NOT force SHARED — the
+#       flag name is legacy and really means "always a standalone target".
+#       Target name is TARGET_NAME if provided, else `runanywhere_<name>`.
+#       Hidden visibility applies for SHARED dlopen-able plugins;
+#       SHARED_ONLY engines (which expose JNI bridges or test-link surfaces)
+#       keep default visibility.
 #
 # v3.1.2 additions to support migrating the 4 hand-rolled engines (onnx,
 # whispercpp, whisperkit_coreml, metalrt) without renaming their existing
@@ -106,10 +128,13 @@ function(rac_add_engine_plugin name)
         endif()
         message(STATUS "  Engine plugin '${name}': STATIC (linked into rac_commons)")
     else()
-        # ── SHARED / STANDALONE PATH ────────────────────────────────────────
-        # When SHARED_ONLY is set, we always produce a standalone library
-        # regardless of RAC_STATIC_PLUGINS (e.g. tests link to it directly).
-        if(RAC_BUILD_SHARED OR P_SHARED_ONLY)
+        # ── STANDALONE PATH ─────────────────────────────────────────────────
+        # SHARED_ONLY means "never fold into rac_commons" (tests + JNI + the
+        # Swift xcframework layout all need the engine as its own library).
+        # It does NOT force SHARED linkage — that is driven solely by
+        # RAC_BUILD_SHARED so iOS (RAC_BUILD_SHARED=OFF) produces static
+        # archives that xcframework packaging can consume without code signing.
+        if(RAC_BUILD_SHARED)
             add_library(${P_TARGET_NAME} SHARED ${P_SOURCES})
         else()
             add_library(${P_TARGET_NAME} STATIC ${P_SOURCES})

@@ -27,9 +27,10 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   // Session state
   VoiceSessionState _sessionState = VoiceSessionState.disconnected;
 
-  // v3.1: voice-agent handle + proto-event subscription. Replaces the
-  // deprecated VoiceSessionHandle / VoiceSessionEvent consumption.
-  sdk.VoiceAgentStreamAdapter? _voiceAgentAdapter;
+  // v3.1: proto-event subscription replaces the deprecated
+  // VoiceSessionHandle / VoiceSessionEvent consumption. The
+  // adapter is owned by the active stream subscription below;
+  // nothing else needs to reach it.
   StreamSubscription<sdk.VoiceEvent>? _eventSubscription;
 
   // Conversation
@@ -106,10 +107,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      // Use SDK public API to check loaded states (matches Swift pattern)
-      final currentModelId = sdk.RunAnywhere.currentModelId;
-      final sttModelId = sdk.RunAnywhere.currentSTTModelId;
-      final ttsVoiceId = sdk.RunAnywhere.currentTTSVoiceId;
+      final currentModelId = sdk.RunAnywhereSDK.instance.llm.currentModelId;
+      final sttModelId = sdk.RunAnywhereSDK.instance.stt.currentModelId;
+      final ttsVoiceId = sdk.RunAnywhereSDK.instance.tts.currentVoiceId;
 
       if (!mounted) return;
       setState(() {
@@ -150,8 +150,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     });
 
     try {
-      // Check if voice agent is ready using SDK API
-      if (!sdk.RunAnywhere.isVoiceAgentReady) {
+      if (!sdk.RunAnywhereSDK.instance.voice.isReady) {
         setState(() {
           _sessionState = VoiceSessionState.error;
           _errorMessage = 'Please load STT, LLM, and TTS models first';
@@ -164,7 +163,6 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       await sdk.DartBridgeVoiceAgent.shared.initializeWithLoadedModels();
       final handle = await sdk.DartBridgeVoiceAgent.shared.getHandle();
       final adapter = sdk.VoiceAgentStreamAdapter(handle);
-      _voiceAgentAdapter = adapter;
 
       _eventSubscription = adapter.stream().listen(
         _handleProtoEvent,
@@ -201,27 +199,27 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.state:
         final state = event.state;
         switch (state.current) {
-          case sdk.StateChangeEvent_State.STATE_IDLE:
+          case sdk.PipelineState.PIPELINE_STATE_IDLE:
             setState(() {
               _sessionState = VoiceSessionState.listening;
             });
             break;
-          case sdk.StateChangeEvent_State.STATE_LISTENING:
+          case sdk.PipelineState.PIPELINE_STATE_LISTENING:
             setState(() {
               _sessionState = VoiceSessionState.listening;
             });
             break;
-          case sdk.StateChangeEvent_State.STATE_THINKING:
+          case sdk.PipelineState.PIPELINE_STATE_THINKING:
             setState(() {
               _sessionState = VoiceSessionState.processing;
             });
             break;
-          case sdk.StateChangeEvent_State.STATE_SPEAKING:
+          case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
             setState(() {
               _sessionState = VoiceSessionState.speaking;
             });
             break;
-          case sdk.StateChangeEvent_State.STATE_STOPPED:
+          case sdk.PipelineState.PIPELINE_STATE_STOPPED:
             unawaited(_stopConversation());
             break;
           default:
@@ -231,11 +229,11 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
       case sdk.VoiceEvent_Payload.vad:
         final vad = event.vad;
-        if (vad.type == sdk.VADEvent_Type.VAD_EVENT_VOICE_START) {
+        if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_START) {
           setState(() {
             _isSpeechDetected = true;
           });
-        } else if (vad.type == sdk.VADEvent_Type.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+        } else if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
           setState(() {
             _isSpeechDetected = false;
             _sessionState = VoiceSessionState.processing;
@@ -296,8 +294,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    // The adapter's Stream onCancel deregisters the C-side callback.
-    _voiceAgentAdapter = null;
+    // The adapter's Stream onCancel deregisters the C-side callback —
+    // cancelling _eventSubscription above is sufficient cleanup.
 
     setState(() {
       _sessionState = VoiceSessionState.disconnected;

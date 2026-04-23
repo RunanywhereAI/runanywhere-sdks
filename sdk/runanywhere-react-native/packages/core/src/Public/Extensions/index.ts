@@ -25,7 +25,6 @@ export {
   transcribeBuffer,
   transcribeStream,
   transcribeFile,
-  startStreamingSTT,
   stopStreamingSTT,
   isStreamingSTT,
 } from './RunAnywhere+STT';
@@ -44,7 +43,6 @@ export {
   isSpeaking,
   stopSpeaking,
   availableTTSVoices,
-  getTTSVoices,
   getTTSVoiceInfo,
   stopSynthesis,
   cancelTTS,

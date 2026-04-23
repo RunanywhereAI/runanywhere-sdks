@@ -2,8 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/runanywhere.dart';
+// Lifecycle + model-registration calls below route through
+// `RunAnywhereSDK.instance` (v4 canonical API).
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -78,15 +79,14 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         debugPrint('   Base URL: $normalizedURL');
 
         // Custom configuration mode - use stored API key and base URL
-        await RunAnywhere.initialize(
+        await RunAnywhereSDK.instance.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
           environment: SDKEnvironment.production,
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
       } else {
-        // Initialize SDK in development mode (default)
-        await RunAnywhere.initialize();
+        await RunAnywhereSDK.instance.initialize();
         debugPrint('✅ SDK initialized in DEVELOPMENT mode');
       }
 
@@ -111,9 +111,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint(
           '⚡ SDK initialization completed in ${stopwatch.elapsedMilliseconds}ms');
       debugPrint(
-          '🎯 SDK Status: ${RunAnywhere.isActive ? "Active" : "Inactive"}');
+          '🎯 SDK Status: ${RunAnywhereSDK.instance.isActive ? "Active" : "Inactive"}');
       debugPrint(
-          '🔧 Environment: ${RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown"}');
+          '🔧 Environment: ${RunAnywhereSDK.instance.environment?.description ?? "Unknown"}');
       debugPrint('📱 Services will initialize on first API call');
 
       // Refresh model manager state (runs model discovery)
@@ -241,7 +241,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await Future<void>.delayed(Duration.zero);
 
     // --- VLM MODULE ---
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'smolvlm-500m-instruct-q8_0',
       name: 'SmolVLM 500M Instruct',
       url: Uri.parse(
@@ -258,7 +258,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
     // --- ONNX MODULE (STT/TTS via Core SDK) ---
     // STT Models (Sherpa-ONNX Whisper)
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'sherpa-onnx-whisper-tiny.en',
       name: 'Sherpa Whisper Tiny (ONNX)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
@@ -267,7 +267,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 75000000,
     );
 
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'sherpa-onnx-whisper-small.en',
       name: 'Sherpa Whisper Small (ONNX)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-small.en.tar.gz'),
@@ -277,7 +277,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     );
 
     // TTS Models (Piper VITS)
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'vits-piper-en_US-lessac-medium',
       name: 'Piper TTS (US English - Medium)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz'),
@@ -286,7 +286,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 65000000,
     );
 
-    RunAnywhere.registerModel(
+    RunAnywhereSDK.instance.models.register(
       id: 'vits-piper-en_GB-alba-medium',
       name: 'Piper TTS (British English)',
       url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz'),
@@ -298,7 +298,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
-    RunAnywhere.registerMultiFileModel(
+    RunAnywhereSDK.instance.models.registerMultiFile(
       id: 'all-minilm-l6-v2',
       name: 'All MiniLM L6 v2 (Embedding)',
       files: [

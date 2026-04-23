@@ -44,6 +44,21 @@ rac_link_archive_deps(test_llm_thinking)
 target_compile_features(test_llm_thinking PRIVATE cxx_std_17)
 add_test(NAME llm_thinking_tests COMMAND test_llm_thinking)
 
+# --- v2 close-out Phase G-1: rac_tool_call_* C ABI test ----------------------
+# Behavioral tests for the single-source-of-truth tool-calling API shared by
+# Swift, Kotlin, Flutter, Web, and React Native SDKs. Covers parse (default +
+# LFM2), free-form, format_prompt, build_initial/followup_prompt, normalize_json,
+# and free-function idempotence.
+add_executable(test_tool_calling test_tool_calling.cpp)
+target_include_directories(test_tool_calling PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_tool_calling PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling)
+target_compile_features(test_tool_calling PRIVATE cxx_std_17)
+add_test(NAME tool_calling_tests COMMAND test_tool_calling)
+
 # --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
 # Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
 # VoiceEvent → SerializeToArray → callback path that GAP 09 Phase 15 declared
@@ -58,6 +73,21 @@ target_link_libraries(test_proto_event_dispatch PRIVATE rac_commons)
 rac_link_archive_deps(test_proto_event_dispatch)
 target_compile_features(test_proto_event_dispatch PRIVATE cxx_std_17)
 add_test(NAME proto_event_dispatch_tests COMMAND test_proto_event_dispatch)
+
+# --- v2 close-out Phase G-2: LLM proto-byte stream dispatch test --------------
+# Exercises rac::llm::dispatch_llm_stream_event() — the token → LLMStreamEvent
+# → SerializeToArray → callback path that Phase G-2 declared. Tests synthetic
+# token schedule, monotonic seq, terminal stop/error events, unregister-stops-
+# dispatch. SKIP-style when RAC_HAVE_PROTOBUF is undefined.
+add_executable(test_llm_stream_proto test_llm_stream_proto.cpp)
+target_include_directories(test_llm_stream_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_llm_stream_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_llm_stream_proto)
+target_compile_features(test_llm_stream_proto PRIVATE cxx_std_17)
+add_test(NAME llm_stream_proto_tests COMMAND test_llm_stream_proto)
 
 # --- GAP 02 Phase 10: unified engine plugin registry tests --------------------
 # No backend dependency; all three link directly against rac_commons.
@@ -120,12 +150,19 @@ add_test(NAME static_registration_tests COMMAND test_static_registration)
 if(NOT RAC_STATIC_PLUGINS)
     # Two fixture libraries from one source — the BAD_ABI variant flips a
     # compile-time toggle so its metadata.abi_version equals host + 99.
+    # Fixtures are minimal .so's that do NOT link rac_commons (they exercise
+    # the dlopen / ABI-version paths in isolation), so the include path has
+    # to be spelled out explicitly — ${CMAKE_SOURCE_DIR} refers to the repo
+    # root when building via the top-level preset, not to commons.
+    set(_RAC_TEST_PLUGIN_INCLUDE_DIR
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+
     add_library(rac_test_plugin SHARED fixtures/rac_test_plugin.cpp)
     set_target_properties(rac_test_plugin PROPERTIES
         OUTPUT_NAME runanywhere_test_plugin
         C_VISIBILITY_PRESET hidden
         CXX_VISIBILITY_PRESET hidden)
-    target_include_directories(rac_test_plugin PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(rac_test_plugin PRIVATE ${_RAC_TEST_PLUGIN_INCLUDE_DIR})
     target_compile_features(rac_test_plugin PRIVATE cxx_std_17)
 
     add_library(rac_test_plugin_bad_abi SHARED fixtures/rac_test_plugin.cpp)
@@ -133,7 +170,7 @@ if(NOT RAC_STATIC_PLUGINS)
         OUTPUT_NAME runanywhere_test_plugin_bad_abi
         C_VISIBILITY_PRESET hidden
         CXX_VISIBILITY_PRESET hidden)
-    target_include_directories(rac_test_plugin_bad_abi PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(rac_test_plugin_bad_abi PRIVATE ${_RAC_TEST_PLUGIN_INCLUDE_DIR})
     target_compile_definitions(rac_test_plugin_bad_abi PRIVATE RAC_TEST_PLUGIN_FORCE_BAD_ABI=1)
     target_compile_features(rac_test_plugin_bad_abi PRIVATE cxx_std_17)
 
@@ -228,6 +265,36 @@ target_link_libraries(test_extraction PRIVATE rac_commons)
 rac_link_archive_deps(test_extraction)
 target_compile_features(test_extraction PRIVATE cxx_std_17)
 add_test(NAME extraction_tests COMMAND test_extraction --run-all)
+
+# --- v2 close-out Phase H: rac_http_client C ABI tests -----------------------
+# Loopback HTTP/1.1 server in-process (POSIX sockets) drives GET/POST/PUT/
+# DELETE happy paths, custom headers, 301/302/307 redirects, timeout,
+# streaming with cancellation, resume-merge-matches. Links libcurl via
+# rac_commons' PUBLIC linkage. Unix-only (the loopback server uses POSIX
+# sockets); Windows coverage tracked as follow-up (winsock wrapper).
+if(UNIX)
+    add_executable(test_http_client test_http_client.cpp)
+    target_include_directories(test_http_client PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_http_client PRIVATE rac_commons)
+    rac_link_archive_deps(test_http_client)
+    target_compile_features(test_http_client PRIVATE cxx_std_17)
+    add_test(NAME http_client_tests COMMAND test_http_client)
+
+    # Higher-level runner that drives rac_http_download_execute —
+    # happy path / checksum / cancel / resume / 404. Also Unix-only.
+    add_executable(test_http_download test_http_download.cpp)
+    target_include_directories(test_http_download PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_http_download PRIVATE rac_commons)
+    rac_link_archive_deps(test_http_download)
+    target_compile_features(test_http_download PRIVATE cxx_std_17)
+    add_test(NAME http_download_tests COMMAND test_http_download)
+endif()
 
 # --- test_download_orchestrator: Always built (no backend dependency) ---
 add_executable(test_download_orchestrator test_download_orchestrator.cpp)
@@ -473,6 +540,17 @@ target_include_directories(rac_benchmark_tests
     PRIVATE
         ${CMAKE_SOURCE_DIR}/include
 )
+
+# Ensure the FetchContent-bundled gtest headers win over any system gtest
+# (e.g. Homebrew's /opt/homebrew/include that protobuf/abseil drag in via
+# -isystem). Without this the bundled libgtest.a (old `const char*` ABI)
+# link-fails when the compile units picked up the newer `std::string`
+# header signatures from the system gtest.
+if(TARGET gtest)
+    target_include_directories(rac_benchmark_tests BEFORE PRIVATE
+        $<TARGET_PROPERTY:gtest,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+endif()
 
 include(GoogleTest)
 gtest_discover_tests(rac_benchmark_tests)

@@ -589,6 +589,10 @@ export const RunAnywhere = {
   voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
   voiceAgentGenerateResponse: VoiceAgent.voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
+  // Phase 1 / B4 fix: forwarder for the v3.1 Nitro `getVoiceAgentHandle()`
+  // method. The sample VoiceAssistantScreen calls `RunAnywhere.getVoiceAgentHandle()`
+  // to feed VoiceAgentStreamAdapter; previously missing from this facade.
+  getVoiceAgentHandle: VoiceAgent.getVoiceAgentHandle,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
 
   // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter

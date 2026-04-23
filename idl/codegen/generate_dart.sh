@@ -35,11 +35,19 @@ protoc \
     --dart_out="${OUT_DIR}" \
     model_types.proto voice_events.proto pipeline.proto solutions.proto
 
-# GAP 09 service definitions — protoc_plugin emits both message types AND
-# `Stream<T>` gRPC client stubs (*.pbgrpc.dart) when --dart_out=grpc:<dir>.
+# GAP 09 service definitions — emit message types only (NOT the gRPC client
+# stubs). The .pbgrpc.dart stubs depend on package:grpc runtime which we
+# don't carry in the Flutter SDK (streaming flows via the hand-written
+# VoiceAgentStreamAdapter / LLMStreamAdapter over rac_*_set_proto_callback
+# instead). Using `--dart_out=<dir>` (no `grpc:` prefix) skips the gRPC
+# stubs and emits only the .pb.dart message types.
 protoc \
     --proto_path="${PROTO_DIR}" \
-    --dart_out="grpc:${OUT_DIR}" \
+    --dart_out="${OUT_DIR}" \
     voice_agent_service.proto llm_service.proto download_service.proto
 
-echo "✓ Dart proto codegen + gRPC stubs → ${OUT_DIR}"
+# Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
+# (some older protoc_plugin versions emit them even without the grpc: prefix).
+rm -f "${OUT_DIR}"/*.pbgrpc.dart
+
+echo "✓ Dart proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"

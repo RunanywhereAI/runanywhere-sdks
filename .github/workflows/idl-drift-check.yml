@@ -21,7 +21,10 @@ on:
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
-    branches: [main]
+    # v2 close-out (B34): include long-lived integration branches so a
+    # direct push that touches IDL-adjacent files without a PR still
+    # gets the drift gate.
+    branches: [main, feat/v2-architecture]
     paths:
       - 'idl/**'
       - 'sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**'

@@ -241,10 +241,7 @@ pattern of `test_plugin_entry_llamacpp` and `test_plugin_entry_onnx`.
 | 100      | platform          | LLM + TTS + Diffusion        | Apple (FoundationModels, AVSpeech, CoreML) |
 |  95      | mlx (example)     | LLM                          | Apple only |
 |  90      | whispercpp        | STT                          | All        |
-|  80      | onnx              | STT + TTS + VAD + Embeddings | All        |
-|  -       | sherpa (stub)     | STT                          | All        |
-|  -       | genie (stub)      | LLM (QNN)                    | Snapdragon |
-|  -       | diffusion-coreml (stub) | Diffusion              | Apple      |
+|  80      | onnx              | STT + TTS + VAD + Embeddings + Wakeword | All |
 
 Pick your priority within the existing range:
 - 0–40: experimental / CPU fallback engines
@@ -277,6 +274,56 @@ bits, etc.).
 - `3u` — v3.0.0: legacy registry deleted; `create` op added to every
   primitive ops struct; VAD `initialize` op added for symmetry
 
+## Streaming consistency (proto callback pattern)
+
+Engines that produce server-streamed data (voice events, LLM tokens,
+download progress) MUST emit serialized proto bytes via the per-feature
+`rac_<feature>_set_proto_callback(...)` C API. Frontend SDKs wrap the
+callback in their idiomatic stream type (`AsyncStream<T>` / `Flow<T>` /
+`Stream<T>` / `AsyncIterable<T>`) using the codegen'd transport at
+`idl/codegen/templates/ts_async_iterable.njk` (TS) and the hand-written
+adapters under each SDK's `Adapters/` directory.
+
+Example (voice agent, GAP 09):
+
+```cpp
+// engines/<name>/<your_voice_engine>.cpp
+rac_voice_event_serialize_to_bytes(/* ... */, &bytes, &len);
+rac_voice_agent_dispatch_proto_event(handle, bytes, len);
+```
+
+Frontend wraps the same handle:
+
+```swift
+// Swift
+let stream = VoiceAgentStreamAdapter(handle: handle).stream()
+for await event in stream { handle(event) }
+```
+
+## Loading a third-party plugin from a frontend
+
+Vendor-shipped engine `.dylib` / `.so` / `.dll` libraries can be loaded
+at runtime on platforms that allow `dlopen` (macOS, Linux, Android,
+Windows). On iOS / WASM the App Store / browser ban dynamic loading;
+link the engine at compile time instead.
+
+```swift
+// Swift (RunAnywhere+PluginLoader.swift)
+try RunAnywhere.PluginLoader.load(at:
+    URL(fileURLWithPath: "/opt/runanywhere/plugins/librunanywhere_acme.dylib"))
+print("loaded:", RunAnywhere.PluginLoader.registeredNames())
+```
+
+```c
+// C / C++ (any host)
+rac_registry_load_plugin("/opt/runanywhere/plugins/librunanywhere_acme.so");
+```
+
+The loader resolves `rac_plugin_entry_<stem>` via `dlsym`, ABI-checks
+the returned vtable against the host's `RAC_PLUGIN_API_VERSION`, runs
+`capability_check` on the host's `HardwareProfile`, and only then
+registers the plugin with the central registry.
+
 ## See also
 
 - [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md) —
@@ -284,9 +331,11 @@ bits, etc.).
 - [`graph_primitives.md`](graph_primitives.md) — DAG primitives
   (`CancelToken`, `RingBuffer`, `StreamEdge`) for engines that need
   pipeline-style fan-out
-- [`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md) — current ABI state,
-  active backlog, versioning policy
-- [`v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md`](../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md)
+- [`v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md`](../../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md)
   — unified plugin ABI spec
-- [`v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md`](../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md)
+- [`v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md`](../../v2_gap_specs/GAP_03_DYNAMIC_PLUGIN_LOADING.md)
+  — `dlopen` loader + `RAC_STATIC_PLUGIN_REGISTER` companion
+- [`v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md`](../../v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md)
   — `engines/<name>/` layout + `rac_add_engine_plugin()` macro spec
+- [`v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md`](../../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md)
+  — proto-encoded streams + per-SDK adapter pattern

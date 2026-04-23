@@ -3,7 +3,7 @@
  * Source: idl/llm_service.proto
  * Template: idl/codegen/templates/ts_async_iterable.njk
  *
- * GAP 09 Phase 14. Provides an AsyncIterable<LLMToken> client
+ * GAP 09 Phase 14. Provides an AsyncIterable<LLMStreamEvent> client
  * over an in-process server-streaming callback. The transport ("how a token
  * arrives in the JS heap") is platform-specific:
  *   - React Native: a Nitro HybridObject method whose callback fires once
@@ -14,12 +14,13 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
-import type { LLMGenerateRequest, LLMToken } from "../llm_service";
+import type { LLMGenerateRequest } from "../llm_service";
+import type { LLMStreamEvent } from "../llm_service";
 
 export interface LLMStreamTransport {
     subscribe(
         req: LLMGenerateRequest,
-        onMessage: (msg: LLMToken) => void,
+        onMessage: (msg: LLMStreamEvent) => void,
         onError:   (err: Error) => void,
         onDone:    () => void,
     ): () => void;   // returns a cancel function
@@ -27,18 +28,18 @@ export interface LLMStreamTransport {
 
 /**
  * Wrap the platform `transport.subscribe` callback into an
- * `AsyncIterable<LLMToken>`. Cancellation is propagated by
+ * `AsyncIterable<LLMStreamEvent>`. Cancellation is propagated by
  * `break`-ing out of `for await` (the iterator's `return()` calls the
  * transport's cancel function).
  */
 export function generateLLM(
     transport: LLMStreamTransport,
     req: LLMGenerateRequest,
-): AsyncIterable<LLMToken> {
+): AsyncIterable<LLMStreamEvent> {
     return {
-        [Symbol.asyncIterator](): AsyncIterator<LLMToken> {
-            const queue: LLMToken[] = [];
-            let resolve: ((v: IteratorResult<LLMToken>) => void) | null = null;
+        [Symbol.asyncIterator](): AsyncIterator<LLMStreamEvent> {
+            const queue: LLMStreamEvent[] = [];
+            let resolve: ((v: IteratorResult<LLMStreamEvent>) => void) | null = null;
             let error: Error | null = null;
             let done = false;
 
@@ -59,13 +60,13 @@ export function generateLLM(
             );
 
             return {
-                next(): Promise<IteratorResult<LLMToken>> {
+                next(): Promise<IteratorResult<LLMStreamEvent>> {
                     if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false });
                     if (error) return Promise.reject(error);
                     if (done)  return Promise.resolve({ value: undefined as any, done: true });
                     return new Promise((r) => { resolve = r; });
                 },
-                return(): Promise<IteratorResult<LLMToken>> {
+                return(): Promise<IteratorResult<LLMStreamEvent>> {
                     cancel();
                     return Promise.resolve({ value: undefined as any, done: true });
                 },

@@ -169,9 +169,6 @@ object CppBridgeTTS {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var state: Int = TTSState.NOT_CREATED
 
     @Volatile
@@ -466,36 +463,6 @@ object CppBridgeTTS {
          */
         fun onAudioChunk(audioData: ByteArray, isFinal: Boolean): Boolean
     }
-
-    /**
-     * Register the TTS callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetTTSCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "TTS callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the TTS callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     /**
      * Get the current component handle.
@@ -1153,63 +1120,6 @@ object CppBridgeTTS {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the TTS callbacks with C++ core.
-     *
-     * Registers [streamAudioCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_tts_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetTTSCallbacks()
-
-    /**
-     * Native method to unset the TTS callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_tts_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetTTSCallbacks()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the TTS callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetTTSCallbacks()
-
-            ttsListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

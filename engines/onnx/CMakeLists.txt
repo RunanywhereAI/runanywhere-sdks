@@ -225,16 +225,17 @@ set(ONNX_BACKEND_SOURCES
     rac_plugin_entry_onnx.cpp
 )
 
-# ONNX embedding provider lives in src/features/rag/ but is compiled here
-# to avoid a shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
+# ONNX embedding provider lives in commons under src/features/rag/ but is
+# compiled HERE (into rac_backend_onnx) to avoid a shared-library cycle:
+# rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
 #
-# Note: pre-v3.1.2, the RAG_DIR variable below pointed at a non-existent
-# path (`engines/onnx/../../features/rag` resolves to `features/rag` at
-# repo root), so the EXISTS check below silently failed and these sources
-# were NEVER compiled. Kept verbatim for bug-compat — fixing it surfaces a
-# latent stale include in onnx_embedding_provider.cpp that's a separate
-# scope from the Sprint 2 CMake-normalization. Tracked as a follow-up.
-set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../features/rag")
+# Phase 1 / B1 fix: previously this pointed at engines/onnx/../../features/rag
+# which resolves to features/rag at the repo root (does not exist), so the
+# EXISTS check below silently SKIPPED both files and the embeddings provider
+# never compiled — leaving rac_backend_onnx_embeddings_register and
+# g_onnx_embeddings_ops as unresolved externals at every final link site
+# that touched the ONNX plugin entry. Path now points at the real location.
+set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons/src/features/rag")
 set(ONNX_EXTRA_INCLUDES "")
 if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
     list(APPEND ONNX_BACKEND_SOURCES
@@ -260,13 +261,19 @@ endif()
 # target name so the 52 existing references across tests + sample apps +
 # RN Android linker config + WASM exports keep working without renaming.
 # CXX_STANDARD=20 because the ONNX backend uses std::span / concepts.
-# Default linkage (STATIC unless RAC_BUILD_SHARED=ON) — matches the
-# pre-v3.1.2 hand-rolled CMakeLists exactly. The static archive defers
-# the (pre-existing) cross-TU symbol resolution to the final link site
-# (e.g. test_plugin_entry_onnx, the Swift xcframework, Android shared lib).
+# SHARED_ONLY → always a standalone library target (never folded into
+# rac_commons). Required because:
+#   * the platform-specific `target_link_libraries(rac_backend_onnx ...)`
+#     blocks below assume the target exists, and
+#   * the Swift xcframework layout distributes the ONNX backend as a
+#     SEPARATE xcframework (RABackendONNX) from RACommons.
+# Default linkage is STATIC unless RAC_BUILD_SHARED=ON, which matches the
+# pre-v3.1.2 hand-rolled CMakeLists exactly and produces the .a archive
+# the xcframework packager consumes on iOS.
 rac_add_engine_plugin(onnx
     TARGET_NAME         rac_backend_onnx
     CXX_STANDARD        20
+    SHARED_ONLY
     SOURCES             ${ONNX_BACKEND_SOURCES}
     LINK_LIBRARIES      ${ONNX_LINK_LIBS}
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include

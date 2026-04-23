@@ -37,7 +37,7 @@ class LLMStub(object):
         self.Generate = channel.unary_stream(
                 '/runanywhere.v1.LLM/Generate',
                 request_serializer=llm__service__pb2.LLMGenerateRequest.SerializeToString,
-                response_deserializer=llm__service__pb2.LLMToken.FromString,
+                response_deserializer=llm__service__pb2.LLMStreamEvent.FromString,
                 _registered_method=True)
 
 
@@ -45,9 +45,9 @@ class LLMServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Generate(self, request, context):
-        """Server-streaming: emits one LLMToken per generated token until
-        is_final=true. Cancellation aborts the underlying generation via
-        the existing rac_llm_cancel() C ABI.
+        """Server-streaming: emits one LLMStreamEvent per generated token
+        until is_final=true. Cancellation aborts the underlying generation
+        via the existing rac_llm_cancel() C ABI.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -59,7 +59,7 @@ def add_LLMServicer_to_server(servicer, server):
             'Generate': grpc.unary_stream_rpc_method_handler(
                     servicer.Generate,
                     request_deserializer=llm__service__pb2.LLMGenerateRequest.FromString,
-                    response_serializer=llm__service__pb2.LLMToken.SerializeToString,
+                    response_serializer=llm__service__pb2.LLMStreamEvent.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -88,7 +88,7 @@ class LLM(object):
             target,
             '/runanywhere.v1.LLM/Generate',
             llm__service__pb2.LLMGenerateRequest.SerializeToString,
-            llm__service__pb2.LLMToken.FromString,
+            llm__service__pb2.LLMStreamEvent.FromString,
             options,
             channel_credentials,
             insecure,

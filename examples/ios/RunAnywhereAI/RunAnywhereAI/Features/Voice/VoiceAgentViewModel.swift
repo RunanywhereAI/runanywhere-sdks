@@ -378,21 +378,17 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
-    /// Start a voice conversation session.
-    ///
-    /// v2 close-out: this function uses `RunAnywhere.startVoiceSession` and
-    /// `VoiceSessionHandle`, both `@available(*, deprecated)` since the
-    /// Wave D Phase 10 cleanup. The function is itself marked deprecated
-    /// to chain-suppress the inner warnings (Swift's idiomatic pattern in
-    /// the absence of per-call `@Suppress`). Migrates to
-    /// `VoiceAgentStreamAdapter` in v3.
-    /// Start a voice conversation using the proto-stream adapter (v3.1).
+    /// Start a voice conversation using the proto-stream adapter.
     ///
     /// Pipeline:
     ///   1. Initialize voice agent against already-loaded STT/LLM/TTS models.
     ///   2. Grab the raw handle via CppBridge.VoiceAgent.
-    ///   3. Wrap with VoiceAgentStreamAdapter.
+    ///   3. Wrap with VoiceAgentStreamAdapter (proto bytes → AsyncStream<RAVoiceEvent>).
     ///   4. Consume RAVoiceEvent proto messages + drive UI state.
+    ///
+    /// `RunAnywhere.startVoiceSession` and `VoiceSessionHandle` were
+    /// removed in the v2 close-out — only the adapter pattern is
+    /// supported now.
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")

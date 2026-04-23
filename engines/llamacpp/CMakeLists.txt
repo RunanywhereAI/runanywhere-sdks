@@ -177,46 +177,67 @@ if(RAC_VLM_USE_MTMD)
     )
 endif()
 
-# GAP 03 Phase 5: dual-mode build of the llama.cpp backend.
+# GAP 06 close-out (Phase 1 / B1): migrated to rac_add_engine_plugin().
 #
 # Two distinct outputs share the same source list:
 #
-#   * `rac_backend_llamacpp`  (existing, legacy) — the per-domain
-#     `rac_service_register_provider()` path, linked PUBLIC against
-#     `rac_commons`. Always built; nothing changes for legacy callers.
+#   * `rac_backend_llamacpp`  — the engine implementation (op-structs,
+#     plugin entry, optional VLM mtmd sources). Produced via the macro
+#     with SHARED_ONLY so it stays a separate library regardless of
+#     RAC_STATIC_PLUGINS (the JNI bridge + per-platform link blocks
+#     reference the target by name and need default visibility).
 #
-#   * `runanywhere_llamacpp`  (new, GAP 03)      — the same TUs PLUS one
-#     extra .cpp that calls `RAC_STATIC_PLUGIN_REGISTER(llamacpp)` so the
-#     plugin self-registers when (a) statically linked into the host on
-#     iOS / WASM, or (b) loaded as a SHARED library at runtime via
-#     `rac_registry_load_plugin("librunanywhere_llamacpp.so")` on Android /
-#     Linux / macOS / Windows.
+#   * `runanywhere_llamacpp`  — the thin self-registration carrier built
+#     from `rac_static_register_llamacpp.cpp`. Two modes:
+#       - RAC_STATIC_PLUGINS=ON:  the .cpp is added directly to rac_commons
+#                                 so the file-scope ctor schedules
+#                                 RAC_STATIC_PLUGIN_REGISTER(llamacpp)
+#                                 before main() (iOS / WASM hosts).
+#       - RAC_STATIC_PLUGINS=OFF: the .cpp is the entry-symbol carrier of
+#                                 a SHARED library loaded at runtime via
+#                                 rac_registry_load_plugin().
 #
-# Build modes:
-#   - RAC_STATIC_PLUGINS=ON:  runanywhere_llamacpp is OBJECT — its sources
-#                             land directly in rac_commons via the `engine`
-#                             target_link path.
-#   - RAC_STATIC_PLUGINS=OFF (default off-iOS): runanywhere_llamacpp is
-#                             SHARED. Installed under the conventional
-#                             librunanywhere_llamacpp.so name so the loader's
-#                             `entry_symbol_from_path()` heuristic resolves
-#                             `rac_plugin_entry_llamacpp`.
-if(RAC_BUILD_SHARED)
-    add_library(rac_backend_llamacpp SHARED
-        ${LLAMACPP_BACKEND_SOURCES}
-        ${LLAMACPP_BACKEND_HEADERS}
+# Resolve the runanywhere-commons root before the macro call so the
+# include path list below references it. Was sdk/runanywhere-commons/
+# src/backends/<name>/ → ../../.. = commons; now engines/<name>/ →
+# ../../sdk/runanywhere-commons.
+get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
+
+include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+
+rac_add_engine_plugin(llamacpp
+    TARGET_NAME         rac_backend_llamacpp
+    CXX_STANDARD        20
+    SHARED_ONLY                          # always a standalone target — matches onnx
+    SOURCES             ${LLAMACPP_BACKEND_SOURCES}
+                        ${LLAMACPP_BACKEND_HEADERS}
+    LINK_LIBRARIES      llama common
+    INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
+                        ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${llamacpp_SOURCE_DIR}/include
+                        ${llamacpp_SOURCE_DIR}/src    # llama-adapter.h for LoRA introspection
+                        ${llamacpp_SOURCE_DIR}/common
+                        ${llamacpp_SOURCE_DIR}/ggml/include
+                        ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
+    COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
+    RUNTIMES            CPU METAL CUDA
+    FORMATS             GGUF GGML BIN
+)
+
+# VLM multimodal mtmd includes/defs — engine-specific, applied after the macro.
+if(RAC_VLM_USE_MTMD)
+    target_include_directories(rac_backend_llamacpp PRIVATE
+        ${llamacpp_SOURCE_DIR}/tools/mtmd
+        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
     )
-else()
-    add_library(rac_backend_llamacpp STATIC
-        ${LLAMACPP_BACKEND_SOURCES}
-        ${LLAMACPP_BACKEND_HEADERS}
-    )
+    target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_VLM_USE_MTMD=1)
 endif()
 
+# Self-registration carrier: thin shim that wraps RAC_STATIC_PLUGIN_REGISTER.
 if(RAC_STATIC_PLUGINS)
-    # Static-plugins path: add the static-register TU directly to rac_commons.
-    # rac_commons already PUBLIC-links rac_backend_llamacpp (further down this
-    # file) so the static-register symbol resolves at link time.
+    # Static path: ctor lands inside rac_commons so it runs before main().
+    # rac_commons PUBLIC-links rac_backend_llamacpp below so the entry
+    # symbol resolves at link time.
     target_sources(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
     )
@@ -225,15 +246,13 @@ if(RAC_STATIC_PLUGINS)
         ${RAC_COMMONS_ROOT_DIR}/include
     )
 else()
-    # Shared-plugin path: ship a thin SHARED library whose only job is to
-    # carry the rac_plugin_entry_llamacpp symbol + the static-register stub.
-    # The actual op functions live in rac_backend_llamacpp.
+    # Shared-plugin path: SHARED library whose only export is the entry
+    # symbol; the actual op functions live in rac_backend_llamacpp.
     add_library(runanywhere_llamacpp SHARED
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
     )
     set_target_properties(runanywhere_llamacpp PROPERTIES
-        OUTPUT_NAME      runanywhere_llamacpp
-        # Default-visibility on the entry symbol; everything else hidden.
+        OUTPUT_NAME           runanywhere_llamacpp
         C_VISIBILITY_PRESET   hidden
         CXX_VISIBILITY_PRESET hidden
     )
@@ -243,49 +262,6 @@ else()
     )
     install(TARGETS runanywhere_llamacpp LIBRARY DESTINATION lib)
 endif()
-
-# Resolve the runanywhere-commons root (3 levels up from src/backends/llamacpp/)
-# GAP 06 Phase 9: was sdk/runanywhere-commons/src/backends/<name>/ → ../../.. = commons.
-# Now engines/<name>/ → ../../sdk/runanywhere-commons.
-get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
-
-target_include_directories(rac_backend_llamacpp PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${RAC_COMMONS_ROOT_DIR}/include
-    ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
-    ${llamacpp_SOURCE_DIR}/include
-    ${llamacpp_SOURCE_DIR}/src                  # Internal headers (llama-adapter.h for LoRA introspection)
-    ${llamacpp_SOURCE_DIR}/common
-    ${llamacpp_SOURCE_DIR}/ggml/include
-    ${llamacpp_SOURCE_DIR}/vendor               # nlohmann/json.hpp
-)
-
-# VLM multimodal includes (mtmd)
-if(RAC_VLM_USE_MTMD)
-    target_include_directories(rac_backend_llamacpp PRIVATE
-        ${llamacpp_SOURCE_DIR}/tools/mtmd
-        ${llamacpp_SOURCE_DIR}/tools/mtmd/models
-    )
-endif()
-
-target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_LLAMACPP_BUILDING)
-
-# VLM multimodal compile definition
-if(RAC_VLM_USE_MTMD)
-    target_compile_definitions(rac_backend_llamacpp PRIVATE RAC_VLM_USE_MTMD=1)
-endif()
-
-target_link_libraries(rac_backend_llamacpp PUBLIC
-    rac_commons
-    llama
-    common
-)
-
-set_target_properties(rac_backend_llamacpp PROPERTIES
-    CXX_STANDARD 20
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
 
 # =============================================================================
 # Platform-specific configuration

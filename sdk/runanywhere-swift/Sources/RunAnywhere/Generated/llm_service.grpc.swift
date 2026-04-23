@@ -32,7 +32,7 @@ public enum RALLM: Sendable {
             /// Request type for "Generate".
             public typealias Input = RALLMGenerateRequest
             /// Response type for "Generate".
-            public typealias Output = RALLMToken
+            public typealias Output = RALLMStreamEvent
             /// Descriptor for "Generate".
             public static let descriptor = GRPCCore.MethodDescriptor(
                 service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.LLM"),
@@ -72,9 +72,9 @@ extension RALLM {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Server-streaming: emits one LLMToken per generated token until
-        /// > is_final=true. Cancellation aborts the underlying generation via
-        /// > the existing rac_llm_cancel() C ABI.
+        /// > Server-streaming: emits one LLMStreamEvent per generated token
+        /// > until is_final=true. Cancellation aborts the underlying generation
+        /// > via the existing rac_llm_cancel() C ABI.
         ///
         /// - Parameters:
         ///   - request: A streaming request of `RALLMGenerateRequest` messages.
@@ -82,11 +82,11 @@ extension RALLM {
         /// - Throws: Any error which occurred during the processing of the request. Thrown errors
         ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
         ///     to an internal error.
-        /// - Returns: A streaming response of `RALLMToken` messages.
+        /// - Returns: A streaming response of `RALLMStreamEvent` messages.
         func generate(
             request: GRPCCore.StreamingServerRequest<RALLMGenerateRequest>,
             context: GRPCCore.ServerContext
-        ) async throws -> GRPCCore.StreamingServerResponse<RALLMToken>
+        ) async throws -> GRPCCore.StreamingServerResponse<RALLMStreamEvent>
     }
 
     /// Service protocol for the "runanywhere.v1.LLM" service.
@@ -101,9 +101,9 @@ extension RALLM {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Server-streaming: emits one LLMToken per generated token until
-        /// > is_final=true. Cancellation aborts the underlying generation via
-        /// > the existing rac_llm_cancel() C ABI.
+        /// > Server-streaming: emits one LLMStreamEvent per generated token
+        /// > until is_final=true. Cancellation aborts the underlying generation
+        /// > via the existing rac_llm_cancel() C ABI.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `RALLMGenerateRequest` message.
@@ -111,11 +111,11 @@ extension RALLM {
         /// - Throws: Any error which occurred during the processing of the request. Thrown errors
         ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
         ///     to an internal error.
-        /// - Returns: A streaming response of `RALLMToken` messages.
+        /// - Returns: A streaming response of `RALLMStreamEvent` messages.
         func generate(
             request: GRPCCore.ServerRequest<RALLMGenerateRequest>,
             context: GRPCCore.ServerContext
-        ) async throws -> GRPCCore.StreamingServerResponse<RALLMToken>
+        ) async throws -> GRPCCore.StreamingServerResponse<RALLMStreamEvent>
     }
 
     /// Simple service protocol for the "runanywhere.v1.LLM" service.
@@ -128,20 +128,20 @@ extension RALLM {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Server-streaming: emits one LLMToken per generated token until
-        /// > is_final=true. Cancellation aborts the underlying generation via
-        /// > the existing rac_llm_cancel() C ABI.
+        /// > Server-streaming: emits one LLMStreamEvent per generated token
+        /// > until is_final=true. Cancellation aborts the underlying generation
+        /// > via the existing rac_llm_cancel() C ABI.
         ///
         /// - Parameters:
         ///   - request: A `RALLMGenerateRequest` message.
-        ///   - response: A response stream of `RALLMToken` messages.
+        ///   - response: A response stream of `RALLMStreamEvent` messages.
         ///   - context: Context providing information about the RPC.
         /// - Throws: Any error which occurred during the processing of the request. Thrown errors
         ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
         ///     to an internal error.
         func generate(
             request: RALLMGenerateRequest,
-            response: GRPCCore.RPCWriter<RALLMToken>,
+            response: GRPCCore.RPCWriter<RALLMStreamEvent>,
             context: GRPCCore.ServerContext
         ) async throws
     }
@@ -154,7 +154,7 @@ extension RALLM.StreamingServiceProtocol {
         router.registerHandler(
             forMethod: RALLM.Method.Generate.descriptor,
             deserializer: GRPCProtobuf.ProtobufDeserializer<RALLMGenerateRequest>(),
-            serializer: GRPCProtobuf.ProtobufSerializer<RALLMToken>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RALLMStreamEvent>(),
             handler: { request, context in
                 try await self.generate(
                     request: request,
@@ -171,7 +171,7 @@ extension RALLM.ServiceProtocol {
     public func generate(
         request: GRPCCore.StreamingServerRequest<RALLMGenerateRequest>,
         context: GRPCCore.ServerContext
-    ) async throws -> GRPCCore.StreamingServerResponse<RALLMToken> {
+    ) async throws -> GRPCCore.StreamingServerResponse<RALLMStreamEvent> {
         let response = try await self.generate(
             request: GRPCCore.ServerRequest(stream: request),
             context: context
@@ -186,8 +186,8 @@ extension RALLM.SimpleServiceProtocol {
     public func generate(
         request: GRPCCore.ServerRequest<RALLMGenerateRequest>,
         context: GRPCCore.ServerContext
-    ) async throws -> GRPCCore.StreamingServerResponse<RALLMToken> {
-        return GRPCCore.StreamingServerResponse<RALLMToken>(
+    ) async throws -> GRPCCore.StreamingServerResponse<RALLMStreamEvent> {
+        return GRPCCore.StreamingServerResponse<RALLMStreamEvent>(
             metadata: [:],
             producer: { writer in
                 try await self.generate(
@@ -214,14 +214,14 @@ extension RALLM {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Server-streaming: emits one LLMToken per generated token until
-        /// > is_final=true. Cancellation aborts the underlying generation via
-        /// > the existing rac_llm_cancel() C ABI.
+        /// > Server-streaming: emits one LLMStreamEvent per generated token
+        /// > until is_final=true. Cancellation aborts the underlying generation
+        /// > via the existing rac_llm_cancel() C ABI.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `RALLMGenerateRequest` message.
         ///   - serializer: A serializer for `RALLMGenerateRequest` messages.
-        ///   - deserializer: A deserializer for `RALLMToken` messages.
+        ///   - deserializer: A deserializer for `RALLMStreamEvent` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
@@ -230,9 +230,9 @@ extension RALLM {
         func generate<Result>(
             request: GRPCCore.ClientRequest<RALLMGenerateRequest>,
             serializer: some GRPCCore.MessageSerializer<RALLMGenerateRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<RALLMToken>,
+            deserializer: some GRPCCore.MessageDeserializer<RALLMStreamEvent>,
             options: GRPCCore.CallOptions,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMToken>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMStreamEvent>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -256,14 +256,14 @@ extension RALLM {
         ///
         /// > Source IDL Documentation:
         /// >
-        /// > Server-streaming: emits one LLMToken per generated token until
-        /// > is_final=true. Cancellation aborts the underlying generation via
-        /// > the existing rac_llm_cancel() C ABI.
+        /// > Server-streaming: emits one LLMStreamEvent per generated token
+        /// > until is_final=true. Cancellation aborts the underlying generation
+        /// > via the existing rac_llm_cancel() C ABI.
         ///
         /// - Parameters:
         ///   - request: A request containing a single `RALLMGenerateRequest` message.
         ///   - serializer: A serializer for `RALLMGenerateRequest` messages.
-        ///   - deserializer: A deserializer for `RALLMToken` messages.
+        ///   - deserializer: A deserializer for `RALLMStreamEvent` messages.
         ///   - options: Options to apply to this RPC.
         ///   - handleResponse: A closure which handles the response, the result of which is
         ///       returned to the caller. Returning from the closure will cancel the RPC if it
@@ -272,9 +272,9 @@ extension RALLM {
         public func generate<Result>(
             request: GRPCCore.ClientRequest<RALLMGenerateRequest>,
             serializer: some GRPCCore.MessageSerializer<RALLMGenerateRequest>,
-            deserializer: some GRPCCore.MessageDeserializer<RALLMToken>,
+            deserializer: some GRPCCore.MessageDeserializer<RALLMStreamEvent>,
             options: GRPCCore.CallOptions = .defaults,
-            onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMToken>) async throws -> Result
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMStreamEvent>) async throws -> Result
         ) async throws -> Result where Result: Sendable {
             try await self.client.serverStreaming(
                 request: request,
@@ -295,9 +295,9 @@ extension RALLM.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Server-streaming: emits one LLMToken per generated token until
-    /// > is_final=true. Cancellation aborts the underlying generation via
-    /// > the existing rac_llm_cancel() C ABI.
+    /// > Server-streaming: emits one LLMStreamEvent per generated token
+    /// > until is_final=true. Cancellation aborts the underlying generation
+    /// > via the existing rac_llm_cancel() C ABI.
     ///
     /// - Parameters:
     ///   - request: A request containing a single `RALLMGenerateRequest` message.
@@ -309,12 +309,12 @@ extension RALLM.ClientProtocol {
     public func generate<Result>(
         request: GRPCCore.ClientRequest<RALLMGenerateRequest>,
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMToken>) async throws -> Result
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMStreamEvent>) async throws -> Result
     ) async throws -> Result where Result: Sendable {
         try await self.generate(
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<RALLMGenerateRequest>(),
-            deserializer: GRPCProtobuf.ProtobufDeserializer<RALLMToken>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RALLMStreamEvent>(),
             options: options,
             onResponse: handleResponse
         )
@@ -328,9 +328,9 @@ extension RALLM.ClientProtocol {
     ///
     /// > Source IDL Documentation:
     /// >
-    /// > Server-streaming: emits one LLMToken per generated token until
-    /// > is_final=true. Cancellation aborts the underlying generation via
-    /// > the existing rac_llm_cancel() C ABI.
+    /// > Server-streaming: emits one LLMStreamEvent per generated token
+    /// > until is_final=true. Cancellation aborts the underlying generation
+    /// > via the existing rac_llm_cancel() C ABI.
     ///
     /// - Parameters:
     ///   - message: request message to send.
@@ -344,7 +344,7 @@ extension RALLM.ClientProtocol {
         _ message: RALLMGenerateRequest,
         metadata: GRPCCore.Metadata = [:],
         options: GRPCCore.CallOptions = .defaults,
-        onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMToken>) async throws -> Result
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RALLMStreamEvent>) async throws -> Result
     ) async throws -> Result where Result: Sendable {
         let request = GRPCCore.ClientRequest<RALLMGenerateRequest>(
             message: message,

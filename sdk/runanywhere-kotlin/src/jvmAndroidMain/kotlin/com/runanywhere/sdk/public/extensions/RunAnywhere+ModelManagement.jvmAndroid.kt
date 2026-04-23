@@ -33,9 +33,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
 
 // MARK: - Multi-File Model Companion Storage
 
@@ -407,8 +405,8 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
 
         // 5. Check for multi-file model (e.g., VLM with model + mmproj)
         // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern.
-        // v3.1.3: refactored to delegate per-file HTTP transport to the existing
-        // `downloadFileWithHttpURLConnection` helper (DRY win, ~80 LOC saved).
+        // v2 close-out Phase H: delegates per-file HTTP transport to the
+        // native libcurl runner in commons (`downloadFileWithNativeRunner`).
         // Per-file progress is converted to combined-progress via `index/count`
         // offset + scale, matching the iOS Alamofire pattern.
         val multiFileDescriptors = getMultiFileDescriptors(modelId)
@@ -433,7 +431,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
 
                     val fileSizeBefore = if (fileDestination.exists()) fileDestination.length() else 0L
                     withContext(Dispatchers.IO) {
-                        downloadFileWithHttpURLConnection(
+                        downloadFileWithNativeRunner(
                             url = fileDescriptor.url,
                             destFile = fileDestination,
                             progressCallback = { fileProgress ->
@@ -903,7 +901,7 @@ private suspend fun downloadEmbeddingModelFiles(
         logger.info("Downloading [$filename] from: $url")
 
         withContext(Dispatchers.IO) {
-            downloadFileWithHttpURLConnection(url, destFile) { _ -> }
+            downloadFileWithNativeRunner(url, destFile) { _ -> }
         }
 
         val overallProgress = (index + 1f) / fileCount
@@ -936,56 +934,47 @@ private suspend fun downloadEmbeddingModelFiles(
 }
 
 /**
- * Download a file using HttpURLConnection with redirect support.
+ * Download a single file via the native libcurl runner in runanywhere-commons.
+ *
+ * v2 close-out Phase H: replaces ~50 LOC of HttpURLConnection + redirect
+ * loop. Redirects, timeouts, TLS verification, and backoff are all handled
+ * by commons (`rac_http_download_execute`). Progress is reported as a
+ * fraction (0.0..1.0) for parity with the old helper's signature.
+ *
+ * Throws [IOException] on network / HTTP / file-write / checksum failure —
+ * matches the previous contract so callers don't need to know the
+ * `DownloadError.*` enum.
  */
-private fun downloadFileWithHttpURLConnection(
+private fun downloadFileWithNativeRunner(
     url: String,
     destFile: File,
     progressCallback: (Float) -> Unit,
 ) {
-    var currentUrl = url
-    var remainingRedirects = 10
-
-    while (remainingRedirects-- > 0) {
-        val connection = java.net.URL(currentUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 120_000
-        connection.instanceFollowRedirects = false
-        connection.connect()
-
-        val responseCode = connection.responseCode
-        if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-            responseCode == 307 ||
-            responseCode == 308
-        ) {
-            val location = connection.getHeaderField("Location")
-            connection.disconnect()
-            if (location.isNullOrBlank()) throw IOException("Redirect with no Location header from: $currentUrl")
-            currentUrl = location
-            continue
-        }
-
-        val totalBytes = connection.contentLengthLong
-        var bytesDownloaded = 0L
-
-        connection.inputStream.use { input ->
-            destFile.outputStream().use { output ->
-                val buffer = ByteArray(8 * 1024)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                    bytesDownloaded += bytesRead
-                    if (totalBytes > 0) {
-                        progressCallback(bytesDownloaded.toFloat() / totalBytes.toFloat())
-                    }
-                }
+    destFile.parentFile?.mkdirs()
+    val listener =
+        com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener { bytes, total ->
+            if (total > 0) {
+                progressCallback(bytes.toFloat() / total.toFloat())
             }
+            true
         }
-        connection.disconnect()
-        return
+    val outStatus = IntArray(1)
+    val rc =
+        RunAnywhereBridge.racHttpDownloadExecute(
+            url = url,
+            destPath = destFile.absolutePath,
+            expectedSha256Hex = null,
+            resumeFromByte = 0L,
+            timeoutMs = 120_000,
+            listener = listener,
+            outHttpStatus = outStatus,
+        )
+    if (rc != CppBridgeDownload.DownloadError.NONE) {
+        throw IOException(
+            "Download failed for $url: ${CppBridgeDownload.DownloadError.getName(rc)} " +
+                "(http_status=${outStatus[0]})",
+        )
     }
-    throw IOException("Too many redirects for URL: $url")
 }
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {

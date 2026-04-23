@@ -34,14 +34,18 @@ function render(vars) {
                        .replaceAll('{{ ' + k + ' | lower }}', vars[k].toLowerCase()),
         tpl.replace(/\{#[\s\S]*?#\}\\n?/g, ''));
 }
-const triples = [
-    ['VoiceAgent', 'voice_agent', 'VoiceAgentRequest',     'VoiceEvent',       'Stream',    '../voice_agent_service'],
-    ['LLM',        'llm',         'LLMGenerateRequest',    'LLMToken',         'Generate',  '../llm_service'],
-    ['Download',   'download',    'DownloadSubscribeRequest','DownloadProgress','Subscribe', '../download_service'],
+// Tuples = (service_name, service_lower, request_type, response_type, rpc_name, request_module, response_module)
+// Separate request/response modules so a service whose response type lives
+// in a different proto file (VoiceAgent's VoiceEvent is in voice_events.proto)
+// renders correctly.
+const tuples = [
+    ['VoiceAgent', 'voice_agent', 'VoiceAgentRequest',      'VoiceEvent',       'Stream',    '../voice_agent_service', '../voice_events'],
+    ['LLM',        'llm',         'LLMGenerateRequest',     'LLMStreamEvent',   'Generate',  '../llm_service',         '../llm_service'],
+    ['Download',   'download',    'DownloadSubscribeRequest','DownloadProgress','Subscribe', '../download_service',    '../download_service'],
 ];
-for (const [s, l, req, resp, rpc, mod] of triples) {
+for (const [s, l, req, resp, rpc, reqMod, respMod] of tuples) {
     const out = '${OUT_DIR}/' + l + '_service_stream.ts';
-    const vars = { service_name: s, service_lower: l, request_type: req, response_type: resp, rpc_name: rpc, messages_module: mod };
+    const vars = { service_name: s, service_lower: l, request_type: req, response_type: resp, rpc_name: rpc, request_module: reqMod, response_module: respMod };
     fs.writeFileSync(out, render(vars));
     console.log('  wrote', out);
 }

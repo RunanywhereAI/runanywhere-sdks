@@ -50,6 +50,27 @@ export interface EmscriptenRunanywhereModule {
     userData: number,
   ): number;
 
+  /**
+   * v2 close-out Phase G-2:
+   *
+   * `rac_result_t rac_llm_set_stream_proto_callback(
+   *    rac_handle_t handle,
+   *    rac_llm_stream_proto_callback_fn callback,  // function-table index
+   *    void* user_data);`
+   *
+   * `rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);`
+   *
+   * Same function-table-index contract as the voice agent variant; the
+   * callback signature is `void (*)(uint8_t*, size_t, void*)` which
+   * encodes as `'viii'` when installed via `addFunction`.
+   */
+  _rac_llm_set_stream_proto_callback(
+    handle: number,
+    callbackPtr: number,
+    userData: number,
+  ): number;
+  _rac_llm_unset_stream_proto_callback(handle: number): number;
+
   // -----------------------------------------------------------------------------
   // LLM Thinking (v3 Phase A11 / GAP 08 #6)
   // -----------------------------------------------------------------------------

@@ -52,21 +52,28 @@ final $typed_data.Uint8List lLMGenerateRequestDescriptor = $convert.base64Decode
     'B0GAYgASgJUgxzeXN0ZW1Qcm9tcHQSIwoNZW1pdF90aG91Z2h0cxgHIAEoCFIMZW1pdFRob3Vn'
     'aHRz');
 
-@$core.Deprecated('Use lLMTokenDescriptor instead')
-const LLMToken$json = {
-  '1': 'LLMToken',
+@$core.Deprecated('Use lLMStreamEventDescriptor instead')
+const LLMStreamEvent$json = {
+  '1': 'LLMStreamEvent',
   '2': [
-    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
-    {'1': 'is_final', '3': 2, '4': 1, '5': 8, '10': 'isFinal'},
-    {'1': 'kind', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.LLMTokenKind', '10': 'kind'},
-    {'1': 'logprob', '3': 4, '4': 1, '5': 2, '10': 'logprob'},
-    {'1': 'emit_us', '3': 5, '4': 1, '5': 3, '10': 'emitUs'},
+    {'1': 'seq', '3': 1, '4': 1, '5': 4, '10': 'seq'},
+    {'1': 'timestamp_us', '3': 2, '4': 1, '5': 3, '10': 'timestampUs'},
+    {'1': 'token', '3': 3, '4': 1, '5': 9, '10': 'token'},
+    {'1': 'is_final', '3': 4, '4': 1, '5': 8, '10': 'isFinal'},
+    {'1': 'kind', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.LLMTokenKind', '10': 'kind'},
+    {'1': 'token_id', '3': 6, '4': 1, '5': 13, '10': 'tokenId'},
+    {'1': 'logprob', '3': 7, '4': 1, '5': 2, '10': 'logprob'},
+    {'1': 'finish_reason', '3': 8, '4': 1, '5': 9, '10': 'finishReason'},
+    {'1': 'error_message', '3': 9, '4': 1, '5': 9, '10': 'errorMessage'},
   ],
 };
 
-/// Descriptor for `LLMToken`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List lLMTokenDescriptor = $convert.base64Decode(
-    'CghMTE1Ub2tlbhISCgR0ZXh0GAEgASgJUgR0ZXh0EhkKCGlzX2ZpbmFsGAIgASgIUgdpc0Zpbm'
-    'FsEjAKBGtpbmQYAyABKA4yHC5ydW5hbnl3aGVyZS52MS5MTE1Ub2tlbktpbmRSBGtpbmQSGAoH'
-    'bG9ncHJvYhgEIAEoAlIHbG9ncHJvYhIXCgdlbWl0X3VzGAUgASgDUgZlbWl0VXM=');
+/// Descriptor for `LLMStreamEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List lLMStreamEventDescriptor = $convert.base64Decode(
+    'Cg5MTE1TdHJlYW1FdmVudBIQCgNzZXEYASABKARSA3NlcRIhCgx0aW1lc3RhbXBfdXMYAiABKA'
+    'NSC3RpbWVzdGFtcFVzEhQKBXRva2VuGAMgASgJUgV0b2tlbhIZCghpc19maW5hbBgEIAEoCFIH'
+    'aXNGaW5hbBIwCgRraW5kGAUgASgOMhwucnVuYW55d2hlcmUudjEuTExNVG9rZW5LaW5kUgRraW'
+    '5kEhkKCHRva2VuX2lkGAYgASgNUgd0b2tlbklkEhgKB2xvZ3Byb2IYByABKAJSB2xvZ3Byb2IS'
+    'IwoNZmluaXNoX3JlYXNvbhgIIAEoCVIMZmluaXNoUmVhc29uEiMKDWVycm9yX21lc3NhZ2UYCS'
+    'ABKAlSDGVycm9yTWVzc2FnZQ==');
 

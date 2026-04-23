@@ -584,10 +584,6 @@ object CppBridgePlatform {
             // Initialize service availability cache
             initializeServiceAvailability()
 
-            // Register the platform callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetPlatformCallbacks()
-
             isRegistered = true
 
             CppBridgePlatformAdapter.logCallback(
@@ -1098,26 +1094,6 @@ object CppBridgePlatform {
     // ========================================================================
 
     /**
-     * Native method to set the platform callbacks with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetPlatformCallbacks()
-
-    /**
-     * Native method to unset the platform callbacks.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetPlatformCallbacks()
-
-    /**
      * Native method to send a streaming token to C++.
      *
      * @param token The token text
@@ -1143,9 +1119,6 @@ object CppBridgePlatform {
             if (!isRegistered) {
                 return
             }
-
-            // TODO: Call native unregistration
-            // nativeUnsetPlatformCallbacks()
 
             platformListener = null
             platformProvider = null

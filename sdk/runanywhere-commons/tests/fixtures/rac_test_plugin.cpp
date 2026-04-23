@@ -62,10 +62,20 @@ static const rac_engine_vtable_t g_test_plugin_vtable = {
     nullptr, nullptr, nullptr, nullptr, nullptr,
 };
 
-/* Default visibility so dlsym can find this symbol. */
+/* Default visibility so dlsym can find this symbol. The entry symbol name
+ * has to match the library file-stem so plugin_loader.cpp's
+ * entry_symbol_from_path() resolves it — see the two add_library() lines
+ * in tests/CMakeLists.txt (OUTPUT_NAME runanywhere_test_plugin[_bad_abi]). */
+#ifndef RAC_TEST_PLUGIN_FORCE_BAD_ABI
 __attribute__((visibility("default")))
 RAC_PLUGIN_ENTRY_DEF(test_plugin) {
     return &g_test_plugin_vtable;
 }
+#else
+__attribute__((visibility("default")))
+RAC_PLUGIN_ENTRY_DEF(test_plugin_bad_abi) {
+    return &g_test_plugin_vtable;
+}
+#endif
 
 }  // extern "C"

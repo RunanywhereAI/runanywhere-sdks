@@ -133,9 +133,6 @@ object CppBridgeLLM {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var state: Int = LLMState.NOT_CREATED
 
     @Volatile
@@ -404,36 +401,6 @@ object CppBridgeLLM {
          */
         fun onToken(token: String): Boolean
     }
-
-    /**
-     * Register the LLM callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetLLMCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "LLM callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the LLM callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     /**
      * Get the current component handle.
@@ -1133,63 +1100,6 @@ object CppBridgeLLM {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the LLM callbacks with C++ core.
-     *
-     * Registers [streamTokenCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_llm_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetLLMCallbacks()
-
-    /**
-     * Native method to unset the LLM callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_llm_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetLLMCallbacks()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the LLM callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetLLMCallbacks()
-
-            llmListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

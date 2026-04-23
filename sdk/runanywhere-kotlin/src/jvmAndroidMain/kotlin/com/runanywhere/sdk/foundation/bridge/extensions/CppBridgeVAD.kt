@@ -156,9 +156,6 @@ object CppBridgeVAD {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var state: Int = VADState.NOT_CREATED
 
     @Volatile
@@ -427,36 +424,6 @@ object CppBridgeVAD {
          */
         fun onFrame(isSpeech: Boolean, probability: Float, eventType: Int): Boolean
     }
-
-    /**
-     * Register the VAD callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetVADCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "VAD callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the VAD callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     /**
      * Get the current component handle.
@@ -1102,64 +1069,6 @@ object CppBridgeVAD {
     @JvmStatic
     fun getLoadedModelIdCallback(): String? {
         return loadedModelId
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the VAD callbacks with C++ core.
-     *
-     * Registers [streamFrameCallback], [speechStartCallback],
-     * [speechEndCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_vad_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetVADCallbacks()
-
-    /**
-     * Native method to unset the VAD callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_vad_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetVADCallbacks()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the VAD callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetVADCallbacks()
-
-            vadListener = null
-            streamCallback = null
-            isRegistered = false
-        }
     }
 
     // ========================================================================

@@ -42,11 +42,3 @@ endif()
 if(APPLE AND RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
     add_subdirectory(metalrt)
 endif()
-
-# GAP 06 Phase 10 stub engines (added in the next commit):
-#   sherpa, genie, diffusion-coreml — each is its own subdirectory.
-foreach(_stub sherpa genie diffusion-coreml)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_stub}/CMakeLists.txt")
-        add_subdirectory(${_stub})
-    endif()
-endforeach()

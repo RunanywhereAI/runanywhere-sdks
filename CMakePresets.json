@@ -147,6 +147,31 @@
                 "RAC_BUILD_PLATFORM": "OFF",
                 "RAC_BUILD_SHARED": "OFF"
             }
+        },
+
+        {
+            "name": "windows-debug",
+            "displayName": "Windows x64 \u2014 Debug + tests (experimental, not release-tested)",
+            "inherits": "base-debug",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "x64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows x64 \u2014 Release (experimental, not release-tested)",
+            "inherits": "base-release",
+            "generator": "Visual Studio 17 2022",
+            "architecture": { "value": "x64", "strategy": "set" },
+            "cacheVariables": {
+                "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_SHARED": "OFF"
+            },
+            "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
         }
     ],
 
@@ -161,7 +186,9 @@
         { "name": "android-x86_64",   "configurePreset": "android-x86_64" },
         { "name": "ios-device",       "configurePreset": "ios-device" },
         { "name": "ios-simulator",    "configurePreset": "ios-simulator" },
-        { "name": "wasm",             "configurePreset": "wasm" }
+        { "name": "wasm",             "configurePreset": "wasm" },
+        { "name": "windows-debug",    "configurePreset": "windows-debug" },
+        { "name": "windows-release",  "configurePreset": "windows-release" }
     ],
 
     "testPresets": [

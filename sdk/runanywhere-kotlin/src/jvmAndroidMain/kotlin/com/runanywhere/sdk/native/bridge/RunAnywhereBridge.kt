@@ -17,6 +17,23 @@ package com.runanywhere.sdk.native.bridge
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
+ * Listener for native HTTP download progress. Invoked from the worker
+ * thread that called `RunAnywhereBridge.racHttpDownloadExecute(...)`
+ * on every libcurl chunk.
+ *
+ * v2 close-out Phase H. Kept in this file (instead of a separate
+ * source file) so the JNI `FindClass(..., "onProgress", "(JJ)Z")`
+ * contract lives next to the `external fun` declaration that uses it.
+ *
+ * Return `false` to cancel the download — the native runner will
+ * abort libcurl, close the partial file, and return
+ * `RAC_HTTP_DL_CANCELLED`.
+ */
+fun interface NativeDownloadProgressListener {
+    fun onProgress(bytesWritten: Long, totalBytes: Long): Boolean
+}
+
+/**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
  * This object maps directly to the JNI functions in runanywhere_commons_jni.cpp.
@@ -187,9 +204,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentTokenize(handle: Long, text: String): Int
 
-    @JvmStatic
-    external fun racLlmSetCallbacks(streamCallback: Any?, progressCallback: Any?)
-
     // ========================================================================
     // LLM LORA ADAPTER (rac_llm_component.h - LoRA section)
     // ========================================================================
@@ -252,9 +266,6 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttComponentDetectLanguage(handle: Long, audioData: ByteArray): String?
 
-    @JvmStatic
-    external fun racSttSetCallbacks(frameCallback: Any?, progressCallback: Any?)
-
     // ========================================================================
     // TTS COMPONENT (rac_tts_component.h)
     // ========================================================================
@@ -297,9 +308,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racTtsComponentGetLanguages(handle: Long): String?
-
-    @JvmStatic
-    external fun racTtsSetCallbacks(audioCallback: Any?, progressCallback: Any?)
 
     // ========================================================================
     // VAD COMPONENT (rac_vad_component.h)
@@ -346,14 +354,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racVadComponentGetSampleRates(handle: Long): String?
-
-    @JvmStatic
-    external fun racVadSetCallbacks(
-        frameCallback: Any?,
-        speechStartCallback: Any?,
-        speechEndCallback: Any?,
-        progressCallback: Any?,
-    )
 
     // ========================================================================
     // VLM COMPONENT (rac_vlm_component.h)
@@ -454,16 +454,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racVlmComponentGetMetrics(handle: Long): String?
-
-    // ========================================================================
-    // HTTP DOWNLOAD (platform adapter callbacks)
-    // ========================================================================
-
-    @JvmStatic
-    external fun racHttpDownloadReportProgress(taskId: String, downloadedBytes: Long, totalBytes: Long): Int
-
-    @JvmStatic
-    external fun racHttpDownloadReportComplete(taskId: String, result: Int, downloadedPath: String?): Int
 
     // ========================================================================
     // ARCHIVE EXTRACTION (rac_extraction.h)
@@ -1255,6 +1245,39 @@ object RunAnywhereBridge {
     /** Destroy the voice-agent handle and release owned component handles
      *  (when created via standalone). */
     @JvmStatic external fun racVoiceAgentDestroy(handle: Long)
+
+    // ========================================================================
+    // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
+    // ========================================================================
+    //
+    // v2 close-out Phase H. Replaces the 1.3 KLOC HttpURLConnection path
+    // that used to live in CppBridgeDownload.kt. The native runner
+    // streams chunks to disk through libcurl, updates SHA-256 inline,
+    // and forwards progress to the Kotlin listener via JNI on every
+    // chunk. Returning `false` from the listener's onProgress cancels
+    // the transfer.
+    //
+    // @param url                  Absolute HTTP/HTTPS URL.
+    // @param destPath             Local file path to write bytes to.
+    // @param expectedSha256Hex    Lowercase hex SHA-256, or null/empty
+    //                             to skip checksum verification.
+    // @param resumeFromByte       Byte offset to resume from (0 = fresh).
+    // @param timeoutMs            Timeout in ms (0 = no timeout).
+    // @param listener             Optional progress listener (nullable).
+    // @param outHttpStatus        Single-element int[] out-param: the
+    //                             final HTTP status code. Pass null if
+    //                             you don't need it.
+    // @return RAC_HTTP_DL_* code (see CppBridgeDownload.DownloadError for
+    //         the byte-for-byte mapping).
+    @JvmStatic external fun racHttpDownloadExecute(
+        url: String,
+        destPath: String,
+        expectedSha256Hex: String?,
+        resumeFromByte: Long,
+        timeoutMs: Int,
+        listener: NativeDownloadProgressListener?,
+        outHttpStatus: IntArray?,
+    ): Int
 
     // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)

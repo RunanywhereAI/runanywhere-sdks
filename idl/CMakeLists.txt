@@ -38,7 +38,15 @@ add_library(rac_idl STATIC ${_RAC_IDL_SRCS} ${_RAC_IDL_HDRS})
 target_include_directories(rac_idl PUBLIC
     ${CMAKE_CURRENT_BINARY_DIR}
 )
-target_link_libraries(rac_idl PUBLIC ${Protobuf_LIBRARIES})
+if(TARGET protobuf::libprotobuf)
+    target_link_libraries(rac_idl PUBLIC protobuf::libprotobuf)
+else()
+    target_link_libraries(rac_idl PUBLIC ${Protobuf_LIBRARIES})
+endif()
+# v2 close-out: SHARED consumers need explicit absl deps; see cmake/protobuf.cmake.
+if(RAC_ABSL_LIBS)
+    target_link_libraries(rac_idl PUBLIC ${RAC_ABSL_LIBS})
+endif()
 
 # Mirror the header tree into the usual install target so CMake consumers can
 # `#include "runanywhere/idl/model_types.pb.h"`.

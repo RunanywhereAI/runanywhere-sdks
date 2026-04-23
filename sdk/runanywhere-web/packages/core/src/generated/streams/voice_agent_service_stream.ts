@@ -14,7 +14,8 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
-import type { VoiceAgentRequest, VoiceEvent } from "../voice_agent_service";
+import type { VoiceAgentRequest } from "../voice_agent_service";
+import type { VoiceEvent } from "../voice_events";
 
 export interface VoiceAgentStreamTransport {
     subscribe(

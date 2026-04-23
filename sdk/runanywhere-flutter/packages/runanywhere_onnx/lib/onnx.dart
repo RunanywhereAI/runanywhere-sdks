@@ -38,7 +38,7 @@ import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/sdk_component.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere.dart' show RunAnywhere;
+import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 
 // Re-export for backward compatibility
@@ -213,7 +213,7 @@ class Onnx implements RunAnywhereModule {
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
 
     // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhere.registerModel(
+    final model = RunAnywhereSDK.instance.models.register(
       id: modelId,
       name: name,
       url: uri,

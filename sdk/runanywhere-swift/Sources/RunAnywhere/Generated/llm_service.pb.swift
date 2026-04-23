@@ -94,25 +94,48 @@ public struct RALLMGenerateRequest: Sendable {
   public init() {}
 }
 
-/// One token delta. Matches AssistantTokenEvent in voice_events.proto so
-/// callers that already speak that type can reuse decoders.
-public struct RALLMToken: Sendable {
+/// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+/// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+/// callbackFlow / StreamController / tokenQueue. One serialized event
+/// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+/// from voice_events.proto so frontends can reuse gap-detection logic.
+public struct RALLMStreamEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var text: String = String()
+  /// Monotonic per-process sequence number. Useful for frontends that
+  /// need to detect gaps or out-of-order delivery.
+  public var seq: UInt64 = 0
 
+  /// Wall-clock timestamp captured at the C++ edge, in microseconds
+  /// since Unix epoch. Frontends may re-timestamp for UI display.
+  public var timestampUs: Int64 = 0
+
+  /// Generated token text. Empty on terminal events where only
+  /// finish_reason or error_message is populated.
+  public var token: String = String()
+
+  /// True on the last event of a generation.
   public var isFinal: Bool = false
 
+  /// Token semantic category (answer / thought / tool-call).
   public var kind: RALLMTokenKind = .unspecified
 
-  /// Optional per-token logprob, populated when the engine supports it.
-  /// 0.0 = no logprob available (proto3 scalar default).
+  /// Backend-provided token id when the engine exposes it; 0 = unset
+  /// (proto3 scalar default).
+  public var tokenID: UInt32 = 0
+
+  /// Per-token log-probability when supported; 0.0 = unset.
   public var logprob: Float = 0
 
-  /// wall-clock timestamp at C++ edge
-  public var emitUs: Int64 = 0
+  /// Reason the stream stopped: "stop", "length", "cancelled", "error",
+  /// "" = unset (proto3 scalar default). Only populated when is_final.
+  public var finishReason: String = String()
+
+  /// Error message on failure events (kind may be unset, is_final true).
+  /// Empty on success.
+  public var errorMessage: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -187,9 +210,9 @@ extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension RALLMToken: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LLMToken"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}kind\0\u{1}logprob\0\u{3}emit_us\0")
+extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -197,41 +220,61 @@ extension RALLMToken: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.logprob) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self.emitUs) }()
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.seq) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.timestampUs) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.token) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.kind) }()
+      case 6: try { try decoder.decodeSingularUInt32Field(value: &self.tokenID) }()
+      case 7: try { try decoder.decodeSingularFloatField(value: &self.logprob) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.finishReason) }()
+      case 9: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
+    if self.seq != 0 {
+      try visitor.visitSingularUInt64Field(value: self.seq, fieldNumber: 1)
+    }
+    if self.timestampUs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampUs, fieldNumber: 2)
+    }
+    if !self.token.isEmpty {
+      try visitor.visitSingularStringField(value: self.token, fieldNumber: 3)
     }
     if self.isFinal != false {
-      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 2)
+      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 4)
     }
     if self.kind != .unspecified {
-      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 3)
+      try visitor.visitSingularEnumField(value: self.kind, fieldNumber: 5)
+    }
+    if self.tokenID != 0 {
+      try visitor.visitSingularUInt32Field(value: self.tokenID, fieldNumber: 6)
     }
     if self.logprob.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.logprob, fieldNumber: 4)
+      try visitor.visitSingularFloatField(value: self.logprob, fieldNumber: 7)
     }
-    if self.emitUs != 0 {
-      try visitor.visitSingularInt64Field(value: self.emitUs, fieldNumber: 5)
+    if !self.finishReason.isEmpty {
+      try visitor.visitSingularStringField(value: self.finishReason, fieldNumber: 8)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 9)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RALLMToken, rhs: RALLMToken) -> Bool {
-    if lhs.text != rhs.text {return false}
+  public static func ==(lhs: RALLMStreamEvent, rhs: RALLMStreamEvent) -> Bool {
+    if lhs.seq != rhs.seq {return false}
+    if lhs.timestampUs != rhs.timestampUs {return false}
+    if lhs.token != rhs.token {return false}
     if lhs.isFinal != rhs.isFinal {return false}
     if lhs.kind != rhs.kind {return false}
+    if lhs.tokenID != rhs.tokenID {return false}
     if lhs.logprob != rhs.logprob {return false}
-    if lhs.emitUs != rhs.emitUs {return false}
+    if lhs.finishReason != rhs.finishReason {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

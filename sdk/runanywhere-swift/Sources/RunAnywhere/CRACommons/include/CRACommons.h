@@ -44,6 +44,8 @@
 #include "rac_llm_events.h"
 #include "rac_llm_structured_output.h"
 #include "rac_llm_thinking.h"
+// v2 close-out Phase G-2: proto-byte LLM stream ABI.
+#include "rac_llm_stream.h"
 #include "rac_tool_calling.h"
 
 // STT (Speech-to-Text)
@@ -163,6 +165,7 @@
 #include "rac_primitive.h"
 #include "rac_engine_vtable.h"
 #include "rac_plugin_entry.h"
+#include "rac_plugin_loader.h"  // v2 close-out (B31): runtime dlopen path
 #include "rac_routing_hints.h"
 #include "rac_route.h"
 

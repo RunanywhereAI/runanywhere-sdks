@@ -160,7 +160,9 @@ rac_result_t llamacpp_vlm_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
+}  // namespace (close anon — see B3-parallel note in rac_backend_llamacpp_register.cpp)
+
+extern "C" const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .initialize = llamacpp_vlm_vtable_initialize,
     .process = llamacpp_vlm_vtable_process,
     .process_stream = llamacpp_vlm_vtable_process_stream,
@@ -170,6 +172,8 @@ const rac_vlm_service_ops_t g_llamacpp_vlm_ops = {
     .destroy = llamacpp_vlm_vtable_destroy,
     .create = llamacpp_vlm_create_impl,
 };
+
+namespace {  // reopen for the rest of the file
 
 // =============================================================================
 // REGISTRY STATE

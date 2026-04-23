@@ -17,7 +17,9 @@
 #include <jni.h>
 
 #include <condition_variable>
+#include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <mutex>
 #include <new>
 #include <nlohmann/json.hpp>
@@ -44,6 +46,7 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/http/rac_http_download.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -55,6 +58,8 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
+// v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
+#include "rac/features/llm/rac_llm_stream.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -1311,11 +1316,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentIsLoaded
                                                                                : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject streamCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
-}
-
 // =============================================================================
 // JNI FUNCTIONS - LLM LoRA Adapter Management
 // =============================================================================
@@ -1721,6 +1721,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     json_obj["duration_ms"] = result.processing_time_ms;
     json_obj["completion_reason"] = 1;  // END_OF_AUDIO
     json_obj["confidence"] = result.confidence;
+
+    // v2 close-out (E-5): emit word-level timestamps when the backend
+    // populated them. Times are converted from milliseconds (C ABI) to
+    // seconds (frontend convention) so Kotlin/Swift/Dart see them in the
+    // same units used by Whisper/Sherpa client examples.
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
     std::string json_result = json_obj.dump();
 
     rac_stt_result_free(&result);
@@ -1788,11 +1807,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDetectLa
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
     // Return null for now - language detection not implemented
     return nullptr;
-}
-
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject partialCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
 }
 
 // =============================================================================
@@ -1893,16 +1907,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
 
     std::string textStr = getCString(env, text);
     std::string pathStr = getCString(env, outputPath);
+    if (pathStr.empty()) {
+        LOGe("racTtsComponentSynthesizeToFile: output path is empty");
+        return -1;
+    }
+
     rac_tts_options_t options = {};
     rac_tts_result_t result = {};
 
     rac_result_t status = rac_tts_component_synthesize(reinterpret_cast<rac_handle_t>(handle),
                                                        textStr.c_str(), &options, &result);
 
-    // TODO: Write result to file
-    rac_tts_result_free(&result);
+    if (status != RAC_SUCCESS) {
+        LOGe("racTtsComponentSynthesizeToFile: synthesize failed with code %d", status);
+        rac_tts_result_free(&result);
+        return -1;
+    }
 
-    return status == RAC_SUCCESS ? 0 : -1;
+    if (result.audio_data == nullptr || result.audio_size == 0) {
+        LOGe("racTtsComponentSynthesizeToFile: empty audio buffer returned");
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    // Write raw PCM bytes to disk. Caller is responsible for wrapping in a
+    // WAV container if desired; mirroring iOS CppBridge+TTS which writes the
+    // raw rac_tts_result_t.audio_data buffer the synthesizer produced.
+    std::ofstream out(pathStr, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        LOGe("racTtsComponentSynthesizeToFile: failed to open %s for writing", pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    out.write(reinterpret_cast<const char*>(result.audio_data),
+              static_cast<std::streamsize>(result.audio_size));
+    const bool writeOk = out.good();
+    out.close();
+
+    if (!writeOk) {
+        LOGe("racTtsComponentSynthesizeToFile: write failed (wrote partial data)");
+        std::remove(pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    const int64_t durationMs = result.duration_ms;
+    LOGi("racTtsComponentSynthesizeToFile: wrote %zu bytes (%lld ms audio) -> %s",
+         result.audio_size, (long long)durationMs, pathStr.c_str());
+
+    rac_tts_result_free(&result);
+    return static_cast<jlong>(durationMs);
 }
 
 JNIEXPORT void JNICALL
@@ -1962,11 +2017,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentGetLangu
                                                                                      jclass clazz,
                                                                                      jlong handle) {
     return env->NewStringUTF("[]");
-}
-
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject audioCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
 }
 
 // =============================================================================
@@ -2105,12 +2155,6 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetSampleRates(
     JNIEnv* env, jclass clazz, jlong handle) {
     return env->NewStringUTF("[16000]");
-}
-
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject frameCallback, jobject speechStartCallback,
-    jobject speechEndCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
 }
 
 // =============================================================================
@@ -3919,9 +3963,52 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
+    std::string optionsStr = getCString(env, optionsJson);
 
-    // Parse options if provided (simplified - use defaults for now)
-    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
+    // Defaults (all 8 fields of rac_tool_calling_options_t incl. format)
+    rac_tool_calling_options_t options =
+        RAC_TOOL_CALLING_OPTIONS_DEFAULT;
+
+    // Parse optionsJson so Kotlin-side fields (format, temperature, etc.) are honored.
+    // Keeps a stable std::string for the system_prompt so the char* stays valid for
+    // the duration of the rac_tool_call_build_initial_prompt call below.
+    std::string systemPromptStorage;
+    std::string formatStorage;
+    if (!optionsStr.empty()) {
+        try {
+            auto opts = nlohmann::json::parse(optionsStr);
+            if (opts.contains("maxToolCalls") && opts["maxToolCalls"].is_number_integer()) {
+                options.max_tool_calls = opts["maxToolCalls"].get<int32_t>();
+            }
+            if (opts.contains("autoExecute") && opts["autoExecute"].is_boolean()) {
+                options.auto_execute = opts["autoExecute"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("temperature") && opts["temperature"].is_number()) {
+                options.temperature = opts["temperature"].get<float>();
+            }
+            if (opts.contains("maxTokens") && opts["maxTokens"].is_number_integer()) {
+                options.max_tokens = opts["maxTokens"].get<int32_t>();
+            }
+            if (opts.contains("systemPrompt") && opts["systemPrompt"].is_string()) {
+                systemPromptStorage = opts["systemPrompt"].get<std::string>();
+                options.system_prompt = systemPromptStorage.c_str();
+            }
+            if (opts.contains("replaceSystemPrompt") && opts["replaceSystemPrompt"].is_boolean()) {
+                options.replace_system_prompt =
+                    opts["replaceSystemPrompt"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("keepToolsAvailable") && opts["keepToolsAvailable"].is_boolean()) {
+                options.keep_tools_available =
+                    opts["keepToolsAvailable"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("format") && opts["format"].is_string()) {
+                formatStorage = opts["format"].get<std::string>();
+                options.format = rac_tool_call_format_from_name(formatStorage.c_str());
+            }
+        } catch (const std::exception& e) {
+            LOGe("racToolCallBuildInitialPrompt: failed to parse optionsJson: %s", e.what());
+        }
+    }
 
     char* prompt = nullptr;
     rac_result_t rc =
@@ -5240,6 +5327,125 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeUnregisterCallba
 }
 
 // =============================================================================
+// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
+//
+// v2 close-out Phase G-2. Same pattern as VaStreamCallbackCtx above — one
+// heap-allocated LlmStreamCallbackCtx per registration, Function1.invoke()
+// method ID cached, trampoline attaches the thread if needed.
+//
+// The C ABI has ONE callback slot per LLM component handle. Kotlin's
+// LLMStreamAdapter builds per-handle fan-out on top (same shape as
+// VoiceAgentStreamAdapter.HandleFanOut).
+
+namespace {
+
+struct LlmStreamCallbackCtx {
+    jobject   lambda_ref;
+    jclass    function1_cls;
+    jmethodID invoke_mid;
+};
+
+void llm_stream_trampoline(const uint8_t* event_bytes,
+                           size_t         event_size,
+                           void*          user_data) {
+    if (!user_data || !event_bytes || !g_jvm) return;
+
+    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env          = nullptr;
+    bool    needs_detach = false;
+    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(
+            jbytes, 0, static_cast<jsize>(event_size),
+            reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;
+    }
+
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef) return 0;
+
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx           = new LlmStreamCallbackCtx{};
+    ctx->lambda_ref     = lambdaRef;
+    ctx->function1_cls  = function1Cls;
+    ctx->invoke_mid     = invokeMid;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_result_t rc =
+        rac_llm_set_stream_proto_callback(racHandle, &llm_stream_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0) return;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_llm_unset_stream_proto_callback(racHandle);
+
+    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(
+        static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
 // Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
 // handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
 // CppBridge.VoiceAgent.shared.getHandle() pattern.)
@@ -5284,6 +5490,97 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     (void)clazz;
     if (handle == 0L) return;
     rac_voice_agent_destroy(reinterpret_cast<rac_voice_agent_handle_t>(handle));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP download (v2 close-out Phase H)
+// =============================================================================
+//
+// Single synchronous entrypoint that Kotlin's CppBridgeDownload shim calls
+// from its own worker thread. The JNI call blocks until the download
+// completes, fails, or is cancelled. Progress is forwarded back to Kotlin
+// via a NativeDownloadProgressListener instance whose `onProgress(long,
+// long): Boolean` method is invoked on every libcurl chunk — returning
+// `false` cancels the download.
+//
+// This replaces the 1.3 KLOC HttpURLConnection loop previously implemented
+// entirely in Kotlin (see docs/v2_closeout_phase_h_report.md).
+
+namespace {
+
+struct DownloadProgressCtx {
+    JNIEnv* env;                // thread-local
+    jobject listener;           // local ref, valid for the JNI call
+    jmethodID on_progress_mid;  // method ID (not cached globally — Kotlin
+                                // class may change across JNI_OnLoad cycles)
+};
+
+rac_bool_t jni_download_progress_cb(uint64_t bytes_written, uint64_t total_bytes, void* user) {
+    auto* ctx = static_cast<DownloadProgressCtx*>(user);
+    if (!ctx || !ctx->env || !ctx->listener || !ctx->on_progress_mid) {
+        return RAC_TRUE;  // no listener = can't cancel
+    }
+    jboolean keep = ctx->env->CallBooleanMethod(ctx->listener, ctx->on_progress_mid,
+                                                static_cast<jlong>(bytes_written),
+                                                static_cast<jlong>(total_bytes));
+    if (ctx->env->ExceptionCheck()) {
+        ctx->env->ExceptionDescribe();
+        ctx->env->ExceptionClear();
+        // Any Kotlin-side exception treated as "continue" — the download
+        // completes and the listener can log from its exception handler.
+        return RAC_TRUE;
+    }
+    return keep == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+}
+
+}  // namespace
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring urlStr, jstring destPathStr, jstring expectedShaStr,
+    jlong resumeFromByte, jint timeoutMs, jobject listener, jintArray outHttpStatus) {
+
+    if (!urlStr || !destPathStr) {
+        return static_cast<jint>(RAC_HTTP_DL_INVALID_URL);
+    }
+
+    const char* url = env->GetStringUTFChars(urlStr, nullptr);
+    const char* dest = env->GetStringUTFChars(destPathStr, nullptr);
+    const char* sha = expectedShaStr ? env->GetStringUTFChars(expectedShaStr, nullptr) : nullptr;
+
+    rac_http_download_request_t req{};
+    req.url = url;
+    req.destination_path = dest;
+    req.timeout_ms = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = resumeFromByte > 0 ? static_cast<uint64_t>(resumeFromByte) : 0;
+    req.expected_sha256_hex = (sha && sha[0] != '\0') ? sha : nullptr;
+
+    DownloadProgressCtx ctx{};
+    ctx.env = env;
+    ctx.listener = listener;
+    if (listener) {
+        jclass listener_cls = env->GetObjectClass(listener);
+        if (listener_cls) {
+            ctx.on_progress_mid = env->GetMethodID(listener_cls, "onProgress", "(JJ)Z");
+            env->DeleteLocalRef(listener_cls);
+        }
+    }
+
+    int32_t http_status = 0;
+    rac_http_download_status_t status = rac_http_download_execute(
+        &req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
+
+    if (outHttpStatus) {
+        jint tmp = static_cast<jint>(http_status);
+        env->SetIntArrayRegion(outHttpStatus, 0, 1, &tmp);
+    }
+
+    env->ReleaseStringUTFChars(urlStr, url);
+    env->ReleaseStringUTFChars(destPathStr, dest);
+    if (sha) env->ReleaseStringUTFChars(expectedShaStr, sha);
+
+    return static_cast<jint>(status);
 }
 
 }  // extern "C"

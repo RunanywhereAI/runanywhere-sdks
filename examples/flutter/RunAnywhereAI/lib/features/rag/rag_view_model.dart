@@ -7,8 +7,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:runanywhere/public/extensions/runanywhere_rag.dart';
-import 'package:runanywhere/public/types/rag_types.dart';
+import 'package:runanywhere/runanywhere.dart';
 
 import 'package:runanywhere_ai/features/rag/document_service.dart';
 
@@ -106,8 +105,8 @@ class RAGViewModel extends ChangeNotifier {
     try {
       final extractedText = await DocumentService.extractText(filePath);
 
-      await RunAnywhereRAG.ragCreatePipeline(config);
-      await RunAnywhereRAG.ragIngest(extractedText);
+      await RunAnywhereSDK.instance.rag.createPipeline(config);
+      await RunAnywhereSDK.instance.rag.ingest(extractedText);
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
@@ -135,7 +134,7 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final result = await RunAnywhereRAG.ragQuery(question);
+      final result = await RunAnywhereSDK.instance.rag.query(question);
 
       _messages = [
         ..._messages,
@@ -158,7 +157,7 @@ class RAGViewModel extends ChangeNotifier {
   ///
   /// Resets all document and conversation state.
   Future<void> clearDocument() async {
-    await RunAnywhereRAG.ragDestroyPipeline();
+    await RunAnywhereSDK.instance.rag.destroyPipeline();
 
     _documentName = null;
     _isDocumentLoaded = false;

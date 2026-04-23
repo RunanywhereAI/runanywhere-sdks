@@ -49,8 +49,7 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Get all models from SDK registry
-      final sdkModels = await sdk.RunAnywhere.availableModels();
+      final sdkModels = await sdk.RunAnywhereSDK.instance.models.available();
 
       // Convert SDK ModelInfo to app ModelInfo
       _availableModels = sdkModels.map(_convertSDKModel).toList();
@@ -228,8 +227,8 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('📥 Starting download for model: ${model.name}');
 
-      // Use SDK's public download API
-      await for (final progress in sdk.RunAnywhere.downloadModel(model.id)) {
+      await for (final progress
+          in sdk.RunAnywhereSDK.instance.downloads.start(model.id)) {
         final progressValue = progress.totalBytes > 0
             ? progress.bytesDownloaded / progress.totalBytes
             : 0.0;
@@ -266,8 +265,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('🗑️ Deleting model: ${model.name}');
 
-      // Use SDK's public delete API (now only takes modelId)
-      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      await sdk.RunAnywhereSDK.instance.downloads.delete(model.id);
 
       // Refresh models from registry
       await loadModelsFromRegistry();
@@ -288,20 +286,18 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('⏳ Loading model: ${model.name}');
 
-      // Use appropriate SDK method based on model category
       switch (model.category) {
         case ModelCategory.language:
-          await sdk.RunAnywhere.loadModel(model.id);
+          await sdk.RunAnywhereSDK.instance.llm.load(model.id);
           break;
         case ModelCategory.speechRecognition:
-          await sdk.RunAnywhere.loadSTTModel(model.id);
+          await sdk.RunAnywhereSDK.instance.stt.load(model.id);
           break;
         case ModelCategory.speechSynthesis:
-          await sdk.RunAnywhere.loadTTSVoice(model.id);
+          await sdk.RunAnywhereSDK.instance.tts.loadVoice(model.id);
           break;
         default:
-          // Default to LLM model loading
-          await sdk.RunAnywhere.loadModel(model.id);
+          await sdk.RunAnywhereSDK.instance.llm.load(model.id);
       }
 
       _currentModel = model;
@@ -324,7 +320,7 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await sdk.RunAnywhere.unloadModel();
+      await sdk.RunAnywhereSDK.instance.llm.unload();
       _currentModel = null;
       debugPrint('✅ Model unloaded successfully');
     } catch (e) {
@@ -347,8 +343,7 @@ class ModelListViewModel extends ChangeNotifier {
     try {
       debugPrint('➕ Adding model from URL: $name');
 
-      // Use SDK's public registration API
-      final modelInfo = sdk.RunAnywhere.registerModel(
+      final modelInfo = sdk.RunAnywhereSDK.instance.models.register(
         name: name,
         url: Uri.parse(url),
         framework: _convertToSDKFramework(framework),

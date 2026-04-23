@@ -83,9 +83,6 @@ object CppBridgeModelPaths {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var baseDirectory: String? = null
 
     private val lock = Any()
@@ -201,42 +198,6 @@ object CppBridgeModelPaths {
          */
         fun isPathWritable(path: String): Boolean
     }
-
-    /**
-     * Register the model paths callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // Initialize base directory if not set
-            if (baseDirectory == null) {
-                initializeDefaultBaseDirectory()
-            }
-
-            // Register the model paths callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetModelPathsCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Model paths callbacks registered. Base dir: $baseDirectory",
-            )
-        }
-    }
-
-    /**
-     * Check if the model paths callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     // ========================================================================
     // MODEL PATH CALLBACKS
@@ -570,58 +531,6 @@ object CppBridgeModelPaths {
             File(base).totalSpace
         } catch (e: Exception) {
             -1L
-        }
-    }
-
-    // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the model paths callbacks with C++ core.
-     *
-     * Registers [getBaseDirCallback], [setBaseDirCallback],
-     * [getModelsDirectoryCallback], [getModelPathCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_model_paths_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetModelPathsCallbacks()
-
-    /**
-     * Native method to unset the model paths callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_model_paths_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetModelPathsCallbacks()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the model paths callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetModelPathsCallbacks()
-
-            pathListener = null
-            isRegistered = false
         }
     }
 

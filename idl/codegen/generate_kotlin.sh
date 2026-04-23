@@ -34,7 +34,20 @@ if command -v wire-compiler >/dev/null 2>&1; then
         --kotlin_out="${OUT_DIR}" \
         model_types.proto voice_events.proto pipeline.proto solutions.proto \
         voice_agent_service.proto llm_service.proto download_service.proto
-    echo "✓ Kotlin proto codegen → ${OUT_DIR}"
+
+    # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
+    # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both
+    # depend on com.squareup.wire:wire-grpc-client which we don't carry in KMP
+    # commonMain (JVM-only grpc runtime). The hand-written
+    # VoiceAgentStreamAdapter / DownloadStreamAdapter under jvmAndroidMain
+    # consume the message types directly via rac_*_set_proto_callback, so the
+    # generated client stubs are dead weight. Strip them so regen stays green.
+    for svc in Download LLM VoiceAgent; do
+        rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/${svc}Client.kt"
+        rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/Grpc${svc}Client.kt"
+    done
+
+    echo "✓ Kotlin proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
 
     # Note: protoc-gen-grpckt (grpc-kotlin official plugin) emits
     # com.google.protobuf-style Java messages + Flow client stubs. We do

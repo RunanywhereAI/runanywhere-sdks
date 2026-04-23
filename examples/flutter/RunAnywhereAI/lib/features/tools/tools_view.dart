@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
@@ -68,7 +67,7 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -78,11 +77,10 @@ class _ToolsViewState extends State<ToolsView> {
 
   /// Register demo tools matching iOS/Android examples
   void _registerDemoTools() {
-    // Clear any existing tools
-    RunAnywhereTools.clearTools();
+    sdk.RunAnywhereSDK.instance.tools.clear();
 
     // 1. Weather tool
-    RunAnywhereTools.registerTool(
+    sdk.RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'get_weather',
         description: 'Get current weather for a location',
@@ -98,7 +96,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 2. Calculator tool
-    RunAnywhereTools.registerTool(
+    sdk.RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'calculate',
         description: 'Perform basic arithmetic calculations',
@@ -114,7 +112,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 3. Time tool
-    RunAnywhereTools.registerTool(
+    sdk.RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'get_current_time',
         description: 'Get the current date and time',
@@ -124,7 +122,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     setState(() {
-      _registeredTools = RunAnywhereTools.getRegisteredTools();
+      _registeredTools = sdk.RunAnywhereSDK.instance.tools.registeredTools();
     });
   }
 
@@ -379,7 +377,7 @@ class _ToolsViewState extends State<ToolsView> {
   }
 
   Future<void> _runToolCalling() async {
-    if (!sdk.RunAnywhere.isModelLoaded) {
+    if (!sdk.RunAnywhereSDK.instance.llm.isLoaded) {
       setState(() {
         _errorMessage = 'Please load an LLM model first';
       });
@@ -404,7 +402,7 @@ class _ToolsViewState extends State<ToolsView> {
     try {
       _addToLog('Starting generation with tools...');
 
-      final result = await RunAnywhereTools.generateWithTools(
+      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
         options: const ToolCallingOptions(
           maxToolCalls: 3,

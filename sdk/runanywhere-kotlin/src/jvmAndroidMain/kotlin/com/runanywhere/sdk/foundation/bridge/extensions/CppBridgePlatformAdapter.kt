@@ -14,14 +14,8 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Platform adapter that provides JNI callbacks for C++ core operations.
@@ -64,35 +58,6 @@ object CppBridgePlatformAdapter {
      * In-memory fallback storage for JVM environments or when platform storage is not available.
      */
     private val inMemoryStorage = ConcurrentHashMap<String, ByteArray>()
-
-    /**
-     * Active HTTP download tasks for platform adapter downloads.
-     */
-    private data class HttpDownloadTask(
-        val taskId: String,
-        val url: String,
-        val destinationPath: String,
-        val cancelFlag: AtomicBoolean = AtomicBoolean(false),
-    ) {
-        @Volatile
-        var connection: HttpURLConnection? = null
-
-        @Volatile
-        var future: Future<*>? = null
-    }
-
-    private val httpDownloadTasks = ConcurrentHashMap<String, HttpDownloadTask>()
-
-    private val httpDownloadExecutor =
-        Executors.newCachedThreadPool { runnable ->
-            Thread(runnable, "runanywhere-http-download").apply {
-                isDaemon = true
-            }
-        }
-
-    private const val RAC_HTTP_ERROR_INVALID_ARGUMENT = -259
-    private const val RAC_HTTP_ERROR_DOWNLOAD_FAILED = -153
-    private const val RAC_HTTP_ERROR_CANCELLED = -380
 
     /**
      * Tag for logging.
@@ -439,156 +404,17 @@ object CppBridgePlatformAdapter {
     }
 
     // ========================================================================
-    // HTTP DOWNLOAD CALLBACKS (Platform Adapter)
+    // v2 close-out Phase H: the platform-adapter HTTP transport that used to
+    // live here (~170 LOC of HttpURLConnection + executor + task lifecycle)
+    // has been DELETED. Commons (runanywhere-commons) now owns HTTP transport
+    // natively via libcurl behind the `rac_http_download_execute` ABI. The
+    // commons JNI bridge never bound `http_download`/`http_download_cancel`
+    // into the `rac_platform_adapter_t` struct, so this code was dead — all
+    // Kotlin downloads now flow through `CppBridgeDownload` →
+    // `RunAnywhereBridge.racHttpDownloadExecute(...)`.
+    // See: docs/rfcs/h1_http_client_vendor.md,
+    //      docs/v2_closeout_phase_h_report.md
     // ========================================================================
-
-    /**
-     * Download a file from a URL to a destination path.
-     *
-     * This is an asynchronous download used by the C++ platform adapter.
-     * Returns RAC_SUCCESS if the download was scheduled, or an error code otherwise.
-     */
-    fun httpDownload(url: String, destinationPath: String, taskId: String): Int {
-        if (url.isBlank() || destinationPath.isBlank() || taskId.isBlank()) {
-            logCallback(LogLevel.ERROR, "HTTP", "Download invalid arguments (taskId=$taskId)")
-            return RAC_HTTP_ERROR_INVALID_ARGUMENT
-        }
-
-        val task = HttpDownloadTask(taskId = taskId, url = url, destinationPath = destinationPath)
-        if (httpDownloadTasks.putIfAbsent(taskId, task) != null) {
-            logCallback(LogLevel.WARN, "HTTP", "Duplicate download taskId=$taskId")
-            return RAC_HTTP_ERROR_INVALID_ARGUMENT
-        }
-
-        return try {
-            val future =
-                httpDownloadExecutor.submit {
-                    performHttpDownload(task)
-                }
-            task.future = future
-            CommonsErrorCode.RAC_SUCCESS
-        } catch (e: Exception) {
-            httpDownloadTasks.remove(taskId)
-            logCallback(LogLevel.ERROR, "HTTP", "Failed to schedule download for $url: ${e.message}")
-            RAC_HTTP_ERROR_DOWNLOAD_FAILED
-        }
-    }
-
-    /**
-     * Cancel a download task.
-     */
-    fun httpDownloadCancel(taskId: String): Boolean {
-        val task = httpDownloadTasks[taskId] ?: return false
-        task.cancelFlag.set(true)
-        task.connection?.disconnect()
-        return true
-    }
-
-    private fun performHttpDownload(task: HttpDownloadTask) {
-        var result = RAC_HTTP_ERROR_DOWNLOAD_FAILED
-        var finalPath: String? = null
-        var tempFile: File? = null
-
-        try {
-            if (task.cancelFlag.get()) {
-                result = RAC_HTTP_ERROR_CANCELLED
-                return
-            }
-
-            val connection = URL(task.url).openConnection() as HttpURLConnection
-            task.connection = connection
-            connection.instanceFollowRedirects = true
-            connection.connectTimeout = 30_000
-            connection.readTimeout = 60_000
-            connection.requestMethod = "GET"
-            connection.connect()
-
-            val status = connection.responseCode
-            if (status !in 200..299) {
-                logCallback(LogLevel.ERROR, "HTTP", "Download failed with status $status for ${task.url}")
-                result = RAC_HTTP_ERROR_DOWNLOAD_FAILED
-                return
-            }
-
-            val totalBytes = connection.contentLengthLong.let { if (it > 0) it else 0L }
-            val destFile = File(task.destinationPath)
-            destFile.parentFile?.mkdirs()
-            val temp = File(destFile.parentFile, destFile.name + ".part")
-            tempFile = temp
-            if (temp.exists()) {
-                temp.delete()
-            }
-
-            var downloaded = 0L
-            var lastReported = 0L
-            val reportThreshold = 256 * 1024L
-
-            connection.inputStream.use { input ->
-                FileOutputStream(temp).use { output ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        if (task.cancelFlag.get()) {
-                            result = RAC_HTTP_ERROR_CANCELLED
-                            return
-                        }
-                        val read = input.read(buffer)
-                        if (read <= 0) break
-                        output.write(buffer, 0, read)
-                        downloaded += read
-                        if (downloaded - lastReported >= reportThreshold) {
-                            RunAnywhereBridge.racHttpDownloadReportProgress(
-                                task.taskId,
-                                downloaded,
-                                totalBytes,
-                            )
-                            lastReported = downloaded
-                        }
-                    }
-                }
-            }
-
-            if (task.cancelFlag.get()) {
-                result = RAC_HTTP_ERROR_CANCELLED
-                return
-            }
-
-            if (temp.exists()) {
-                if (destFile.exists()) {
-                    destFile.delete()
-                }
-                val moved = temp.renameTo(destFile)
-                if (!moved) {
-                    temp.copyTo(destFile, overwrite = true)
-                    temp.delete()
-                }
-            }
-
-            RunAnywhereBridge.racHttpDownloadReportProgress(task.taskId, downloaded, totalBytes)
-            finalPath = destFile.absolutePath
-            result = CommonsErrorCode.RAC_SUCCESS
-        } catch (e: Exception) {
-            if (task.cancelFlag.get()) {
-                result = RAC_HTTP_ERROR_CANCELLED
-            } else {
-                logCallback(LogLevel.ERROR, "HTTP", "Download failed for ${task.url}: ${e.message}")
-                result = RAC_HTTP_ERROR_DOWNLOAD_FAILED
-            }
-        } finally {
-            task.connection?.disconnect()
-            task.connection = null
-            httpDownloadTasks.remove(task.taskId)
-
-            if (result != CommonsErrorCode.RAC_SUCCESS) {
-                tempFile?.let {
-                    if (it.exists()) {
-                        it.delete()
-                    }
-                }
-            }
-
-            RunAnywhereBridge.racHttpDownloadReportComplete(task.taskId, result, finalPath)
-        }
-    }
 
     // ========================================================================
     // INSTANCE METHODS REQUIRED BY JNI PLATFORM ADAPTER
@@ -629,16 +455,6 @@ object CppBridgePlatformAdapter {
     // JNI NATIVE DECLARATIONS
     // ========================================================================
 
-    /**
-     * Native method to unregister the platform adapter.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnregisterPlatformAdapter()
-
     // ========================================================================
     // LIFECYCLE MANAGEMENT
     // ========================================================================
@@ -654,9 +470,6 @@ object CppBridgePlatformAdapter {
             if (!isRegistered) {
                 return
             }
-
-            // TODO: Call native unregistration
-            // nativeUnregisterPlatformAdapter()
 
             // Only clear in-memory storage, preserve persistent storage
             inMemoryStorage.clear()

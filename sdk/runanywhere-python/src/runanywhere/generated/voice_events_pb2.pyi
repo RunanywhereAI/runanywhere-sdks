@@ -164,7 +164,7 @@ class ErrorEvent(_message.Message):
     def __init__(self, code: _Optional[int] = ..., message: _Optional[str] = ..., component: _Optional[str] = ..., is_recoverable: _Optional[bool] = ...) -> None: ...
 
 class MetricsEvent(_message.Message):
-    __slots__ = ("stt_final_ms", "llm_first_token_ms", "tts_first_audio_ms", "end_to_end_ms", "tokens_generated", "audio_samples_played", "is_over_budget")
+    __slots__ = ("stt_final_ms", "llm_first_token_ms", "tts_first_audio_ms", "end_to_end_ms", "tokens_generated", "audio_samples_played", "is_over_budget", "created_at_ns")
     STT_FINAL_MS_FIELD_NUMBER: _ClassVar[int]
     LLM_FIRST_TOKEN_MS_FIELD_NUMBER: _ClassVar[int]
     TTS_FIRST_AUDIO_MS_FIELD_NUMBER: _ClassVar[int]
@@ -172,6 +172,7 @@ class MetricsEvent(_message.Message):
     TOKENS_GENERATED_FIELD_NUMBER: _ClassVar[int]
     AUDIO_SAMPLES_PLAYED_FIELD_NUMBER: _ClassVar[int]
     IS_OVER_BUDGET_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_NS_FIELD_NUMBER: _ClassVar[int]
     stt_final_ms: float
     llm_first_token_ms: float
     tts_first_audio_ms: float
@@ -179,4 +180,5 @@ class MetricsEvent(_message.Message):
     tokens_generated: int
     audio_samples_played: int
     is_over_budget: bool
-    def __init__(self, stt_final_ms: _Optional[float] = ..., llm_first_token_ms: _Optional[float] = ..., tts_first_audio_ms: _Optional[float] = ..., end_to_end_ms: _Optional[float] = ..., tokens_generated: _Optional[int] = ..., audio_samples_played: _Optional[int] = ..., is_over_budget: _Optional[bool] = ...) -> None: ...
+    created_at_ns: int
+    def __init__(self, stt_final_ms: _Optional[float] = ..., llm_first_token_ms: _Optional[float] = ..., tts_first_audio_ms: _Optional[float] = ..., end_to_end_ms: _Optional[float] = ..., tokens_generated: _Optional[int] = ..., audio_samples_played: _Optional[int] = ..., is_over_budget: _Optional[bool] = ..., created_at_ns: _Optional[int] = ...) -> None: ...

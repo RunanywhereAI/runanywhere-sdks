@@ -61,7 +61,15 @@ class RacBindings {
       : rac_voice_agent_set_proto_callback = lib.lookupFunction<
             RacVoiceAgentSetProtoCallbackNative,
             RacVoiceAgentSetProtoCallbackDart>(
-            'rac_voice_agent_set_proto_callback');
+            'rac_voice_agent_set_proto_callback'),
+        rac_llm_set_stream_proto_callback = lib.lookupFunction<
+            RacLlmSetStreamProtoCallbackNative,
+            RacLlmSetStreamProtoCallbackDart>(
+            'rac_llm_set_stream_proto_callback'),
+        rac_llm_unset_stream_proto_callback = lib.lookupFunction<
+            ffi.Int32 Function(ffi.Pointer<ffi.Void>),
+            int Function(ffi.Pointer<ffi.Void>)>(
+            'rac_llm_unset_stream_proto_callback');
 
   /// Bind a proto-byte callback to a voice agent handle.
   ///
@@ -80,7 +88,41 @@ class RacBindings {
   /// RAC_ERROR_FEATURE_NOT_AVAILABLE (Protobuf not linked).
   // ignore: non_constant_identifier_names
   final RacVoiceAgentSetProtoCallbackDart rac_voice_agent_set_proto_callback;
+
+  /// v2 close-out Phase G-2: proto-byte LLM stream ABI. Matches
+  /// `rac/features/llm/rac_llm_stream.h`:
+  ///
+  ///   rac_result_t rac_llm_set_stream_proto_callback(
+  ///       rac_handle_t handle,
+  ///       rac_llm_stream_proto_callback_fn callback,
+  ///       void* user_data);
+  // ignore: non_constant_identifier_names
+  final RacLlmSetStreamProtoCallbackDart rac_llm_set_stream_proto_callback;
+
+  /// v2 close-out Phase G-2: explicit unregister helper. Equivalent to
+  /// `rac_llm_set_stream_proto_callback(handle, nullptr, nullptr)`.
+  // ignore: non_constant_identifier_names
+  final int Function(ffi.Pointer<ffi.Void>) rac_llm_unset_stream_proto_callback;
 }
+
+/// Matches `rac_llm_stream_proto_callback_fn` in `rac/features/llm/rac_llm_stream.h`.
+typedef RacLlmStreamProtoCallbackNative = ffi.Void Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacLlmSetStreamProtoCallbackNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacLlmSetStreamProtoCallbackDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.NativeFunction<RacLlmStreamProtoCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
 
 /// Entry point for the typed commons FFI bindings.
 ///

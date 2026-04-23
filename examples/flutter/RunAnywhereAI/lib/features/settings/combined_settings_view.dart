@@ -312,11 +312,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     });
 
     try {
-      // Get storage info from SDK
-      final storageInfo = await sdk.RunAnywhere.getStorageInfo();
+      final storageInfo = await sdk.RunAnywhereSDK.instance.downloads.getStorageInfo();
 
-      // Get downloaded models with full info (including sizes)
-      final storedModels = await sdk.RunAnywhere.getDownloadedModelsWithInfo();
+      final storedModels = await sdk.RunAnywhereSDK.instance.downloads.list();
 
       // Calculate total model storage from actual models
       int totalModelStorage = 0;
@@ -362,7 +360,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     // TODO: Implement clearCache() in SDK
     // Once SDK implements clearCache(), replace this with:
     // try {
-    //   await sdk.RunAnywhere.clearCache();
+    //   await sdk.RunAnywhereSDK.instance.downloads.clearCache();
     //   if (mounted) {
     //     ScaffoldMessenger.of(context).showSnackBar(
     //       const SnackBar(content: Text('Cache cleared')),
@@ -387,7 +385,7 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   /// Delete a stored model using RunAnywhere SDK
   Future<void> _deleteModel(sdk.StoredModel model) async {
     try {
-      await sdk.RunAnywhere.deleteStoredModel(model.id);
+      await sdk.RunAnywhereSDK.instance.downloads.delete(model.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${model.name} deleted')),

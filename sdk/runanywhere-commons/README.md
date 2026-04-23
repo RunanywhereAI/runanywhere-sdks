@@ -432,6 +432,8 @@ typedef struct rac_platform_adapter {
 | **Sherpa-ONNX** | 1.12.18+ | STT/TTS/VAD via ONNX Runtime |
 | **ONNX Runtime** | 1.17.1+ | Neural network inference |
 | **nlohmann/json** | 3.11.3 | JSON parsing |
+| **libarchive** | 3.8.1 | ZIP / tar.gz / tar.bz2 model archive extraction |
+| **libcurl** | system or curl-7_88_1 | Native HTTP transport behind `rac_http_client_*` (v2 close-out Phase H). System package preferred; `FetchContent` fallback builds a static copy with platform-native TLS (SecureTransport on Apple, SChannel on Windows, OpenSSL elsewhere). See `docs/rfcs/h1_http_client_vendor.md`. |
 
 ### Binary Outputs
 

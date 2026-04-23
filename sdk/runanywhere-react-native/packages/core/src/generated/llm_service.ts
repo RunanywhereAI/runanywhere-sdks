@@ -67,20 +67,49 @@ export interface LLMGenerateRequest {
 }
 
 /**
- * One token delta. Matches AssistantTokenEvent in voice_events.proto so
- * callers that already speak that type can reuse decoders.
+ * v2 close-out Phase G-2: unified per-token streaming event. Replaces
+ * LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+ * callbackFlow / StreamController / tokenQueue. One serialized event
+ * per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+ * from voice_events.proto so frontends can reuse gap-detection logic.
  */
-export interface LLMToken {
-  text: string;
+export interface LLMStreamEvent {
+  /**
+   * Monotonic per-process sequence number. Useful for frontends that
+   * need to detect gaps or out-of-order delivery.
+   */
+  seq: number;
+  /**
+   * Wall-clock timestamp captured at the C++ edge, in microseconds
+   * since Unix epoch. Frontends may re-timestamp for UI display.
+   */
+  timestampUs: number;
+  /**
+   * Generated token text. Empty on terminal events where only
+   * finish_reason or error_message is populated.
+   */
+  token: string;
+  /** True on the last event of a generation. */
   isFinal: boolean;
+  /** Token semantic category (answer / thought / tool-call). */
   kind: LLMTokenKind;
   /**
-   * Optional per-token logprob, populated when the engine supports it.
-   * 0.0 = no logprob available (proto3 scalar default).
+   * Backend-provided token id when the engine exposes it; 0 = unset
+   * (proto3 scalar default).
    */
+  tokenId: number;
+  /** Per-token log-probability when supported; 0.0 = unset. */
   logprob: number;
-  /** wall-clock timestamp at C++ edge */
-  emitUs: number;
+  /**
+   * Reason the stream stopped: "stop", "length", "cancelled", "error",
+   * "" = unset (proto3 scalar default). Only populated when is_final.
+   */
+  finishReason: string;
+  /**
+   * Error message on failure events (kind may be unset, is_final true).
+   * Empty on success.
+   */
+  errorMessage: string;
 }
 
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
@@ -232,71 +261,121 @@ export const LLMGenerateRequest = {
   },
 };
 
-function createBaseLLMToken(): LLMToken {
-  return { text: "", isFinal: false, kind: 0, logprob: 0, emitUs: 0 };
+function createBaseLLMStreamEvent(): LLMStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    token: "",
+    isFinal: false,
+    kind: 0,
+    tokenId: 0,
+    logprob: 0,
+    finishReason: "",
+    errorMessage: "",
+  };
 }
 
-export const LLMToken = {
-  encode(message: LLMToken, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.text !== "") {
-      writer.uint32(10).string(message.text);
+export const LLMStreamEvent = {
+  encode(message: LLMStreamEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.token !== "") {
+      writer.uint32(26).string(message.token);
     }
     if (message.isFinal !== false) {
-      writer.uint32(16).bool(message.isFinal);
+      writer.uint32(32).bool(message.isFinal);
     }
     if (message.kind !== 0) {
-      writer.uint32(24).int32(message.kind);
+      writer.uint32(40).int32(message.kind);
+    }
+    if (message.tokenId !== 0) {
+      writer.uint32(48).uint32(message.tokenId);
     }
     if (message.logprob !== 0) {
-      writer.uint32(37).float(message.logprob);
+      writer.uint32(61).float(message.logprob);
     }
-    if (message.emitUs !== 0) {
-      writer.uint32(40).int64(message.emitUs);
+    if (message.finishReason !== "") {
+      writer.uint32(66).string(message.finishReason);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(74).string(message.errorMessage);
     }
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): LLMToken {
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMStreamEvent {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLLMToken();
+    const message = createBaseLLMStreamEvent();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
         case 1:
-          if (tag !== 10) {
+          if (tag !== 8) {
             break;
           }
 
-          message.text = reader.string();
+          message.seq = longToNumber(reader.uint64() as Long);
           continue;
         case 2:
           if (tag !== 16) {
             break;
           }
 
-          message.isFinal = reader.bool();
+          message.timestampUs = longToNumber(reader.int64() as Long);
           continue;
         case 3:
-          if (tag !== 24) {
+          if (tag !== 26) {
             break;
           }
 
-          message.kind = reader.int32() as any;
+          message.token = reader.string();
           continue;
         case 4:
-          if (tag !== 37) {
+          if (tag !== 32) {
             break;
           }
 
-          message.logprob = reader.float();
+          message.isFinal = reader.bool();
           continue;
         case 5:
           if (tag !== 40) {
             break;
           }
 
-          message.emitUs = longToNumber(reader.int64() as Long);
+          message.kind = reader.int32() as any;
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.tokenId = reader.uint32();
+          continue;
+        case 7:
+          if (tag !== 61) {
+            break;
+          }
+
+          message.logprob = reader.float();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.finishReason = reader.string();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -307,20 +386,30 @@ export const LLMToken = {
     return message;
   },
 
-  fromJSON(object: any): LLMToken {
+  fromJSON(object: any): LLMStreamEvent {
     return {
-      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      token: isSet(object.token) ? globalThis.String(object.token) : "",
       isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
       kind: isSet(object.kind) ? lLMTokenKindFromJSON(object.kind) : 0,
+      tokenId: isSet(object.tokenId) ? globalThis.Number(object.tokenId) : 0,
       logprob: isSet(object.logprob) ? globalThis.Number(object.logprob) : 0,
-      emitUs: isSet(object.emitUs) ? globalThis.Number(object.emitUs) : 0,
+      finishReason: isSet(object.finishReason) ? globalThis.String(object.finishReason) : "",
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
     };
   },
 
-  toJSON(message: LLMToken): unknown {
+  toJSON(message: LLMStreamEvent): unknown {
     const obj: any = {};
-    if (message.text !== "") {
-      obj.text = message.text;
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.token !== "") {
+      obj.token = message.token;
     }
     if (message.isFinal !== false) {
       obj.isFinal = message.isFinal;
@@ -328,25 +417,35 @@ export const LLMToken = {
     if (message.kind !== 0) {
       obj.kind = lLMTokenKindToJSON(message.kind);
     }
+    if (message.tokenId !== 0) {
+      obj.tokenId = Math.round(message.tokenId);
+    }
     if (message.logprob !== 0) {
       obj.logprob = message.logprob;
     }
-    if (message.emitUs !== 0) {
-      obj.emitUs = Math.round(message.emitUs);
+    if (message.finishReason !== "") {
+      obj.finishReason = message.finishReason;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
     }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<LLMToken>, I>>(base?: I): LLMToken {
-    return LLMToken.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(base?: I): LLMStreamEvent {
+    return LLMStreamEvent.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<LLMToken>, I>>(object: I): LLMToken {
-    const message = createBaseLLMToken();
-    message.text = object.text ?? "";
+  fromPartial<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(object: I): LLMStreamEvent {
+    const message = createBaseLLMStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.token = object.token ?? "";
     message.isFinal = object.isFinal ?? false;
     message.kind = object.kind ?? 0;
+    message.tokenId = object.tokenId ?? 0;
     message.logprob = object.logprob ?? 0;
-    message.emitUs = object.emitUs ?? 0;
+    message.finishReason = object.finishReason ?? "";
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };

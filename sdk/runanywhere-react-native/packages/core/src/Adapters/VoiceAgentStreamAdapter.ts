@@ -18,7 +18,8 @@
  */
 
 import { VoiceAgent as NitroVoiceAgent } from '../generated/NitroVoiceAgentSpec';
-import { VoiceEvent, VoiceAgentRequest } from '../generated/voice_agent_service';
+import { VoiceAgentRequest } from '../generated/voice_agent_service';
+import { VoiceEvent } from '../generated/voice_events';
 import {
   streamVoiceAgent,
   VoiceAgentStreamTransport,

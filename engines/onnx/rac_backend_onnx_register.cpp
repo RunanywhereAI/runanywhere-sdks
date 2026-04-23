@@ -159,7 +159,16 @@ static rac_result_t onnx_stt_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_stt_service_ops_t g_onnx_stt_ops = {
+}  // namespace (close anon — ops struct must have external linkage)
+
+// Phase 1 / B3 fix: g_onnx_stt_ops is declared `extern const` from
+// rac_plugin_entry_onnx.cpp (external linkage). Defining it inside the
+// anonymous namespace gives it internal linkage and only worked because
+// rac_backend_onnx is currently STATIC (both TUs end up in the same
+// final image). A SHARED build of rac_backend_onnx would surface the
+// linkage mismatch as undefined behaviour. Wrapping in extern "C" makes
+// the definition match the declaration.
+extern "C" const rac_stt_service_ops_t g_onnx_stt_ops = {
     .initialize = onnx_stt_vtable_initialize,
     .transcribe = onnx_stt_vtable_transcribe,
     .transcribe_stream = onnx_stt_vtable_transcribe_stream,
@@ -168,6 +177,8 @@ const rac_stt_service_ops_t g_onnx_stt_ops = {
     .destroy = onnx_stt_vtable_destroy,
     .create = onnx_stt_create_impl,
 };
+
+namespace {  // reopen for the next batch of static helpers
 
 // =============================================================================
 // TTS VTABLE IMPLEMENTATION
@@ -241,7 +252,9 @@ static rac_result_t onnx_tts_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_tts_service_ops_t g_onnx_tts_ops = {
+}  // namespace (close anon — see B3 note above)
+
+extern "C" const rac_tts_service_ops_t g_onnx_tts_ops = {
     .initialize = onnx_tts_vtable_initialize,
     .synthesize = onnx_tts_vtable_synthesize,
     .synthesize_stream = onnx_tts_vtable_synthesize_stream,
@@ -251,6 +264,8 @@ const rac_tts_service_ops_t g_onnx_tts_ops = {
     .destroy = onnx_tts_vtable_destroy,
     .create = onnx_tts_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // MODULE IDENTITY
@@ -328,7 +343,9 @@ static rac_result_t onnx_vad_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_vad_service_ops_t g_onnx_vad_ops = {
+}  // namespace (close anon — see B3 note above)
+
+extern "C" const rac_vad_service_ops_t g_onnx_vad_ops = {
     .process = onnx_vad_vtable_process,
     .start = onnx_vad_vtable_start,
     .stop = onnx_vad_vtable_stop,
@@ -339,6 +356,8 @@ const rac_vad_service_ops_t g_onnx_vad_ops = {
     .initialize = onnx_vad_vtable_initialize,
     .create = onnx_vad_create_impl,
 };
+
+namespace {
 
 // =============================================================================
 // STORAGE AND DOWNLOAD STRATEGIES

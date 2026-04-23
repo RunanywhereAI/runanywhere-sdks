@@ -2900,29 +2900,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isTelemetryInitialized() {
 // Tool Calling
 //
 // ARCHITECTURE:
-// - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
-//   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
-//
-// - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
-//   storage, prompt formatting, and orchestration. Executors MUST stay in
-//   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
-//
-// Only parseToolCallFromOutput is implemented in C++. All other tool calling
-// functionality (registration, execution, prompt formatting) is in TypeScript.
+// - Commons C ABI (rac_tool_call_*): SINGLE SOURCE OF TRUTH for parsing and
+//   prompt formatting. Shared by all SDK frontends (Swift/Kotlin/Flutter/Web/RN).
+// - ToolCallingBridge: Thin C++ wrapper that marshals std::string <-> C ABI.
+// - TypeScript (RunAnywhere+ToolCalling.ts): Registry, executor storage,
+//   orchestration. Executors stay in TS because they need JS APIs (fetch, etc.).
 // ============================================================================
 
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOutput(const std::string& llmOutput) {
     return Promise<std::string>::async([llmOutput]() -> std::string {
         LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
-
-        // TODO: Re-enable when commons includes rac_tool_call_* functions
-        // Use ToolCallingBridge for parsing - single source of truth
-        // This ensures consistent <tool_call> tag parsing across all platforms
-        // return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
-
-        // Temporary stub - return empty JSON for now
-        LOGW("parseToolCallFromOutput: ToolCallingBridge disabled, returning empty JSON");
-        return "{}";
+        return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
     });
 }
 
@@ -2932,15 +2920,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPromp
 ) {
     return Promise<std::string>::async([toolsJson, format]() -> std::string {
         LOGD("formatToolsForPrompt: tools length=%zu, format=%s", toolsJson.length(), format.c_str());
-
-        // TODO: Re-enable when commons includes rac_tool_call_* functions
-        // Use C++ single source of truth for prompt formatting
-        // This eliminates duplicate TypeScript implementation
-        // return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
-
-        // Temporary stub - return empty string for now
-        LOGW("formatToolsForPrompt: ToolCallingBridge disabled, returning empty string");
-        return "";
+        return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
     });
 }
 
@@ -2950,15 +2930,10 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
     const std::string& optionsJson
 ) {
     return Promise<std::string>::async([userPrompt, toolsJson, optionsJson]() -> std::string {
-        LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu", userPrompt.length(), toolsJson.length());
-
-        // TODO: Re-enable when commons includes rac_tool_call_* functions
-        // Use C++ single source of truth for initial prompt building
-        // return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(userPrompt, toolsJson, optionsJson);
-
-        // Temporary stub - return user prompt as-is
-        LOGW("buildInitialPrompt: ToolCallingBridge disabled, returning user prompt");
-        return userPrompt;
+        LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu",
+             userPrompt.length(), toolsJson.length());
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(
+            userPrompt, toolsJson, optionsJson);
     });
 }
 
@@ -2971,15 +2946,8 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt
 ) {
     return Promise<std::string>::async([originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable]() -> std::string {
         LOGD("buildFollowupPrompt: tool=%s, keepTools=%d", toolName.c_str(), keepToolsAvailable);
-
-        // TODO: Re-enable when commons includes rac_tool_call_* functions
-        // Use C++ single source of truth for follow-up prompt building
-        // return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
-        //     originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
-
-        // Temporary stub - return original prompt
-        LOGW("buildFollowupPrompt: ToolCallingBridge disabled, returning original prompt");
-        return originalPrompt;
+        return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
+            originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
     });
 }
 

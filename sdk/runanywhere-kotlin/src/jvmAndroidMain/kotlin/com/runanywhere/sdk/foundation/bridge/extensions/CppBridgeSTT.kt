@@ -160,9 +160,6 @@ object CppBridgeSTT {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var state: Int = STTState.NOT_CREATED
 
     @Volatile
@@ -421,36 +418,6 @@ object CppBridgeSTT {
          */
         fun onPartialResult(text: String, isFinal: Boolean): Boolean
     }
-
-    /**
-     * Register the STT callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // TODO: Call native registration
-            // nativeSetSTTCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "STT callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the STT callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     /**
      * Get the current component handle.
@@ -1044,63 +1011,6 @@ object CppBridgeSTT {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the STT callbacks with C++ core.
-     *
-     * Registers [streamPartialCallback], [progressCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_stt_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetSTTCallbacks()
-
-    /**
-     * Native method to unset the STT callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_stt_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetSTTCallbacks()
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the STT callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // Destroy component if created
-            if (handle != 0L) {
-                destroy()
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetSTTCallbacks()
-
-            sttListener = null
-            streamCallback = null
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
     // UTILITY FUNCTIONS
     // ========================================================================
 
@@ -1187,8 +1097,45 @@ object CppBridgeSTT {
             completionReason = completionReason,
             confidence = confidence,
             processingTimeMs = elapsedMs,
-            wordTimestamps = emptyList(), // TODO: Parse word timestamps if present
+            wordTimestamps = parseWordTimestamps(json),
         )
+    }
+
+    /**
+     * Parse the optional `word_timestamps` array out of the STT JSON
+     * payload. The JNI layer emits seconds; this bridge represents word
+     * timing in milliseconds so we multiply by 1000.
+     *
+     * Format (matches sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp):
+     *   "word_timestamps": [
+     *     {"word": "hello", "start_time": 0.0, "end_time": 0.5, "confidence": 0.95},
+     *     ...
+     *   ]
+     */
+    private fun parseWordTimestamps(json: String): List<WordTimestamp> {
+        val arrayRegex = Regex("\"word_timestamps\"\\s*:\\s*\\[(.*?)\\]", RegexOption.DOT_MATCHES_ALL)
+        val arrayBody = arrayRegex.find(json)?.groupValues?.get(1) ?: return emptyList()
+
+        val objectRegex = Regex("\\{[^{}]*\\}")
+        val results = mutableListOf<WordTimestamp>()
+        for (match in objectRegex.findAll(arrayBody)) {
+            val obj = match.value
+            val word = Regex("\"word\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(obj)
+                ?.groupValues?.get(1)?.let { unescapeJson(it) } ?: continue
+            val startSeconds = Regex("\"start_time\"\\s*:\\s*(-?[\\d.]+)").find(obj)
+                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+            val endSeconds = Regex("\"end_time\"\\s*:\\s*(-?[\\d.]+)").find(obj)
+                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+            val conf = Regex("\"confidence\"\\s*:\\s*(-?[\\d.]+)").find(obj)
+                ?.groupValues?.get(1)?.toFloatOrNull() ?: 0f
+            results += WordTimestamp(
+                word = word,
+                startMs = (startSeconds * 1000.0).toLong(),
+                endMs = (endSeconds * 1000.0).toLong(),
+                confidence = conf,
+            )
+        }
+        return results
     }
 
     /**

@@ -23,11 +23,34 @@
 // Main entry point
 export { RunAnywhere } from './Public/RunAnywhere';
 
-// Voice orchestration (cross-backend, uses provider interfaces)
-export { VoiceAgent, VoiceAgentSession, PipelineState } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
+// Voice orchestration — two paths:
+//   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
+//   2. VoiceAgentStreamAdapter — WASM proto-stream (VoiceEvent) parity with iOS/Android/Flutter/RN.
+//      Also accepts a custom VoiceAgentStreamTransport for TS-backed / test transports.
 export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
+export { PipelineState } from './Public/Extensions/VoiceAgentTypes';
 export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
+export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
+export type { VoiceAgentStreamTransport } from './generated/streams/voice_agent_service_stream';
+export type { VoiceAgentRequest } from './generated/voice_agent_service';
+export {
+  VoiceEvent,
+  UserSaidEvent,
+  AssistantTokenEvent,
+  AudioFrameEvent,
+  VADEvent,
+  InterruptedEvent,
+  StateChangeEvent,
+  ErrorEvent,
+  MetricsEvent,
+  TokenKind,
+  AudioEncoding,
+  VADEventType,
+  InterruptReason,
+  PipelineState as VoiceEventPipelineState,
+} from './generated/voice_events';
+export { setRunanywhereModule } from './runtime/EmscriptenModule';
+export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
 
 // Types
 export * from './types';

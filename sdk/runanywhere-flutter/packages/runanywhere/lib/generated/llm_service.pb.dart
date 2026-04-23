@@ -152,19 +152,32 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   void clearEmitThoughts() => clearField(7);
 }
 
-/// One token delta. Matches AssistantTokenEvent in voice_events.proto so
-/// callers that already speak that type can reuse decoders.
-class LLMToken extends $pb.GeneratedMessage {
-  factory LLMToken({
-    $core.String? text,
+/// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+/// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+/// callbackFlow / StreamController / tokenQueue. One serialized event
+/// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+/// from voice_events.proto so frontends can reuse gap-detection logic.
+class LLMStreamEvent extends $pb.GeneratedMessage {
+  factory LLMStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? token,
     $core.bool? isFinal,
     LLMTokenKind? kind,
+    $core.int? tokenId,
     $core.double? logprob,
-    $fixnum.Int64? emitUs,
+    $core.String? finishReason,
+    $core.String? errorMessage,
   }) {
     final $result = create();
-    if (text != null) {
-      $result.text = text;
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (token != null) {
+      $result.token = token;
     }
     if (isFinal != null) {
       $result.isFinal = isFinal;
@@ -172,24 +185,34 @@ class LLMToken extends $pb.GeneratedMessage {
     if (kind != null) {
       $result.kind = kind;
     }
+    if (tokenId != null) {
+      $result.tokenId = tokenId;
+    }
     if (logprob != null) {
       $result.logprob = logprob;
     }
-    if (emitUs != null) {
-      $result.emitUs = emitUs;
+    if (finishReason != null) {
+      $result.finishReason = finishReason;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
     }
     return $result;
   }
-  LLMToken._() : super();
-  factory LLMToken.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory LLMToken.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  LLMStreamEvent._() : super();
+  factory LLMStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory LLMStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMToken', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aOB(2, _omitFieldNames ? '' : 'isFinal')
-    ..e<LLMTokenKind>(3, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED, valueOf: LLMTokenKind.valueOf, enumValues: LLMTokenKind.values)
-    ..a<$core.double>(4, _omitFieldNames ? '' : 'logprob', $pb.PbFieldType.OF)
-    ..aInt64(5, _omitFieldNames ? '' : 'emitUs')
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'token')
+    ..aOB(4, _omitFieldNames ? '' : 'isFinal')
+    ..e<LLMTokenKind>(5, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED, valueOf: LLMTokenKind.valueOf, enumValues: LLMTokenKind.values)
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'tokenId', $pb.PbFieldType.OU3)
+    ..a<$core.double>(7, _omitFieldNames ? '' : 'logprob', $pb.PbFieldType.OF)
+    ..aOS(8, _omitFieldNames ? '' : 'finishReason')
+    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
     ..hasRequiredFields = false
   ;
 
@@ -197,69 +220,118 @@ class LLMToken extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
   'Will be removed in next major version')
-  LLMToken clone() => LLMToken()..mergeFromMessage(this);
+  LLMStreamEvent clone() => LLMStreamEvent()..mergeFromMessage(this);
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  LLMToken copyWith(void Function(LLMToken) updates) => super.copyWith((message) => updates(message as LLMToken)) as LLMToken;
+  LLMStreamEvent copyWith(void Function(LLMStreamEvent) updates) => super.copyWith((message) => updates(message as LLMStreamEvent)) as LLMStreamEvent;
 
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static LLMToken create() => LLMToken._();
-  LLMToken createEmptyInstance() => create();
-  static $pb.PbList<LLMToken> createRepeated() => $pb.PbList<LLMToken>();
+  static LLMStreamEvent create() => LLMStreamEvent._();
+  LLMStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<LLMStreamEvent> createRepeated() => $pb.PbList<LLMStreamEvent>();
   @$core.pragma('dart2js:noInline')
-  static LLMToken getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LLMToken>(create);
-  static LLMToken? _defaultInstance;
+  static LLMStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LLMStreamEvent>(create);
+  static LLMStreamEvent? _defaultInstance;
 
+  /// Monotonic per-process sequence number. Useful for frontends that
+  /// need to detect gaps or out-of-order delivery.
   @$pb.TagNumber(1)
-  $core.String get text => $_getSZ(0);
+  $fixnum.Int64 get seq => $_getI64(0);
   @$pb.TagNumber(1)
-  set text($core.String v) { $_setString(0, v); }
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
   @$pb.TagNumber(1)
-  $core.bool hasText() => $_has(0);
+  $core.bool hasSeq() => $_has(0);
   @$pb.TagNumber(1)
-  void clearText() => clearField(1);
+  void clearSeq() => clearField(1);
 
+  /// Wall-clock timestamp captured at the C++ edge, in microseconds
+  /// since Unix epoch. Frontends may re-timestamp for UI display.
   @$pb.TagNumber(2)
-  $core.bool get isFinal => $_getBF(1);
+  $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
-  set isFinal($core.bool v) { $_setBool(1, v); }
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
   @$pb.TagNumber(2)
-  $core.bool hasIsFinal() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(1);
   @$pb.TagNumber(2)
-  void clearIsFinal() => clearField(2);
+  void clearTimestampUs() => clearField(2);
 
+  /// Generated token text. Empty on terminal events where only
+  /// finish_reason or error_message is populated.
   @$pb.TagNumber(3)
-  LLMTokenKind get kind => $_getN(2);
+  $core.String get token => $_getSZ(2);
   @$pb.TagNumber(3)
-  set kind(LLMTokenKind v) { setField(3, v); }
+  set token($core.String v) { $_setString(2, v); }
   @$pb.TagNumber(3)
-  $core.bool hasKind() => $_has(2);
+  $core.bool hasToken() => $_has(2);
   @$pb.TagNumber(3)
-  void clearKind() => clearField(3);
+  void clearToken() => clearField(3);
 
-  /// Optional per-token logprob, populated when the engine supports it.
-  /// 0.0 = no logprob available (proto3 scalar default).
+  /// True on the last event of a generation.
   @$pb.TagNumber(4)
-  $core.double get logprob => $_getN(3);
+  $core.bool get isFinal => $_getBF(3);
   @$pb.TagNumber(4)
-  set logprob($core.double v) { $_setFloat(3, v); }
+  set isFinal($core.bool v) { $_setBool(3, v); }
   @$pb.TagNumber(4)
-  $core.bool hasLogprob() => $_has(3);
+  $core.bool hasIsFinal() => $_has(3);
   @$pb.TagNumber(4)
-  void clearLogprob() => clearField(4);
+  void clearIsFinal() => clearField(4);
 
+  /// Token semantic category (answer / thought / tool-call).
   @$pb.TagNumber(5)
-  $fixnum.Int64 get emitUs => $_getI64(4);
+  LLMTokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
-  set emitUs($fixnum.Int64 v) { $_setInt64(4, v); }
+  set kind(LLMTokenKind v) { setField(5, v); }
   @$pb.TagNumber(5)
-  $core.bool hasEmitUs() => $_has(4);
+  $core.bool hasKind() => $_has(4);
   @$pb.TagNumber(5)
-  void clearEmitUs() => clearField(5);
+  void clearKind() => clearField(5);
+
+  /// Backend-provided token id when the engine exposes it; 0 = unset
+  /// (proto3 scalar default).
+  @$pb.TagNumber(6)
+  $core.int get tokenId => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set tokenId($core.int v) { $_setUnsignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTokenId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTokenId() => clearField(6);
+
+  /// Per-token log-probability when supported; 0.0 = unset.
+  @$pb.TagNumber(7)
+  $core.double get logprob => $_getN(6);
+  @$pb.TagNumber(7)
+  set logprob($core.double v) { $_setFloat(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasLogprob() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearLogprob() => clearField(7);
+
+  /// Reason the stream stopped: "stop", "length", "cancelled", "error",
+  /// "" = unset (proto3 scalar default). Only populated when is_final.
+  @$pb.TagNumber(8)
+  $core.String get finishReason => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set finishReason($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasFinishReason() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearFinishReason() => clearField(8);
+
+  /// Error message on failure events (kind may be unset, is_final true).
+  /// Empty on success.
+  @$pb.TagNumber(9)
+  $core.String get errorMessage => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set errorMessage($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorMessage() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorMessage() => clearField(9);
 }
 
 

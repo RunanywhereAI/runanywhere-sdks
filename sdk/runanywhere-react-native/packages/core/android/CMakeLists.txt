@@ -57,9 +57,7 @@ message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_common
 # =============================================================================
 # Collect core bridge source files
 file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-# TODO: Re-enable ToolCallingBridge when commons library includes rac_tool_call_* functions
-# Currently disabled because these functions aren't in commons v0.1.4
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*ToolCallingBridge\\.cpp$")
+# Phase G-1: ToolCallingBridge is now wired through commons rac_tool_call_* API.
 # TODO: Re-enable RAGBridge when commons library includes rac_rag_* functions
 list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*RAGBridge\\.cpp$")
 # TODO: Re-enable CompatibilityBridge when commons library includes rac_model_check_compatibility

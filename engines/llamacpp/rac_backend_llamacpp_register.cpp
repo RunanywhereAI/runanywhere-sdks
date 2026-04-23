@@ -183,7 +183,16 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
-const rac_llm_service_ops_t g_llamacpp_ops = {
+}  // namespace (close anon — ops struct must have external linkage)
+
+// v2 close-out (B3-parallel for llamacpp): g_llamacpp_ops is declared
+// `extern const` from rac_plugin_entry_llamacpp.cpp (external linkage). Defining
+// it inside the anonymous namespace gave it internal linkage and only worked
+// because rac_backend_llamacpp was historically STATIC. The macro now produces
+// a SHARED library when RAC_BUILD_SHARED=ON or SHARED_ONLY is set, which
+// surfaces the linkage mismatch as undefined-symbol at link time. Wrapping in
+// extern "C" makes the definition match the declaration.
+extern "C" const rac_llm_service_ops_t g_llamacpp_ops = {
     .initialize = llamacpp_vtable_initialize,
     .generate = llamacpp_vtable_generate,
     .generate_stream = llamacpp_vtable_generate_stream,
@@ -202,6 +211,8 @@ const rac_llm_service_ops_t g_llamacpp_ops = {
     .clear_context = llamacpp_vtable_clear_context,
     .create = llamacpp_llm_create_impl,
 };
+
+namespace {  // reopen for the next batch of static helpers
 
 // =============================================================================
 // REGISTRY STATE

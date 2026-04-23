@@ -10,8 +10,10 @@
 //  swift-protobuf (GAP 01).
 //
 //  Public API:
-//      let stream = RunAnywhere.voiceAgent.stream()  // AsyncStream<RAVoiceEvent>
-//      for await event in stream { handle(event) }
+//      try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+//      let handle = try await CppBridge.VoiceAgent.shared.getHandle()
+//      let adapter = VoiceAgentStreamAdapter(handle: handle)
+//      for await event in adapter.stream() { handle(event) }
 //
 //  Cancellation: standard `for-await break` cancels the underlying
 //  AsyncStream which deregisters the C callback via `onTermination`.

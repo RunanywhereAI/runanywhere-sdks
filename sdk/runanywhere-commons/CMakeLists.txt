@@ -308,6 +308,71 @@ endif()
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 
 # =============================================================================
+# libcurl (v2 close-out Phase H — HTTP transport into commons)
+# =============================================================================
+# Used by src/infrastructure/http/rac_http_client_curl.cpp. Prefer the
+# system package (brew/apt/NDK/Xcode SDK); only fall back to
+# FetchContent on targets where libcurl isn't reliably on the
+# CMAKE_PREFIX_PATH (Windows MSVC, some CI runners). See
+# docs/rfcs/h1_http_client_vendor.md for the vendor decision.
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
+    if(NOT DEFINED CURL_FETCH_VERSION)
+        set(CURL_FETCH_VERSION "curl-7_88_1")
+    endif()
+    FetchContent_Declare(
+        curl_fetched
+        GIT_REPOSITORY https://github.com/curl/curl.git
+        GIT_TAG        ${CURL_FETCH_VERSION}
+        GIT_SHALLOW    TRUE
+    )
+    set(BUILD_CURL_EXE      OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
+    set(CURL_STATICLIB      ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_LDAP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_LDAPS  ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_RTSP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_DICT   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_FILE   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_FTP    ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_GOPHER ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_IMAP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_MQTT   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_POP3   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_SMB    ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_SMTP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_TELNET ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_TFTP   ON  CACHE BOOL "" FORCE)
+    set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
+    # Pick a TLS backend sensibly per platform when bundling. Apple/Windows
+    # use the native provider so we don't pull OpenSSL into the iOS
+    # xcframework or the Windows DLL. `CURL_USE_SECTRANSP` / `CURL_USE_SCHANNEL`
+    # are the curl 7.86+ variable names; the pre-7.86 `CMAKE_USE_*` names
+    # are no longer honoured by curl 7.88.1. Explicitly disable OpenSSL so
+    # curl's CMake doesn't fall through to `find_package(OpenSSL REQUIRED)`
+    # which has no valid target on the iOS sysroot.
+    if(APPLE)
+        set(CURL_USE_SECTRANSP ON  CACHE BOOL "" FORCE)
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+    elseif(WIN32)
+        set(CURL_USE_SCHANNEL ON  CACHE BOOL "" FORCE)
+        set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
+    endif()
+    FetchContent_MakeAvailable(curl_fetched)
+    # The target built by curl's CMake is `libcurl` (static).
+    if(TARGET libcurl AND NOT TARGET CURL::libcurl)
+        add_library(CURL::libcurl ALIAS libcurl)
+    elseif(TARGET libcurl_static AND NOT TARGET CURL::libcurl)
+        add_library(CURL::libcurl ALIAS libcurl_static)
+    endif()
+    set(CURL_FOUND TRUE CACHE BOOL "" FORCE)
+    message(STATUS "Bundled libcurl ready (${CURL_FETCH_VERSION})")
+else()
+    message(STATUS "Using system libcurl: ${CURL_LIBRARIES}")
+endif()
+
+# =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
 # =============================================================================
 
@@ -439,6 +504,10 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/http_client.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
+    # v2 close-out Phase H — native HTTP transport (libcurl-backed).
+    # Replaces the HttpURLConnection path in CppBridgeDownload.kt.
+    src/infrastructure/http/rac_http_client_curl.cpp
+    src/infrastructure/http/rac_http_download.cpp
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
@@ -458,6 +527,10 @@ set(RAC_FEATURES_SOURCES
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
+    # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
+    # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
+    # AsyncThrowingStream / callbackFlow / tokenQueue shims).
+    src/features/llm/rac_llm_stream.cpp
     # STT
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
@@ -470,8 +543,11 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
-    # Wake Word
-    src/features/wakeword/wakeword_service.cpp
+    # Wake Word — high-level service scaffold was removed in Phase F of the
+    # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
+    # consumers call engines/onnx/wakeword_onnx.cpp directly via the
+    # rac_wakeword_onnx_* API. The shared types in
+    # include/rac/features/wakeword/rac_wakeword_types.h remain.
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
@@ -579,6 +655,15 @@ else()
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
+# libcurl — PUBLIC so tests and SDK adapters (rac_commons_jni) pick it
+# up transitively. See Phase H — docs/rfcs/h1_http_client_vendor.md.
+if(TARGET CURL::libcurl)
+    target_link_libraries(rac_commons PUBLIC CURL::libcurl)
+else()
+    target_link_libraries(rac_commons PUBLIC ${CURL_LIBRARIES})
+    target_include_directories(rac_commons PUBLIC ${CURL_INCLUDE_DIRS})
+endif()
+
 # =============================================================================
 # Protobuf — optional, gates RAC_HAVE_PROTOBUF
 #
@@ -591,6 +676,18 @@ target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchi
 # =============================================================================
 
 find_package(Protobuf QUIET)
+
+# v2 close-out: SHARED builds need absl symbols (see cmake/protobuf.cmake).
+# Find absl independently here too for standalone-commons builds that
+# bypass the root CMake.
+if(NOT DEFINED RAC_ABSL_LIBS)
+    find_package(absl QUIET CONFIG)
+    if(absl_FOUND)
+        set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
+    else()
+        set(RAC_ABSL_LIBS "")
+    endif()
+endif()
 if(Protobuf_FOUND)
     set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
     if(EXISTS ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc)
@@ -599,6 +696,9 @@ if(Protobuf_FOUND)
             ${_RAC_PROTO_GEN_DIR}/model_types.pb.cc
             ${_RAC_PROTO_GEN_DIR}/pipeline.pb.cc
             ${_RAC_PROTO_GEN_DIR}/solutions.pb.cc
+            # v2 close-out Phase G-2: LLMStreamEvent for the proto-byte
+            # LLM stream ABI (rac_llm_stream.cpp).
+            ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
         )
         target_include_directories(rac_commons PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
@@ -611,6 +711,13 @@ if(Protobuf_FOUND)
             target_link_libraries(rac_commons PUBLIC protobuf::libprotobuf)
         else()
             target_link_libraries(rac_commons PUBLIC ${Protobuf_LIBRARIES})
+        endif()
+        # v2 close-out: when SHARED, absl symbols must resolve at link
+        # time. RAC_ABSL_LIBS comes from cmake/protobuf.cmake (or the
+        # block above for standalone-commons). PUBLIC so consumers
+        # (engine plugins built as SHARED) inherit the deps.
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
         endif()
         target_compile_definitions(rac_commons PUBLIC RAC_HAVE_PROTOBUF=1)
         message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")

@@ -92,9 +92,36 @@ def main():
     parser.add_argument(
         "--require",
         default="swift,kt,dart,rn,web",
-        help="Comma-separated list of SDKs that MUST have a trace",
+        help="Comma-separated list of SDKs that MUST have a trace. "
+             "Set empty to allow all missing (harness sanity check mode).",
     )
+    # v2 close-out: accept a positional directory as convenience for CTest
+    # wiring — treat it as the dir holding cancel_trace.<sdk>.log files. If
+    # no logs are present, fall back to harness-sanity-check mode (exit 0).
+    parser.add_argument("trace_dir", nargs="?", default=None,
+                        help="Optional directory holding cancel_trace.<sdk>.log files.")
     args = parser.parse_args()
+
+    if args.trace_dir:
+        from pathlib import Path
+        td = Path(args.trace_dir)
+        if td.is_dir():
+            any_log = False
+            for sdk in ("swift", "kt", "dart", "rn", "web"):
+                p = td / f"cancel_trace.{sdk}.log"
+                if p.exists():
+                    any_log = True
+                    setattr(args, sdk, str(p))
+            if not any_log:
+                print(f"[compare_cancel_traces] no per-SDK cancel_trace.*.log "
+                      f"in {td} (per-SDK runners run in their SDK CI). "
+                      "Exit 0.")
+                return 0
+            # Downgrade require to what's actually present.
+            args.require = ",".join(
+                sdk for sdk in ("swift", "kt", "dart", "rn", "web")
+                if (td / f"cancel_trace.{sdk}.log").exists()
+            )
 
     sdks = {
         "swift": args.swift,

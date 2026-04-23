@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
-import com.runanywhere.sdk.public.extensions.LLM.LLMStreamingResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Text Generation
@@ -43,49 +43,29 @@ expect suspend fun RunAnywhere.generate(
 /**
  * Streaming text generation.
  *
- * Returns a Flow of tokens for real-time display.
+ * v2 close-out Phase G-2: returns `Flow<LLMStreamEvent>` sourced from the
+ * Phase G-2 [`LLMStreamAdapter`]. One event per generated token plus a
+ * terminal event (`isFinal == true`) carrying `finishReason` and any
+ * `errorMessage`. The prior `Flow<String>` shape + `generateStreamWithMetrics`
+ * variant were DELETED; callers derive metrics from the event sequence
+ * (e.g. track `firstTokenTime` on the first non-empty `event.token_`).
  *
- * Example usage:
+ * Example:
  * ```kotlin
- * RunAnywhere.generateStream("Tell me a story")
- *     .collect { token -> print(token) }
+ * RunAnywhere.generateStream("Tell me a story").collect { event ->
+ *     if (event.isFinal) return@collect
+ *     print(event.token_)
+ * }
  * ```
  *
  * @param prompt The text prompt
  * @param options Generation options (optional)
- * @return Flow of tokens as they are generated
+ * @return Flow of proto-decoded events as they are generated.
  */
 expect fun RunAnywhere.generateStream(
     prompt: String,
     options: LLMGenerationOptions? = null,
-): Flow<String>
-
-/**
- * Streaming text generation with metrics.
- *
- * Returns both a token stream for real-time display and a deferred result
- * that resolves to complete metrics.
- *
- * Example usage:
- * ```kotlin
- * val result = RunAnywhere.generateStreamWithMetrics("Tell me a story")
- *
- * // Display tokens in real-time
- * result.stream.collect { token -> print(token) }
- *
- * // Get complete analytics after streaming finishes
- * val metrics = result.result.await()
- * println("Speed: ${metrics.tokensPerSecond} tok/s")
- * ```
- *
- * @param prompt The text prompt
- * @param options Generation options (optional)
- * @return LLMStreamingResult containing both the token stream and final metrics deferred
- */
-expect suspend fun RunAnywhere.generateStreamWithMetrics(
-    prompt: String,
-    options: LLMGenerationOptions? = null,
-): LLMStreamingResult
+): Flow<LLMStreamEvent>
 
 // MARK: - Generation Control
 

@@ -203,9 +203,20 @@ kotlin {
         }
 
         jvmTest {
+            // Phase E: the repo-level streaming fixtures (cancel_parity,
+            // perf_bench) live outside the Kotlin source tree but are
+            // imported by the JVM perf tests. Wire them into the test
+            // source set so those tests compile against real Kotlin
+            // rather than missing symbols.
+            kotlin.srcDir("../../tests/streaming/cancel_parity")
+            kotlin.srcDir("../../tests/streaming/perf_bench")
             dependencies {
                 implementation(libs.junit)
                 implementation(libs.mockk)
+                // testRuns uses useJUnitPlatform(); to run classic JUnit 4
+                // test classes (org.junit.Test) under JUnit Platform we
+                // need the Vintage engine on the test runtime classpath.
+                runtimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
             }
         }
 

@@ -13,15 +13,17 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoraRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.errors.SDKError
+import com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterConfig
 import com.runanywhere.sdk.public.extensions.LLM.LoRAAdapterInfo
 import com.runanywhere.sdk.public.extensions.Models.DownloadProgress
 import com.runanywhere.sdk.public.extensions.Models.DownloadState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -30,9 +32,8 @@ import kotlinx.serialization.json.float
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
-import java.net.HttpURLConnection
 import java.net.URI
-import kotlin.coroutines.coroutineContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val loraLogger = SDKLogger("LoRA")
 
@@ -155,7 +156,7 @@ private fun getLoraDownloadDir(): File =
     File(CppBridgeModelPaths.getBaseDirectory(), "lora_adapters").also { it.mkdirs() }
 
 actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress> =
-    flow {
+    callbackFlow {
         if (!isInitialized) throw SDKError.notInitialized("SDK not initialized")
 
         val entry =
@@ -187,10 +188,10 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
             throw SDKError.download("Invalid adapter filename (path traversal): ${entry.filename}")
         }
 
-        // Already downloaded — emit COMPLETED and return
+        // Already downloaded — emit COMPLETED and return.
         if (destFile.exists() && destFile.length() > 0) {
             loraLogger.info("LoRA adapter already downloaded: ${destFile.absolutePath}")
-            emit(
+            trySend(
                 DownloadProgress(
                     modelId = adapterId,
                     progress = 1f,
@@ -199,10 +200,11 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
                     state = DownloadState.COMPLETED,
                 ),
             )
-            return@flow
+            close()
+            return@callbackFlow
         }
 
-        emit(
+        trySend(
             DownloadProgress(
                 modelId = adapterId,
                 progress = 0f,
@@ -214,66 +216,62 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
 
         loraLogger.info("Starting LoRA download: ${entry.name} from ${entry.downloadUrl}")
 
-        val connection = uri.toURL().openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 120_000
-        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
-
-        try {
-            val responseCode = connection.responseCode
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw SDKError.download("HTTP $responseCode downloading LoRA adapter '${entry.filename}'")
-            }
-
-            val totalSize = connection.contentLengthLong.takeIf { it > 0 } ?: entry.fileSize
-            var downloaded = 0L
-            var lastEmitTime = 0L
-            val buffer = ByteArray(8192)
-
-            connection.inputStream.buffered().use { input ->
-                tmpFile.outputStream().buffered().use { output ->
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        coroutineContext.ensureActive()
-                        output.write(buffer, 0, bytesRead)
-                        downloaded += bytesRead
-
-                        val now = System.currentTimeMillis()
-                        if (now - lastEmitTime >= 200) {
-                            lastEmitTime = now
-                            val progress =
-                                if (totalSize > 0) {
-                                    (downloaded.toFloat() / totalSize).coerceIn(0f, 1f)
-                                } else {
-                                    0f
-                                }
-                            emit(
-                                DownloadProgress(
-                                    modelId = adapterId,
-                                    progress = progress,
-                                    bytesDownloaded = downloaded,
-                                    totalBytes = totalSize,
-                                    state = DownloadState.DOWNLOADING,
-                                ),
-                            )
-                        }
+        // v2 close-out Phase H: HTTP transport (HttpURLConnection) was
+        // removed from Kotlin; commons' libcurl runner handles request,
+        // redirects, TLS, range resume, and checksum. The Kotlin layer
+        // just relays progress from the native callback into this flow.
+        val cancellation = AtomicBoolean(false)
+        val totalHint = entry.fileSize.takeIf { it > 0 } ?: 0L
+        val listener =
+            NativeDownloadProgressListener { bytes, total ->
+                val effectiveTotal = if (total > 0) total else totalHint
+                val progress =
+                    if (effectiveTotal > 0) {
+                        (bytes.toFloat() / effectiveTotal.toFloat()).coerceIn(0f, 1f)
+                    } else {
+                        0f
                     }
-                }
+                trySend(
+                    DownloadProgress(
+                        modelId = adapterId,
+                        progress = progress,
+                        bytesDownloaded = bytes,
+                        totalBytes = effectiveTotal,
+                        state = DownloadState.DOWNLOADING,
+                    ),
+                )
+                !cancellation.get()
             }
 
-            destFile.delete()
-            if (!tmpFile.renameTo(destFile)) {
-                tmpFile.copyTo(destFile, overwrite = true)
-                tmpFile.delete()
-            }
-        } catch (e: Exception) {
-            tmpFile.delete()
-            throw e
-        } finally {
-            connection.disconnect()
+        val outStatus = IntArray(1)
+        val rc =
+            RunAnywhereBridge.racHttpDownloadExecute(
+                url = entry.downloadUrl,
+                destPath = tmpFile.absolutePath,
+                expectedSha256Hex = null,
+                resumeFromByte = 0L,
+                timeoutMs = 120_000,
+                listener = listener,
+                outHttpStatus = outStatus,
+            )
+
+        if (rc != CppBridgeDownload.DownloadError.NONE) {
+            runCatching { tmpFile.delete() }
+            val errorName = CppBridgeDownload.DownloadError.getName(rc)
+            throw SDKError.download(
+                "LoRA download failed for '${entry.filename}': $errorName (http_status=${outStatus[0]})",
+            )
         }
 
-        // Validate GGUF magic bytes (matches iOS validation)
+        // Promote .tmp → final filename (preserves the same atomic swap the
+        // old HttpURLConnection path had).
+        destFile.delete()
+        if (!tmpFile.renameTo(destFile)) {
+            tmpFile.copyTo(destFile, overwrite = true)
+            tmpFile.delete()
+        }
+
+        // Validate GGUF magic bytes (matches iOS validation).
         val isValidGguf =
             destFile.inputStream().use { stream ->
                 val bytes = ByteArray(4)
@@ -283,7 +281,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
                         ((bytes[1].toUInt() and 0xFFu) shl 8) or
                         ((bytes[2].toUInt() and 0xFFu) shl 16) or
                         ((bytes[3].toUInt() and 0xFFu) shl 24)
-                magic == 0x46554747u // "GGUF" in little-endian
+                magic == 0x46554747u
             }
         if (!isValidGguf) {
             destFile.delete()
@@ -291,7 +289,7 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
         }
 
         loraLogger.info("LoRA download completed: ${destFile.absolutePath}")
-        emit(
+        trySend(
             DownloadProgress(
                 modelId = adapterId,
                 progress = 1f,
@@ -300,6 +298,8 @@ actual fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProg
                 state = DownloadState.COMPLETED,
             ),
         )
+
+        awaitClose { cancellation.set(true) }
     }.flowOn(Dispatchers.IO)
 
 actual fun RunAnywhere.loraAdapterLocalPath(adapterId: String): String? {

@@ -8,10 +8,12 @@ import 'package:path/path.dart' as p;
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart'
+    hide ModelInfo;
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 import 'package:runanywhere/public/events/sdk_event.dart';
-import 'package:runanywhere/public/runanywhere.dart';
 
 /// Download progress information
 class ModelDownloadProgress {
@@ -110,7 +112,7 @@ class ModelDownloadService {
     _logger.info('Starting download for model: $modelId');
 
     // Find the model
-    final models = await RunAnywhere.availableModels();
+    final models = await RunAnywhereModels.shared.available();
     final model = models.where((m) => m.id == modelId).firstOrNull;
 
     if (model == null) {
@@ -467,7 +469,8 @@ class ModelDownloadService {
     try {
       // Update the C++ registry so model is discoverable
       // Matches Swift: CppBridge.ModelRegistry.shared.updateDownloadStatus()
-      await RunAnywhere.updateModelDownloadStatus(modelId, path);
+      await DartBridgeModelRegistry.instance
+          .updateDownloadStatus(modelId, path);
     } catch (e) {
       _logger.debug('Could not update C++ registry: $e');
     }

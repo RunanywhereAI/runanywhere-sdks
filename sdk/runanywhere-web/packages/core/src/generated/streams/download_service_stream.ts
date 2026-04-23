@@ -14,7 +14,8 @@
  * function; this generated wrapper turns it into an AsyncIterable.
  */
 
-import type { DownloadSubscribeRequest, DownloadProgress } from "../download_service";
+import type { DownloadSubscribeRequest } from "../download_service";
+import type { DownloadProgress } from "../download_service";
 
 export interface DownloadStreamTransport {
     subscribe(

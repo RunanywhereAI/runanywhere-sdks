@@ -34,16 +34,24 @@ class LLMGenerateRequest(_message.Message):
     emit_thoughts: bool
     def __init__(self, prompt: _Optional[str] = ..., max_tokens: _Optional[int] = ..., temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., top_k: _Optional[int] = ..., system_prompt: _Optional[str] = ..., emit_thoughts: _Optional[bool] = ...) -> None: ...
 
-class LLMToken(_message.Message):
-    __slots__ = ("text", "is_final", "kind", "logprob", "emit_us")
-    TEXT_FIELD_NUMBER: _ClassVar[int]
+class LLMStreamEvent(_message.Message):
+    __slots__ = ("seq", "timestamp_us", "token", "is_final", "kind", "token_id", "logprob", "finish_reason", "error_message")
+    SEQ_FIELD_NUMBER: _ClassVar[int]
+    TIMESTAMP_US_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_FIELD_NUMBER: _ClassVar[int]
     IS_FINAL_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
     LOGPROB_FIELD_NUMBER: _ClassVar[int]
-    EMIT_US_FIELD_NUMBER: _ClassVar[int]
-    text: str
+    FINISH_REASON_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    seq: int
+    timestamp_us: int
+    token: str
     is_final: bool
     kind: LLMTokenKind
+    token_id: int
     logprob: float
-    emit_us: int
-    def __init__(self, text: _Optional[str] = ..., is_final: _Optional[bool] = ..., kind: _Optional[_Union[LLMTokenKind, str]] = ..., logprob: _Optional[float] = ..., emit_us: _Optional[int] = ...) -> None: ...
+    finish_reason: str
+    error_message: str
+    def __init__(self, seq: _Optional[int] = ..., timestamp_us: _Optional[int] = ..., token: _Optional[str] = ..., is_final: _Optional[bool] = ..., kind: _Optional[_Union[LLMTokenKind, str]] = ..., token_id: _Optional[int] = ..., logprob: _Optional[float] = ..., finish_reason: _Optional[str] = ..., error_message: _Optional[str] = ...) -> None: ...

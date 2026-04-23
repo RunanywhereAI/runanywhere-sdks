@@ -26,16 +26,44 @@ message LLMGenerateRequest {
     bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
 }
 
-// One token delta. Matches AssistantTokenEvent in voice_events.proto so
-// callers that already speak that type can reuse decoders.
-message LLMToken {
-    string text          = 1;
-    bool   is_final      = 2;
-    LLMTokenKind kind    = 3;
-    // Optional per-token logprob, populated when the engine supports it.
-    // 0.0 = no logprob available (proto3 scalar default).
-    float  logprob       = 4;
-    int64  emit_us       = 5;  // wall-clock timestamp at C++ edge
+// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+// callbackFlow / StreamController / tokenQueue. One serialized event
+// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+// from voice_events.proto so frontends can reuse gap-detection logic.
+message LLMStreamEvent {
+    // Monotonic per-process sequence number. Useful for frontends that
+    // need to detect gaps or out-of-order delivery.
+    uint64 seq             = 1;
+
+    // Wall-clock timestamp captured at the C++ edge, in microseconds
+    // since Unix epoch. Frontends may re-timestamp for UI display.
+    int64  timestamp_us    = 2;
+
+    // Generated token text. Empty on terminal events where only
+    // finish_reason or error_message is populated.
+    string token           = 3;
+
+    // True on the last event of a generation.
+    bool   is_final        = 4;
+
+    // Token semantic category (answer / thought / tool-call).
+    LLMTokenKind kind      = 5;
+
+    // Backend-provided token id when the engine exposes it; 0 = unset
+    // (proto3 scalar default).
+    uint32 token_id        = 6;
+
+    // Per-token log-probability when supported; 0.0 = unset.
+    float  logprob         = 7;
+
+    // Reason the stream stopped: "stop", "length", "cancelled", "error",
+    // "" = unset (proto3 scalar default). Only populated when is_final.
+    string finish_reason   = 8;
+
+    // Error message on failure events (kind may be unset, is_final true).
+    // Empty on success.
+    string error_message   = 9;
 }
 
 enum LLMTokenKind {
@@ -46,8 +74,8 @@ enum LLMTokenKind {
 }
 
 service LLM {
-    // Server-streaming: emits one LLMToken per generated token until
-    // is_final=true. Cancellation aborts the underlying generation via
-    // the existing rac_llm_cancel() C ABI.
-    rpc Generate(LLMGenerateRequest) returns (stream LLMToken);
+    // Server-streaming: emits one LLMStreamEvent per generated token
+    // until is_final=true. Cancellation aborts the underlying generation
+    // via the existing rac_llm_cancel() C ABI.
+    rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
 }

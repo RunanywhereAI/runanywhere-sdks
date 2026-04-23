@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import '../../../../tests/streaming/cancel_parity/cancel_parity.dart';
+import '../../../../../tests/streaming/cancel_parity/cancel_parity.dart';
 
 void main() {
   group('cancel_parity (dart)', () {

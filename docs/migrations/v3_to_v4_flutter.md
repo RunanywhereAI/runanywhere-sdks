@@ -1,190 +1,244 @@
 # Flutter SDK v3.x → v4.0 Migration Guide
 
-_v4.0.0 introduces a BREAKING API change to the Flutter SDK
-(`runanywhere` package only). The 2,607 LOC `runanywhere.dart`
-god-class is split into a singleton + capability instance methods,
-matching the canonical Dart pattern used by `supabase-dart`,
-`firebase_core`, etc._
+_v4.0.0 is a BREAKING API change to the Flutter SDK (`runanywhere`
+package only). The 2,621 LOC `runanywhere.dart` god-class is **gone**.
+In its place: a singleton + capability instance methods, matching the
+canonical Dart pattern used by `supabase-dart`, `firebase_core`, etc._
+
+> **The static `RunAnywhere` class is DELETED in v4.0.** There is no
+> deprecation window, no forwarding shim, no `@Deprecated` stub. Every
+> v3 call site must be rewritten as `RunAnywhereSDK.instance.<cap>.<method>()`
+> before the package will build.
 
 > **Affected packages**: ONLY `runanywhere` (Flutter). The other 6
 > packages (Swift / Kotlin / RN / Web + 3 backend plugins) are
-> unaffected and stay on v3.x.
+> unaffected and stay on v3.x. The backend plugins
+> (`runanywhere_llamacpp`, `runanywhere_onnx`, `runanywhere_genie`)
+> ship v4-compatible updates alongside the main package.
 
-## Why this change
+## 1:1 replacement table (48 symbols)
 
-Per the Phase 7 analysis ([HISTORY.md#flutter-split-analysis](../HISTORY.md#flutter-split-analysis)),
-Dart language constraints prevent the Swift-style extension split
-without breaking the API. Four options were evaluated:
+Exactly one instance call replaces every old static call. No new
+capabilities, no reshaped semantics — just the new call site.
 
-1. `extension X on T { static method() }` — caller syntax becomes
-   `X.method()` (breaks every consumer)
-2. `part`/`part of` — Dart parser sees one class body per file
-3. Top-level functions + thin facade — adds ~100 LOC of forwarding
-   boilerplate, modest LOC reduction
-4. **Instance methods on a singleton** — canonical Dart pattern;
-   matches supabase-dart / firebase_core; THIS IS WHAT v4.0 SHIPS.
+### Lifecycle (7)
 
-## API mapping table
-
-### Lifecycle
-
-| v3.x (static)                                          | v4.0 (instance)                                   |
+| v3.x (static) | v4.0 (instance) |
 |--------------------------------------------------------|---------------------------------------------------|
-| `await RunAnywhere.initialize(...)`                    | `await RunAnywhere.instance.initialize(...)`      |
-| `RunAnywhere.isSDKInitialized`                         | `RunAnywhere.instance.isInitialized`              |
-| `RunAnywhere.environment`                              | `RunAnywhere.instance.environment`                |
-| `RunAnywhere.version`                                  | `RunAnywhere.instance.version`                    |
-| `RunAnywhere.events`                                   | `RunAnywhere.instance.events`                     |
-| `await RunAnywhere.reset()`                            | `await RunAnywhere.instance.reset()`              |
+| `await RunAnywhere.initialize(...)`                    | `await RunAnywhereSDK.instance.initialize(...)`      |
+| `RunAnywhere.isSDKInitialized`                         | `RunAnywhereSDK.instance.isInitialized`              |
+| `RunAnywhere.isActive`                                 | `RunAnywhereSDK.instance.isActive`                   |
+| `RunAnywhere.environment` / `getCurrentEnvironment()`  | `RunAnywhereSDK.instance.environment`                |
+| `RunAnywhere.version`                                  | `RunAnywhereSDK.instance.version`                    |
+| `RunAnywhere.events`                                   | `RunAnywhereSDK.instance.events`                     |
+| `await RunAnywhere.reset()`                            | `await RunAnywhereSDK.instance.reset()`              |
 
-### LLM (Text Generation)
+### LLM (9)
 
-| v3.x                                              | v4.0                                                  |
-|---------------------------------------------------|-------------------------------------------------------|
-| `await RunAnywhere.loadModel(id)`                 | `await RunAnywhere.instance.llm.load(id)`             |
-| `await RunAnywhere.unloadModel()`                 | `await RunAnywhere.instance.llm.unload()`             |
-| `RunAnywhere.isModelLoaded`                       | `RunAnywhere.instance.llm.isLoaded`                   |
-| `await RunAnywhere.currentLLMModel()`             | `await RunAnywhere.instance.llm.currentModel()`       |
-| `await RunAnywhere.chat(prompt)`                  | `await RunAnywhere.instance.llm.chat(prompt)`         |
-| `await RunAnywhere.generate(prompt, options)`     | `await RunAnywhere.instance.llm.generate(prompt, options)` |
-| `await RunAnywhere.generateStream(prompt, ...)`   | `await RunAnywhere.instance.llm.generateStream(prompt, ...)` |
-| `await RunAnywhere.cancelGeneration()`            | `await RunAnywhere.instance.llm.cancel()`             |
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhere.loadModel(id)`                 | `await RunAnywhereSDK.instance.llm.load(id)`             |
+| `await RunAnywhere.unloadModel()`                 | `await RunAnywhereSDK.instance.llm.unload()`             |
+| `RunAnywhere.isModelLoaded`                       | `RunAnywhereSDK.instance.llm.isLoaded`                   |
+| `RunAnywhere.currentModelId`                      | `RunAnywhereSDK.instance.llm.currentModelId`             |
+| `await RunAnywhere.currentLLMModel()`             | `await RunAnywhereSDK.instance.llm.currentModel()`       |
+| `await RunAnywhere.chat(prompt)`                  | `await RunAnywhereSDK.instance.llm.chat(prompt)`         |
+| `await RunAnywhere.generate(prompt, options)`     | `await RunAnywhereSDK.instance.llm.generate(prompt, options)` |
+| `await RunAnywhere.generateStream(prompt, ...)`   | `await RunAnywhereSDK.instance.llm.generateStream(prompt, ...)` |
+| `await RunAnywhere.cancelGeneration()`            | `await RunAnywhereSDK.instance.llm.cancel()`             |
 
-### STT (Speech-to-Text)
+### STT (7)
 
-| v3.x                                          | v4.0                                              |
-|-----------------------------------------------|---------------------------------------------------|
-| `await RunAnywhere.loadSTTModel(id)`          | `await RunAnywhere.instance.stt.load(id)`         |
-| `await RunAnywhere.unloadSTTModel()`          | `await RunAnywhere.instance.stt.unload()`         |
-| `RunAnywhere.isSTTModelLoaded`                | `RunAnywhere.instance.stt.isLoaded`               |
-| `await RunAnywhere.transcribe(audio)`         | `await RunAnywhere.instance.stt.transcribe(audio)` |
-| `await RunAnywhere.transcribeWithResult(...)` | `await RunAnywhere.instance.stt.transcribeWithResult(...)` |
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhere.loadSTTModel(id)`          | `await RunAnywhereSDK.instance.stt.load(id)`         |
+| `await RunAnywhere.unloadSTTModel()`          | `await RunAnywhereSDK.instance.stt.unload()`         |
+| `RunAnywhere.isSTTModelLoaded`                | `RunAnywhereSDK.instance.stt.isLoaded`               |
+| `RunAnywhere.currentSTTModelId`               | `RunAnywhereSDK.instance.stt.currentModelId`         |
+| `await RunAnywhere.currentSTTModel()`         | `await RunAnywhereSDK.instance.stt.currentModel()`   |
+| `await RunAnywhere.transcribe(audio)`         | `await RunAnywhereSDK.instance.stt.transcribe(audio)` |
+| `await RunAnywhere.transcribeWithResult(...)` | `await RunAnywhereSDK.instance.stt.transcribeWithResult(...)` |
 
-### TTS (Text-to-Speech)
+### TTS (6)
 
-| v3.x                                       | v4.0                                              |
-|--------------------------------------------|---------------------------------------------------|
-| `await RunAnywhere.loadTTSVoice(id)`       | `await RunAnywhere.instance.tts.loadVoice(id)`    |
-| `await RunAnywhere.unloadTTSVoice()`       | `await RunAnywhere.instance.tts.unloadVoice()`    |
-| `RunAnywhere.isTTSVoiceLoaded`             | `RunAnywhere.instance.tts.isLoaded`               |
-| `await RunAnywhere.synthesize(text, ...)`  | `await RunAnywhere.instance.tts.synthesize(text, ...)` |
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhere.loadTTSVoice(id)`       | `await RunAnywhereSDK.instance.tts.loadVoice(id)`    |
+| `await RunAnywhere.unloadTTSVoice()`       | `await RunAnywhereSDK.instance.tts.unloadVoice()`    |
+| `RunAnywhere.isTTSVoiceLoaded`             | `RunAnywhereSDK.instance.tts.isLoaded`               |
+| `RunAnywhere.currentTTSVoiceId`            | `RunAnywhereSDK.instance.tts.currentVoiceId`         |
+| `await RunAnywhere.currentTTSVoice()`      | `await RunAnywhereSDK.instance.tts.currentVoice()`   |
+| `await RunAnywhere.synthesize(text, ...)`  | `await RunAnywhereSDK.instance.tts.synthesize(text, ...)` |
 
-### VLM (Vision-Language)
+### VLM (10)
 
-| v3.x                                              | v4.0                                                  |
-|---------------------------------------------------|-------------------------------------------------------|
-| `await RunAnywhere.loadVLMModel(id)`              | `await RunAnywhere.instance.vlm.load(id)`             |
-| `await RunAnywhere.unloadVLMModel()`              | `await RunAnywhere.instance.vlm.unload()`             |
-| `RunAnywhere.isVLMModelLoaded`                    | `RunAnywhere.instance.vlm.isLoaded`                   |
-| `await RunAnywhere.processImage(image, ...)`      | `await RunAnywhere.instance.vlm.processImage(image, ...)` |
-| `await RunAnywhere.processImageStream(image, ..)` | `await RunAnywhere.instance.vlm.processImageStream(image, ...)` |
-| `await RunAnywhere.describeImage(image, ...)`     | `await RunAnywhere.instance.vlm.describe(image, ...)` |
-| `await RunAnywhere.askAboutImage(q, ...)`         | `await RunAnywhere.instance.vlm.askAbout(q, ...)`     |
-| `await RunAnywhere.cancelVLMGeneration()`         | `await RunAnywhere.instance.vlm.cancel()`             |
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhere.loadVLMModel(id)`              | `await RunAnywhereSDK.instance.vlm.load(id)`             |
+| `await RunAnywhere.loadVLMModelById(id)`          | `await RunAnywhereSDK.instance.vlm.loadById(id)`         |
+| `await RunAnywhere.loadVLMModelWithPath(...)`     | `await RunAnywhereSDK.instance.vlm.loadWithPath(...)`    |
+| `await RunAnywhere.unloadVLMModel()`              | `await RunAnywhereSDK.instance.vlm.unload()`             |
+| `RunAnywhere.isVLMModelLoaded`                    | `RunAnywhereSDK.instance.vlm.isLoaded`                   |
+| `RunAnywhere.currentVLMModelId`                   | `RunAnywhereSDK.instance.vlm.currentModelId`             |
+| `await RunAnywhere.processImage(image, ...)`      | `await RunAnywhereSDK.instance.vlm.processImage(image, ...)` |
+| `await RunAnywhere.processImageStream(image, ..)` | `await RunAnywhereSDK.instance.vlm.processImageStream(image, ...)` |
+| `await RunAnywhere.describeImage(image, ...)`     | `await RunAnywhereSDK.instance.vlm.describe(image, ...)` |
+| `await RunAnywhere.askAboutImage(q, ...)`         | `await RunAnywhereSDK.instance.vlm.askAbout(q, ...)`     |
+| `await RunAnywhere.cancelVLMGeneration()`         | `await RunAnywhereSDK.instance.vlm.cancel()`             |
 
-### Voice Agent
+### Voice Agent (4)
 
-| v3.x                                                  | v4.0                                                          |
-|-------------------------------------------------------|---------------------------------------------------------------|
-| `RunAnywhere.isVoiceAgentReady`                       | `RunAnywhere.instance.voice.isReady`                          |
-| `await RunAnywhere.initializeVoiceAgentWithLoadedModels()` | `await RunAnywhere.instance.voice.initializeWithLoadedModels()` |
-| `RunAnywhere.cleanupVoiceAgent()`                     | `RunAnywhere.instance.voice.cleanup()`                        |
+| v3.x | v4.0 |
+|---|---|
+| `RunAnywhere.isVoiceAgentReady`                            | `RunAnywhereSDK.instance.voice.isReady`                          |
+| `RunAnywhere.getVoiceAgentComponentStates()`               | `RunAnywhereSDK.instance.voice.componentStates()`                |
+| `await RunAnywhere.initializeVoiceAgentWithLoadedModels()` | `await RunAnywhereSDK.instance.voice.initializeWithLoadedModels()` |
+| `RunAnywhere.cleanupVoiceAgent()`                          | `RunAnywhereSDK.instance.voice.cleanup()`                        |
 
-VoiceAgentStreamAdapter unchanged.
+`VoiceAgentStreamAdapter` is unchanged.
 
-### Models
+### Models (6)
 
-| v3.x                                              | v4.0                                                  |
-|---------------------------------------------------|-------------------------------------------------------|
-| `await RunAnywhere.availableModels()`             | `await RunAnywhere.instance.models.available()`       |
-| `await RunAnywhere.refreshDiscoveredModels()`     | `await RunAnywhere.instance.models.refresh()`         |
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhere.availableModels()`             | `await RunAnywhereSDK.instance.models.available()`       |
+| `await RunAnywhere.refreshDiscoveredModels()`     | `await RunAnywhereSDK.instance.models.refresh()`         |
+| `RunAnywhere.registerModel(...)`                  | `RunAnywhereSDK.instance.models.register(...)`           |
+| `RunAnywhere.registerMultiFileModel(...)`         | `RunAnywhereSDK.instance.models.registerMultiFile(...)`  |
+| `await RunAnywhere.updateModelDownloadStatus(id, path)` | `await RunAnywhereSDK.instance.models.updateDownloadStatus(id, path)` |
+| `await RunAnywhere.removeModel(id)`               | `await RunAnywhereSDK.instance.models.remove(id)`        |
 
-### Downloads
+### Downloads (4)
 
-| v3.x                                                  | v4.0                                                      |
-|-------------------------------------------------------|-----------------------------------------------------------|
-| `RunAnywhere.downloadModel(id)`                       | `RunAnywhere.instance.downloads.start(id)`                |
-| `await RunAnywhere.deleteStoredModel(id)`             | `await RunAnywhere.instance.downloads.delete(id)`         |
-| `await RunAnywhere.getStorageInfo()`                  | `await RunAnywhere.instance.downloads.getStorageInfo()`   |
-| `await RunAnywhere.getDownloadedModelsWithInfo()`     | `await RunAnywhere.instance.downloads.list()`             |
+| v3.x | v4.0 |
+|---|---|
+| `RunAnywhere.downloadModel(id)`                       | `RunAnywhereSDK.instance.downloads.start(id)`                |
+| `await RunAnywhere.deleteStoredModel(id)`             | `await RunAnywhereSDK.instance.downloads.delete(id)`         |
+| `await RunAnywhere.getStorageInfo()`                  | `await RunAnywhereSDK.instance.downloads.getStorageInfo()`   |
+| `await RunAnywhere.getDownloadedModelsWithInfo()`     | `await RunAnywhereSDK.instance.downloads.list()`             |
+
+### Tools (LLM function calling) — 7
+
+The old `RunAnywhereTools` convenience class and `RunAnywhereToolCalling`
+extension are deleted. Use `RunAnywhereSDK.instance.tools` instead.
+
+| v3.x | v4.0 |
+|---|---|
+| `RunAnywhereTools.registerTool(def, exec)`            | `RunAnywhereSDK.instance.tools.register(def, exec)`      |
+| `RunAnywhereTools.unregisterTool(name)`               | `RunAnywhereSDK.instance.tools.unregister(name)`         |
+| `RunAnywhereTools.getRegisteredTools()`               | `RunAnywhereSDK.instance.tools.registeredTools()`        |
+| `RunAnywhereTools.clearTools()`                       | `RunAnywhereSDK.instance.tools.clear()`                  |
+| `RunAnywhereTools.executeTool(call)`                  | `RunAnywhereSDK.instance.tools.execute(call)`            |
+| `await RunAnywhereTools.generateWithTools(p, options)` | `await RunAnywhereSDK.instance.tools.generateWithTools(p, options)` |
+| `await RunAnywhereTools.continueWithToolResult(...)`  | `await RunAnywhereSDK.instance.tools.continueWithToolResult(...)` |
+
+### RAG (Retrieval-Augmented Generation) — 6
+
+The old `RunAnywhereRAG` extension and its `rag*` prefix are deleted.
+Use `RunAnywhereSDK.instance.rag` instead — note the drop of the
+`rag`-prefix on method names.
+
+| v3.x | v4.0 |
+|---|---|
+| `await RunAnywhereRAG.ragCreatePipeline(cfg)`     | `await RunAnywhereSDK.instance.rag.createPipeline(cfg)`      |
+| `await RunAnywhereRAG.ragDestroyPipeline()`       | `await RunAnywhereSDK.instance.rag.destroyPipeline()`        |
+| `await RunAnywhereRAG.ragIngest(text)`            | `await RunAnywhereSDK.instance.rag.ingest(text)`             |
+| `await RunAnywhereRAG.ragAddDocumentsBatch(docs)` | `await RunAnywhereSDK.instance.rag.addDocumentsBatch(docs)`  |
+| `await RunAnywhereRAG.ragQuery(q, options)`       | `await RunAnywhereSDK.instance.rag.query(q, options)`        |
+| `await RunAnywhereRAG.ragDocumentCount()`         | `await RunAnywhereSDK.instance.rag.documentCount()`          |
+| `await RunAnywhereRAG.ragGetStatistics()`         | `await RunAnywhereSDK.instance.rag.getStatistics()`          |
+
+### Unaffected helpers
+
+These classes kept their `static`-method shape (they were never
+on the god-class, just used `extension on RunAnywhere` as a
+namespace trick). v4.0 makes them plain classes — call sites
+unchanged:
+
+- `RunAnywhereDevice.getChip()`
+- `RunAnywhereFrameworks.getRegisteredFrameworks()`, `getFrameworks(cap)`, `isFrameworkAvailable`, `modelsForFramework`, `downloadedModelsForFramework`
+- `RunAnywhereLogging.configureLogging(cfg)`, `setLogLevel(lvl)`, `setDebugMode(bool)`, `flushLogs()`
+- `RunAnywhereLoRA.loadLoraAdapter(cfg)`, `removeLoraAdapter(path)`, `clearLoraAdapters()`, `getLoadedLoraAdapters()`, `checkLoraCompatibility(path)`, `registerLoraAdapter(entry)`, `loraAdaptersForModel(id)`, `allRegisteredLoraAdapters()`
+- `RunAnywhereStorage.checkStorageAvailable`, `getStorageValue(k)`, `setStorageValue(k, v)`, `deleteStorageValue(k)`, `storageKeyExists(k)`, `clearStorage()`, `getBaseDirectoryPath()`, `downloadModel(id)`
+- `RAGModule.register()`, `unregister()`, `isRegistered`
 
 ## Migration recipe
 
-### Step 1: Update the dependency
+### Step 1 — Update the dependency
 
 ```yaml
 dependencies:
   runanywhere: ^4.0.0
+  runanywhere_llamacpp: ^4.0.0  # if used
+  runanywhere_onnx: ^4.0.0      # if used
+  runanywhere_genie: ^4.0.0     # if used
 ```
 
-### Step 2: Add the `.instance` accessor
+### Step 2 — Run analyzer, fix every `undefined_identifier: RunAnywhere`
 
-The simplest mechanical migration: replace `RunAnywhere.X` with
-`RunAnywhere.instance.<capability>.<method>`.
+Since the static class is deleted, `flutter analyze` reports every
+v3 call site as an error. Walk the list from top to bottom, applying
+the 1:1 mapping in the table above.
 
-**Find/replace patterns** (use sparingly — context matters):
-
-```
-RunAnywhere\.loadModel\(  →  RunAnywhere.instance.llm.load(
-RunAnywhere\.chat\(        →  RunAnywhere.instance.llm.chat(
-RunAnywhere\.generate\(    →  RunAnywhere.instance.llm.generate(
-RunAnywhere\.transcribe\(  →  RunAnywhere.instance.stt.transcribe(
-RunAnywhere\.synthesize\(  →  RunAnywhere.instance.tts.synthesize(
-... etc.
-```
-
-### Step 3: Use the deprecation shim during transition
-
-v4.0.0 ships the OLD static API as `@Deprecated` forwarders to the
-new instance API for ONE minor version cycle (v4.0.x). v4.1 deletes
-the static surface. This gives you a buffer to migrate at your own
-pace.
+### Step 3 — Drop old imports
 
 ```dart
-// Both work in v4.0:
-await RunAnywhere.loadModel('llama-3-8b');           // @Deprecated, prints warning
-await RunAnywhere.instance.llm.load('llama-3-8b');   // Canonical
+// DELETE these imports:
+import 'package:runanywhere/public/runanywhere.dart';
+import 'package:runanywhere/public/runanywhere_tool_calling.dart';
+import 'package:runanywhere/public/extensions/runanywhere_rag.dart';
 
-// Only the canonical form works in v4.1+
+// These are still exported from the umbrella barrel:
+import 'package:runanywhere/runanywhere.dart';
+// ...and give you RunAnywhereSDK + every capability class.
 ```
 
-### Step 4: Update sample apps
+### Step 4 — Update sample apps
 
 The official `examples/flutter/RunAnywhereAI/` sample is migrated
-in v4.0.0 — use it as the reference for migrating your own app.
+as part of v4.0 — use it as the reference for your own migration.
 
 ## Why this is the right shape
 
-The instance pattern enables:
+Moving every implementation off the god-class and onto the
+capabilities enables:
 
 - **Lazy capability initialization**: each capability getter only
   spins up when first accessed.
-- **Per-capability mocking** for tests.
-- **Cleaner namespacing**: 80+ static methods → 9 grouped instance APIs.
-- **File-scope splitting**: each capability lives in its own file
-  (lib/public/capabilities/*.dart), reducing the god-class problem
-  from 2,607 LOC to ~150 LOC core + 9 ~150-300 LOC files.
-- **Discoverability**: IDE autocomplete on `instance.` shows you
-  exactly which capabilities exist, not 80+ methods on the class.
+- **Per-capability mocking** for tests — each capability is an
+  independent singleton class.
+- **Cleaner namespacing**: ~80 static methods collapse to 9 grouped
+  instance APIs.
+- **File-scope splitting**: each capability lives in
+  `lib/public/capabilities/runanywhere_<cap>.dart`. The 2,621 LOC
+  god-class is replaced by ~210 LOC of `runanywhere_v4.dart` (pure
+  lifecycle) plus ~200 LOC of internal state helpers plus the
+  capability classes.
+- **Discoverability**: IDE autocomplete on `instance.` shows exactly
+  which capabilities exist, instead of 80+ methods on one class.
 
 ## Frequently asked
 
-**Q: Will the deprecated static API still work in v4.0?**
-A: Yes — every static method is a one-line forwarder marked
-`@Deprecated` with a `ReplaceWith` hint. Your app compiles + runs
-unchanged on v4.0; you'll get analyzer warnings.
-
-**Q: When does the static API get deleted?**
-A: v4.1.0. That gives you at least one minor cycle to migrate.
+**Q: Is there a deprecation window?**
+A: No. The static `RunAnywhere` class is deleted in v4.0 — there is
+no `@Deprecated` stub, no one-minor-version grace period, no
+forwarder. Every call site must migrate before you can build against
+v4.0.
 
 **Q: Are there other breaking changes besides the API shape?**
-A: No. The semantics of every method are unchanged — only the
-call site changes from `RunAnywhere.X` to `RunAnywhere.instance.cap.X`.
+A: No. The semantics of every method are unchanged — only the call
+site changes from `RunAnywhere.X` to `RunAnywhereSDK.instance.<cap>.X`.
 
 **Q: What about the proto types (VoiceEvent, etc.)?**
 A: Unchanged. Generated from `idl/voice_events.proto`; consumers
 import them the same way as v3.x.
 
 **Q: What about the C ABI (`RAC_PLUGIN_API_VERSION`)?**
-A: Unchanged at `3u`. v4.0.0 is a Flutter SDK API-shape change
-only; the underlying native commons stays on the v3.x ABI.
+A: Unchanged. v4.0 is a Flutter SDK API-shape change only; the
+underlying native commons stays on the v3 ABI.
+
+**Q: The backend plugins (llamacpp / onnx / genie) — do they change?**
+A: Only internally. `LlamaCpp.addModel(...)` now calls
+`RunAnywhereSDK.instance.models.register(...)` under the hood instead
+of `RunAnywhere.registerModel(...)`; the public API of each plugin is
+unchanged for callers.

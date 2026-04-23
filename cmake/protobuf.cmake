@@ -26,6 +26,21 @@ include_guard(GLOBAL)
 
 find_package(Protobuf QUIET)
 
+# v2 close-out: SHARED-build consumers of proto-generated .pb.cc.o files
+# (rac_voice_event_abi.cpp, pipeline.pb.cc, etc.) need absl symbols at
+# link time (absl::log_internal::Check*, absl::hash_internal::*).
+# Modern Homebrew protobuf 22+ ships with absl as a separate package;
+# module-mode FindProtobuf.cmake doesn't propagate the absl deps. Find
+# absl independently and expose its components via the RAC_ABSL_LIBS
+# variable that consumers append to their link line.
+find_package(absl QUIET CONFIG)
+if(absl_FOUND)
+    set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
+    message(STATUS "absl: found via CONFIG (${absl_VERSION})")
+else()
+    set(RAC_ABSL_LIBS "")
+endif()
+
 if(Protobuf_FOUND)
     set(RAC_HAVE_PROTOBUF TRUE)
     message(STATUS "Protobuf: found ${Protobuf_VERSION} (${Protobuf_LIBRARIES})")

@@ -4,8 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
-import 'package:runanywhere/public/types/tool_calling_types.dart';
+import 'package:runanywhere/runanywhere.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
@@ -48,14 +47,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshRegisteredTools() async {
-    _registeredTools = RunAnywhereTools.getRegisteredTools();
+    _registeredTools = RunAnywhereSDK.instance.tools.registeredTools();
     notifyListeners();
   }
 
   /// Register demo tools (matches iOS implementation)
   Future<void> registerDemoTools() async {
     // 1. Weather Tool - Uses Open-Meteo API (free, no API key required)
-    RunAnywhereTools.registerTool(
+    RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'get_weather',
         description:
@@ -72,7 +71,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 2. Time Tool - Real system time with timezone
-    RunAnywhereTools.registerTool(
+    RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
@@ -82,7 +81,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 3. Calculator Tool - Real math evaluation
-    RunAnywhereTools.registerTool(
+    RunAnywhereSDK.instance.tools.register(
       const ToolDefinition(
         name: 'calculate',
         description:
@@ -102,7 +101,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> clearAllTools() async {
-    RunAnywhereTools.clearTools();
+    RunAnywhereSDK.instance.tools.clear();
     await refreshRegisteredTools();
   }
 
