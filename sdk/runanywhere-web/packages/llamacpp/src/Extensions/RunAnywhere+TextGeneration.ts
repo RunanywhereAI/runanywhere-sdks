@@ -4,12 +4,11 @@
  * Adds LLM text generation capabilities to RunAnywhere.
  * Mirrors: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/
  *
- * v2 close-out Phase 14: the inline `tokenQueue: string[] + resolveNext`
- * async-iterator pattern in `generateStream()` was replaced by the
- * shared `AsyncQueue<T>` helper from `@runanywhere/web` (Foundation/AsyncQueue).
- * Behavior is identical; the dedup means future stream-style call sites
- * (STT, TTS, future LLM variants) get the same battle-tested mechanics
- * for free.
+ * v2 GAP 09 / T6.5: `generateStream()` now flows through the shared
+ * `LLMStreamAdapter` (proto-byte path) — symmetric to RN/Swift/Kotlin/
+ * Flutter. The previous `addFunction`-based per-token JS callback +
+ * `AsyncQueue<string>` plumbing has been deleted; tokens arrive as
+ * `LLMStreamEvent`s decoded by the adapter and yielded as strings.
  *
  * Usage:
  *   import { RunAnywhere } from '@runanywhere/web';
@@ -19,13 +18,20 @@
  *   console.log(result.text);
  *
  *   // Streaming
- *   for await (const token of RunAnywhere.generateStream('Tell me a story')) {
+ *   const streaming = await RunAnywhere.generateStream('Tell me a story');
+ *   for await (const token of streaming.stream) {
  *     process.stdout.write(token);
  *   }
+ *   const metrics = await streaming.result;
  */
 
-import { RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, LLMFramework, AsyncQueue } from '@runanywhere/web';
-import type { ModelLoadContext , HardwareAcceleration } from '@runanywhere/web';
+import {
+  RunAnywhere, SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType,
+  LLMFramework, LLMStreamAdapter,
+} from '@runanywhere/web';
+import type {
+  ModelLoadContext, HardwareAcceleration, EmscriptenRunanywhereModule,
+} from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 import { Offsets } from '../Foundation/LlamaCppOffsets';
 import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '@runanywhere/web';
@@ -365,9 +371,14 @@ class TextGenerationImpl {
   /**
    * Generate text with streaming (returns AsyncIterable of tokens).
    *
-   * Async because the underlying C call uses `{async: true}` so Emscripten's
-   * JSPI can suspend the WASM stack during WebGPU buffer operations.  On
-   * CPU-only builds the result is simply an already-resolved Promise.
+   * GAP 09 / T6.5: events flow through the shared `LLMStreamAdapter`
+   * (proto-byte path). The native `rac_llm_component_generate_stream`
+   * call is driven fire-and-forget with NULL struct callbacks — the
+   * C++ side's proto-callback fan-out (`dispatch_llm_stream_event`)
+   * delivers each token to the adapter regardless of whether the struct
+   * callbacks are wired, so this keeps the engine driver and the JS
+   * consumer fully decoupled. Symmetric to the RN / Swift / Kotlin /
+   * Flutter rewires.
    *
    * @param prompt - Input text prompt
    * @param options - Generation options
@@ -382,15 +393,25 @@ class TextGenerationImpl {
       throw new SDKError(SDKErrorCode.ModelNotLoaded, 'No LLM model loaded. Call loadModel() first.');
     }
 
-    // v2 close-out Phase 14: shared AsyncQueue<T> producer/consumer
-    // replaces the inline tokenQueue/resolveNext pattern (~50 LOC of
-    // boilerplate across 3 places — see Foundation/AsyncQueue.ts).
-    const tokens = new AsyncQueue<string>();
+    // Subscribe to the proto-byte stream BEFORE driving the engine so we
+    // never miss tokens emitted synchronously from inside the native call.
+    // The adapter handles per-handle fan-out (one C trampoline / N JS
+    // subscribers) so multiple collectors on the same handle are safe.
+    const eventIterator = new LLMStreamAdapter(
+      handle,
+      m as unknown as EmscriptenRunanywhereModule,
+    ).stream({
+      prompt,
+      maxTokens: options.maxTokens ?? 0,
+      temperature: options.temperature ?? 0,
+      topP: options.topP ?? 0,
+      topK: 0,
+      systemPrompt: options.systemPrompt ?? '',
+      emitThoughts: false,
+    })[Symbol.asyncIterator]();
 
-    // Result promise
-    let resolveResult: ((result: LLMGenerationResult) => void) | null = null;
-    let rejectResult: ((error: Error) => void) | null = null;
-
+    let resolveResult!: (result: LLMGenerationResult) => void;
+    let rejectResult!: (error: Error) => void;
     const resultPromise = new Promise<LLMGenerationResult>((resolve, reject) => {
       resolveResult = resolve;
       rejectResult = reject;
@@ -401,57 +422,8 @@ class TextGenerationImpl {
     let fullText = '';
     let timeToFirstToken: number | undefined;
 
-    // Register token callback
-    const tokenCbPtr = m.addFunction((tokenPtr: number, _userData: number): number => {
-      const token = m.UTF8ToString(tokenPtr);
-      tokenCount++;
-      fullText += token;
-      if (timeToFirstToken === undefined) {
-        timeToFirstToken = performance.now() - startTime;
-      }
-      tokens.push(token);
-      return 1; // RAC_TRUE = continue
-    }, 'iii');
-
-    // Register complete callback
-    const completeCbPtr = m.addFunction((_resultPtr: number, _userData: number): void => {
-      tokens.complete();
-
-      const latencyMs = performance.now() - startTime;
-      const tokensPerSecond = tokenCount > 0 ? (tokenCount / (latencyMs / 1000)) : 0;
-      resolveResult?.({
-        text: fullText,
-        inputTokens: 0,
-        tokensUsed: tokenCount,
-        modelUsed: '',
-        latencyMs,
-        framework: LLMFramework.LlamaCpp,
-        hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
-        tokensPerSecond,
-        timeToFirstTokenMs: timeToFirstToken,
-        thinkingTokens: 0,
-        responseTokens: tokenCount,
-      });
-
-      m.removeFunction(tokenCbPtr);
-      m.removeFunction(completeCbPtr);
-      m.removeFunction(errorCbPtr);
-    }, 'vii');
-
-    // Register error callback
-    const errorCbPtr = m.addFunction((errorCode: number, errorMsgPtr: number, _userData: number): void => {
-      const errorMsg = m.UTF8ToString(errorMsgPtr);
-      const err = SDKError.fromRACResult(errorCode, errorMsg);
-      tokens.fail(err);
-      rejectResult?.(err);
-
-      m.removeFunction(tokenCbPtr);
-      m.removeFunction(completeCbPtr);
-      m.removeFunction(errorCbPtr);
-    }, 'viii');
-
-    // If system_prompt WASM offset is not available (WASM not rebuilt yet),
-    // inject the system prompt into the user prompt as a fallback.
+    // System-prompt fallback: inject into user prompt when the WASM
+    // build doesn't expose the system_prompt offset yet.
     let effectivePrompt = prompt;
     const canSetSystemPromptNatively = Offsets.llmOptions.systemPrompt !== 0;
     if (options.systemPrompt && !canSetSystemPromptNatively) {
@@ -459,73 +431,119 @@ class TextGenerationImpl {
       logger.debug('System prompt injected into user prompt (WASM offset not available)');
     }
 
-    // Start streaming generation
     const promptPtr = bridge.allocString(effectivePrompt);
     const optionsPtr = m._rac_wasm_create_llm_options_default();
-
     if (options.maxTokens !== undefined) {
       m.setValue(optionsPtr + Offsets.llmOptions.maxTokens, options.maxTokens, 'i32');
     }
     if (options.temperature !== undefined) {
       m.setValue(optionsPtr + Offsets.llmOptions.temperature, options.temperature, 'float');
     }
-    // Set system_prompt if the WASM offset is available (non-zero = real offset)
     let systemPromptPtr = 0;
     if (options.systemPrompt && Offsets.llmOptions.systemPrompt) {
       systemPromptPtr = bridge.allocString(options.systemPrompt);
       m.setValue(optionsPtr + Offsets.llmOptions.systemPrompt, systemPromptPtr, '*');
     }
 
-    let startResult: number;
-    try {
-      logger.debug('Calling rac_llm_component_generate_stream via ccall({async:true})');
-      const callResult = bridge.callFunction<number | Promise<number>>(
-        'rac_llm_component_generate_stream',
-        'number',
-        ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
-        [handle, promptPtr, optionsPtr, tokenCbPtr, completeCbPtr, errorCbPtr, 0],
-        { async: true },
-      );
-      logger.debug(`ccall returned type=${typeof callResult}, isPromise=${callResult instanceof Promise}`);
-      startResult = await callResult as number;
-      logger.debug(`Stream generation returned result=${startResult}`);
-    } catch (wasmErr: unknown) {
-      bridge.free(promptPtr);
-      if (systemPromptPtr) bridge.free(systemPromptPtr);
-      m._free(optionsPtr);
-      m.removeFunction(tokenCbPtr);
-      m.removeFunction(completeCbPtr);
-      m.removeFunction(errorCbPtr);
-      if (wasmErr instanceof Error) {
-        logger.error(`WASM stream generation error: ${wasmErr.message}\nStack: ${wasmErr.stack}`);
-      } else {
-        logger.error(`WASM stream generation error (raw): type=${typeof wasmErr}, value=${String(wasmErr)}`);
+    // Drive the C++ engine. Tokens are delivered to `eventIterator` via
+    // the adapter's proto-byte callback; struct callbacks are NULL (0)
+    // because we consume events through the adapter, not per-token JS
+    // shims. Fire-and-forget so the consumer can drain `stream` in
+    // real-time rather than waiting for the entire generation to finish.
+    const drivePromise = (async (): Promise<void> => {
+      try {
+        logger.debug('Calling rac_llm_component_generate_stream via ccall({async:true})');
+        const callResult = bridge.callFunction<number | Promise<number>>(
+          'rac_llm_component_generate_stream',
+          'number',
+          ['number', 'number', 'number', 'number', 'number', 'number', 'number'],
+          [handle, promptPtr, optionsPtr, 0, 0, 0, 0],
+          { async: true },
+        );
+        const startResult = await callResult as number;
+        logger.debug(`Stream generation returned result=${startResult}`);
+        if (startResult !== 0) {
+          throw SDKError.fromRACResult(startResult, 'Failed to start streaming generation');
+        }
+      } catch (wasmErr: unknown) {
+        if (wasmErr instanceof SDKError) throw wasmErr;
+        if (wasmErr instanceof Error) {
+          logger.error(`WASM stream generation error: ${wasmErr.message}\nStack: ${wasmErr.stack}`);
+        } else {
+          logger.error(`WASM stream generation error (raw): type=${typeof wasmErr}, value=${String(wasmErr)}`);
+        }
+        const detail = typeof wasmErr === 'number'
+          ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
+          : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
+        throw new SDKError(SDKErrorCode.GenerationFailed, `LLM streaming generation crashed: ${detail}`);
+      } finally {
+        bridge.free(promptPtr);
+        if (systemPromptPtr) bridge.free(systemPromptPtr);
+        m._free(optionsPtr);
       }
-      const detail = typeof wasmErr === 'number'
-        ? `WASM C++ exception (ptr=${wasmErr}). The model's chat template may be unsupported.`
-        : wasmErr instanceof Error ? wasmErr.message : String(wasmErr);
-      throw new SDKError(
-        SDKErrorCode.GenerationFailed,
-        `LLM streaming generation crashed: ${detail}`,
-      );
-    }
+    })();
 
-    bridge.free(promptPtr);
-    if (systemPromptPtr) bridge.free(systemPromptPtr);
-    m._free(optionsPtr);
+    drivePromise.catch((err: Error) => {
+      rejectResult(err);
+      void eventIterator.return?.();
+    });
 
-    if (startResult !== 0) {
-      m.removeFunction(tokenCbPtr);
-      m.removeFunction(completeCbPtr);
-      m.removeFunction(errorCbPtr);
-      throw SDKError.fromRACResult(startResult, 'Failed to start streaming generation');
+    async function* tokenGenerator(): AsyncGenerator<string> {
+      try {
+        while (true) {
+          const next = await eventIterator.next();
+          if (next.done) break;
+          const event = next.value;
+
+          if (event.token) {
+            if (timeToFirstToken === undefined) {
+              timeToFirstToken = performance.now() - startTime;
+            }
+            fullText += event.token;
+            tokenCount++;
+            yield event.token;
+          }
+
+          if (event.isFinal) {
+            if (event.errorMessage) {
+              const err = new SDKError(SDKErrorCode.GenerationFailed, event.errorMessage);
+              rejectResult(err);
+              throw err;
+            }
+            break;
+          }
+        }
+
+        const latencyMs = performance.now() - startTime;
+        const tokensPerSecond = tokenCount > 0 ? (tokenCount / (latencyMs / 1000)) : 0;
+        resolveResult({
+          text: fullText,
+          inputTokens: 0,
+          tokensUsed: tokenCount,
+          modelUsed: '',
+          latencyMs,
+          framework: LLMFramework.LlamaCpp,
+          hardwareUsed: bridge.accelerationMode as HardwareAcceleration,
+          tokensPerSecond,
+          timeToFirstTokenMs: timeToFirstToken,
+          thinkingTokens: 0,
+          responseTokens: tokenCount,
+        });
+      } finally {
+        await eventIterator.return?.();
+      }
     }
 
     return {
-      stream: tokens,
+      stream: tokenGenerator(),
       result: resultPromise,
       cancel: () => {
-        m._rac_llm_component_cancel(handle);
+        try {
+          m._rac_llm_component_cancel(handle);
+        } catch {
+          // best-effort cancel; the iterator return below tears down the C subscription
+        }
+        void eventIterator.return?.();
       },
     };
   }

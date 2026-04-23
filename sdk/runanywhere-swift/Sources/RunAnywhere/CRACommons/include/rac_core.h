@@ -11,6 +11,7 @@
 
 #include "rac_error.h"
 #include "rac_types.h"
+#include "rac_lora_registry.h"
 #include "rac_model_types.h"
 #include "rac_environment.h"
 
@@ -175,12 +176,17 @@ RAC_API rac_result_t rac_modules_for_capability(rac_capability_t capability,
 RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module_info_t** out_info);
 
 // =============================================================================
-// v3.0.0 (C1): legacy service-registry surface REMOVED. Swift code that
-// previously called rac_service_{register_provider,unregister_provider,
-// create,list_providers} must use the unified plugin registry via the
-// CRACommons headers rac_plugin_entry.h / rac_primitive.h / rac_route.h
-// (added in v3 Phase B10). See CppBridge+Services.swift for the canonical
-// migration.
+// v3 NOTE: The legacy service-registry surface (rac_service_request_t,
+// rac_service_provider_t, rac_service_can_handle_fn, rac_service_create_fn,
+// rac_service_register_provider, rac_service_unregister_provider,
+// rac_service_create, rac_service_list_providers, RAC_DEPRECATED_LEGACY_SVC)
+// was REMOVED in v3.0.0 (RAC_PLUGIN_API_VERSION 3u).
+//
+// New code uses the unified plugin registry from rac/plugin/rac_plugin_entry.h
+// (rac_plugin_register / rac_plugin_list) and the hardware-aware router
+// from rac/router/rac_route.h (rac_plugin_route). See
+// docs/engine_plugin_authoring.md §"Migrating off the legacy service registry"
+// for per-call-site translation.
 // =============================================================================
 
 // =============================================================================
@@ -216,13 +222,15 @@ RAC_API rac_result_t rac_get_model(const char* model_id, struct rac_model_info**
 
 /**
  * Gets model info from the global registry by local path.
+ * Convenience function that calls rac_model_registry_get_by_path on the global registry.
  * Useful when loading models by path instead of model_id.
  *
  * @param local_path Local path to search for
  * @param out_model Output: Model info (owned, must be freed with rac_model_info_free)
  * @return RAC_SUCCESS on success, RAC_ERROR_NOT_FOUND if not registered
  */
-RAC_API rac_result_t rac_get_model_by_path(const char* local_path, struct rac_model_info** out_model);
+RAC_API rac_result_t rac_get_model_by_path(const char* local_path,
+                                           struct rac_model_info** out_model);
 
 // =============================================================================
 // GLOBAL LORA REGISTRY API
@@ -247,13 +255,14 @@ RAC_API rac_result_t rac_register_lora(const struct rac_lora_entry* entry);
 /**
  * @brief Query the global registry for adapters compatible with a model
  * @param model_id Model ID to match
- * @param out_entries Output: array of matching entries (caller must free with rac_lora_entry_array_free)
+ * @param out_entries Output: array of matching entries (caller must free with
+ * rac_lora_entry_array_free)
  * @param out_count Output: number of matching entries
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_get_lora_for_model(const char* model_id,
-                                             struct rac_lora_entry*** out_entries,
-                                             size_t* out_count);
+                                            struct rac_lora_entry*** out_entries,
+                                            size_t* out_count);
 
 #ifdef __cplusplus
 }

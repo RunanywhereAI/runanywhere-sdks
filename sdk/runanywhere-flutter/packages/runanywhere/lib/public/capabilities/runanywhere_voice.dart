@@ -2,12 +2,19 @@
 //
 // runanywhere_voice.dart — v4 Voice Agent (STT → LLM → TTS) capability.
 //
-// Streaming voice events are still consumed via
-// `VoiceAgentStreamAdapter(handle).stream()` (see the runanywhere
-// package barrel). This class manages the lifecycle only.
+// Symmetric with the LLM capability: this class owns both the
+// lifecycle surface AND a `Stream<VoiceEvent>` factory
+// (`eventStream()`) that wraps `VoiceAgentStreamAdapter` internally.
+//
+// Advanced callers who need fine-grained control over the
+// adapter (e.g. multiple fan-out subscriptions, custom handles)
+// can still construct `VoiceAgentStreamAdapter(handle)` directly —
+// it remains exported from `package:runanywhere/runanywhere.dart`.
 
+import 'package:runanywhere/adapters/voice_agent_stream_adapter.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/types/voice_agent_types.dart';
 
@@ -46,8 +53,8 @@ class RunAnywhereVoice {
   }
 
   /// Initialize the voice agent against currently-loaded STT/LLM/TTS
-  /// models. Call BEFORE `DartBridgeVoiceAgent.shared.getHandle()` +
-  /// `VoiceAgentStreamAdapter(handle).stream()`.
+  /// models. Must be called before [eventStream] (or before manually
+  /// constructing a `VoiceAgentStreamAdapter` for advanced use cases).
   Future<void> initializeWithLoadedModels() async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
 
@@ -68,4 +75,23 @@ class RunAnywhereVoice {
 
   /// Cleanup voice agent native resources.
   void cleanup() => DartBridge.voiceAgent.cleanup();
+
+  /// Subscribe to canonical voice-agent events.
+  ///
+  /// Symmetric with `RunAnywhereSDK.instance.llm.generateStream(...)`:
+  /// the capability owns adapter construction so callers never touch
+  /// `VoiceAgentStreamAdapter` directly. The handle is fetched from
+  /// the internal `DartBridgeVoiceAgent` singleton — call
+  /// [initializeWithLoadedModels] first.
+  ///
+  /// Cancellation propagates: cancelling the returned stream's
+  /// subscription tears down the underlying C-side proto callback.
+  ///
+  /// Advanced callers needing multiple fan-out subscriptions or a
+  /// custom handle can still construct `VoiceAgentStreamAdapter`
+  /// directly (exported from `package:runanywhere/runanywhere.dart`).
+  Stream<VoiceEvent> eventStream() async* {
+    final handle = await DartBridge.voiceAgent.getHandle();
+    yield* VoiceAgentStreamAdapter(handle).stream();
+  }
 }

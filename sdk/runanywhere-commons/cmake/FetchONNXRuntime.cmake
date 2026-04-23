@@ -121,7 +121,10 @@ elseif(ANDROID)
     # Sherpa-ONNX version is defined in VERSIONS file: SHERPA_ONNX_VERSION_ANDROID
     # Sherpa-ONNX bundles a compatible version of ONNX Runtime
     # Downloaded by: ./scripts/android/download-sherpa-onnx.sh
-    set(SHERPA_ONNX_DIR "${CMAKE_SOURCE_DIR}/third_party/sherpa-onnx-android")
+    # Anchor on this module's location so the lookup is stable under the
+    # GAP_07 single-root CMake layout, where CMAKE_SOURCE_DIR is the repo
+    # root but download-sherpa-onnx.sh populates sdk/runanywhere-commons/third_party/.
+    set(SHERPA_ONNX_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party/sherpa-onnx-android")
 
     # Check if Sherpa-ONNX libraries exist
     if(EXISTS "${SHERPA_ONNX_DIR}/jniLibs/${ANDROID_ABI}/libonnxruntime.so")

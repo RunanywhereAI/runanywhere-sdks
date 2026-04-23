@@ -39,9 +39,21 @@ import {
  * Adapter that exposes the C++ proto-byte LLM stream callback as a
  * standard JS AsyncIterable. Construct with either:
  *
- *   1. `new LLMStreamAdapter(handle)` — WASM path. `handle` is an
- *      opaque pointer returned from the backend package's
- *      `_rac_llm_component_create*` thunk.
+ *   1. `new LLMStreamAdapter(handle, module?)` — WASM path. `handle`
+ *      is an opaque pointer returned from the backend package's
+ *      `_rac_llm_component_create*` thunk. The optional `module` arg
+ *      lets backend packages (e.g. `@runanywhere/web-llamacpp`) pass
+ *      their own Emscripten module instance directly — the global
+ *      `runanywhereModule` singleton is only used when no module is
+ *      supplied (test harnesses / future single-module deployments).
+ *
+ *      Why optional `module`? Backend packages (llamacpp, onnx) load
+ *      independent Emscripten modules and do not call
+ *      `setRunanywhereModule()` (each backend may export a different
+ *      symbol surface, so a singleton is the wrong abstraction for
+ *      multi-WASM deployments). Allowing an explicit module reference
+ *      keeps the adapter usable from backend `RunAnywhere+*.ts`
+ *      extensions without coupling them to the singleton.
  *
  *   2. `new LLMStreamAdapter(transport)` — custom transport path for
  *      unit tests that inject a fake transport satisfying the codegen'd
@@ -50,10 +62,13 @@ import {
 export class LLMStreamAdapter {
   private readonly transportImpl: LLMStreamTransport;
 
-  constructor(handleOrTransport: number | LLMStreamTransport) {
+  constructor(
+    handleOrTransport: number | LLMStreamTransport,
+    module: EmscriptenRunanywhereModule = runanywhereModule,
+  ) {
     this.transportImpl =
       typeof handleOrTransport === 'number'
-        ? fanOutTransportFor(handleOrTransport, runanywhereModule)
+        ? fanOutTransportFor(handleOrTransport, module)
         : handleOrTransport;
   }
 

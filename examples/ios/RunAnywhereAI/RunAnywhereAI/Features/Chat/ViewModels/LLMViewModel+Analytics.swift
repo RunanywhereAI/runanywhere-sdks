@@ -57,7 +57,7 @@ extension LLMViewModel {
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: result.framework ?? currentModel.framework.rawValue,
+            framework: result.framework ?? currentModel.framework.wireString,
             timestamp: Date(),
             timeToFirstToken: nil,
             totalGenerationTime: result.latencyMs / 1000.0,

@@ -84,9 +84,9 @@ typedef void (*rac_voice_agent_proto_event_callback_fn)(const uint8_t* event_byt
  *                                           should fall back to the struct
  *                                           callback.
  */
-rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t                  handle,
-                                                rac_voice_agent_proto_event_callback_fn   callback,
-                                                void*                                     user_data);
+RAC_API rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t                  handle,
+                                                        rac_voice_agent_proto_event_callback_fn   callback,
+                                                        void*                                     user_data);
 
 #ifdef __cplusplus
 }  /* extern "C" */

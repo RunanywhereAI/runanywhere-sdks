@@ -79,6 +79,22 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 #define LOGd(...) RAC_LOG_DEBUG(JNI_LOG_TAG, __VA_ARGS__)
 
 // =============================================================================
+// JNI AttachCurrentThread signature shim
+// =============================================================================
+// The `AttachCurrentThread` parameter type differs between JVM headers:
+//   - Android NDK jni.h (r27+):  AttachCurrentThread(JNIEnv**, void*)
+//   - Oracle / Temurin  jni.h:   AttachCurrentThread(void**,   void*)
+// NDK r27 tightened parameter-type checking, so the previous
+// `reinterpret_cast<void**>(&env)` no longer compiles on Android. Pick
+// the right cast per platform. `GetEnv` still takes `void**` on both
+// platforms and does not need this shim.
+#ifdef __ANDROID__
+#define RAC_JNI_ATTACH_ENVPP(envpp) (envpp)
+#else
+#define RAC_JNI_ATTACH_ENVPP(envpp) (reinterpret_cast<void**>(envpp))
+#endif
+
+// =============================================================================
 // Global State for Platform Adapter JNI Callbacks
 // =============================================================================
 
@@ -133,11 +149,10 @@ static JNIEnv* getJNIEnv() {
     int status = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (status == JNI_EDETACHED) {
-        // v3.1 (audit fix): use reinterpret_cast<void**> for cross-platform
-        // compatibility. Android NDK's jni.h expects JNIEnv**; macOS Temurin
-        // jni.h expects void**. The reinterpret_cast form compiles cleanly
-        // on both (JNIEnv** and void** are layout-compatible pointer types).
-        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+        // Use RAC_JNI_ATTACH_ENVPP to bridge the Android NDK vs Oracle/Temurin
+        // parameter-type difference (see shim definition near the top of
+        // this file). NDK r27 no longer tolerates the prior `void**` cast.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
             return nullptr;
         }
     }
@@ -760,7 +775,7 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("Failed to attach thread for streaming callback");
@@ -2547,7 +2562,7 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
 
     if (get_result == JNI_EDETACHED) {
         if (g_model_assignment_state.jvm->AttachCurrentThread(
-                reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+                RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
             did_attach = true;
         } else {
             LOGe("model_assignment_http_get_callback: failed to attach thread");
@@ -4314,7 +4329,7 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("VLM: Failed to attach thread for streaming callback");
@@ -5235,7 +5250,7 @@ void va_stream_trampoline(const uint8_t* event_bytes,
         // `void**` cast matches the working GetEnv pattern above and the
         // host-JDK signature on macOS/Linux; Android NDK's `JNIEnv**` is
         // binary-compatible.
-        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
             return;
         }
         needs_detach = true;
@@ -5357,7 +5372,7 @@ void llm_stream_trampoline(const uint8_t* event_bytes,
     bool    needs_detach = false;
     jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
     if (getEnvRc == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
             return;
         }
         needs_detach = true;

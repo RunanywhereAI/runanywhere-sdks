@@ -393,6 +393,39 @@ RAC_API rac_result_t rac_download_manager_mark_failed(rac_download_manager_handl
                                                       const char* error_message);
 
 // =============================================================================
+// EXTRACTION COMPLETION API
+// =============================================================================
+
+/**
+ * @brief Mark extraction as completed for a download task.
+ *
+ * Called after archive extraction succeeds. Transitions the task
+ * from EXTRACTING to COMPLETED state.
+ *
+ * @param handle Manager handle
+ * @param task_id Task ID
+ * @param extracted_path Path to the extracted model directory
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_download_manager_mark_extraction_complete(
+    rac_download_manager_handle_t handle, const char* task_id, const char* extracted_path);
+
+/**
+ * @brief Mark extraction as failed for a download task.
+ *
+ * Called if archive extraction fails.
+ *
+ * @param handle Manager handle
+ * @param task_id Task ID
+ * @param error_code Extraction error code
+ * @param error_message Error description (can be NULL)
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_download_manager_mark_extraction_failed(
+    rac_download_manager_handle_t handle, const char* task_id, rac_result_t error_code,
+    const char* error_message);
+
+// =============================================================================
 // MEMORY MANAGEMENT
 // =============================================================================
 

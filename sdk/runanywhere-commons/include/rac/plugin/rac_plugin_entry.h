@@ -222,10 +222,10 @@ const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
  * Callers pass an array of `max` `const rac_engine_vtable_t*` pointers; the
  * registry fills it in-place. Values >= `max` are truncated.
  */
-rac_result_t rac_plugin_list(rac_primitive_t primitive,
-                             const rac_engine_vtable_t** out_plugins,
-                             size_t max,
-                             size_t* out_count);
+RAC_API rac_result_t rac_plugin_list(rac_primitive_t primitive,
+                                     const rac_engine_vtable_t** out_plugins,
+                                     size_t max,
+                                     size_t* out_count);
 
 /**
  * @brief Total number of registered plugins (across all primitives,

@@ -126,7 +126,7 @@ extension RunAnywhere {
                                        "Plugin held by an active session (refcount wired in GAP 04+)" + suffix)
             default:
                 throw SDKError.runtime(.unknown,
-                                       "rac_registry_\(op)_plugin returned \(rc.rawValue)" + suffix)
+                                       "rac_registry_\(op)_plugin returned \(rc)" + suffix)
             }
         }
     }

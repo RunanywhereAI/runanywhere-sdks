@@ -35,6 +35,22 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
 option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
+
+# Emscripten: force the ONNX + RAG backends OFF. FetchONNXRuntime.cmake has
+# no WASM binary distribution (it expects headers under
+# third_party/onnxruntime-wasm/ which are not vendored in this tree), so the
+# engine TUs fail to compile with `onnxruntime_c_api.h: file not found`. The
+# ONNX WASM story is delivered by `onnxruntime-web` (JavaScript package)
+# from the frontend; commons does not need an in-module ONNX runtime on WASM.
+# sdk/runanywhere-web/wasm/CMakeLists.txt already defaults these OFF for the
+# standalone WASM entrypoint — mirror that here so the root-level `wasm`
+# preset (which inherits base-release) configures cleanly.
+# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip these back to
+# default ON when the onnxruntime-wasm third_party package lands.
+if(EMSCRIPTEN)
+    set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_RAG  OFF CACHE BOOL "" FORCE)
+endif()
 if(APPLE)
     option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
     option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
@@ -289,6 +305,13 @@ endif()
 # "bz2_bundled.lib" by bare filename. The linker can't find them because they
 # are built into <config>/ subdirectories. Fix: redirect their output to a
 # single known directory and add it to the global linker search path.
+#
+# The same issue surfaces under Android (NDK + Ninja + ld.lld) and Emscripten:
+# libarchive's internal find_package(BZip2) stores BZIP2_LIBRARIES as the bare
+# string "bz2_bundled", which its build then emits into the transitive link
+# line as "-lbz2_bundled" rather than a full path to libbz2_bundled.a. Pin the
+# archive to a known directory and add it to the linker search path so the
+# `-l` lookup succeeds.
 if(MSVC)
     set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
@@ -302,6 +325,17 @@ if(MSVC)
                 ARCHIVE_OUTPUT_DIRECTORY_${_CFG} "${RAC_BUNDLED_LIB_DIR}")
         endif()
     endforeach()
+    link_directories("${RAC_BUNDLED_LIB_DIR}")
+elseif(ANDROID OR EMSCRIPTEN)
+    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
+    if(TARGET bz2_bundled)
+        set_target_properties(bz2_bundled PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")
+    endif()
+    if(TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")
+    endif()
     link_directories("${RAC_BUNDLED_LIB_DIR}")
 endif()
 
@@ -358,6 +392,18 @@ if(NOT CURL_FOUND)
     elseif(WIN32)
         set(CURL_USE_SCHANNEL ON  CACHE BOOL "" FORCE)
         set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
+    elseif(EMSCRIPTEN)
+        # WASM runtime: HTTPS flows through the browser's fetch() API via
+        # Emscripten FETCH, not libcurl. Compile curl without TLS.
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
+    elseif(ANDROID)
+        # Android: frontend layer (OkHttp / HttpURLConnection) is the HTTPS
+        # transport. Desktop/iOS curl is the only consumer of TLS via commons.
+        # Disable curl's TLS backend here; revisit in v0.21 if commons HTTPS
+        # on Android becomes required (would wire NDK BoringSSL).
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
     endif()
     FetchContent_MakeAvailable(curl_fetched)
     # The target built by curl's CMake is `libcurl` (static).
@@ -515,6 +561,25 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/extraction/rac_extraction.cpp
 )
 
+# Legacy executor-plugin HTTP ABI (network/http_client.cpp) and the v2
+# curl-backed ABI (http/rac_http_client_curl.cpp) both define the C symbol
+# `rac_http_response_free` with different rac_http_response_t semantics. On
+# STATIC builds (macOS / iOS xcframework / Windows / WASM) archive-search
+# resolves only one .o per consumer, so the collision is invisible. On
+# Android commons is built SHARED (librac_commons.so); lld pulls both .o
+# files into the single output and aborts with a duplicate-symbol error.
+# The legacy file has no Android consumers — the Kotlin SDK uses OkHttp /
+# HttpURLConnection at the frontend layer — so drop the TU on Android.
+# iOS/macOS keep it for xcframework export compatibility (see the legacy
+# symbols listed in sdk/runanywhere-flutter/.../RACommons.exports).
+# TODO(v0.21): delete src/infrastructure/network/http_client.cpp and the
+# companion header include/rac/infrastructure/network/rac_http_client.h
+# once the legacy executor ABI is fully retired.
+if(ANDROID)
+    list(REMOVE_ITEM RAC_INFRASTRUCTURE_SOURCES
+        src/infrastructure/network/http_client.cpp)
+endif()
+
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
     # LLM
@@ -636,6 +701,28 @@ if(RAC_BUILD_SHARED)
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
+endif()
+
+# Android: override the hidden-visibility preset for rac_commons. The JNI
+# shared library librunanywhere_jni.so dynamic-links against librac_commons.so
+# and needs every rac_* C ABI function resolvable at link time. Several
+# functions in the public C headers are still missing the `RAC_API`
+# visibility attribute (rac_plugin_list, rac_llm_{extract,strip}_thinking,
+# rac_llm_split_thinking_tokens, rac_voice_agent_set_proto_callback,
+# rac_llm_{,un}set_stream_proto_callback); hiding them breaks the JNI link
+# with `undefined symbol` errors. Forcing default visibility on this target
+# matches the macOS/iOS xcframework behaviour, where commons is a static
+# archive and every symbol is visible to downstream consumers. The override
+# is target-scoped so engine backends keep their hidden-visibility hardening.
+# TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
+# and drop this Android-specific override.
+if(ANDROID)
+    set_target_properties(rac_commons PROPERTIES
+        C_VISIBILITY_PRESET   default
+        CXX_VISIBILITY_PRESET default
+        VISIBILITY_INLINES_HIDDEN OFF
+    )
+    target_compile_options(rac_commons PRIVATE -fvisibility=default)
 endif()
 
 # libarchive - native archive extraction

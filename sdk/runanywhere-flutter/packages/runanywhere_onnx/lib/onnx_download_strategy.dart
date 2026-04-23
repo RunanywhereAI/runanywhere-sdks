@@ -262,8 +262,8 @@ class OnnxDownloadStrategy {
     // Ensure destination directory exists
     await to.parent.create(recursive: true);
 
-    final request = http.Request('GET', from);
-    final response = await http.Client().send(request);
+    final http.Request request = http.Request('GET', from);
+    final http.StreamedResponse response = await http.Client().send(request);
 
     if (response.statusCode != 200) {
       throw SDKError.downloadFailed(
@@ -272,18 +272,18 @@ class OnnxDownloadStrategy {
       );
     }
 
-    final totalBytes = response.contentLength ?? 0;
+    final int totalBytes = response.contentLength ?? 0;
     int bytesDownloaded = 0;
 
-    final sink = to.openWrite();
+    final IOSink sink = to.openWrite();
 
     // Stream response and track progress
-    await for (final chunk in response.stream) {
+    await for (final List<int> chunk in response.stream) {
       sink.add(chunk);
       bytesDownloaded += chunk.length;
 
       if (totalBytes > 0 && progressHandler != null) {
-        final progress = bytesDownloaded / totalBytes;
+        final double progress = bytesDownloaded / totalBytes;
         progressHandler(progress);
       }
     }

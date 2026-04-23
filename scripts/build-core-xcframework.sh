@@ -130,11 +130,21 @@ find_lib() {
     echo "${dev_path}|${sim_path}"
 }
 
-# build_xcframework <lib-subdir> <libname> <xcframework-name>
+# build_xcframework <lib-subdir> <libname> <xcframework-name> [--with-headers]
+#
+# Only the first (RACommons) xcframework ships the commons C header tree via
+# `-headers`. Backend xcframeworks share the same canonical commons headers,
+# but bundling the same tree into every `.xcframework`'s `Headers/` directory
+# causes `error: Multiple commands produce .../include/rac/.../*.h` when Xcode's
+# SPM binary-target integration processes all three bundles in the same build
+# graph. Downstream Swift modules import the commons headers via
+# `RACommonsBinary` anyway, so the backend xcframeworks only need to carry
+# their `.a` archives — the headers come from RACommons.xcframework.
 build_xcframework() {
     local subdir="$1"
     local libname="$2"
     local xcf_name="$3"
+    local mode="${4:-}"
 
     local paths
     paths="$(find_lib "${subdir}" "${libname}")"
@@ -144,13 +154,20 @@ build_xcframework() {
     local xcf="${DEST}/${xcf_name}"
     echo "▶ Create-xcframework → ${xcf}"
     run rm -rf "${xcf}"
-    run xcodebuild -create-xcframework \
-        -library "${dev_lib}" -headers "${COMMONS_HEADERS}" \
-        -library "${sim_lib}" -headers "${COMMONS_HEADERS}" \
-        -output  "${xcf}"
+    if [ "${mode}" = "--with-headers" ]; then
+        run xcodebuild -create-xcframework \
+            -library "${dev_lib}" -headers "${COMMONS_HEADERS}" \
+            -library "${sim_lib}" -headers "${COMMONS_HEADERS}" \
+            -output  "${xcf}"
+    else
+        run xcodebuild -create-xcframework \
+            -library "${dev_lib}" \
+            -library "${sim_lib}" \
+            -output  "${xcf}"
+    fi
 }
 
-build_xcframework "sdk/runanywhere-commons" "librac_commons.a"          "RACommons.xcframework"
+build_xcframework "sdk/runanywhere-commons" "librac_commons.a"          "RACommons.xcframework"          --with-headers
 build_xcframework "engines/llamacpp"        "librac_backend_llamacpp.a" "RABackendLLAMACPP.xcframework"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     build_xcframework "engines/onnx"         "librac_backend_onnx.a"    "RABackendONNX.xcframework"

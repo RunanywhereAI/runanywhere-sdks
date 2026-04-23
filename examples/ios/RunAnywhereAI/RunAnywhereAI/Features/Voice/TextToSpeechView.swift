@@ -290,7 +290,7 @@ struct TextToSpeechView: View {
                     metadataRow(
                         icon: "speaker.wave.2",
                         label: "Format",
-                        value: result.format.rawValue.uppercased()
+                        value: result.format.wireString.uppercased()
                     )
                 }
                 metadataRow(

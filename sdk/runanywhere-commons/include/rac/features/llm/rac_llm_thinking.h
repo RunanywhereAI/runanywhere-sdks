@@ -49,11 +49,11 @@ extern "C" {
  *                         is NULL.
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_extract_thinking(const char*  text,
-                                       const char** out_response,
-                                       size_t*      out_response_len,
-                                       const char** out_thinking,
-                                       size_t*      out_thinking_len);
+RAC_API rac_result_t rac_llm_extract_thinking(const char*  text,
+                                               const char** out_response,
+                                               size_t*      out_response_len,
+                                               const char** out_thinking,
+                                               size_t*      out_thinking_len);
 
 /**
  * Removes ALL `<think>...</think>` blocks (multiple per text + trailing
@@ -62,9 +62,9 @@ rac_result_t rac_llm_extract_thinking(const char*  text,
  *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_strip_thinking(const char*  text,
-                                     const char** out_stripped,
-                                     size_t*      out_stripped_len);
+RAC_API rac_result_t rac_llm_strip_thinking(const char*  text,
+                                             const char** out_stripped,
+                                             size_t*      out_stripped_len);
 
 /**
  * Splits @p total_completion_tokens between thinking and response by the
@@ -81,11 +81,11 @@ rac_result_t rac_llm_strip_thinking(const char*  text,
  * @param out_response_tokens     Receives response-segment count.
  * @return RAC_SUCCESS or RAC_ERROR_NULL_POINTER.
  */
-rac_result_t rac_llm_split_thinking_tokens(int32_t     total_completion_tokens,
-                                            const char* response_text,
-                                            const char* thinking_text,
-                                            int32_t*    out_thinking_tokens,
-                                            int32_t*    out_response_tokens);
+RAC_API rac_result_t rac_llm_split_thinking_tokens(int32_t     total_completion_tokens,
+                                                    const char* response_text,
+                                                    const char* thinking_text,
+                                                    int32_t*    out_thinking_tokens,
+                                                    int32_t*    out_response_tokens);
 
 #ifdef __cplusplus
 }  /* extern "C" */

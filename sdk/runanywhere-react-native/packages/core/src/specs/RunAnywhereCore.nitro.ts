@@ -351,6 +351,16 @@ export interface RunAnywhereCore
   ): Promise<string>;
 
   /**
+   * Get the native LLM-component handle as a JS number. Pass to
+   * `LLM.subscribeProtoEvents(handle, ...)` to subscribe to streaming
+   * events. Mirrors `getVoiceAgentHandle()` — exposes the underlying
+   * `rac_llm_handle_t` so the `LLMStreamAdapter` pattern works.
+   *
+   * @returns handle as number (0 if LLM component not yet allocated).
+   */
+  getLLMHandle(): Promise<number>;
+
+  /**
    * Cancel ongoing text generation
    */
   cancelGeneration(): Promise<boolean>;

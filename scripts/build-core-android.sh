@@ -29,20 +29,31 @@ else
     ABIS=("arm64-v8a" "armeabi-v7a" "x86_64")
 fi
 
-declare -A PRESET_BY_ABI=(
-    ["arm64-v8a"]="android-arm64"
-    ["armeabi-v7a"]="android-armv7"
-    ["x86_64"]="android-x86_64"
-)
+# ABI → preset mapping. Written as a `case` block instead of an associative
+# array (`declare -A`) so this script works on macOS' default /bin/bash 3.2,
+# which predates bash 4's associative-array support.
+preset_for_abi() {
+    case "$1" in
+        arm64-v8a)   echo "android-arm64"   ;;
+        armeabi-v7a) echo "android-armv7"   ;;
+        x86_64)      echo "android-x86_64"  ;;
+        *)
+            echo "error: unknown Android ABI '$1' (expected arm64-v8a|armeabi-v7a|x86_64)" >&2
+            exit 1
+            ;;
+    esac
+}
 
 mkdir -p "${JNI_DEST}"
 
 for ABI in "${ABIS[@]}"; do
-    PRESET="${PRESET_BY_ABI[$ABI]}"
+    PRESET="$(preset_for_abi "${ABI}")"
     echo "▶ ${ABI} via preset '${PRESET}'"
 
     cmake --preset "${PRESET}"
-    cmake --build --preset "${PRESET}" -- -j
+    # Use CMake's generator-agnostic --parallel (Ninja rejects a bare `-j`,
+    # while Make accepts it). Lets CMake pick a sensible default job count.
+    cmake --build --preset "${PRESET}" --parallel
 
     BUILD_DIR="${REPO_ROOT}/build/${PRESET}"
     DEST="${JNI_DEST}/${ABI}"

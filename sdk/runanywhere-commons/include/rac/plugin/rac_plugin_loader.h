@@ -45,7 +45,7 @@ extern "C" {
  * runtime function so loaders, frontends, and third-party tooling can ask the
  * commons binary for its version without `#include`-ing the C++ macro header.
  */
-uint32_t rac_plugin_api_version(void);
+RAC_API uint32_t rac_plugin_api_version(void);
 
 /**
  * @brief Load a shared library, resolve its `rac_plugin_entry_<stem>` symbol,
@@ -66,7 +66,7 @@ uint32_t rac_plugin_api_version(void);
  *
  * Thread-safe.
  */
-rac_result_t rac_registry_load_plugin(const char* path);
+RAC_API rac_result_t rac_registry_load_plugin(const char* path);
 
 /**
  * @brief Unregister a plugin by name. If the plugin was loaded via
@@ -80,7 +80,7 @@ rac_result_t rac_registry_load_plugin(const char* path);
  *
  * Thread-safe.
  */
-rac_result_t rac_registry_unload_plugin(const char* name);
+RAC_API rac_result_t rac_registry_unload_plugin(const char* name);
 
 /**
  * @brief Total number of plugins currently registered (across all primitives,
@@ -89,7 +89,7 @@ rac_result_t rac_registry_unload_plugin(const char* name);
  * Equivalent to `rac_plugin_count()` in `rac_plugin_entry.h` — exposed here
  * for symmetry with the loader API surface.
  */
-size_t rac_registry_plugin_count(void);
+RAC_API size_t rac_registry_plugin_count(void);
 
 /**
  * @brief Snapshot the names of currently-registered plugins.
@@ -98,12 +98,12 @@ size_t rac_registry_plugin_count(void);
  * `rac_registry_free_plugin_list()`. Returns RAC_SUCCESS even when no plugins
  * are registered (`*out_count = 0`, `*out_names = NULL`).
  */
-rac_result_t rac_registry_list_plugins(const char*** out_names, size_t* out_count);
+RAC_API rac_result_t rac_registry_list_plugins(const char*** out_names, size_t* out_count);
 
 /**
  * @brief Free the array returned by `rac_registry_list_plugins`.
  */
-void rac_registry_free_plugin_list(const char** names, size_t count);
+RAC_API void rac_registry_free_plugin_list(const char** names, size_t count);
 
 #ifdef __cplusplus
 }

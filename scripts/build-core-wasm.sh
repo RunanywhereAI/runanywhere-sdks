@@ -26,7 +26,9 @@ echo "▶ Configure wasm preset"
 cmake --preset wasm
 
 echo "▶ Build wasm preset"
-cmake --build --preset wasm -- -j
+# Use CMake's generator-agnostic --parallel (Ninja rejects a bare `-j`,
+# while Make accepts it). Lets CMake pick a sensible default job count.
+cmake --build --preset wasm --parallel
 
 mkdir -p "${DEST}"
 

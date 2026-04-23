@@ -158,13 +158,13 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         return;
       }
 
-      // v3.1: initialize voice agent against loaded models + wrap the
-      // handle as an adapter that emits proto VoiceEvent messages.
-      await sdk.DartBridgeVoiceAgent.shared.initializeWithLoadedModels();
-      final handle = await sdk.DartBridgeVoiceAgent.shared.getHandle();
-      final adapter = sdk.VoiceAgentStreamAdapter(handle);
+      // v4: voice capability owns adapter construction. Initialize
+      // against loaded models then subscribe to the proto VoiceEvent
+      // stream — symmetric with `instance.llm.generateStream(...)`.
+      final voice = sdk.RunAnywhereSDK.instance.voice;
+      await voice.initializeWithLoadedModels();
 
-      _eventSubscription = adapter.stream().listen(
+      _eventSubscription = voice.eventStream().listen(
         _handleProtoEvent,
         onError: (Object error) {
           setState(() {

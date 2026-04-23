@@ -208,7 +208,9 @@ class RunAnywhereSDK {
   RunAnywhereVLM get vlm => RunAnywhereVLM.shared;
 
   /// Voice Agent (full STT → LLM → TTS pipeline) — initialize,
-  /// cleanup, isReady. For streaming, use `VoiceAgentStreamAdapter`.
+  /// cleanup, isReady, eventStream. Symmetric with `llm.generateStream`:
+  /// `voice.eventStream()` returns `Stream<VoiceEvent>` and wraps
+  /// `VoiceAgentStreamAdapter` internally.
   RunAnywhereVoice get voice => RunAnywhereVoice.shared;
 
   /// Models registry — list available, refresh from filesystem,

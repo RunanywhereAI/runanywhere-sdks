@@ -79,56 +79,56 @@ typedef struct {
  * @param env The environment to check
  * @return true for staging/production, false for development
  */
-bool rac_env_requires_auth(rac_environment_t env);
+RAC_API bool rac_env_requires_auth(rac_environment_t env);
 
 /**
  * @brief Check if environment requires a backend URL
  * @param env The environment to check
  * @return true for staging/production, false for development
  */
-bool rac_env_requires_backend_url(rac_environment_t env);
+RAC_API bool rac_env_requires_backend_url(rac_environment_t env);
 
 /**
  * @brief Check if environment is production
  * @param env The environment to check
  * @return true only for production
  */
-bool rac_env_is_production(rac_environment_t env);
+RAC_API bool rac_env_is_production(rac_environment_t env);
 
 /**
  * @brief Check if environment is a testing environment
  * @param env The environment to check
  * @return true for development and staging
  */
-bool rac_env_is_testing(rac_environment_t env);
+RAC_API bool rac_env_is_testing(rac_environment_t env);
 
 /**
  * @brief Get the default log level for an environment
  * @param env The environment
  * @return DEBUG for development, INFO for staging, WARNING for production
  */
-rac_log_level_t rac_env_default_log_level(rac_environment_t env);
+RAC_API rac_log_level_t rac_env_default_log_level(rac_environment_t env);
 
 /**
  * @brief Check if telemetry should be sent for this environment
  * @param env The environment
  * @return true only for production
  */
-bool rac_env_should_send_telemetry(rac_environment_t env);
+RAC_API bool rac_env_should_send_telemetry(rac_environment_t env);
 
 /**
  * @brief Check if environment should sync with backend
  * @param env The environment
  * @return true for staging/production, false for development
  */
-bool rac_env_should_sync_with_backend(rac_environment_t env);
+RAC_API bool rac_env_should_sync_with_backend(rac_environment_t env);
 
 /**
  * @brief Get human-readable environment description
  * @param env The environment
  * @return String like "Development Environment"
  */
-const char* rac_env_description(rac_environment_t env);
+RAC_API const char* rac_env_description(rac_environment_t env);
 
 // =============================================================================
 // Validation Functions
@@ -155,7 +155,7 @@ typedef enum {
  * @param env The target environment
  * @return RAC_VALIDATION_OK if valid, error code otherwise
  */
-rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environment_t env);
+RAC_API rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environment_t env);
 
 /**
  * @brief Validate base URL for the given environment
@@ -163,21 +163,21 @@ rac_validation_result_t rac_validate_api_key(const char* api_key, rac_environmen
  * @param env The target environment
  * @return RAC_VALIDATION_OK if valid, error code otherwise
  */
-rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t env);
+RAC_API rac_validation_result_t rac_validate_base_url(const char* url, rac_environment_t env);
 
 /**
  * @brief Validate complete SDK configuration
  * @param config The configuration to validate
  * @return RAC_VALIDATION_OK if valid, first error code otherwise
  */
-rac_validation_result_t rac_validate_config(const rac_sdk_config_t* config);
+RAC_API rac_validation_result_t rac_validate_config(const rac_sdk_config_t* config);
 
 /**
  * @brief Get error message for validation result
  * @param result The validation result code
  * @return Human-readable error message
  */
-const char* rac_validation_error_message(rac_validation_result_t result);
+RAC_API const char* rac_validation_error_message(rac_validation_result_t result);
 
 // =============================================================================
 // Global SDK State

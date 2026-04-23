@@ -365,6 +365,8 @@ extern "C" {
 #define RAC_ERROR_BACKEND_INIT_FAILED ((rac_result_t) - 602)
 /** Backend busy */
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
+/** Backend unavailable: backend compiled as stub, engine binary not installed */
+#define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 
@@ -396,6 +398,23 @@ extern "C" {
 #define RAC_ERROR_UNKNOWN ((rac_result_t) - 804)
 /** Internal error */
 #define RAC_ERROR_INTERNAL ((rac_result_t) - 805)
+
+/* ─────────── GAP 02: engine plugin errors ─────────── */
+/** Plugin's `metadata.abi_version` did not equal `RAC_PLUGIN_API_VERSION`. */
+#define RAC_ERROR_ABI_VERSION_MISMATCH ((rac_result_t) - 810)
+/** Plugin's `capability_check()` returned non-zero (silent reject; engine
+ *  does not run on this host — e.g. MetalRT on Linux). */
+#define RAC_ERROR_CAPABILITY_UNSUPPORTED ((rac_result_t) - 811)
+/** Plugin registration rejected due to duplicate `metadata.name`. */
+#define RAC_ERROR_PLUGIN_DUPLICATE ((rac_result_t) - 812)
+
+/* ─────────── GAP 03: dynamic plugin loader errors ─────────── */
+/** dlopen / dlsym failed (file not found, missing entry symbol, arch mismatch,
+ *  unresolved dependency). Use `dlerror()` for details on POSIX hosts. */
+#define RAC_ERROR_PLUGIN_LOAD_FAILED ((rac_result_t) - 820)
+/** Plugin cannot be unloaded because outstanding sessions still hold its
+ *  primitive. The session-refcount mechanism is wired by GAP 04. */
+#define RAC_ERROR_PLUGIN_BUSY ((rac_result_t) - 821)
 
 // =============================================================================
 // ERROR MESSAGE API

@@ -32,7 +32,7 @@ extern "C" {
  * @return RAC_TRUE if WhisperKit CoreML can handle this model
  */
 typedef rac_bool_t (*rac_whisperkit_coreml_stt_can_handle_fn)(const char* model_id,
-                                                               void* user_data);
+                                                              void* user_data);
 
 /**
  * Callback to load a WhisperKit CoreML model.
@@ -43,8 +43,7 @@ typedef rac_bool_t (*rac_whisperkit_coreml_stt_can_handle_fn)(const char* model_
  * @return Opaque handle to loaded service, or NULL on failure
  */
 typedef rac_handle_t (*rac_whisperkit_coreml_stt_create_fn)(const char* model_path,
-                                                             const char* model_id,
-                                                             void* user_data);
+                                                            const char* model_id, void* user_data);
 
 /**
  * Callback to transcribe audio via WhisperKit CoreML.
@@ -57,12 +56,9 @@ typedef rac_handle_t (*rac_whisperkit_coreml_stt_create_fn)(const char* model_pa
  * @param user_data User-provided context
  * @return RAC_SUCCESS or error code
  */
-typedef rac_result_t (*rac_whisperkit_coreml_stt_transcribe_fn)(rac_handle_t handle,
-                                                                 const void* audio_data,
-                                                                 size_t audio_size,
-                                                                 const rac_stt_options_t* options,
-                                                                 rac_stt_result_t* out_result,
-                                                                 void* user_data);
+typedef rac_result_t (*rac_whisperkit_coreml_stt_transcribe_fn)(
+    rac_handle_t handle, const void* audio_data, size_t audio_size,
+    const rac_stt_options_t* options, rac_stt_result_t* out_result, void* user_data);
 
 /**
  * Callback to destroy/unload a WhisperKit CoreML service.
@@ -102,8 +98,7 @@ rac_whisperkit_coreml_stt_set_callbacks(const rac_whisperkit_coreml_stt_callback
  *
  * @return Pointer to callbacks, or NULL if not set
  */
-RAC_API const rac_whisperkit_coreml_stt_callbacks_t*
-rac_whisperkit_coreml_stt_get_callbacks(void);
+RAC_API const rac_whisperkit_coreml_stt_callbacks_t* rac_whisperkit_coreml_stt_get_callbacks(void);
 
 /**
  * Checks if Swift callbacks are registered.

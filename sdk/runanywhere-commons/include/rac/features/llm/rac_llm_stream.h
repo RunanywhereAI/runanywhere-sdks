@@ -71,9 +71,9 @@ typedef void (*rac_llm_stream_proto_callback_fn)(const uint8_t* event_bytes,
  *                                         frontend should fall back to
  *                                         the struct callback path.
  */
-rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    handle,
-                                                rac_llm_stream_proto_callback_fn callback,
-                                                void*                           user_data);
+RAC_API rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    handle,
+                                                        rac_llm_stream_proto_callback_fn callback,
+                                                        void*                           user_data);
 
 /**
  * @brief Unregister the proto-byte stream callback for a handle.
@@ -84,7 +84,7 @@ rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    h
  * @retval RAC_SUCCESS              Registration cleared (or was already empty).
  * @retval RAC_ERROR_INVALID_HANDLE @p handle is null.
  */
-rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);
+RAC_API rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle);
 
 #ifdef __cplusplus
 }  /* extern "C" */

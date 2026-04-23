@@ -31,7 +31,7 @@
 /// ```
 library runanywhere_genie;
 
-import 'dart:async' show unawaited;
+import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/core/types/model_types.dart';

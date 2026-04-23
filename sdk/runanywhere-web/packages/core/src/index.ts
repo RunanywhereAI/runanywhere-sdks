@@ -33,6 +33,14 @@ export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnRes
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from './generated/streams/voice_agent_service_stream';
 export type { VoiceAgentRequest } from './generated/voice_agent_service';
+
+// LLM proto-byte streaming (GAP 09 — symmetric to VoiceAgentStreamAdapter).
+// Used by backend packages (e.g. @runanywhere/web-llamacpp) to expose a
+// platform-agnostic AsyncIterable<LLMStreamEvent> over the C++ proto callback.
+export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
+export type { LLMStreamTransport } from './generated/streams/llm_service_stream';
+export type { LLMGenerateRequest, LLMStreamEvent } from './generated/llm_service';
+export { LLMTokenKind } from './generated/llm_service';
 export {
   VoiceEvent,
   UserSaidEvent,

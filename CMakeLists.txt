@@ -8,8 +8,12 @@
 # Subdirectories:
 #   - sdk/runanywhere-commons/ — the C++ runtime library (rac_commons)
 #   - idl/                     — protobuf IDL + rac_idl static library
-#   - engines/                 — engine plugins (after GAP 06; until then
-#                                they live under sdk/runanywhere-commons/src/backends/)
+#   - engines/                 — engine plugins (llamacpp, onnx, whispercpp,
+#                                whisperkit_coreml, metalrt). Each publishes
+#                                a `rac_engine_vtable_t` at
+#                                `RAC_PLUGIN_API_VERSION=3u` via
+#                                `RAC_STATIC_PLUGIN_REGISTER` or a dlopen'd
+#                                `rac_plugin_entry` symbol (GAP 02 + GAP 06).
 #   - tools/plugin-loader-smoke/ — CLI smoke test for the GAP 03 loader
 #
 # Common builds:

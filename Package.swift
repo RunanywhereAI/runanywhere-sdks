@@ -40,7 +40,7 @@ import Foundation
 // the same — it's been renamed to `useLocalNatives` for consistency with the
 // equivalent toggle in the other client SDKs (Kotlin, Flutter, React Native).
 // =============================================================================
-let useLocalNatives = false //  Toggle: true for local dev, false for release
+let useLocalNatives = true //  Toggle: true for local dev, false for release
 
 // Version for remote XCFrameworks (used when useLocalNatives = false)
 // Updated automatically by CI/CD during releases.

@@ -27,6 +27,8 @@ import com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.StateChangeEvent
+import ai.runanywhere.proto.v1.PipelineState
+import ai.runanywhere.proto.v1.VADEventType
 import ai.runanywhere.proto.v1.VADEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -902,7 +904,7 @@ class VoiceAssistantViewModel(
             event.state != null -> {
                 val state = event.state!!
                 when (state.current) {
-                    StateChangeEvent.State.IDLE -> {
+                    PipelineState.PIPELINE_STATE_IDLE -> {
                         Timber.i("Voice agent idle → listening")
                         _uiState.update {
                             it.copy(
@@ -911,7 +913,7 @@ class VoiceAssistantViewModel(
                             )
                         }
                     }
-                    StateChangeEvent.State.LISTENING -> {
+                    PipelineState.PIPELINE_STATE_LISTENING -> {
                         // Audio level isn't in the proto state event; audio
                         // level comes from the local AudioCaptureService RMS
                         // calculation, already updated separately.
@@ -928,7 +930,7 @@ class VoiceAssistantViewModel(
                             }
                         }
                     }
-                    StateChangeEvent.State.THINKING -> {
+                    PipelineState.PIPELINE_STATE_THINKING -> {
                         Timber.i("Processing speech...")
                         _uiState.update {
                             it.copy(
@@ -937,11 +939,11 @@ class VoiceAssistantViewModel(
                             )
                         }
                     }
-                    StateChangeEvent.State.SPEAKING -> {
+                    PipelineState.PIPELINE_STATE_SPEAKING -> {
                         Timber.d("Playing TTS audio")
                         _uiState.update { it.copy(sessionState = SessionState.SPEAKING) }
                     }
-                    StateChangeEvent.State.STOPPED -> {
+                    PipelineState.PIPELINE_STATE_STOPPED -> {
                         Timber.i("Voice agent stopped")
                         _uiState.update {
                             it.copy(
@@ -956,11 +958,11 @@ class VoiceAssistantViewModel(
 
             event.vad != null -> {
                 when (event.vad!!.type) {
-                    VADEvent.Type.VAD_EVENT_VOICE_START -> {
+                    VADEventType.VAD_EVENT_VOICE_START -> {
                         Timber.d("Speech detected")
                         _uiState.update { it.copy(isSpeechDetected = true) }
                     }
-                    VADEvent.Type.VAD_EVENT_VOICE_END_OF_UTTERANCE -> {
+                    VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE -> {
                         Timber.i("Processing speech...")
                         _uiState.update {
                             it.copy(
