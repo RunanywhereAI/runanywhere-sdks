@@ -5,14 +5,18 @@ released). Updated: 2026-04-22._
 
 ## Start here
 
-1. **[`TEAM_STATUS.md`](TEAM_STATUS.md)** — **3-min status read** for
-   sharing in standup. Branch state + per-GAP closure + what's left
-   + suggested release sequencing.
-2. **[`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md)** — architectural
+1. **[`COMPREHENSIVE_STATUS.md`](COMPREHENSIVE_STATUS.md)** — **the
+   one document to read for full state**. Synthesized from a 6-agent
+   parallel deep-dive: per-SDK state, architecture diagram, 25-bug
+   inventory with file:line + severity (4 P0 / 8 P1 / 4 P2 / 8 P3 /
+   1 P4 group), prioritized backlog, release-readiness checklist.
+2. **[`TEAM_STATUS.md`](TEAM_STATUS.md)** — 3-min standup-ready
+   summary (lighter than COMPREHENSIVE_STATUS).
+3. **[`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md)** — architectural
    detail + active backlog + versioning policy + doc map.
-3. **[`GAP_STATUS.md`](GAP_STATUS.md)** — rolling 10-GAP scoreboard
+4. **[`GAP_STATUS.md`](GAP_STATUS.md)** — rolling 10-GAP scoreboard
    (DONE / MOSTLY DONE / DEFERRED per spec). Update when a GAP ships.
-4. **[`HISTORY.md`](HISTORY.md)** — chronological narrative of the
+5. **[`HISTORY.md`](HISTORY.md)** — chronological narrative of the
    114 branch commits. Full evidence under `archive/`.
 
 ## Reference docs (active)
