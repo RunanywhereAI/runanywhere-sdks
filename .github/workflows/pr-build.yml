@@ -87,7 +87,6 @@ jobs:
         run: |
           curl -sSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
           unzip -q ndk.zip
-          mv android-ndk-r27c "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - run: cmake --preset android-arm64
       - run: cmake --build --preset android-arm64
@@ -117,7 +116,6 @@ jobs:
       - run: |
           curl -sSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r27c-linux.zip
           unzip -q ndk.zip
-          mv android-ndk-r27c "${ANDROID_NDK_HOME}"
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Build Android JNI libs
         run: ./scripts/build-core-android.sh
