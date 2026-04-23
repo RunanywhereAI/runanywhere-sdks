@@ -1,9 +1,20 @@
 # Engine Plugin Authoring Guide
 
-_Closes GAP 02 Phase 10. The definitive "how do I add a new engine to RunAnywhere?" reference._
+_The definitive "how do I add a new engine to RunAnywhere?" reference._
 
-Use this guide when you want RunAnywhere to route a new primitive (LLM, STT, TTS, VAD, embedding, reranker, VLM, diffusion) through your engine. After Phase 10 of
-[`v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md`](../v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md) there are **two** registration paths. Most authors should pick the unified path; the legacy path only stays around for binary-compatibility with releases ≤ v0.19.
+> **v3.1 status**: `RAC_PLUGIN_API_VERSION = 3u`. The legacy
+> `rac_service_*` registry was DELETED in v3.0.0; the **unified
+> path** is now the only path. Every `rac_*_service_ops_t` struct
+> requires a `create` op pointer (added in v3.0.0). Examples below
+> using the "legacy path" / `abi_version 1` are HISTORICAL —
+> retained for archaeology only. Active engine authors should
+> follow the unified path exclusively.
+>
+> See [`STATE_AND_ROADMAP.md`](STATE_AND_ROADMAP.md) for current
+> ABI state and [`plugins/PLUGIN_AUTHORING.md`](plugins/PLUGIN_AUTHORING.md)
+> for third-party packaging (static vs `dlopen`).
+
+Use this guide when you want RunAnywhere to route a new primitive (LLM, STT, TTS, VAD, embedding, reranker, VLM, diffusion) through your engine. The unified registration path is the only supported way as of v3.0.0; the legacy text below is preserved for historical context.
 
 ## Which path should I pick?
 

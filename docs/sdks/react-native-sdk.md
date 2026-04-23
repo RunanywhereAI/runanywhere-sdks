@@ -1,5 +1,14 @@
 # RunAnywhere React Native SDK
 
+> ⚠️ **DOC DRIFT NOTICE**: Version numbers in examples reflect a
+> pre-v2.x snapshot; current version is `3.1.0` (see
+> `sdk/runanywhere-react-native/packages/core/package.json`). Voice
+> APIs now use `VoiceAgentStreamAdapter(handle).stream()` returning
+> `AsyncIterable<VoiceEvent>` (proto). See
+> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) and
+> [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md).
+> Refresh tracked in Active Backlog #4.
+
 React Native SDK for on-device AI inference. Uses Nitrogen/Nitro for high-performance TypeScript-to-C++ bridging.
 
 ## Installation

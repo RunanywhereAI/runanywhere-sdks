@@ -1,12 +1,20 @@
-# Migrating off `VoiceSessionEvent` (v2.1-1)
+# Migrating off `VoiceSessionEvent` (v2.1 → v3.1)
 
-> **Target audience**: consumers of the RunAnywhere SDK's voice-session
-> API who use the legacy `VoiceSessionEvent` enum. After v2.1, this
-> type is a deprecated derived view over the canonical `VoiceEvent`
-> proto (codegen'd from [`idl/voice_events.proto`](../../idl/voice_events.proto)).
+> **v3.1 STATUS**: `VoiceSessionEvent` (and its 4-language siblings:
+> sealed class / interface / enum) was **DELETED** across all 5 SDKs
+> in v3.1 Phase 4 (April 2026). This doc is now a **migration guide
+> for consumers still on v2.x or v3.0.x** — the canonical (and only)
+> path on v3.1.0+ is `VoiceAgentStreamAdapter(handle).stream()`
+> returning the proto-generated `VoiceEvent` type.
 >
-> **Closes**: [`GAP 09 #6`](../../../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md)
-> ("zero hand-written `VoiceSessionEvent` types").
+> **Target audience**:
+> - **You're on v2.x / v3.0.x**: use the mapping tables below to
+>   migrate before upgrading to v3.1.0+.
+> - **You're on v3.1.0+**: the legacy types no longer exist; consume
+>   `VoiceEvent` directly via the adapter (`event.payload` switch).
+>
+> **Closed**: [`GAP 09 #6`](../../v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md)
+> ("zero hand-written `VoiceSessionEvent` types") in v3.1.
 
 ## Why the change
 

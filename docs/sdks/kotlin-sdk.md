@@ -1,5 +1,14 @@
 # RunAnywhere Kotlin Multiplatform SDK
 
+> ⚠️ **DOC DRIFT NOTICE**: Examples reflect a pre-v2.x snapshot
+> (`io.github...:0.1.5`); current version is `3.1.0` (see Kotlin
+> `build.gradle.kts` fallback). The voice API now uses
+> `VoiceAgentStreamAdapter(handle).stream()` returning
+> `Flow<VoiceEvent>` — see
+> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) and
+> [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md).
+> Refresh tracked in Active Backlog #4.
+
 Cross-platform SDK for on-device AI inference with intelligent routing. Supports JVM, Android, and (planned) Native targets.
 
 ## Installation

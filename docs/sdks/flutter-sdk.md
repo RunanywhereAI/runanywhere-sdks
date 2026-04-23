@@ -1,5 +1,17 @@
 # RunAnywhere Flutter SDK
 
+> ⚠️ **DOC DRIFT NOTICE**: This file's API examples and version
+> numbers reflect a pre-v2.x snapshot. Current version is `3.1.0`
+> (see `sdk/runanywhere-flutter/packages/runanywhere/pubspec.yaml`).
+> Voice APIs in this doc still describe the deleted
+> `VoiceSessionEvent` shape; the canonical voice API is
+> `VoiceAgentStreamAdapter(handle).stream()` returning
+> `Stream<VoiceEvent>` (proto). See
+> [`../STATE_AND_ROADMAP.md`](../STATE_AND_ROADMAP.md) for current
+> state and [`../migrations/VoiceSessionEvent.md`](../migrations/VoiceSessionEvent.md)
+> for the migration. This doc needs a v3.1 refresh pass — tracked
+> in `STATE_AND_ROADMAP.md` Active Backlog #4.
+
 Cross-platform Flutter SDK for on-device AI inference. Supports iOS and Android with native C++ backends via Dart FFI.
 
 ## Installation
