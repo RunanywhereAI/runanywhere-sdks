@@ -406,103 +406,76 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
         CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
         // 5. Check for multi-file model (e.g., VLM with model + mmproj)
-        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern
+        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern.
+        // v3.1.3: refactored to delegate per-file HTTP transport to the existing
+        // `downloadFileWithHttpURLConnection` helper (DRY win, ~80 LOC saved).
+        // Per-file progress is converted to combined-progress via `index/count`
+        // offset + scale, matching the iOS Alamofire pattern.
         val multiFileDescriptors = getMultiFileDescriptors(modelId)
         if (multiFileDescriptors != null && multiFileDescriptors.size > 1) {
             downloadLogger.info("Multi-file model detected with ${multiFileDescriptors.size} files")
 
             try {
-                // Create model directory (path = {models_dir}/{type_dir}/{modelId}/)
                 val modelDirPath = CppBridgeModelPaths.getModelPath(modelId, modelType)
                 val modelDir = File(modelDirPath)
                 modelDir.mkdirs()
                 downloadLogger.info("Created model directory: ${modelDir.absolutePath}")
 
-                var totalBytesDownloaded = 0L
                 val fileCount = multiFileDescriptors.size
+                var totalBytesDownloaded = 0L
                 var lastProgressEmitTime = 0L
 
-                // Download each file sequentially (matches iOS pattern)
                 for ((index, fileDescriptor) in multiFileDescriptors.withIndex()) {
                     val fileDestination = File(modelDir, fileDescriptor.filename)
                     downloadLogger.info("Downloading file ${index + 1}/$fileCount: ${fileDescriptor.filename}")
                     downloadLogger.info("  URL: ${fileDescriptor.url}")
                     downloadLogger.info("  Destination: ${fileDestination.absolutePath}")
 
+                    val fileSizeBefore = if (fileDestination.exists()) fileDestination.length() else 0L
                     withContext(Dispatchers.IO) {
-                        val url = java.net.URL(fileDescriptor.url)
-                        val connection = url.openConnection() as java.net.HttpURLConnection
-                        connection.connectTimeout = 30_000 // 30s for initial connection
-                        connection.readTimeout = 300_000 // 5 min for large model file transfers
-                        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
-
-                        try {
-                            val responseCode = connection.responseCode
-                            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                                throw SDKError.download(
-                                    "HTTP $responseCode downloading ${fileDescriptor.filename}",
-                                )
-                            }
-
-                            val fileTotalBytes = connection.contentLengthLong
-                            var fileBytesRead = 0L
-                            val buffer = ByteArray(8192)
-
-                            connection.inputStream.use { input ->
-                                FileOutputStream(fileDestination).use { output ->
-                                    var len: Int
-                                    while (input.read(buffer).also { len = it } != -1) {
-                                        output.write(buffer, 0, len)
-                                        fileBytesRead += len
-
-                                        // Throttle progress emissions to every 200ms
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastProgressEmitTime >= 200) {
-                                            lastProgressEmitTime = now
-                                            // iOS pattern: offset + (fileProgress * scale)
-                                            val fileProgress =
-                                                if (fileTotalBytes > 0) {
-                                                    fileBytesRead.toFloat() / fileTotalBytes
-                                                } else {
-                                                    0f
-                                                }
-                                            val combinedProgress =
-                                                (index.toFloat() + fileProgress) / fileCount
-
-                                            trySend(
-                                                DownloadProgress(
-                                                    modelId = modelId,
-                                                    progress = combinedProgress,
-                                                    bytesDownloaded = totalBytesDownloaded + fileBytesRead,
-                                                    totalBytes = modelInfo.downloadSize,
-                                                    state = DownloadState.DOWNLOADING,
-                                                ),
-                                            )
-
-                                            // Emit SDK event every ~5% overall
-                                            val progressPercent = (combinedProgress * 100).toInt()
-                                            if (progressPercent % 5 == 0) {
-                                                CppBridgeEvents.emitDownloadProgress(
-                                                    modelId,
-                                                    combinedProgress.toDouble(),
-                                                    totalBytesDownloaded + fileBytesRead,
-                                                    modelInfo.downloadSize ?: 0,
-                                                )
-                                            }
+                        downloadFileWithHttpURLConnection(
+                            url = fileDescriptor.url,
+                            destFile = fileDestination,
+                            progressCallback = { fileProgress ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastProgressEmitTime >= 200) {
+                                    lastProgressEmitTime = now
+                                    val combinedProgress =
+                                        (index.toFloat() + fileProgress) / fileCount
+                                    val fileBytesRead =
+                                        if (fileDestination.exists()) {
+                                            fileDestination.length() - fileSizeBefore
+                                        } else {
+                                            0L
                                         }
+                                    trySend(
+                                        DownloadProgress(
+                                            modelId = modelId,
+                                            progress = combinedProgress,
+                                            bytesDownloaded = totalBytesDownloaded + fileBytesRead,
+                                            totalBytes = modelInfo.downloadSize,
+                                            state = DownloadState.DOWNLOADING,
+                                        ),
+                                    )
+                                    val progressPercent = (combinedProgress * 100).toInt()
+                                    if (progressPercent % 5 == 0) {
+                                        CppBridgeEvents.emitDownloadProgress(
+                                            modelId,
+                                            combinedProgress.toDouble(),
+                                            totalBytesDownloaded + fileBytesRead,
+                                            modelInfo.downloadSize ?: 0,
+                                        )
                                     }
                                 }
-                            }
-
-                            totalBytesDownloaded += fileBytesRead
-                            downloadLogger.info(
-                                "Completed file ${index + 1}/$fileCount: " +
-                                    "${fileDescriptor.filename} ($fileBytesRead bytes)",
-                            )
-                        } finally {
-                            connection.disconnect()
-                        }
+                            },
+                        )
                     }
+                    val finalFileBytes = fileDestination.length() - fileSizeBefore
+                    totalBytesDownloaded += finalFileBytes
+                    downloadLogger.info(
+                        "Completed file ${index + 1}/$fileCount: " +
+                            "${fileDescriptor.filename} ($finalFileBytes bytes)",
+                    )
                 }
 
                 // All files downloaded — update registry with directory path

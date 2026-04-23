@@ -50,7 +50,7 @@ let useLocalNatives = false //  Toggle: true for local dev, false for release
 // should set `useLocalNatives = true` until release automation publishes
 // the v3.1.0
 // artifacts.
-let sdkVersion = "3.1.2"
+let sdkVersion = "3.1.3"
 
 // MetalRT remote binary availability flag.
 // Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip

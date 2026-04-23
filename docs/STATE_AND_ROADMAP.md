@@ -14,7 +14,7 @@ Updated: 2026-04-22 (v3.1.1)._
 
 ## TL;DR
 
-- **Current shipped version: v3.1.2** across all 7 packages
+- **Current shipped version: v3.1.3** across all 7 packages
   (Swift / Kotlin / Flutter `runanywhere` + 3 backend plugins / Web
   core+plugins / RN core+plugins). Tagged 2026-04-22.
 - **C ABI version: `RAC_PLUGIN_API_VERSION = 3u`** (bumped in v3.0.0).
@@ -110,9 +110,13 @@ v4.x. None are release-blocking.
    options preserved in [`HISTORY.md#flutter-split-analysis`](HISTORY.md#flutter-split-analysis).
 
 6. **Kotlin LOC trim — GAP 08 #3 (download orchestration)** —
-   `RunAnywhere+ModelManagement.jvmAndroid.kt` ~1,308 LOC. Needs
-   a commons-side orchestrator + thin Flow adapter. Multi-sprint
-   effort (~1,000 LOC saving expected).
+   AUDITED in v3.1.3. Architectural blocker: requires choosing a
+   commons HTTP client (libcurl / cpr / platform-native shims). The
+   1,485 LOC of CppBridgeDownload is the Android HTTP executor that
+   the C++ download manager calls back into — not orchestration
+   duplication. v3.1.3 shipped a small DRY refactor (-27 LOC). Full
+   cleanup deferred until commons HTTP client decision; see
+   [docs/v3_2_kotlin_download_blocker.md](v3_2_kotlin_download_blocker.md).
 
 ### QA (out of v3.1 scope per user directive)
 

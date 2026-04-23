@@ -14,6 +14,7 @@ evidence (commit lists, LOC diffs, audit tables) lives at
 | 2026-04-22 | v3.1.0 | Sample app migrations + delete deprecated shims + DAG primitives + perf/cancel parity harnesses |
 | 2026-04-22 | v3.1.1 | Doc refreshes (3 SDK API refs + engine authoring guide) + Swift release-tooling script |
 | 2026-04-22 | v3.1.2 | 4 engine CMakeLists migrated to `rac_add_engine_plugin()` (onnx, whispercpp, whisperkit_coreml, metalrt); macro extended with TARGET_NAME / CXX_STANDARD / SHARED_ONLY / COMPILE_OPTIONS / LINK_OPTIONS |
+| 2026-04-22 | v3.1.3 | Kotlin download multi-file path DRY refactor (-27 LOC); GAP 08 #3 architectural blocker documented |
 
 ---
 
@@ -212,6 +213,41 @@ L63-64 ("build when a 2nd pipeline needs them").
   `test_graph_primitives` 13/13, `perf_producer` 144 ns/event,
   `cancel_producer` clean.
 - Doc consolidation (this set of docs).
+
+---
+
+## v3.1.3 Kotlin download DRY refactor + GAP 08 #3 blocker doc (2026-04-22)
+
+Sprint 3 of the post-v3.1 cleanup roadmap. Original plan called for
+a ~1,000 LOC win by routing all Kotlin downloads through commons.
+Audit surfaced an architectural blocker: the C++ `rac_download_manager_*`
+API does NOT do HTTP itself — it delegates to a platform-registered
+executor (Kotlin's `CppBridgeDownload.executeDownload()` runs
+`HttpURLConnection` on Android). Eliminating the Kotlin executor
+requires picking a commons HTTP client (libcurl / cpr / platform
+shims) — multi-month vendor + integration scope.
+
+**Headline deliverables:**
+- DRY refactor in
+  `RunAnywhere+ModelManagement.jvmAndroid.kt`: multi-file download
+  loop (~150 LOC of inline `HttpURLConnection`) refactored to
+  delegate per-file HTTP to the existing
+  `downloadFileWithHttpURLConnection` helper. Net: -27 LOC.
+- New doc:
+  [`docs/v3_2_kotlin_download_blocker.md`](v3_2_kotlin_download_blocker.md)
+  — full audit + architectural-blocker explanation +
+  recommended next steps if/when GAP 08 #3 is prioritized.
+- 7 packages bumped to `3.1.3`.
+- `STATE_AND_ROADMAP.md` Active Backlog #6 reframed: GAP 08 #3 is
+  blocked on a vendor decision, not stalled-engineering.
+
+**Why Sprint 3.2 + 3.3 were cancelled:**
+The original Sprint 3 plan called for adding 5 new JNI thunks for
+`rac_download_manager_*` and a `CppBridgeDownloadManager.kt` facade.
+Audit found these were already in place (the existing JNI surface
+covers the manager API; CppBridgeDownload IS the facade). The
+remaining 1,485 LOC of `CppBridgeDownload.kt` is platform-executor
+logic, not duplication.
 
 ---
 

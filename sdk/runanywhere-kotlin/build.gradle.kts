@@ -62,7 +62,7 @@ group =
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")
-        ?: "3.1.2"
+        ?: "3.1.3"
 version = resolvedVersion
 
 logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")
