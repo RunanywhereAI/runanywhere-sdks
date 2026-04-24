@@ -34,6 +34,107 @@ const logger = new SDKLogger('RunAnywhere.ToolCalling');
 
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
+type SerializedToolDefinition = Pick<ToolDefinition, 'name' | 'description'> & {
+  parameters: Array<{
+    name: string;
+    type: string;
+    description: string;
+    required: boolean;
+    enumValues?: string[];
+  }>;
+};
+
+function serializeToolsForCpp(toolsToFormat: ToolDefinition[]): string {
+  return JSON.stringify(toolsToFormat.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters.map((p) => ({
+      name: p.name,
+      type: p.type,
+      description: p.description,
+      required: p.required,
+      ...(p.enum ? { enumValues: p.enum } : {}),
+    })),
+  })));
+}
+
+function getFormatInstructions(format: string): string {
+  switch (format) {
+    case 'lfm2':
+      return [
+        'TOOL CALLING FORMAT (LFM2):',
+        'When you need to use a tool, output ONLY this format:',
+        '<|tool_call_start|>[TOOL_NAME(param="VALUE_FROM_USER_QUERY")]<|tool_call_end|>',
+        '',
+        "CRITICAL: Extract the EXACT value from the user's question:",
+        '- User asks \'weather in Tokyo\' -> <|tool_call_start|>[get_weather(location="Tokyo")]<|tool_call_end|>',
+        '- User asks \'weather in sf\' -> <|tool_call_start|>[get_weather(location="San Francisco")]<|tool_call_end|>',
+        '',
+        'RULES:',
+        '1. For greetings or general chat, respond normally without tools',
+        '2. Use Python-style function call syntax inside the tags',
+        '3. String values MUST be quoted with double quotes',
+        '4. Multiple arguments are separated by commas',
+      ].join('\n');
+    case 'default':
+    default:
+      return [
+        'TOOL CALLING FORMAT - YOU MUST USE THIS EXACT FORMAT:',
+        'When you need to use a tool, output ONLY this (no other text before or after):',
+        '<tool_call>{"tool": "TOOL_NAME", "arguments": {"PARAM_NAME": "VALUE_FROM_USER_QUERY"}}</tool_call>',
+        '',
+        "CRITICAL: Extract the EXACT value from the user's question:",
+        '- User asks \'weather in Tokyo\' -> <tool_call>{"tool": "get_weather", "arguments": {"location": "Tokyo"}}</tool_call>',
+        '- User asks \'weather in sf\' -> <tool_call>{"tool": "get_weather", "arguments": {"location": "San Francisco"}}</tool_call>',
+        '',
+        'RULES:',
+        '1. For greetings or general chat, respond normally without tools',
+        '2. When using a tool, output ONLY the <tool_call> tag, nothing else',
+        '3. Use the exact parameter names shown in the tool definitions above',
+      ].join('\n');
+  }
+}
+
+function formatToolsForPromptFallback(
+  toolsToFormat: SerializedToolDefinition[],
+  format: string
+): string {
+  if (toolsToFormat.length === 0) {
+    return '';
+  }
+
+  let prompt = 'You have access to these tools:\n\n';
+
+  for (const tool of toolsToFormat) {
+    prompt += `- ${tool.name}: ${tool.description ?? ''}\n`;
+
+    if (tool.parameters.length > 0) {
+      prompt += '  Parameters:\n';
+      for (const param of tool.parameters) {
+        prompt += `    - ${param.name} (${param.type}${param.required ? ', required' : ''}): ${param.description ?? ''}\n`;
+      }
+    }
+
+    prompt += '\n';
+  }
+
+  prompt += getFormatInstructions(format);
+  return prompt;
+}
+
+function formatSerializedToolsJsonFallback(
+  toolsJson: string,
+  format: string
+): string {
+  try {
+    const parsed = JSON.parse(toolsJson) as SerializedToolDefinition[];
+    return formatToolsForPromptFallback(parsed, format);
+  } catch (error) {
+    logger.error(`Failed to parse tools JSON for fallback formatting: ${error}`);
+    return toolsJson;
+  }
+}
+
 // =============================================================================
 // TOOL REGISTRATION
 // =============================================================================
@@ -138,25 +239,10 @@ export function formatToolsForPrompt(tools?: ToolDefinition[], format?: string):
     return '';
   }
 
-  // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
-
-  // Use async C++ bridge version internally
-  // For sync callers, we return a placeholder and log a warning
-  // Prefer using formatToolsForPromptAsync for new code
-  logger.warning('formatToolsForPrompt is sync but C++ bridge is async. Use formatToolsForPromptAsync() for full C++ integration.');
-
-  return toolsJson; // Return raw JSON - actual formatting done by buildInitialPrompt
+  return formatToolsForPromptFallback(
+    JSON.parse(serializeToolsForCpp(toolsToFormat)) as SerializedToolDefinition[],
+    toolFormat
+  );
 }
 
 /**
@@ -174,22 +260,11 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
     return '';
   }
 
-  // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(toolsToFormat.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
+  const toolsJson = serializeToolsForCpp(toolsToFormat);
 
   if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available, returning raw tools JSON');
-    return toolsJson;
+    logger.warning('Native module not available, using TypeScript tool prompt formatter');
+    return formatSerializedToolsJsonFallback(toolsJson, toolFormat);
   }
 
   try {
@@ -197,7 +272,7 @@ export async function formatToolsForPromptAsync(tools?: ToolDefinition[], format
     return await native.formatToolsForPrompt(toolsJson, toolFormat);
   } catch (error) {
     logger.error(`C++ formatToolsForPrompt failed: ${error}`);
-    return toolsJson;
+    return formatSerializedToolsJsonFallback(toolsJson, toolFormat);
   }
 }
 
@@ -262,8 +337,11 @@ async function buildInitialPromptViaCpp(
   options?: ToolCallingOptions
 ): Promise<string> {
   if (!isNativeModuleAvailable()) {
-    // Fallback: simple concatenation
-    return `${toolsJson}\n\nUser: ${userPrompt}`;
+    const toolsPrompt = formatSerializedToolsJsonFallback(
+      toolsJson,
+      options?.format?.toLowerCase() || 'default'
+    );
+    return `${toolsPrompt}\n\nUser: ${userPrompt}`;
   }
 
   try {
@@ -281,7 +359,11 @@ async function buildInitialPromptViaCpp(
     return await native.buildInitialPrompt(userPrompt, toolsJson, optionsJson);
   } catch (error) {
     logger.error(`C++ buildInitialPrompt failed: ${error}`);
-    return `${toolsJson}\n\nUser: ${userPrompt}`;
+    const toolsPrompt = formatSerializedToolsJsonFallback(
+      toolsJson,
+      options?.format?.toLowerCase() || 'default'
+    );
+    return `${toolsPrompt}\n\nUser: ${userPrompt}`;
   }
 }
 
@@ -345,17 +427,7 @@ export async function generateWithTools(
   logger.debug(`[ToolCalling] Starting with format: ${format}, tools: ${tools.length}`);
 
   // Serialize tools to JSON for C++ consumption
-  const toolsJson = JSON.stringify(tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    parameters: tool.parameters.map((p) => ({
-      name: p.name,
-      type: p.type,
-      description: p.description,
-      required: p.required,
-      ...(p.enum ? { enumValues: p.enum } : {}),
-    })),
-  })));
+  const toolsJson = serializeToolsForCpp(tools);
 
   // Build initial prompt using C++ single source of truth
   let fullPrompt = await buildInitialPromptViaCpp(prompt, toolsJson, options);

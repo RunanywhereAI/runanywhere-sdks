@@ -57,10 +57,8 @@ android {
     packagingOptions {
         // libc++_shared.so ships from every Flutter plugin that consumes
         // runanywhere native .so files — AGP needs a tie-breaker.
-        // libomp.so is NOT linked by any runanywhere engine (neither commons
-        // nor llamacpp/onnx CMakeLists pull in OpenMP), so no pickFirst is
-        // required for it. See T0.1 discovery notes.
         pickFirst '**/libc++_shared.so'
+        pickFirst '**/libomp.so'
     }
 }
 

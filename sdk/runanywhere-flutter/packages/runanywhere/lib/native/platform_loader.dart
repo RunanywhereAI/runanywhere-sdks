@@ -100,24 +100,24 @@ class PlatformLoader {
 
   /// Load on Android from jniLibs.
   static DynamicLibrary _loadAndroid(String libraryName) {
-    final soName = 'lib$libraryName.so';
-
-    try {
-      return DynamicLibrary.open(soName);
-    } catch (e) {
-      // Try JNI wrapper naming convention as fallback
-      if (libraryName == 'rac_commons') {
-        try {
-          return DynamicLibrary.open('librunanywhere_jni.so');
-        } catch (_) {
-          // Fall through
-        }
-      }
-      throw ArgumentError(
-        'Could not load $soName on Android: $e. '
-        'Ensure the native library is built and placed in jniLibs.',
-      );
+    final candidateNames = <String>['lib$libraryName.so'];
+    if (libraryName == 'rac_commons') {
+      candidateNames.add('librunanywhere_jni.so');
     }
+
+    Object? lastError;
+    for (final soName in candidateNames) {
+      try {
+        return DynamicLibrary.open(soName);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw ArgumentError(
+      'Could not load Android library for $libraryName. '
+      'Tried: ${candidateNames.join(", ")}. Last error: $lastError',
+    );
   }
 
   /// Load on iOS using executable() for statically linked XCFramework.

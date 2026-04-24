@@ -21,6 +21,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Kotlin + React Native destinations (existing).
 KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/androidMain/jniLibs"
+KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"
+KOTLIN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-onnx/src/androidMain/jniLibs"
 RN_CORE_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/android/src/main/jniLibs"
 RN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/llamacpp/android/src/main/jniLibs"
 RN_ONNX_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-react-native/packages/onnx/android/src/main/jniLibs"
@@ -75,6 +77,19 @@ ndk_triple_for_abi() {
     esac
 }
 
+# Map ABI → libomp arch directory within the NDK clang runtime tree.
+ndk_omp_arch_for_abi() {
+    case "$1" in
+        arm64-v8a)   echo "aarch64" ;;
+        armeabi-v7a) echo "arm"     ;;
+        x86_64)      echo "x86_64"  ;;
+        *)
+            echo "error: unknown Android ABI '$1' (cannot map to libomp arch)" >&2
+            exit 1
+            ;;
+    esac
+}
+
 # Detect NDK host tag so we can locate libc++_shared.so in the prebuilt sysroot.
 HOST_UNAME="$(uname -s)"
 case "${HOST_UNAME}" in
@@ -89,6 +104,8 @@ NDK_SYSROOT_LIB="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/${NDK_HOST_TAG}/sy
 
 mkdir -p \
     "${KOTLIN_JNI_DEST}" \
+    "${KOTLIN_LLAMA_JNI_DEST}" \
+    "${KOTLIN_ONNX_JNI_DEST}" \
     "${RN_CORE_JNI_DEST}" \
     "${RN_LLAMA_JNI_DEST}" \
     "${RN_ONNX_JNI_DEST}" \
@@ -117,6 +134,7 @@ copy_if_exists() {
 for ABI in "${ABIS[@]}"; do
     PRESET="$(preset_for_abi "${ABI}")"
     TRIPLE="$(ndk_triple_for_abi "${ABI}")"
+    OMP_ARCH="$(ndk_omp_arch_for_abi "${ABI}")"
     echo "▶ ${ABI} via preset '${PRESET}'"
 
     cmake --preset "${PRESET}"
@@ -126,6 +144,8 @@ for ABI in "${ABIS[@]}"; do
 
     BUILD_DIR="${REPO_ROOT}/build/${PRESET}"
     KOTLIN_DEST="${KOTLIN_JNI_DEST}/${ABI}"
+    KOTLIN_LLAMA_DEST="${KOTLIN_LLAMA_JNI_DEST}/${ABI}"
+    KOTLIN_ONNX_DEST="${KOTLIN_ONNX_JNI_DEST}/${ABI}"
     RN_CORE_DEST="${RN_CORE_JNI_DEST}/${ABI}"
     RN_LLAMA_DEST="${RN_LLAMA_JNI_DEST}/${ABI}"
     RN_ONNX_DEST="${RN_ONNX_JNI_DEST}/${ABI}"
@@ -135,13 +155,16 @@ for ABI in "${ABIS[@]}"; do
     FLUTTER_GENIE_DEST="${FLUTTER_GENIE_JNI_DEST}/${ABI}"
 
     mkdir -p \
-        "${KOTLIN_DEST}" \
+        "${KOTLIN_DEST}" "${KOTLIN_LLAMA_DEST}" "${KOTLIN_ONNX_DEST}" \
         "${RN_CORE_DEST}" "${RN_LLAMA_DEST}" "${RN_ONNX_DEST}" \
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}"
 
     # Clean everything we manage before re-staging so stale artifacts from a
     # previous run (e.g. a dropped backend) don't linger.
     rm -f \
+        "${KOTLIN_DEST}"/*.so \
+        "${KOTLIN_LLAMA_DEST}"/*.so \
+        "${KOTLIN_ONNX_DEST}"/*.so \
         "${RN_CORE_DEST}"/*.so "${RN_LLAMA_DEST}"/*.so "${RN_ONNX_DEST}"/*.so \
         "${FLUTTER_CORE_DEST}"/*.so "${FLUTTER_LLAMA_DEST}"/*.so \
         "${FLUTTER_ONNX_DEST}"/*.so "${FLUTTER_GENIE_DEST}"/*.so
@@ -159,12 +182,14 @@ for ABI in "${ABIS[@]}"; do
     LIB_LLAMA_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp_jni.so" -print -quit || true)"
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
     LIB_ONNX_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_onnx_jni.so"   -print -quit || true)"
+    LIB_RAG_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_rag_jni.so"     -print -quit || true)"
     # GAP 06 T5.1 — new Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
     LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
 
     # commons core + JNI go to Kotlin, RN core and Flutter core.
     copy_if_exists "${LIB_COMMONS}"     "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
     copy_if_exists "${LIB_COMMONS_JNI}" "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
+    copy_if_exists "${LIB_RAG_JNI}"     "${KOTLIN_DEST}"
 
     # Engine plugin entry-point libs (runanywhere_<engine>.so) — Kotlin loads
     # them via the dlopen registry. Keep the original glob-based collection
@@ -173,19 +198,20 @@ for ABI in "${ABIS[@]}"; do
 
     # Per-engine backend + JNI libs. Staged to both RN and Flutter plugin
     # packages so the same jniLibs layout is shipped from every SDK.
-    copy_if_exists "${LIB_LLAMA}"     "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
-    copy_if_exists "${LIB_LLAMA_JNI}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
-    copy_if_exists "${LIB_ONNX}"      "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
-    copy_if_exists "${LIB_ONNX_JNI}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    copy_if_exists "${LIB_LLAMA}"     "${KOTLIN_LLAMA_DEST}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
+    copy_if_exists "${LIB_LLAMA_JNI}" "${KOTLIN_LLAMA_DEST}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
+    copy_if_exists "${LIB_ONNX}"      "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    copy_if_exists "${LIB_ONNX_JNI}"  "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
     # it alongside the onnx plugin on every ONNX-enabled SDK package. Also
     # stage into Kotlin so its dlopen registry picks up the plugin.
-    copy_if_exists "${LIB_SHERPA}"    "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}" "${KOTLIN_DEST}"
+    copy_if_exists "${LIB_SHERPA}"    "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}" "${KOTLIN_DEST}" "${KOTLIN_ONNX_DEST}"
 
     # Sherpa / ORT prebuilt runtime — only has arm64-v8a/armeabi-v7a/x86_64
-    # sub-folders. Staged into both RN and Flutter ONNX plugins.
+    # sub-folders. Staged into Kotlin, RN, and Flutter ONNX plugins.
     if [ -d "${SHERPA_ANDROID_JNI_SRC}/${ABI}" ]; then
         find "${SHERPA_ANDROID_JNI_SRC}/${ABI}" -maxdepth 1 -name "*.so" \
+            -exec cp -v {} "${KOTLIN_ONNX_DEST}/" \; \
             -exec cp -v {} "${RN_ONNX_DEST}/" \; \
             -exec cp -v {} "${FLUTTER_ONNX_DEST}/" \;
     fi
@@ -205,11 +231,25 @@ for ABI in "${ABIS[@]}"; do
         "${FLUTTER_CORE_DEST}" "${FLUTTER_LLAMA_DEST}" "${FLUTTER_ONNX_DEST}" "${FLUTTER_GENIE_DEST}" ; do
         cp -v "${LIBCXX_SHARED}" "${dst}/"
     done
+
+    # Some engine builds (notably ORT/Sherpa variants) require libomp.so at
+    # runtime. Ship a single copy from the core package so every app that
+    # depends on RunAnywhere core plus backends resolves it from the merged APK.
+    LIBOMP_SHARED="$(find "${ANDROID_NDK_HOME}" -path "*/linux/${OMP_ARCH}/libomp.so" | sort | tail -1 || true)"
+    if [ -z "${LIBOMP_SHARED}" ] || [ ! -f "${LIBOMP_SHARED}" ]; then
+        echo "error: libomp.so not found for ABI ${ABI} under ${ANDROID_NDK_HOME}" >&2
+        exit 1
+    fi
+    for dst in "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}" ; do
+        cp -v "${LIBOMP_SHARED}" "${dst}/"
+    done
 done
 
 echo ""
 echo "✓ Android native libs copied to:"
 echo "  - ${KOTLIN_JNI_DEST}/{${ABIS[*]}}"
+echo "  - ${KOTLIN_LLAMA_JNI_DEST}/{${ABIS[*]}}"
+echo "  - ${KOTLIN_ONNX_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_CORE_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_LLAMA_JNI_DEST}/{${ABIS[*]}}"
 echo "  - ${RN_ONNX_JNI_DEST}/{${ABIS[*]}}"

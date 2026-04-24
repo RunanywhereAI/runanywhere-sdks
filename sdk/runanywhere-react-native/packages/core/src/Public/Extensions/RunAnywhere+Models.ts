@@ -164,18 +164,37 @@ export async function refreshModelRegistry(
     pruneOrphans?: boolean;
   } = {}
 ): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
-  const native = requireNativeModule();
-  try {
-    return await native.refreshModelRegistry(
-      options.includeRemoteCatalog ?? true,
-      options.rescanLocal ?? false,
-      options.pruneOrphans ?? false
-    );
-  } catch (error) {
-    logger.warning('refreshModelRegistry failed:', { error });
-    return false;
+  const includeRemoteCatalog = options.includeRemoteCatalog ?? true;
+  const rescanLocal = options.rescanLocal ?? false;
+  const pruneOrphans = options.pruneOrphans ?? false;
+
+  let nativeSucceeded = !includeRemoteCatalog;
+  if (includeRemoteCatalog) {
+    if (!isNativeModuleAvailable()) {
+      logger.warning('refreshModelRegistry: native module unavailable for remote catalog refresh');
+    } else {
+      const native = requireNativeModule();
+      try {
+        nativeSucceeded = await native.refreshModelRegistry(
+          includeRemoteCatalog,
+          rescanLocal,
+          pruneOrphans
+        );
+      } catch (error) {
+        logger.warning('refreshModelRegistry remote step failed:', { error });
+      }
+    }
   }
+
+  let localSucceeded = !(rescanLocal || pruneOrphans);
+  if (rescanLocal || pruneOrphans) {
+    localSucceeded = await reconcileLocalRegistryModels({
+      rescanLocal,
+      pruneOrphans,
+    });
+  }
+
+  return nativeSucceeded && localSucceeded;
 }
 
 /**
@@ -385,6 +404,97 @@ function inferFrameworkDir(framework: LLMFramework): string {
     case 'ONNX': return 'ONNX';
     case 'LlamaCpp': return 'LlamaCpp';
     default: return framework;
+  }
+}
+
+function getPreferredFramework(model: ModelInfo): LLMFramework | null {
+  return model.preferredFramework ?? model.compatibleFrameworks[0] ?? null;
+}
+
+async function localPathExists(path: string): Promise<boolean> {
+  try {
+    if (await FileSystem.fileExists(path)) {
+      return true;
+    }
+    return await FileSystem.directoryExists(path);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveDownloadedLocalPath(model: ModelInfo): Promise<string | undefined> {
+  if (!FileSystem.isAvailable()) {
+    return undefined;
+  }
+
+  if (model.localPath && await localPathExists(model.localPath)) {
+    return model.localPath;
+  }
+
+  const framework = getPreferredFramework(model);
+  if (!framework) {
+    return undefined;
+  }
+
+  const frameworkDir = inferFrameworkDir(framework);
+  const exists = await FileSystem.modelExists(model.id, frameworkDir);
+  if (!exists) {
+    return undefined;
+  }
+
+  if (frameworkDir === 'ONNX') {
+    return FileSystem.getModelFolder(model.id, frameworkDir);
+  }
+
+  return FileSystem.getModelPath(model.id, frameworkDir);
+}
+
+async function reconcileLocalRegistryModels(options: {
+  rescanLocal: boolean;
+  pruneOrphans: boolean;
+}): Promise<boolean> {
+  if (!FileSystem.isAvailable()) {
+    logger.warning('refreshModelRegistry: react-native-fs unavailable for local reconciliation');
+    return false;
+  }
+
+  try {
+    const models = await ModelRegistry.getAllModels();
+    const now = new Date().toISOString();
+
+    for (const model of models) {
+      const discoveredPath =
+        options.rescanLocal || model.localPath
+          ? await resolveDownloadedLocalPath(model)
+          : undefined;
+
+      if (discoveredPath) {
+        if (!model.isDownloaded || model.localPath !== discoveredPath) {
+          await ModelRegistry.updateModel({
+            ...model,
+            localPath: discoveredPath,
+            isDownloaded: true,
+            isAvailable: true,
+            updatedAt: now,
+          });
+        }
+        continue;
+      }
+
+      if (options.pruneOrphans && (model.isDownloaded || model.localPath)) {
+        await ModelRegistry.updateModel({
+          ...model,
+          localPath: undefined,
+          isDownloaded: false,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logger.warning('refreshModelRegistry local reconciliation failed:', { error });
+    return false;
   }
 }
 

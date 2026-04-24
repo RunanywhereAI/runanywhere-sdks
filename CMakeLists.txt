@@ -173,6 +173,10 @@ include(sanitizers OPTIONAL)   # rac_apply_sanitizer()  — Phase 3
 include(plugins    OPTIONAL)   # rac_add_engine_plugin() / rac_force_load() — Phase 4
 include(protobuf   OPTIONAL)   # rac_protobuf_generate() — Phase 5
 
+if(COMMAND rac_detect_platform)
+    rac_detect_platform()
+endif()
+
 # =============================================================================
 # Compiler defaults
 # =============================================================================

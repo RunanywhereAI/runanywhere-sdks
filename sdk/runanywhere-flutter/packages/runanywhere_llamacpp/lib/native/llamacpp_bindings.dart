@@ -68,6 +68,7 @@ class LlamaCppBindings {
 
       // Try different naming conventions for the backend library
       final libraryNames = [
+        'librac_backend_llamacpp.so',
         'librac_backend_llamacpp_jni.so',
         'librunanywhere_llamacpp.so',
       ];

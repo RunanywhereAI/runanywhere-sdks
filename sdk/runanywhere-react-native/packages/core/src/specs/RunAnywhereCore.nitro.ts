@@ -180,14 +180,15 @@ export interface RunAnywhereCore
    * Refresh the model registry — T4.9 unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is
-   * independent; steps that require missing infrastructure (model assignment
-   * HTTP callbacks, discovery callbacks) are skipped silently.
+   * independent. The higher-level JS `RunAnywhere+Models.refreshModelRegistry`
+   * wrapper composes this native refresh with RN filesystem reconciliation so
+   * local rescans and orphan pruning behave like the other SDKs.
    *
    * @param includeRemoteCatalog Fetch the backend model assignment catalog.
-   * @param rescanLocal Rescan on-disk model folders (currently a no-op from
-   *   RN — the native bridge does not wire discovery callbacks).
-   * @param pruneOrphans Clear `localPath` on models whose file is missing
-   *   (currently a no-op from RN for the same reason as `rescanLocal`).
+   * @param rescanLocal Request a local filesystem rescan when routed through
+   *   the public JS wrapper.
+   * @param pruneOrphans Clear `localPath` on models whose file is missing when
+   *   routed through the public JS wrapper.
    * @returns `true` if the refresh returned `RAC_SUCCESS`.
    */
   refreshModelRegistry(

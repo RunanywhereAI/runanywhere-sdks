@@ -773,9 +773,25 @@ static int64_t platformNowMsCallback(void* userData) {
 }
 
 static rac_result_t platformGetMemoryInfoCallback(rac_memory_info_t* outInfo, void* userData) {
-    // Memory info not easily available in React Native
-    // Return not supported - platform can query via JS if needed
-    return RAC_ERROR_NOT_SUPPORTED;
+    if (!outInfo) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    const uint64_t totalBytes = InitBridge::shared().getTotalMemory();
+    if (totalBytes == 0) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    uint64_t availableBytes = InitBridge::shared().getAvailableMemory();
+    if (availableBytes > totalBytes) {
+        availableBytes = totalBytes;
+    }
+
+    outInfo->total_bytes = totalBytes;
+    outInfo->available_bytes = availableBytes;
+    outInfo->used_bytes = totalBytes >= availableBytes ? (totalBytes - availableBytes) : 0;
+
+    return RAC_SUCCESS;
 }
 
 static void platformTrackErrorCallback(const char* errorJson, void* userData) {
@@ -962,7 +978,7 @@ void InitBridge::registerPlatformAdapter() {
     // Clock
     adapter_.now_ms = platformNowMsCallback;
 
-    // Memory info (not implemented)
+    // Memory info
     adapter_.get_memory_info = platformGetMemoryInfoCallback;
 
     // Error tracking

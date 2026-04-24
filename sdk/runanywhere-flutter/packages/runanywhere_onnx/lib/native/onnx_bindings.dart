@@ -66,6 +66,7 @@ class OnnxBindings {
 
       // Try different naming conventions for the backend library
       final libraryNames = [
+        'librac_backend_onnx.so',
         'librac_backend_onnx_jni.so',
         'librunanywhere_onnx.so',
       ];

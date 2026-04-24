@@ -21,12 +21,31 @@ class OnnxPlugin : FlutterPlugin, MethodCallHandler {
         private const val BACKEND_VERSION = "0.1.4"
         private const val BACKEND_NAME = "ONNX"
 
+        private fun loadFirstAvailable(vararg names: String) {
+            var lastError: UnsatisfiedLinkError? = null
+            for (name in names) {
+                try {
+                    System.loadLibrary(name)
+                    return
+                } catch (e: UnsatisfiedLinkError) {
+                    lastError = e
+                }
+            }
+            if (lastError != null) {
+                throw lastError
+            }
+        }
+
         init {
             // Load ONNX backend native libraries
             try {
                 System.loadLibrary("onnxruntime")
                 System.loadLibrary("sherpa-onnx-c-api")
-                System.loadLibrary("rac_backend_onnx_jni")
+                loadFirstAvailable(
+                    "rac_backend_onnx",
+                    "rac_backend_onnx_jni",
+                    "runanywhere_onnx",
+                )
             } catch (e: UnsatisfiedLinkError) {
                 // Library may not be available in all configurations
                 android.util.Log.w("ONNX", "Failed to load ONNX libraries: ${e.message}")

@@ -315,28 +315,44 @@ endif()
 # JNI TARGET (Android)
 # =============================================================================
 
-if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
-    if(ANDROID)
-        message(STATUS "Building LlamaCPP JNI bridge for Android")
-
-        add_library(rac_backend_llamacpp_jni SHARED
-            jni/rac_backend_llamacpp_jni.cpp
-        )
-
-        target_include_directories(rac_backend_llamacpp_jni PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${RAC_COMMONS_ROOT_DIR}/include
-        )
-
-        target_link_libraries(rac_backend_llamacpp_jni PRIVATE
-            rac_backend_llamacpp
-            log
-        )
-
-        target_compile_options(rac_backend_llamacpp_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
-        # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
-        target_link_options(rac_backend_llamacpp_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
+if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED AND RAC_BUILD_JNI)
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+        set(_RAC_ANDROID_NDK_HOST_TAG "darwin-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+        set(_RAC_ANDROID_NDK_HOST_TAG "linux-x86_64")
+    elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
+        set(_RAC_ANDROID_NDK_HOST_TAG "windows-x86_64")
+    else()
+        message(FATAL_ERROR "Unsupported host platform for Android JNI bridge: ${CMAKE_HOST_SYSTEM_NAME}")
     endif()
+
+    set(_RAC_ANDROID_NDK_SYSROOT_INCLUDE
+        "${CMAKE_ANDROID_NDK}/toolchains/llvm/prebuilt/${_RAC_ANDROID_NDK_HOST_TAG}/sysroot/usr/include")
+    if(NOT EXISTS "${_RAC_ANDROID_NDK_SYSROOT_INCLUDE}/jni.h")
+        message(FATAL_ERROR "Could not locate Android NDK JNI headers at ${_RAC_ANDROID_NDK_SYSROOT_INCLUDE}")
+    endif()
+
+    message(STATUS "Building LlamaCPP JNI bridge for Android")
+
+    add_library(rac_backend_llamacpp_jni SHARED
+        jni/rac_backend_llamacpp_jni.cpp
+    )
+
+    target_include_directories(rac_backend_llamacpp_jni PRIVATE
+        ${_RAC_ANDROID_NDK_SYSROOT_INCLUDE}
+        ${_RAC_ANDROID_NDK_SYSROOT_INCLUDE}/android
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${RAC_COMMONS_ROOT_DIR}/include
+    )
+
+    target_link_libraries(rac_backend_llamacpp_jni PRIVATE
+        rac_backend_llamacpp
+        log
+    )
+
+    target_compile_options(rac_backend_llamacpp_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
+    # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
+    target_link_options(rac_backend_llamacpp_jni PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
 endif()
 
 # =============================================================================

@@ -21,13 +21,28 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
         private const val SDK_VERSION = "0.15.8"
         private const val COMMONS_VERSION = "0.1.4"
 
+        private fun loadFirstAvailable(vararg names: String) {
+            var lastError: UnsatisfiedLinkError? = null
+            for (name in names) {
+                try {
+                    System.loadLibrary(name)
+                    return
+                } catch (e: UnsatisfiedLinkError) {
+                    lastError = e
+                }
+            }
+            if (lastError != null) {
+                throw lastError
+            }
+        }
+
         init {
             // Load RACommons native libraries
             try {
-                System.loadLibrary("rac_commons")
+                loadFirstAvailable("rac_commons", "runanywhere_jni")
             } catch (e: UnsatisfiedLinkError) {
                 // Library may not be available in all configurations
-                android.util.Log.w("RunAnywhere", "Failed to load rac_commons: ${e.message}")
+                android.util.Log.w("RunAnywhere", "Failed to load RACommons libraries: ${e.message}")
             }
         }
     }

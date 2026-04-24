@@ -122,6 +122,7 @@ gradle.properties
 
 # But keep project-level gradle properties if needed
 !gradle.properties.example
+!examples/flutter/RunAnywhereAI/android/gradle.properties
 
 # Also ignore .idea folders in subdirectories
 examples/intellij-plugin-demo/plugin/.idea/
@@ -197,6 +198,7 @@ node_modules/
 .npm
 .yarn/cache
 .yarn/install-state.gz
+.vite/
 
 # Flutter/Dart
 .dart_tool/
