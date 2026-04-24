@@ -310,14 +310,18 @@ public final class Logging: @unchecked Sendable {
     private static let sensitiveMessagePatterns: [(NSRegularExpression, String)] = {
         let specs: [(String, String)] = [
             // Group 1: keyword  Group 2: separator (= or : only)  Group 3: value
-            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|credential)(\s*[=:]\s*)(\S+)"#,
+            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|authorization|credential)(\s*[=:]\s*)(\S+)"#,
              "$1$2[REDACTED]"),
             // Bearer scheme: keyword + whitespace + token (min 8 chars to skip short words)
             (#"(?i)(bearer)(\s+)([A-Za-z0-9+/=._\-]{8,})"#,
              "$1$2[REDACTED]"),
         ]
-        return specs.compactMap { (pattern, template) in
-            (try? NSRegularExpression(pattern: pattern, options: [])).map { ($0, template) }
+        return specs.map { (patternString, template) in
+            do {
+                return (try NSRegularExpression(pattern: patternString, options: []), template)
+            } catch {
+                preconditionFailure("Invalid sanitization regex '\(patternString)': \(error)")
+            }
         }
     }()
 

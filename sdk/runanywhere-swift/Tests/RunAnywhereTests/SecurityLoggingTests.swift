@@ -125,23 +125,23 @@ final class SecurityLoggingTests: XCTestCase {
         // "token" followed by a noun, not a separator — must not trigger
         let msg = "token count: 5"
         Logging.shared.log(level: .info, category: "Test", message: msg)
-        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
-                       "'token count: 5' must not be redacted")
+        XCTAssertEqual(destination.captured.first?.message, msg,
+                       "'token count: 5' must pass through unchanged")
     }
 
     func testPasswordRequiredPhraseIsNotRedacted() {
         let msg = "password required for this operation"
         Logging.shared.log(level: .info, category: "Test", message: msg)
-        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
-                       "'password required' must not be redacted — no = or : separator present")
+        XCTAssertEqual(destination.captured.first?.message, msg,
+                       "'password required' must pass through unchanged — no = or : separator present")
     }
 
     func testBasicEnglishPhraseIsNotRedacted() {
         // "basic" is excluded from the pattern entirely to avoid prose false-positives
         let msg = "basic authentication is disabled"
         Logging.shared.log(level: .info, category: "Test", message: msg)
-        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
-                       "'basic' in plain English must not be redacted")
+        XCTAssertEqual(destination.captured.first?.message, msg,
+                       "'basic' in plain English must pass through unchanged")
     }
 
     // MARK: - Metadata sanitization (regression)
