@@ -31,21 +31,30 @@ private final class CapturingDestination: LogDestination, @unchecked Sendable {
 final class SecurityLoggingTests: XCTestCase {
 
     private var destination: CapturingDestination!
+    private var originalConfig: LoggingConfiguration!
 
     override func setUp() {
         super.setUp()
+        // Snapshot config so tearDown can restore it — Logging.shared is a
+        // process-wide singleton and mutated state would bleed into other test classes.
+        originalConfig = Logging.shared.configuration
+
         destination = CapturingDestination()
 
         var config = Logging.shared.configuration
-        config.enableLocalLogging = false   // suppress os.Logger output in CI
+        config.enableLocalLogging = false   // suppress os.Logger console output in CI
         config.enableSentryLogging = false
         config.minLogLevel = .debug
+        // NOTE: both local + Sentry are disabled here, so the guard in log() would
+        // short-circuit before reaching CapturingDestination. The guard was updated to
+        // also pass when !currentDestinations.isEmpty, which is true once we addDestination.
         Logging.shared.configure(config)
         Logging.shared.addDestination(destination)
     }
 
     override func tearDown() {
         Logging.shared.removeDestination(destination)
+        Logging.shared.configure(originalConfig)  // restore original state
         super.tearDown()
     }
 
@@ -108,6 +117,31 @@ final class SecurityLoggingTests: XCTestCase {
     func testEmptyMessagePassesThroughUnchanged() {
         Logging.shared.log(level: .info, category: "Test", message: "")
         XCTAssertEqual(destination.captured.first?.message, "")
+    }
+
+    // MARK: - False-positive regression
+
+    func testTokenCountPhraseIsNotRedacted() {
+        // "token" followed by a noun, not a separator — must not trigger
+        let msg = "token count: 5"
+        Logging.shared.log(level: .info, category: "Test", message: msg)
+        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
+                       "'token count: 5' must not be redacted")
+    }
+
+    func testPasswordRequiredPhraseIsNotRedacted() {
+        let msg = "password required for this operation"
+        Logging.shared.log(level: .info, category: "Test", message: msg)
+        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
+                       "'password required' must not be redacted — no = or : separator present")
+    }
+
+    func testBasicEnglishPhraseIsNotRedacted() {
+        // "basic" is excluded from the pattern entirely to avoid prose false-positives
+        let msg = "basic authentication is disabled"
+        Logging.shared.log(level: .info, category: "Test", message: msg)
+        XCTAssertFalse(destination.captured.first?.message.contains("[REDACTED]") ?? false,
+                       "'basic' in plain English must not be redacted")
     }
 
     // MARK: - Metadata sanitization (regression)

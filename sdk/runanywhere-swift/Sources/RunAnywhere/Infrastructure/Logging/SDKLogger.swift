@@ -208,7 +208,7 @@ public final class Logging: @unchecked Sendable {
         let (config, currentDestinations) = lock.withLock { ($0.configuration, $0.destinations) }
 
         guard level >= config.minLogLevel else { return }
-        guard config.enableLocalLogging || config.enableSentryLogging else { return }
+        guard config.enableLocalLogging || config.enableSentryLogging || !currentDestinations.isEmpty else { return }
 
         let entry = LogEntry(
             level: level,
@@ -284,7 +284,7 @@ public final class Logging: @unchecked Sendable {
         // Route through os.Logger so the system log privacy controls apply.
         // Message is already sanitized by sanitizeMessage(); mark .public so it
         // appears in release Console.app captures without double-redaction.
-        let osLog = Logger(subsystem: "com.runanywhere.sdk", category: entry.category)
+        let osLog = Logger(subsystem: Self.logSubsystem, category: entry.category)
         switch entry.level {
         case .debug:   osLog.debug("\(output, privacy: .public)")
         case .info:    osLog.info("\(output, privacy: .public)")
@@ -296,25 +296,40 @@ public final class Logging: @unchecked Sendable {
 
     // MARK: - Sanitization
 
+    private static let logSubsystem = "com.runanywhere.sdk"
+
     private static let sensitivePatterns = ["key", "secret", "password", "token", "auth", "credential"]
 
     /// Redacts credential values embedded directly in a log message string.
-    /// Handles `key=value`, `key: value`, and HTTP Authorization schemes (`Bearer <token>`).
-    private static let sensitiveMessagePattern: NSRegularExpression? = {
-        // Group 1: keyword  Group 2: separator  Group 3: value (redacted)
-        let pattern = #"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|credential|bearer|basic)(\s*[=:\s]\s*)(\S+)"#
-        return try? NSRegularExpression(pattern: pattern, options: [])
+    ///
+    /// Two patterns are applied in sequence:
+    /// - `key=value` / `key: value` — explicit `=` or `:` separators only, preventing
+    ///   false positives on phrases like "token count: 5" or "password required".
+    /// - `Bearer <token>` — HTTP Authorization scheme (space-separated, 8+ char value).
+    ///   `basic` is intentionally excluded as it appears too often in ordinary prose.
+    private static let sensitiveMessagePatterns: [(NSRegularExpression, String)] = {
+        let specs: [(String, String)] = [
+            // Group 1: keyword  Group 2: separator (= or : only)  Group 3: value
+            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|credential)(\s*[=:]\s*)(\S+)"#,
+             "$1$2[REDACTED]"),
+            // Bearer scheme: keyword + whitespace + token (min 8 chars to skip short words)
+            (#"(?i)(bearer)(\s+)([A-Za-z0-9+/=._\-]{8,})"#,
+             "$1$2[REDACTED]"),
+        ]
+        return specs.compactMap { (pattern, template) in
+            (try? NSRegularExpression(pattern: pattern, options: [])).map { ($0, template) }
+        }
     }()
 
     private func sanitizeMessage(_ message: String) -> String {
-        guard let pattern = Self.sensitiveMessagePattern else { return message }
-        let range = NSRange(message.startIndex..., in: message)
-        return pattern.stringByReplacingMatches(
-            in: message,
-            options: [],
-            range: range,
-            withTemplate: "$1$2[REDACTED]"
-        )
+        var result = message
+        for (pattern, template) in Self.sensitiveMessagePatterns {
+            let range = NSRange(result.startIndex..., in: result)
+            result = pattern.stringByReplacingMatches(
+                in: result, options: [], range: range, withTemplate: template
+            )
+        }
+        return result
     }
 
     private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
