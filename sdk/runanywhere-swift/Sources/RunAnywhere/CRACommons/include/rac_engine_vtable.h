@@ -90,12 +90,21 @@ typedef struct rac_engine_metadata {
      * decoding, …). See rac_backend_caps.h. */
     uint64_t capability_flags;
 
-    /* ─────── GAP 04 routing extension ─────── */
+    /* ─────── GAP 04 + T4.1 routing extension ─────── */
 
-    /** Runtimes this engine can serve (CPU / Metal / CUDA / QNN / …).
-     *  MAY be NULL when the plugin doesn't care about hardware-aware routing
-     *  — the router falls back to priority-only scoring. The pointer must
-     *  reference plugin-owned .rodata; the registry does not copy. */
+    /** L1 runtimes this engine can consume (CPU / Metal / CoreML / CUDA /
+     *  QNN / NNAPI / WebGPU / …). MAY be NULL when the plugin doesn't care
+     *  about hardware-aware routing — the router falls back to priority-only
+     *  scoring. The pointer must reference plugin-owned .rodata; the
+     *  registry does not copy.
+     *
+     *  T4.1 (`docs/RUNTIME_VTABLE_DESIGN.md`): runtimes are now first-class
+     *  plugins registered via `rac_runtime_register()`. The engine router
+     *  gives plugins a small scoring bonus when at least one of their
+     *  declared runtimes is *registered* in the runtime registry, on top of
+     *  the existing preferred_runtime bonus. Engines that don't wire to the
+     *  runtime registry (e.g. llama.cpp today, which bundles its own Metal
+     *  shaders) simply continue to score off priority + hardware profile. */
     const rac_runtime_id_t* runtimes;
     size_t                  runtimes_count;
 

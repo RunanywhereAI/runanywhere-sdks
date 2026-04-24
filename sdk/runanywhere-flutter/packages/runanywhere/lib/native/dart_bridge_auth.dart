@@ -4,11 +4,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
@@ -91,6 +92,12 @@ class DartBridgeAuth {
       // Load stored tokens
       await instance._loadStoredTokens();
 
+      // Wire token refresh hooks into the shared HTTP client so any
+      // request with `requiresAuth: true` can pick up / refresh tokens
+      // without a direct dependency on this bridge.
+      HTTPClientAdapter.shared.setTokenResolver(instance._resolveToken);
+      HTTPClientAdapter.shared.setRefreshCallback(instance._refreshForAdapter);
+
       _isInitialized = true;
       _logger.debug('Auth manager initialized');
     } catch (e, stack) {
@@ -136,21 +143,21 @@ class DartBridgeAuth {
         return AuthResult.failure('Failed to build auth request');
       }
 
-      // Make HTTP request
       final endpoint = _getAuthEndpoint();
       final baseURL = _baseURL ?? _getDefaultBaseURL();
-      final url = Uri.parse('$baseURL$endpoint');
+      final url = '$baseURL$endpoint';
 
       _logger.debug('Auth POST to: $url');
       _logger.debug('Auth body: $requestJson');
 
-      final response = await http.post(
-        url,
-        headers: {
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'POST',
+        url: url,
+        headers: const {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: requestJson,
+        body: Uint8List.fromList(utf8.encode(requestJson)),
       );
 
       _logger.debug('Auth response status: ${response.statusCode}');
@@ -234,17 +241,19 @@ class DartBridgeAuth {
 
       _logger.debug('Refreshing token for device: $deviceId');
 
-      // Make HTTP request
       final endpoint = _getRefreshEndpoint();
       final baseURL = _baseURL ?? _getDefaultBaseURL();
-      final url = Uri.parse('$baseURL$endpoint');
+      final url = '$baseURL$endpoint';
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      final response = await http.post(url, headers: headers, body: requestJson);
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'POST',
+        url: url,
+        headers: const {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: Uint8List.fromList(utf8.encode(requestJson)),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final authData = _parseAuthResponse(response.body);
@@ -397,6 +406,42 @@ class DartBridgeAuth {
     } catch (e) {
       return null;
     }
+  }
+
+  // ============================================================================
+  // HTTP Client Integration
+  // ============================================================================
+
+  /// Token resolver consumed by [HTTPClientAdapter] to attach a valid
+  /// bearer on `requiresAuth: true` requests. Returns null when no
+  /// token is available (adapter falls back to API key).
+  Future<String?> _resolveToken({required bool requiresAuth}) async {
+    if (!requiresAuth) return null;
+
+    final current = getAccessToken();
+    if (current != null && current.isNotEmpty && !needsRefresh()) {
+      return current;
+    }
+
+    if (isAuthenticated()) {
+      final result = await refreshToken();
+      if (result.isSuccess) {
+        final fresh = getAccessToken();
+        if (fresh != null && fresh.isNotEmpty) return fresh;
+      }
+    }
+
+    // Last-resort cached access token (may still be stale; the server
+    // will reject it and the 401 retry path will refresh again).
+    return _secureCache['com.runanywhere.sdk.accessToken'];
+  }
+
+  /// Adapter-facing refresh hook. Returns the new access token, or
+  /// null if the refresh attempt failed.
+  Future<String?> _refreshForAdapter() async {
+    final result = await refreshToken();
+    if (!result.isSuccess) return null;
+    return getAccessToken();
   }
 
   // ============================================================================

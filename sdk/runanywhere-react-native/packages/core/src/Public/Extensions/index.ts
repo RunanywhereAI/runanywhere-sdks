@@ -118,6 +118,7 @@ export {
   deleteModel,
   registerModel,
   registerMultiFileModel,
+  refreshModelRegistry,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -170,6 +171,10 @@ export {
   ragGetDocumentCount,
   ragGetStatistics,
 } from './RunAnywhere+RAG';
+
+// Solutions Runtime (T4.7 / T4.8)
+export { solutions, SolutionHandle } from './RunAnywhere+Solutions';
+export type { SolutionRunArgs } from './RunAnywhere+Solutions';
 
 // Vision Language Model
 export {

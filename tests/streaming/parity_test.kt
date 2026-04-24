@@ -15,18 +15,23 @@
 
 package com.runanywhere.sdk.tests.streaming
 
-import com.runanywhere.sdk.generated.AssistantTokenEvent
-import com.runanywhere.sdk.generated.AudioEncoding
-import com.runanywhere.sdk.generated.AudioFrameEvent
-import com.runanywhere.sdk.generated.ErrorEvent
-import com.runanywhere.sdk.generated.MetricsEvent
-import com.runanywhere.sdk.generated.PipelineState
-import com.runanywhere.sdk.generated.StateChangeEvent
-import com.runanywhere.sdk.generated.TokenKind
-import com.runanywhere.sdk.generated.UserSaidEvent
-import com.runanywhere.sdk.generated.VADEvent
-import com.runanywhere.sdk.generated.VADEventType
-import com.runanywhere.sdk.generated.VoiceEvent
+// Wire-generated bindings live under `ai.runanywhere.proto.v1` (see
+// `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/
+// ai/runanywhere/proto/v1/`). The matching SDK adapters (e.g.
+// VoiceAgentStreamAdapter) consume these same types, so the parity check
+// proves the wire-format is identical to the C++ producer's emit path.
+import ai.runanywhere.proto.v1.AssistantTokenEvent
+import ai.runanywhere.proto.v1.AudioEncoding
+import ai.runanywhere.proto.v1.AudioFrameEvent
+import ai.runanywhere.proto.v1.ErrorEvent
+import ai.runanywhere.proto.v1.MetricsEvent
+import ai.runanywhere.proto.v1.PipelineState
+import ai.runanywhere.proto.v1.StateChangeEvent
+import ai.runanywhere.proto.v1.TokenKind
+import ai.runanywhere.proto.v1.UserSaidEvent
+import ai.runanywhere.proto.v1.VADEvent
+import ai.runanywhere.proto.v1.VADEventType
+import ai.runanywhere.proto.v1.VoiceEvent
 import okio.ByteString
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -57,9 +62,20 @@ class StreamingParityTests {
     }
 
     private fun loadGolden(): List<String> {
-        val path = System.getenv("RAC_PARITY_GOLDEN")
-            ?: "tests/streaming/fixtures/golden_events.txt"
-        return File(path).readLines()
+        // The golden file is repo-root-relative (`tests/streaming/fixtures/
+        // golden_events.txt`). Resolve it without depending on the runner's
+        // CWD: probe `RAC_PARITY_GOLDEN` first (CI / explicit override),
+        // then walk parent directories from the JVM's CWD looking for the
+        // fixture. Works whether `./gradlew jvmTest` is invoked at the
+        // repo root or under `sdk/runanywhere-kotlin/`.
+        val relative = "tests/streaming/fixtures/golden_events.txt"
+        val envPath = System.getenv("RAC_PARITY_GOLDEN")?.takeIf { it.isNotBlank() }
+        val resolved: File = envPath?.let(::File)?.takeIf { it.exists() }
+            ?: generateSequence(File(".").canonicalFile) { it.parentFile }
+                .map { File(it, relative) }
+                .firstOrNull { it.exists() }
+            ?: error("golden file not found: $relative (cwd=${File(".").canonicalPath})")
+        return resolved.readLines()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith("#") }
     }
@@ -106,16 +122,26 @@ class StreamingParityTests {
         // is cancelled, awaitClose fires and JNI deregisters the C callback.
         // Pure-Flow mechanics check here — full live-agent verification is in
         // docs/v2_closeout_device_verification.md.
+        //
+        // CancellationException thrown inside `collect { ... }` propagates up
+        // through `runBlocking`; catch it here so the test itself observes
+        // the same "first emission only, cancel is honored" contract that
+        // the real adapter exposes via Flow cancellation.
         val collected = mutableListOf<Int>()
-        kotlinx.coroutines.runBlocking {
-            kotlinx.coroutines.flow.flow<Int> {
-                emit(1); emit(2); emit(3)
-            }.collect {
-                collected.add(it)
-                if (collected.size >= 1) throw kotlinx.coroutines.CancellationException("user break")
+        try {
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.flow.flow<Int> {
+                    emit(1); emit(2); emit(3)
+                }.collect {
+                    collected.add(it)
+                    if (collected.size >= 1) {
+                        throw kotlinx.coroutines.CancellationException("user break")
+                    }
+                }
             }
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            // Expected — proves the cancel signal terminated collection.
         }
-        // CancellationException swallowed by collect; only first emission seen.
-        // This test should NOT be reached on raw runBlocking re-throw — wrap it.
+        assertEquals(listOf(1), collected, "cancel should fire after first emission")
     }
 }

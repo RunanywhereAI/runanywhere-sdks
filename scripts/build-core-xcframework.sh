@@ -196,9 +196,56 @@ merge_onnx_backend_slice() {
     local output="$3"
     local arch="$4"
     local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/onnx"
+    # GAP 06 T5.1 phase 1 note: the onnx engine on iOS still contains the
+    # Sherpa-backed STT/TTS/VAD class bodies (onnx_backend.cpp). We keep
+    # the sherpa-onnx static archives folded into RABackendONNX.xcframework
+    # below so that downstream consumers on SPM don't have to link a third
+    # xcframework before phase 2 migrates the class bodies to engines/sherpa.
+    # engines/sherpa ships its own RABackendSherpa.xcframework (via
+    # merge_sherpa_backend_slice) for Apple consumers that want to opt into
+    # the peer plugin directly.
     local inputs=(
         "${build_root}/engines/onnx/${slice_dir}/librac_backend_onnx.a"
         "$(find_onnxruntime_ios_archive "${slice_dir}")"
+    )
+    local sherpa_dir
+
+    if [ "${slice_dir}" = "Release-iphoneos" ]; then
+        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64"
+    else
+        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator"
+    fi
+
+    if [ "${DRY_RUN}" = "1" ] || [ -d "${sherpa_dir}" ]; then
+        local sherpa_archive
+        for sherpa_archive in "${sherpa_dir}"/*.a; do
+            if [ "${DRY_RUN}" = "1" ] || [ -f "${sherpa_archive}" ]; then
+                inputs+=("${sherpa_archive}")
+            fi
+        done
+    fi
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+# GAP 06 T5.1 — Sherpa engine slice. For now the .a only contains the
+# plugin entry + shell (primitive ops NULL pending phase 2), so we
+# optionally fold in the sherpa-onnx prebuilt archive too; the xcframework
+# stays usable as the long-term owner of the sherpa plugin target.
+merge_sherpa_backend_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/sherpa"
+    local inputs=(
+        "${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a"
     )
     local sherpa_dir
 
@@ -361,6 +408,24 @@ else
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
 fi
 
+# GAP 06 T5.1 — RABackendSherpa.xcframework as a peer of RABackendONNX.
+# Builds when RAC_BACKEND_SHERPA is not explicitly OFF (default ON). Shares
+# the sherpa-onnx iOS prebuilt with ONNX during T5.1 phase 1; phase 2 will
+# make this the sole owner once the source migration lands.
+if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+    SHERPA_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_sherpa.a"
+    SHERPA_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_sherpa.a"
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${DEV_BIN}/engines/sherpa/Release-iphoneos/librac_backend_sherpa.a" ]; then
+        merge_sherpa_backend_slice "${DEV_BIN}" "Release-iphoneos" "${SHERPA_DEV_LIB}" "arm64"
+        merge_sherpa_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${SHERPA_SIM_LIB}" "arm64"
+        build_xcframework_from_paths "${SHERPA_DEV_LIB}" "${SHERPA_SIM_LIB}" "RABackendSherpa.xcframework"
+    else
+        echo "▶ Skipping RABackendSherpa.xcframework (target not built — engines/sherpa disabled?)"
+    fi
+else
+    echo "▶ Skipping RABackendSherpa.xcframework (RAC_BACKEND_SHERPA=OFF)"
+fi
+
 sync_react_native_frameworks() {
     local rn_root="${REPO_ROOT}/sdk/runanywhere-react-native/packages"
     if [ ! -d "${rn_root}" ]; then
@@ -381,6 +446,14 @@ sync_react_native_frameworks() {
         run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendONNX.xcframework"
         run cp -R "${DEST}/RABackendONNX.xcframework" "${rn_root}/onnx/ios/Frameworks/"
         run rm -rf "${rn_root}/onnx/ios/Frameworks/onnxruntime.xcframework"
+    fi
+
+    # GAP 06 T5.1 — stage the Sherpa plugin xcframework alongside ONNX's
+    # (sherpa is the long-term owner of speech primitives).
+    if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then
+        run mkdir -p "${rn_root}/onnx/ios/Frameworks"
+        run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendSherpa.xcframework"
+        run cp -R "${DEST}/RABackendSherpa.xcframework" "${rn_root}/onnx/ios/Frameworks/"
     fi
 }
 
@@ -448,6 +521,14 @@ sync_flutter_frameworks() {
         # Stale onnxruntime.xcframework (pre-v0.19.0) is no longer shipped —
         # ONNX Runtime is now statically linked into RABackendONNX.a.
         run rm -rf "${flutter_onnx}/onnxruntime.xcframework"
+    fi
+
+    # GAP 06 T5.1 — ship RABackendSherpa.xcframework inside runanywhere_onnx
+    # for now (sherpa peers with onnx on speech). A future runanywhere_sherpa
+    # plugin can consume it directly.
+    if [ -d "${DEST}/RABackendSherpa.xcframework" ]; then
+        run rm -rf "${flutter_onnx}/RABackendSherpa.xcframework"
+        run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
     fi
 
     # runanywhere_genie has no iOS binary — soft-skip.

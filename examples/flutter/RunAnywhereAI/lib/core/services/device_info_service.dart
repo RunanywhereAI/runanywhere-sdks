@@ -44,18 +44,16 @@ class DeviceInfoService extends ChangeNotifier {
         chipName = _getChipNameFromModel(modelName);
         osVersion = iosInfo.systemVersion;
         neuralEngineAvailable = _checkNeuralEngineAvailability(modelName);
-        // TODO: Get actual memory info via native channel
-        totalMemory = 4 * 1024 * 1024 * 1024; // Placeholder: 4GB
-        availableMemory = 2 * 1024 * 1024 * 1024; // Placeholder: 2GB
+        // iOS does not expose total/available RAM without a native plugin.
+        // Leave as 0 so the UI can hide the row.
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfoPlugin.androidInfo;
         modelName = '${androidInfo.manufacturer} ${androidInfo.model}';
         chipName = androidInfo.hardware;
         osVersion = 'Android ${androidInfo.version.release}';
-        // TODO: Get actual memory info via native channel
-        totalMemory = 4 * 1024 * 1024 * 1024; // Placeholder
-        availableMemory = 2 * 1024 * 1024 * 1024; // Placeholder
         neuralEngineAvailable = true; // Android devices generally have NPU
+        // Android memory info would require ActivityManager.MemoryInfo via a
+        // platform channel; leave as 0 so the UI can hide the row.
       } else if (Platform.isMacOS) {
         final macOSInfo = await deviceInfoPlugin.macOsInfo;
         modelName = macOSInfo.model;

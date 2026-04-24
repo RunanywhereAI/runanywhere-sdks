@@ -97,6 +97,9 @@
 #include "rac_rag_pipeline.h"
 #include "rac_rag.h"
 
+// Solutions (T4.7) — proto/YAML driven L5 solution runtime
+#include "rac_solution.h"
+
 // =============================================================================
 // INFRASTRUCTURE - Events, Download, Model Management
 // =============================================================================
@@ -148,6 +151,7 @@
 #include "rac_endpoints.h"
 #include "rac_api_types.h"
 #include "rac_http_client.h"
+#include "rac_http_download.h"
 #include "rac_auth_manager.h"
 #include "rac_dev_config.h"
 

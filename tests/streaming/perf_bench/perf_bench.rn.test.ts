@@ -19,16 +19,12 @@ const OUTPUT_PATH = '/tmp/perf_bench.rn.log';
 
 function decodeRN(frame: Uint8Array): bigint | null {
   const event = VoiceEvent.decode(frame);
-  // ts-proto emits oneof payloads as a discriminated union on
-  // `payload.$case`. The MetricsEvent arm carries created_at_ns.
-  if (
-    event.payload?.$case === 'metrics' &&
-    event.payload.metrics.createdAtNs !== undefined
-  ) {
-    // ts-proto represents int64 as string|Long depending on the
-    // options; the default is `string` (safe for very large values).
-    // We coerce via BigInt for uniformity with the producer's hrtime.
-    const raw = event.payload.metrics.createdAtNs as unknown as string | number | bigint;
+  // ts-proto generates oneof arms as top-level optional fields here
+  // (no `oneofs=unions`). The MetricsEvent arm carries created_at_ns.
+  if (event.metrics !== undefined && event.metrics.createdAtNs !== undefined) {
+    // ts-proto represents int64 as string|Long|number depending on
+    // options; coerce via BigInt for uniformity with hrtime.bigint().
+    const raw = event.metrics.createdAtNs as unknown as string | number | bigint;
     return BigInt(raw);
   }
   return null;

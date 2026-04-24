@@ -34,6 +34,46 @@ fun interface NativeDownloadProgressListener {
 }
 
 /**
+ * Response descriptor returned by [RunAnywhereBridge.racHttpRequestExecute].
+ *
+ * Fields are `@JvmField` so the JNI layer can construct this object via a
+ * single reflective `NewObject(...)` call with a matching
+ * `(I[B[Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)V` signature.
+ *
+ * The `headerKeys` / `headerValues` arrays are parallel: `headerKeys[i]` pairs
+ * with `headerValues[i]`. Empty when the server sent no headers.
+ *
+ * On transport-level failure (DNS/connect/TLS/timeout) [statusCode] is `-1`
+ * and [errorMessage] is non-null. On HTTP-level 4xx/5xx responses,
+ * [statusCode] reflects the server status and [errorMessage] stays null.
+ */
+class NativeHttpResponse(
+    @JvmField val statusCode: Int,
+    @JvmField val body: ByteArray,
+    @JvmField val headerKeys: Array<String>,
+    @JvmField val headerValues: Array<String>,
+    @JvmField val errorMessage: String?,
+) {
+    /** True when the native call completed and the HTTP status is 2xx. */
+    val isSuccess: Boolean get() = errorMessage == null && statusCode in 200..299
+
+    /** Returns the response body decoded as UTF-8 (empty string on empty body). */
+    fun bodyAsString(): String = if (body.isEmpty()) "" else body.decodeToString()
+
+    /** Lookup helper; case-insensitive per RFC 7230. Returns null if not present. */
+    fun header(name: String): String? {
+        for (i in headerKeys.indices) {
+            if (headerKeys[i].equals(name, ignoreCase = true)) return headerValues[i]
+        }
+        return null
+    }
+
+    /** Materialize headers as a map — O(n) allocation, use sparingly. */
+    fun headersAsMap(): Map<String, String> =
+        headerKeys.indices.associate { headerKeys[it] to headerValues[it] }
+}
+
+/**
  * RunAnywhereBridge provides low-level JNI bindings for the runanywhere-commons C API.
  *
  * This object maps directly to the JNI functions in runanywhere_commons_jni.cpp.
@@ -612,6 +652,29 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
+
+    /**
+     * Refresh the C++ model registry (T4.9).
+     *
+     * Backed by `rac_model_registry_refresh` in commons. Each flag is
+     * independent; steps that require unavailable infrastructure (e.g. the
+     * model assignment HTTP callbacks) are skipped silently.
+     *
+     * @param includeRemoteCatalog Fetch the backend model catalog.
+     * @param rescanLocal Rescan the on-disk model directories (no-op from JVM
+     *   until the Kotlin SDK wires discovery callbacks; today discovery runs
+     *   in Kotlin via `ModelFileSystem`).
+     * @param pruneOrphans Clear `localPath` entries whose file no longer
+     *   exists (no-op from JVM for the same reason as `rescanLocal`).
+     * @return `RAC_SUCCESS` (0) on success, otherwise the first error code
+     *   encountered while running the requested steps.
+     */
+    @JvmStatic
+    external fun racModelRegistryRefresh(
+        includeRemoteCatalog: Boolean,
+        rescanLocal: Boolean,
+        pruneOrphans: Boolean,
+    ): Int
 
     // ========================================================================
     // LORA REGISTRY (rac_lora_registry.h)
@@ -1247,6 +1310,41 @@ object RunAnywhereBridge {
     @JvmStatic external fun racVoiceAgentDestroy(handle: Long)
 
     // ========================================================================
+    // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
+    // ========================================================================
+    //
+    // Proto-byte / YAML driven L5 solution runtime. Each call returns a
+    // Long handle that wraps a `rac_solution_handle_t` from the C side;
+    // pass the same handle to start/stop/cancel/feed/closeInput/destroy.
+    // 0 from `racSolutionCreateFromProto` / `racSolutionCreateFromYaml`
+    // signals failure (handle was never allocated).
+
+    /** Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
+     *  (or `PipelineSpec`) protobuf. Returns 0 on failure. */
+    @JvmStatic external fun racSolutionCreateFromProto(configBytes: ByteArray): Long
+
+    /** Construct a solution from a YAML document. Returns 0 on failure. */
+    @JvmStatic external fun racSolutionCreateFromYaml(yamlText: String): Long
+
+    /** Start the underlying scheduler (non-blocking). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionStart(handle: Long): Int
+
+    /** Request a graceful shutdown (non-blocking). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionStop(handle: Long): Int
+
+    /** Force-cancel the graph. Returns rac_result_t. */
+    @JvmStatic external fun racSolutionCancel(handle: Long): Int
+
+    /** Feed one UTF-8 item into the root input edge. Returns rac_result_t. */
+    @JvmStatic external fun racSolutionFeed(handle: Long, item: String): Int
+
+    /** Close the root input edge (signal end-of-stream). Returns rac_result_t. */
+    @JvmStatic external fun racSolutionCloseInput(handle: Long): Int
+
+    /** Cancel, join, and destroy the solution. Always safe; null handle is a no-op. */
+    @JvmStatic external fun racSolutionDestroy(handle: Long)
+
+    // ========================================================================
     // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
     // ========================================================================
     //
@@ -1278,6 +1376,38 @@ object RunAnywhereBridge {
         listener: NativeDownloadProgressListener?,
         outHttpStatus: IntArray?,
     ): Int
+
+    // ========================================================================
+    // NATIVE HTTP REQUEST (rac_http_client.h)
+    // ========================================================================
+    //
+    // v2.1 quick-wins / T3.5. Single blocking entrypoint that wraps
+    // rac_http_client_create + rac_http_request_send + rac_http_response_free
+    // + rac_http_client_destroy. Used by CppBridgeHTTP, CppBridgeAuth, and
+    // CppBridgeTelemetry to replace per-SDK HttpURLConnection plumbing with
+    // the libcurl-backed C ABI shared across Swift / Dart / RN / Web.
+    //
+    // Headers are passed as parallel String[] arrays (keys, values) to keep
+    // the JNI signature flat. Return is a [NativeHttpResponse] or null only
+    // on catastrophic JNI failure (class resolution failed).
+    //
+    // @param method         HTTP method ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD").
+    // @param url            Absolute HTTP/HTTPS URL.
+    // @param headerKeys     Header name array (parallel to headerValues; may be empty).
+    // @param headerValues   Header value array (parallel to headerKeys).
+    // @param body           Request body bytes (null for GET/HEAD).
+    // @param timeoutMs      Timeout in milliseconds (0 = no timeout).
+    // @param followRedirects True to follow 3xx up to 10 hops.
+    // @return [NativeHttpResponse] — statusCode == -1 + non-null errorMessage on transport error.
+    @JvmStatic external fun racHttpRequestExecute(
+        method: String,
+        url: String,
+        headerKeys: Array<String>,
+        headerValues: Array<String>,
+        body: ByteArray?,
+        timeoutMs: Int,
+        followRedirects: Boolean,
+    ): NativeHttpResponse?
 
     // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)

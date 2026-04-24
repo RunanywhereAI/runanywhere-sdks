@@ -47,10 +47,42 @@ String formatEvent(pb.VoiceEvent event) {
   return 'unknown_arm';
 }
 
+String _resolveGoldenPath() {
+  // Probe order:
+  //   1. RAC_PARITY_GOLDEN env var (CI / explicit override).
+  //   2. Path resolved relative to this Dart source file. Works whether
+  //      `flutter test` is run from the package dir or via the shim under
+  //      `sdk/runanywhere-flutter/packages/runanywhere/test/`.
+  //   3. Repo-root-relative fallback for `dart test` invoked from the
+  //      monorepo root.
+  final env = Platform.environment['RAC_PARITY_GOLDEN'];
+  if (env != null && env.isNotEmpty && File(env).existsSync()) return env;
+
+  final scriptUri = Platform.script;
+  if (scriptUri.scheme.isNotEmpty) {
+    final fromScript = scriptUri.resolve('fixtures/golden_events.txt');
+    final asPath = fromScript.toFilePath();
+    if (File(asPath).existsSync()) return asPath;
+  }
+
+  // Walk up from CWD looking for `tests/streaming/fixtures/golden_events.txt`.
+  Directory? dir = Directory.current.absolute;
+  while (dir != null) {
+    final candidate =
+        File('${dir.path}/tests/streaming/fixtures/golden_events.txt');
+    if (candidate.existsSync()) return candidate.path;
+    final parent = dir.parent;
+    if (parent.path == dir.path) break;
+    dir = parent;
+  }
+  throw StateError(
+    'parity_test.dart: golden_events.txt not found '
+    '(set RAC_PARITY_GOLDEN to override)',
+  );
+}
+
 List<String> loadGolden() {
-  final path = Platform.environment['RAC_PARITY_GOLDEN']
-      ?? 'tests/streaming/fixtures/golden_events.txt';
-  return File(path).readAsLinesSync()
+  return File(_resolveGoldenPath()).readAsLinesSync()
       .map((l) => l.trim())
       .where((l) => l.isNotEmpty && !l.startsWith('#'))
       .toList();

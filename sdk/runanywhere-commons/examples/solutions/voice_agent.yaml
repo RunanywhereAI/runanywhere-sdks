@@ -1,0 +1,29 @@
+# RunAnywhere Solution — canonical voice agent.
+#
+# Matches the VAD → STT → LLM → TTS DAG built by the hand-rolled
+# voice_agent_pipeline.cpp; SolutionRunner compiles this YAML into an
+# equivalent GraphScheduler graph via PipelineExecutor.
+#
+# Consumed by rac_solution_create_from_yaml(). The top-level
+# `voice_agent:` key selects the SolutionConfig.voice_agent oneof arm;
+# field names mirror solutions.proto's VoiceAgentConfig.
+
+voice_agent:
+  llm_model_id: "qwen3-4b-q4_k_m"
+  stt_model_id: "whisper-base"
+  tts_model_id: "kokoro"
+  vad_model_id: "silero-v5"
+
+  sample_rate_hz: 16000
+  chunk_ms: 20
+  audio_source: "microphone"
+
+  enable_barge_in: true
+  barge_in_threshold_ms: 200
+
+  system_prompt: "You are a helpful voice assistant. Keep answers concise."
+  max_context_tokens: 4096
+  temperature: 0.7
+
+  emit_partials: true
+  emit_thoughts: false

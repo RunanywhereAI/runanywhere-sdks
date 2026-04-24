@@ -3,11 +3,22 @@
  * @brief Engine-router scoring implementation.
  *
  * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
+ * T4.1 extension — see sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
  *
- * Phase-10 scoring (priority + name pinning) is wired here. Phase 11 will
- * add the +30 runtime-affinity bonus and the format-match check once the
- * vtable metadata extension is in place. The scoring function is the only
- * place callers need to inspect to understand routing decisions.
+ * Scoring stack (all weights deliberately small and well-separated so the
+ * ordering is easy to reason about when debugging a routing decision):
+ *
+ *   base        = metadata.priority
+ *   +30         preferred_runtime declared AND hardware-profile confirmed
+ *   +15         any declared runtime is registered in the L1 runtime registry
+ *   +10         model-format match
+ *   +10000      pinned-engine name match (short-circuit; beats all scoring)
+ *   -1000       hard reject: primitive not served OR pinned-name mismatch
+ *
+ * The T4.1 +15 bonus makes the router prefer engines whose compute runtime
+ * has actually been loaded in-process over ones that merely *could* run on
+ * this host. It is strictly smaller than the +30 preferred_runtime bonus so
+ * callers who explicitly request a runtime keep control of the decision.
  */
 
 #include "rac/router/rac_engine_router.h"
@@ -17,6 +28,7 @@
 #include <vector>
 
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_runtime_registry.h"
 
 namespace rac {
 namespace router {
@@ -70,6 +82,21 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
         for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
             if (vt.metadata.runtimes[i] == req.preferred_runtime) {
                 s += 30;
+                break;
+            }
+        }
+    }
+
+    /* T4.1: +15 when any of the plugin's declared runtimes is *registered*
+     * in the L1 runtime registry. A registered runtime is a strictly
+     * stronger signal than hardware presence alone (it means someone has
+     * already loaded and initialised the runtime plugin), so we layer this
+     * bonus on top of the preferred-runtime bonus above. Capped at a single
+     * +15 per plugin so declaring many runtimes doesn't farm points. */
+    if (vt.metadata.runtimes != nullptr) {
+        for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
+            if (rac_runtime_is_available(vt.metadata.runtimes[i])) {
+                s += 15;
                 break;
             }
         }

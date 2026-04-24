@@ -98,11 +98,12 @@ class _ModelsViewState extends State<ModelsView> {
                   icon: Icons.memory,
                   value: device.chipName,
                 ),
-                DeviceInfoRow(
-                  label: 'Memory',
-                  icon: Icons.storage,
-                  value: device.totalMemory.formattedFileSize,
-                ),
+                if (device.totalMemory > 0)
+                  DeviceInfoRow(
+                    label: 'Memory',
+                    icon: Icons.storage,
+                    value: device.totalMemory.formattedFileSize,
+                  ),
                 if (device.neuralEngineAvailable) const NeuralEngineRow(),
               ],
             );

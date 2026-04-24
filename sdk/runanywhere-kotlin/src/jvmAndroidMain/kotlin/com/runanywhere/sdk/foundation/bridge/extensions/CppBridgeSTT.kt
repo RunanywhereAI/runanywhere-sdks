@@ -1182,15 +1182,27 @@ object CppBridgeSTT {
     /**
      * Detect language from audio sample.
      *
-     * @param audioData Raw audio data bytes
-     * @return Detected language code, or Language.AUTO if detection fails
+     * Returns [Language.AUTO] only when the STT component is not ready — this
+     * keeps callers out of the native path when there's no model loaded yet.
+     *
+     * When the component is ready, we surface the native failure instead of
+     * silently falling back to AUTO: a null JNI result means the backend
+     * rejected the call (not supported / bad audio / decode failure) and
+     * callers must know about it so they can retry or report.
+     *
+     * @throws IllegalStateException when the native bridge returns null while
+     *         the component is loaded.
      */
     fun detectLanguage(audioData: ByteArray): String {
         synchronized(lock) {
             if (handle == 0L || state != STTState.READY) {
                 return Language.AUTO
             }
-            return RunAnywhereBridge.racSttComponentDetectLanguage(handle, audioData) ?: Language.AUTO
+            return RunAnywhereBridge.racSttComponentDetectLanguage(handle, audioData)
+                ?: throw IllegalStateException(
+                    "STT backend returned no language (handle=$handle, bytes=${audioData.size}). " +
+                        "The loaded model may not support language detection.",
+                )
         }
     }
 

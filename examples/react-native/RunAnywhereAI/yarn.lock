@@ -1244,6 +1244,11 @@
     prompts "^2.4.2"
     semver "^7.5.2"
 
+"@react-native-community/slider@^5.2.0":
+  version "5.2.0"
+  resolved "https://registry.yarnpkg.com/@react-native-community/slider/-/slider-5.2.0.tgz#c154ac4ec10537160462d7a9f3e2e43098257302"
+  integrity sha512-484sH8aWEaSjxaZ7HT3YZ8CKDcNes2synko1vdEz5DFEdvKAduxKJTj22L/qBMD7rtIkfbX69DMzWDAGbOAV6w==
+
 "@react-native-documents/picker@^12.0.1":
   version "12.0.1"
   resolved "https://registry.npmjs.org/@react-native-documents/picker/-/picker-12.0.1.tgz"

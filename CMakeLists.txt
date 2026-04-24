@@ -43,6 +43,15 @@ project(runanywhere
     HOMEPAGE_URL "https://github.com/RunanywhereAI/runanywhere-sdks"
 )
 
+# GAP 06 T5.3: enable Objective-C++ at the root project level so
+# engines/diffusion-coreml/*.mm (and any future Apple-framework
+# bridge TU) compile correctly. `enable_language` inside a subdirectory
+# doesn't populate the CMAKE_OBJCXX_* toolchain variables the build
+# generator needs — it must be called before the subdirectories run.
+if(APPLE)
+    enable_language(OBJCXX)
+endif()
+
 # =============================================================================
 # Top-level options
 #
@@ -200,6 +209,20 @@ endif()
 # QNN SDK integration work is funded.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
+endif()
+
+# runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
+# to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
+# is always folded into rac_commons; extracted ORT/CoreML/Metal runtimes land
+# here as follow-ups. See sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
+    add_subdirectory(runtimes)
+endif()
+
+# Fold the built-in CPU runtime's OBJECTs into rac_commons so there is no
+# separate librac_runtime_cpu to ship (symmetrical with rac_backend_metalrt).
+if(TARGET rac_runtime_cpu)
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_runtime_cpu>)
 endif()
 
 # MetalRT is an OBJECT library rather than a rac_add_engine_plugin()-managed

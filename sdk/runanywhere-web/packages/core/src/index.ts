@@ -22,6 +22,7 @@
 
 // Main entry point
 export { RunAnywhere } from './Public/RunAnywhere';
+export type { StorageBackend } from './Public/RunAnywhere';
 
 // Voice orchestration — two paths:
 //   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
@@ -41,6 +42,16 @@ export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 export type { LLMStreamTransport } from './generated/streams/llm_service_stream';
 export type { LLMGenerateRequest, LLMStreamEvent } from './generated/llm_service';
 export { LLMTokenKind } from './generated/llm_service';
+
+// Solutions runtime (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+// Construct via `RunAnywhere.solutions.run(...)` (preferred) or directly via
+// `SolutionAdapter.run(...)`. Returns a `SolutionHandle` whose verbs map 1:1
+// to `rac_solution_*` in the C ABI.
+export {
+  SolutionAdapter,
+  SolutionHandle,
+  type SolutionRunInput,
+} from './Adapters/SolutionAdapter';
 export {
   VoiceEvent,
   UserSaidEvent,
@@ -59,6 +70,31 @@ export {
 } from './generated/voice_events';
 export { setRunanywhereModule } from './runtime/EmscriptenModule';
 export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
+
+// HTTP adapter (T3.13) — wraps the commons libcurl-backed C ABI so every
+// Web site goes through the same HTTP transport as Swift/Kotlin/RN/Flutter.
+// Backend packages install their Emscripten module via
+// HTTPAdapter.setDefaultModule(module) after WASM load.
+export { HTTPAdapter, DownloadStatus } from './Adapters/HTTPAdapter';
+export type {
+  HTTPRequest,
+  HTTPResponse,
+  HTTPHeader,
+  HTTPModule,
+  ChunkHandler,
+  DownloadRequest,
+  DownloadProgressHandler,
+} from './Adapters/HTTPAdapter';
+
+// Model registry refresh (T4.9) — wraps the commons
+// `rac_model_registry_refresh` C ABI so the web surface is symmetric with
+// Swift / Kotlin / RN / Flutter. Backend packages install their Emscripten
+// module via `ModelRegistryAdapter.setDefaultModule(module)` after load.
+export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter';
+export type {
+  ModelRegistryModule,
+  RefreshOptions,
+} from './Adapters/ModelRegistryAdapter';
 
 // Types
 export * from './types';
@@ -126,7 +162,5 @@ export { inferModelFromFilename, sanitizeId } from './Infrastructure/ModelFileIn
 export type { InferredModelMeta } from './Infrastructure/ModelFileInference';
 
 // Services
-export { HTTPService } from './services/HTTPService';
-export type { HTTPServiceConfig, DevModeConfig } from './services/HTTPService';
 export { AnalyticsEmitter } from './services/AnalyticsEmitter';
 export type { AnalyticsEmitterBackend } from './services/AnalyticsEmitter';

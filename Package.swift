@@ -52,14 +52,13 @@ let useLocalNatives = true //  Toggle: true for local dev, false for release
 // artifacts.
 let sdkVersion = "0.19.13"
 
-// MetalRT remote binary availability flag.
-// Set to `false` until a real checksum for RABackendMetalRT-v<sdkVersion>.zip
-// has been published. When `false`, the MetalRT product/targets are only
-// exposed under `useLocalNatives = true`, so SPM resolution will not fail
-// for external consumers due to a placeholder checksum.
-let metalrtRemoteBinaryAvailable = false
-
-let includeMetalRT = useLocalNatives || metalrtRemoteBinaryAvailable
+// MetalRT is currently only shipped as a local xcframework (built via
+// `./scripts/build-swift.sh --setup`). There is no published remote binary
+// target yet — when one exists, add a `.binaryTarget(... url: ..., checksum:
+// ...)` entry for `RABackendMetalRTBinary` in the remote branch of
+// `binaryTargets()` below and flip `includeMetalRT` to also be true when
+// `useLocalNatives == false`.
+let includeMetalRT = useLocalNatives
 
 let package = Package(
     name: "runanywhere-sdks",
@@ -103,7 +102,6 @@ let package = Package(
     ] + metalRTProducts(),
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
-        .package(url: "https://github.com/Alamofire/Alamofire.git", from: "5.9.0"),
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
@@ -170,7 +168,6 @@ let package = Package(
             name: "RunAnywhere",
             dependencies: [
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
@@ -271,18 +268,54 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
+        // =================================================================
+        // Cross-SDK streaming parity / cancel / perf tests
+        //
+        // Wires the shared parity/cancel/perf consumers under tests/streaming
+        // (also consumed by the C++/Kotlin/Dart/RN/Web runners) into a
+        // single Swift test target so `swift test --filter
+        // "parity|cancel|perf"` exercises the same wire-format goldens.
+        //
+        // Pre-conditions for cancel/perf cases (skipped if missing):
+        //   cmake --build build/macos-release --target cancel_producer && \
+        //   ./build/macos-release/tests/streaming/cancel_parity/cancel_producer
+        //   cmake --build build/macos-release --target perf_producer && \
+        //   ./build/macos-release/tests/streaming/perf_bench/perf_producer
+        // =================================================================
+        .testTarget(
+            name: "StreamingParityTests",
+            dependencies: [
+                "RunAnywhere",
+                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
+            ],
+            path: "tests/streaming",
+            // Limit Swift compilation to the parity/cancel/perf .swift
+            // files. The shared `tests/streaming` directory also hosts
+            // C++/Kotlin/Dart/TS sources (parity_test.{cpp,kt,dart,ts},
+            // perf_producer.cpp, etc.) that must not be fed to the Swift
+            // compiler. SPM's `sources:` whitelist achieves this without
+            // having to enumerate the (much larger) exclude list.
+            sources: [
+                "parity_test.swift",
+                "cancel_parity/cancel_parity.swift",
+                "cancel_parity/cancel_parity_test.swift",
+                "perf_bench/perf_bench.swift",
+                "perf_bench/perf_bench_test.swift",
+            ]
+        ),
+
     ] + metalRTTargets() + binaryTargets()
 )
 
 // =============================================================================
 // METALRT PRODUCT / TARGET GATING
 // =============================================================================
-// The RABackendMetalRT.xcframework is not yet published to GitHub releases
-// with a real checksum. To avoid SPM resolution failures for external
-// consumers due to a placeholder zero-checksum binary target, the MetalRT
-// product and its dependent targets are only included when:
-//   - `useLocalNatives == true` (local dev with a checked-out xcframework), or
-//   - `metalrtRemoteBinaryAvailable == true` (once a real checksum is wired in).
+// The RABackendMetalRT.xcframework is not yet published to GitHub releases.
+// To keep SPM resolution stable for external consumers, the MetalRT product
+// and its dependent targets are only included when `useLocalNatives == true`
+// (local dev with a checked-out xcframework). When a remote binary is
+// published, add a `RABackendMetalRTBinary` `.binaryTarget` to the remote
+// branch of `binaryTargets()` and update `includeMetalRT` accordingly.
 func metalRTProducts() -> [Product] {
     guard includeMetalRT else { return [] }
     return [
@@ -367,7 +400,13 @@ func binaryTargets() -> [Target] {
         // Download XCFrameworks from GitHub releases
         // All xcframeworks include iOS + macOS slices (v0.19.0+)
         // =====================================================================
-        var targets: [Target] = [
+        // NOTE: MetalRT is deliberately NOT published as a remote binary yet.
+        // The MetalRT product/targets are omitted from the package graph in
+        // the remote configuration (see `includeMetalRT` + `metalRTProducts()`
+        // / `metalRTTargets()`). When a real checksum is published, add a
+        // `RABackendMetalRTBinary` `.binaryTarget` below and update
+        // `includeMetalRT`.
+        return [
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
@@ -384,20 +423,5 @@ func binaryTargets() -> [Target] {
                 checksum: "0f8575559ac96a9a7b872bb3adca3608acef38fdec1ab8ccf9b0716a8d627c6c"
             ),
         ]
-
-        // MetalRT remote binary is only appended once a real checksum has been
-        // published. Until then the MetalRT product/targets are omitted from
-        // the package graph entirely (see metalRTProducts/metalRTTargets).
-        if metalrtRemoteBinaryAvailable {
-            targets.append(
-                .binaryTarget(
-                    name: "RABackendMetalRTBinary",
-                    url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMetalRT-ios-v\(sdkVersion).zip",
-                    checksum: "0000000000000000000000000000000000000000000000000000000000000000" // TODO: replace with real checksum
-                )
-            )
-        }
-
-        return targets
     }
 }

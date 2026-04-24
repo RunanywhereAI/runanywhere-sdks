@@ -47,6 +47,7 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_download.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
@@ -59,6 +60,7 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
+#include "rac/solutions/rac_solution.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
 #include "rac/features/llm/rac_llm_stream.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
@@ -1957,15 +1959,52 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    // Return empty array for now
-    return env->NewStringUTF("[]");
+    if (handle == 0)
+        return nullptr;
+
+    char* json = nullptr;
+    rac_result_t rc = rac_stt_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDetectLanguage(
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
-    // Return null for now - language detection not implemented
-    return nullptr;
+    if (handle == 0 || audioData == nullptr)
+        return nullptr;
+
+    const jsize size = env->GetArrayLength(audioData);
+    if (size <= 0)
+        return nullptr;
+
+    jbyte* bytes = env->GetByteArrayElements(audioData, nullptr);
+    if (!bytes)
+        return nullptr;
+
+    char* detected = nullptr;
+    rac_result_t rc = rac_stt_component_detect_language(reinterpret_cast<rac_handle_t>(handle),
+                                                        bytes, static_cast<size_t>(size),
+                                                        &detected);
+    env->ReleaseByteArrayElements(audioData, bytes, JNI_ABORT);
+
+    if (rc != RAC_SUCCESS || !detected) {
+        if (detected)
+            free(detected);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(detected);
+    free(detected);
+    return result;
 }
 
 // =============================================================================
@@ -2175,7 +2214,21 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    return env->NewStringUTF("[]");
+    if (handle == 0)
+        return nullptr;
+
+    char* json = nullptr;
+    rac_result_t rc = rac_tts_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 // =============================================================================
@@ -2664,6 +2717,33 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
     if (path_str)
         env->ReleaseStringUTFChars(localPath, path_str);
 
+    return static_cast<jint>(result);
+}
+
+// racModelRegistryRefresh — T4.9.
+// Mirrors the C ABI rac_model_registry_refresh(handle, opts). We do not wire
+// discovery callbacks from the JVM here (Kotlin discovery currently runs in
+// Java-side code via registerModel + filesystem helpers), so only the
+// include_remote_catalog branch needs transport — which reuses the model
+// assignment callbacks already registered at SDK init.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh(
+    JNIEnv* env, jclass /*clazz*/, jboolean includeRemoteCatalog, jboolean rescanLocal,
+    jboolean pruneOrphans) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryRefresh: registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_model_registry_refresh_opts_t opts = {};
+    opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE;
+    opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE;
+    opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE;
+    opts.discovery_callbacks = nullptr;
+
+    rac_result_t result = rac_model_registry_refresh(registry, opts);
+    LOGi("racModelRegistryRefresh result=%d", result);
     return static_cast<jint>(result);
 }
 
@@ -5652,6 +5732,113 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
 }
 
 // =============================================================================
+// JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
+// =============================================================================
+//
+// T4.7/T4.8 — proto-byte / YAML driven L5 solution runtime. One-to-one
+// mapping over `rac_solution_*`; the Kotlin handle is the C handle cast
+// to jlong. 0 from create_from_* signals failure and the handle was
+// never allocated, so destroy is a no-op for it.
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromProto(
+    JNIEnv* env, jclass clazz, jbyteArray configBytes) {
+    (void)clazz;
+    if (configBytes == nullptr) return 0L;
+
+    const jsize len = env->GetArrayLength(configBytes);
+    jbyte* bytes = env->GetByteArrayElements(configBytes, nullptr);
+    if (bytes == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_proto(
+        static_cast<const void*>(bytes), static_cast<size_t>(len), &handle);
+
+    env->ReleaseByteArrayElements(configBytes, bytes, JNI_ABORT);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromProto failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromYaml(
+    JNIEnv* env, jclass clazz, jstring yamlText) {
+    (void)clazz;
+    if (yamlText == nullptr) return 0L;
+
+    const char* utf = env->GetStringUTFChars(yamlText, nullptr);
+    if (utf == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_yaml(utf, &handle);
+
+    env->ReleaseStringUTFChars(yamlText, utf);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromYaml failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStart(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_start(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStop(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_stop(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCancel(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_cancel(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionFeed(
+    JNIEnv* env, jclass clazz, jlong handle, jstring item) {
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    if (item == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+
+    const char* utf = env->GetStringUTFChars(item, nullptr);
+    if (utf == nullptr) return static_cast<jint>(RAC_ERROR_OUT_OF_MEMORY);
+
+    const rac_result_t result =
+        rac_solution_feed(reinterpret_cast<rac_solution_handle_t>(handle), utf);
+
+    env->ReleaseStringUTFChars(item, utf);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCloseInput(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_close_input(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_solution_destroy(reinterpret_cast<rac_solution_handle_t>(handle));
+}
+
+// =============================================================================
 // JNI FUNCTIONS - Native HTTP download (v2 close-out Phase H)
 // =============================================================================
 //
@@ -5740,6 +5927,183 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
     if (sha) env->ReleaseStringUTFChars(expectedShaStr, sha);
 
     return static_cast<jint>(status);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP request/response (v2.1 quick-wins, T3.5)
+// =============================================================================
+//
+// Single blocking entrypoint for buffered HTTP request/response. Wraps
+// rac_http_client_create + rac_http_request_send + rac_http_response_free
+// + rac_http_client_destroy into one call so Kotlin never touches the
+// curl handle lifecycle (matches Swift's URLSession-based parity layer).
+//
+// Replaces the HttpURLConnection paths in:
+//   - CppBridgeAuth.kt  (POST authenticate / refresh)
+//   - CppBridgeHTTP.kt  (generic GET/POST/PUT/DELETE)
+//   - CppBridgeTelemetry.kt (POST telemetry batches)
+//   - data/network/HttpClient.kt (deleted)
+
+namespace {
+
+// Returns a freshly-allocated NativeHttpResponse. Caller-owned local refs.
+jobject build_native_http_response(JNIEnv* env, jint statusCode, const uint8_t* body,
+                                   size_t body_len, const rac_http_header_kv_t* headers,
+                                   size_t header_count, const char* error_message) {
+    jclass strCls = env->FindClass("java/lang/String");
+
+    // Body: empty array when the transport layer produced no bytes.
+    jbyteArray jBody = env->NewByteArray(static_cast<jsize>(body_len));
+    if (body && body_len > 0) {
+        env->SetByteArrayRegion(jBody, 0, static_cast<jsize>(body_len),
+                                reinterpret_cast<const jbyte*>(body));
+    }
+
+    // Headers: parallel String[] arrays (avoids Map<String,String> marshaling
+    // and keeps the JNI signature simple).
+    jobjectArray jKeys = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    jobjectArray jVals = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    for (size_t i = 0; i < header_count; ++i) {
+        if (headers[i].name) {
+            jstring k = env->NewStringUTF(headers[i].name);
+            env->SetObjectArrayElement(jKeys, static_cast<jsize>(i), k);
+            env->DeleteLocalRef(k);
+        }
+        if (headers[i].value) {
+            jstring v = env->NewStringUTF(headers[i].value);
+            env->SetObjectArrayElement(jVals, static_cast<jsize>(i), v);
+            env->DeleteLocalRef(v);
+        }
+    }
+
+    jstring jErr = error_message ? env->NewStringUTF(error_message) : nullptr;
+
+    jclass respCls =
+        env->FindClass("com/runanywhere/sdk/native/bridge/NativeHttpResponse");
+    if (!respCls) {
+        LOGe("build_native_http_response: NativeHttpResponse class not found");
+        return nullptr;
+    }
+    jmethodID ctor = env->GetMethodID(
+        respCls, "<init>", "(I[B[Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)V");
+    if (!ctor) {
+        LOGe("build_native_http_response: NativeHttpResponse ctor not found");
+        env->DeleteLocalRef(respCls);
+        return nullptr;
+    }
+    jobject obj = env->NewObject(respCls, ctor, statusCode, jBody, jKeys, jVals, jErr);
+    env->DeleteLocalRef(respCls);
+    return obj;
+}
+
+}  // namespace
+
+JNIEXPORT jobject JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring jMethod, jstring jUrl, jobjectArray jHeaderKeys,
+    jobjectArray jHeaderValues, jbyteArray jBody, jint timeoutMs, jboolean followRedirects) {
+
+    if (!jMethod || !jUrl) {
+        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
+                                          "Invalid argument: method/url is null");
+    }
+
+    // Pin Kotlin strings for the request lifetime. rac_http_request_t
+    // requires the pointers stay valid until rac_http_request_send returns.
+    const char* method = env->GetStringUTFChars(jMethod, nullptr);
+    const char* url    = env->GetStringUTFChars(jUrl, nullptr);
+
+    // Copy headers into stable std::string storage so the KV array
+    // remains valid after we release the Kotlin String handles.
+    jsize headerCount = 0;
+    if (jHeaderKeys && jHeaderValues) {
+        jsize k = env->GetArrayLength(jHeaderKeys);
+        jsize v = env->GetArrayLength(jHeaderValues);
+        headerCount = k < v ? k : v;
+    }
+    std::vector<std::string> hNames;
+    std::vector<std::string> hValues;
+    std::vector<rac_http_header_kv_t> hKVs;
+    hNames.reserve(static_cast<size_t>(headerCount));
+    hValues.reserve(static_cast<size_t>(headerCount));
+    hKVs.reserve(static_cast<size_t>(headerCount));
+    for (jsize i = 0; i < headerCount; ++i) {
+        auto jk = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderKeys, i));
+        auto jv = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderValues, i));
+        if (!jk || !jv) {
+            if (jk) env->DeleteLocalRef(jk);
+            if (jv) env->DeleteLocalRef(jv);
+            continue;
+        }
+        hNames.emplace_back(getCString(env, jk));
+        hValues.emplace_back(getCString(env, jv));
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    }
+    for (size_t i = 0; i < hNames.size(); ++i) {
+        rac_http_header_kv_t kv{};
+        kv.name  = hNames[i].c_str();
+        kv.value = hValues[i].c_str();
+        hKVs.push_back(kv);
+    }
+
+    // Body bytes: copy into std::vector so we can safely pass a raw pointer.
+    std::vector<uint8_t> bodyBuf;
+    if (jBody) {
+        jsize n = env->GetArrayLength(jBody);
+        bodyBuf.resize(static_cast<size_t>(n));
+        if (n > 0) {
+            env->GetByteArrayRegion(jBody, 0, n, reinterpret_cast<jbyte*>(bodyBuf.data()));
+        }
+    }
+
+    rac_http_request_t req{};
+    req.method          = method;
+    req.url             = url;
+    req.headers         = hKVs.empty() ? nullptr : hKVs.data();
+    req.header_count    = hKVs.size();
+    req.body_bytes      = bodyBuf.empty() ? nullptr : bodyBuf.data();
+    req.body_len        = bodyBuf.size();
+    req.timeout_ms      = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = followRedirects == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+
+    rac_http_client_t* client = nullptr;
+    rac_result_t crc = rac_http_client_create(&client);
+    if (crc != RAC_SUCCESS || !client) {
+        env->ReleaseStringUTFChars(jMethod, method);
+        env->ReleaseStringUTFChars(jUrl, url);
+        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
+                                          "Failed to create HTTP client");
+    }
+
+    rac_http_response_t resp{};
+    rac_result_t rc = rac_http_request_send(client, &req, &resp);
+
+    jobject result = nullptr;
+    if (rc != RAC_SUCCESS) {
+        const char* errMsg = "HTTP transport error";
+        switch (rc) {
+            case RAC_ERROR_NETWORK_ERROR: errMsg = "Network error"; break;
+            case RAC_ERROR_TIMEOUT:       errMsg = "Request timeout"; break;
+            case RAC_ERROR_CANCELLED:     errMsg = "Request cancelled"; break;
+            case RAC_ERROR_INVALID_ARGUMENT: errMsg = "Invalid HTTP argument"; break;
+            case RAC_ERROR_OUT_OF_MEMORY: errMsg = "Out of memory"; break;
+            default: break;
+        }
+        result = build_native_http_response(env, -1, nullptr, 0, nullptr, 0, errMsg);
+    } else {
+        result = build_native_http_response(env, static_cast<jint>(resp.status), resp.body_bytes,
+                                            resp.body_len, resp.headers, resp.header_count,
+                                            nullptr);
+    }
+
+    rac_http_response_free(&resp);
+    rac_http_client_destroy(client);
+
+    env->ReleaseStringUTFChars(jMethod, method);
+    env->ReleaseStringUTFChars(jUrl, url);
+
+    return result;
 }
 
 }  // extern "C"

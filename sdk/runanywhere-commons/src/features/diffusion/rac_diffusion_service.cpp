@@ -27,7 +27,15 @@ namespace fs = std::filesystem;
 
 static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
     switch (fw) {
-        case RAC_FRAMEWORK_COREML:             return "platform";
+        // GAP 06 T5.3: routed diffusion previously pointed at the generic
+        // "platform" plugin (Apple Foundation Models), which never
+        // registered diffusion_ops — effectively a no-op stub. The new
+        // engines/diffusion-coreml plugin registers the real
+        // rac_diffusion_service_ops_t vtable under this name. ONNX is
+        // retained as a fallback route even though ONNX diffusion is not
+        // supported (the router will fail cleanly with
+        // RAC_ERROR_BACKEND_NOT_FOUND if neither plugin is loaded).
+        case RAC_FRAMEWORK_COREML:             return "diffusion-coreml";
         case RAC_FRAMEWORK_ONNX:                return "onnx";
         default:                               return nullptr;
     }

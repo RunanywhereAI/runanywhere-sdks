@@ -159,6 +159,8 @@ for ABI in "${ABIS[@]}"; do
     LIB_LLAMA_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_llamacpp_jni.so" -print -quit || true)"
     LIB_ONNX="$(find "${BUILD_DIR}"  -maxdepth 6 -name "librac_backend_onnx.so"          -print -quit || true)"
     LIB_ONNX_JNI="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_onnx_jni.so"   -print -quit || true)"
+    # GAP 06 T5.1 — new Sherpa-ONNX plugin artifact, peer of librac_backend_onnx.so.
+    LIB_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librac_backend_sherpa.so"       -print -quit || true)"
 
     # commons core + JNI go to Kotlin, RN core and Flutter core.
     copy_if_exists "${LIB_COMMONS}"     "${KOTLIN_DEST}" "${RN_CORE_DEST}" "${FLUTTER_CORE_DEST}"
@@ -175,6 +177,10 @@ for ABI in "${ABIS[@]}"; do
     copy_if_exists "${LIB_LLAMA_JNI}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
     copy_if_exists "${LIB_ONNX}"      "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
     copy_if_exists "${LIB_ONNX_JNI}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    # Sherpa is the long-term owner of Sherpa-ONNX-backed STT/TTS/VAD; ship
+    # it alongside the onnx plugin on every ONNX-enabled SDK package. Also
+    # stage into Kotlin so its dlopen registry picks up the plugin.
+    copy_if_exists "${LIB_SHERPA}"    "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}" "${KOTLIN_DEST}"
 
     # Sherpa / ORT prebuilt runtime — only has arm64-v8a/armeabi-v7a/x86_64
     # sub-folders. Staged into both RN and Flutter ONNX plugins.

@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 
 #ifdef _WIN32
 #include <direct.h>  // for _mkdir

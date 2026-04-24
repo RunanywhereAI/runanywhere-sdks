@@ -4,7 +4,7 @@
 // Mirrors Swift `RunAnywhere+Storage.swift`.
 
 import 'package:path_provider/path_provider.dart';
-import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/adapters/model_download_adapter.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/events/event_bus.dart';

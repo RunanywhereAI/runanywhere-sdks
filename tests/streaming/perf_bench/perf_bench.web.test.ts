@@ -20,11 +20,10 @@ const OUTPUT_PATH = '/tmp/perf_bench.web.log';
 
 function decodeWeb(frame: Uint8Array): bigint | null {
   const event = VoiceEvent.decode(frame);
-  if (
-    event.payload?.$case === 'metrics' &&
-    event.payload.metrics.createdAtNs !== undefined
-  ) {
-    const raw = event.payload.metrics.createdAtNs as unknown as string | number | bigint;
+  // ts-proto generates oneof arms as top-level optional fields here
+  // (no `oneofs=unions`). The MetricsEvent arm carries created_at_ns.
+  if (event.metrics !== undefined && event.metrics.createdAtNs !== undefined) {
+    const raw = event.metrics.createdAtNs as unknown as string | number | bigint;
     return BigInt(raw);
   }
   return null;

@@ -3,44 +3,31 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * HTTP extension for CppBridge.
- * Provides HTTP transport bridge for C++ core network operations.
  *
- * Follows iOS CppBridge+HTTP.swift architecture.
+ * Post T3.5: this used to be a 275 LOC HttpURLConnection wrapper. All
+ * of that plumbing now lives in the commons libcurl-backed
+ * `rac_http_client_*` C ABI, accessed via
+ * [RunAnywhereBridge.racHttpRequestExecute]. This file retains only the
+ * public helper surface (HttpMethod constants, HttpResponse record,
+ * get/post/put/delete/request shorthands) that the rest of the Kotlin
+ * SDK (CppBridgeModelAssignment etc.) compiles against.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
- * HTTP bridge that provides network transport callbacks for C++ core operations.
- *
- * The C++ core may need to perform HTTP requests for various operations such as:
- * - Model downloads
- * - Authentication flows
- * - Service API calls
- * - Configuration fetching
- *
- * This extension provides a unified HTTP transport layer via callbacks that C++ can invoke
- * to perform network operations using the platform's native HTTP stack.
- *
- * Usage:
- * - Called during Phase 1 initialization in [CppBridge.initialize]
- * - Must be registered after [CppBridgePlatformAdapter] is registered
- *
- * Thread Safety:
- * - Registration is thread-safe via synchronized block
- * - HTTP requests are executed on a background thread pool
- * - Callbacks from C++ are thread-safe
+ * Synchronous HTTP helper. Every call routes through the native curl
+ * HTTP client — no Kotlin-side socket / HttpURLConnection code remains.
  */
 object CppBridgeHTTP {
-    /**
-     * HTTP method constants matching C++ RAC_HTTP_METHOD_* values.
-     */
+    private const val TAG = "CppBridgeHTTP"
+
+    /** Default call timeout in ms applied when the caller passes 0. */
+    private const val DEFAULT_TIMEOUT_MS = 60_000
+
+    /** HTTP method ordinals — matched to `rac_http_*` method strings. */
     object HttpMethod {
         const val GET = 0
         const val POST = 1
@@ -50,9 +37,6 @@ object CppBridgeHTTP {
         const val HEAD = 5
         const val OPTIONS = 6
 
-        /**
-         * Get the string representation of an HTTP method.
-         */
         fun getName(method: Int): String =
             when (method) {
                 GET -> "GET"
@@ -66,9 +50,7 @@ object CppBridgeHTTP {
             }
     }
 
-    /**
-     * HTTP response status categories.
-     */
+    /** Status-code classification helpers. */
     object HttpStatus {
         const val SUCCESS_MIN = 200
         const val SUCCESS_MAX = 299
@@ -90,9 +72,7 @@ object CppBridgeHTTP {
         fun isError(statusCode: Int): Boolean = isClientError(statusCode) || isServerError(statusCode)
     }
 
-    /**
-     * HTTP error codes for C++ callback responses.
-     */
+    /** Error codes kept for call-site API compatibility. */
     object HttpErrorCode {
         const val NONE = 0
         const val NETWORK_ERROR = 1
@@ -102,39 +82,15 @@ object CppBridgeHTTP {
         const val UNKNOWN = 99
     }
 
-    private val lock = Any()
-
     /**
-     * Tag for logging.
-     */
-    private const val TAG = "CppBridgeHTTP"
-
-    /**
-     * Default connection timeout in milliseconds.
-     */
-    private const val DEFAULT_CONNECT_TIMEOUT_MS = 30_000
-
-    /**
-     * Default read timeout in milliseconds.
-     */
-    private const val DEFAULT_READ_TIMEOUT_MS = 60_000
-
-    // ========================================================================
-    // UTILITY FUNCTIONS
-    // ========================================================================
-
-    /**
-     * Perform an HTTP request synchronously from Kotlin code.
+     * Perform an HTTP request via the native curl-backed client.
      *
-     * This is a utility method for performing HTTP requests from Kotlin directly,
-     * not intended for use by C++ callbacks.
-     *
-     * @param url The request URL
-     * @param method The HTTP method (see [HttpMethod] constants)
-     * @param headers Map of headers to send
-     * @param body Request body, or null for no body
-     * @param timeoutMs Request timeout in milliseconds (0 for default)
-     * @return [HttpResponse] containing status code, body, and headers
+     * @param url The request URL (absolute HTTP/HTTPS).
+     * @param method One of the [HttpMethod] constants.
+     * @param headers Optional header map (Content-Type defaults to application/json
+     *                when a body is present and no Content-Type header was supplied).
+     * @param body Optional request body — ignored for GET/HEAD.
+     * @param timeoutMs Timeout in ms (0 → [DEFAULT_TIMEOUT_MS]).
      */
     fun request(
         url: String,
@@ -143,127 +99,94 @@ object CppBridgeHTTP {
         body: String? = null,
         timeoutMs: Int = 0,
     ): HttpResponse {
-        var connection: HttpURLConnection? = null
+        val methodName = HttpMethod.getName(method)
+        val effectiveTimeout = if (timeoutMs > 0) timeoutMs else DEFAULT_TIMEOUT_MS
 
-        try {
-            val urlObj = URL(url)
-            connection = urlObj.openConnection() as HttpURLConnection
-            connection.requestMethod = HttpMethod.getName(method)
-
-            val connectTimeout = if (timeoutMs > 0) timeoutMs else DEFAULT_CONNECT_TIMEOUT_MS
-            val readTimeout = if (timeoutMs > 0) timeoutMs else DEFAULT_READ_TIMEOUT_MS
-            connection.connectTimeout = connectTimeout
-            connection.readTimeout = readTimeout
-            connection.doInput = true
-
-            // Set headers
-            headers?.forEach { (key, value) ->
-                connection.setRequestProperty(key, value)
+        // Ensure Content-Type for bodied methods when caller didn't set one —
+        // mirrors the legacy HttpURLConnection behaviour.
+        val resolved =
+            if (body != null && method != HttpMethod.GET && method != HttpMethod.HEAD &&
+                headers?.keys?.any { it.equals("Content-Type", ignoreCase = true) } != true) {
+                (headers ?: emptyMap()) + ("Content-Type" to "application/json")
+            } else {
+                headers ?: emptyMap()
             }
 
-            // Set default content type if not specified and body is present
-            if (body != null && headers?.keys?.any { it.equals("Content-Type", ignoreCase = true) } != true) {
-                connection.setRequestProperty("Content-Type", "application/json")
-            }
-
-            // Write body if present
+        val keys = resolved.keys.toTypedArray()
+        val values = resolved.values.toTypedArray()
+        val bodyBytes: ByteArray? =
             if (body != null && method != HttpMethod.GET && method != HttpMethod.HEAD) {
-                connection.doOutput = true
-                OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
-                    writer.write(body)
-                    writer.flush()
-                }
+                body.encodeToByteArray()
+            } else {
+                null
             }
 
-            val statusCode = connection.responseCode
+        val resp = RunAnywhereBridge.racHttpRequestExecute(
+            method = methodName,
+            url = url,
+            headerKeys = keys,
+            headerValues = values,
+            body = bodyBytes,
+            timeoutMs = effectiveTimeout,
+            followRedirects = true,
+        )
 
-            val inputStream =
-                if (HttpStatus.isSuccess(statusCode)) {
-                    connection.inputStream
-                } else {
-                    connection.errorStream
-                }
-
-            val responseBody =
-                if (inputStream != null) {
-                    BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                        reader.readText()
-                    }
-                } else {
-                    null
-                }
-
-            val responseHeaders =
-                connection.headerFields
-                    .filterKeys { it != null }
-                    .mapValues { it.value.firstOrNull() ?: "" }
-                    .filterValues { it.isNotEmpty() }
-
-            return HttpResponse(
-                statusCode = statusCode,
-                body = responseBody,
-                headers = responseHeaders,
-                success = HttpStatus.isSuccess(statusCode),
-                errorMessage = null,
-            )
-        } catch (e: Exception) {
+        if (resp == null || resp.errorMessage != null) {
+            val err = resp?.errorMessage ?: "native HTTP call returned null"
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "HTTP request failed: ${e.message}",
+                "HTTP request failed: $err",
             )
             return HttpResponse(
-                statusCode = -1,
+                statusCode = resp?.statusCode ?: -1,
                 body = null,
                 headers = emptyMap(),
                 success = false,
-                errorMessage = e.message ?: "Unknown error",
+                errorMessage = err,
             )
-        } finally {
-            connection?.disconnect()
         }
+
+        return HttpResponse(
+            statusCode = resp.statusCode,
+            body = resp.bodyAsString().ifEmpty { null },
+            headers = resp.headersAsMap(),
+            success = HttpStatus.isSuccess(resp.statusCode),
+            errorMessage = null,
+        )
     }
 
-    /**
-     * Perform a GET request.
-     */
-    fun get(url: String, headers: Map<String, String>? = null, timeoutMs: Int = 0): HttpResponse {
-        return request(url, HttpMethod.GET, headers, null, timeoutMs)
-    }
+    /** Perform a GET request. */
+    fun get(url: String, headers: Map<String, String>? = null, timeoutMs: Int = 0): HttpResponse =
+        request(url, HttpMethod.GET, headers, null, timeoutMs)
 
-    /**
-     * Perform a POST request with JSON body.
-     */
+    /** Perform a POST request with an optional body. */
     fun post(
         url: String,
         body: String?,
         headers: Map<String, String>? = null,
         timeoutMs: Int = 0,
-    ): HttpResponse {
-        return request(url, HttpMethod.POST, headers, body, timeoutMs)
-    }
+    ): HttpResponse = request(url, HttpMethod.POST, headers, body, timeoutMs)
 
-    /**
-     * Perform a PUT request with JSON body.
-     */
+    /** Perform a PUT request with an optional body. */
     fun put(
         url: String,
         body: String?,
         headers: Map<String, String>? = null,
         timeoutMs: Int = 0,
-    ): HttpResponse {
-        return request(url, HttpMethod.PUT, headers, body, timeoutMs)
-    }
+    ): HttpResponse = request(url, HttpMethod.PUT, headers, body, timeoutMs)
+
+    /** Perform a DELETE request. */
+    fun delete(url: String, headers: Map<String, String>? = null, timeoutMs: Int = 0): HttpResponse =
+        request(url, HttpMethod.DELETE, headers, null, timeoutMs)
 
     /**
-     * Perform a DELETE request.
-     */
-    fun delete(url: String, headers: Map<String, String>? = null, timeoutMs: Int = 0): HttpResponse {
-        return request(url, HttpMethod.DELETE, headers, null, timeoutMs)
-    }
-
-    /**
-     * HTTP response data class.
+     * HTTP response record.
+     *
+     * [body] is the UTF-8 decoded body, or null when the server sent an
+     * empty body. [headers] is a deduplicated flat string map; when the
+     * server sent multiple values for the same header only the first is
+     * preserved (matches the pre-T3.5 HttpURLConnection behaviour).
      */
     data class HttpResponse(
         val statusCode: Int,

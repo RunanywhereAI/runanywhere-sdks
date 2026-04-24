@@ -9,36 +9,60 @@
 # or as a SHARED librunanywhere_<name>.so loaded via rac_registry_load_plugin()
 # at runtime (default on Android / Linux / macOS / Windows).
 #
+# T5.4: per-engine RAC_BACKEND_<name> options are owned by each engine's own
+# CMakeLists.txt (option() + self-gating `return()` guard). This directory
+# simply descends into each engine unconditionally; the engine's own CMake
+# decides whether to proceed. `if(EXISTS ...)` guards tolerate partial trees.
+#
 # Adding a new in-tree engine:
 #   1. Create engines/<name>/{CMakeLists.txt, *.cpp}.
 #   2. Add `add_subdirectory(<name>)` below.
-#   3. Per-engine CMakeLists is a one-liner (or two) calling
-#      `rac_add_engine_plugin(<name> SOURCES ... LINK_LIBRARIES ... RUNTIMES
-#      ... FORMATS ...)`.
+#   3. Per-engine CMakeLists declares its own
+#        option(RAC_BACKEND_<NAME> "..." <default>)
+#        if(NOT RAC_BACKEND_<NAME>) return() endif()
+#      before calling rac_add_engine_plugin(...).
 # Out-of-tree engines: no edit here required — they live in their own repo
 # and are dlopen'd by the host or static-linked via the user's build.
 # =============================================================================
 
-# Per-engine RAC_BACKEND_* options are still owned by sdk/runanywhere-commons
-# until the post-Wave-B cleanup hoists them here. Today they gate which
-# subdirectories we descend into.
-
-if(RAC_BACKEND_LLAMACPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp/CMakeLists.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llamacpp/CMakeLists.txt")
     add_subdirectory(llamacpp)
 endif()
 
-if(RAC_BACKEND_ONNX AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
+# T5.1: sherpa must come BEFORE onnx. engines/sherpa owns Sherpa-ONNX
+# prebuilt discovery and publishes the GLOBAL IMPORTED target `sherpa_onnx`
+# + CACHE INTERNAL flag `RAC_SHERPA_ONNX_AVAILABLE` that engines/onnx
+# consumes while its Sherpa-backed STT/TTS/VAD migration (T5.1 phase 2)
+# is in flight.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sherpa/CMakeLists.txt")
+    add_subdirectory(sherpa)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx/CMakeLists.txt")
     add_subdirectory(onnx)
 endif()
 
-if(RAC_BACKEND_WHISPERCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whispercpp/CMakeLists.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whispercpp/CMakeLists.txt")
     add_subdirectory(whispercpp)
 endif()
 
-if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whisperkit_coreml/CMakeLists.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/whisperkit_coreml/CMakeLists.txt")
     add_subdirectory(whisperkit_coreml)
 endif()
 
-if(APPLE AND RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metalrt/CMakeLists.txt")
     add_subdirectory(metalrt)
+endif()
+
+# T5.2: Qualcomm Genie / NPU LLM engine. OFF by default — requires the
+# Genie SDK headers which are not in-tree. Compiles a shell plugin that
+# surfaces RAC_ERROR_BACKEND_UNAVAILABLE when the SDK isn't linked in.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/genie/CMakeLists.txt")
+    add_subdirectory(genie)
+endif()
+
+# T5.3: Apple CoreML diffusion engine (Stable Diffusion via MLModel).
+# Apple-only — self-gates to return() on non-Apple platforms.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/diffusion-coreml/CMakeLists.txt")
+    add_subdirectory(diffusion-coreml)
 endif()

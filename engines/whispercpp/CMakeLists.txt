@@ -2,6 +2,14 @@
 # WhisperCPP Backend - Speech-to-Text via whisper.cpp
 # =============================================================================
 
+# T5.4: per-engine build toggle owned locally.
+# WhisperCPP defaults OFF — Sherpa-ONNX (NeMo CTC / Parakeet) is the primary
+# STT backend; WhisperCPP is an opt-in alternative.
+option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
+if(NOT RAC_BACKEND_WHISPERCPP)
+    return()
+endif()
+
 message(STATUS "Configuring WhisperCPP backend...")
 
 # =============================================================================

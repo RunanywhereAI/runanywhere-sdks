@@ -1,15 +1,20 @@
 // perf_bench.ts — RN/Web consumer for the GAP 09 #8 perf bench.
 //
-// v3.1: real implementation. Reads /tmp/perf_input.bin (produced by
-// perf_producer.cpp), decodes each VoiceEvent via ts-proto, extracts
-// the producer-side timestamp from `metrics.created_at_ns`, and
-// computes consumer-side latency deltas. Writes per-event delta_ns
-// to /tmp/perf_bench.<rn|web>.log.
+// v3.2: in-process decode latency (mirrors perf_bench.kt / perf_bench.dart).
 //
-// Single source for both React Native (Jest) and Web (Vitest) SDKs
-// since both use ts-proto and the same AsyncIterable consumer pattern.
-// The runner harnesses differ per platform; each test file imports
-// the correct VoiceEvent proto path via the `voiceEventPath` parameter.
+// Why not `now() - metrics.created_at_ns`: the C++ producer stamps
+// `created_at_ns` from `std::chrono::steady_clock`, which is monotonic
+// but has a process-local, platform-defined epoch. Node's
+// `process.hrtime.bigint()` is also monotonic with its own origin
+// (process start). Subtracting the two yields garbage deltas (observed:
+// ~158 s offset on macOS), which the `>0` filter still accepts but
+// blows past the 1ms p50 budget. Decode latency in-process is what the
+// README spec actually describes — "per-event work: proto decode +
+// delta computation only" — so we bracket `process.hrtime.bigint()`
+// directly around the `decode` callback. Same clock, same process,
+// measures exactly the cost the p50 budget is meant to bound.
+//
+// Single source for both React Native (Jest) and Web (Vitest) SDKs.
 //
 // Input format (matches perf_producer.cpp):
 //   uint32_t magic = 0x42504152 ('RAPB')
@@ -22,23 +27,20 @@ const DEFAULT_INPUT_PATH = '/tmp/perf_input.bin';
 const MAGIC = 0x42504152;
 
 /**
- * Decode one VoiceEvent frame and extract the producer timestamp
- * from `metrics.created_at_ns` (v3.1 schema). Returns nanoseconds or
- * null if the event has no metrics arm.
+ * Decode one VoiceEvent frame and return the producer-side
+ * `metrics.created_at_ns` if present, else null. Used only to
+ * count "non-empty" frames; the perf delta is the bracketed
+ * decode time, not a cross-clock subtraction.
  */
 export type VoiceEventDecoder = (frame: Uint8Array) => bigint | null;
 
 /**
- * Run the perf bench consumer against /tmp/perf_input.bin.
+ * Run the perf bench consumer against /tmp/perf_input.bin. Each
+ * delta is the in-process decode time of one VoiceEvent (bracketed
+ * with `process.hrtime.bigint()`), not a cross-process clock diff.
  *
- * @param outputPath    Where to write per-event delta_ns (one per line).
- * @param decode        VoiceEvent decoder. Each platform wires its own
- *                      ts-proto import (RN / Web) and returns the
- *                      producer-side ns or null.
- * @param inputPath     Override for the input binary. Defaults to
- *                      /tmp/perf_input.bin.
- * @returns             { count, nonEmpty } so the caller can sanity-
- *                      check whether the producer wrote useful data.
+ * @returns { count, nonEmpty } — `nonEmpty` counts frames whose
+ *           MetricsEvent arm carries `created_at_ns > 0`.
  */
 export async function runPerfBench(
   outputPath: string,
@@ -72,21 +74,18 @@ export async function runPerfBench(
     const frame = buf.subarray(cursor, cursor + len);
     cursor += len;
 
-    // Mark consumer-receive BEFORE decode so proto-decode cost is
-    // attributed to latency (this is what a real consumer pays).
-    const recvNs = process.hrtime.bigint();
-
+    // Bracket decode in-process — same monotonic clock, same process.
+    const startNs = process.hrtime.bigint();
     const producerNs = decode(frame);
-    if (producerNs === null) {
-      // Event has no metrics arm — record zero so aggregator's
-      // percentile math stays stable. compute_percentiles.py knows
-      // to filter zero values when computing meaningful stats.
-      deltas[i] = 0n;
-      continue;
-    }
+    const endNs = process.hrtime.bigint();
+    const decodeNs = endNs - startNs;
 
-    deltas[i] = recvNs - producerNs;
-    nonEmpty++;
+    if (decodeNs > 0n) {
+      deltas[i] = decodeNs;
+      if (producerNs !== null && producerNs > 0n) nonEmpty++;
+    } else {
+      deltas[i] = 0n;
+    }
   }
 
   const lines = Array.from(deltas).map((d) => d.toString()).join('\n') + '\n';

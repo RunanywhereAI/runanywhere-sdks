@@ -72,18 +72,44 @@ class RunAnywhereModels {
     return List.unmodifiable(uniqueModels.values.toList());
   }
 
-  /// Re-scan filesystem for downloaded models and update the C++
-  /// registry with their `localPath`s. Normally called automatically
-  /// on first [available] call.
-  Future<void> refresh() async {
+  /// Refresh the model registry — T4.9 cross-SDK unified surface.
+  ///
+  /// Routes through the commons C ABI `rac_model_registry_refresh` for the
+  /// remote catalog step (which runs under the SDK's model assignment HTTP
+  /// callbacks). The local filesystem rescan still runs through the Dart
+  /// bridge because discovery callbacks are Dart closures that can't be
+  /// expressed in the native opts struct cleanly.
+  ///
+  /// - [includeRemoteCatalog] fetches the backend model assignment catalog.
+  /// - [rescanLocal] rescans on-disk model folders and links downloads.
+  /// - [pruneOrphans] clears `localPath` on models whose file is missing
+  ///   (detected via the same filesystem discovery callbacks).
+  Future<void> refresh({
+    bool includeRemoteCatalog = true,
+    bool rescanLocal = true,
+    bool pruneOrphans = false,
+  }) async {
     if (!SdkState.shared.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Discovery');
-    final result =
-        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
-    if (result.discoveredModels.isNotEmpty) {
-      logger.info(
-          'Discovery found ${result.discoveredModels.length} downloaded models');
+
+    if (rescanLocal) {
+      final result =
+          await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+      if (result.discoveredModels.isNotEmpty) {
+        logger.info(
+            'Discovery found ${result.discoveredModels.length} downloaded models');
+      }
+    }
+
+    if (includeRemoteCatalog || pruneOrphans) {
+      final ok = await DartBridgeModelRegistry.instance.refresh(
+        includeRemoteCatalog: includeRemoteCatalog,
+        pruneOrphans: pruneOrphans,
+      );
+      if (!ok) {
+        logger.warning('rac_model_registry_refresh reported failure');
+      }
     }
   }
 

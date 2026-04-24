@@ -59,7 +59,6 @@ object CppBridgePlatform {
 
         /** Platform vision/image understanding service */
         const val VISION = 6
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed
 
         /**
          * Get a human-readable name for the service type.
@@ -1267,8 +1266,6 @@ object CppBridgePlatform {
         serviceAvailability[ServiceType.STT] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.EMBEDDING] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.VISION] = AvailabilityStatus.UNKNOWN
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Android
-        serviceAvailability[5] = AvailabilityStatus.UNKNOWN
     }
 
     /**

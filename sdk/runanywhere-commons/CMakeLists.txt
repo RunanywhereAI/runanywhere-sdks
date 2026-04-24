@@ -30,33 +30,21 @@ option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
-option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
-option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
-option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
-# WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
-option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
 
-# Emscripten: force the ONNX + RAG backends OFF. FetchONNXRuntime.cmake has
-# no WASM binary distribution (it expects headers under
-# third_party/onnxruntime-wasm/ which are not vendored in this tree), so the
-# engine TUs fail to compile with `onnxruntime_c_api.h: file not found`. The
-# ONNX WASM story is delivered by `onnxruntime-web` (JavaScript package)
-# from the frontend; commons does not need an in-module ONNX runtime on WASM.
-# sdk/runanywhere-web/wasm/CMakeLists.txt already defaults these OFF for the
-# standalone WASM entrypoint — mirror that here so the root-level `wasm`
-# preset (which inherits base-release) configures cleanly.
-# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip these back to
+# T5.4: per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
+# Only commons-local backends (RAG pipeline) declare their option here.
+option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
+
+# Emscripten: force the RAG backend OFF. FetchONNXRuntime.cmake has no WASM
+# binary distribution (it expects headers under third_party/onnxruntime-wasm/
+# which are not vendored in this tree), so the RAG ONNX embedding TUs fail
+# to compile with `onnxruntime_c_api.h: file not found`. The ONNX WASM story
+# is delivered by `onnxruntime-web` (JavaScript package) from the frontend;
+# commons does not need an in-module ONNX runtime on WASM.
+# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip this back to
 # default ON when the onnxruntime-wasm third_party package lands.
 if(EMSCRIPTEN)
-    set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
-    set(RAC_BACKEND_RAG  OFF CACHE BOOL "" FORCE)
-endif()
-if(APPLE)
-    option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
-    option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
-else()
-    set(RAC_BACKEND_WHISPERKIT_COREML OFF CACHE BOOL "" FORCE)
-    set(RAC_BACKEND_METALRT OFF CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_RAG OFF CACHE BOOL "" FORCE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
@@ -583,6 +571,10 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/plugin/rac_plugin_registry.cpp
     # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
     src/plugin/plugin_loader.cpp
+    # T4.1: L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
+    # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
+    # rac_commons by the root CMakeLists so the registry is never empty.
+    src/plugin/rac_runtime_registry.cpp
     # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
     src/router/rac_hardware_profile.cpp
     src/router/rac_engine_router.cpp
@@ -613,6 +605,11 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
     src/infrastructure/extraction/rac_extraction.cpp
+    # v3.1 Phase 9: DAG streaming runtime (GAP 05 Phase 2). The primitives
+    # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
+    # MemoryPool / PipelineNode) are header-only templates; only the
+    # non-templated GraphScheduler has a .cpp to compile here.
+    src/graph/graph_scheduler.cpp
 )
 
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
@@ -664,6 +661,11 @@ set(RAC_FEATURES_SOURCES
     src/features/voice_agent/voice_agent.cpp
     # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
     src/features/voice_agent/rac_voice_event_abi.cpp
+    # GAP 05 Phase 2: GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
+    # First v3.1 Phase 9 DAG consumer; replaces the in-line process_stream
+    # orchestration with typed PipelineNodes + bounded StreamEdge
+    # backpressure + hierarchical CancelToken propagation.
+    src/features/voice_agent/voice_agent_pipeline.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
@@ -685,18 +687,25 @@ else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# GAP 06 Phase 9: WhisperKit CoreML moved to engines/whisperkit_coreml/.
-# Build hook stays here (paths shifted to the new location) until the
-# engines/ subdirectory's per-engine CMakeLists owns the wiring directly.
-if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML)
-    set(RAC_WHISPERKIT_COREML_SOURCES
-        ${CMAKE_SOURCE_DIR}/engines/whisperkit_coreml/rac_stt_whisperkit_coreml.cpp
-        ${CMAKE_SOURCE_DIR}/engines/whisperkit_coreml/rac_backend_whisperkit_coreml_register.cpp
-    )
-    message(STATUS "Building WhisperKit CoreML backend (sources from engines/whisperkit_coreml/)")
-else()
-    set(RAC_WHISPERKIT_COREML_SOURCES "")
-endif()
+# T5.4: WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
+# which declares its own rac_backend_whisperkit_coreml target (via
+# rac_add_engine_plugin). Commons no longer compiles those TUs directly.
+
+# T4.7 Solutions C ABI — always-built fallback.
+#
+# The full SolutionRunner implementation (rac_solution.cpp + companions)
+# requires Protobuf and is added to rac_commons inside the Protobuf_FOUND
+# block below. On cross-compilation targets (iOS / Android / WASM) Protobuf
+# is typically not discoverable, so without this stub TU every downstream
+# binding (Swift facade, JNI thunks, RN HybridRunAnywhereCore, Flutter FFI,
+# Web exports) would fail to link against the rac_solution_* symbols.
+#
+# rac_solution_stub.cpp is gated on `#ifndef RAC_HAVE_PROTOBUF`, so when the
+# Protobuf branch defines RAC_HAVE_PROTOBUF=1 the stub TU compiles to an
+# empty object and the real symbols from rac_solution.cpp win at link time.
+set(RAC_SOLUTIONS_STUB_SOURCES
+    src/solutions/rac_solution_stub.cpp
+)
 
 # Combine all sources
 set(RAC_COMMONS_SOURCES
@@ -704,7 +713,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
     ${RAC_PLATFORM_SOURCES}
-    ${RAC_WHISPERKIT_COREML_SOURCES}
+    ${RAC_SOLUTIONS_STUB_SOURCES}
 )
 
 # =============================================================================
@@ -843,6 +852,21 @@ if(Protobuf_FOUND)
         endif()
         target_compile_definitions(rac_commons PUBLIC RAC_HAVE_PROTOBUF=1)
         message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")
+
+        # T4.7: SolutionRunner + PipelineExecutor + C ABI. Gated on
+        # Protobuf because the implementation walks PipelineSpec /
+        # SolutionConfig messages directly. The neutral operator
+        # registry keeps the subsystem engine-agnostic; real backends
+        # register their factories at startup.
+        target_sources(rac_commons PRIVATE
+            src/solutions/operator_registry.cpp
+            src/solutions/pipeline_executor.cpp
+            src/solutions/solution_converter.cpp
+            src/solutions/solution_runner.cpp
+            src/solutions/config_loader.cpp
+            src/solutions/rac_solution.cpp
+        )
+        message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
     else()
         message(STATUS "Protobuf found but src/generated/proto/*.pb.cc absent — proto event ABI inactive")
     endif()
@@ -947,94 +971,33 @@ if(RAC_BUILD_JNI)
 endif()
 
 # =============================================================================
-# BACKENDS (LlamaCPP, ONNX, WhisperCPP, MetalRT)
+# COMMONS-LOCAL BACKENDS (RAG)
 #
-# GAP 06 Phase 9: per-engine CMakeLists were `git mv`-d to engines/<name>/
-# at the repo root. The ROOT CMakeLists.txt (runanywhere-sdks-main/) now
-# add_subdirectory(engines) which descends into each engine. This block is
-# kept ONLY for the standalone "build commons by itself" workflow (some
-# external consumers configure the commons subdir directly without the
-# root CMake) — it forwards to the new locations via add_subdirectory with
-# absolute paths so per-engine CMakeLists need no edit per consumer.
-#
-# When configured via the root CMake, the root owns engines/ and this block
-# only folds commons-local OBJECT libraries (RAG) into rac_commons. Engine
-# targets themselves are added exactly once from the repo root.
+# T5.4: engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
+# are wired exclusively from engines/<name>/CMakeLists.txt via the root
+# add_subdirectory(engines) path. Commons no longer instantiates or forwards
+# engine targets — only commons-local OBJECT libraries (RAG) are folded into
+# rac_commons below.
 # =============================================================================
 
-if(RAC_BUILD_BACKENDS)
-    message(STATUS "Building ML backends (paths forwarded to engines/<name>/)...")
+if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
+    message(STATUS "Building RAG pipeline (USearch) — folded into rac_commons")
+    add_subdirectory(src/features/rag)
 
-    # Resolve the engines/ root: prefer the repo root if we were configured
-    # via the root CMake; fall back to ../../engines/ for standalone commons
-    # configures.
-    if(DEFINED CMAKE_SOURCE_DIR AND EXISTS "${CMAKE_SOURCE_DIR}/engines/llamacpp/CMakeLists.txt")
-        set(_ENGINES_ROOT "${CMAKE_SOURCE_DIR}/engines")
-    else()
-        set(_ENGINES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../engines")
-    endif()
+    # RAG is an OBJECT library. Fold its compiled objects into rac_commons
+    # so there is no separate librac_backend_rag binary to distribute.
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_rag>)
 
-    if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-        if(RAC_BACKEND_LLAMACPP AND EXISTS "${_ENGINES_ROOT}/llamacpp/CMakeLists.txt"
-           AND NOT TARGET rac_backend_llamacpp)
-            message(STATUS "  - LlamaCPP backend (engines/llamacpp)")
-            add_subdirectory("${_ENGINES_ROOT}/llamacpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_llamacpp")
-        endif()
-
-        if(RAC_BACKEND_ONNX AND EXISTS "${_ENGINES_ROOT}/onnx/CMakeLists.txt"
-           AND NOT TARGET rac_backend_onnx)
-            message(STATUS "  - ONNX backend (engines/onnx)")
-            add_subdirectory("${_ENGINES_ROOT}/onnx" "${CMAKE_CURRENT_BINARY_DIR}/_engine_onnx")
-        endif()
-
-        if(RAC_BACKEND_WHISPERCPP AND EXISTS "${_ENGINES_ROOT}/whispercpp/CMakeLists.txt"
-           AND NOT TARGET rac_backend_whispercpp)
-            message(STATUS "  - WhisperCPP backend (engines/whispercpp)")
-            add_subdirectory("${_ENGINES_ROOT}/whispercpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_whispercpp")
-        endif()
-
-        if(RAC_BACKEND_METALRT AND EXISTS "${_ENGINES_ROOT}/metalrt/CMakeLists.txt"
-           AND NOT TARGET rac_backend_metalrt)
-            message(STATUS "  - MetalRT backend (engines/metalrt) — folded into rac_commons")
-            add_subdirectory("${_ENGINES_ROOT}/metalrt" "${CMAKE_CURRENT_BINARY_DIR}/_engine_metalrt")
-
-            # MetalRT is an OBJECT library. Fold its compiled objects into
-            # rac_commons so there is no separate rac_backend_metalrt artifact
-            # to distribute — mirrors how RAG is integrated.
-            target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
-
-            if(APPLE)
-                target_link_libraries(rac_commons PUBLIC
-                    "-framework Metal"
-                    "-framework Foundation"
-                    "-framework Accelerate"
-                )
-            endif()
-
-            if(RAC_METALRT_ENGINE_LIB)
-                target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
-            endif()
-        endif()
-    endif()
-
-    if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
-        message(STATUS "  - RAG pipeline (USearch) — folded into rac_commons")
-        add_subdirectory(src/features/rag)
-
-        # RAG is an OBJECT library. Fold its compiled objects into rac_commons
-        # so there is no separate librac_backend_rag binary to distribute.
-        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_rag>)
-
-        # Propagate RAG's non-cyclic dependencies manually.
-        # We intentionally do NOT use target_link_libraries(rac_commons PRIVATE rac_backend_rag)
-        # because that would transitively pull in rac_backend_onnx (via the ONNX embedding
-        # provider) and create a shared-library cycle:
-        #   rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons
-        # nlohmann_json is already linked project-wide (line 116).
-        # Apple frameworks used by RAG (Accelerate) need explicit propagation.
-        if(APPLE)
-            target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
-        endif()
+    # Propagate RAG's non-cyclic dependencies manually.
+    # We intentionally do NOT use target_link_libraries(rac_commons PRIVATE rac_backend_rag)
+    # because that would transitively pull in rac_backend_onnx (via the ONNX embedding
+    # provider) and create a shared-library cycle:
+    #   rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons
+    # nlohmann_json is already linked project-wide.
+    # Apple frameworks used by RAG (Accelerate) need explicit propagation.
+    if(APPLE)
+        target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
     endif()
 endif()
 
@@ -1104,7 +1067,8 @@ if(RAC_PLATFORM_WINDOWS)
     message(STATUS "  Platform:     Windows (MSVC)")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}, MetalRT=${RAC_BACKEND_METALRT}")
+    # T5.4: per-engine RAC_BACKEND_<name> status is printed by each
+    # engines/<name>/CMakeLists.txt; commons only reports its RAG flag.
     if(RAC_BACKEND_RAG)
         message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
     endif()

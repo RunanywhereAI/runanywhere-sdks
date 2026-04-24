@@ -17,7 +17,7 @@
  * package (@runanywhere/web) is pure TypeScript.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere } from '@runanywhere/web';
+import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere, HTTPAdapter } from '@runanywhere/web';
 import type { AccelerationMode } from '@runanywhere/web';
 import { getDeviceInfo } from '@runanywhere/web';
 import { PlatformAdapter } from './PlatformAdapter';
@@ -302,6 +302,11 @@ export class LlamaCppBridge {
         this._module!,
         (eventType, dataPtr) => this._telemetryService?.trackAnalyticsEvent(eventType, dataPtr),
       );
+
+      // Publish this module as the default HTTP transport (T3.13) so
+      // core's ModelDownloader can route through the commons libcurl
+      // C ABI without taking a hard dependency on this backend package.
+      HTTPAdapter.setDefaultModule(this._module! as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
@@ -663,6 +668,8 @@ export class LlamaCppBridge {
       }
       this._platformAdapter = null;
     }
+
+    HTTPAdapter.clearDefaultModule();
 
     this._module = null;
     this._loaded = false;

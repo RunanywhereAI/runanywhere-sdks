@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:runanywhere/data/network/http_service.dart';
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -271,11 +271,11 @@ class TelemetryEvent {
 ///
 /// ARCHITECTURE:
 /// - C++ telemetry manager handles core event logic (batching, JSON building, routing)
-/// - Platform SDK provides HTTP transport via HTTPService
+/// - Platform SDK provides HTTP transport via [HTTPClientAdapter]
 /// - Events are automatically tracked by C++ when using LLM/STT/TTS/VAD capabilities
 ///
 /// This Dart service provides:
-/// - A wrapper to send telemetry events via HTTPService
+/// - A wrapper to send telemetry events via [HTTPClientAdapter]
 /// - Convenience methods that match the Swift/Kotlin/React Native API
 /// - SDK-level events that Dart code can emit
 ///
@@ -440,16 +440,21 @@ class TelemetryService {
             _logger.debug('Sending telemetry event: ${event.type}');
             _logger.debug('Payload: $payload');
 
-            final response = await HTTPService.shared.post<dynamic>(
+            final response = await HTTPClientAdapter.shared.post(
               endpoint,
-              payload,
+              body: payload,
               requiresAuth: false,
             );
 
-            // Debug: Log the response
-            _logger.debug('Response for ${event.type}: $response');
+            _logger.debug(
+                'Response for ${event.type}: ${response.statusCode} ${response.body}');
 
-            successCount++;
+            if (response.isSuccess) {
+              successCount++;
+            } else {
+              _logger.error(
+                  'Failed to send event ${event.type}: HTTP ${response.statusCode}');
+            }
           } catch (e) {
             _logger.error('Failed to send event ${event.type}: $e');
           }
@@ -489,14 +494,19 @@ class TelemetryService {
           }
 
           try {
-            await HTTPService.shared.post<dynamic>(
+            final response = await HTTPClientAdapter.shared.post(
               endpoint,
-              payload,
+              body: payload,
               requiresAuth: true,
             );
-            successCount += modalityEvents.length;
-            _logger.debug(
-                'Flushed ${modalityEvents.length} ${modality ?? "system"} events');
+            if (response.isSuccess) {
+              successCount += modalityEvents.length;
+              _logger.debug(
+                  'Flushed ${modalityEvents.length} ${modality ?? "system"} events');
+            } else {
+              _logger.error(
+                  'Failed to flush ${modality ?? "system"} events: HTTP ${response.statusCode}');
+            }
           } catch (e) {
             _logger.error(
                 'Failed to flush ${modality ?? "system"} events: $e');

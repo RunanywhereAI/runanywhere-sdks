@@ -6,7 +6,7 @@
 // Moved out of the old static `RunAnywhere` god-class during Phase C
 // of the v2 close-out. These helpers are NOT part of the public API.
 
-import 'package:runanywhere/data/network/http_service.dart';
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
@@ -56,7 +56,7 @@ Future<void> authenticateWithBackend(
     if (result.isSuccess) {
       logger.info('Authenticated for ${params.environment.description}');
       if (result.data?.accessToken != null) {
-        HTTPService.shared.setToken(result.data!.accessToken!);
+        HTTPClientAdapter.shared.setToken(result.data!.accessToken!);
       }
     } else {
       logger.warning(

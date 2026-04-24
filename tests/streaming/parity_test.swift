@@ -64,12 +64,12 @@ final class StreamingParityTests: XCTestCase {
         var events: [RAVoiceEvent] = []
 
         var e1 = RAVoiceEvent()
-        var v1 = RAVADEvent(); v1.type = .voiceStart
+        var v1 = RAVADEvent(); v1.type = .vadEventVoiceStart
         e1.vad = v1
         events.append(e1)
 
         var e2 = RAVoiceEvent()
-        var v2 = RAVADEvent(); v2.type = .voiceEndOfUtterance
+        var v2 = RAVADEvent(); v2.type = .vadEventVoiceEndOfUtterance
         e2.vad = v2
         events.append(e2)
 

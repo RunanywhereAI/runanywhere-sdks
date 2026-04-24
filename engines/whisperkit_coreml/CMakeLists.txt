@@ -8,6 +8,18 @@
 # v3.1.2: target declaration migrated to rac_add_engine_plugin().
 # =============================================================================
 
+# T5.4: per-engine build toggle owned locally. Apple-only — force OFF
+# elsewhere so non-Apple builds don't accidentally enable it from a cached
+# value.
+if(APPLE)
+    option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
+else()
+    set(RAC_BACKEND_WHISPERKIT_COREML OFF CACHE BOOL "" FORCE)
+endif()
+if(NOT RAC_BACKEND_WHISPERKIT_COREML)
+    return()
+endif()
+
 message(STATUS "Configuring WhisperKit CoreML backend...")
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)

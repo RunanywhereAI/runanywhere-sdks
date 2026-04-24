@@ -54,14 +54,21 @@
 #include "rac_vad_component.h"
 #include "rac_vad_types.h"
 #include "rac_voice_agent.h"
+#include "rac/solutions/rac_solution.h"
 #include "rac_types.h"
 #include "rac_model_assignment.h"
 #include "rac_extraction.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_download.h"
 
 #include <sstream>
 #include <chrono>
 #include <vector>
 #include <mutex>
+#include <atomic>
+#include <memory>
+#include <unordered_map>
+#include <thread>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <cstdio>
@@ -325,6 +332,151 @@ std::string buildJsonObject(const std::vector<std::pair<std::string, std::string
     }
     result += "}";
     return result;
+}
+
+// =============================================================================
+// Native HTTP transport helpers (rac_http_client_* wrapper + cancel registry)
+// =============================================================================
+
+// Parse a JSON object of string → string headers. Deliberately minimal: we
+// expect TypeScript callers to hand us a plain `{"Key":"Value",...}` object.
+std::vector<std::pair<std::string, std::string>> parseHeadersJson(const std::string& headersJson) {
+    std::vector<std::pair<std::string, std::string>> out;
+    if (headersJson.empty()) return out;
+    size_t i = 0;
+    while (i < headersJson.size()) {
+        size_t kStart = headersJson.find('"', i);
+        if (kStart == std::string::npos) break;
+        size_t kEnd = headersJson.find('"', kStart + 1);
+        if (kEnd == std::string::npos) break;
+        std::string key = headersJson.substr(kStart + 1, kEnd - kStart - 1);
+
+        size_t colon = headersJson.find(':', kEnd + 1);
+        if (colon == std::string::npos) break;
+        size_t vStart = headersJson.find('"', colon + 1);
+        if (vStart == std::string::npos) break;
+        size_t vEnd = headersJson.find('"', vStart + 1);
+        if (vEnd == std::string::npos) break;
+        std::string value = headersJson.substr(vStart + 1, vEnd - vStart - 1);
+
+        out.emplace_back(std::move(key), std::move(value));
+        i = vEnd + 1;
+    }
+    return out;
+}
+
+struct NativeHttpResult {
+    int32_t status = 0;
+    std::string body;
+    std::vector<std::pair<std::string, std::string>> headers;
+};
+
+// Execute a blocking HTTP request via rac_http_client_*. Throws std::runtime_error
+// on transport-level failure (DNS / TLS / timeout). 4xx/5xx responses are
+// returned through NativeHttpResult so callers can decide how to handle them.
+NativeHttpResult performNativeHttpRequest(
+    const std::string& method,
+    const std::string& url,
+    const std::vector<std::pair<std::string, std::string>>& headers,
+    const std::string& body,
+    int32_t timeoutMs
+) {
+    rac_http_client_t* client = nullptr;
+    rac_result_t createResult = rac_http_client_create(&client);
+    if (createResult != RAC_SUCCESS || !client) {
+        throw std::runtime_error("rac_http_client_create failed (rc=" +
+                                 std::to_string(createResult) + ")");
+    }
+
+    std::vector<rac_http_header_kv_t> headerKVs;
+    headerKVs.reserve(headers.size());
+    for (const auto& h : headers) {
+        headerKVs.push_back(rac_http_header_kv_t{h.first.c_str(), h.second.c_str()});
+    }
+
+    rac_http_request_t req{};
+    req.method = method.c_str();
+    req.url = url.c_str();
+    req.headers = headerKVs.empty() ? nullptr : headerKVs.data();
+    req.header_count = headerKVs.size();
+    req.body_bytes = body.empty() ? nullptr : reinterpret_cast<const uint8_t*>(body.data());
+    req.body_len = body.size();
+    req.timeout_ms = timeoutMs > 0 ? timeoutMs : 30000;
+    req.follow_redirects = RAC_TRUE;
+    req.expected_checksum_hex = nullptr;
+
+    rac_http_response_t resp{};
+    rac_result_t sendResult = rac_http_request_send(client, &req, &resp);
+    rac_http_client_destroy(client);
+
+    if (sendResult != RAC_SUCCESS) {
+        rac_http_response_free(&resp);
+        throw std::runtime_error("rac_http_request_send failed (rc=" +
+                                 std::to_string(sendResult) + ")");
+    }
+
+    NativeHttpResult out;
+    out.status = resp.status;
+    if (resp.body_bytes && resp.body_len > 0) {
+        out.body.assign(reinterpret_cast<const char*>(resp.body_bytes), resp.body_len);
+    }
+    if (resp.headers) {
+        out.headers.reserve(resp.header_count);
+        for (size_t i = 0; i < resp.header_count; i++) {
+            out.headers.emplace_back(
+                resp.headers[i].name ? resp.headers[i].name : "",
+                resp.headers[i].value ? resp.headers[i].value : ""
+            );
+        }
+    }
+    rac_http_response_free(&resp);
+    return out;
+}
+
+// Serialize a response-headers vector to `{"k":"v",...}`.
+std::string headersToJson(const std::vector<std::pair<std::string, std::string>>& headers) {
+    std::string out = "{";
+    for (size_t i = 0; i < headers.size(); i++) {
+        if (i > 0) out += ",";
+        out += jsonString(headers[i].first) + ":" + jsonString(headers[i].second);
+    }
+    out += "}";
+    return out;
+}
+
+// -----------------------------------------------------------------------------
+// Download cancel registry — maps cancel tokens to atomic cancel flags. The
+// progress callback reads the flag and returns RAC_FALSE to abort the
+// download. The registry is thread-safe.
+// -----------------------------------------------------------------------------
+struct DownloadCancelRegistry {
+    std::mutex mutex;
+    std::unordered_map<std::string, std::shared_ptr<std::atomic<bool>>> flags;
+
+    std::shared_ptr<std::atomic<bool>> registerToken(const std::string& token) {
+        auto flag = std::make_shared<std::atomic<bool>>(false);
+        std::lock_guard<std::mutex> lk(mutex);
+        flags[token] = flag;
+        return flag;
+    }
+
+    bool cancel(const std::string& token) {
+        std::lock_guard<std::mutex> lk(mutex);
+        auto it = flags.find(token);
+        if (it == flags.end()) return false;
+        it->second->store(true);
+        return true;
+    }
+
+    void release(const std::string& token) {
+        std::lock_guard<std::mutex> lk(mutex);
+        flags.erase(token);
+    }
+};
+
+DownloadCancelRegistry& downloadCancelRegistry() {
+    static DownloadCancelRegistry instance;
+    return instance;
 }
 
 } // anonymous namespace
@@ -649,6 +801,107 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::setAuthTokens(
             setLastError("Failed to set auth tokens: " + response.error);
             return false;
         }
+    });
+}
+
+namespace {
+
+// Shared helper: POST a JSON payload to `baseURL + endpoint` using the
+// libcurl-backed client and return the response body. Throws on transport or
+// non-2xx failure so the surrounding Promise rejects cleanly.
+std::string postJsonNative(
+    const std::string& baseURL,
+    const std::string& endpoint,
+    const std::string& bodyJson
+) {
+    std::string url = baseURL;
+    if (!url.empty() && url.back() == '/') url.pop_back();
+    url += endpoint;
+
+    std::vector<std::pair<std::string, std::string>> headers = {
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"},
+    };
+
+    NativeHttpResult resp = performNativeHttpRequest(
+        "POST", url, headers, bodyJson, /*timeoutMs=*/30000);
+
+    if (resp.status < 200 || resp.status >= 300) {
+        throw std::runtime_error(
+            "HTTP " + std::to_string(resp.status) + " from " + url + ": " + resp.body);
+    }
+    return resp.body;
+}
+
+} // anonymous namespace
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::authAuthenticate(
+    const std::string& apiKey,
+    const std::string& baseURL,
+    const std::string& deviceId,
+    const std::string& platform,
+    const std::string& sdkVersion) {
+    return Promise<std::string>::async([this, apiKey, baseURL, deviceId, platform, sdkVersion]() -> std::string {
+        LOGI("authAuthenticate -> %s (device=%s, platform=%s)",
+             baseURL.c_str(), deviceId.c_str(), platform.c_str());
+
+        std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
+            apiKey, deviceId, platform, sdkVersion);
+        if (requestJson.empty()) {
+            setLastError("Failed to build auth request");
+            throw std::runtime_error("Failed to build auth request");
+        }
+
+        std::string responseBody;
+        try {
+            responseBody = postJsonNative(baseURL, "/api/v1/auth/sdk/authenticate", requestJson);
+        } catch (const std::exception& e) {
+            setLastError(std::string("authAuthenticate transport error: ") + e.what());
+            throw;
+        }
+
+        AuthResponse parsed = AuthBridge::shared().handleAuthResponse(responseBody);
+        if (!parsed.success) {
+            std::string msg = "authAuthenticate: backend rejected auth: " + parsed.error;
+            setLastError(msg);
+            throw std::runtime_error(msg);
+        }
+        AuthBridge::shared().setAuth(parsed);
+        LOGI("authAuthenticate: tokens stored (expires_in=%lld)",
+             static_cast<long long>(parsed.expiresIn));
+        return responseBody;
+    });
+}
+
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::authRefreshToken(
+    const std::string& baseURL) {
+    return Promise<std::string>::async([this, baseURL]() -> std::string {
+        std::string refresh = AuthBridge::shared().getRefreshToken();
+        if (refresh.empty()) {
+            throw std::runtime_error("authRefreshToken: no refresh token stored");
+        }
+
+        std::string deviceId = InitBridge::shared().getPersistentDeviceUUID();
+        std::string requestJson = AuthBridge::shared().buildRefreshRequestJSON(refresh, deviceId);
+
+        std::string responseBody;
+        try {
+            responseBody = postJsonNative(baseURL, "/api/v1/auth/sdk/refresh", requestJson);
+        } catch (const std::exception& e) {
+            setLastError(std::string("authRefreshToken transport error: ") + e.what());
+            throw;
+        }
+
+        AuthResponse parsed = AuthBridge::shared().handleAuthResponse(responseBody);
+        if (!parsed.success) {
+            std::string msg = "authRefreshToken: backend rejected refresh: " + parsed.error;
+            setLastError(msg);
+            throw std::runtime_error(msg);
+        }
+        AuthBridge::shared().setAuth(parsed);
+        LOGI("authRefreshToken: refreshed tokens (expires_in=%lld)",
+             static_cast<long long>(parsed.expiresIn));
+        return responseBody;
     });
 }
 
@@ -1120,74 +1373,135 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::checkCompatibility(
         });
     });
 }
+
 // ============================================================================
-// Download Service
+// Refresh (T4.9) — delegates to rac_model_registry_refresh in commons.
+// Discovery callbacks are left NULL here: rescan_local / prune_orphans need
+// platform file-IO stubs that the RN bridge does not wire today; those flags
+// are honoured at the C ABI layer (they just no-op without callbacks).
 // ============================================================================
 
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::downloadModel(
-    const std::string& modelId,
-    const std::string& url,
-    const std::string& destPath) {
-    return Promise<bool>::async([this, modelId, url, destPath]() -> bool {
-        LOGI("Starting download: %s", modelId.c_str());
-
-        std::string taskId = DownloadBridge::shared().startDownload(
-            modelId, url, destPath, false,  // requiresExtraction
-            [](const DownloadProgress& progress) {
-                LOGD("Download progress: %.1f%%", progress.overallProgress * 100);
-            }
-        );
-
-        if (taskId.empty()) {
-            setLastError("Failed to start download");
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::refreshModelRegistry(
+    bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) {
+    return Promise<bool>::async([includeRemoteCatalog, rescanLocal,
+                                 pruneOrphans]() -> bool {
+        auto registryHandle = ModelRegistryBridge::shared().getHandle();
+        if (!registryHandle) {
+            LOGE("refreshModelRegistry: registry not initialized");
             return false;
         }
 
+        rac_model_registry_refresh_opts_t opts{};
+        opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE;
+        opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE;
+        opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE;
+        opts.discovery_callbacks = nullptr;
+
+        rac_result_t rc = rac_model_registry_refresh(registryHandle, opts);
+        if (rc != RAC_SUCCESS) {
+            LOGE("refreshModelRegistry: rc=%d", rc);
+            return false;
+        }
         return true;
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelDownload(
-    const std::string& taskId) {
-    return Promise<bool>::async([taskId]() -> bool {
-        rac_result_t result = DownloadBridge::shared().cancelDownload(taskId);
-        return result == RAC_SUCCESS;
+// ============================================================================
+// Download Service — libcurl-backed runner (rac_http_download_execute) with
+// cancel-token registry. Replaces the RNFS/job-id plumbing that used to live
+// in FileSystem.ts.
+// ============================================================================
+
+namespace {
+
+// Progress trampoline — forwards rac_http_download progress to the JS callback
+// and honours the cancel flag registered against the caller's token.
+struct DownloadProgressContext {
+    std::function<void(double, double)> onProgress;
+    std::shared_ptr<std::atomic<bool>> cancelFlag;
+};
+
+rac_bool_t downloadProgressTrampoline(uint64_t bytesWritten, uint64_t totalBytes,
+                                      void* userData) {
+    auto* ctx = static_cast<DownloadProgressContext*>(userData);
+    if (!ctx) return RAC_TRUE;
+    if (ctx->cancelFlag && ctx->cancelFlag->load()) {
+        return RAC_FALSE;
+    }
+    if (ctx->onProgress) {
+        ctx->onProgress(static_cast<double>(bytesWritten),
+                        static_cast<double>(totalBytes));
+    }
+    return RAC_TRUE;
+}
+
+} // anonymous namespace
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::downloadModel(
+    const std::string& url,
+    const std::string& destPath,
+    const std::string& cancelToken,
+    const std::function<void(double, double)>& onProgress) {
+    return Promise<void>::async([this, url, destPath, cancelToken, onProgress]() -> void {
+        LOGI("Starting native download: %s -> %s", url.c_str(), destPath.c_str());
+
+        auto cancelFlag = downloadCancelRegistry().registerToken(cancelToken);
+
+        DownloadProgressContext ctx{onProgress, cancelFlag};
+
+        rac_http_download_request_t req{};
+        req.url = url.c_str();
+        req.destination_path = destPath.c_str();
+        req.headers = nullptr;
+        req.header_count = 0;
+        req.timeout_ms = 0;  // no timeout — model downloads can be large
+        req.follow_redirects = RAC_TRUE;
+        req.resume_from_byte = 0;
+        req.expected_sha256_hex = nullptr;
+
+        int32_t httpStatus = 0;
+        rac_http_download_status_t status = rac_http_download_execute(
+            &req, downloadProgressTrampoline, &ctx, &httpStatus);
+
+        downloadCancelRegistry().release(cancelToken);
+
+        if (status == RAC_HTTP_DL_OK) {
+            LOGI("Download complete: %s", destPath.c_str());
+            return;
+        }
+
+        std::string reason;
+        switch (status) {
+            case RAC_HTTP_DL_CANCELLED: reason = "cancelled"; break;
+            case RAC_HTTP_DL_TIMEOUT: reason = "timeout"; break;
+            case RAC_HTTP_DL_NETWORK_ERROR: reason = "network_error"; break;
+            case RAC_HTTP_DL_NETWORK_UNAVAILABLE: reason = "network_unavailable"; break;
+            case RAC_HTTP_DL_DNS_ERROR: reason = "dns_error"; break;
+            case RAC_HTTP_DL_SSL_ERROR: reason = "ssl_error"; break;
+            case RAC_HTTP_DL_SERVER_ERROR: reason = "server_error"; break;
+            case RAC_HTTP_DL_FILE_ERROR: reason = "file_error"; break;
+            case RAC_HTTP_DL_INSUFFICIENT_STORAGE: reason = "insufficient_storage"; break;
+            case RAC_HTTP_DL_INVALID_URL: reason = "invalid_url"; break;
+            case RAC_HTTP_DL_CHECKSUM_FAILED: reason = "checksum_failed"; break;
+            default: reason = "unknown"; break;
+        }
+        std::string msg = "download failed: " + reason + " (status=" +
+                          std::to_string(status) + ", http=" +
+                          std::to_string(httpStatus) + ")";
+        LOGE("%s", msg.c_str());
+        setLastError(msg);
+        throw std::runtime_error(msg);
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getDownloadProgress(
-    const std::string& taskId) {
-    return Promise<std::string>::async([taskId]() -> std::string {
-        auto progress = DownloadBridge::shared().getProgress(taskId);
-        if (!progress.has_value()) {
-            return "{}";
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::cancelDownload(
+    const std::string& cancelToken) {
+    return Promise<bool>::async([cancelToken]() -> bool {
+        bool cancelled = downloadCancelRegistry().cancel(cancelToken);
+        if (cancelled) {
+            LOGI("Cancelled download: %s", cancelToken.c_str());
         }
-
-        const auto& p = progress.value();
-        std::string stateStr;
-        switch (p.state) {
-            case DownloadState::Pending: stateStr = "pending"; break;
-            case DownloadState::Downloading: stateStr = "downloading"; break;
-            case DownloadState::Extracting: stateStr = "extracting"; break;
-            case DownloadState::Retrying: stateStr = "retrying"; break;
-            case DownloadState::Completed: stateStr = "completed"; break;
-            case DownloadState::Failed: stateStr = "failed"; break;
-            case DownloadState::Cancelled: stateStr = "cancelled"; break;
-        }
-
-        return buildJsonObject({
-            {"bytesDownloaded", std::to_string(p.bytesDownloaded)},
-            {"totalBytes", std::to_string(p.totalBytes)},
-            {"overallProgress", std::to_string(p.overallProgress)},
-            {"stageProgress", std::to_string(p.stageProgress)},
-            {"state", jsonString(stateStr)},
-            {"speed", std::to_string(p.speed)},
-            {"estimatedTimeRemaining", std::to_string(p.estimatedTimeRemaining)},
-            {"retryAttempt", std::to_string(p.retryAttempt)},
-            {"errorCode", std::to_string(p.errorCode)},
-            {"errorMessage", jsonString(p.errorMessage)}
-        });
+        return cancelled;
     });
 }
 
@@ -1283,7 +1597,7 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::pollEvents() {
 }
 
 // ============================================================================
-// HTTP Client
+// HTTP Client — libcurl-backed rac_http_client_*
 // ============================================================================
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::configureHttp(
@@ -1295,42 +1609,22 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::configureHttp(
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpPost(
-    const std::string& path,
-    const std::string& bodyJson) {
-    return Promise<std::string>::async([this, path, bodyJson]() -> std::string {
-        // HTTP is handled by JS layer
-        // This returns URL for JS to use
-        std::string url = HTTPBridge::shared().buildURL(path);
+std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpRequest(
+    const std::string& method,
+    const std::string& url,
+    const std::string& headersJson,
+    const std::string& bodyJson,
+    double timeoutMs) {
+    return Promise<std::string>::async([method, url, headersJson, bodyJson, timeoutMs]() -> std::string {
+        auto headers = parseHeadersJson(headersJson);
+        NativeHttpResult result = performNativeHttpRequest(
+            method, url, headers, bodyJson, static_cast<int32_t>(timeoutMs));
 
-        // Try to use registered executor if available
-        auto response = HTTPBridge::shared().execute("POST", path, bodyJson, true);
-        if (response.has_value()) {
-            if (response->success) {
-                return response->body;
-            } else {
-                throw std::runtime_error(response->error);
-            }
-        }
-
-        // No executor - return error indicating HTTP must be done by JS
-        throw std::runtime_error("HTTP executor not registered. Use JS layer for HTTP requests.");
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::httpGet(
-    const std::string& path) {
-    return Promise<std::string>::async([this, path]() -> std::string {
-        auto response = HTTPBridge::shared().execute("GET", path, "", true);
-        if (response.has_value()) {
-            if (response->success) {
-                return response->body;
-            } else {
-                throw std::runtime_error(response->error);
-            }
-        }
-
-        throw std::runtime_error("HTTP executor not registered. Use JS layer for HTTP requests.");
+        return buildJsonObject({
+            {"status", std::to_string(result.status)},
+            {"body", jsonString(result.body)},
+            {"headersJson", jsonString(headersToJson(result.headers))}
+        });
     });
 }
 
@@ -3000,6 +3294,154 @@ std::shared_ptr<Promise<double>> HybridRunAnywhereCore::ragGetDocumentCount() {
 std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::ragGetStatistics() {
     return Promise<std::string>::async([]() {
         return ::runanywhere::bridges::RAGBridge::shared().getStatistics();
+    });
+}
+
+// ============================================================================
+// Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+//
+// Direct 1:1 mapping to the C ABI. Handles round-trip through a `double`
+// so the JS side can hold a stable reference (Nitro doesn't yet support
+// 64-bit integers in bridge types — the same pattern is used by
+// `getVoiceAgentHandle` / `getLLMHandle`).
+// ============================================================================
+
+namespace {
+
+inline double solutionHandleToDouble(rac_solution_handle_t handle) {
+    // Pointer round-trip: intptr_t -> uint64 -> double. A JS `number` holds
+    // 53-bit integer precision, which is enough for every pointer we see on
+    // current mobile hardware.
+    return static_cast<double>(reinterpret_cast<uintptr_t>(handle));
+}
+
+inline rac_solution_handle_t solutionHandleFromDouble(double handle) {
+    return reinterpret_cast<rac_solution_handle_t>(
+        static_cast<uintptr_t>(static_cast<uint64_t>(handle)));
+}
+
+// Minimal base64 decoder — avoids pulling in a new dep. Accepts the
+// canonical alphabet with `+` / `/` and optional `=` padding (same as
+// Swift / Kotlin / Web). Returns an empty vector on any malformed input.
+std::vector<uint8_t> base64Decode(const std::string& input) {
+    static const int8_t table[256] = {
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,62,-1,-1,-1,63,
+        52,53,54,55,56,57,58,59,60,61,-1,-1,-1, 0,-1,-1,
+        -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,
+        15,16,17,18,19,20,21,22,23,24,25,-1,-1,-1,-1,-1,
+        -1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+        41,42,43,44,45,46,47,48,49,50,51,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
+        -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
+    };
+    std::vector<uint8_t> out;
+    out.reserve((input.size() * 3) / 4);
+    uint32_t buf = 0;
+    int bits = 0;
+    for (unsigned char c : input) {
+        if (c == '=') break;
+        int8_t v = table[c];
+        if (v < 0) {
+            if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+            return {};
+        }
+        buf = (buf << 6) | static_cast<uint32_t>(v);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((buf >> bits) & 0xFF));
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+std::shared_ptr<Promise<double>> HybridRunAnywhereCore::solutionCreateFromProto(
+    const std::string& configBytesBase64) {
+    return Promise<double>::async([configBytesBase64]() -> double {
+        const auto bytes = base64Decode(configBytesBase64);
+        if (bytes.empty()) {
+            return 0.0;
+        }
+        rac_solution_handle_t handle = nullptr;
+        const rac_result_t rc = rac_solution_create_from_proto(
+            bytes.data(), bytes.size(), &handle);
+        if (rc != RAC_SUCCESS || handle == nullptr) {
+            return 0.0;
+        }
+        return solutionHandleToDouble(handle);
+    });
+}
+
+std::shared_ptr<Promise<double>> HybridRunAnywhereCore::solutionCreateFromYaml(
+    const std::string& yamlText) {
+    return Promise<double>::async([yamlText]() -> double {
+        rac_solution_handle_t handle = nullptr;
+        const rac_result_t rc =
+            rac_solution_create_from_yaml(yamlText.c_str(), &handle);
+        if (rc != RAC_SUCCESS || handle == nullptr) {
+            return 0.0;
+        }
+        return solutionHandleToDouble(handle);
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::solutionStart(double handle) {
+    return Promise<bool>::async([handle]() -> bool {
+        auto h = solutionHandleFromDouble(handle);
+        if (!h) return false;
+        return rac_solution_start(h) == RAC_SUCCESS;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::solutionStop(double handle) {
+    return Promise<bool>::async([handle]() -> bool {
+        auto h = solutionHandleFromDouble(handle);
+        if (!h) return false;
+        return rac_solution_stop(h) == RAC_SUCCESS;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::solutionCancel(double handle) {
+    return Promise<bool>::async([handle]() -> bool {
+        auto h = solutionHandleFromDouble(handle);
+        if (!h) return false;
+        return rac_solution_cancel(h) == RAC_SUCCESS;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::solutionFeed(
+    double handle, const std::string& item) {
+    return Promise<bool>::async([handle, item]() -> bool {
+        auto h = solutionHandleFromDouble(handle);
+        if (!h) return false;
+        return rac_solution_feed(h, item.c_str()) == RAC_SUCCESS;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::solutionCloseInput(double handle) {
+    return Promise<bool>::async([handle]() -> bool {
+        auto h = solutionHandleFromDouble(handle);
+        if (!h) return false;
+        return rac_solution_close_input(h) == RAC_SUCCESS;
+    });
+}
+
+std::shared_ptr<Promise<void>> HybridRunAnywhereCore::solutionDestroy(double handle) {
+    return Promise<void>::async([handle]() {
+        auto h = solutionHandleFromDouble(handle);
+        if (h != nullptr) {
+            rac_solution_destroy(h);
+        }
     });
 }
 

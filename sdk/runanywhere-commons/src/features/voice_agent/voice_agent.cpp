@@ -35,6 +35,12 @@
 // or when the build was configured without Protobuf.
 #include "rac_voice_event_abi_internal.h"
 
+// GAP 05 Phase 2 — VoiceAgent is the first GraphScheduler-driven consumer.
+// `voice_agent_internal.h` now owns the rac_voice_agent struct layout so
+// `voice_agent_pipeline.cpp` can read the component handles too.
+#include "voice_agent_internal.h"
+#include "voice_agent_pipeline.hpp"
+
 namespace {
 inline void rac_va_emit(rac_voice_agent_handle_t          handle,
                         const rac_voice_agent_event_t*    event,
@@ -56,38 +62,10 @@ void emit_voice_agent_tts_state_changed(rac_voice_agent_component_state_t state,
 void emit_voice_agent_all_ready();
 }  // namespace rac::events
 
-// =============================================================================
-// INTERNAL STRUCTURE - Mirrors Swift's VoiceAgentCapability properties
-// =============================================================================
-
-struct rac_voice_agent {
-    // State — atomic so is_ready() checks don't need the mutex
-    std::atomic<bool> is_configured{false};
-
-    // Shutdown barrier — prevents use-after-free on destroy
-    std::atomic<bool> is_shutting_down{false};
-    std::atomic<int> in_flight{0};
-
-    // Whether we own the component handles (and should destroy them)
-    bool owns_components;
-
-    // Composed component handles (set at creation, immutable after)
-    rac_handle_t llm_handle;
-    rac_handle_t stt_handle;
-    rac_handle_t tts_handle;
-    rac_handle_t vad_handle;
-
-    // Thread safety — protects mutable operations (load, process, cleanup)
-    std::mutex mutex;
-
-    rac_voice_agent()
-        : owns_components(false),
-          llm_handle(nullptr),
-          stt_handle(nullptr),
-          tts_handle(nullptr),
-          vad_handle(nullptr) {}
-};
-
+// Note: the `rac_voice_agent` struct definition now lives in
+// `voice_agent_internal.h` so the GAP 05 Phase 2 pipeline implementation
+// can also read the component handles. See that header for field docs.
+//
 // Note: rac_strdup is declared in rac_types.h and implemented in rac_memory.cpp
 
 // =============================================================================
@@ -261,6 +239,14 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     handle->is_shutting_down.store(true, std::memory_order_release);
     handle->is_configured.store(false, std::memory_order_release);
 
+    // GAP 05 Phase 2 — propagate cancel to any GraphScheduler-driven
+    // pipeline run currently in flight. Snapshot under no lock; the
+    // pipeline itself uses cancel_all() which is non-blocking and
+    // idempotent, so racing destroy() against an in-flight run is safe.
+    if (auto pipeline = handle->pipeline) {
+        pipeline->cancel();
+    }
+
     // Spin-wait until all in-flight operations complete
     while (handle->in_flight.load(std::memory_order_acquire) > 0) {
         std::this_thread::yield();
@@ -268,6 +254,10 @@ void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
 
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
+
+        // Drop the pipeline before component handles so its nodes (which
+        // call into stt/llm/tts/vad) cannot outlive the handles they use.
+        handle->pipeline.reset();
 
         if (handle->owns_components) {
             RAC_LOG_DEBUG("VoiceAgent", "Destroying owned component handles");
@@ -534,9 +524,20 @@ rac_result_t rac_voice_agent_cleanup(rac_voice_agent_handle_t handle) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    // GAP 05 Phase 2 — cancel any in-flight pipeline BEFORE taking the
+    // outer mutex; the pipeline run holds the same mutex while it drains
+    // and cancel_all() is the only way out of a stalled stage.
+    if (auto pipeline = handle->pipeline) {
+        pipeline->cancel();
+    }
+
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     RAC_LOG_INFO("VoiceAgent", "Cleaning up Voice Agent");
+
+    // Tear the pipeline down before the underlying components so its
+    // worker threads cannot dispatch into stt/llm/tts/vad after cleanup.
+    handle->pipeline.reset();
 
     // Cleanup all components (mirrors Swift's cleanup)
     rac_llm_component_cleanup(handle->llm_handle);
@@ -688,7 +689,9 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Hold lock for the entire pipeline to prevent TOCTOU races.
+    // Hold lock for the entire pipeline to prevent TOCTOU races, mirroring
+    // the legacy in-line orchestration. The GAP 05 Phase 2 pipeline drains
+    // synchronously inside `run_once()`, so the lock duration is unchanged.
     std::lock_guard<std::mutex> lock(handle->mutex);
 
     if (!handle->is_configured.load(std::memory_order_acquire)) {
@@ -709,119 +712,21 @@ rac_result_t rac_voice_agent_process_stream(rac_voice_agent_handle_t handle, con
         return validation_result;
     }
 
-    // Step 1: Transcribe
-    rac_stt_result_t stt_result = {};
-    rac_result_t result;
-    result = rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr,
-                                          &stt_result);
+    // GAP 05 Phase 2 — drive the request through the GraphScheduler-backed
+    // VoiceAgentPipeline (VAD → STT → LLM → TTS → Sink). Each stage runs on
+    // its own worker thread; bounded edges between stages provide
+    // backpressure; cancel_all() (invoked from destroy/cleanup) tears the
+    // graph down deterministically.
+    auto pipeline = std::make_shared<rac::voice_agent::VoiceAgentPipeline>(
+        handle, callback, user_data);
+    handle->pipeline = pipeline;
 
-    if (result != RAC_SUCCESS) {
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = result;
-        rac_va_emit(handle, &error_event, callback, user_data);
-        return result;
-    }
+    rac_result_t result = pipeline->run_once(audio_data, audio_size);
 
-    // Emit transcription event
-    rac_voice_agent_event_t transcription_event = {};
-    transcription_event.type = RAC_VOICE_AGENT_EVENT_TRANSCRIPTION;
-    transcription_event.data.transcription = stt_result.text;
-    rac_va_emit(handle, &transcription_event, callback, user_data);
-
-    // Step 2: Generate response
-    rac_llm_result_t llm_result = {};
-    result = rac_llm_component_generate(handle->llm_handle, stt_result.text, nullptr, &llm_result);
-
-    if (result != RAC_SUCCESS) {
-        rac_stt_result_free(&stt_result);
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = result;
-        rac_va_emit(handle, &error_event, callback, user_data);
-        return result;
-    }
-
-    // Emit response event
-    rac_voice_agent_event_t response_event = {};
-    response_event.type = RAC_VOICE_AGENT_EVENT_RESPONSE;
-    response_event.data.response = llm_result.text;
-    rac_va_emit(handle, &response_event, callback, user_data);
-
-    // Step 3: Synthesize
-    rac_tts_result_t tts_result = {};
-    result =
-        rac_tts_component_synthesize(handle->tts_handle, llm_result.text, nullptr, &tts_result);
-
-    if (result != RAC_SUCCESS) {
-        rac_stt_result_free(&stt_result);
-        rac_llm_result_free(&llm_result);
-        rac_voice_agent_event_t error_event = {};
-        error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-        error_event.data.error_code = result;
-        rac_va_emit(handle, &error_event, callback, user_data);
-        return result;
-    }
-    // Step 4: Convert Float32 PCM to WAV — no lock needed (pure computation)
-    void* wav_data = nullptr;
-    size_t wav_size = 0;
-
-    if (tts_result.audio_data != nullptr && tts_result.audio_size > 0) {
-        result = rac_audio_float32_to_wav(tts_result.audio_data, tts_result.audio_size,
-                                          tts_result.sample_rate > 0 ? tts_result.sample_rate
-                                                                     : RAC_TTS_DEFAULT_SAMPLE_RATE,
-                                          &wav_data, &wav_size);
-
-        if (result != RAC_SUCCESS) {
-            rac_stt_result_free(&stt_result);
-            rac_llm_result_free(&llm_result);
-            rac_tts_result_free(&tts_result);
-            rac_voice_agent_event_t error_event = {};
-            error_event.type = RAC_VOICE_AGENT_EVENT_ERROR;
-            error_event.data.error_code = result;
-            rac_va_emit(handle, &error_event, callback, user_data);
-            return result;
-        }
-    }
-
-    // Emit audio synthesized event
-    rac_voice_agent_event_t audio_event = {};
-    audio_event.type = RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED;
-    audio_event.data.audio.audio_data = wav_data;
-    audio_event.data.audio.audio_size = wav_size;
-    rac_va_emit(handle, &audio_event, callback, user_data);
-
-    // Copy wav_data for the processed event so each callback gets independent memory
-    void* wav_copy = nullptr;
-    if (wav_data && wav_size > 0) {
-        wav_copy = malloc(wav_size);
-        if (wav_copy) {
-            memcpy(wav_copy, wav_data, wav_size);
-        }
-    }
-
-    // Emit final processed event
-    rac_voice_agent_event_t processed_event = {};
-    processed_event.type = RAC_VOICE_AGENT_EVENT_PROCESSED;
-    processed_event.data.result.speech_detected = RAC_TRUE;
-    processed_event.data.result.transcription = rac_strdup(stt_result.text);
-    processed_event.data.result.response = rac_strdup(llm_result.text);
-    processed_event.data.result.synthesized_audio = wav_copy;
-    processed_event.data.result.synthesized_audio_size = wav_copy ? wav_size : 0;
-    rac_va_emit(handle, &processed_event, callback, user_data);
-
-    // Free event-owned allocations (callback has consumed the data)
-    free(processed_event.data.result.transcription);
-    free(processed_event.data.result.response);
-    free(wav_copy);
-    free(wav_data);
-
-    // Free intermediate results
-    rac_stt_result_free(&stt_result);
-    rac_llm_result_free(&llm_result);
-    rac_tts_result_free(&tts_result);
-
-    return RAC_SUCCESS;
+    // Drop the per-call pipeline so destroy()'s cancel path doesn't latch
+    // onto a torn-down scheduler. Any future call constructs a fresh one.
+    handle->pipeline.reset();
+    return result;
 }
 
 // =============================================================================

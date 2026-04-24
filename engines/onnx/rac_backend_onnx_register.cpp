@@ -159,6 +159,17 @@ static rac_result_t onnx_stt_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
+static rac_result_t onnx_stt_vtable_get_languages(void* impl, char** out_json) {
+    return rac_stt_onnx_get_languages(impl, out_json);
+}
+
+static rac_result_t onnx_stt_vtable_detect_language(void* impl, const void* audio_data,
+                                                    size_t audio_size,
+                                                    const rac_stt_options_t* options,
+                                                    char** out_language) {
+    return rac_stt_onnx_detect_language(impl, audio_data, audio_size, options, out_language);
+}
+
 }  // namespace (close anon — ops struct must have external linkage)
 
 // Phase 1 / B3 fix: g_onnx_stt_ops is declared `extern const` from
@@ -176,6 +187,8 @@ extern "C" const rac_stt_service_ops_t g_onnx_stt_ops = {
     .cleanup = onnx_stt_vtable_cleanup,
     .destroy = onnx_stt_vtable_destroy,
     .create = onnx_stt_create_impl,
+    .get_languages = onnx_stt_vtable_get_languages,
+    .detect_language = onnx_stt_vtable_detect_language,
 };
 
 namespace {  // reopen for the next batch of static helpers
@@ -252,6 +265,10 @@ static rac_result_t onnx_tts_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
+static rac_result_t onnx_tts_vtable_get_languages(void* impl, char** out_json) {
+    return rac_tts_onnx_get_languages(impl, out_json);
+}
+
 }  // namespace (close anon — see B3 note above)
 
 extern "C" const rac_tts_service_ops_t g_onnx_tts_ops = {
@@ -263,6 +280,7 @@ extern "C" const rac_tts_service_ops_t g_onnx_tts_ops = {
     .cleanup = onnx_tts_vtable_cleanup,
     .destroy = onnx_tts_vtable_destroy,
     .create = onnx_tts_create_impl,
+    .get_languages = onnx_tts_vtable_get_languages,
 };
 
 namespace {

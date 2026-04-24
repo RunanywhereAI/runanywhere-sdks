@@ -78,16 +78,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-    override fun onResume() {
-        super.onResume()
-        // Resume any active voice sessions if needed
-        // TODO: Implement when voice pipeline service is available
-    }
-
-    override fun onPause() {
-        super.onPause()
-        // Pause voice sessions to save battery
-        // TODO: Implement when voice pipeline service is available
-    }
 }

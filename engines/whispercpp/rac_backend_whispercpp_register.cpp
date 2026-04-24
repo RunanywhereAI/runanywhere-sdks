@@ -59,24 +59,6 @@ static rac_result_t whispercpp_stt_vtable_transcribe(void* impl, const void* aud
                                          out_result);
 }
 
-// Stream transcription (not implemented for WhisperCPP - use batch)
-static rac_result_t whispercpp_stt_vtable_transcribe_stream(void* impl, const void* audio_data,
-                                                            size_t audio_size,
-                                                            const rac_stt_options_t* options,
-                                                            rac_stt_stream_callback_t callback,
-                                                            void* user_data) {
-    // Fall back to batch transcription
-    rac_stt_result_t result = {};
-    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
-    rac_result_t status = rac_stt_whispercpp_transcribe(impl, float_samples.data(),
-                                                        float_samples.size(), options, &result);
-    if (status == RAC_SUCCESS && callback && result.text) {
-        callback(result.text, RAC_TRUE, user_data);
-    }
-    rac_stt_result_free(&result);
-    return status;
-}
-
 // Get info
 static rac_result_t whispercpp_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
     if (!out_info)
@@ -122,14 +104,29 @@ static rac_result_t whispercpp_stt_create_impl(const char* model_id,
     return RAC_SUCCESS;
 }
 
+static rac_result_t whispercpp_stt_vtable_get_languages(void* impl, char** out_json) {
+    return rac_stt_whispercpp_get_languages(impl, out_json);
+}
+
+static rac_result_t whispercpp_stt_vtable_detect_language(void* impl, const void* audio_data,
+                                                          size_t audio_size,
+                                                          const rac_stt_options_t* options,
+                                                          char** out_language) {
+    return rac_stt_whispercpp_detect_language(impl, audio_data, audio_size, options, out_language);
+}
+
 const rac_stt_service_ops_t g_whispercpp_stt_ops = {
     .initialize = whispercpp_stt_vtable_initialize,
     .transcribe = whispercpp_stt_vtable_transcribe,
-    .transcribe_stream = whispercpp_stt_vtable_transcribe_stream,
+    // Streaming STT not supported by whisper.cpp backend; commons returns
+    // RAC_ERROR_NOT_SUPPORTED on NULL. Use sherpa-onnx for live streaming.
+    .transcribe_stream = nullptr,
     .get_info = whispercpp_stt_vtable_get_info,
     .cleanup = whispercpp_stt_vtable_cleanup,
     .destroy = whispercpp_stt_vtable_destroy,
     .create = whispercpp_stt_create_impl,
+    .get_languages = whispercpp_stt_vtable_get_languages,
+    .detect_language = whispercpp_stt_vtable_detect_language,
 };
 
 // =============================================================================

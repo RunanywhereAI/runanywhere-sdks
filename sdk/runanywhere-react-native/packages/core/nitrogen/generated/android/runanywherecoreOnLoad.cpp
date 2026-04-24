@@ -18,6 +18,7 @@
 #include "JHybridRunAnywhereDeviceInfoSpec.hpp"
 #include "HybridRunAnywhereCore.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
+#include "HybridVoiceAgent.hpp"
 
 namespace margelo::nitro::runanywhere {
 
@@ -46,6 +47,15 @@ int initialize(JavaVM* vm) {
         static DefaultConstructableObject<JHybridRunAnywhereDeviceInfoSpec::javaobject> object("com/margelo/nitro/runanywhere/HybridRunAnywhereDeviceInfo");
         auto instance = object.create();
         return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "VoiceAgent",
+      []() -> std::shared_ptr<HybridObject> {
+        static_assert(std::is_default_constructible_v<HybridVoiceAgent>,
+                      "The HybridObject \"HybridVoiceAgent\" is not default-constructible! "
+                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+        return std::make_shared<HybridVoiceAgent>();
       }
     );
   });

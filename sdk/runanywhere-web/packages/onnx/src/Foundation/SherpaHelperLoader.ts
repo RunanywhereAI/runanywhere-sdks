@@ -102,6 +102,13 @@ async function doLoad<T>(
     : new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;
   logger.info(`Loading sherpa helper: ${filename}`);
 
+  // T3.13: This fetch() intentionally bypasses HTTPAdapter. The
+  // response body is loaded as text, wrapped with an ESM `export`
+  // shim, and handed back to the browser via a Blob URL for dynamic
+  // import(). Routing through WASM would force us to surface bytes
+  // from the WASM heap only to re-wrap them in the same Blob, which
+  // is both slower and architecturally absurd for a browser-local
+  // helper load.
   const response = await fetch(url);
   if (!response.ok) {
     throw new SDKError(

@@ -7,7 +7,7 @@
  * Architecture:
  * - Creates rac_telemetry_manager_t via WASM
  * - Registers an HTTP callback that C++ calls when events need sending
- * - The HTTP callback uses HTTPService (browser fetch) to POST to the endpoint
+ * - The HTTP callback POSTs the telemetry batch directly via browser `fetch`
  * - Calls rac_telemetry_manager_http_complete() with the result
  * - Also provides AnalyticsEventCallback for forwarding events from AnalyticsEventsBridge
  *
@@ -16,7 +16,7 @@
  * - Generated with crypto.randomUUID() on first run
  */
 
-import { SDKLogger, SDKEnvironment, HTTPService } from '@runanywhere/web';
+import { SDKLogger, SDKEnvironment } from '@runanywhere/web';
 import type { DeviceInfoData } from '@runanywhere/web';
 import type { LlamaCppModule } from './LlamaCppBridge';
 
@@ -24,6 +24,8 @@ const logger = new SDKLogger('TelemetryService');
 
 const DEVICE_ID_KEY = 'rac_device_id';
 const SDK_VERSION = '0.1.0-beta.8';
+const SDK_CLIENT = 'RunAnywhereSDK';
+const SDK_PLATFORM = 'web';
 
 // C++ rac_environment_t values
 const RAC_ENV_DEVELOPMENT = 0;
@@ -93,6 +95,12 @@ export class TelemetryService {
   private _httpCallbackPtr: number = 0;  // Emscripten function table ptr
   private _initialized = false;
   private _initPromise: Promise<void> | null = null;  // guards concurrent initialize() calls
+
+  // Dev-mode HTTP config (Supabase). Populated from WASM-compiled credentials
+  // in `configureDevHTTP()` — kept local to the service since telemetry is
+  // the only HTTP path in the current web SDK.
+  private _supabaseURL: string = '';
+  private _supabaseKey: string = '';
 
   private constructor() {}
 
@@ -192,6 +200,8 @@ export class TelemetryService {
     this._httpCallbackPtr = 0;
     this._module = null;
     this._initialized = false;
+    this._supabaseURL = '';
+    this._supabaseKey = '';
     TelemetryService._instance = null;
     logger.debug('TelemetryService shut down');
   }
@@ -245,13 +255,15 @@ export class TelemetryService {
       this.freeAll([modelPtr, osVersionPtr]);
     }
 
-    // Register HTTP callback
-    this.registerHttpCallback(environment);
-
-    // Configure HTTPService in dev mode using WASM dev config
+    // Configure dev HTTP credentials before registering the callback so the
+    // first flush can succeed. Prod path currently has no HTTP transport wired
+    // up — telemetry batches are simply dropped there.
     if (environment === SDKEnvironment.Development) {
       this.configureDevHTTP(module);
     }
+
+    // Register HTTP callback
+    this.registerHttpCallback(environment);
 
     this._initialized = true;
     logger.info(`TelemetryService initialized (env=${environment}, device=${deviceId.substring(0, 8)}...)`);
@@ -297,15 +309,19 @@ export class TelemetryService {
 
   /**
    * Perform the actual HTTP POST for a telemetry batch.
-   * Returns the response JSON string on success.
+   * Returns the response body (as text) on success, or null on failure / when
+   * HTTP transport is not configured (e.g. prod mode without credentials).
+   *
+   * Only the dev/Supabase path is wired up here — prod telemetry currently
+   * flows through the C++ manager but has no JS-side HTTP transport.
    */
   private async performHttpPost(
     endpoint: string,
     jsonBody: string,
     environment: SDKEnvironment,
   ): Promise<string | null> {
-    if (!HTTPService.shared.isConfigured) {
-      logger.debug('HTTPService not configured — skipping telemetry POST');
+    if (!this.isHttpConfigured) {
+      logger.debug('Telemetry HTTP not configured — skipping POST');
       return null;
     }
 
@@ -320,18 +336,83 @@ export class TelemetryService {
       // In dev mode we POST directly to Supabase REST API which rejects
       // columns that don't exist on the target table. The C++ telemetry
       // manager includes modality-specific metrics (e.g. speech_duration_ms,
-      // audio_duration_ms) that belong in child tables in V2.  Strip them
+      // audio_duration_ms) that belong in child tables in V2. Strip them
       // so PostgREST accepts the payload.
       if (environment === SDKEnvironment.Development && endpoint.includes('telemetry_events')) {
         body = this.filterForDevTable(body);
       }
 
-      const response = await HTTPService.shared.post<unknown, unknown>(endpoint, body);
-      return typeof response === 'string' ? response : JSON.stringify(response);
+      const url = this.buildURL(endpoint);
+      // T3.13: Telemetry POSTs are small JSON envelopes going to the
+      // same origin as the SDK config — they fall under the task's
+      // "small JSON manifest loads" exception for keeping browser
+      // fetch(). Migrating this to HTTPAdapter would require threading
+      // an Emscripten module through the TelemetryService bootstrap
+      // BEFORE rac_init completes (since rac_init wires up the HTTP
+      // callback), which reintroduces a chicken-and-egg coupling that
+      // the existing design explicitly avoids.
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.buildHeaders(endpoint),
+        body: JSON.stringify(body),
+      });
+
+      // Device registration is idempotent — a 409 means we're already
+      // registered and is not an error.
+      if (!response.ok && !(response.status === 409 && this.isDeviceRegistrationPath(endpoint))) {
+        logger.debug(`Telemetry POST HTTP ${response.status}: ${endpoint}`);
+        return null;
+      }
+
+      const text = await response.text();
+      return text || '';
     } catch (err) {
       logger.debug(`Telemetry POST failed (${environment}): ${err instanceof Error ? err.message : String(err)}`);
       return null;
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // HTTP transport (inlined from the former `HTTPService`)
+  // ---------------------------------------------------------------------------
+
+  private get isHttpConfigured(): boolean {
+    return !!this._supabaseURL && !!this._supabaseKey;
+  }
+
+  private buildURL(path: string): string {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    const base = this._supabaseURL.replace(/\/$/, '');
+    const endpoint = path.startsWith('/') ? path : `/${path}`;
+    // Device registration is idempotent in Supabase via on_conflict=device_id.
+    if (this.isDeviceRegistrationPath(endpoint)) {
+      const sep = endpoint.includes('?') ? '&' : '?';
+      return `${base}${endpoint}${sep}on_conflict=device_id`;
+    }
+    return `${base}${endpoint}`;
+  }
+
+  private buildHeaders(path: string): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-SDK-Client': SDK_CLIENT,
+      'X-SDK-Version': SDK_VERSION,
+      'X-Platform': SDK_PLATFORM,
+      'apikey': this._supabaseKey,
+      'Authorization': `Bearer ${this._supabaseKey}`,
+      'Prefer': this.isDeviceRegistrationPath(path)
+        ? 'resolution=merge-duplicates'
+        : 'return=representation',
+    };
+  }
+
+  private isDeviceRegistrationPath(path: string): boolean {
+    return path.includes('sdk_devices')
+      || path.includes('devices/register')
+      || path.includes('rest/v1/sdk_devices');
   }
 
   /**
@@ -359,7 +440,7 @@ export class TelemetryService {
   }
 
   /**
-   * If the WASM module has dev config compiled in, use it to configure HTTPService.
+   * Pull Supabase credentials compiled into the WASM dev config, if available.
    */
   private configureDevHTTP(module: LlamaCppModule): void {
     if (typeof module._rac_wasm_dev_config_is_available !== 'function') return;
@@ -371,8 +452,9 @@ export class TelemetryService {
     const key  = keyPtr  ? module.UTF8ToString(keyPtr)  : '';
 
     if (url && key) {
-      HTTPService.shared.configureDev({ supabaseURL: url, supabaseKey: key });
-      logger.info('HTTPService configured with WASM dev config (Supabase)');
+      this._supabaseURL = url;
+      this._supabaseKey = key;
+      logger.info('Telemetry HTTP configured with WASM dev config (Supabase)');
     }
   }
 

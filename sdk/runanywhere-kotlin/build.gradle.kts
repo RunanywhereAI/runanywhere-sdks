@@ -203,13 +203,15 @@ kotlin {
         }
 
         jvmTest {
-            // Phase E: the repo-level streaming fixtures (cancel_parity,
-            // perf_bench) live outside the Kotlin source tree but are
-            // imported by the JVM perf tests. Wire them into the test
-            // source set so those tests compile against real Kotlin
-            // rather than missing symbols.
-            kotlin.srcDir("../../tests/streaming/cancel_parity")
-            kotlin.srcDir("../../tests/streaming/perf_bench")
+            // Phase E + T7.2: the repo-level streaming fixtures live outside
+            // the Kotlin source tree but are imported by the JVM tests:
+            //   - tests/streaming/parity_test.kt      → StreamingParityTests
+            //   - tests/streaming/cancel_parity/*.kt  → CancelParity consumer
+            //   - tests/streaming/perf_bench/*.kt     → PerfBench consumer
+            // Mount the whole `tests/streaming` directory; Kotlin only picks
+            // up `.kt` files, so the C++/Swift/Dart/TS fixtures next to them
+            // are ignored.
+            kotlin.srcDir("../../tests/streaming")
             dependencies {
                 implementation(libs.junit)
                 implementation(libs.mockk)

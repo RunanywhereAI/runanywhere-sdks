@@ -155,6 +155,35 @@ RAC_API rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
  */
 RAC_API void rac_stt_component_destroy(rac_handle_t handle);
 
+/**
+ * @brief Get supported languages for the loaded STT model as a JSON array string.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no model is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend cannot enumerate.
+ *
+ * @param handle    Component handle
+ * @param out_json  Output: malloc'd JSON string (e.g. "[\"en\",\"es\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_component_get_supported_languages(rac_handle_t handle,
+                                                               char** out_json);
+
+/**
+ * @brief Detect spoken language for a short audio clip.
+ *
+ * Forwards to the underlying service/backend. Returns RAC_ERROR_BACKEND_NOT_READY
+ * if no model is loaded, or RAC_ERROR_NOT_SUPPORTED if the backend does not
+ * expose language detection.
+ *
+ * @param handle        Component handle
+ * @param audio_data    PCM audio buffer (Int16 mono, sample rate per component config)
+ * @param audio_size    Size of audio_data in bytes
+ * @param out_language  Output: malloc'd NUL-terminated language code. Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_stt_component_detect_language(rac_handle_t handle, const void* audio_data,
+                                                       size_t audio_size, char** out_language);
+
 #ifdef __cplusplus
 }
 #endif

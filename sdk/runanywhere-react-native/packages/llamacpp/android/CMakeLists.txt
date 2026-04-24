@@ -73,6 +73,10 @@ include_directories(
     "src/main/cpp"
     "../cpp"
     "../cpp/bridges"
+    # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
+    # Sharing avoids re-fetching the dependency and keeps both packages on the
+    # same JSON version.
+    "${CMAKE_SOURCE_DIR}/../../core/cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from core package (flat access for all subdirectories)
     "${CORE_INCLUDE_DIR}"

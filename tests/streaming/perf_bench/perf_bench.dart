@@ -1,9 +1,17 @@
 // perf_bench.dart — Dart consumer for the GAP 09 #8 perf bench.
 //
-// v3.1: real implementation. Reads /tmp/perf_input.bin (produced by
-// tests/streaming/perf_bench/perf_producer.cpp), decodes each VoiceEvent
-// via protoc_plugin, extracts the producer-side timestamp from
-// `metrics.createdAtNs`, and writes per-event delta_ns to
+// v3.2 (T7.5): mirrors the T3.2 Kotlin fix. The producer stamps
+// `metrics.createdAtNs` using C++ `std::chrono::steady_clock`, which has
+// a process-local epoch. Dart's `Stopwatch` is monotonic but starts from
+// its own zero — so `recvNs - producerNs` produces a giant negative
+// offset that the `> 0` filter discards, yielding spurious "no non-zero
+// deltas" failures. The README's spec ("per-event work: proto decode +
+// delta computation only") is a per-event decode-latency budget, so we
+// bracket `Stopwatch.elapsedMicroseconds` around the decode call only —
+// monotonic, same-clock, exactly the cost the p50 budget bounds.
+//
+// Reads /tmp/perf_input.bin (produced by perf_producer.cpp), decodes each
+// VoiceEvent via protoc_plugin, and writes per-event decode delta_ns to
 // /tmp/perf_bench.dart.log.
 //
 // Runner integration: sdk/runanywhere-flutter/packages/runanywhere/test/
@@ -67,27 +75,29 @@ class PerfBench {
       cursor += 4;
       if (cursor + len > bytes.length) break;
 
-      // Mark consumer-receive BEFORE decode — proto-decode cost is part
-      // of the latency the consumer actually pays. Dart has no
-      // std::chrono::steady_clock; use Stopwatch.elapsedMicroseconds and
-      // convert to ns. Microsecond precision is ~1000x coarser than the
-      // producer's ns, so p50 measurements floor to the nearest µs.
-      final recvNs = stopwatch.elapsedMicroseconds * 1000;
-
       final frame = bytes.sublist(cursor, cursor + len);
       cursor += len;
 
       try {
+        // Bracket the Stopwatch around decode only (T7.5 / T3.2 fix —
+        // see header). Stopwatch is microsecond-precision on Dart, so
+        // ns deltas floor to the nearest µs; that's still enough
+        // resolution to enforce the 1ms p50 budget.
+        final startUs = stopwatch.elapsedMicroseconds;
         final event = VoiceEvent.fromBuffer(frame);
-        if (event.hasMetrics()) {
-          final producerNs = event.metrics.createdAtNs.toInt();
-          if (producerNs > 0) {
-            deltas[i] = recvNs - producerNs;
+        final endUs = stopwatch.elapsedMicroseconds;
+        final decodeNs = (endUs - startUs) * 1000;
+
+        if (decodeNs > 0) {
+          deltas[i] = decodeNs;
+          // `nonEmpty` retains its original semantics — the count of
+          // events that carry a metrics arm. Decoupled from the delta
+          // value so the aggregator can still tell "producer emitted
+          // metrics" apart from "decode took too long".
+          if (event.hasMetrics() && event.metrics.createdAtNs.toInt() > 0) {
             nonEmpty++;
-            continue;
           }
         }
-        // No metrics arm — record zero. Aggregator filters zeros.
       } catch (_) {
         // Malformed frame: skip gracefully.
       }

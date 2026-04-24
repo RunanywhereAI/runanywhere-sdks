@@ -20,8 +20,8 @@ dependencies:
     sdk: flutter
   # FFI (Foreign Function Interface)
   ffi: ^2.1.0
-  # HTTP and networking
-  http: ^1.2.1
+  # Networking: HTTP transport routed through the commons Phase H C ABI
+  # (rac_http_client_*, rac_http_download_execute).
   rxdart: ^0.27.7
   # Protobuf runtime — consumed by the IDL-generated bindings in
   # `lib/generated/` (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).

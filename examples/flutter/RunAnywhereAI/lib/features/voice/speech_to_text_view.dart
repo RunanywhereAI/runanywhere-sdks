@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -268,7 +268,8 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   }
 
   void _copyToClipboard() {
-    // TODO: Implement clipboard copy
+    if (_transcribedText.isEmpty) return;
+    unawaited(Clipboard.setData(ClipboardData(text: _transcribedText)));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Copied to clipboard')),
     );

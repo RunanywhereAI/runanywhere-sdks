@@ -119,6 +119,44 @@ export interface EmscriptenRunanywhereModule {
     outResponseTokensPtr: number,
   ): number;
 
+  // -----------------------------------------------------------------------------
+  // Solutions runtime (T4.7 / T4.8) — `rac/solutions/rac_solution.h`
+  // -----------------------------------------------------------------------------
+  // Backing the `RunAnywhere.solutions.run(...)` capability. `_create_from_proto`
+  // takes a `(bytesPtr, bytesLen, outHandlePtr)` triple and populates the
+  // out-pointer with an opaque handle on success; the lifecycle verbs operate
+  // on that handle. The proto-byte path requires the WASM module to be built
+  // with Protobuf support (`RAC_WASM_PROTOBUF=ON`), otherwise it returns
+  // `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
+
+  /**
+   * `rac_result_t rac_solution_create_from_proto(
+   *    const void* proto_bytes, size_t len,
+   *    rac_solution_handle_t* out_handle);`
+   */
+  _rac_solution_create_from_proto(
+    bytesPtr: number,
+    bytesLen: number,
+    outHandlePtr: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_solution_create_from_yaml(
+   *    const char* yaml_text,
+   *    rac_solution_handle_t* out_handle);`
+   */
+  _rac_solution_create_from_yaml(
+    yamlPtr: number,
+    outHandlePtr: number,
+  ): number;
+
+  _rac_solution_start(handle: number): number;
+  _rac_solution_stop(handle: number): number;
+  _rac_solution_cancel(handle: number): number;
+  _rac_solution_feed(handle: number, itemPtr: number): number;
+  _rac_solution_close_input(handle: number): number;
+  _rac_solution_destroy(handle: number): void;
+
   // =============================================================================
   // Emscripten runtime helpers
   // =============================================================================

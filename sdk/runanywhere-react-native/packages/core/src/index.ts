@@ -156,11 +156,6 @@ export {
   MultiFileModelCache,
   DownloadService,
   DownloadState,
-  SystemTTSService,
-  getVoicesByLanguage,
-  getDefaultVoice,
-  getPlatformDefaultVoice,
-  PlatformVoices,
   type ModelCriteria,
   type AddModelFromURLOptions,
   type ModelFileDescriptor,
@@ -171,13 +166,11 @@ export {
 } from './services';
 
 // =============================================================================
-// Network Layer - Using axios (industry standard HTTP library)
+// Network Layer — HTTP transport is owned by native C++ (rac_http_client_*).
+// These exports are for configuration / telemetry / endpoints only.
 // =============================================================================
 
 export {
-  // HTTP Service
-  HTTPService,
-  // Configuration
   SDKEnvironment,
   createNetworkConfig,
   getEnvironmentName,
@@ -185,16 +178,12 @@ export {
   isProduction,
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
-  // Telemetry
   TelemetryService,
   TelemetryCategory,
-  // Endpoints
   APIEndpoints,
 } from './services';
 
 export type {
-  HTTPServiceConfig,
-  DevModeConfig,
   NetworkConfig,
   APIEndpointKey,
   APIEndpointValue,
@@ -257,6 +246,7 @@ export {
   deleteModel,
   registerModel,
   registerMultiFileModel,
+  refreshModelRegistry,
 } from './Public/Extensions/RunAnywhere+Models';
 
 // =============================================================================

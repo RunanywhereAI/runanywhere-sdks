@@ -8,6 +8,9 @@
 
 import Foundation
 import SwiftProtobuf
+// RAVoiceEvent + payload oneof are vended publicly by the RunAnywhere
+// module via the swift-protobuf generated voice_events.pb.swift.
+import RunAnywhere
 
 public enum CancelParity {
     public static let defaultInputPath = "/tmp/cancel_input.bin"

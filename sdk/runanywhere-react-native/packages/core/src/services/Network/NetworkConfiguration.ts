@@ -1,12 +1,12 @@
 /**
  * NetworkConfiguration.ts
  *
- * Network configuration types and utilities.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/Services/HTTPService.swift
+ * Network configuration types and utilities. HTTP transport lives entirely in
+ * native code (rac_http_client_*) — this module only defines the
+ * configuration shape consumed by the SDK facade.
  */
 
-import { SDKEnvironment } from './HTTPService';
+import { SDKEnvironment } from '../../types';
 
 export { SDKEnvironment };
 
@@ -71,7 +71,6 @@ export function createNetworkConfig(options: {
   supabaseKey?: string;
   timeoutMs?: number;
 }): NetworkConfig {
-  // Map string environment to enum
   let environment = SDKEnvironment.Production;
   if (options.environment === 'development') {
     environment = SDKEnvironment.Development;
@@ -79,7 +78,6 @@ export function createNetworkConfig(options: {
     environment = SDKEnvironment.Staging;
   }
 
-  // Build supabase config if provided
   const supabase =
     options.supabaseURL && options.supabaseKey
       ? {
@@ -113,16 +111,10 @@ export function getEnvironmentName(env: SDKEnvironment): string {
   }
 }
 
-/**
- * Check if environment is development
- */
 export function isDevelopment(env: SDKEnvironment): boolean {
   return env === SDKEnvironment.Development;
 }
 
-/**
- * Check if environment is production
- */
 export function isProduction(env: SDKEnvironment): boolean {
   return env === SDKEnvironment.Production;
 }

@@ -14,9 +14,17 @@ const OUTPUT_PATH = '/tmp/cancel_trace.web.log';
 
 function extractKindWeb(frame: Uint8Array): PayloadKind {
   const event = VoiceEvent.decode(frame);
-  const kind = event.payload?.$case;
-  if (!kind) return 'unknown';
-  return kind as PayloadKind;
+  // ts-proto generates oneof arms as top-level optional fields (no
+  // `oneofs=unions`). Probe each arm in proto field order.
+  if (event.userSaid !== undefined) return 'userSaid';
+  if (event.assistantToken !== undefined) return 'assistantToken';
+  if (event.audio !== undefined) return 'audio';
+  if (event.vad !== undefined) return 'vad';
+  if (event.interrupted !== undefined) return 'interrupted';
+  if (event.state !== undefined) return 'state';
+  if (event.error !== undefined) return 'error';
+  if (event.metrics !== undefined) return 'metrics';
+  return 'unknown';
 }
 
 describe('cancel_parity (web)', () => {

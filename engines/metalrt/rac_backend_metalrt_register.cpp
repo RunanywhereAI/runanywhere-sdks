@@ -164,8 +164,7 @@ static rac_result_t metalrt_llm_create_impl(const char* model_id,
     if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    RAC_LOG_DEBUG(LOG_CAT, "LLM create: MetalRT engine not available — stub build");
-    return RAC_ERROR_NOT_SUPPORTED;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
     std::string resolved = resolve_metalrt_model_path(model_id);
     RAC_LOG_INFO(LOG_CAT, "metalrt_llm_create_impl: model=%s", resolved.c_str());
@@ -235,8 +234,7 @@ static rac_result_t metalrt_stt_create_impl(const char* model_id,
     if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    RAC_LOG_DEBUG(LOG_CAT, "STT create: MetalRT engine not available — stub build");
-    return RAC_ERROR_NOT_SUPPORTED;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
     std::string resolved = resolve_metalrt_model_path(model_id);
     RAC_LOG_INFO(LOG_CAT, "metalrt_stt_create_impl: model=%s", resolved.c_str());
@@ -301,8 +299,7 @@ static rac_result_t metalrt_tts_create_impl(const char* model_id,
     if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    RAC_LOG_DEBUG(LOG_CAT, "TTS create: MetalRT engine not available — stub build");
-    return RAC_ERROR_NOT_SUPPORTED;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
     std::string resolved = resolve_metalrt_model_path(model_id);
     RAC_LOG_INFO(LOG_CAT, "metalrt_tts_create_impl: model=%s", resolved.c_str());
@@ -385,8 +382,7 @@ static rac_result_t metalrt_vlm_create_impl(const char* model_id,
     if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
     *out_impl = nullptr;
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    RAC_LOG_DEBUG(LOG_CAT, "VLM create: MetalRT engine not available — stub build");
-    return RAC_ERROR_NOT_SUPPORTED;
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
     std::string resolved = resolve_metalrt_model_path(model_id);
     RAC_LOG_INFO(LOG_CAT, "metalrt_vlm_create_impl: model=%s", resolved.c_str());
@@ -424,14 +420,13 @@ MetalRTRegistryState& get_state() {
     return state;
 }
 
-// v3 Phase B6: metalrt_can_handle + 4 metalrt_*_create legacy factories
-// (LLM/STT/TTS/VLM using rac_service_request_t) removed. Model format
-// + framework (RAC_FRAMEWORK_METALRT) gating is encoded in
+// Model format + framework (RAC_FRAMEWORK_METALRT) gating is encoded in
 // g_metalrt_engine_vtable.metadata.{formats,runtimes} in
 // rac_plugin_entry_metalrt.cpp; per-primitive impl allocation flows
-// through each ops struct's `.create` adapter defined above. Stub-build
-// gating (RAC_METALRT_ENGINE_AVAILABLE=0) short-circuits inside each
-// create_impl by returning RAC_ERROR_NOT_SUPPORTED.
+// through each ops struct's `.create` adapter defined above. When the
+// closed-source MetalRT binary is not linked (RAC_METALRT_ENGINE_AVAILABLE=0)
+// every create adapter short-circuits with RAC_ERROR_BACKEND_UNAVAILABLE
+// and rac_backend_metalrt_register() emits a single warning (see below).
 
 }  // namespace
 
@@ -450,14 +445,16 @@ rac_result_t rac_backend_metalrt_register(void) {
     }
 
 #if !defined(RAC_METALRT_ENGINE_AVAILABLE) || RAC_METALRT_ENGINE_AVAILABLE == 0
-    // Stub build: MetalRT engine binary not linked. Skip module
-    // registration as well — loadModel(framework: .metalrt) surfaces
-    // BACKEND_NOT_FOUND via the router when no plugin_entry_metalrt
-    // plugin claims the framework.
+    // MetalRT ships as a closed-source binary (RABackendMetalRTBinary
+    // xcframework, see Package.swift). Without it linked, all create
+    // adapters short-circuit with RAC_ERROR_BACKEND_UNAVAILABLE and the
+    // router surfaces BACKEND_NOT_FOUND for loadModel(framework: .metalrt).
+    // Emit a single registration-time warning so operators know why.
     RAC_LOG_WARNING(LOG_CAT,
-                    "MetalRT backend compiled without engine binary — skipping "
-                    "registration. loadModel(..., framework: .metalrt) will "
-                    "fail with BACKEND_NOT_FOUND until the engine is installed.");
+                    "MetalRT engine binary not linked — backend is a stub. "
+                    "loadModel(..., framework: .metalrt) will fail with "
+                    "BACKEND_UNAVAILABLE. Install the RABackendMetalRTBinary "
+                    "xcframework (see engines/metalrt/README.md) to enable it.");
     state.registered = true;
     return RAC_SUCCESS;
 #endif

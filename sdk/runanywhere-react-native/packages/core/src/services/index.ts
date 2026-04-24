@@ -29,23 +29,10 @@ export {
   type ProgressCallback,
 } from './DownloadService';
 
-// TTS Service - Native implementation available
+// Network Layer — HTTP transport lives in native C++ (rac_http_client_*).
+// These exports cover configuration helpers, telemetry, and endpoints only.
 export {
-  SystemTTSService,
-  getVoicesByLanguage,
-  getDefaultVoice,
-  getPlatformDefaultVoice,
-  PlatformVoices,
-} from './SystemTTSService';
-
-// Network Layer - HTTP service using axios (industry standard)
-export {
-  // HTTP Service
-  HTTPService,
   SDKEnvironment,
-  type HTTPServiceConfig,
-  type DevModeConfig,
-  // Configuration
   createNetworkConfig,
   getEnvironmentName,
   isDevelopment,
@@ -53,10 +40,8 @@ export {
   DEFAULT_BASE_URL,
   DEFAULT_TIMEOUT_MS,
   type NetworkConfig,
-  // Telemetry
   TelemetryService,
   TelemetryCategory,
-  // Endpoints
   APIEndpoints,
   type APIEndpointKey,
   type APIEndpointValue,

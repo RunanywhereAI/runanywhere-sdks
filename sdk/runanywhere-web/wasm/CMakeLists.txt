@@ -228,6 +228,54 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_http_download_cancel"
     "_rac_extract_archive"
 
+    # HTTP client / download (T3.13 — Web SDK migration off hand-rolled
+    # fetch() onto the commons libcurl-backed C ABI). See
+    # sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_client.h
+    # and rac_http_download.h. TypeScript wrapper lives at
+    # sdk/runanywhere-web/packages/core/src/Adapters/HTTPAdapter.ts.
+    # Progress/body chunk callbacks are installed via addFunction, so the
+    # runtime already enables the required ALLOW_TABLE_GROWTH flag above.
+    "_rac_http_client_create"
+    "_rac_http_client_destroy"
+    "_rac_http_request_send"
+    "_rac_http_request_stream"
+    "_rac_http_request_resume"
+    "_rac_http_response_free"
+    "_rac_http_download_execute"
+
+    # Struct layout helpers used by HTTPAdapter.ts to pack/unpack
+    # rac_http_request_t / rac_http_response_t / rac_http_download_request_t
+    # without hard-coding offsets (safe against future field changes).
+    "_rac_wasm_sizeof_http_request"
+    "_rac_wasm_offsetof_http_request_method"
+    "_rac_wasm_offsetof_http_request_url"
+    "_rac_wasm_offsetof_http_request_headers"
+    "_rac_wasm_offsetof_http_request_header_count"
+    "_rac_wasm_offsetof_http_request_body_bytes"
+    "_rac_wasm_offsetof_http_request_body_len"
+    "_rac_wasm_offsetof_http_request_timeout_ms"
+    "_rac_wasm_offsetof_http_request_follow_redirects"
+    "_rac_wasm_offsetof_http_request_expected_checksum_hex"
+    "_rac_wasm_sizeof_http_response"
+    "_rac_wasm_offsetof_http_response_status"
+    "_rac_wasm_offsetof_http_response_headers"
+    "_rac_wasm_offsetof_http_response_header_count"
+    "_rac_wasm_offsetof_http_response_body_bytes"
+    "_rac_wasm_offsetof_http_response_body_len"
+    "_rac_wasm_offsetof_http_response_redirected_url"
+    "_rac_wasm_sizeof_http_header_kv"
+    "_rac_wasm_offsetof_http_header_kv_name"
+    "_rac_wasm_offsetof_http_header_kv_value"
+    "_rac_wasm_sizeof_http_download_request"
+    "_rac_wasm_offsetof_http_download_request_url"
+    "_rac_wasm_offsetof_http_download_request_destination_path"
+    "_rac_wasm_offsetof_http_download_request_headers"
+    "_rac_wasm_offsetof_http_download_request_header_count"
+    "_rac_wasm_offsetof_http_download_request_timeout_ms"
+    "_rac_wasm_offsetof_http_download_request_follow_redirects"
+    "_rac_wasm_offsetof_http_download_request_resume_from_byte"
+    "_rac_wasm_offsetof_http_download_request_expected_sha256_hex"
+
     # Module registry
     "_rac_module_register"
     "_rac_module_unregister"
@@ -266,6 +314,7 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_model_registry_remove"
     "_rac_model_registry_get_downloaded"
     "_rac_model_registry_update_download_status"
+    "_rac_model_registry_refresh"
     "_rac_model_info_is_downloaded"
     "_rac_model_info_alloc"
     "_rac_model_info_free"
@@ -470,6 +519,21 @@ set(RAC_EXPORTED_FUNCTIONS
     # -sEXPORTED_RUNTIME_METHODS=['addFunction','removeFunction'] +
     # -sALLOW_TABLE_GROWTH=1 (already enabled in this target).
     "_rac_voice_agent_set_proto_callback"
+
+    # Solutions runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8.
+    # Required by sdk/runanywhere-web/packages/core/src/Adapters/
+    # SolutionAdapter.ts (proto-byte / YAML driven L5 pipeline runtime).
+    # `rac_solution_create_from_proto` consumes a serialized
+    # `runanywhere.v1.SolutionConfig` (or PipelineSpec) message; the
+    # lifecycle verbs operate on the returned opaque handle.
+    "_rac_solution_create_from_proto"
+    "_rac_solution_create_from_yaml"
+    "_rac_solution_start"
+    "_rac_solution_stop"
+    "_rac_solution_cancel"
+    "_rac_solution_feed"
+    "_rac_solution_close_input"
+    "_rac_solution_destroy"
 
     # VLM service
     "_rac_vlm_get_builtin_template"

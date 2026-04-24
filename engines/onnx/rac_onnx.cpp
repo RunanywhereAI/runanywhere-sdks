@@ -14,10 +14,32 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "rac/core/rac_error.h"
 #include "rac/infrastructure/events/rac_events.h"
+
+namespace {
+// Build a minimal JSON array of string codes. Returns a malloc'd NUL-terminated
+// buffer; caller must free() it. We skip escaping because language codes are
+// ASCII alphabet / digits / hyphen.
+char* build_json_string_array(const std::vector<std::string>& items) {
+    std::string json;
+    json.reserve(items.size() * 8 + 2);
+    json.push_back('[');
+    for (size_t i = 0; i < items.size(); ++i) {
+        if (i > 0)
+            json.push_back(',');
+        json.push_back('"');
+        json.append(items[i]);
+        json.push_back('"');
+    }
+    json.push_back(']');
+    return strdup(json.c_str());
+}
+}  // namespace
 
 // =============================================================================
 // INTERNAL HANDLE STRUCTURES
@@ -265,6 +287,64 @@ void rac_stt_onnx_destroy_stream(rac_handle_t handle, rac_handle_t stream) {
     free(stream_id);
 }
 
+rac_result_t rac_stt_onnx_get_languages(rac_handle_t handle, char** out_json) {
+    if (handle == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_onnx_stt_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    const auto languages = h->stt->get_supported_languages();
+    *out_json = build_json_string_array(languages);
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_stt_onnx_detect_language(rac_handle_t handle, const void* audio_data,
+                                          size_t audio_size, const rac_stt_options_t* options,
+                                          char** out_language) {
+    if (handle == nullptr || audio_data == nullptr || out_language == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_onnx_stt_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    // Convert Int16 PCM -> Float32 (same format the ONNX STT vtable uses).
+    const int16_t* samples = static_cast<const int16_t*>(audio_data);
+    const size_t num_samples = audio_size / sizeof(int16_t);
+    if (num_samples == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    runanywhere::STTRequest request;
+    request.audio_samples.resize(num_samples);
+    for (size_t i = 0; i < num_samples; ++i) {
+        request.audio_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
+    }
+    request.sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
+    request.detect_language = true;
+    request.language.clear();
+
+    const auto result = h->stt->transcribe(request);
+    if (result.detected_language.empty()) {
+        return RAC_ERROR_BACKEND_NOT_READY;
+    }
+
+    *out_language = strdup(result.detected_language.c_str());
+    if (!*out_language) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
+
 void rac_stt_onnx_destroy(rac_handle_t handle) {
     if (handle == nullptr) {
         return;
@@ -418,6 +498,34 @@ rac_result_t rac_tts_onnx_get_voices(rac_handle_t handle, char*** out_voices, si
         }
     }
 
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_tts_onnx_get_languages(rac_handle_t handle, char** out_json) {
+    if (handle == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_onnx_tts_handle_impl*>(handle);
+    if (!h->tts) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    // Sherpa-ONNX (Piper) voices expose a language tag. Deduplicate via set so
+    // multi-voice models don't emit "[\"en\",\"en\",...]".
+    std::set<std::string> seen;
+    std::vector<std::string> languages;
+    for (const auto& voice : h->tts->get_voices()) {
+        if (voice.language.empty() || !seen.insert(voice.language).second) {
+            continue;
+        }
+        languages.push_back(voice.language);
+    }
+
+    *out_json = build_json_string_array(languages);
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
     return RAC_SUCCESS;
 }
 

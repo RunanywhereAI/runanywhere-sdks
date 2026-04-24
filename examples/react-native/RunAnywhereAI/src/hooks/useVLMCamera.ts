@@ -42,6 +42,7 @@ export interface VLMCameraActions {
   selectPhotoAndDescribe: () => Promise<void>;
   toggleAutoStreaming: () => void;
   cancelGeneration: () => void;
+  clearError: () => void;
 }
 
 export type VLMCameraHook = VLMCameraState & VLMCameraActions;
@@ -262,5 +263,6 @@ export function useVLMCamera(
     selectPhotoAndDescribe,
     toggleAutoStreaming,
     cancelGeneration: () => vlmService.cancel(),
+    clearError: () => setError(null),
   };
 }

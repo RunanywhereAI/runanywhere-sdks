@@ -680,12 +680,11 @@ export const SettingsScreen: React.FC = () => {
 
   const handleDeleteDownloadedModel = useCallback(
     async (model: ModelInfo) => {
-      const downloadedModel = downloadedModels.find((m) => m.id === model.id); // Prefer downloaded model's size (actual disk usage) over catalog downloadSize (expected size)
-      // TODO: Replace with actual disk size once SDK exposes it (e.g., sizeOnDisk or actualSize)
+      const downloadedModel = downloadedModels.find((m) => m.id === model.id);
+      // Prefer the downloaded model's size (reported by the SDK after download)
+      // over the catalog's expected downloadSize.
       const freedSize =
-        downloadedModel?.downloadSize ?? // Use downloaded model's size when available
-        model.downloadSize ??
-        0;
+        downloadedModel?.downloadSize ?? model.downloadSize ?? 0;
 
       Alert.alert(
         'Delete Model',

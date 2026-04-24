@@ -8,6 +8,8 @@ library runanywhere;
 //   DartBridgeVoiceAgent.shared.initializeWithLoadedModels()
 //   DartBridgeVoiceAgent.shared.getHandle()
 //   VoiceAgentStreamAdapter(handle).stream() -> Stream<VoiceEvent>
+export 'adapters/model_download_adapter.dart'
+    show ModelDownloadService, ModelDownloadProgress, ModelDownloadStage;
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'core/module/runanywhere_module.dart';
 export 'core/types/component_state.dart';
@@ -28,8 +30,6 @@ export 'generated/voice_events.pb.dart'
     show VoiceEvent, StateChangeEvent, VADEvent, VoiceEvent_Payload;
 export 'generated/voice_events.pbenum.dart'
     show PipelineState, VADEventType;
-export 'infrastructure/download/download_service.dart'
-    show ModelDownloadService, ModelDownloadProgress, ModelDownloadStage;
 export 'native/dart_bridge_rag.dart' show DartBridgeRAG;
 export 'native/dart_bridge_voice_agent.dart' show DartBridgeVoiceAgent;
 export 'native/native_backend.dart' show NativeBackend, NativeBackendException;

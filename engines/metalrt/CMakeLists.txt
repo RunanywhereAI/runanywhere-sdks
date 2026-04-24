@@ -26,6 +26,17 @@
 # metadata via GLOBAL properties directly (matching what the macro records
 # for the other engines).
 
+# T5.4: per-engine build toggle owned locally. Apple-only — force OFF
+# elsewhere so non-Apple builds don't accidentally enable it.
+if(APPLE)
+    option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
+else()
+    set(RAC_BACKEND_METALRT OFF CACHE BOOL "" FORCE)
+endif()
+if(NOT RAC_BACKEND_METALRT)
+    return()
+endif()
+
 option(RAC_METALRT_ENGINE_AVAILABLE
     "Link the private MetalRT engine (libmetalrt_engine.a). OFF = compile stubs only."
     OFF)

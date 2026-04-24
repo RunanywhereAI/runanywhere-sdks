@@ -2,6 +2,18 @@
 # ONNX Backend - STT, TTS, VAD via ONNX Runtime and Sherpa-ONNX
 # =============================================================================
 
+# T5.4: per-engine build toggle owned locally. Emscripten has no in-tree
+# ONNX Runtime WASM binary (FetchONNXRuntime expects third_party/onnxruntime-wasm);
+# WASM ONNX ships via onnxruntime-web from the frontend. Force off there.
+# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip back to default ON.
+option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
+if(EMSCRIPTEN)
+    set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
+endif()
+if(NOT RAC_BACKEND_ONNX)
+    return()
+endif()
+
 message(STATUS "Configuring ONNX backend...")
 
 # =============================================================================
@@ -43,165 +55,25 @@ endif()
 include(FetchONNXRuntime)
 
 # =============================================================================
-# Sherpa-ONNX (iOS and Android)
+# Sherpa-ONNX availability (discovered by engines/sherpa/CMakeLists.txt)
 # =============================================================================
+# GAP 06 T5.1 — the Sherpa-ONNX prebuilt discovery logic moved out of this
+# file and into engines/sherpa/CMakeLists.txt (which MUST be added_subdirectory
+# BEFORE engines/onnx — see engines/CMakeLists.txt).
+#
+# engines/sherpa exposes:
+#   - A GLOBAL IMPORTED target `sherpa_onnx` when the prebuilt is present.
+#   - A CACHE INTERNAL flag `RAC_SHERPA_ONNX_AVAILABLE` (0/1) that mirrors
+#     the on/off state of that target.
+# Onnx consumes them below so its Sherpa-backed STT/TTS/VAD implementation
+# in onnx_backend.cpp keeps working during T5.1 phase 1. Phase 2 migrates
+# those ops to engines/sherpa and onnx drops its speech capability.
 
-set(SHERPA_ONNX_AVAILABLE OFF)
-get_filename_component(RUNANYWHERE_COMMONS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
-
-if(RAC_PLATFORM_IOS)
-    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-ios")
-
-    if(EXISTS "${SHERPA_ONNX_ROOT}/sherpa-onnx.xcframework")
-        message(STATUS "Found Sherpa-ONNX xcframework at: ${SHERPA_ONNX_ROOT}")
-        set(SHERPA_ONNX_AVAILABLE ON)
-
-        string(TOLOWER "${CMAKE_OSX_SYSROOT}" _sherpa_sysroot_lower)
-        if(_sherpa_sysroot_lower MATCHES "simulator" OR (DEFINED IOS_PLATFORM AND IOS_PLATFORM MATCHES "SIMULATOR"))
-            set(SHERPA_ARCH "ios-arm64_x86_64-simulator")
-        else()
-            set(SHERPA_ARCH "ios-arm64")
-        endif()
-
-        if(EXISTS "${SHERPA_ONNX_ROOT}/sherpa-onnx.xcframework/${SHERPA_ARCH}/libsherpa-onnx.a")
-            set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/sherpa-onnx.xcframework/${SHERPA_ARCH}/libsherpa-onnx.a")
-        else()
-            file(GLOB SHERPA_LIB_CANDIDATES "${SHERPA_ONNX_ROOT}/sherpa-onnx.xcframework/${SHERPA_ARCH}/*.a")
-            if(SHERPA_LIB_CANDIDATES)
-                list(GET SHERPA_LIB_CANDIDATES 0 SHERPA_LIB_PATH)
-            else()
-                set(SHERPA_ONNX_AVAILABLE OFF)
-            endif()
-        endif()
-        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/sherpa-onnx.xcframework/${SHERPA_ARCH}/Headers")
-
-        if(SHERPA_ONNX_AVAILABLE AND SHERPA_LIB_PATH)
-            add_library(sherpa_onnx STATIC IMPORTED GLOBAL)
-            set_target_properties(sherpa_onnx PROPERTIES
-                IMPORTED_LOCATION "${SHERPA_LIB_PATH}"
-                INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
-            )
-        endif()
-    endif()
-
-elseif(RAC_PLATFORM_ANDROID)
-    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-android")
-
-    if(EXISTS "${SHERPA_ONNX_ROOT}/jniLibs")
-        set(SHERPA_ABI_DIR "${SHERPA_ONNX_ROOT}/jniLibs/${ANDROID_ABI}")
-
-        if(EXISTS "${SHERPA_ABI_DIR}/libsherpa-onnx-c-api.so")
-            set(SHERPA_ONNX_AVAILABLE ON)
-            set(SHERPA_LIB_PATH "${SHERPA_ABI_DIR}/libsherpa-onnx-c-api.so")
-
-            add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
-            set_target_properties(sherpa_onnx PROPERTIES IMPORTED_LOCATION "${SHERPA_LIB_PATH}")
-
-            if(EXISTS "${SHERPA_ONNX_ROOT}/include")
-                set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
-                set_target_properties(sherpa_onnx PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}")
-            endif()
-        endif()
-    endif()
-
-elseif(RAC_PLATFORM_MACOS)
-    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-macos")
-
-    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.a")
-        set(SHERPA_ONNX_AVAILABLE ON)
-        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.a")
-        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
-
-        add_library(sherpa_onnx STATIC IMPORTED GLOBAL)
-        set_target_properties(sherpa_onnx PROPERTIES
-            IMPORTED_LOCATION "${SHERPA_LIB_PATH}"
-            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
-        )
-
-        set(SHERPA_ONNX_DEPS
-            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
-            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
-            "piper_phonemize" "espeak-ng" "ucd" "cppinyin_core" "ssentencepiece_core" "kissfft-float"
-        )
-
-        foreach(dep ${SHERPA_ONNX_DEPS})
-            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/lib${dep}.a")
-                add_library(sherpa_${dep} STATIC IMPORTED GLOBAL)
-                set_target_properties(sherpa_${dep} PROPERTIES IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/lib${dep}.a")
-                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
-            endif()
-        endforeach()
-    endif()
-
-elseif(RAC_PLATFORM_LINUX)
-    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-linux")
-
-    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.so")
-        set(SHERPA_ONNX_AVAILABLE ON)
-        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.so")
-        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
-
-        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
-        set_target_properties(sherpa_onnx PROPERTIES
-            IMPORTED_LOCATION "${SHERPA_LIB_PATH}"
-            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
-        )
-
-        # Link supporting libraries if present
-        set(SHERPA_ONNX_DEPS
-            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
-            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
-            "piper_phonemize" "espeak-ng" "ucd"
-        )
-
-        foreach(dep ${SHERPA_ONNX_DEPS})
-            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/lib${dep}.so")
-                add_library(sherpa_${dep} SHARED IMPORTED GLOBAL)
-                set_target_properties(sherpa_${dep} PROPERTIES IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/lib${dep}.so")
-                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
-            endif()
-        endforeach()
-
-        message(STATUS "Found Sherpa-ONNX Linux: ${SHERPA_LIB_PATH}")
-    else()
-        message(STATUS "Sherpa-ONNX not found. Run: ./scripts/linux/download-sherpa-onnx.sh")
-    endif()
-
-elseif(RAC_PLATFORM_WINDOWS)
-    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-windows")
-
-    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
-        set(SHERPA_ONNX_AVAILABLE ON)
-        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/sherpa-onnx-c-api.lib")
-        set(SHERPA_DLL_PATH "${SHERPA_ONNX_ROOT}/bin/sherpa-onnx-c-api.dll")
-        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
-
-        add_library(sherpa_onnx SHARED IMPORTED GLOBAL)
-        set_target_properties(sherpa_onnx PROPERTIES
-            IMPORTED_IMPLIB "${SHERPA_LIB_PATH}"
-            IMPORTED_LOCATION "${SHERPA_DLL_PATH}"
-            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
-        )
-
-        # Link supporting libraries if present
-        set(SHERPA_ONNX_DEPS
-            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
-            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
-            "piper_phonemize" "espeak-ng" "ucd"
-        )
-
-        foreach(dep ${SHERPA_ONNX_DEPS})
-            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/${dep}.lib")
-                add_library(sherpa_${dep} STATIC IMPORTED GLOBAL)
-                set_target_properties(sherpa_${dep} PROPERTIES IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/${dep}.lib")
-                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
-            endif()
-        endforeach()
-
-        message(STATUS "Found Sherpa-ONNX Windows: ${SHERPA_LIB_PATH}")
-    else()
-        message(STATUS "Sherpa-ONNX not found for Windows at ${SHERPA_ONNX_ROOT}")
-    endif()
+if(RAC_SHERPA_ONNX_AVAILABLE)
+    set(SHERPA_ONNX_AVAILABLE ON)
+    set(SHERPA_HEADER_PATH "${RAC_SHERPA_ONNX_HEADER_PATH}")
+else()
+    set(SHERPA_ONNX_AVAILABLE OFF)
 endif()
 
 # =============================================================================
@@ -278,6 +150,7 @@ rac_add_engine_plugin(onnx
     LINK_LIBRARIES      ${ONNX_LINK_LIBS}
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${RAC_COMMONS_ROOT_DIR}/src
                         ${ONNX_EXTRA_INCLUDES}
     COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS}
     RUNTIMES            CPU CORE_ML NNAPI

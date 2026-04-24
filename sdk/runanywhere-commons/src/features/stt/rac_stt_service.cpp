@@ -211,6 +211,34 @@ void rac_stt_destroy(rac_handle_t handle) {
     free(service);
 }
 
+rac_result_t rac_stt_get_languages(rac_handle_t handle, char** out_json) {
+    if (!handle || !out_json)
+        return RAC_ERROR_NULL_POINTER;
+
+    *out_json = nullptr;
+    auto* service = static_cast<rac_stt_service_t*>(handle);
+    if (!service->ops || !service->ops->get_languages) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->get_languages(service->impl, out_json);
+}
+
+rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* audio_data, size_t audio_size,
+                                     const rac_stt_options_t* options, char** out_language) {
+    if (!handle || !audio_data || !out_language)
+        return RAC_ERROR_NULL_POINTER;
+
+    *out_language = nullptr;
+    auto* service = static_cast<rac_stt_service_t*>(handle);
+    if (!service->ops || !service->ops->detect_language) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->detect_language(service->impl, audio_data, audio_size, options,
+                                         out_language);
+}
+
 void rac_stt_result_free(rac_stt_result_t* result) {
     if (!result)
         return;

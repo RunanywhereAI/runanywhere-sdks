@@ -2,6 +2,13 @@
 # LlamaCPP Backend - Text Generation via llama.cpp
 # =============================================================================
 
+# T5.4: per-engine build toggle owned locally. Self-gating via return() keeps
+# this decision out of commons and out of engines/CMakeLists.txt.
+option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
+if(NOT RAC_BACKEND_LLAMACPP)
+    return()
+endif()
+
 message(STATUS "Configuring LlamaCPP backend...")
 
 # =============================================================================

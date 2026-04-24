@@ -29,7 +29,7 @@ public extension RunAnywhere {
             throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
         }
 
-        let task = try await AlamofireDownloadService.shared.downloadModel(model)
+        let task = try await DownloadAdapter.shared.downloadModel(model)
         return task.progress
     }
 

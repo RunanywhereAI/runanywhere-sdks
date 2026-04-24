@@ -15,6 +15,7 @@ import type { LocalFileStorage } from './LocalFileStorage';
 import { ModelStatus, DownloadStage, SDKEventType } from '../types/enums';
 import type { ManagedModel, DownloadProgress } from './ModelRegistry';
 import type { ModelRegistry } from './ModelRegistry';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 
 // ---------------------------------------------------------------------------
 // Quota Check Result
@@ -337,12 +338,29 @@ export class ModelDownloader {
    * Exposed so ModelManager can use it for on-demand file downloads during load.
    *
    * URLs are validated before fetching to prevent SSRF and enforce HTTPS.
+   *
+   * Transport selection (T3.13):
+   *   1. If a backend package has registered an Emscripten module with
+   *      HTTPAdapter, route through the commons libcurl C ABI for
+   *      parity with Swift/Kotlin/RN/Flutter downloads.
+   *   2. Otherwise fall back to the browser `fetch()` stream — this
+   *      is the bootstrap path, reached before any backend WASM has
+   *      loaded (e.g. a consumer that only uses core storage APIs).
    */
   async downloadFile(
     url: string,
     onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
   ): Promise<Uint8Array> {
     validateModelUrl(url);
+
+    const http = HTTPAdapter.tryDefault();
+    if (http) {
+      return this.downloadFileViaWasm(http, url, onProgress);
+    }
+
+    // Bootstrap path: no backend WASM is loaded yet. `fetch()` here is
+    // intentional — routing through a not-yet-loaded WASM module would
+    // be impossible, and this call site only runs in browser contexts.
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 
@@ -373,6 +391,36 @@ export class ModelDownloader {
   }
 
   /**
+   * WASM-backed variant of `downloadFile` — collects chunks delivered
+   * via the commons streaming HTTP client into a single `Uint8Array`.
+   */
+  private async downloadFileViaWasm(
+    http: HTTPAdapter,
+    url: string,
+    onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+  ): Promise<Uint8Array> {
+    const chunks: Uint8Array[] = [];
+    let received = 0;
+    let declaredTotal = 0;
+
+    await http.stream({ url }, (chunk, totalWritten, contentLength) => {
+      chunks.push(chunk);
+      received = totalWritten;
+      if (contentLength > 0) declaredTotal = contentLength;
+      const progress = declaredTotal > 0 ? received / declaredTotal : 0;
+      onProgress?.(progress, received, declaredTotal);
+    });
+
+    const data = new Uint8Array(received);
+    let offset = 0;
+    for (const c of chunks) {
+      data.set(c, offset);
+      offset += c.length;
+    }
+    return data;
+  }
+
+  /**
    * Download a file and stream it directly to persistent storage (OPFS or local FS)
    * without buffering the entire payload in memory.
    *
@@ -387,6 +435,14 @@ export class ModelDownloader {
     onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
   ): Promise<number | null> {
     validateModelUrl(url);
+
+    const http = HTTPAdapter.tryDefault();
+    if (http) {
+      return this.streamViaWasm(http, url, storageKey, onProgress);
+    }
+
+    // Bootstrap path: see `downloadFile` for rationale on keeping
+    // browser `fetch()` available when no WASM module is registered.
     const response = await fetch(url);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
     if (!response.body) return null;
@@ -394,7 +450,6 @@ export class ModelDownloader {
     const total = Number(response.headers.get('content-length') || 0);
     let received = 0;
 
-    // Build a progress-tracking pass-through stream
     const progressTransform = new TransformStream<Uint8Array, Uint8Array>({
       transform: (chunk, controller) => {
         received += chunk.length;
@@ -418,6 +473,61 @@ export class ModelDownloader {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.warning(`Streaming store failed for "${storageKey}": ${msg}, will fall back to buffered download`);
+      return null;
+    }
+  }
+
+  /**
+   * WASM-backed streaming download: bridges `rac_http_request_stream`
+   * chunk callbacks into a JS `ReadableStream` that the same storage
+   * pipeline (`saveModelFromStream`) can consume unchanged.
+   */
+  private async streamViaWasm(
+    http: HTTPAdapter,
+    url: string,
+    storageKey: string,
+    onProgress?: (progress: number, bytesDownloaded: number, totalBytes: number) => void,
+  ): Promise<number | null> {
+    let received = 0;
+    let declaredTotal = 0;
+    let enqueue: ((chunk: Uint8Array) => void) | null = null;
+    let closeStream: (() => void) | null = null;
+    let errorStream: ((err: unknown) => void) | null = null;
+
+    const body: ReadableStream<Uint8Array> = new ReadableStream({
+      start(controller) {
+        enqueue = (chunk) => controller.enqueue(chunk);
+        closeStream = () => controller.close();
+        errorStream = (err) => controller.error(err);
+      },
+    });
+
+    const pump = http.stream({ url }, (chunk, totalWritten, contentLength) => {
+      if (enqueue) enqueue(chunk);
+      received = totalWritten;
+      if (contentLength > 0) declaredTotal = contentLength;
+      onProgress?.(declaredTotal > 0 ? received / declaredTotal : 0, received, declaredTotal);
+    }).then(() => {
+      closeStream?.();
+    }, (err) => {
+      errorStream?.(err);
+    });
+
+    try {
+      if (this.localFileStorage?.isReady) {
+        await this.localFileStorage.saveModelFromStream(storageKey, body);
+        await pump;
+        logger.info(`Streamed ${storageKey} to local storage via WASM HTTP (${(received / 1024 / 1024).toFixed(1)} MB)`);
+        return received;
+      }
+
+      await this.storage.saveModelFromStream(storageKey, body);
+      await pump;
+      logger.info(`Streamed ${storageKey} to OPFS via WASM HTTP (${(received / 1024 / 1024).toFixed(1)} MB)`);
+      return received;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warning(`WASM-backed streaming store failed for "${storageKey}": ${msg}, will fall back to buffered download`);
       return null;
     }
   }

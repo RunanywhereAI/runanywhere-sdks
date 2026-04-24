@@ -168,12 +168,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                   icon: Icons.memory,
                   value: device.chipName,
                 ),
-                _buildDeviceInfoRow(
-                  context,
-                  label: 'Memory',
-                  icon: Icons.storage,
-                  value: device.totalMemory.formattedFileSize,
-                ),
+                if (device.totalMemory > 0)
+                  _buildDeviceInfoRow(
+                    context,
+                    label: 'Memory',
+                    icon: Icons.storage,
+                    value: device.totalMemory.formattedFileSize,
+                  ),
                 if (device.neuralEngineAvailable)
                   _buildDeviceInfoRow(
                     context,

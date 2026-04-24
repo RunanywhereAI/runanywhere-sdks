@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/core/types/model_types.dart' as public_types;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
@@ -700,6 +701,45 @@ class DartBridgeModelRegistry {
     } catch (e) {
       _logger.debug('rac_model_registry_update_last_used error: $e');
       return false;
+    }
+  }
+
+  // ============================================================================
+  // Refresh (T4.9) — bridges rac_model_registry_refresh
+  // ============================================================================
+
+  /// Refresh the model registry via commons C ABI.
+  ///
+  /// Note: we deliberately pass `discoveryCallbacks = nullptr`. Local rescan
+  /// / orphan pruning from the native layer requires the Dart-side discovery
+  /// callbacks struct (see [discoverDownloadedModels]) which is not safe to
+  /// hand off into an opaque pointer shared across C-ABI boundaries here.
+  /// Callers that want those steps should use [discoverDownloadedModels]
+  /// directly — the Models capability does exactly that.
+  Future<bool> refresh({
+    required bool includeRemoteCatalog,
+    required bool pruneOrphans,
+  }) async {
+    if (_registryHandle == null) return false;
+    final optsPtr = calloc<RacModelRegistryRefreshOpts>();
+    try {
+      optsPtr.ref
+        ..includeRemoteCatalog = includeRemoteCatalog ? 1 : 0
+        ..rescanLocal = 0
+        ..pruneOrphans = pruneOrphans ? 1 : 0
+        ..discoveryCallbacks = nullptr;
+      final rc = RacNative.bindings
+          .rac_model_registry_refresh(_registryHandle!, optsPtr.ref);
+      if (rc != 0) {
+        _logger.debug('rac_model_registry_refresh rc=$rc');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      _logger.debug('rac_model_registry_refresh error: $e');
+      return false;
+    } finally {
+      calloc.free(optsPtr);
     }
   }
 

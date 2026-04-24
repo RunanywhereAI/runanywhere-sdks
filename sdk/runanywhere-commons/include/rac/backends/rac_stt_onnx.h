@@ -93,6 +93,22 @@ RAC_ONNX_API void rac_stt_onnx_destroy_stream(rac_handle_t handle, rac_handle_t 
 
 RAC_ONNX_API void rac_stt_onnx_destroy(rac_handle_t handle);
 
+/**
+ * Enumerates languages supported by the loaded ONNX STT model as a JSON array.
+ * Caller frees *out_json with free().
+ */
+RAC_ONNX_API rac_result_t rac_stt_onnx_get_languages(rac_handle_t handle, char** out_json);
+
+/**
+ * Detects the language of a short Int16 mono PCM clip by running a
+ * transcription pass and reading the detected_language field from the result.
+ * Caller frees *out_language with free().
+ */
+RAC_ONNX_API rac_result_t rac_stt_onnx_detect_language(rac_handle_t handle, const void* audio_data,
+                                                       size_t audio_size,
+                                                       const rac_stt_options_t* options,
+                                                       char** out_language);
+
 #ifdef __cplusplus
 }
 #endif

@@ -32,6 +32,8 @@ Pod::Spec.new do |s|
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
       "$(PODS_TARGET_SRCROOT)/cpp/bridges",
+      # nlohmann/json (header-only) vendored by sibling @runanywhere/core package.
+      "$(PODS_TARGET_SRCROOT)/../core/cpp/third_party",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64-simulator/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64_x86_64-simulator/Headers",

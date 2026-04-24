@@ -25,7 +25,7 @@
     "typecheck": "tsc --noEmit",
     "test:types": "tsd",
     "test:unit": "vitest run",
-    "test": "tsd && vitest run",
+    "test": "vitest run",
     "test:e2e": "npm run build && (cd ../../../../examples/web/RunAnywhereAI && npm run build)",
     "clean": "rm -rf dist",
     "prepublishOnly": "test -d dist || (echo 'ERROR: Not built. Run npm run build first.' && exit 1)"

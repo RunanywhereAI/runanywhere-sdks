@@ -26,6 +26,17 @@ import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure
 import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
 import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
+import { OPFSStorage } from '../Infrastructure/OPFSStorage';
+import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
+import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+
+/**
+ * Persistent storage backend active for the current SDK session.
+ * - `fsAccess`: File System Access API (user picked a real directory, Chrome 122+).
+ * - `opfs`: Origin Private File System (default persistent fallback).
+ * - `memory`: No persistent backend — models live in volatile MEMFS.
+ */
+export type StorageBackend = 'fsAccess' | 'opfs' | 'memory';
 
 /** Options for showOpenFilePicker. */
 interface OpenFilePickerOptions {
@@ -110,6 +121,19 @@ export const RunAnywhere = {
         }
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
+
+        // Streaming downloads and WASM progress reporting require the
+        // Fetch Streams API. Fail fast with a clear message in environments
+        // where it's missing (very old browsers, some SSR contexts) instead
+        // of surfacing a confusing error deep inside a model download.
+        if (typeof ReadableStream === 'undefined') {
+          throw new SDKError(
+            SDKErrorCode.InitializationFailed,
+            'ReadableStream is not available in this environment. ' +
+            'The RunAnywhere Web SDK requires the Fetch Streams API ' +
+            '(Chrome 43+, Firefox 65+, Safari 14.1+, Edge 79+).',
+          );
+        }
 
         // Restore local file storage from previous session (non-blocking)
         try {
@@ -273,6 +297,29 @@ export const RunAnywhere = {
     return _localFileStorage?.directoryName ?? LocalFileStorage.storedDirectoryName;
   },
 
+  /**
+   * Which persistent storage backend is currently active.
+   *
+   * Resolution order:
+   *   1. `fsAccess` — File System Access API with an active directory handle
+   *      (user picked a folder via `chooseLocalStorageDirectory()` or a handle
+   *      was restored from a previous session).
+   *   2. `opfs` — Origin Private File System (default persistent fallback).
+   *   3. `memory` — Neither backend is available; models live only in MEMFS.
+   *
+   * Apps can surface this to users (e.g. "Stored on disk" vs. "Stored in
+   * browser storage") or gate features that assume real-filesystem semantics.
+   */
+  get storageBackend(): StorageBackend {
+    if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
+      return 'fsAccess';
+    }
+    if (OPFSStorage.isSupported) {
+      return 'opfs';
+    }
+    return 'memory';
+  },
+
   async chooseLocalStorageDirectory(): Promise<boolean> {
     if (!LocalFileStorage.isSupported) {
       logger.warning('File System Access API not supported — using browser storage (OPFS)');
@@ -317,6 +364,15 @@ export const RunAnywhere = {
     }
     return success;
   },
+
+  // =========================================================================
+  // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+  // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
+  // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
+  // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
+  // =========================================================================
+
+  solutions: SolutionsCapability,
 
   // =========================================================================
   // Shutdown

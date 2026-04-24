@@ -5,12 +5,12 @@
 
 import 'dart:io';
 
+import 'package:runanywhere/adapters/model_download_adapter.dart';
 import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/infrastructure/download/download_service.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';

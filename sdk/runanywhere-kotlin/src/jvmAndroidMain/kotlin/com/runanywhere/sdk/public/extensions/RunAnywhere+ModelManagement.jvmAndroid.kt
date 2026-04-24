@@ -1012,8 +1012,21 @@ actual suspend fun RunAnywhere.refreshModelRegistry() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    modelsLogger.info("Refreshing model registry from backend assignments")
-    fetchModelAssignments(forceRefresh = true)
+    modelsLogger.info("Refreshing model registry via rac_model_registry_refresh")
+    // Route through the unified commons C ABI (T4.9). Local rescan / orphan
+    // pruning require platform file-IO callbacks that the Kotlin SDK does
+    // not wire into JNI today, so we only request the remote catalog step.
+    // Callers that have already populated the registry via registerModel()
+    // will see the backend assignments merged back in after this call.
+    val rc =
+        RunAnywhereBridge.racModelRegistryRefresh(
+            includeRemoteCatalog = true,
+            rescanLocal = false,
+            pruneOrphans = false,
+        )
+    if (rc != 0) {
+        modelsLogger.warning("refreshModelRegistry returned non-zero rc=$rc")
+    }
 }
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {

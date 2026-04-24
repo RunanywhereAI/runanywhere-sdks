@@ -12,6 +12,7 @@
 
 #include "HybridRunAnywhereCore.hpp"
 #include "HybridRunAnywhereDeviceInfoSpecSwift.hpp"
+#include "HybridVoiceAgent.hpp"
 
 @interface RunAnywhereCoreAutolinking : NSObject
 @end
@@ -36,6 +37,15 @@
     []() -> std::shared_ptr<HybridObject> {
       std::shared_ptr<HybridRunAnywhereDeviceInfoSpec> hybridObject = RunAnywhereCore::RunAnywhereCoreAutolinking::createRunAnywhereDeviceInfo();
       return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "VoiceAgent",
+    []() -> std::shared_ptr<HybridObject> {
+      static_assert(std::is_default_constructible_v<HybridVoiceAgent>,
+                    "The HybridObject \"HybridVoiceAgent\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridVoiceAgent>();
     }
   );
 }

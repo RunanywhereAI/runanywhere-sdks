@@ -16,8 +16,7 @@
 
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
-import 'package:runanywhere/foundation/dependency_injection/service_container.dart'
-    hide SDKInitParams;
+import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
@@ -29,6 +28,7 @@ import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_rag.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
@@ -226,4 +226,10 @@ class RunAnywhereSDK {
   /// RAG (Retrieval-Augmented Generation) — pipeline lifecycle,
   /// ingest, query, statistics.
   RunAnywhereRAG get rag => RunAnywhereRAG.shared;
+
+  /// Solutions (T4.7/T4.8) — proto/YAML-driven L5 pipeline runtime.
+  /// Construct a solution from a typed `SolutionConfig` proto, raw
+  /// proto bytes, or YAML sugar; returns a [SolutionHandle] with
+  /// start / stop / cancel / feed / closeInput / destroy verbs.
+  RunAnywhereSolutions get solutions => RunAnywhereSolutions.shared;
 }

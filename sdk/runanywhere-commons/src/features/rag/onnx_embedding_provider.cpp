@@ -24,7 +24,7 @@
 // rac_add_engine_plugin macro from CMAKE_CURRENT_SOURCE_DIR).
 #include "onnx_backend.h"
 #include "rac/core/rac_logger.h"
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 #include "rac/features/rag/ort_guards.h"
 
 #if defined(__aarch64__) && defined(__ARM_NEON)

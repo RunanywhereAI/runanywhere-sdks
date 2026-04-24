@@ -15,13 +15,13 @@ import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Platform adapter that provides JNI callbacks for C++ core operations.
  *
  * CRITICAL: This MUST be registered FIRST before any C++ calls.
- * On Android, call [setAndroidContext] before secure storage operations for persistence.
+ * The host app MUST configure a [PlatformSecureStorage] via [setPlatformStorage]
+ * (or [setContext] on Android) before any secure-storage callback is invoked.
  *
  * Provides callbacks for:
  * - Logging: Route C++ logs to Kotlin logging system
@@ -48,21 +48,27 @@ object CppBridgePlatformAdapter {
     private val lock = Any()
 
     /**
-     * Platform-specific storage delegate for Android persistent storage.
-     * Set via [setAndroidContext] on Android platform.
+     * Platform-specific storage delegate. MUST be set before any secure-storage
+     * callback is invoked. On Android, use [setContext] which installs an
+     * AndroidKeyStore-backed implementation.
      */
     @Volatile
     private var platformStorage: PlatformSecureStorage? = null
 
     /**
-     * In-memory fallback storage for JVM environments or when platform storage is not available.
-     */
-    private val inMemoryStorage = ConcurrentHashMap<String, ByteArray>()
-
-    /**
      * Tag for logging.
      */
     private const val TAG = "CppBridge"
+
+    /**
+     * Fetch the configured [PlatformSecureStorage] or fail fast if the host app
+     * forgot to configure one. There is no in-memory fallback by design — secure
+     * storage MUST be backed by a real persistent, encrypted implementation.
+     */
+    private fun requirePlatformStorage(): PlatformSecureStorage =
+        platformStorage ?: throw IllegalStateException(
+            "Platform secure storage not configured — call RunAnywhere.setPlatformStorage() before use",
+        )
 
     /**
      * Interface for platform-specific secure storage.
@@ -305,27 +311,20 @@ object CppBridgePlatformAdapter {
     /**
      * Get a value from secure storage.
      *
-     * On Android with platform storage set: Uses persistent storage (SharedPreferences)
-     * On JVM or without platform storage: Uses in-memory storage (non-persistent)
+     * Requires a [PlatformSecureStorage] to be configured via [setPlatformStorage]
+     * (or [setContext] on Android). There is no in-memory fallback by design.
      *
      * @param key The key to retrieve
      * @return The stored value as ByteArray, or null if not found
+     * @throws IllegalStateException if platform secure storage is not configured
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun secureGetCallback(key: String): ByteArray? {
+        val storage = requirePlatformStorage()
         return try {
-            // Try platform storage first (persistent storage)
-            val storage = platformStorage
-            if (storage != null) {
-                val result = storage.get(key)
-                if (result != null) {
-                    return result
-                }
-            }
-            // Fall back to in-memory storage
-            inMemoryStorage[key]
+            storage.get(key)
         } catch (e: Exception) {
             logCallback(LogLevel.ERROR, "SecureStorage", "secureGet failed for key '$key': ${e.message}")
             null
@@ -335,30 +334,25 @@ object CppBridgePlatformAdapter {
     /**
      * Store a value in secure storage.
      *
-     * On Android with platform storage set: Uses persistent storage (SharedPreferences)
-     * On JVM or without platform storage: Uses in-memory storage (non-persistent)
+     * Requires a [PlatformSecureStorage] to be configured via [setPlatformStorage]
+     * (or [setContext] on Android). There is no in-memory fallback by design.
      *
      * @param key The key to store under
      * @param value The value to store
      * @return true if storage succeeded, false otherwise
+     * @throws IllegalStateException if platform secure storage is not configured
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun secureSetCallback(key: String, value: ByteArray): Boolean {
+        val storage = requirePlatformStorage()
         return try {
-            // Try platform storage first (persistent storage)
-            val storage = platformStorage
-            if (storage != null) {
-                if (storage.set(key, value)) {
-                    logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to platform storage")
-                    return true
-                }
+            val ok = storage.set(key, value)
+            if (ok) {
+                logCallback(LogLevel.DEBUG, "SecureStorage", "Persisted key '$key' to platform storage")
             }
-            // Fall back to in-memory storage
-            inMemoryStorage[key] = value.copyOf()
-            logCallback(LogLevel.WARN, "SecureStorage", "Using in-memory storage for key '$key' (platform storage not set)")
-            true
+            ok
         } catch (e: Exception) {
             logCallback(LogLevel.ERROR, "SecureStorage", "secureSet failed for key '$key': ${e.message}")
             false
@@ -368,18 +362,20 @@ object CppBridgePlatformAdapter {
     /**
      * Delete a value from secure storage.
      *
+     * Requires a [PlatformSecureStorage] to be configured via [setPlatformStorage]
+     * (or [setContext] on Android). There is no in-memory fallback by design.
+     *
      * @param key The key to delete
      * @return true if delete succeeded or key didn't exist, false otherwise
+     * @throws IllegalStateException if platform secure storage is not configured
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
     @JvmStatic
     fun secureDeleteCallback(key: String): Boolean {
+        val storage = requirePlatformStorage()
         return try {
-            // Remove from platform storage if available
-            platformStorage?.delete(key)
-            // Also remove from in-memory
-            inMemoryStorage.remove(key)
+            storage.delete(key)
             true
         } catch (e: Exception) {
             logCallback(LogLevel.ERROR, "SecureStorage", "secureDelete failed for key '$key': ${e.message}")
@@ -460,34 +456,30 @@ object CppBridgePlatformAdapter {
     // ========================================================================
 
     /**
-     * Unregister the platform adapter and clean up resources.
+     * Unregister the platform adapter.
      *
      * Called during SDK shutdown.
-     * Note: Does NOT clear persistent storage (device ID should survive SDK restarts)
+     * Note: Does NOT clear persistent storage (device ID should survive SDK restarts).
      */
     fun unregister() {
         synchronized(lock) {
             if (!isRegistered) {
                 return
             }
-
-            // Only clear in-memory storage, preserve persistent storage
-            inMemoryStorage.clear()
             isRegistered = false
         }
     }
 
     /**
-     * Clear all secure storage entries (both persistent and in-memory).
+     * Clear all secure storage entries via the configured [PlatformSecureStorage].
      *
      * WARNING: This clears the device ID! Device will be re-registered on next app start.
      * Useful for testing or when user requests data deletion.
+     *
+     * @throws IllegalStateException if platform secure storage is not configured
      */
     fun clearSecureStorage() {
-        // Clear platform storage
-        platformStorage?.clear()
-        // Clear in-memory storage
-        inMemoryStorage.clear()
+        requirePlatformStorage().clear()
         logCallback(LogLevel.INFO, "SecureStorage", "All secure storage cleared")
     }
 }

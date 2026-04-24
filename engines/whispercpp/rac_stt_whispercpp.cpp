@@ -189,6 +189,87 @@ rac_result_t rac_stt_whispercpp_get_language(rac_handle_t handle, char** out_lan
     return RAC_SUCCESS;
 }
 
+rac_result_t rac_stt_whispercpp_get_languages(rac_handle_t handle, char** out_json) {
+    if (handle == nullptr || out_json == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    const std::vector<std::string> languages = h->stt->get_supported_languages();
+
+    // Emit a minimal JSON array with proper escaping. whisper language codes
+    // are ASCII letters only so escaping is trivial but we quote defensively.
+    std::string json;
+    json.reserve(languages.size() * 6 + 2);
+    json.push_back('[');
+    for (size_t i = 0; i < languages.size(); ++i) {
+        if (i > 0)
+            json.push_back(',');
+        json.push_back('"');
+        json.append(languages[i]);
+        json.push_back('"');
+    }
+    json.push_back(']');
+
+    *out_json = strdup(json.c_str());
+    if (!*out_json) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_stt_whispercpp_detect_language(rac_handle_t handle, const void* audio_data,
+                                                size_t audio_size,
+                                                const rac_stt_options_t* options,
+                                                char** out_language) {
+    if (handle == nullptr || audio_data == nullptr || out_language == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_whispercpp_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    // Convert Int16 PCM -> Float32, matching the whispercpp vtable transcribe path.
+    const int16_t* samples = static_cast<const int16_t*>(audio_data);
+    const size_t num_samples = audio_size / sizeof(int16_t);
+    if (num_samples == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::vector<float> float_samples(num_samples);
+    for (size_t i = 0; i < num_samples; ++i) {
+        float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
+    }
+
+    runanywhere::STTRequest request;
+    request.audio_samples = std::move(float_samples);
+    request.sample_rate = (options && options->sample_rate > 0) ? options->sample_rate : 16000;
+    request.detect_language = true;
+    // Force empty language to trigger detection regardless of options->language.
+    request.language.clear();
+
+    const auto result = h->stt->transcribe(request);
+
+    if (result.detected_language.empty()) {
+        return RAC_ERROR_BACKEND_NOT_READY;
+    }
+
+    *out_language = strdup(result.detected_language.c_str());
+    if (!*out_language) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    // Cache for get_language() compatibility.
+    h->detected_language = result.detected_language;
+    return RAC_SUCCESS;
+}
+
 rac_bool_t rac_stt_whispercpp_is_ready(rac_handle_t handle) {
     if (handle == nullptr) {
         return RAC_FALSE;

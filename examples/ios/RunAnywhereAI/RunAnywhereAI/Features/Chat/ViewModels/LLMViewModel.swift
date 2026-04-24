@@ -240,7 +240,7 @@ final class LLMViewModel {
             conversationStore.addMessage(userMessage, to: conversation)
         }
 
-        // Create placeholder assistant message
+        // Append an empty assistant message slot that streaming tokens are written into.
         let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
 

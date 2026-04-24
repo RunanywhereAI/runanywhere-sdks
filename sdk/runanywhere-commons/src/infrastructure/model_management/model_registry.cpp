@@ -22,6 +22,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
+#include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 
@@ -730,6 +731,94 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
     RAC_LOG_INFO("ModelRegistry", "Model discovery complete");
 
     return RAC_SUCCESS;
+}
+
+// =============================================================================
+// PUBLIC API - REFRESH (T4.9)
+// =============================================================================
+
+rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
+                                        rac_model_registry_refresh_opts_t opts) {
+    if (!handle) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    RAC_LOG_INFO("ModelRegistry",
+                 "Refresh requested: remote=%d, rescan_local=%d, prune_orphans=%d",
+                 static_cast<int>(opts.include_remote_catalog),
+                 static_cast<int>(opts.rescan_local),
+                 static_cast<int>(opts.prune_orphans));
+
+    rac_result_t first_error = RAC_SUCCESS;
+
+    // Step 1: Remote catalog refresh via model assignment manager.
+    // The assignment manager delegates HTTP to whatever transport the SDK
+    // wired up (libcurl in native builds, platform HTTP in WASM/JS).
+    if (opts.include_remote_catalog == RAC_TRUE) {
+        rac_model_info_t** remote_models = nullptr;
+        size_t remote_count = 0;
+        rac_result_t remote_rc =
+            rac_model_assignment_fetch(RAC_TRUE, &remote_models, &remote_count);
+        if (remote_rc == RAC_SUCCESS) {
+            RAC_LOG_INFO("ModelRegistry", "Remote catalog refreshed (%zu models)", remote_count);
+            if (remote_models) {
+                rac_model_info_array_free(remote_models, remote_count);
+            }
+        } else {
+            RAC_LOG_WARNING("ModelRegistry", "Remote catalog refresh failed: %d", remote_rc);
+            if (first_error == RAC_SUCCESS) first_error = remote_rc;
+        }
+    }
+
+    // Step 2: Rescan local filesystem and link discovered downloads.
+    if (opts.rescan_local == RAC_TRUE) {
+        if (opts.discovery_callbacks) {
+            rac_discovery_result_t disc = {};
+            rac_result_t rescan_rc =
+                rac_model_registry_discover_downloaded(handle, opts.discovery_callbacks, &disc);
+            if (rescan_rc == RAC_SUCCESS) {
+                RAC_LOG_INFO("ModelRegistry",
+                             "Local rescan complete (%zu discovered, %zu unregistered)",
+                             disc.discovered_count, disc.unregistered_count);
+            } else {
+                RAC_LOG_WARNING("ModelRegistry", "Local rescan failed: %d", rescan_rc);
+                if (first_error == RAC_SUCCESS) first_error = rescan_rc;
+            }
+            rac_discovery_result_free(&disc);
+        } else {
+            RAC_LOG_DEBUG("ModelRegistry",
+                          "Rescan local requested but discovery_callbacks is NULL; skipping");
+        }
+    }
+
+    // Step 3: Prune orphaned local_path entries.
+    if (opts.prune_orphans == RAC_TRUE) {
+        if (opts.discovery_callbacks && opts.discovery_callbacks->path_exists) {
+            std::lock_guard<std::mutex> lock(handle->mutex);
+            size_t pruned = 0;
+            for (auto& pair : handle->models) {
+                rac_model_info_t* model = pair.second;
+                if (!model || !model->local_path || strlen(model->local_path) == 0) {
+                    continue;
+                }
+                rac_bool_t exists = opts.discovery_callbacks->path_exists(
+                    model->local_path, opts.discovery_callbacks->user_data);
+                if (exists != RAC_TRUE) {
+                    free(model->local_path);
+                    model->local_path = nullptr;
+                    model->updated_at = rac_get_current_time_ms() / 1000;
+                    ++pruned;
+                }
+            }
+            RAC_LOG_INFO("ModelRegistry", "Pruned %zu orphaned local_path entries", pruned);
+        } else {
+            RAC_LOG_DEBUG(
+                "ModelRegistry",
+                "Prune orphans requested but discovery_callbacks/path_exists is NULL; skipping");
+        }
+    }
+
+    return first_error;
 }
 
 void rac_discovery_result_free(rac_discovery_result_t* result) {

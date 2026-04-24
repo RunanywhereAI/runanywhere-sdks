@@ -176,37 +176,55 @@ export interface RunAnywhereCore
    */
   checkCompatibility(modelId: string): Promise<string>;
 
-  // ============================================================================
-  // Download Service
-  // Matches Swift: CppBridge+Download.swift
-  // ============================================================================
-
   /**
-   * Download a model
-   * @param modelId Model identifier
-   * @param url Download URL
-   * @param destPath Destination path
-   * @returns true if download started successfully
+   * Refresh the model registry — T4.9 unified cross-SDK surface.
+   *
+   * Routes to `rac_model_registry_refresh` in commons. Each flag is
+   * independent; steps that require missing infrastructure (model assignment
+   * HTTP callbacks, discovery callbacks) are skipped silently.
+   *
+   * @param includeRemoteCatalog Fetch the backend model assignment catalog.
+   * @param rescanLocal Rescan on-disk model folders (currently a no-op from
+   *   RN — the native bridge does not wire discovery callbacks).
+   * @param pruneOrphans Clear `localPath` on models whose file is missing
+   *   (currently a no-op from RN for the same reason as `rescanLocal`).
+   * @returns `true` if the refresh returned `RAC_SUCCESS`.
    */
-  downloadModel(
-    modelId: string,
-    url: string,
-    destPath: string
+  refreshModelRegistry(
+    includeRemoteCatalog: boolean,
+    rescanLocal: boolean,
+    pruneOrphans: boolean
   ): Promise<boolean>;
 
-  /**
-   * Cancel an ongoing download
-   * @param modelId Model identifier
-   * @returns true if cancelled
-   */
-  cancelDownload(modelId: string): Promise<boolean>;
+  // ============================================================================
+  // Download Service
+  // Backed by rac_http_download_execute (libcurl). Progress is delivered via
+  // the onProgress callback and cancellation is keyed on `cancelToken`.
+  // ============================================================================
 
   /**
-   * Get download progress
-   * @param modelId Model identifier
-   * @returns JSON with progress info (bytes, total, percentage)
+   * Download a file to `destPath` using the native libcurl-backed runner.
+   *
+   * @param url Absolute HTTP/HTTPS URL to download
+   * @param destPath Destination file path
+   * @param cancelToken Opaque token the caller uses to cancel via cancelDownload
+   * @param onProgress Progress callback — (bytesWritten, totalBytes) =>
+   *   void. `totalBytes` is 0 when the server omitted Content-Length.
+   * @returns Resolves when the file is fully written; rejects on error /
+   *   cancellation.
    */
-  getDownloadProgress(modelId: string): Promise<string>;
+  downloadModel(
+    url: string,
+    destPath: string,
+    cancelToken: string,
+    onProgress: (bytesWritten: number, totalBytes: number) => void
+  ): Promise<void>;
+
+  /**
+   * Cancel an ongoing download identified by `cancelToken`.
+   * @returns true if a matching in-flight download was found and cancelled.
+   */
+  cancelDownload(cancelToken: string): Promise<boolean>;
 
   // ============================================================================
   // Storage
@@ -250,32 +268,65 @@ export interface RunAnywhereCore
   pollEvents(): Promise<string>;
 
   // ============================================================================
-  // HTTP Client
-  // Matches Swift: CppBridge+HTTP.swift
+  // HTTP Client (libcurl-backed — rac_http_client_*)
+  // Matches Swift: HTTPClientAdapter.swift / Kotlin: CppBridgeHTTP.kt
   // ============================================================================
 
   /**
-   * Configure HTTP client
-   * @param baseUrl Base URL for API
-   * @param apiKey API key for authentication
+   * Configure HTTP client base URL / API key for downstream C++ consumers
+   * (DeviceBridge etc.). TypeScript callers use `httpRequest` directly.
    * @returns true if configured successfully
    */
   configureHttp(baseUrl: string, apiKey: string): Promise<boolean>;
 
   /**
-   * Make HTTP POST request
-   * @param path API path
-   * @param bodyJson Request body JSON
-   * @returns Response JSON
+   * Perform a synchronous HTTP request via the native curl-backed client.
+   * Returns a JSON string `{"status": number, "body": string, "headersJson":
+   * string}` on any HTTP response (including 4xx/5xx). Rejects the promise
+   * only on transport-level failures (DNS / TLS / timeout / cancellation).
+   *
+   * @param method HTTP method (uppercase: GET / POST / PUT / DELETE / PATCH / HEAD)
+   * @param url Absolute URL (http:// or https://)
+   * @param headersJson Request headers serialized as `{"Name": "Value", ...}`
+   *        (empty string or `{}` for none)
+   * @param bodyJson Request body as string (ignored for GET/HEAD)
+   * @param timeoutMs Request timeout in ms (0 = no timeout)
    */
-  httpPost(path: string, bodyJson: string): Promise<string>;
+  httpRequest(
+    method: string,
+    url: string,
+    headersJson: string,
+    bodyJson: string,
+    timeoutMs: number
+  ): Promise<string>;
 
   /**
-   * Make HTTP GET request
-   * @param path API path
-   * @returns Response JSON
+   * Authenticate with the RunAnywhere backend and store the resulting JWT
+   * access/refresh tokens in the C++ AuthBridge. The native implementation
+   * builds the request JSON, executes the POST via rac_http_client_*, and
+   * calls AuthBridge::setAuth on success so subsequent native HTTP calls
+   * (device registration, telemetry) pick up the access token automatically.
+   *
+   * @returns The full auth response body (`{access_token, refresh_token,
+   *   expires_in, device_id, organization_id, user_id, token_type}`) as a
+   *   JSON string. Rejects when the backend returns a non-2xx response.
    */
-  httpGet(path: string): Promise<string>;
+  authAuthenticate(
+    apiKey: string,
+    baseURL: string,
+    deviceId: string,
+    platform: string,
+    sdkVersion: string
+  ): Promise<string>;
+
+  /**
+   * Refresh the stored JWT access token using the refresh token currently
+   * held by AuthBridge. Rejects when no refresh token is present or the
+   * backend rejects the refresh.
+   *
+   * @returns The new auth response body as a JSON string.
+   */
+  authRefreshToken(baseURL: string): Promise<string>;
 
   // ============================================================================
   // Utility Functions
@@ -827,4 +878,57 @@ export interface RunAnywhereCore
    * @returns JSON with stats
    */
   ragGetStatistics(): Promise<string>;
+
+  // ===========================================================================
+  // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+  //
+  // Proto-byte / YAML driven L5 solution runtime. Callers pass a serialized
+  // `runanywhere.v1.SolutionConfig` (or PipelineSpec) protobuf or a YAML
+  // document and receive an opaque handle that maps to the same
+  // `rac_solution_handle_t` used by every other SDK.
+  //
+  // The handle is exposed to JS as a `double` — we pack the C pointer
+  // into a 64-bit double (same trick the VoiceAgent / LLM capabilities
+  // use for their native handles). Lifecycle verbs (start/stop/cancel/
+  // feed/closeInput/destroy) take that handle back.
+  // ===========================================================================
+
+  /**
+   * Construct a solution from a serialized `runanywhere.v1.SolutionConfig`
+   * (or PipelineSpec) protobuf. The handle is returned in the **created**
+   * state — call `solutionStart(handle)` to launch worker threads.
+   *
+   * @param configBytesBase64 Base64-encoded SolutionConfig / PipelineSpec
+   *        proto bytes. Base64 is used because Nitro does not yet bridge
+   *        `Uint8Array` cleanly on every platform; the native side decodes
+   *        before calling `rac_solution_create_from_proto`.
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromProto(configBytesBase64: string): Promise<number>;
+
+  /**
+   * Construct a solution from a YAML document (SolutionConfig-shape or
+   * PipelineSpec-shape — loader auto-disambiguates on `operators:`).
+   *
+   * @returns Native solution handle as a double (0 on failure).
+   */
+  solutionCreateFromYaml(yamlText: string): Promise<number>;
+
+  /** Start the underlying scheduler (non-blocking). */
+  solutionStart(handle: number): Promise<boolean>;
+
+  /** Request a graceful shutdown (non-blocking). */
+  solutionStop(handle: number): Promise<boolean>;
+
+  /** Force-cancel the graph; returns once workers observe cancellation. */
+  solutionCancel(handle: number): Promise<boolean>;
+
+  /** Feed one UTF-8 item into the root input edge. */
+  solutionFeed(handle: number, item: string): Promise<boolean>;
+
+  /** Signal end-of-stream on the root input edge. */
+  solutionCloseInput(handle: number): Promise<boolean>;
+
+  /** Cancel, join, and release native resources. Idempotent. */
+  solutionDestroy(handle: number): Promise<void>;
 }

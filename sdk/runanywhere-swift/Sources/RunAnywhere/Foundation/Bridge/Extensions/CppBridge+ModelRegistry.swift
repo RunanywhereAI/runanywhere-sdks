@@ -277,6 +277,49 @@ extension CppBridge {
             )
         }
 
+        // MARK: - Refresh (T4.9)
+
+        /// Unified registry refresh — bridges `rac_model_registry_refresh`.
+        ///
+        /// Each flag is independent:
+        ///   - `includeRemoteCatalog`: fetches the model assignment catalog
+        ///     from the backend (requires assignment callbacks to have been
+        ///     registered at SDK init).
+        ///   - `rescanLocal`: rescans the on-disk model directories and
+        ///     links any newly downloaded models back to the registry.
+        ///   - `pruneOrphans`: clears `localPath` on models whose recorded
+        ///     path no longer exists on disk.
+        @discardableResult
+        public func refresh(
+            includeRemoteCatalog: Bool = true,
+            rescanLocal: Bool = true,
+            pruneOrphans: Bool = false
+        ) -> Bool {
+            guard let handle = handle else {
+                logger.warning("Refresh: Registry not initialized")
+                return false
+            }
+
+            logger.info("Refreshing registry: remote=\(includeRemoteCatalog), rescan=\(rescanLocal), prune=\(pruneOrphans)")
+
+            var callbacks = makeDiscoveryCallbacks()
+            let needsCallbacks = rescanLocal || pruneOrphans
+            let status = withUnsafePointer(to: &callbacks) { cbPtr -> rac_result_t in
+                var opts = rac_model_registry_refresh_opts_t()
+                opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE
+                opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE
+                opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE
+                opts.discovery_callbacks = needsCallbacks ? cbPtr : nil
+                return rac_model_registry_refresh(handle, opts)
+            }
+
+            if status != RAC_SUCCESS {
+                logger.warning("Refresh returned non-success status: \(status)")
+                return false
+            }
+            return true
+        }
+
         // MARK: - Discovery Callbacks
 
         private func makeDiscoveryCallbacks() -> rac_discovery_callbacks_t {

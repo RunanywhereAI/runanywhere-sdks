@@ -17,9 +17,9 @@
 
 #include <NitroModules/Promise.hpp>
 #include <string>
-#include <optional>
 #include <functional>
-// #include <NitroModules/Null.hpp> // Removed - file does not exist in nitro-modules 0.31.3
+#include <optional>
+#include <NitroModules/Null.hpp>
 #include <variant>
 
 namespace margelo::nitro::runanywhere {
@@ -72,17 +72,18 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) = 0;
-      virtual std::shared_ptr<Promise<bool>> downloadModel(const std::string& modelId, const std::string& url, const std::string& destPath) = 0;
-      virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& modelId) = 0;
-      virtual std::shared_ptr<Promise<std::string>> getDownloadProgress(const std::string& modelId) = 0;
+      virtual std::shared_ptr<Promise<bool>> refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) = 0;
+      virtual std::shared_ptr<Promise<void>> downloadModel(const std::string& url, const std::string& destPath, const std::string& cancelToken, const std::function<void(double /* bytesWritten */, double /* totalBytes */)>& onProgress) = 0;
+      virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) = 0;
       virtual std::shared_ptr<Promise<std::string>> getStorageInfo() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;
       virtual std::shared_ptr<Promise<bool>> deleteModel(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<void>> emitEvent(const std::string& eventJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> pollEvents() = 0;
       virtual std::shared_ptr<Promise<bool>> configureHttp(const std::string& baseUrl, const std::string& apiKey) = 0;
-      virtual std::shared_ptr<Promise<std::string>> httpPost(const std::string& path, const std::string& bodyJson) = 0;
-      virtual std::shared_ptr<Promise<std::string>> httpGet(const std::string& path) = 0;
+      virtual std::shared_ptr<Promise<std::string>> httpRequest(const std::string& method, const std::string& url, const std::string& headersJson, const std::string& bodyJson, double timeoutMs) = 0;
+      virtual std::shared_ptr<Promise<std::string>> authAuthenticate(const std::string& apiKey, const std::string& baseURL, const std::string& deviceId, const std::string& platform, const std::string& sdkVersion) = 0;
+      virtual std::shared_ptr<Promise<std::string>> authRefreshToken(const std::string& baseURL) = 0;
       virtual std::shared_ptr<Promise<std::string>> getLastError() = 0;
       virtual std::shared_ptr<Promise<bool>> extractArchive(const std::string& archivePath, const std::string& destPath) = 0;
       virtual std::shared_ptr<Promise<std::string>> getDeviceCapabilities() = 0;
@@ -92,8 +93,12 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadTextModel() = 0;
       virtual std::shared_ptr<Promise<std::string>> generate(const std::string& prompt, const std::optional<std::string>& optionsJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> generateStream(const std::string& prompt, const std::string& optionsJson, const std::function<void(const std::string& /* token */, bool /* isComplete */)>& callback) = 0;
+      virtual std::shared_ptr<Promise<double>> getLLMHandle() = 0;
       virtual std::shared_ptr<Promise<bool>> cancelGeneration() = 0;
       virtual std::shared_ptr<Promise<std::string>> generateStructured(const std::string& prompt, const std::string& schema, const std::optional<std::string>& optionsJson) = 0;
+      virtual std::shared_ptr<Promise<std::string>> llmExtractThinking(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<std::string>> llmStripThinking(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(double totalCompletionTokens, const std::string& responseText, const std::string& thinkingText) = 0;
       virtual std::shared_ptr<Promise<bool>> loadSTTModel(const std::string& modelPath, const std::string& modelType, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> isSTTModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
@@ -121,6 +126,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() = 0;
+      virtual std::shared_ptr<Promise<double>> getVoiceAgentHandle() = 0;
       virtual std::shared_ptr<Promise<bool>> isVoiceAgentReady() = 0;
       virtual std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() = 0;
       virtual std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) = 0;
@@ -140,6 +146,14 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> ragClearDocuments() = 0;
       virtual std::shared_ptr<Promise<double>> ragGetDocumentCount() = 0;
       virtual std::shared_ptr<Promise<std::string>> ragGetStatistics() = 0;
+      virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) = 0;
+      virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
+      virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;
+      virtual std::shared_ptr<Promise<bool>> solutionStop(double handle) = 0;
+      virtual std::shared_ptr<Promise<bool>> solutionCancel(double handle) = 0;
+      virtual std::shared_ptr<Promise<bool>> solutionFeed(double handle, const std::string& item) = 0;
+      virtual std::shared_ptr<Promise<bool>> solutionCloseInput(double handle) = 0;
+      virtual std::shared_ptr<Promise<void>> solutionDestroy(double handle) = 0;
 
     protected:
       // Hybrid Setup

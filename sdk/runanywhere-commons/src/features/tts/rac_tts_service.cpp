@@ -213,6 +213,19 @@ void rac_tts_destroy(rac_handle_t handle) {
     free(service);
 }
 
+rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json) {
+    if (!handle || !out_json)
+        return RAC_ERROR_NULL_POINTER;
+
+    *out_json = nullptr;
+    auto* service = static_cast<rac_tts_service_t*>(handle);
+    if (!service->ops || !service->ops->get_languages) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    return service->ops->get_languages(service->impl, out_json);
+}
+
 void rac_tts_result_free(rac_tts_result_t* result) {
     if (!result)
         return;

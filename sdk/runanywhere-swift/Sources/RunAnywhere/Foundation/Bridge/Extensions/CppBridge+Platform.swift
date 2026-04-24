@@ -278,10 +278,10 @@ extension CppBridge {
 
                 Task {
                     do {
-                        _ = try await service.synthesize(text: text, options: options)
+                        try await service.speak(text: text, options: options)
                         result = RAC_SUCCESS
                     } catch {
-                        Platform.logger.error("System TTS synthesize failed: \(error)")
+                        Platform.logger.error("System TTS speak failed: \(error)")
                         result = RAC_ERROR_INTERNAL
                     }
                     group.leave()

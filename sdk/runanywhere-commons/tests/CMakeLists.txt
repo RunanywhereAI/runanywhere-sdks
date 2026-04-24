@@ -20,6 +20,14 @@ endfunction()
 
 set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
+# Tests may need access to commons private headers (e.g. the internal
+# platform-compat shim under src/core/internal/). Add the private src/ root so
+# test sources can include e.g. "core/internal/platform_compat.h".
+# Uses CMAKE_CURRENT_LIST_DIR (not CMAKE_SOURCE_DIR) so the path resolves to
+# commons/src regardless of whether commons is built standalone or as a
+# subdirectory of the top-level project.
+include_directories(${CMAKE_CURRENT_LIST_DIR}/../src)
+
 # --- v3.1 Phase 9: DAG graph primitives unit tests --------------------------
 # CancelToken + RingBuffer + StreamEdge (GAP 05 skeleton). Header-only
 # primitives; no backend dependency. Always built.
@@ -32,6 +40,84 @@ target_link_libraries(test_graph_primitives PRIVATE rac_commons)
 rac_link_archive_deps(test_graph_primitives)
 target_compile_features(test_graph_primitives PRIVATE cxx_std_17)
 add_test(NAME graph_primitives_tests COMMAND test_graph_primitives)
+
+# --- v3.1 Phase 9 Phase 2: MemoryPool<T> tests ------------------------------
+# Header-only template; verifies acquire/release, blocking, cancel, and a
+# concurrent stress test.
+add_executable(test_memory_pool test_memory_pool.cpp)
+target_include_directories(test_memory_pool PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_memory_pool PRIVATE rac_commons)
+rac_link_archive_deps(test_memory_pool)
+target_compile_features(test_memory_pool PRIVATE cxx_std_17)
+add_test(NAME memory_pool_tests COMMAND test_memory_pool)
+
+# --- v3.1 Phase 9 Phase 2: PipelineNode family tests ------------------------
+# Exercises PrimitiveNode, SplitNode, MergeNode, and the 3-node linear graph
+# wiring that GraphScheduler::connect() relies on.
+add_executable(test_pipeline_node test_pipeline_node.cpp)
+target_include_directories(test_pipeline_node PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_pipeline_node PRIVATE rac_commons)
+rac_link_archive_deps(test_pipeline_node)
+target_compile_features(test_pipeline_node PRIVATE cxx_std_17)
+add_test(NAME pipeline_node_tests COMMAND test_pipeline_node)
+
+# --- v3.1 Phase 9 Phase 2: GraphScheduler tests -----------------------------
+# Streaming correctness + backpressure + cancellation + lifecycle.
+add_executable(test_graph_scheduler test_graph_scheduler.cpp)
+target_include_directories(test_graph_scheduler PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_graph_scheduler PRIVATE rac_commons)
+rac_link_archive_deps(test_graph_scheduler)
+target_compile_features(test_graph_scheduler PRIVATE cxx_std_17)
+add_test(NAME graph_scheduler_tests COMMAND test_graph_scheduler)
+
+# --- GAP 05 Phase 2: VoiceAgentPipeline unit tests --------------------------
+# Backend-free tests for the GraphScheduler-driven voice pipeline. Verifies
+# the public C ABI input contract, error-propagation, and cancel hooks
+# wired into rac_voice_agent_destroy / cleanup. End-to-end coverage with
+# real backends still lives in test_voice_agent.cpp.
+add_executable(test_voice_agent_pipeline test_voice_agent_pipeline.cpp)
+target_include_directories(test_voice_agent_pipeline PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_voice_agent_pipeline PRIVATE rac_commons)
+rac_link_archive_deps(test_voice_agent_pipeline)
+target_compile_features(test_voice_agent_pipeline PRIVATE cxx_std_17)
+add_test(NAME voice_agent_pipeline_tests COMMAND test_voice_agent_pipeline)
+
+# --- T4.7: PipelineExecutor + SolutionRunner (Protobuf-gated) ---------------
+# The executor / runner / C ABI live behind RAC_HAVE_PROTOBUF. Each test
+# TU compiles a SKIP-style stub when the symbol is undefined (e.g. CI
+# hosts without system Protobuf), so the test executables always link
+# cleanly.
+add_executable(test_pipeline_executor test_pipeline_executor.cpp)
+target_include_directories(test_pipeline_executor PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_pipeline_executor PRIVATE rac_commons)
+rac_link_archive_deps(test_pipeline_executor)
+target_compile_features(test_pipeline_executor PRIVATE cxx_std_17)
+add_test(NAME pipeline_executor_tests COMMAND test_pipeline_executor)
+
+add_executable(test_solution_runner test_solution_runner.cpp)
+target_include_directories(test_solution_runner PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_solution_runner PRIVATE rac_commons)
+rac_link_archive_deps(test_solution_runner)
+target_compile_features(test_solution_runner PRIVATE cxx_std_17)
+add_test(NAME solution_runner_tests COMMAND test_solution_runner)
 
 # --- v2 close-out Phase 5: rac_llm_thinking C ABI test -----------------------
 # Behavioral parity with Swift ThinkingContentParser. 10 scenarios covering
@@ -134,6 +220,31 @@ target_link_libraries(test_hardware_profile PRIVATE rac_commons)
 rac_link_archive_deps(test_hardware_profile)
 target_compile_features(test_hardware_profile PRIVATE cxx_std_17)
 add_test(NAME hardware_profile_tests COMMAND test_hardware_profile)
+
+# T4.1: L1 runtime-plugin registry tests (always built — no backend dep).
+add_executable(test_runtime_registry test_runtime_registry.cpp)
+target_include_directories(test_runtime_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_runtime_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_runtime_registry)
+target_compile_features(test_runtime_registry PRIVATE cxx_std_17)
+add_test(NAME runtime_registry_tests COMMAND test_runtime_registry)
+
+# T4.1: runtime loader smoke test — exercises the RAC_STATIC_RUNTIME_REGISTER
+# path and the rac_runtime_entry_<name> symbol convention that the future
+# dlopen loader will share with the engine-plugin loader.
+add_executable(test_runtime_loader test_runtime_loader.cpp)
+target_include_directories(test_runtime_loader PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}
+)
+target_link_libraries(test_runtime_loader PRIVATE rac_commons)
+rac_link_archive_deps(test_runtime_loader)
+target_compile_features(test_runtime_loader PRIVATE cxx_std_17)
+add_test(NAME runtime_loader_tests COMMAND test_runtime_loader)
 
 # GAP 03 Phase 6: static registration test (always built — exercises the
 # RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
@@ -442,36 +553,25 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
     FetchContent_MakeAvailable(googletest)
     include(GoogleTest)
 
-    # RAG pipeline thread safety test (disabled on Windows — needs IEmbeddingProvider internal header)
-    if(NOT WIN32)
-    add_executable(rac_rag_backend_thread_safety_test
-        rag_backend_thread_safety_test.cpp
-    )
-    target_include_directories(rac_rag_backend_thread_safety_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/src/features/rag
-    )
-    target_link_libraries(rac_rag_backend_thread_safety_test
-        PRIVATE
-        rac_commons
-        Threads::Threads
-        GTest::gtest_main
-    )
-    target_compile_features(rac_rag_backend_thread_safety_test PRIVATE cxx_std_20)
-    gtest_discover_tests(rac_rag_backend_thread_safety_test
-        DISCOVERY_MODE PRE_TEST
-    )
-    add_test(
-        NAME rac_rag_backend_thread_safety_test
-        COMMAND rac_rag_backend_thread_safety_test
-    )
-    endif()
+    # The rag/* tests depend on internal headers under src/features/rag/ that
+    # aren't installed publicly. Resolve the path relative to this CMakeLists
+    # (commons/tests) so it works whether commons is the top-level project or
+    # a subdirectory of the multi-target build.
+    set(_RAG_INTERNAL_INCLUDE_DIR
+        "${CMAKE_CURRENT_LIST_DIR}/../src/features/rag")
+
+    # NOTE: rag_backend_thread_safety_test.cpp targets a previous RAGBackend
+    # API (`IEmbeddingProvider` + `set_embedding_provider`) that no longer
+    # exists on main — the constructor now takes service handles directly.
+    # The test is left in-tree but excluded from the build until it is
+    # rewritten against the current API.
 
     # Chunker Unit Tests
     add_executable(rac_chunker_test
         chunker_test.cpp
     )
     target_include_directories(rac_chunker_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/src/features/rag
+        ${_RAG_INTERNAL_INCLUDE_DIR}
     )
     target_link_libraries(rac_chunker_test
         PRIVATE
@@ -479,6 +579,16 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         Threads::Threads
         GTest::gtest_main
     )
+    # Force the bundled (release-1.12.1) gtest headers to win over any system
+    # gtest (e.g. /opt/homebrew/include) — without this the prebuilt
+    # libgtest_main.a (older `const char*` ABI) link-fails when the test
+    # picks up the newer `std::string` header signatures. Same fix as
+    # rac_benchmark_tests below.
+    if(TARGET gtest)
+        target_include_directories(rac_chunker_test BEFORE PRIVATE
+            $<TARGET_PROPERTY:gtest,INTERFACE_INCLUDE_DIRECTORIES>
+        )
+    endif()
     target_compile_features(rac_chunker_test PRIVATE cxx_std_20)
     gtest_discover_tests(rac_chunker_test
         DISCOVERY_MODE PRE_TEST
@@ -498,6 +608,11 @@ if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG AND NOT (WIN32 AND RAC_BUILD_SHARED))
         Threads::Threads
         GTest::gtest_main
     )
+    if(TARGET gtest)
+        target_include_directories(rac_simple_tokenizer_test BEFORE PRIVATE
+            $<TARGET_PROPERTY:gtest,INTERFACE_INCLUDE_DIRECTORIES>
+        )
+    endif()
     target_compile_features(rac_simple_tokenizer_test PRIVATE cxx_std_20)
     gtest_discover_tests(rac_simple_tokenizer_test
         DISCOVERY_MODE PRE_TEST

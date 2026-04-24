@@ -11,6 +11,8 @@
 
 import Foundation
 import SwiftProtobuf
+// RAVoiceEvent is vended by the RunAnywhere module (Generated/voice_events.pb.swift).
+import RunAnywhere
 
 /// Swift consumer for the GAP 09 #8 p50 benchmark.
 ///

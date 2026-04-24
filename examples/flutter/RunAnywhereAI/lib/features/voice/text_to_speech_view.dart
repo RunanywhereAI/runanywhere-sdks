@@ -52,7 +52,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   // Voice settings
   double _speechRate = 1.0;
-  final double _pitch = 1.0;
 
   // Model state
   LLMFramework? _selectedFramework;
@@ -184,7 +183,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       final result = await sdk.RunAnywhereSDK.instance.tts.synthesize(
         _textController.text,
         rate: _speechRate,
-        pitch: _pitch,
+        pitch: 1.0,
         volume: 1.0,
       );
 
@@ -442,23 +441,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
-          
-          /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
-          const SizedBox(height: AppSpacing.mediumLarge),
-
-          _buildSliderRow(
-            label: 'Pitch',
-            value: _pitch,
-            min: 0.5,
-            max: 2.0,
-            color: AppColors.primaryPurple,
-            onChanged: (value) {
-              setState(() {
-                _pitch = value;
-              });
-            },
-          ),
-          */
         ],
       ),
     );
