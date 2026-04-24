@@ -1,9 +1,10 @@
 #
-# RunAnywhere Genie Backend - iOS (stub)
+# RunAnywhere Genie Backend - iOS compatibility shim
 #
 # Genie NPU backend is Android/Snapdragon only — no iOS binary is provided.
-# This podspec exists solely to satisfy Flutter's iOS plugin registration
-# requirements so the example app can link the Dart package.
+# This podspec exists so Flutter can register the package and link the example
+# app cleanly on iOS while keeping the backend unavailable on unsupported
+# hardware.
 #
 
 Pod::Spec.new do |s|
@@ -13,7 +14,8 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
 Qualcomm Genie NPU backend for RunAnywhere Flutter SDK. Provides LLM text
 generation on Snapdragon NPU hardware. This is an Android-only backend; the
-iOS pod is a stub for Flutter plugin system compatibility.
+iOS pod only provides package registration and metadata on unsupported Apple
+platforms.
                        DESC
   s.homepage         = 'https://runanywhere.ai'
   s.license          = { :type => 'MIT' }

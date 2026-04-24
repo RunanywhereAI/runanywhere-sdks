@@ -66,3 +66,4 @@ endif()
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/diffusion-coreml/CMakeLists.txt")
     add_subdirectory(diffusion-coreml)
 endif()
+

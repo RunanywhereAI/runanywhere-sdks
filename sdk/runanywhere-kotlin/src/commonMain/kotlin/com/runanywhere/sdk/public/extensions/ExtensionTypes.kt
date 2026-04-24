@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Extension types for RunAnywhere SDK
- * Simple placeholder types to satisfy interface requirements
+ * Shared orchestration and configuration value types used by extension APIs.
  */
 
 @Serializable
