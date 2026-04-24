@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
@@ -238,7 +239,7 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
           _buildEmptyModelsMessage(context)
         else ...[
           // System TTS option for TTS context
-          if (widget.context == ModelSelectionContext.tts)
+          if (widget.context == ModelSelectionContext.tts && !Platform.isWindows)
             _buildSystemTTSRow(context),
 
           // All models in a flat list

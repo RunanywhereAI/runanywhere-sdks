@@ -55,7 +55,6 @@ ios/Podfile.lock
 # Platforms not supported (mobile-only app)
 linux/
 macos/
-windows/
 web/
 
 # Duplicate Kotlin DSL build files (using Groovy .gradle)

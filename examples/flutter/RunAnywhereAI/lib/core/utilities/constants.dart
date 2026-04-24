@@ -77,6 +77,10 @@ class KeychainKeys {
   static const String baseURL = 'runanywhere_base_url';
   static const String analyticsLogToLocal = 'analyticsLogToLocal';
   static const String deviceRegistered = 'com.runanywhere.sdk.deviceRegistered';
+  static const String proxyGeneralUsername = 'proxy_general_username';
+  static const String proxyGeneralPassword = 'proxy_general_password';
+  static const String proxyDownloadUsername = 'proxy_download_username';
+  static const String proxyDownloadPassword = 'proxy_download_password';
 }
 
 /// UserDefaults keys for preferences
@@ -88,4 +92,21 @@ class PreferenceKeys {
   static const String defaultMaxTokens = 'defaultMaxTokens';
   static const String defaultSystemPrompt = 'defaultSystemPrompt';
   static const String useStreaming = 'useStreaming';
+  static const String proxyEnabled = 'proxyEnabled';
+  static const String proxyScheme = 'proxyScheme';
+  static const String proxyHost = 'proxyHost';
+  static const String proxyPort = 'proxyPort';
+  static const String proxyBypassLocal = 'proxyBypassLocal';
+
+  static const String proxyGeneralEnabled = 'proxyGeneralEnabled';
+  static const String proxyGeneralScheme = 'proxyGeneralScheme';
+  static const String proxyGeneralHost = 'proxyGeneralHost';
+  static const String proxyGeneralPort = 'proxyGeneralPort';
+  static const String proxyGeneralBypassLocal = 'proxyGeneralBypassLocal';
+
+  static const String proxyDownloadEnabled = 'proxyDownloadEnabled';
+  static const String proxyDownloadScheme = 'proxyDownloadScheme';
+  static const String proxyDownloadHost = 'proxyDownloadHost';
+  static const String proxyDownloadPort = 'proxyDownloadPort';
+  static const String proxyDownloadBypassLocal = 'proxyDownloadBypassLocal';
 }

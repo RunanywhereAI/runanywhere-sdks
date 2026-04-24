@@ -7,6 +7,9 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
+import 'package:runanywhere_ai/core/models/proxy_settings.dart';
+import 'package:runanywhere_ai/core/services/example_http_service.dart';
+import 'package:runanywhere_ai/core/services/proxy_settings_service.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
@@ -40,6 +43,20 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
   bool _isApiKeyConfigured = false;
   bool _isBaseURLConfigured = false;
 
+  // General Proxy Configuration
+  String _generalProxyScheme = ProxyScheme.http.wireValue;
+  String _generalProxyHost = '';
+  int? _generalProxyPort;
+  bool _generalProxyBypassLocal = true;
+  bool _isGeneralProxyConfigured = false;
+
+  // Download Proxy Configuration
+  String _downloadProxyScheme = ProxyScheme.http.wireValue;
+  String _downloadProxyHost = '';
+  int? _downloadProxyPort;
+  bool _downloadProxyBypassLocal = true;
+  bool _isDownloadProxyConfigured = false;
+
   // Generation Settings
   double _temperature = 0.7;
   int _maxTokens = 1000;
@@ -56,6 +73,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     unawaited(_loadSettings());
     unawaited(_loadGenerationSettings());
     unawaited(_loadApiConfiguration());
+    unawaited(_loadProxyConfiguration(ProxyScope.general));
+    unawaited(_loadProxyConfiguration(ProxyScope.download));
     unawaited(_loadStorageData());
   }
 
@@ -79,9 +98,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _temperature = prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
+        _temperature =
+            prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
         _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
-        _systemPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+        _systemPrompt =
+            prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
         _systemPromptController.text = _systemPrompt;
       });
     }
@@ -113,6 +134,36 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         _isApiKeyConfigured = storedApiKey != null && storedApiKey.isNotEmpty;
         _isBaseURLConfigured =
             storedBaseURL != null && storedBaseURL.isNotEmpty;
+      });
+    }
+  }
+
+  Future<void> _loadProxyConfiguration(ProxyScope scope) async {
+    final settings = await ProxySettingsService.shared.load(scope);
+    final selectedScheme = settings.scheme.isSupportedInExampleApp
+        ? settings.scheme
+        : ProxyScheme.http;
+    final isConfigured = settings.enabled &&
+        settings.isComplete &&
+        settings.scheme.isSupportedInExampleApp;
+    if (mounted) {
+      setState(() {
+        switch (scope) {
+          case ProxyScope.general:
+            _generalProxyScheme = selectedScheme.wireValue;
+            _generalProxyHost = settings.host;
+            _generalProxyPort = settings.port;
+            _generalProxyBypassLocal = settings.bypassLocal;
+            _isGeneralProxyConfigured = isConfigured;
+            break;
+          case ProxyScope.download:
+            _downloadProxyScheme = selectedScheme.wireValue;
+            _downloadProxyHost = settings.host;
+            _downloadProxyPort = settings.port;
+            _downloadProxyBypassLocal = settings.bypassLocal;
+            _isDownloadProxyConfigured = isConfigured;
+            break;
+        }
       });
     }
   }
@@ -184,6 +235,218 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
         ],
       ),
     ));
+  }
+
+  Future<void> _showProxyConfigDialog(ProxyScope scope) async {
+    final currentSettings = await ProxySettingsService.shared.load(scope);
+    final hostController = TextEditingController(text: currentSettings.host);
+    final portController =
+        TextEditingController(text: currentSettings.port?.toString() ?? '');
+    final usernameController =
+        TextEditingController(text: currentSettings.username);
+    final passwordController =
+        TextEditingController(text: currentSettings.password);
+    var proxyEnabled = currentSettings.enabled &&
+        currentSettings.scheme.isSupportedInExampleApp;
+    var selectedScheme = currentSettings.scheme.isSupportedInExampleApp
+        ? currentSettings.scheme
+        : ProxyScheme.http;
+    var bypassLocal = currentSettings.bypassLocal;
+    var showPassword = false;
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(scope.displayName),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Enable Proxy'),
+                  value: proxyEnabled,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      proxyEnabled = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.smallMedium),
+                DropdownButtonFormField<ProxyScheme>(
+                  value: selectedScheme,
+                  decoration: const InputDecoration(
+                    labelText: 'Protocol',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: ProxyScheme.supportedValues
+                      .map(
+                        (scheme) => DropdownMenuItem(
+                          value: scheme,
+                          child: Text(scheme.displayName),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() {
+                        selectedScheme = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.mediumLarge),
+                TextField(
+                  controller: hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Host',
+                    hintText: '127.0.0.1',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.mediumLarge),
+                TextField(
+                  controller: portController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Port',
+                    hintText: '7890',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.mediumLarge),
+                TextField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.mediumLarge),
+                TextField(
+                  controller: passwordController,
+                  obscureText: !showPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        showPassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setDialogState(() {
+                          showPassword = !showPassword;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.mediumLarge),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Bypass localhost'),
+                  subtitle: const Text(
+                      'Skip proxy for localhost, 127.0.0.1, and ::1'),
+                  value: bypassLocal,
+                  onChanged: (value) {
+                    setDialogState(() {
+                      bypassLocal = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final settings = ProxySettings(
+                  enabled: proxyEnabled,
+                  scheme: selectedScheme,
+                  host: hostController.text.trim(),
+                  port: int.tryParse(portController.text.trim()),
+                  username: usernameController.text.trim(),
+                  password: passwordController.text,
+                  bypassLocal: bypassLocal,
+                );
+
+                final result =
+                    await ProxySettingsService.shared.save(scope, settings);
+                if (!result.isValid) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          result.message ?? 'Invalid proxy settings',
+                        ),
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                await _loadProxyConfiguration(scope);
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${scope.displayName} settings saved'),
+                    ),
+                  );
+                }
+
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _clearProxyConfiguration(ProxyScope scope) async {
+    await ProxySettingsService.shared.clear(scope);
+    await _loadProxyConfiguration(scope);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${scope.displayName} settings cleared')),
+      );
+    }
+  }
+
+  Future<void> _testProxyConfiguration(ProxyScope scope) async {
+    try {
+      final ok = await ExampleHttpService.shared.testProxy(
+        scope,
+        Uri.parse('https://api.ipify.org?format=json'),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ok
+                ? '${scope.displayName} test succeeded'
+                : '${scope.displayName} test failed',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Proxy test failed: $e')),
+      );
+    }
   }
 
   /// Show API configuration dialog
@@ -435,6 +698,16 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
           _buildApiConfigurationCard(),
           const SizedBox(height: AppSpacing.large),
 
+          // Network Proxy Section
+          _buildSectionHeader('Network Proxy'),
+          _buildProxyConfigurationCard(ProxyScope.general),
+          const SizedBox(height: AppSpacing.large),
+
+          // Download Proxy Section
+          _buildSectionHeader('Download Proxy'),
+          _buildProxyConfigurationCard(ProxyScope.download),
+          const SizedBox(height: AppSpacing.large),
+
           // Generation Settings Section
           _buildSectionHeader('Generation Settings'),
           _buildGenerationSettingsCard(),
@@ -655,8 +928,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                       ),
                       Text(
                         '${viewModel.registeredTools.length}',
-                        style: AppTypography.subheadlineSemibold(context)
-                            .copyWith(
+                        style:
+                            AppTypography.subheadlineSemibold(context).copyWith(
                           color: AppColors.primaryAccent,
                         ),
                       ),
@@ -783,6 +1056,110 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     );
   }
 
+  Widget _buildProxyConfigurationCard(ProxyScope scope) {
+    final isConfigured = scope == ProxyScope.general
+        ? _isGeneralProxyConfigured
+        : _isDownloadProxyConfigured;
+    final scheme = scope == ProxyScope.general
+        ? _generalProxyScheme
+        : _downloadProxyScheme;
+    final host =
+        scope == ProxyScope.general ? _generalProxyHost : _downloadProxyHost;
+    final port =
+        scope == ProxyScope.general ? _generalProxyPort : _downloadProxyPort;
+    final bypassLocal = scope == ProxyScope.general
+        ? _generalProxyBypassLocal
+        : _downloadProxyBypassLocal;
+
+    final summary = isConfigured
+        ? 'Enabled • ${scheme.toUpperCase()} • $host:${port ?? "-"}'
+        : 'Disabled';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Status', style: AppTypography.subheadline(context)),
+                Text(
+                  summary,
+                  style: AppTypography.caption(context).copyWith(
+                    color: isConfigured
+                        ? AppColors.statusGreen
+                        : AppColors.textSecondary(context),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Bypass localhost',
+                    style: AppTypography.subheadline(context)),
+                Text(
+                  bypassLocal ? 'Enabled' : 'Disabled',
+                  style: AppTypography.caption(context).copyWith(
+                    color: AppColors.textSecondary(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            Row(
+              children: [
+                OutlinedButton(
+                  onPressed: () {
+                    unawaited(_showProxyConfigDialog(scope));
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryBlue,
+                  ),
+                  child: const Text('Configure'),
+                ),
+                const SizedBox(width: AppSpacing.smallMedium),
+                OutlinedButton(
+                  onPressed: () {
+                    unawaited(_testProxyConfiguration(scope));
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryGreen,
+                  ),
+                  child: const Text('Test'),
+                ),
+                if (isConfigured || host.isNotEmpty) ...[
+                  const SizedBox(width: AppSpacing.smallMedium),
+                  OutlinedButton(
+                    onPressed: () {
+                      unawaited(_clearProxyConfiguration(scope));
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryRed,
+                    ),
+                    child: const Text('Clear'),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            Text(
+              scope == ProxyScope.general
+                  ? 'Applies only to HTTP requests made directly by the Flutter example.'
+                  : 'Applies only to model downloads. If disabled, downloads go direct.',
+              style: AppTypography.caption2(context).copyWith(
+                color: AppColors.textSecondary(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStorageOverviewCard() {
     return Card(
       child: Padding(
@@ -877,7 +1254,9 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                     children: [
                       _StoredModelRow(
                         model: model,
-                        onDelete: () => _deleteModel(model),
+                        onDelete: () async {
+                          await _deleteModel(model);
+                        },
                       ),
                       if (!isLast) const Divider(),
                     ],
@@ -1139,22 +1518,6 @@ class _StoredModelRowState extends State<_StoredModelRow> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
-  }
-
-  // ignore: unused_element - kept for future use
-  String _formatRelativeDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays > 0) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} hours ago';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} minutes ago';
-    } else {
-      return 'Just now';
-    }
   }
 }
 
