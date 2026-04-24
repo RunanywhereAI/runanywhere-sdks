@@ -57,10 +57,17 @@ public:
     static VADBridge& shared();
 
     // Lifecycle
+    bool isInitialized() const;
     bool isLoaded() const;
+    bool isReady() const;
     std::string currentModelId() const;
     rac_result_t loadModel(const std::string& modelId);
     rac_result_t unload();
+    rac_result_t initialize(int sampleRate = 16000,
+                            float frameLengthSeconds = 0.1f,
+                            float energyThreshold = 0.005f);
+    rac_result_t start();
+    rac_result_t stop();
     void cleanup();
     void reset();  // Reset VAD state without unloading model
 
@@ -74,6 +81,8 @@ private:
     // Disable copy/move
     VADBridge(const VADBridge&) = delete;
     VADBridge& operator=(const VADBridge&) = delete;
+
+    rac_result_t ensureHandle();
 
     rac_handle_t handle_ = nullptr;
     std::string loadedModelId_;

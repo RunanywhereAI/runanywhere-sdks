@@ -253,10 +253,10 @@ class _ModelsViewState extends State<ModelsView> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) => AddModelFromURLView(
-        onModelAdded: (model) async {
+        onModelAdded: () async {
           // Capture navigator before async gap
           final navigator = Navigator.of(sheetContext);
-          await _viewModel.addImportedModel(model);
+          await _viewModel.loadModels();
           if (mounted) navigator.pop();
         },
       ),

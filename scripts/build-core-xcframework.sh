@@ -37,6 +37,7 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
+STAGING_DIR="${REPO_ROOT}/build/ios-xcframework-staging"
 
 run() {
     # Thin wrapper that either prints the command (DRY_RUN=1) or executes it.
@@ -49,6 +50,180 @@ run() {
     else
         "$@"
     fi
+}
+
+prepare_archive_input() {
+    local input="$1"
+    local arch="$2"
+    local scratch_dir="$3"
+
+    if [ "${DRY_RUN}" = "1" ]; then
+        echo "${input}"
+        return
+    fi
+    if [ ! -f "${input}" ]; then
+        echo "error: required archive not found: ${input}" >&2
+        exit 1
+    fi
+    if ! xcrun lipo "${input}" -verify_arch "${arch}" >/dev/null 2>&1; then
+        echo "error: ${input} does not contain architecture ${arch}" >&2
+        exit 1
+    fi
+
+    local info
+    info="$(xcrun lipo -info "${input}")"
+    if printf '%s' "${info}" | grep -q "^Non-fat file:"; then
+        echo "${input}"
+        return
+    fi
+
+    run mkdir -p "${scratch_dir}"
+    local prepared="${scratch_dir}/$(basename "${input}").${arch}.a"
+    run xcrun lipo -thin "${arch}" "${input}" -output "${prepared}"
+    echo "${prepared}"
+}
+
+merge_static_archives() {
+    local output="$1"
+    shift
+    local inputs=("$@")
+
+    if [ "${#inputs[@]}" -eq 0 ]; then
+        echo "error: merge_static_archives called without input archives" >&2
+        exit 1
+    fi
+
+    if [ "${DRY_RUN}" != "1" ]; then
+        local input
+        for input in "${inputs[@]}"; do
+            if [ ! -f "${input}" ]; then
+                echo "error: required archive not found: ${input}" >&2
+                exit 1
+            fi
+        done
+    fi
+
+    run mkdir -p "$(dirname "${output}")"
+    run rm -f "${output}"
+    run xcrun libtool -static -o "${output}" "${inputs[@]}"
+}
+
+merge_commons_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/commons"
+    local inputs=(
+        "${build_root}/sdk/runanywhere-commons/${slice_dir}/librac_commons.a"
+        "${build_root}/_deps/libarchive-build/libarchive/${slice_dir}/libarchive.a"
+        "${build_root}/_deps/curl_fetched-build/lib/${slice_dir}/libcurl.a"
+    )
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+find_onnxruntime_ios_archive() {
+    local slice_dir="$1"
+    local arch_dir
+
+    if [ "${slice_dir}" = "Release-iphoneos" ]; then
+        arch_dir="ios-arm64"
+    else
+        arch_dir="ios-arm64_x86_64-simulator"
+    fi
+
+    local candidates=(
+        "${IOS_ONNXRT}/${arch_dir}/libonnxruntime.a"
+        "${IOS_ONNXRT}/${arch_dir}/onnxruntime.a"
+        "${IOS_ONNXRT}/${arch_dir}/onnxruntime.framework/onnxruntime"
+    )
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [ "${DRY_RUN}" = "1" ] || [ -f "${candidate}" ]; then
+            echo "${candidate}"
+            return
+        fi
+    done
+
+    echo "error: could not locate ONNX Runtime iOS archive for ${slice_dir}" >&2
+    exit 1
+}
+
+merge_llamacpp_backend_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/llamacpp"
+    local inputs=(
+        "${build_root}/engines/llamacpp/${slice_dir}/librac_backend_llamacpp.a"
+        "${build_root}/_deps/llamacpp-build/src/${slice_dir}/libllama.a"
+        "${build_root}/_deps/llamacpp-build/common/${slice_dir}/libcommon.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-base.a"
+        "${build_root}/_deps/llamacpp-build/ggml/src/${slice_dir}/libggml-cpu.a"
+    )
+
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/_deps/llamacpp-build/ggml/src/ggml-metal/${slice_dir}/libggml-metal.a" ]; then
+        inputs+=("${build_root}/_deps/llamacpp-build/ggml/src/ggml-metal/${slice_dir}/libggml-metal.a")
+    fi
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/_deps/llamacpp-build/ggml/src/ggml-blas/${slice_dir}/libggml-blas.a" ]; then
+        inputs+=("${build_root}/_deps/llamacpp-build/ggml/src/ggml-blas/${slice_dir}/libggml-blas.a")
+    fi
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/_deps/llamacpp-build/vendor/cpp-httplib/${slice_dir}/libcpp-httplib.a" ]; then
+        inputs+=("${build_root}/_deps/llamacpp-build/vendor/cpp-httplib/${slice_dir}/libcpp-httplib.a")
+    fi
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
+merge_onnx_backend_slice() {
+    local build_root="$1"
+    local slice_dir="$2"
+    local output="$3"
+    local arch="$4"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/onnx"
+    local inputs=(
+        "${build_root}/engines/onnx/${slice_dir}/librac_backend_onnx.a"
+        "$(find_onnxruntime_ios_archive "${slice_dir}")"
+    )
+    local sherpa_dir
+
+    if [ "${slice_dir}" = "Release-iphoneos" ]; then
+        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64"
+    else
+        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator"
+    fi
+
+    if [ "${DRY_RUN}" = "1" ] || [ -d "${sherpa_dir}" ]; then
+        local sherpa_archive
+        for sherpa_archive in "${sherpa_dir}"/*.a; do
+            if [ "${DRY_RUN}" = "1" ] || [ -f "${sherpa_archive}" ]; then
+                inputs+=("${sherpa_archive}")
+            fi
+        done
+    fi
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
 }
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -69,6 +244,8 @@ EOF
 fi
 
 mkdir -p "${DEST}"
+run rm -rf "${STAGING_DIR}"
+run mkdir -p "${STAGING_DIR}"
 
 # ────────────────────────────────────────────────────────────────────────────
 # 1 & 2. Configure + build both iOS slices (device + simulator).
@@ -130,7 +307,7 @@ find_lib() {
     echo "${dev_path}|${sim_path}"
 }
 
-# build_xcframework <lib-subdir> <libname> <xcframework-name> [--with-headers]
+# build_xcframework_from_paths <device-lib> <simulator-lib> <xcframework-name> [--with-headers]
 #
 # Only the first (RACommons) xcframework ships the commons C header tree via
 # `-headers`. Backend xcframeworks share the same canonical commons headers,
@@ -140,16 +317,11 @@ find_lib() {
 # graph. Downstream Swift modules import the commons headers via
 # `RACommonsBinary` anyway, so the backend xcframeworks only need to carry
 # their `.a` archives — the headers come from RACommons.xcframework.
-build_xcframework() {
-    local subdir="$1"
-    local libname="$2"
+build_xcframework_from_paths() {
+    local dev_lib="$1"
+    local sim_lib="$2"
     local xcf_name="$3"
     local mode="${4:-}"
-
-    local paths
-    paths="$(find_lib "${subdir}" "${libname}")"
-    local dev_lib="${paths%|*}"
-    local sim_lib="${paths#*|}"
 
     local xcf="${DEST}/${xcf_name}"
     echo "▶ Create-xcframework → ${xcf}"
@@ -167,13 +339,122 @@ build_xcframework() {
     fi
 }
 
-build_xcframework "sdk/runanywhere-commons" "librac_commons.a"          "RACommons.xcframework"          --with-headers
-build_xcframework "engines/llamacpp"        "librac_backend_llamacpp.a" "RABackendLLAMACPP.xcframework"
+COMMONS_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_commons.a"
+COMMONS_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_commons.a"
+merge_commons_slice "${DEV_BIN}" "Release-iphoneos" "${COMMONS_DEV_LIB}" "arm64"
+merge_commons_slice "${SIM_BIN}" "Release-iphonesimulator" "${COMMONS_SIM_LIB}" "arm64"
+
+LLAMACPP_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_llamacpp.a"
+LLAMACPP_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_llamacpp.a"
+merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
+merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
+
+build_xcframework_from_paths "${COMMONS_DEV_LIB}" "${COMMONS_SIM_LIB}" "RACommons.xcframework" --with-headers
+build_xcframework_from_paths "${LLAMACPP_DEV_LIB}" "${LLAMACPP_SIM_LIB}" "RABackendLLAMACPP.xcframework"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
-    build_xcframework "engines/onnx"         "librac_backend_onnx.a"    "RABackendONNX.xcframework"
+    ONNX_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_onnx.a"
+    ONNX_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_onnx.a"
+    merge_onnx_backend_slice "${DEV_BIN}" "Release-iphoneos" "${ONNX_DEV_LIB}" "arm64"
+    merge_onnx_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${ONNX_SIM_LIB}" "arm64"
+    build_xcframework_from_paths "${ONNX_DEV_LIB}" "${ONNX_SIM_LIB}" "RABackendONNX.xcframework"
 else
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
 fi
+
+sync_react_native_frameworks() {
+    local rn_root="${REPO_ROOT}/sdk/runanywhere-react-native/packages"
+    if [ ! -d "${rn_root}" ]; then
+        return
+    fi
+
+    echo "▶ Sync React Native local iOS binaries"
+    run mkdir -p "${rn_root}/core/ios/Binaries"
+    run rm -rf "${rn_root}/core/ios/Binaries/RACommons.xcframework"
+    run cp -R "${DEST}/RACommons.xcframework" "${rn_root}/core/ios/Binaries/"
+
+    run mkdir -p "${rn_root}/llamacpp/ios/Frameworks"
+    run rm -rf "${rn_root}/llamacpp/ios/Frameworks/RABackendLLAMACPP.xcframework"
+    run cp -R "${DEST}/RABackendLLAMACPP.xcframework" "${rn_root}/llamacpp/ios/Frameworks/"
+
+    if [ -d "${DEST}/RABackendONNX.xcframework" ]; then
+        run mkdir -p "${rn_root}/onnx/ios/Frameworks"
+        run rm -rf "${rn_root}/onnx/ios/Frameworks/RABackendONNX.xcframework"
+        run cp -R "${DEST}/RABackendONNX.xcframework" "${rn_root}/onnx/ios/Frameworks/"
+        run rm -rf "${rn_root}/onnx/ios/Frameworks/onnxruntime.xcframework"
+    fi
+}
+
+# Copy locally built xcframeworks into each Flutter plugin's ios/Frameworks
+# directory so the example app (and any path-based consumer) builds against the
+# monorepo binaries without needing a GitHub release download. Mirrors the
+# sync_react_native_frameworks() pattern above.
+#
+# Plugin → xcframework mapping:
+#   runanywhere             ← RACommons.xcframework
+#   runanywhere_llamacpp    ← RABackendLLAMACPP.xcframework
+#   runanywhere_onnx        ← RABackendONNX.xcframework
+#   runanywhere_genie       ← (no iOS binary; Android/Snapdragon only)
+sync_flutter_frameworks() {
+    local flutter_root="${REPO_ROOT}/sdk/runanywhere-flutter/packages"
+    if [ ! -d "${flutter_root}" ]; then
+        return
+    fi
+
+    echo "▶ Sync Flutter local iOS binaries"
+
+    local flutter_core="${flutter_root}/runanywhere/ios/Frameworks"
+    local flutter_llama="${flutter_root}/runanywhere_llamacpp/ios/Frameworks"
+    local flutter_onnx="${flutter_root}/runanywhere_onnx/ios/Frameworks"
+
+    run mkdir -p "${flutter_core}" "${flutter_llama}" "${flutter_onnx}"
+
+    if [ -d "${DEST}/RACommons.xcframework" ]; then
+        run rm -rf "${flutter_core}/RACommons.xcframework"
+        run cp -R "${DEST}/RACommons.xcframework" "${flutter_core}/"
+
+        # Flutter's iOS integration links vendored static frameworks with
+        # -all_load (set in runanywhere.podspec) so Dart FFI can resolve
+        # RACommons / backend C symbols via dlsym() at runtime. -all_load
+        # unfortunately also drags in engines/whisperkit_coreml/
+        # rac_plugin_entry_whisperkit_coreml.o, whose vtable references
+        # `g_whisperkit_coreml_stt_ops` with C linkage — but the definition
+        # in rac_backend_whisperkit_coreml_register.cpp lives inside an
+        # anonymous C++ namespace (so the symbol is mangled + internal).
+        # Swift SPM + React Native avoid this because they don't force-load
+        # commons.
+        #
+        # Until engines/whisperkit_coreml/ gets a proper fix (move
+        # `g_whisperkit_coreml_stt_ops` out of the anonymous namespace and
+        # wrap it in `extern "C"`), strip the offending entry TU from
+        # Flutter's copy only. Swift + RN archives are untouched.
+        local slice archive
+        for slice in ios-arm64 ios-arm64-simulator; do
+            archive="${flutter_core}/RACommons.xcframework/${slice}/librac_commons.a"
+            if [ -f "${archive}" ]; then
+                run ar -d "${archive}" rac_plugin_entry_whisperkit_coreml.o \
+                    >/dev/null 2>&1 || true
+            fi
+        done
+    fi
+
+    if [ -d "${DEST}/RABackendLLAMACPP.xcframework" ]; then
+        run rm -rf "${flutter_llama}/RABackendLLAMACPP.xcframework"
+        run cp -R "${DEST}/RABackendLLAMACPP.xcframework" "${flutter_llama}/"
+    fi
+
+    if [ -d "${DEST}/RABackendONNX.xcframework" ]; then
+        run rm -rf "${flutter_onnx}/RABackendONNX.xcframework"
+        run cp -R "${DEST}/RABackendONNX.xcframework" "${flutter_onnx}/"
+        # Stale onnxruntime.xcframework (pre-v0.19.0) is no longer shipped —
+        # ONNX Runtime is now statically linked into RABackendONNX.a.
+        run rm -rf "${flutter_onnx}/onnxruntime.xcframework"
+    fi
+
+    # runanywhere_genie has no iOS binary — soft-skip.
+}
+
+sync_react_native_frameworks
+sync_flutter_frameworks
 
 echo ""
 echo "✓ XCFrameworks written to: ${DEST}"

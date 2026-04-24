@@ -357,28 +357,20 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
   /// Clear cache using RunAnywhere SDK
   Future<void> _clearCache() async {
-    // TODO: Implement clearCache() in SDK
-    // Once SDK implements clearCache(), replace this with:
-    // try {
-    //   await sdk.RunAnywhereSDK.instance.downloads.clearCache();
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       const SnackBar(content: Text('Cache cleared')),
-    //     );
-    //   }
-    //   await _loadStorageData();
-    // } catch (e) {
-    //   if (mounted) {
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(content: Text('Failed to clear cache: $e')),
-    //     );
-    //   }
-    // }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clear Cache not available yet')),
-      );
+    try {
+      await sdk.RunAnywhereSDK.instance.downloads.clearCache();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cache cleared')),
+        );
+      }
+      await _loadStorageData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to clear cache: $e')),
+        );
+      }
     }
   }
 

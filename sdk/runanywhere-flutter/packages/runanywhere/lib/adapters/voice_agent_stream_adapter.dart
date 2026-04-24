@@ -75,7 +75,7 @@ class VoiceAgentStreamAdapter {
           'rac_voice_agent_set_proto_callback failed: $rc '
           '(Protobuf may not be linked)',
         ));
-        controller.close();
+        unawaited(controller.close());
       }
     }
 

@@ -92,7 +92,11 @@ android {
 
     packaging {
         jniLibs {
-            pickFirsts += ['**/libc++_shared.so']
+            // Each Flutter plugin stages its own copy of libc++_shared.so and
+            // librac_commons.so (the latter because downstream backends link
+            // against it at runtime). pickFirsts lets AGP keep one copy in the
+            // final APK instead of failing with a duplicate-file error.
+            pickFirsts += ['**/libc++_shared.so', '**/librac_commons.so']
         }
     }
 }

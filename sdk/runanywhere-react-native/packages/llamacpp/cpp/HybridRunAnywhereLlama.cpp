@@ -26,8 +26,13 @@ extern "C" {
 
 #include <sstream>
 #include <chrono>
+#include <fstream>
 #include <vector>
 #include <stdexcept>
+
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 // Log category for this module
 #define LOG_CATEGORY "LLM.LlamaCpp"
@@ -396,8 +401,36 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::getLastError() {
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereLlama::getMemoryUsage() {
   return Promise<double>::async([]() {
-    // TODO: Get memory usage from LlamaCPP
-    return 0.0;
+    double memoryUsageMB = 0.0;
+
+#if defined(__APPLE__)
+    mach_task_basic_info_data_t taskInfo;
+    mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
+    kern_return_t result = task_info(
+      mach_task_self(),
+      MACH_TASK_BASIC_INFO,
+      reinterpret_cast<task_info_t>(&taskInfo),
+      &infoCount
+    );
+
+    if (result == KERN_SUCCESS) {
+      memoryUsageMB = static_cast<double>(taskInfo.resident_size) / (1024.0 * 1024.0);
+    }
+#elif defined(__ANDROID__) || defined(ANDROID)
+    std::ifstream statusFile("/proc/self/status");
+    std::string line;
+    while (std::getline(statusFile, line)) {
+      if (line.rfind("VmRSS:", 0) == 0) {
+        std::istringstream iss(line.substr(6));
+        long vmRssKB = 0;
+        iss >> vmRssKB;
+        memoryUsageMB = static_cast<double>(vmRssKB) / 1024.0;
+        break;
+      }
+    }
+#endif
+
+    return memoryUsageMB;
   });
 }
 

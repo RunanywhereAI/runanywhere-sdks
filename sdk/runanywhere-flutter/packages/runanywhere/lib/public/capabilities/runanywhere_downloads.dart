@@ -5,6 +5,7 @@
 
 import 'dart:io';
 
+import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/core/types/storage_types.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
@@ -84,8 +85,41 @@ class RunAnywhereDownloads {
     if (!SdkState.shared.isInitialized) {
       throw SDKError.notInitialized();
     }
-    await DartBridgeModelRegistry.instance.removeModel(modelId);
+
+    final logger = SDKLogger('RunAnywhere.Download');
+    final models = await RunAnywhereModels.shared.available();
+    final model = models.cast<ModelInfo?>().firstWhere(
+          (m) => m?.id == modelId,
+          orElse: () => null,
+        );
+
+    if (model != null) {
+      final deleted = DartBridgeFileManager.deleteModel(
+        model.id,
+        _frameworkToCValue(model.framework),
+      );
+      if (!deleted && model.localPath != null) {
+        throw SDKError.storageError(
+          'Failed to delete stored files for model: ${model.id}',
+        );
+      }
+    } else {
+      logger.warning('Delete requested for unknown model: $modelId');
+    }
+
+    await DartBridgeModelRegistry.instance.updateDownloadStatus(modelId, null);
     EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
+  }
+
+  /// Clear cached files managed by the native file manager.
+  Future<void> clearCache() async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKError.notInitialized();
+    }
+
+    if (!DartBridgeFileManager.clearCache()) {
+      throw SDKError.storageError('Failed to clear cache directory');
+    }
   }
 
   /// Aggregated storage info: device totals, per-app usage, and every
@@ -212,4 +246,27 @@ class RunAnywhereDownloads {
 
   Future<int> _getDirectorySize(String path) async =>
       DartBridgeFileManager.calculateDirectorySize(path);
+
+  int _frameworkToCValue(InferenceFramework framework) {
+    switch (framework) {
+      case InferenceFramework.onnx:
+        return 0;
+      case InferenceFramework.llamaCpp:
+        return 1;
+      case InferenceFramework.foundationModels:
+        return 2;
+      case InferenceFramework.systemTTS:
+        return 3;
+      case InferenceFramework.fluidAudio:
+        return 4;
+      case InferenceFramework.builtIn:
+        return 5;
+      case InferenceFramework.none:
+        return 6;
+      case InferenceFramework.genie:
+        return 11;
+      case InferenceFramework.unknown:
+        return 99;
+    }
+  }
 }

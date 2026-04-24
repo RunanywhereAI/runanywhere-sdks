@@ -70,7 +70,22 @@ target 'RunAnywhereAI' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
       end
+    end
+
+    # Local core xcframeworks are built for device arm64 + simulator arm64.
+    # Keep the app project aligned so Xcode does not try to compile/link x86_64.
+    installer.aggregate_targets.map(&:user_project).uniq.each do |project|
+      project.targets.each do |target|
+        target.build_configurations.each do |config|
+          config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
+        end
+      end
+      project.build_configurations.each do |config|
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
+      end
+      project.save
     end
 
     # Fix Xcode 16 sandbox issue for script phases
@@ -110,6 +125,31 @@ target 'RunAnywhereAI' do
             file.settings.delete('COMPILER_FLAGS')
           end
         end
+      end
+    end
+
+    # Xcode 26.4 + RN 0.83.1: fmt's consteval path trips AppleClang during pod
+    # compilation. fmt 11's header overwrites FMT_USE_CONSTEVAL after reading
+    # compiler feature macros, so use C++17 for this pod to keep that path off.
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'fmt'
+
+      target.build_configurations.each do |config|
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
+
+        definitions = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+        definitions = [definitions] unless definitions.is_a?(Array)
+        unless definitions.include?('FMT_USE_CONSTEVAL=0')
+          definitions << 'FMT_USE_CONSTEVAL=0'
+        end
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = definitions
+
+        cxxflags = config.build_settings['OTHER_CPLUSPLUSFLAGS'] || ['$(inherited)']
+        cxxflags = [cxxflags] unless cxxflags.is_a?(Array)
+        unless cxxflags.include?('-DFMT_USE_CONSTEVAL=0')
+          cxxflags << '-DFMT_USE_CONSTEVAL=0'
+        end
+        config.build_settings['OTHER_CPLUSPLUSFLAGS'] = cxxflags
       end
     end
   end

@@ -15,7 +15,8 @@ ext {
     // Canonical name (matches Swift/Kotlin/RN).
     // Set this to true for local development/testing.
     // Set to false for production builds (downloads from GitHub releases).
-    useLocalNatives = false
+    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
+    useLocalNatives = localNativesProp != null ? localNativesProp.toString().toBoolean() : true
 
     // Legacy alias — kept so existing code reading `testLocal` keeps working.
     // Prefer `useLocalNatives`.
@@ -43,7 +44,9 @@ ext {
         return !testLocal
     }
 
-    // Helper method to check if local RACommons libs exist
+    // Helper method to check if local RACommons libs exist.
+    // Both librac_commons.so (core C ABI) AND librunanywhere_jni.so (JNI bridge)
+    // are required for the Flutter plugin to load successfully at runtime.
     checkLocalLibsExist = { ->
         def jniLibsDir = project.file('src/main/jniLibs')
         def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
@@ -52,9 +55,9 @@ ext {
             return false
         }
 
-        // Check for RACommons library
         def commonsLib = new File(arm64Dir, 'librac_commons.so')
-        return commonsLib.exists()
+        def commonsJniLib = new File(arm64Dir, 'librunanywhere_jni.so')
+        return commonsLib.exists() && commonsJniLib.exists()
     }
 
 }

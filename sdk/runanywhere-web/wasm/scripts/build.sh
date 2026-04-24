@@ -22,6 +22,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WASM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${WASM_DIR}/../../.." && pwd)"
 OUTPUT_DIR="${WASM_DIR}/../packages/llamacpp/wasm"
 
 # Defaults
@@ -140,16 +141,21 @@ if [ "$CLEAN" = true ]; then
     rm -rf "${BUILD_DIR}"
 fi
 
+rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
+
 # Create build directory
 mkdir -p "${BUILD_DIR}"
 
-# Configure with Emscripten
+# Configure the single-root CMake build with Emscripten
 echo ""
 echo ">>> Configuring CMake with Emscripten..."
 emcmake cmake \
     -B "${BUILD_DIR}" \
-    -S "${WASM_DIR}" \
+    -S "${REPO_ROOT}" \
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+    -DRAC_STATIC_PLUGINS=ON \
+    -DRAC_BUILD_PLATFORM=OFF \
+    -DRAC_BUILD_SHARED=OFF \
     -DRAC_WASM_PTHREADS="${PTHREADS}" \
     -DRAC_WASM_DEBUG="${DEBUG}" \
     -DRAC_WASM_LLAMACPP="${LLAMACPP}" \
@@ -169,7 +175,7 @@ echo ">>> Building WASM module..."
 # Serial costs us ~5-10 minutes vs. parallel — acceptable for a release
 # pipeline that already takes 20+ minutes total. Local devs can override
 # by exporting CMAKE_BUILD_PARALLEL_LEVEL=N.
-emmake cmake --build "${BUILD_DIR}" --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-1}"
+cmake --build "${BUILD_DIR}" --target runanywhere_wasm --parallel "${CMAKE_BUILD_PARALLEL_LEVEL:-1}"
 
 # Verify outputs
 echo ""
@@ -202,6 +208,8 @@ else
     echo "  Expected: ${JS_FILE}"
     exit 1
 fi
+
+rm -f "${REPO_ROOT}/a.out.js" "${REPO_ROOT}/a.out.wasm"
 
 echo ""
 echo "WASM module ready at: ${OUTPUT_DIR}/"

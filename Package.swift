@@ -197,6 +197,11 @@ let package = Package(
             ],
             linkerSettings: [
                 .linkedLibrary("c++"),
+                .linkedLibrary("z"),
+                .linkedLibrary("bz2"),
+                .linkedFramework("CFNetwork"),
+                .linkedFramework("Security"),
+                .linkedFramework("SystemConfiguration"),
             ]
         ),
 

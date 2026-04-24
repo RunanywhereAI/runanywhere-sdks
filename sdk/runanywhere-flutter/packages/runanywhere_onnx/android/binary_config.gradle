@@ -9,9 +9,12 @@
 // =============================================================================
 
 ext {
-    // Set this to true for local development/testing
-    // Set to false for production builds (downloads from GitHub releases)
-    useLocalNatives = false
+    // Canonical name (matches Swift/Kotlin/RN and the runanywhere core plugin).
+    // Defaults to true so monorepo developers building via
+    // `scripts/build-core-android.sh` consume local .so files. Overridable via
+    // the root Gradle property `runanywhere.useLocalNatives`.
+    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
+    useLocalNatives = localNativesProp != null ? localNativesProp.toString().toBoolean() : true
     testLocal = useLocalNatives  // legacy alias
 
     // =============================================================================
@@ -35,7 +38,11 @@ ext {
         return !testLocal
     }
 
-    // Helper method to check if local libs exist
+    // Helper method to check if local libs exist.
+    // The engines CMake may emit either `librac_backend_onnx.so` (always)
+    // and/or `librac_backend_onnx_jni.so` (Android JNI entry point, emitted
+    // only when RAC_BUILD_SHARED=ON). Treat either as a valid indicator so we
+    // don't fail the build when the JNI suffix isn't generated on every preset.
     checkLocalLibsExist = { ->
         def jniLibsDir = project.file('src/main/jniLibs')
         def arm64Dir = new File(jniLibsDir, 'arm64-v8a')
@@ -44,8 +51,8 @@ ext {
             return false
         }
 
-        // Check for ONNX backend library
-        def onnxLib = new File(arm64Dir, 'librac_backend_onnx_jni.so')
-        return onnxLib.exists()
+        def backendLib = new File(arm64Dir, 'librac_backend_onnx.so')
+        def backendJniLib = new File(arm64Dir, 'librac_backend_onnx_jni.so')
+        return backendLib.exists() || backendJniLib.exists()
     }
 }

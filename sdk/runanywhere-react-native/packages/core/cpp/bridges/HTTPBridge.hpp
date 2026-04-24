@@ -23,12 +23,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <functional>
 #include <optional>
-
-#include "rac_types.h"
-#include "rac_http_client.h"
 
 namespace runanywhere {
 namespace bridges {

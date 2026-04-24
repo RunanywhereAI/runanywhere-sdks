@@ -32,24 +32,6 @@ import Flutter
         result(self.hasMicrophonePermission())
       case "getDeviceCapabilities":
         result(self.getDeviceCapabilities())
-      case "loadNativeModel":
-        let args = call.arguments as? [String: Any]
-        let modelId = args?["modelId"] as? String
-        let modelPath = args?["modelPath"] as? String
-        if let modelId = modelId, let modelPath = modelPath {
-          self.loadNativeModel(modelId: modelId, modelPath: modelPath, result: result)
-        } else {
-          result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing modelId or modelPath", details: nil))
-        }
-      case "unloadNativeModel":
-        let args = call.arguments as? [String: Any]
-        let modelId = args?["modelId"] as? String
-        if let modelId = modelId {
-          self.unloadNativeModel(modelId: modelId)
-          result(nil)
-        } else {
-          result(FlutterError(code: "INVALID_ARGUMENT", message: "Missing modelId", details: nil))
-        }
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -111,15 +93,6 @@ import Flutter
       "totalMemory": processInfo.physicalMemory,
       "availableProcessors": processInfo.processorCount,
     ]
-  }
-
-  private func loadNativeModel(modelId: String, modelPath: String, result: @escaping FlutterResult) {
-    // TODO: Implement native model loading (could bridge to Swift SDK)
-    result(true)
-  }
-
-  private func unloadNativeModel(modelId: String) {
-    // TODO: Implement native model unloading
   }
 }
 

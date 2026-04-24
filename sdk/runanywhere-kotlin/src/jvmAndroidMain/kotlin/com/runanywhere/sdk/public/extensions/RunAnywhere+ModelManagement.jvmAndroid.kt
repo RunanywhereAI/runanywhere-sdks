@@ -1012,8 +1012,8 @@ actual suspend fun RunAnywhere.refreshModelRegistry() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Trigger registry refresh via native call
-    // TODO: Implement via CppBridge
+    modelsLogger.info("Refreshing model registry from backend assignments")
+    fetchModelAssignments(forceRefresh = true)
 }
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {

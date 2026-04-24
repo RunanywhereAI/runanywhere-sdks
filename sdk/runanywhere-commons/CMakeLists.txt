@@ -127,6 +127,13 @@ message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 
 include(FetchContent)
 
+# Cross-compilation targets that bundle zlib/BZip2 need a stable archive
+# output directory so downstream FetchContent projects can consume concrete
+# file paths instead of unresolved logical library names.
+if(MSVC OR ANDROID OR EMSCRIPTEN)
+    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
+endif()
+
 # nlohmann/json - header-only JSON library (used by JNI, backends, server)
 if(NOT DEFINED NLOHMANN_JSON_VERSION)
     set(NLOHMANN_JSON_VERSION "3.11.3")
@@ -155,7 +162,18 @@ endif()
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
 # -----------------------------------------------------------------------------
-find_package(ZLIB QUIET)
+set(_RAC_FORCE_BUNDLED_ZLIB OFF)
+if(EMSCRIPTEN)
+    set(_RAC_FORCE_BUNDLED_ZLIB ON)
+endif()
+
+if(_RAC_FORCE_BUNDLED_ZLIB)
+    message(STATUS "Emscripten build: forcing bundled zlib")
+    set(ZLIB_FOUND FALSE)
+else()
+    find_package(ZLIB QUIET)
+endif()
+
 if(NOT ZLIB_FOUND)
     message(STATUS "System zlib not found — bundling from source...")
     FetchContent_Declare(
@@ -176,14 +194,27 @@ if(NOT ZLIB_FOUND)
     FetchContent_MakeAvailable(zlib_src)
     set(BUILD_SHARED_LIBS ${_SAVED_BSL_ZLIB})
 
-    # Set cache variables so libarchive's find_package(ZLIB) picks up our build.
-    # For multi-config generators (Visual Studio), we point to the static lib
-    # output. The actual path is resolved at build time via target_link_libraries.
+    if((ANDROID OR EMSCRIPTEN) AND TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
+        )
+        set(_RAC_ZLIB_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    endif()
+
+    # Set cache variables so libarchive/curl's find_package(ZLIB) picks up our
+    # build. Android/Emscripten need the concrete archive path here; passing
+    # the logical target name through cache variables leaks raw `zlibstatic`
+    # / `-lzlibstatic` entries into downstream link lines.
     set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
     set(ZLIB_INCLUDE_DIRS "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
-    # Use the CMake target name directly - this works because we link manually below
-    set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
-    set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    if(ANDROID OR EMSCRIPTEN)
+        set(ZLIB_LIBRARY "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(ZLIB_LIBRARY_RELEASE "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(ZLIB_LIBRARIES "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+    else()
+        set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
+        set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
     # Create an imported ZLIB::ZLIB target that points to our zlibstatic
     if(NOT TARGET ZLIB::ZLIB)
@@ -206,7 +237,18 @@ endif()
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
 # -----------------------------------------------------------------------------
-find_package(BZip2 QUIET)
+set(_RAC_FORCE_BUNDLED_BZIP2 OFF)
+if(ANDROID OR EMSCRIPTEN)
+    set(_RAC_FORCE_BUNDLED_BZIP2 ON)
+endif()
+
+if(_RAC_FORCE_BUNDLED_BZIP2)
+    message(STATUS "${RAC_PLATFORM_NAME}: forcing bundled BZip2")
+    set(BZIP2_FOUND FALSE)
+else()
+    find_package(BZip2 QUIET)
+endif()
+
 if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
@@ -228,9 +270,23 @@ if(NOT BZIP2_FOUND)
     target_include_directories(bz2_bundled PUBLIC ${bzip2_src_SOURCE_DIR})
     set_target_properties(bz2_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-    # Set cache variables so libarchive's find_package(BZip2) picks up our build
+    if((ANDROID OR EMSCRIPTEN) AND TARGET bz2_bundled)
+        set_target_properties(bz2_bundled PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
+        )
+        set(_RAC_BZIP2_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}bz2_bundled${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    endif()
+
+    # Set cache variables so libarchive's find_package(BZip2) picks up our
+    # build. Android/Emscripten again need the concrete archive path.
     set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
-    set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    if(ANDROID OR EMSCRIPTEN)
+        set(BZIP2_LIBRARY "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(BZIP2_LIBRARY_RELEASE "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(BZIP2_LIBRARIES "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+    else()
+        set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    endif()
     set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
     # On MSVC, set output to a known location so the linker can find it
     if(MSVC AND TARGET bz2_bundled)
@@ -313,7 +369,6 @@ endif()
 # archive to a known directory and add it to the linker search path so the
 # `-l` lookup succeeds.
 if(MSVC)
-    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
         string(TOUPPER "${_cfg}" _CFG)
         if(TARGET zlibstatic)
@@ -327,7 +382,6 @@ if(MSVC)
     endforeach()
     link_directories("${RAC_BUNDLED_LIB_DIR}")
 elseif(ANDROID OR EMSCRIPTEN)
-    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
     if(TARGET bz2_bundled)
         set_target_properties(bz2_bundled PROPERTIES
             ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")
@@ -363,6 +417,7 @@ if(NOT CURL_FOUND)
     )
     set(BUILD_CURL_EXE      OFF CACHE BOOL "" FORCE)
     set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
+    set(CURL_ENABLE_EXPORT_TARGET OFF CACHE BOOL "" FORCE)
     set(CURL_STATICLIB      ON  CACHE BOOL "" FORCE)
     set(CURL_DISABLE_LDAP   ON  CACHE BOOL "" FORCE)
     set(CURL_DISABLE_LDAPS  ON  CACHE BOOL "" FORCE)
@@ -547,7 +602,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/endpoints.cpp
     src/infrastructure/network/api_types.cpp
-    src/infrastructure/network/http_client.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
     # v2 close-out Phase H — native HTTP transport (libcurl-backed).
@@ -560,25 +614,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/device/rac_device_manager.cpp
     src/infrastructure/extraction/rac_extraction.cpp
 )
-
-# Legacy executor-plugin HTTP ABI (network/http_client.cpp) and the v2
-# curl-backed ABI (http/rac_http_client_curl.cpp) both define the C symbol
-# `rac_http_response_free` with different rac_http_response_t semantics. On
-# STATIC builds (macOS / iOS xcframework / Windows / WASM) archive-search
-# resolves only one .o per consumer, so the collision is invisible. On
-# Android commons is built SHARED (librac_commons.so); lld pulls both .o
-# files into the single output and aborts with a duplicate-symbol error.
-# The legacy file has no Android consumers — the Kotlin SDK uses OkHttp /
-# HttpURLConnection at the frontend layer — so drop the TU on Android.
-# iOS/macOS keep it for xcframework export compatibility (see the legacy
-# symbols listed in sdk/runanywhere-flutter/.../RACommons.exports).
-# TODO(v0.21): delete src/infrastructure/network/http_client.cpp and the
-# companion header include/rac/infrastructure/network/rac_http_client.h
-# once the legacy executor ABI is fully retired.
-if(ANDROID)
-    list(REMOVE_ITEM RAC_INFRASTRUCTURE_SOURCES
-        src/infrastructure/network/http_client.cpp)
-endif()
 
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
 set(RAC_FEATURES_SOURCES
@@ -922,9 +957,9 @@ endif()
 # root CMake) — it forwards to the new locations via add_subdirectory with
 # absolute paths so per-engine CMakeLists need no edit per consumer.
 #
-# When configured via the root CMake, this block is a no-op because the
-# root has already added engines/ before commons descends here (engines/
-# adds its own subdirectory targets, and CMake silently no-ops re-adds).
+# When configured via the root CMake, the root owns engines/ and this block
+# only folds commons-local OBJECT libraries (RAG) into rac_commons. Engine
+# targets themselves are added exactly once from the repo root.
 # =============================================================================
 
 if(RAC_BUILD_BACKENDS)
@@ -939,44 +974,46 @@ if(RAC_BUILD_BACKENDS)
         set(_ENGINES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../engines")
     endif()
 
-    if(RAC_BACKEND_LLAMACPP AND EXISTS "${_ENGINES_ROOT}/llamacpp/CMakeLists.txt"
-       AND NOT TARGET rac_backend_llamacpp)
-        message(STATUS "  - LlamaCPP backend (engines/llamacpp)")
-        add_subdirectory("${_ENGINES_ROOT}/llamacpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_llamacpp")
-    endif()
-
-    if(RAC_BACKEND_ONNX AND EXISTS "${_ENGINES_ROOT}/onnx/CMakeLists.txt"
-       AND NOT TARGET rac_backend_onnx)
-        message(STATUS "  - ONNX backend (engines/onnx)")
-        add_subdirectory("${_ENGINES_ROOT}/onnx" "${CMAKE_CURRENT_BINARY_DIR}/_engine_onnx")
-    endif()
-
-    if(RAC_BACKEND_WHISPERCPP AND EXISTS "${_ENGINES_ROOT}/whispercpp/CMakeLists.txt"
-       AND NOT TARGET rac_backend_whispercpp)
-        message(STATUS "  - WhisperCPP backend (engines/whispercpp)")
-        add_subdirectory("${_ENGINES_ROOT}/whispercpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_whispercpp")
-    endif()
-
-    if(RAC_BACKEND_METALRT AND EXISTS "${_ENGINES_ROOT}/metalrt/CMakeLists.txt"
-       AND NOT TARGET rac_backend_metalrt)
-        message(STATUS "  - MetalRT backend (engines/metalrt) — folded into rac_commons")
-        add_subdirectory("${_ENGINES_ROOT}/metalrt" "${CMAKE_CURRENT_BINARY_DIR}/_engine_metalrt")
-
-        # MetalRT is an OBJECT library. Fold its compiled objects into
-        # rac_commons so there is no separate rac_backend_metalrt artifact
-        # to distribute — mirrors how RAG is integrated.
-        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
-
-        if(APPLE)
-            target_link_libraries(rac_commons PUBLIC
-                "-framework Metal"
-                "-framework Foundation"
-                "-framework Accelerate"
-            )
+    if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+        if(RAC_BACKEND_LLAMACPP AND EXISTS "${_ENGINES_ROOT}/llamacpp/CMakeLists.txt"
+           AND NOT TARGET rac_backend_llamacpp)
+            message(STATUS "  - LlamaCPP backend (engines/llamacpp)")
+            add_subdirectory("${_ENGINES_ROOT}/llamacpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_llamacpp")
         endif()
 
-        if(RAC_METALRT_ENGINE_LIB)
-            target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+        if(RAC_BACKEND_ONNX AND EXISTS "${_ENGINES_ROOT}/onnx/CMakeLists.txt"
+           AND NOT TARGET rac_backend_onnx)
+            message(STATUS "  - ONNX backend (engines/onnx)")
+            add_subdirectory("${_ENGINES_ROOT}/onnx" "${CMAKE_CURRENT_BINARY_DIR}/_engine_onnx")
+        endif()
+
+        if(RAC_BACKEND_WHISPERCPP AND EXISTS "${_ENGINES_ROOT}/whispercpp/CMakeLists.txt"
+           AND NOT TARGET rac_backend_whispercpp)
+            message(STATUS "  - WhisperCPP backend (engines/whispercpp)")
+            add_subdirectory("${_ENGINES_ROOT}/whispercpp" "${CMAKE_CURRENT_BINARY_DIR}/_engine_whispercpp")
+        endif()
+
+        if(RAC_BACKEND_METALRT AND EXISTS "${_ENGINES_ROOT}/metalrt/CMakeLists.txt"
+           AND NOT TARGET rac_backend_metalrt)
+            message(STATUS "  - MetalRT backend (engines/metalrt) — folded into rac_commons")
+            add_subdirectory("${_ENGINES_ROOT}/metalrt" "${CMAKE_CURRENT_BINARY_DIR}/_engine_metalrt")
+
+            # MetalRT is an OBJECT library. Fold its compiled objects into
+            # rac_commons so there is no separate rac_backend_metalrt artifact
+            # to distribute — mirrors how RAG is integrated.
+            target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+
+            if(APPLE)
+                target_link_libraries(rac_commons PUBLIC
+                    "-framework Metal"
+                    "-framework Foundation"
+                    "-framework Accelerate"
+                )
+            endif()
+
+            if(RAC_METALRT_ENGINE_LIB)
+                target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+            endif()
         endif()
     endif()
 

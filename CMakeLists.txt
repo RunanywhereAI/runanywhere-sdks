@@ -72,6 +72,82 @@ option(RAC_STATIC_PLUGINS "Link engine plugins statically into rac_commons (forc
 set(RAC_SANITIZER "" CACHE STRING "Enable a sanitizer: '', 'asan', 'tsan', 'ubsan'")
 set_property(CACHE RAC_SANITIZER PROPERTY STRINGS "" asan tsan ubsan)
 
+# WebAssembly knobs must be cached at the root so commons/engines see the
+# final values before their CMakeLists run. The wasm wrapper target itself
+# lives under sdk/runanywhere-web/wasm and is added after the engine targets.
+if(EMSCRIPTEN)
+    option(RAC_WASM_PTHREADS   "Enable pthreads in the WebAssembly target" OFF)
+    option(RAC_WASM_DEBUG      "Enable debug assertions/logging in the WebAssembly target" OFF)
+    option(RAC_WASM_LLAMACPP   "Build the WebAssembly target with llama.cpp" OFF)
+    option(RAC_WASM_VLM        "Enable llama.cpp mtmd VLM support in the WebAssembly target" OFF)
+    option(RAC_WASM_WHISPERCPP "Build the WebAssembly target with whisper.cpp" OFF)
+    option(RAC_WASM_ONNX       "Build the WebAssembly target with ONNX/sherpa support" OFF)
+    option(RAC_WASM_WEBGPU     "Enable WebGPU acceleration for the WebAssembly target" OFF)
+
+    set(RAC_BUILD_JNI OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(RAC_BUILD_PLATFORM OFF CACHE BOOL "" FORCE)
+
+    if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP OR RAC_WASM_ONNX)
+        set(RAC_BUILD_BACKENDS ON CACHE BOOL "" FORCE)
+    else()
+        set(RAC_BUILD_BACKENDS OFF CACHE BOOL "" FORCE)
+    endif()
+
+    set(RAC_BACKEND_LLAMACPP ${RAC_WASM_LLAMACPP} CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_WHISPERCPP ${RAC_WASM_WHISPERCPP} CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_ONNX ${RAC_WASM_ONNX} CACHE BOOL "" FORCE)
+
+    if(RAC_WASM_VLM AND RAC_WASM_LLAMACPP)
+        set(RAC_VLM_USE_MTMD ON CACHE BOOL "" FORCE)
+    else()
+        if(RAC_WASM_VLM AND NOT RAC_WASM_LLAMACPP)
+            message(WARNING "RAC_WASM_VLM requires RAC_WASM_LLAMACPP=ON; disabling VLM.")
+        endif()
+        set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+    endif()
+
+    if(RAC_WASM_LLAMACPP OR RAC_WASM_WHISPERCPP)
+        set(GGML_METAL OFF CACHE BOOL "" FORCE)
+        set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+        set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+        set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+        set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+        set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+        set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+        set(GGML_RPC OFF CACHE BOOL "" FORCE)
+        set(GGML_ACCELERATE OFF CACHE BOOL "" FORCE)
+        set(GGML_NEON OFF CACHE BOOL "" FORCE)
+        set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+        set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
+        set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+        set(GGML_CPU_HBM OFF CACHE BOOL "" FORCE)
+    endif()
+
+    if(RAC_WASM_LLAMACPP)
+        if(RAC_WASM_WEBGPU)
+            set(GGML_WEBGPU ON CACHE BOOL "" FORCE)
+            set(GGML_WEBGPU_JSPI ON CACHE BOOL "" FORCE)
+        else()
+            set(GGML_WEBGPU OFF CACHE BOOL "" FORCE)
+            set(GGML_WEBGPU_JSPI OFF CACHE BOOL "" FORCE)
+        endif()
+        set(LLAMA_WASM_MEM64 OFF CACHE BOOL "" FORCE)
+        set(LLAMA_BUILD_HTML OFF CACHE BOOL "" FORCE)
+        set(LLAMA_WASM_SINGLE_FILE OFF CACHE BOOL "" FORCE)
+    endif()
+
+    if(RAC_WASM_WHISPERCPP)
+        set(WHISPER_COREML OFF CACHE BOOL "" FORCE)
+    endif()
+
+    if(RAC_WASM_ONNX)
+        set(ORT_USE_COREML OFF CACHE BOOL "" FORCE)
+        set(ORT_USE_NNAPI OFF CACHE BOOL "" FORCE)
+    endif()
+endif()
+
 # =============================================================================
 # Shared cmake/ helpers
 # =============================================================================
@@ -124,6 +200,30 @@ endif()
 # QNN SDK integration work is funded.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
+endif()
+
+# MetalRT is an OBJECT library rather than a rac_add_engine_plugin()-managed
+# STATIC/SHARED target. When the root build owns engines/, fold its objects into
+# rac_commons here so Apple SDKs still get a single commons archive.
+if(TARGET rac_backend_metalrt)
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+    if(APPLE)
+        target_link_libraries(rac_commons PUBLIC
+            "-framework Metal"
+            "-framework Foundation"
+            "-framework Accelerate"
+        )
+    endif()
+    if(DEFINED RAC_METALRT_ENGINE_LIB AND RAC_METALRT_ENGINE_LIB)
+        target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
+    endif()
+endif()
+
+# WASM wrapper target — composes rac_commons + any enabled engine plugins into
+# the JavaScript/WebAssembly artifacts consumed by sdk/runanywhere-web.
+if(EMSCRIPTEN
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-web/wasm/CMakeLists.txt")
+    add_subdirectory(sdk/runanywhere-web/wasm)
 endif()
 
 # Smoke test for the plugin loader (GAP 03). Only built when explicitly

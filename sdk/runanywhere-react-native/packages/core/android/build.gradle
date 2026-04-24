@@ -193,7 +193,8 @@ android {
                     jniLibs.srcDirs = [commonsDistDir]
                     logger.lifecycle("[RunAnywhereCore] Using LOCAL native libraries from: $commonsDistDir")
                 } else {
-                    logger.warn("[RunAnywhereCore] Local commons dist not found at: $commonsDistDir")
+                    jniLibs.srcDirs = [jniLibsDir]
+                    logger.lifecycle("[RunAnywhereCore] Using staged LOCAL native libraries from: $jniLibsDir")
                 }
             } else {
                 jniLibs.srcDirs = [jniLibsDir]

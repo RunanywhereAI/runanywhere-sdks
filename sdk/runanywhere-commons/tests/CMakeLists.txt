@@ -18,6 +18,8 @@ function(rac_link_archive_deps target)
     endif()
 endfunction()
 
+set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
+
 # --- v3.1 Phase 9: DAG graph primitives unit tests --------------------------
 # CancelToken + RingBuffer + StreamEdge (GAP 05 skeleton). Header-only
 # primitives; no backend dependency. Always built.
@@ -378,7 +380,7 @@ endif()
 
 # --- macOS RPATH for ONNX Runtime dylib ---
 if(APPLE)
-    set(ONNX_MACOS_LIB_DIR "${CMAKE_SOURCE_DIR}/third_party/onnxruntime-macos/lib")
+    set(ONNX_MACOS_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-macos/lib")
     foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES
@@ -391,7 +393,7 @@ endif()
 
 # --- Linux RPATH for Sherpa-ONNX shared libs ---
 if(UNIX AND NOT APPLE)
-    set(SHERPA_LINUX_LIB_DIR "${CMAKE_SOURCE_DIR}/third_party/sherpa-onnx-linux/lib")
+    set(SHERPA_LINUX_LIB_DIR "${RAC_COMMONS_THIRD_PARTY_DIR}/sherpa-onnx-linux/lib")
     foreach(test_target test_vad test_stt test_tts test_wakeword test_voice_agent)
         if(TARGET ${test_target})
             set_target_properties(${test_target} PROPERTIES

@@ -1,233 +1,236 @@
 /**
  * @file rac_http_client.h
- * @brief HTTP client abstraction
+ * @brief Native HTTP client C ABI (v2 close-out Phase H).
  *
- * Defines a platform-agnostic HTTP interface. Platform SDKs implement
- * the actual HTTP transport (URLSession, OkHttp, etc.) and register
- * it via callback.
+ * Opaque handle around a libcurl easy handle (see
+ * `src/infrastructure/http/rac_http_client_curl.cpp`). Replaces the
+ * per-SDK hand-rolled HTTP transport (HttpURLConnection in Kotlin,
+ * URLSession in Swift, fetch/axios in RN/Web, http in Flutter) with a
+ * single canonical implementation shared via this C ABI.
+ *
+ * Scope:
+ *   - blocking request/response (`rac_http_request_send`)
+ *   - streaming body delivered via per-chunk callback
+ *     (`rac_http_request_stream`)
+ *   - byte-range resume
+ *     (`rac_http_request_resume` — wraps `Range: bytes=N-`)
+ *   - redirects, custom headers, configurable timeouts
+ *   - cancellation via chunk-callback return value
+ *
+ * The older executor-plugin ABI under `infrastructure/network` has
+ * been removed from the build. New code must use this curl-backed ABI
+ * for request/response and streaming download transport.
+ *
+ * Rationale: see `docs/rfcs/h1_http_client_vendor.md`.
  */
 
-#ifndef RAC_HTTP_CLIENT_H
-#define RAC_HTTP_CLIENT_H
+#ifndef RAC_INFRASTRUCTURE_HTTP_RAC_HTTP_CLIENT_H
+#define RAC_INFRASTRUCTURE_HTTP_RAC_HTTP_CLIENT_H
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#include "rac_types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // =============================================================================
-// HTTP Types
+// TYPES
 // =============================================================================
 
 /**
- * @brief HTTP method enum
+ * @brief Opaque handle. One handle == one libcurl easy handle.
+ * Instances are NOT thread-safe; create one per worker thread.
  */
-typedef enum {
-    RAC_HTTP_GET = 0,
-    RAC_HTTP_POST = 1,
-    RAC_HTTP_PUT = 2,
-    RAC_HTTP_DELETE = 3,
-    RAC_HTTP_PATCH = 4
-} rac_http_method_t;
+typedef struct rac_http_client rac_http_client_t;
 
 /**
- * @brief HTTP header key-value pair
+ * @brief Single HTTP header (key + value, both NUL-terminated).
+ *
+ * The caller owns the strings for the lifetime of the request
+ * struct; the implementation copies them into libcurl's slist before
+ * firing the request.
  */
 typedef struct {
-    const char* key;
+    const char* name;
     const char* value;
-} rac_http_header_t;
+} rac_http_header_kv_t;
 
 /**
- * @brief HTTP request structure
+ * @brief Request descriptor.
+ *
+ * `method` is uppercase ASCII ("GET" / "POST" / "PUT" / "DELETE" /
+ * "PATCH" / "HEAD"). `url` must be a full absolute URL (http:// or
+ * https://). `headers` can be NULL when `header_count == 0`.
+ *
+ * `body_bytes` / `body_len` are ignored for GET/HEAD. Set
+ * `expected_checksum_hex` is advisory: the HTTP client does NOT
+ * verify it — resumable / streaming downloads need to checksum on
+ * the caller side where the bytes land on disk. The field is carried
+ * here so a single descriptor can travel end-to-end through the
+ * download manager. NULL = no checksum check.
+ *
+ * `timeout_ms == 0` means "no timeout" (libcurl default).
+ * `follow_redirects == RAC_TRUE` follows 3xx up to 10 hops.
  */
 typedef struct {
-    rac_http_method_t method;
-    const char* url;   // Full URL
-    const char* body;  // JSON body (can be NULL for GET)
-    size_t body_length;
-    rac_http_header_t* headers;
+    const char* method;
+    const char* url;
+
+    const rac_http_header_kv_t* headers;
     size_t header_count;
-    int32_t timeout_ms;  // Request timeout in milliseconds
+
+    const uint8_t* body_bytes;
+    size_t body_len;
+
+    int32_t timeout_ms;
+    rac_bool_t follow_redirects;
+
+    const char* expected_checksum_hex;
 } rac_http_request_t;
 
 /**
- * @brief HTTP response structure
+ * @brief Response descriptor.
+ *
+ * `body_bytes` is NULL for streaming calls
+ * (`rac_http_request_stream`, `rac_http_request_resume`); they
+ * deliver the body through the chunk callback. For
+ * `rac_http_request_send` the body is a heap-allocated buffer of
+ * length `body_len`.
+ *
+ * `headers` is an allocated array of `header_count` items; both the
+ * outer array and the `name`/`value` strings live until the caller
+ * invokes `rac_http_response_free(resp)`.
+ *
+ * `redirected_url` is non-NULL only when the server returned a 3xx
+ * and `follow_redirects == RAC_TRUE`; it is the final absolute URL
+ * after hops (owned by the response struct).
+ *
+ * `elapsed_ms` is total wall-clock time from connect to last byte.
  */
 typedef struct {
-    int32_t status_code;  // HTTP status code (200, 401, etc.)
-    char* body;           // Response body (caller frees)
-    size_t body_length;
-    rac_http_header_t* headers;
+    int32_t status;
+
+    rac_http_header_kv_t* headers;
     size_t header_count;
-    char* error_message;  // Non-HTTP error (network failure, etc.)
+
+    uint8_t* body_bytes;
+    size_t body_len;
+
+    char* redirected_url;
+
+    uint64_t elapsed_ms;
 } rac_http_response_t;
 
-// =============================================================================
-// Response Memory Management
-// =============================================================================
-
 /**
- * @brief Free HTTP response
- */
-void rac_http_response_free(rac_http_response_t* response);
-
-// =============================================================================
-// Platform Callback Interface
-// =============================================================================
-
-/**
- * @brief Callback type for receiving HTTP response
+ * @brief Streaming body callback.
  *
- * @param response The HTTP response (platform must free after callback returns)
- * @param user_data Opaque user data passed to request
+ * Called 0..N times as bytes arrive on the wire. Total bytes
+ * delivered across all calls equals `total_written` on the final
+ * invocation. `content_length` is the server-declared length (0 if
+ * the server did not send `Content-Length`). Return `RAC_FALSE` to
+ * cancel the transfer — libcurl aborts the connection and
+ * `rac_http_request_stream` returns a non-zero status.
  */
-typedef void (*rac_http_callback_t)(const rac_http_response_t* response, void* user_data);
-
-/**
- * @brief HTTP executor function type
- *
- * Platform implements this to perform actual HTTP requests.
- * Must call callback when request completes (success or failure).
- *
- * @param request The HTTP request to execute
- * @param callback Callback to invoke with response
- * @param user_data Opaque user data to pass to callback
- */
-typedef void (*rac_http_executor_t)(const rac_http_request_t* request, rac_http_callback_t callback,
-                                    void* user_data);
-
-/**
- * @brief Register platform HTTP executor
- *
- * Platform SDKs must call this during initialization to provide
- * their HTTP implementation.
- *
- * @param executor The executor function
- */
-void rac_http_set_executor(rac_http_executor_t executor);
-
-/**
- * @brief Check if HTTP executor is registered
- * @return true if executor has been set
- */
-bool rac_http_has_executor(void);
+typedef rac_bool_t (*rac_http_body_chunk_fn)(const uint8_t* chunk, size_t chunk_len,
+                                             uint64_t total_written, uint64_t content_length,
+                                             void* user_data);
 
 // =============================================================================
-// Request Building Helpers
+// LIFECYCLE
 // =============================================================================
 
 /**
- * @brief Create a new HTTP request
- * @param method HTTP method
- * @param url Full URL
- * @return New request (caller must free with rac_http_request_free)
+ * @brief Create a client instance. Each instance holds a single
+ * libcurl easy handle; it is NOT thread-safe. Use one per worker.
+ *
+ * @param out Handle out parameter (NULL on failure).
+ * @return RAC_SUCCESS on success, RAC_ERROR_OUT_OF_MEMORY /
+ *         RAC_ERROR_INTERNAL on failure.
  */
-rac_http_request_t* rac_http_request_create(rac_http_method_t method, const char* url);
+RAC_API rac_result_t rac_http_client_create(rac_http_client_t** out);
 
 /**
- * @brief Set request body
- * @param request The request
- * @param body JSON body string
+ * @brief Destroy a client instance. NULL-safe.
  */
-void rac_http_request_set_body(rac_http_request_t* request, const char* body);
-
-/**
- * @brief Add header to request
- * @param request The request
- * @param key Header key
- * @param value Header value
- */
-void rac_http_request_add_header(rac_http_request_t* request, const char* key, const char* value);
-
-/**
- * @brief Set request timeout
- * @param request The request
- * @param timeout_ms Timeout in milliseconds
- */
-void rac_http_request_set_timeout(rac_http_request_t* request, int32_t timeout_ms);
-
-/**
- * @brief Free HTTP request
- */
-void rac_http_request_free(rac_http_request_t* request);
+RAC_API void rac_http_client_destroy(rac_http_client_t* c);
 
 // =============================================================================
-// Standard Headers
+// REQUESTS
 // =============================================================================
 
 /**
- * @brief Add standard SDK headers to request
+ * @brief Send a blocking request, buffer full body into `out_resp`.
  *
- * Adds: Content-Type, X-SDK-Client, X-SDK-Version, X-Platform
+ * On success the response body lives in `out_resp->body_bytes` (size
+ * `body_len`). The caller MUST call `rac_http_response_free(out_resp)`
+ * to release the body + headers + redirected_url allocations.
  *
- * @param request The request
- * @param sdk_version SDK version string
- * @param platform Platform string
+ * @return RAC_SUCCESS on any HTTP response (even 4xx/5xx — check
+ *         `out_resp->status`). Network / connect / TLS errors return
+ *         RAC_ERROR_NETWORK_ERROR. Timeout returns RAC_ERROR_TIMEOUT.
+ *         Cancellation only applies to the streaming variants.
  */
-void rac_http_add_sdk_headers(rac_http_request_t* request, const char* sdk_version,
-                              const char* platform);
+RAC_API rac_result_t rac_http_request_send(rac_http_client_t* c, const rac_http_request_t* req,
+                                           rac_http_response_t* out_resp);
 
 /**
- * @brief Add authorization header
- * @param request The request
- * @param token Bearer token
+ * @brief Stream body through `cb` as chunks arrive. The response
+ * struct is populated with status/headers only — `body_bytes` stays
+ * NULL; the body never lands in memory.
+ *
+ * Return `RAC_FALSE` from `cb` to cancel the transfer — the
+ * connection is aborted and RAC_ERROR_CANCELLED is returned.
  */
-void rac_http_add_auth_header(rac_http_request_t* request, const char* token);
+RAC_API rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_http_request_t* req,
+                                             rac_http_body_chunk_fn cb, void* user_data,
+                                             rac_http_response_t* out_resp_meta);
 
 /**
- * @brief Add API key header (for Supabase compatibility)
- * @param request The request
- * @param api_key API key
+ * @brief Resume a download from `resume_from_byte` using
+ * `Range: bytes=N-`. Semantically identical to
+ * `rac_http_request_stream`, except the caller must already have the
+ * first `resume_from_byte` bytes on disk.
+ *
+ * The implementation sets `CURLOPT_RESUME_FROM_LARGE` which appends
+ * a correctly-formed `Range` header. If the server returns 200
+ * instead of 206, the caller can detect this via
+ * `out_resp_meta->status` and truncate its destination file before
+ * writing the new bytes.
  */
-void rac_http_add_api_key_header(rac_http_request_t* request, const char* api_key);
+RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_http_request_t* req,
+                                             uint64_t resume_from_byte,
+                                             rac_http_body_chunk_fn cb, void* user_data,
+                                             rac_http_response_t* out_resp_meta);
+
+/**
+ * @brief Free a response struct. NULL-safe. Frees `body_bytes`,
+ * every `headers[i].name` / `headers[i].value`, the outer `headers`
+ * array, and `redirected_url`. Does NOT free the struct itself
+ * (callers typically stack-allocate).
+ */
+RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
-// High-Level Request Functions
+// RESULT CODES
 // =============================================================================
-
-/**
- * @brief Context for async HTTP operations
- */
-typedef struct {
-    void* user_data;
-    void (*on_success)(const char* response_body, void* user_data);
-    void (*on_error)(int status_code, const char* error_message, void* user_data);
-} rac_http_context_t;
-
-/**
- * @brief Execute HTTP request asynchronously
- *
- * Uses the registered platform executor.
- *
- * @param request The request to execute
- * @param context Callback context
- */
-void rac_http_execute(const rac_http_request_t* request, rac_http_context_t* context);
-
-/**
- * @brief Helper: POST JSON to endpoint
- * @param url Full URL
- * @param json_body JSON body
- * @param auth_token Bearer token (can be NULL)
- * @param context Callback context
- */
-void rac_http_post_json(const char* url, const char* json_body, const char* auth_token,
-                        rac_http_context_t* context);
-
-/**
- * @brief Helper: GET from endpoint
- * @param url Full URL
- * @param auth_token Bearer token (can be NULL)
- * @param context Callback context
- */
-void rac_http_get(const char* url, const char* auth_token, rac_http_context_t* context);
+// Phase H consumers only need to check against RAC_SUCCESS; the other
+// result codes come from rac/core/rac_error.h. For convenience:
+//
+//   RAC_SUCCESS                     — transfer completed (check .status
+//                                     for HTTP-level errors)
+//   RAC_ERROR_INVALID_ARGUMENT      — bad pointer / URL / method
+//   RAC_ERROR_OUT_OF_MEMORY         — allocation failure
+//   RAC_ERROR_NETWORK_ERROR         — DNS / connect / TLS failure
+//   RAC_ERROR_TIMEOUT               — timeout_ms exceeded
+//   RAC_ERROR_CANCELLED             — chunk callback returned RAC_FALSE
+//   RAC_ERROR_INTERNAL              — libcurl internal error
+// =============================================================================
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // RAC_HTTP_CLIENT_H
+#endif  // RAC_INFRASTRUCTURE_HTTP_RAC_HTTP_CLIENT_H

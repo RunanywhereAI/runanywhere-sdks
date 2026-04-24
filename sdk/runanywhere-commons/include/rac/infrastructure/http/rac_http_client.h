@@ -17,11 +17,9 @@
  *   - redirects, custom headers, configurable timeouts
  *   - cancellation via chunk-callback return value
  *
- * The older executor-plugin ABI in
- * `include/rac/infrastructure/network/rac_http_client.h` is retained
- * for existing consumers (auth_manager, api_types). It is *not*
- * deleted in Phase H because its consumers (auth/POST/GET) are out
- * of scope for this phase; they will migrate in v0.21.
+ * The older executor-plugin ABI under `infrastructure/network` has
+ * been removed from the build. New code must use this curl-backed ABI
+ * for request/response and streaming download transport.
  *
  * Rationale: see `docs/rfcs/h1_http_client_vendor.md`.
  */

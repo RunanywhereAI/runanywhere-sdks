@@ -170,13 +170,13 @@ public:
   // LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
   // ============================================================================
   std::shared_ptr<Promise<std::string>> llmExtractThinking(
-    const std::string& text) override;
+    const std::string& text);
   std::shared_ptr<Promise<std::string>> llmStripThinking(
-    const std::string& text) override;
+    const std::string& text);
   std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(
     double totalCompletionTokens,
     const std::string& responseText,
-    const std::string& thinkingText) override;
+    const std::string& thinkingText);
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)
@@ -269,7 +269,7 @@ public:
 
   std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
-  std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
+  std::shared_ptr<Promise<double>> getVoiceAgentHandle();
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
   std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
   std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) override;

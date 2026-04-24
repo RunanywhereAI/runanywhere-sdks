@@ -41,15 +41,16 @@ Pod::Spec.new do |s|
       "$(PODS_TARGET_SRCROOT)/cpp/third_party",
       "$(PODS_ROOT)/Headers/Public",
       "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64/Headers",
-      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-x86_64-simulator/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64-simulator/Headers",
+      "$(PODS_TARGET_SRCROOT)/ios/Binaries/RACommons.xcframework/ios-arm64_x86_64-simulator/Headers",
     ].join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_RACOMMONS=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
   }
 
-  s.libraries = "c++", "archive", "bz2"
-  s.frameworks = "Accelerate", "Foundation", "CoreML", "AudioToolbox"
+  s.libraries = "c++", "archive", "bz2", "z"
+  s.frameworks = "Accelerate", "Foundation", "CoreML", "AudioToolbox", "CFNetwork", "Security", "SystemConfiguration"
 
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'

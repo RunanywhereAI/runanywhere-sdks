@@ -94,6 +94,7 @@
                 "ANDROID_STL": "c++_shared",
                 "RAC_BUILD_JNI": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
+                "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BUILD_SHARED": "ON"
             }
         },
@@ -122,6 +123,7 @@
                 "CMAKE_OSX_SYSROOT": "iphoneos",
                 "CMAKE_BUILD_TYPE": "Release",
                 "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BUILD_PLATFORM": "ON",
                 "RAC_BUILD_SHARED": "OFF"
             },
@@ -144,8 +146,10 @@
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
                 "RAC_STATIC_PLUGINS": "ON",
+                "RAC_BUILD_BACKENDS": "ON",
                 "RAC_BUILD_PLATFORM": "OFF",
-                "RAC_BUILD_SHARED": "OFF"
+                "RAC_BUILD_SHARED": "OFF",
+                "RAC_WASM_LLAMACPP": "ON"
             }
         },
 

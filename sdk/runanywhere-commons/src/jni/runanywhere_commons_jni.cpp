@@ -24,6 +24,7 @@
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -1766,11 +1767,154 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeFile(
     JNIEnv* env, jclass clazz, jlong handle, jstring audioPath, jstring configJson) {
-    // NOTE: rac_stt_component_transcribe_file does not exist in current API
-    // This is a stub - actual implementation would need to read file and call transcribe
-    if (handle == 0)
-        return nullptr;
-    return env->NewStringUTF("{\"error\": \"transcribe_file not implemented\"}");
+    if (handle == 0 || audioPath == nullptr) {
+        return env->NewStringUTF("{\"error\":\"invalid_handle_or_path\"}");
+    }
+
+    const char* audio_path = env->GetStringUTFChars(audioPath, nullptr);
+    if (audio_path == nullptr) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_path\"}");
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    std::string language_override;
+
+    if (configJson != nullptr) {
+        const char* json_str = env->GetStringUTFChars(configJson, nullptr);
+        if (json_str != nullptr) {
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                if (json.contains("sample_rate") && json["sample_rate"].is_number_integer()) {
+                    const int sample_rate = json["sample_rate"].get<int>();
+                    if (sample_rate > 0) {
+                        options.sample_rate = sample_rate;
+                    }
+                }
+                if (json.contains("language") && json["language"].is_string()) {
+                    language_override = json["language"].get<std::string>();
+                    options.language = language_override.c_str();
+                }
+            } catch (const nlohmann::json::exception& e) {
+                LOGe("Failed to parse STT transcribeFile config JSON: %s", e.what());
+            }
+            env->ReleaseStringUTFChars(configJson, json_str);
+        }
+    }
+
+    std::ifstream file(audio_path, std::ios::binary | std::ios::ate);
+    env->ReleaseStringUTFChars(audioPath, audio_path);
+
+    if (!file.is_open()) {
+        return env->NewStringUTF("{\"error\":\"failed_to_open_audio_file\"}");
+    }
+
+    std::streamsize file_size = file.tellg();
+    if (file_size <= 0) {
+        return env->NewStringUTF("{\"error\":\"audio_file_is_empty\"}");
+    }
+
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> file_data(static_cast<size_t>(file_size));
+    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_file\"}");
+    }
+
+    const uint8_t* data = file_data.data();
+    const size_t data_size = file_data.size();
+    int32_t sample_rate = options.sample_rate;
+
+    if (data_size < 44) {
+        return env->NewStringUTF("{\"error\":\"file_too_small_for_wav\"}");
+    }
+    if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_riff\"}");
+    }
+    if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_wave\"}");
+    }
+
+    size_t pos = 12;
+    size_t audio_data_offset = 0;
+    size_t audio_data_size = 0;
+
+    while (pos + 8 < data_size) {
+        char chunk_id[5] = {0};
+        std::memcpy(chunk_id, &data[pos], 4);
+
+        uint32_t chunk_size = 0;
+        std::memcpy(&chunk_size, &data[pos + 4], sizeof(chunk_size));
+
+        if (std::strcmp(chunk_id, "fmt ") == 0) {
+            if (pos + 8 + chunk_size <= data_size && chunk_size >= 16) {
+                std::memcpy(&sample_rate, &data[pos + 12], sizeof(sample_rate));
+                if (sample_rate <= 0 || sample_rate > 48000) {
+                    sample_rate = options.sample_rate;
+                }
+            }
+        } else if (std::strcmp(chunk_id, "data") == 0) {
+            audio_data_offset = pos + 8;
+            audio_data_size = chunk_size;
+            break;
+        }
+
+        pos += 8 + chunk_size;
+        if (chunk_size % 2 != 0) {
+            ++pos;
+        }
+    }
+
+    if (audio_data_size == 0 || audio_data_offset + audio_data_size > data_size) {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_data_chunk\"}");
+    }
+
+    if (audio_data_size < 3200) {
+        return env->NewStringUTF("{\"error\":\"recording_too_short_to_transcribe\"}");
+    }
+
+    options.sample_rate = sample_rate;
+
+    rac_stt_result_t result = {};
+    rac_result_t status = rac_stt_component_transcribe(
+        reinterpret_cast<rac_handle_t>(handle),
+        &data[audio_data_offset],
+        audio_data_size,
+        &options,
+        &result);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("STT transcribeFile failed with status: %d", status);
+        rac_stt_result_free(&result);
+        nlohmann::json error_json;
+        error_json["error"] = "transcription_failed";
+        error_json["status"] = status;
+        const std::string error_result = error_json.dump();
+        return env->NewStringUTF(error_result.c_str());
+    }
+
+    nlohmann::json json_obj;
+    json_obj["text"] = result.text ? std::string(result.text) : "";
+    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["duration_ms"] = result.processing_time_ms;
+    json_obj["completion_reason"] = 1;
+    json_obj["confidence"] = result.confidence;
+
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
+    const std::string json_result = json_obj.dump();
+    rac_stt_result_free(&result);
+    return env->NewStringUTF(json_result.c_str());
 }
 
 JNIEXPORT jstring JNICALL
