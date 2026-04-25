@@ -92,6 +92,19 @@ final class SecurityLoggingTests: XCTestCase {
         XCTAssertTrue(msg.contains("[REDACTED]"))
     }
 
+    func testAuthorizationBearerJWTIsFullyRedacted() {
+        // Regression for pattern-ordering bug: Pattern 1 must not consume "Bearer" as the
+        // credential value before Pattern 2 captures the actual JWT.
+        // Expected: both the scheme value and the header key are scrubbed; JWT never appears.
+        let input = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"
+        Logging.shared.log(level: .info, category: "Test", message: input)
+        let msg = destination.captured.first?.message ?? ""
+        XCTAssertFalse(msg.contains("eyJhbGciOiJIUzI1NiJ9.payload.sig"),
+                       "JWT must not appear in log output")
+        XCTAssertTrue(msg.contains("[REDACTED]"),
+                      "Redaction marker must be present")
+    }
+
     func testSecretInMessageIsRedacted() {
         Logging.shared.log(level: .debug, category: "Test",
                            message: "secret=xyzTopSecret")

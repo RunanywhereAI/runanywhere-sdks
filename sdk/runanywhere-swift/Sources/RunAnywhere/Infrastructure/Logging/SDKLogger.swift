@@ -309,11 +309,16 @@ public final class Logging: @unchecked Sendable {
     ///   `basic` is intentionally excluded as it appears too often in ordinary prose.
     private static let sensitiveMessagePatterns: [(NSRegularExpression, String)] = {
         let specs: [(String, String)] = [
-            // Group 1: keyword  Group 2: separator (= or : only)  Group 3: value
-            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|authorization|credential)(\s*[=:]\s*)(\S+)"#,
-             "$1$2[REDACTED]"),
-            // Bearer scheme: keyword + whitespace + token (min 8 chars to skip short words)
+            // Bearer scheme FIRST: must run before the key=value pattern so that
+            // "Authorization: Bearer <token>" has its token captured here before
+            // the next pattern can consume "Bearer" as the credential value.
+            // Minimum 8 chars to avoid matching short English words.
             (#"(?i)(bearer)(\s+)([A-Za-z0-9+/=._\-]{8,})"#,
+             "$1$2[REDACTED]"),
+            // Group 1: keyword  Group 2: separator (= or : only)  Group 3: value
+            // "authorization" is safe to include here because the Bearer token has
+            // already been redacted by the pattern above.
+            (#"(?i)(api[_\-]?key|apikey|secret|password|token|auth[_\-]?key|authorization|credential)(\s*[=:]\s*)(\S+)"#,
              "$1$2[REDACTED]"),
         ]
         return specs.map { (patternString, template) in
