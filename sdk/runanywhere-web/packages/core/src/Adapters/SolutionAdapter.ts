@@ -16,7 +16,7 @@
  * finished — there is no JS finalizer that releases native memory.
  */
 
-import { SolutionConfig } from '../generated/solutions';
+import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,

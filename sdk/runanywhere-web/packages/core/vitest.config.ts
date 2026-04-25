@@ -12,10 +12,17 @@
 //     ./build/macos-release/tests/streaming/perf_bench/perf_producer
 
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@runanywhere/proto-ts': fileURLToPath(new URL('../../../runanywhere-proto-ts/dist', import.meta.url)),
+      'protobufjs/minimal': fileURLToPath(new URL('../../node_modules/protobufjs/minimal.js', import.meta.url)),
+    },
+  },
   test: {
-    include: ['../../../../tests/streaming/**/*.web.test.ts'],
+    include: ['src/**/*.test.ts', '../../../../tests/streaming/**/*.web.test.ts'],
     environment: 'node',
     testTimeout: 30_000,
   },

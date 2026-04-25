@@ -18,9 +18,6 @@
 #include <unordered_map>
 
 // Resolved via target_include_directories on rac_backend_onnx — the engine
-// CMakeLists adds engines/onnx/ to the include path (auto-added by the
-// rac_add_engine_plugin macro from CMAKE_CURRENT_SOURCE_DIR).
-#include "onnx_backend.h"
 #include "rac_runtime_onnxrt.h"
 #include "rac/core/rac_logger.h"
 

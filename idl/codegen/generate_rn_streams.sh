@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# generate_rn_streams.sh — emit AsyncIterable<T> client wrappers for the
-# 3 GAP 09 streaming services into the RN SDK's generated/ tree.
+# generate_rn_streams.sh — compatibility entrypoint for shared TS stream
+# wrappers. RN and Web now consume @runanywhere/proto-ts.
 #
 # Uses the in-tree Nunjucks template at
 # idl/codegen/templates/ts_async_iterable.njk. The actual rendering is done
 # by a tiny Node helper invoked once per (service, rpc, response) triple.
 #
 # Output:
-#   sdk/runanywhere-react-native/packages/core/src/generated/streams/
-#     voice_agent_service_stream.ts
-#     llm_service_stream.ts
-#     download_service_stream.ts
+#   sdk/runanywhere-proto-ts/src/streams/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/generated/streams"
+OUT_DIR="${REPO_ROOT}/sdk/runanywhere-proto-ts/src/streams"
 TEMPLATE="${SCRIPT_DIR}/templates/ts_async_iterable.njk"
 
 mkdir -p "${OUT_DIR}"
@@ -54,4 +51,4 @@ for (const [s, l, req, resp, rpc, reqMod, respMod] of tuples) {
 "
 
 node -e "${RENDER_NODE_SCRIPT}"
-echo "✓ RN AsyncIterable streams → ${OUT_DIR}"
+echo "✓ shared TS AsyncIterable streams → ${OUT_DIR}"

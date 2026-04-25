@@ -42,5 +42,10 @@ module.exports = {
       },
     ],
   },
+  moduleNameMapper: {
+    '^@runanywhere/proto-ts/(.*)$': '<rootDir>/../../../runanywhere-proto-ts/src/$1.ts',
+    '^long$': '<rootDir>/../../node_modules/long/umd/index.js',
+    '^protobufjs/minimal$': '<rootDir>/../../node_modules/protobufjs/minimal.js',
+  },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 };

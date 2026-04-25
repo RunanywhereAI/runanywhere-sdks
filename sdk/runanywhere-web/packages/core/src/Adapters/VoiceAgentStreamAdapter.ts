@@ -21,10 +21,10 @@
  *   of the first-through-last subscriber.
  */
 
-import type { VoiceAgentRequest } from '../generated/voice_agent_service';
-import { VoiceEvent } from '../generated/voice_events';
-import type { VoiceAgentStreamTransport } from '../generated/streams/voice_agent_service_stream';
-import { streamVoiceAgent } from '../generated/streams/voice_agent_service_stream';
+import type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
+import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,

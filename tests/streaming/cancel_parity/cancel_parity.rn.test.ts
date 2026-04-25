@@ -8,7 +8,7 @@
 
 import * as fs from 'fs';
 import { runCancelParity, type PayloadKind } from './cancel_parity';
-import { VoiceEvent } from '../../../sdk/runanywhere-react-native/packages/core/src/generated/voice_events';
+import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
 const OUTPUT_PATH = '/tmp/cancel_trace.rn.log';
 

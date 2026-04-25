@@ -1,0 +1,40 @@
+{
+  "name": "@runanywhere/proto-ts",
+  "version": "0.19.13",
+  "description": "Shared RunAnywhere ts-proto generated types and stream wrappers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js"
+    },
+    "./streams/*": {
+      "types": "./dist/streams/*.d.ts",
+      "import": "./dist/streams/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "long": "^5.2.3",
+    "protobufjs": "^7.2.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

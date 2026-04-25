@@ -29,7 +29,7 @@ import {
   MetricsEvent,
   StateChangeEvent,
   PipelineState,
-} from '../../sdk/runanywhere-react-native/packages/core/src/generated/voice_events';
+} from '@runanywhere/proto-ts/voice_events';
 
 function formatEvent(e: VoiceEvent): string {
   if (e.userSaid)        return `user_said:text=${e.userSaid.text},is_final=${e.userSaid.isFinal}`;

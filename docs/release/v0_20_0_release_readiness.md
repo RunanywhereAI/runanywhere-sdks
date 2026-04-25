@@ -84,6 +84,22 @@ frontends.
 - [ ] Web parity/cancel/perf: Vitest tests wired to `tests/streaming/**` pass
   for `*.web.test.ts`.
 
+## Post-remediation Gates Added
+
+These checks were added during the surgical remediation pass and must stay green
+for the release candidate:
+
+- [ ] CPU/runtime targeted tests pass:
+  `ctest --preset macos-debug -R "runtime_|engine_uses_runtime|engine_router|engine_capability" --output-on-failure`.
+- [ ] `@runanywhere/proto-ts` builds and typechecks before Web/RN consumers:
+  `cd sdk/runanywhere-proto-ts && npm install --package-lock=false && npm run typecheck`.
+- [ ] Web core Vitest now includes both streaming harness tests and singleton
+  module lifecycle tests: `npm run test -w packages/core -- --run`.
+- [ ] React Native Jest streaming harness resolves shared proto types from
+  `@runanywhere/proto-ts`.
+- [ ] Legacy RN/Web file blocklist workflow passes; removed files must not
+  reappear.
+
 ## Version Bump Tasks
 
 Perform the bump atomically from `0.19.13` to `0.20.0`. Do not tag if any
@@ -100,6 +116,7 @@ manifest below still reports `0.19.13`.
 - [ ] `sdk/runanywhere-web/packages/core/package.json`
 - [ ] `sdk/runanywhere-web/packages/onnx/package.json`
 - [ ] `sdk/runanywhere-web/packages/llamacpp/package.json`
+- [ ] `sdk/runanywhere-proto-ts/package.json`
 - [ ] `sdk/runanywhere-react-native/package.json`
 - [ ] `sdk/runanywhere-react-native/packages/core/package.json`
 - [ ] `sdk/runanywhere-kotlin/gradle.properties`
@@ -163,6 +180,10 @@ they do not block `v0.20.0` if every blocking gate above passes.
 - [ ] Web bootstrap `fetch` carve-outs are allowed for no-module-yet downloads,
   WASM binary loading, helper text loading, and pre-`rac_init` telemetry. No
   steady-state Web SDK HTTP/download path may bypass the commons HTTP adapter.
+- [ ] Large bridge-file splits are staged follow-up work, not a release blocker.
+  See `verification/2026-04-24/G4.1_jni_split_reclassified.md`,
+  `G4.2_kotlin_bridge_reclassified.md`, and
+  `G4.3_G4.7_large_file_split_reclassified.md`.
 
 ## Security and Compliance
 

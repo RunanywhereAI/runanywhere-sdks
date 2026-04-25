@@ -32,16 +32,16 @@ export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
 export { PipelineState } from './Public/Extensions/VoiceAgentTypes';
 export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
-export type { VoiceAgentStreamTransport } from './generated/streams/voice_agent_service_stream';
-export type { VoiceAgentRequest } from './generated/voice_agent_service';
+export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
+export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
 
 // LLM proto-byte streaming (GAP 09 — symmetric to VoiceAgentStreamAdapter).
 // Used by backend packages (e.g. @runanywhere/web-llamacpp) to expose a
 // platform-agnostic AsyncIterable<LLMStreamEvent> over the C++ proto callback.
 export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
-export type { LLMStreamTransport } from './generated/streams/llm_service_stream';
-export type { LLMGenerateRequest, LLMStreamEvent } from './generated/llm_service';
-export { LLMTokenKind } from './generated/llm_service';
+export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
+export type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+export { LLMTokenKind } from '@runanywhere/proto-ts/llm_service';
 
 // Solutions runtime (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
 // Construct via `RunAnywhere.solutions.run(...)` (preferred) or directly via
@@ -67,8 +67,8 @@ export {
   VADEventType,
   InterruptReason,
   PipelineState as VoiceEventPipelineState,
-} from './generated/voice_events';
-export { setRunanywhereModule } from './runtime/EmscriptenModule';
+} from '@runanywhere/proto-ts/voice_events';
+export { clearRunanywhereModule, setRunanywhereModule } from './runtime/EmscriptenModule';
 export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
 
 // HTTP adapter (T3.13) — wraps the commons libcurl-backed C ABI so every

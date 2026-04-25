@@ -682,7 +682,7 @@ RAC_ONNX_API rac_result_t rac_wakeword_onnx_load_vad(rac_handle_t handle,
         backend->vad_loaded = false;
     }
 
-    // Create VAD using existing rac_vad_onnx implementation
+    // Create VAD using the Sherpa implementation behind the compatibility type aliases.
     rac_vad_sherpa_config_t vad_config = RAC_VAD_ONNX_CONFIG_DEFAULT;
     vad_config.sample_rate = backend->config.sample_rate;
     vad_config.energy_threshold = VAD_THRESHOLD;

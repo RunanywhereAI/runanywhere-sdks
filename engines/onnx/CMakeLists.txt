@@ -61,7 +61,6 @@ include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 set(ONNX_BACKEND_SOURCES
-    rac_onnx.cpp
     rac_backend_onnx_register.cpp
     rac_plugin_entry_onnx.cpp
 )
@@ -93,13 +92,6 @@ set(ONNX_LINK_LIBS rac_runtime_onnxrt nlohmann_json::nlohmann_json)
 set(ONNX_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX)
 if(NOT TARGET rac_runtime_onnxrt)
     message(FATAL_ERROR "RAC_BACKEND_ONNX requires rac_runtime_onnxrt. Enable RAC_RUNTIME_ONNXRT or disable RAC_BACKEND_ONNX.")
-endif()
-set(RAC_ONNX_SHERPA_COMPAT_AVAILABLE OFF)
-if(TARGET rac_backend_sherpa)
-    list(APPEND ONNX_LINK_LIBS rac_backend_sherpa)
-    list(APPEND ONNX_COMPILE_DEFS RAC_ONNX_SHERPA_COMPAT=1)
-    list(APPEND ONNX_EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../sherpa)
-    set(RAC_ONNX_SHERPA_COMPAT_AVAILABLE ON)
 endif()
 
 # v3.1.2: TARGET_NAME=rac_backend_onnx preserves the historical CMake
@@ -145,20 +137,17 @@ elseif(RAC_PLATFORM_IOS)
         "-framework CoreML"
         "-framework Accelerate"
     )
-    # CoreML Execution Provider is available in ONNX Runtime iOS package
-    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_COREML=1)
+    # CoreML framework remains linked for runtime packaging; ORT API usage is
+    # centralized in runtimes/onnxrt.
     message(STATUS "ONNX Backend: CoreML EP enabled for iOS")
 
 elseif(RAC_PLATFORM_ANDROID)
     target_link_libraries(rac_backend_onnx PRIVATE log)
     # Don't use -fvisibility=hidden here - JNI bridge needs these symbols
     target_compile_options(rac_backend_onnx PRIVATE -O3 -ffunction-sections -fdata-sections)
-        # Ensure ORT_API_VERSION matches bundled libonnxruntime (1.17.x -> API 17)
-        target_compile_definitions(rac_backend_onnx PRIVATE ORT_API_VERSION=17)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
     target_link_options(rac_backend_onnx PRIVATE -Wl,--gc-sections -Wl,-z,max-page-size=16384)
-    # NNAPI Execution Provider for Android NPU acceleration
-    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_NNAPI=1)
+    # NNAPI / ORT compile definitions belong to runtimes/onnxrt, not this engine.
     message(STATUS "ONNX Backend: NNAPI EP enabled for Android")
 
 elseif(RAC_PLATFORM_MACOS)
@@ -167,8 +156,8 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework CoreML"
         "-framework Accelerate"
     )
-    # CoreML Execution Provider is available in ONNX Runtime macOS package
-    target_compile_definitions(rac_backend_onnx PRIVATE ORT_USE_COREML=1)
+    # CoreML framework remains linked for runtime packaging; ORT API usage is
+    # centralized in runtimes/onnxrt.
     message(STATUS "ONNX Backend: CoreML EP enabled for macOS")
 
 elseif(RAC_PLATFORM_LINUX)
@@ -227,6 +216,6 @@ endif()
 
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
-message(STATUS "  Speech compatibility shims: ${RAC_ONNX_SHERPA_COMPAT_AVAILABLE}")
+message(STATUS "  Speech compatibility shims: owned by engines/sherpa")
 message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

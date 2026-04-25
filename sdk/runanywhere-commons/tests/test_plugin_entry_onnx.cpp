@@ -1,6 +1,6 @@
 /**
  * @file test_plugin_entry_onnx.cpp
- * @brief Verifies the ONNX Runtime plugin entry point serves STT + TTS + VAD.
+ * @brief Verifies the ONNX Runtime plugin entry point owns embeddings only.
  *
  * GAP 02 Phase 10.
  */
@@ -19,30 +19,27 @@ int main() {
     if (vt == nullptr) { return 1; }
     if (vt->metadata.abi_version != RAC_PLUGIN_API_VERSION) { return 1; }
 
-    if (vt->stt_ops == nullptr) {
-        std::fprintf(stderr, "stt_ops is NULL\n");
+    if (vt->embedding_ops == nullptr) {
+        std::fprintf(stderr, "embedding_ops is NULL\n");
         return 1;
     }
-    if (vt->tts_ops == nullptr) {
-        std::fprintf(stderr, "tts_ops is NULL\n");
-        return 1;
-    }
-    if (vt->vad_ops == nullptr) {
-        std::fprintf(stderr, "vad_ops is NULL\n");
+    if (vt->stt_ops != nullptr || vt->tts_ops != nullptr || vt->vad_ops != nullptr) {
+        std::fprintf(stderr, "speech ops should live in the Sherpa engine\n");
         return 1;
     }
 
     rac_plugin_register(vt);
 
-    // All 3 primitive maps must list ONNX after registration.
-    if (rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE)   != vt) { return 1; }
-    if (rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE)   != vt) { return 1; }
-    if (rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE) != vt) { return 1; }
+    // ONNX owns embeddings after Sherpa speech extraction.
+    if (rac_plugin_find(RAC_PRIMITIVE_EMBED) != vt) { return 1; }
 
-    // LLM / VLM / embedding must remain NULL.
+    // LLM / VLM / speech primitives must remain off ONNX.
     if (rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != nullptr) { return 1; }
+    if (rac_plugin_find(RAC_PRIMITIVE_TRANSCRIBE)   != nullptr) { return 1; }
+    if (rac_plugin_find(RAC_PRIMITIVE_SYNTHESIZE)   != nullptr) { return 1; }
+    if (rac_plugin_find(RAC_PRIMITIVE_DETECT_VOICE) != nullptr) { return 1; }
 
     rac_plugin_unregister("onnx");
-    std::fprintf(stdout, "  ok: all 3 primitive slots populated, registry round-trip ok\n");
+    std::fprintf(stdout, "  ok: embedding slot populated, speech slots null, registry round-trip ok\n");
     return 0;
 }

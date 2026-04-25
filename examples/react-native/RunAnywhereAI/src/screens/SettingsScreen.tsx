@@ -327,6 +327,7 @@ export const SettingsScreen: React.FC = () => {
       async (args: Record<string, unknown>) => {
         const location = (args.location as string) || 'San Francisco';
         try {
+          // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
           const response = await fetch(
             `https://wttr.in/${encodeURIComponent(location)}?format=j1`
           );

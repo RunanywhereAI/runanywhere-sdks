@@ -17,8 +17,20 @@
  * package (@runanywhere/web) is pure TypeScript.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger, EventBus, SDKEventType, SDKEnvironment, RunAnywhere, HTTPAdapter } from '@runanywhere/web';
-import type { AccelerationMode } from '@runanywhere/web';
+import {
+  SDKError,
+  SDKErrorCode,
+  SDKLogger,
+  EventBus,
+  SDKEventType,
+  SDKEnvironment,
+  RunAnywhere,
+  HTTPAdapter,
+  ModelRegistryAdapter,
+  clearRunanywhereModule,
+  setRunanywhereModule,
+} from '@runanywhere/web';
+import type { AccelerationMode, EmscriptenRunanywhereModule } from '@runanywhere/web';
 import { getDeviceInfo } from '@runanywhere/web';
 import { PlatformAdapter } from './PlatformAdapter';
 import { AnalyticsEventsBridge } from './AnalyticsEventsBridge';
@@ -306,7 +318,12 @@ export class LlamaCppBridge {
       // Publish this module as the default HTTP transport (T3.13) so
       // core's ModelDownloader can route through the commons libcurl
       // C ABI without taking a hard dependency on this backend package.
+      const coreModule = this._module! as unknown as EmscriptenRunanywhereModule;
+      setRunanywhereModule(coreModule);
       HTTPAdapter.setDefaultModule(this._module! as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
+      ModelRegistryAdapter.setDefaultModule(
+        this._module! as unknown as Parameters<typeof ModelRegistryAdapter.setDefaultModule>[0],
+      );
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
@@ -670,6 +687,8 @@ export class LlamaCppBridge {
     }
 
     HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    clearRunanywhereModule();
 
     this._module = null;
     this._loaded = false;

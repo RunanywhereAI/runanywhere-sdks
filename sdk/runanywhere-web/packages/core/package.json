@@ -61,6 +61,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@runanywhere/proto-ts": "file:../../../runanywhere-proto-ts",
     "long": "^5.2.3",
     "protobufjs": "^7.2.6"
   },

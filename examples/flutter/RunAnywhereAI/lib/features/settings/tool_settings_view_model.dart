@@ -7,6 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:runanywhere/runanywhere.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+// SAMPLE_HTTP_CARVE_OUT: this sample uses `package:http` only for external
+// weather-tool demo calls. SDK auth/download/model traffic stays on
+// RACommons-backed adapters.
+
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
 ///
 /// Manages tool calling state and registered tools.

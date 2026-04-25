@@ -9,7 +9,7 @@
 // v3.1: proto imports removed — legacy mapper helpers that used them
 // (voiceSessionEventFromProto / voiceSessionEventKindFromProto) were
 // deleted. Consumers import VoiceEvent directly from
-// '../generated/voice_events' when they need it.
+// '@runanywhere/proto-ts/voice_events' when they need it.
 
 /**
  * Component load state

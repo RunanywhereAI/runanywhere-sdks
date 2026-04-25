@@ -185,12 +185,9 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(libs.whisper.jni)
-                implementation(libs.okhttp)
-                implementation(libs.okhttp.logging)
                 implementation(libs.gson)
                 implementation(libs.commons.io)
 
-                implementation(libs.ktor.client.okhttp)
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)
                 // org.json - available on Android via SDK, needed explicitly for JVM

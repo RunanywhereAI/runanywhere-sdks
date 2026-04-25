@@ -26,10 +26,10 @@
  *   trampoline for the lifetime of the first-through-last subscriber.
  */
 
-import type { LLMGenerateRequest } from '../generated/llm_service';
-import { LLMStreamEvent } from '../generated/llm_service';
-import type { LLMStreamTransport } from '../generated/streams/llm_service_stream';
-import { generateLLM } from '../generated/streams/llm_service_stream';
+import type { LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
+import { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
+import { generateLLM } from '@runanywhere/proto-ts/streams/llm_service_stream';
 import {
   runanywhereModule,
   type EmscriptenRunanywhereModule,

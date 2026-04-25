@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# generate_web_streams.sh — emit AsyncIterable<T> client wrappers for the
-# 3 GAP 09 streaming services into the Web SDK's generated/ tree.
+# generate_web_streams.sh — compatibility entrypoint for shared TS stream
+# wrappers. RN and Web now consume @runanywhere/proto-ts.
 #
-# Same template as generate_rn_streams.sh; only the output path differs.
 # The transport interface is identical at the type level — what plugs into
 # `transport.subscribe()` differs (Nitro callback vs Emscripten callback)
 # but the consumer signature (AsyncIterable<T>) is the same.
 #
 # Output:
-#   sdk/runanywhere-web/packages/core/src/generated/streams/
+#   sdk/runanywhere-proto-ts/src/streams/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-OUT_DIR="${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/generated/streams"
+OUT_DIR="${REPO_ROOT}/sdk/runanywhere-proto-ts/src/streams"
 TEMPLATE="${SCRIPT_DIR}/templates/ts_async_iterable.njk"
 
 mkdir -p "${OUT_DIR}"
@@ -52,4 +51,4 @@ for (const [s, l, req, resp, rpc, reqMod, respMod] of tuples) {
 "
 
 node -e "${RENDER_NODE_SCRIPT}"
-echo "✓ Web AsyncIterable streams → ${OUT_DIR}"
+echo "✓ shared TS AsyncIterable streams → ${OUT_DIR}"

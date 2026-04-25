@@ -25,9 +25,9 @@
 
 import { test, expect } from 'vitest';
 
-import { VoiceEvent } from '../../generated/voice_events';
+import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import { __testing__ } from '../VoiceAgentStreamAdapter';
-import { streamVoiceAgent } from '../../generated/streams/voice_agent_service_stream';
+import { streamVoiceAgent } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 
 // -----------------------------------------------------------------------------
 // Fake Emscripten module.

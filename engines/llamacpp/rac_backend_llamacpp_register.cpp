@@ -11,12 +11,17 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <new>
 #include <nlohmann/json.hpp>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/plugin/rac_cpu_runtime_provider.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/plugin/rac_runtime_registry.h"
+#include "rac/plugin/rac_runtime_vtable.h"
 
 static const char* LOG_CAT = "LlamaCPP";
 
@@ -26,16 +31,127 @@ static const char* LOG_CAT = "LlamaCPP";
 
 namespace {
 
+struct LlamaCppRuntimeImpl {
+    const rac_runtime_vtable_t* runtime = nullptr;
+    rac_runtime_session_t* runtime_session = nullptr;
+    rac_handle_t legacy_handle = nullptr;
+};
+
+LlamaCppRuntimeImpl* as_runtime_impl(void* impl) {
+    return static_cast<LlamaCppRuntimeImpl*>(impl);
+}
+
+rac_handle_t legacy_handle(void* impl) {
+    auto* runtime_impl = as_runtime_impl(impl);
+    return runtime_impl ? runtime_impl->legacy_handle : nullptr;
+}
+
+rac_result_t llamacpp_cpu_provider_create_session(const rac_runtime_session_desc_t* desc,
+                                                  rac_runtime_session_t** out) {
+    if (desc == nullptr || out == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out = nullptr;
+    if (desc->model_path == nullptr || desc->model_path[0] == '\0') {
+        return RAC_ERROR_INVALID_PATH;
+    }
+
+    rac_handle_t backend_handle = nullptr;
+    rac_result_t rc = rac_llm_llamacpp_create(desc->model_path, nullptr, &backend_handle);
+    if (rc != RAC_SUCCESS) return rc;
+    *out = reinterpret_cast<rac_runtime_session_t*>(backend_handle);
+    return RAC_SUCCESS;
+}
+
+const rac_runtime_io_t* find_io(const rac_runtime_io_t* ios, size_t count, const char* name) {
+    if (ios == nullptr || name == nullptr) return nullptr;
+    for (size_t i = 0; i < count; ++i) {
+        if (ios[i].name != nullptr && std::strcmp(ios[i].name, name) == 0) {
+            return &ios[i];
+        }
+    }
+    return nullptr;
+}
+
+rac_result_t llamacpp_cpu_provider_run_session(rac_runtime_session_t* session,
+                                               const rac_runtime_io_t* inputs,
+                                               size_t n_in,
+                                               rac_runtime_io_t* outputs,
+                                               size_t n_out) {
+    if (session == nullptr) return RAC_ERROR_NULL_POINTER;
+    const auto* prompt_io = find_io(inputs, n_in, "prompt");
+    auto* result_io = const_cast<rac_runtime_io_t*>(find_io(outputs, n_out, "llm_result"));
+    if (prompt_io == nullptr || prompt_io->data == nullptr ||
+        result_io == nullptr || result_io->data == nullptr ||
+        result_io->data_bytes < sizeof(rac_llm_result_t)) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    const char* prompt = static_cast<const char*>(prompt_io->data);
+    const auto* options_io = find_io(inputs, n_in, "llm_options");
+    const rac_llm_options_t* options = nullptr;
+    if (options_io != nullptr && options_io->data != nullptr &&
+        options_io->data_bytes >= sizeof(rac_llm_options_t)) {
+        options = static_cast<const rac_llm_options_t*>(options_io->data);
+    }
+
+    return rac_llm_llamacpp_generate(
+        reinterpret_cast<rac_handle_t>(session),
+        prompt,
+        options,
+        static_cast<rac_llm_result_t*>(result_io->data));
+}
+
+void llamacpp_cpu_provider_destroy_session(rac_runtime_session_t* session) {
+    if (session == nullptr) return;
+    rac_llm_llamacpp_destroy(reinterpret_cast<rac_handle_t>(session));
+}
+
+const uint32_t k_llamacpp_cpu_formats[] = {
+    1,  /* MODEL_FORMAT_GGUF */
+    2,  /* MODEL_FORMAT_GGML */
+    5,  /* MODEL_FORMAT_BIN  */
+};
+
+const rac_cpu_runtime_provider_t k_llamacpp_cpu_provider = {
+    /* .name            = */ "llamacpp",
+    /* .primitive       = */ RAC_PRIMITIVE_GENERATE_TEXT,
+    /* .formats         = */ k_llamacpp_cpu_formats,
+    /* .formats_count   = */ sizeof(k_llamacpp_cpu_formats) / sizeof(k_llamacpp_cpu_formats[0]),
+    /* .create_session  = */ llamacpp_cpu_provider_create_session,
+    /* .run_session     = */ llamacpp_cpu_provider_run_session,
+    /* .destroy_session = */ llamacpp_cpu_provider_destroy_session,
+};
+
 // Initialize (model already loaded during create for LlamaCpp)
 static rac_result_t llamacpp_vtable_initialize(void* impl, const char* model_path) {
-    return rac_llm_llamacpp_load_model(impl, model_path, nullptr);
+    return rac_llm_llamacpp_load_model(legacy_handle(impl), model_path, nullptr);
 }
 
 // Generate (blocking)
 static rac_result_t llamacpp_vtable_generate(void* impl, const char* prompt,
                                              const rac_llm_options_t* options,
                                              rac_llm_result_t* out_result) {
-    return rac_llm_llamacpp_generate(impl, prompt, options, out_result);
+    auto* runtime_impl = as_runtime_impl(impl);
+    if (runtime_impl == nullptr || runtime_impl->runtime == nullptr ||
+        runtime_impl->runtime->run_session == nullptr ||
+        runtime_impl->runtime_session == nullptr) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    rac_runtime_io_t inputs[2] = {};
+    size_t n_in = 1;
+    inputs[0].name = "prompt";
+    inputs[0].data = const_cast<char*>(prompt);
+    inputs[0].data_bytes = prompt ? std::strlen(prompt) + 1 : 0;
+    if (options != nullptr) {
+        inputs[1].name = "llm_options";
+        inputs[1].data = const_cast<rac_llm_options_t*>(options);
+        inputs[1].data_bytes = sizeof(rac_llm_options_t);
+        n_in = 2;
+    }
+    rac_runtime_io_t output = {};
+    output.name = "llm_result";
+    output.data = out_result;
+    output.data_bytes = sizeof(rac_llm_result_t);
+    return runtime_impl->runtime->run_session(runtime_impl->runtime_session, inputs, n_in, &output, 1);
 }
 
 // Streaming callback adapter
@@ -59,7 +175,7 @@ static rac_result_t llamacpp_vtable_generate_stream(void* impl, const char* prom
                                                     rac_llm_stream_callback_fn callback,
                                                     void* user_data) {
     StreamAdapter adapter = {callback, user_data};
-    return rac_llm_llamacpp_generate_stream(impl, prompt, options, stream_adapter_callback,
+    return rac_llm_llamacpp_generate_stream(legacy_handle(impl), prompt, options, stream_adapter_callback,
                                             &adapter);
 }
 
@@ -69,7 +185,7 @@ static rac_result_t llamacpp_vtable_generate_stream_with_timing(
     rac_llm_stream_callback_fn callback, void* user_data, rac_benchmark_timing_t* timing_out) {
     StreamAdapter adapter = {callback, user_data};
     return rac_llm_llamacpp_generate_stream_with_timing(
-        impl, prompt, options, stream_adapter_callback, &adapter, timing_out);
+        legacy_handle(impl), prompt, options, stream_adapter_callback, &adapter, timing_out);
 }
 
 // Get info
@@ -77,7 +193,7 @@ static rac_result_t llamacpp_vtable_get_info(void* impl, rac_llm_info_t* out_inf
     if (!out_info)
         return RAC_ERROR_NULL_POINTER;
 
-    out_info->is_ready = rac_llm_llamacpp_is_model_loaded(impl);
+    out_info->is_ready = rac_llm_llamacpp_is_model_loaded(legacy_handle(impl));
     out_info->supports_streaming = RAC_TRUE;
     out_info->current_model = nullptr;
     out_info->context_length = 0;  // Default if model not loaded or info unavailable
@@ -85,7 +201,7 @@ static rac_result_t llamacpp_vtable_get_info(void* impl, rac_llm_info_t* out_inf
     // Get actual context_length from model info JSON when model is loaded
     if (out_info->is_ready) {
         char* json_str = nullptr;
-        if (rac_llm_llamacpp_get_model_info(impl, &json_str) == RAC_SUCCESS && json_str) {
+        if (rac_llm_llamacpp_get_model_info(legacy_handle(impl), &json_str) == RAC_SUCCESS && json_str) {
             try {
                 auto json = nlohmann::json::parse(json_str);
                 if (json.contains("context_size") && json["context_size"].is_number()) {
@@ -103,54 +219,59 @@ static rac_result_t llamacpp_vtable_get_info(void* impl, rac_llm_info_t* out_inf
 
 // Cancel
 static rac_result_t llamacpp_vtable_cancel(void* impl) {
-    rac_llm_llamacpp_cancel(impl);
+    rac_llm_llamacpp_cancel(legacy_handle(impl));
     return RAC_SUCCESS;
 }
 
 // Cleanup
 static rac_result_t llamacpp_vtable_cleanup(void* impl) {
-    return rac_llm_llamacpp_unload_model(impl);
+    return rac_llm_llamacpp_unload_model(legacy_handle(impl));
 }
 
 // Destroy
 static void llamacpp_vtable_destroy(void* impl) {
-    rac_llm_llamacpp_destroy(impl);
+    auto* runtime_impl = as_runtime_impl(impl);
+    if (runtime_impl == nullptr) return;
+    if (runtime_impl->runtime && runtime_impl->runtime->destroy_session) {
+        runtime_impl->runtime->destroy_session(runtime_impl->runtime_session);
+    }
+    delete runtime_impl;
 }
 
 // LoRA adapter management
 static rac_result_t llamacpp_vtable_load_lora(void* impl, const char* adapter_path, float scale) {
-    return rac_llm_llamacpp_load_lora(impl, adapter_path, scale);
+    return rac_llm_llamacpp_load_lora(legacy_handle(impl), adapter_path, scale);
 }
 
 static rac_result_t llamacpp_vtable_remove_lora(void* impl, const char* adapter_path) {
-    return rac_llm_llamacpp_remove_lora(impl, adapter_path);
+    return rac_llm_llamacpp_remove_lora(legacy_handle(impl), adapter_path);
 }
 
 static rac_result_t llamacpp_vtable_clear_lora(void* impl) {
-    return rac_llm_llamacpp_clear_lora(impl);
+    return rac_llm_llamacpp_clear_lora(legacy_handle(impl));
 }
 
 static rac_result_t llamacpp_vtable_get_lora_info(void* impl, char** out_json) {
-    return rac_llm_llamacpp_get_lora_info(impl, out_json);
+    return rac_llm_llamacpp_get_lora_info(legacy_handle(impl), out_json);
 }
 
 // Adaptive context ops
 static rac_result_t llamacpp_vtable_inject_system_prompt(void* impl, const char* prompt) {
-    return rac_llm_llamacpp_inject_system_prompt(impl, prompt);
+    return rac_llm_llamacpp_inject_system_prompt(legacy_handle(impl), prompt);
 }
 
 static rac_result_t llamacpp_vtable_append_context(void* impl, const char* text) {
-    return rac_llm_llamacpp_append_context(impl, text);
+    return rac_llm_llamacpp_append_context(legacy_handle(impl), text);
 }
 
 static rac_result_t llamacpp_vtable_generate_from_context(void* impl, const char* query,
                                                           const rac_llm_options_t* options,
                                                           rac_llm_result_t* out_result) {
-    return rac_llm_llamacpp_generate_from_context(impl, query, options, out_result);
+    return rac_llm_llamacpp_generate_from_context(legacy_handle(impl), query, options, out_result);
 }
 
 static rac_result_t llamacpp_vtable_clear_context(void* impl) {
-    return rac_llm_llamacpp_clear_context(impl);
+    return rac_llm_llamacpp_clear_context(legacy_handle(impl));
 }
 
 // Static vtable for LlamaCpp
@@ -173,13 +294,42 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id,
     *out_impl = nullptr;
     RAC_LOG_INFO(LOG_CAT, "llamacpp_llm_create_impl: model=%s", model_id);
 
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t rc = rac_llm_llamacpp_create(model_id, nullptr, &backend_handle);
+    const rac_runtime_vtable_t* runtime = rac_runtime_get_by_id(RAC_RUNTIME_CPU);
+    rac_result_t rc = runtime ? RAC_SUCCESS : RAC_ERROR_NOT_FOUND;
+    if (rc != RAC_SUCCESS || runtime == nullptr || runtime->create_session == nullptr ||
+        runtime->run_session == nullptr || runtime->destroy_session == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT, "CPU runtime session ops unavailable: %d", rc);
+        return rc == RAC_SUCCESS ? RAC_ERROR_NOT_IMPLEMENTED : rc;
+    }
+
+    rac_runtime_session_desc_t desc = {};
+    desc.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+    desc.model_format = 1; /* MODEL_FORMAT_GGUF by default; CPU provider accepts compatible formats. */
+    desc.model_path = model_id;
+
+    rac_runtime_session_t* runtime_session = nullptr;
+    rc = runtime->create_session(&desc, &runtime_session);
     if (rc != RAC_SUCCESS) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_llm_llamacpp_create failed: %d", rc);
+        RAC_LOG_ERROR(LOG_CAT, "CPU runtime create_session failed: %d", rc);
         return rc;
     }
-    *out_impl = backend_handle;
+
+    rac_runtime_session_t* provider_session = nullptr;
+    rc = rac_cpu_runtime_get_provider_session(runtime_session, nullptr, &provider_session);
+    if (rc != RAC_SUCCESS || provider_session == nullptr) {
+        runtime->destroy_session(runtime_session);
+        return rc == RAC_SUCCESS ? RAC_ERROR_INVALID_HANDLE : rc;
+    }
+
+    auto* runtime_impl = new (std::nothrow) LlamaCppRuntimeImpl();
+    if (runtime_impl == nullptr) {
+        runtime->destroy_session(runtime_session);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    runtime_impl->runtime = runtime;
+    runtime_impl->runtime_session = runtime_session;
+    runtime_impl->legacy_handle = reinterpret_cast<rac_handle_t>(provider_session);
+    *out_impl = runtime_impl;
     return RAC_SUCCESS;
 }
 
@@ -244,6 +394,14 @@ LlamaCPPRegistryState& get_state() {
 // =============================================================================
 
 extern "C" {
+
+rac_result_t rac_llamacpp_cpu_runtime_register(void) {
+    return rac_cpu_runtime_register_provider(&k_llamacpp_cpu_provider);
+}
+
+void rac_llamacpp_cpu_runtime_unregister(void) {
+    rac_cpu_runtime_unregister_provider(k_llamacpp_cpu_provider.name);
+}
 
 rac_result_t rac_backend_llamacpp_register(void) {
     auto& state = get_state();

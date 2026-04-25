@@ -22,7 +22,7 @@ import type {
   LLMGenerationResult,
 } from '../../types/LLMTypes';
 import { LLMStreamAdapter } from '../../Adapters/LLMStreamAdapter';
-import type { LLMStreamEvent } from '../../generated/llm_service';
+import type { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 

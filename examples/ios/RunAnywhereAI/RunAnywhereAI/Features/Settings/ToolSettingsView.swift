@@ -354,6 +354,7 @@ enum WeatherService {
             return nil
         }
 
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         let (data, _) = try await URLSession.shared.data(from: url)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -381,6 +382,7 @@ enum WeatherService {
             return ["error": .string("Invalid weather API URL")]
         }
 
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         let (data, _) = try await URLSession.shared.data(from: url)
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

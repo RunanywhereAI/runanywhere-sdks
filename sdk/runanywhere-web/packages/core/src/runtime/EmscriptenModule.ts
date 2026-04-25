@@ -215,6 +215,11 @@ export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
   _module = mod;
 }
 
+/** Clear the singleton module during backend shutdown. */
+export function clearRunanywhereModule(): void {
+  _module = null;
+}
+
 /**
  * Typed accessor for the runanywhere WASM module.
  *

@@ -256,6 +256,32 @@ rac_link_archive_deps(test_runtime_loader)
 target_compile_features(test_runtime_loader PRIVATE cxx_std_17)
 add_test(NAME runtime_loader_tests COMMAND test_runtime_loader)
 
+# A2.1: CPU runtime session dispatch. Tests the built-in CPU runtime's
+# provider hook without depending on a real GGUF model or llama.cpp.
+add_executable(test_runtime_cpu_session test_runtime_cpu_session.cpp)
+target_include_directories(test_runtime_cpu_session PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}
+)
+target_link_libraries(test_runtime_cpu_session PRIVATE rac_commons)
+rac_link_archive_deps(test_runtime_cpu_session)
+target_compile_features(test_runtime_cpu_session PRIVATE cxx_std_17)
+add_test(NAME runtime_cpu_session_tests COMMAND test_runtime_cpu_session)
+
+# A2.4: anti-regression that an engine create path can be wired to the
+# runtime session vtable instead of allocating its own private session.
+add_executable(test_engine_uses_runtime test_engine_uses_runtime.cpp)
+target_include_directories(test_engine_uses_runtime PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}
+)
+target_link_libraries(test_engine_uses_runtime PRIVATE rac_commons)
+rac_link_archive_deps(test_engine_uses_runtime)
+target_compile_features(test_engine_uses_runtime PRIVATE cxx_std_17)
+add_test(NAME engine_uses_runtime_tests COMMAND test_engine_uses_runtime)
+
 # GAP 03 Phase 6: static registration test (always built — exercises the
 # RAC_STATIC_PLUGIN_REGISTER macro independently of the dlopen path).
 add_executable(test_static_registration test_static_registration.cpp)

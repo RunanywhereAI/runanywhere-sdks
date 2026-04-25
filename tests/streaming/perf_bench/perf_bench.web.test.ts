@@ -14,7 +14,7 @@
 import * as fs from 'fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { runPerfBench } from './perf_bench';
-import { VoiceEvent } from '../../../sdk/runanywhere-web/packages/core/src/generated/voice_events';
+import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
 const OUTPUT_PATH = '/tmp/perf_bench.web.log';
 

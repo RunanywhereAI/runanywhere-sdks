@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Generate TypeScript bindings via ts-proto for React Native AND Web targets.
+# Generate shared TypeScript bindings via ts-proto for React Native and Web.
 #
 # Requirements:
 #   npm install -g ts-proto@1.181.1 protobufjs
 #
 # Output:
-#   sdk/runanywhere-react-native/packages/core/src/generated/
-#   sdk/runanywhere-web/packages/core/src/generated/
+#   sdk/runanywhere-proto-ts/src/
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PROTO_DIR="${REPO_ROOT}/idl"
-RN_OUT_DIR="${REPO_ROOT}/sdk/runanywhere-react-native/packages/core/src/generated"
-WEB_OUT_DIR="${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/generated"
+TS_OUT_DIR="${REPO_ROOT}/sdk/runanywhere-proto-ts/src"
 
-mkdir -p "${RN_OUT_DIR}" "${WEB_OUT_DIR}"
+mkdir -p "${TS_OUT_DIR}"
 
 if ! command -v protoc >/dev/null 2>&1; then
     echo "error: protoc not found. Run scripts/setup-toolchain.sh." >&2
@@ -33,22 +31,13 @@ if [ ! -x "${TS_PROTO_PLUGIN}" ]; then
     exit 127
 fi
 
-# RN target: env=node works for both RN and the metro packager's Node parser.
+# Shared target: env=browser keeps bytes as Uint8Array, which works in Web and
+# React Native without coupling generated code to global Buffer.
 protoc \
     --plugin=protoc-gen-ts_proto="${TS_PROTO_PLUGIN}" \
     --proto_path="${PROTO_DIR}" \
-    --ts_proto_out="${RN_OUT_DIR}" \
-    --ts_proto_opt=esModuleInterop=true,outputServices=false,env=node,useOptionals=messages \
-    model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto
-
-echo "✓ TS (RN) proto codegen → ${RN_OUT_DIR}"
-
-# Web target: env=browser enables different Buffer/Uint8Array handling.
-protoc \
-    --plugin=protoc-gen-ts_proto="${TS_PROTO_PLUGIN}" \
-    --proto_path="${PROTO_DIR}" \
-    --ts_proto_out="${WEB_OUT_DIR}" \
+    --ts_proto_out="${TS_OUT_DIR}" \
     --ts_proto_opt=esModuleInterop=true,outputServices=false,env=browser,useOptionals=messages \
     model_types.proto voice_events.proto pipeline.proto solutions.proto voice_agent_service.proto llm_service.proto download_service.proto
 
-echo "✓ TS (Web) proto codegen → ${WEB_OUT_DIR}"
+echo "✓ TS proto codegen → ${TS_OUT_DIR}"

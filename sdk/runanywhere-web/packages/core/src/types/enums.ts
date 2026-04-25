@@ -7,10 +7,10 @@
  *
  * GAP 01 Phase 5: each IDL-backed enum below ships a `<name>ToProto()` /
  * `<name>FromProto()` helper that bridges to the ts-proto-generated numeric
- * enum under `./generated/model_types`. Adding a case on either side forces
+ * enum under `@runanywhere/proto-ts/model_types`. Adding a case on either side forces
  * the mapping to cover it; the CI drift-check enforces freshness.
  */
-import * as proto from '../generated/model_types';
+import * as proto from '@runanywhere/proto-ts/model_types';
 
 export enum SDKEnvironment {
   Development = 'development',

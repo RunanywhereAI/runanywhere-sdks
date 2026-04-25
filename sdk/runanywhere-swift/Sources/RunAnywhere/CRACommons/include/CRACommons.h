@@ -168,6 +168,7 @@
 
 #include "rac_primitive.h"
 #include "rac_engine_vtable.h"
+#include "rac_cpu_runtime_provider.h"
 #include "rac_plugin_entry.h"
 #include "rac_plugin_loader.h"  // v2 close-out (B31): runtime dlopen path
 #include "rac_routing_hints.h"

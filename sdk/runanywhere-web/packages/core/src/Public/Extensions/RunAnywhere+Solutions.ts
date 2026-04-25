@@ -11,7 +11,7 @@
  * .run({ config | configBytes | yaml })`.
  */
 
-import type { SolutionConfig } from '../../generated/solutions';
+import type { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 import {
   SolutionAdapter,
   SolutionHandle,

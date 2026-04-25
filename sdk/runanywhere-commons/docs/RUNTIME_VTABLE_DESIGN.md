@@ -38,7 +38,7 @@ internally). This forced three problems:
 
 ## 2. Goals & non-goals
 
-**Goals (MVP through Phase 6):**
+**Phase A goals (shipped):**
 
 - A C ABI (`rac_runtime_vtable_t`) that wraps a compute runtime's lifecycle,
   session management, and buffer allocation.
@@ -54,6 +54,18 @@ internally). This forced three problems:
 - Adapter runtime extraction for ONNX Runtime, CoreML, and Metal so engines
   call thin runtime helpers for shared session/model/device lifecycles instead
   of directly owning every L1 object.
+
+**Phase B goals (remaining):**
+
+- Move additional engine-owned primitive sessions behind `create_session` /
+  `run_session` / `destroy_session`. A2.1 starts this with llama.cpp blocking
+  generate on CPU; streaming / LoRA / context still use the extracted native
+  handle during the staged migration.
+- Add integration tests that prove an engine selected by the router actually
+  calls a runtime vtable session op, not only checks runtime metadata.
+- Promote typed tensor descriptors and output ownership into reserved runtime
+  ABI space so `run_session` can represent LLM, speech, embedding, and
+  diffusion primitive I/O without engine-specific casts.
 
 **Non-goals (follow-up work):**
 
@@ -111,8 +123,9 @@ typedef struct rac_runtime_vtable {
 ```
 
 All op pointers except `init`/`destroy` MAY be NULL when the runtime only
-advertises metadata (e.g. a lightweight `cpu` runtime that engines use for
-fallback identification but that doesn't own session lifecycles). Callers
+advertises metadata. The built-in CPU runtime now implements session ops by
+delegating to registered CPU providers (for example llama.cpp); runtimes that
+do not own session lifecycles should still leave those slots NULL. Callers
 probe with `rac_runtime_has_op(vt, &rac_runtime_vtable::run_session)` before
 dispatch.
 
@@ -180,21 +193,24 @@ registry). Its vtable:
 - Implements `init`/`destroy` as no-ops, `device_info` returning a CPU
   descriptor built from `HardwareProfile::cached()`, and
   `capabilities` returning a generic "supports any ModelFormat" set.
-- Leaves `create_session` / `run_session` / `destroy_session` NULL: the CPU
-  runtime in this MVP is a marker, not a compute engine. Engines that run
-  on the CPU (llama.cpp CPU backend, ONNX Runtime CPU EP) continue to own
-  their own execution paths, they just now *observe* that
-  `RAC_RUNTIME_CPU` is registered.
+- Implements `create_session` / `run_session` / `destroy_session` by delegating
+  to `rac_cpu_runtime_provider_t` entries registered by engine plugins. This
+  keeps `rac_commons` independent of concrete engines while allowing staged
+  engine-to-runtime dispatch.
 
 The CPU runtime uses the same `RAC_STATIC_PLUGIN_REGISTER`-style mechanism
 used for engine plugins, so it survives iOS / WASM static-linking.
 
 ## 7. Executable runtime extraction status
 
-Phase 6 promotes the registry from descriptor-only to executable adapter
+Phase A promotes the registry from descriptor-only to executable helper
 runtimes. The public ABI remains additive: `rac_runtime_vtable_t` keeps the
 same op slots, and `RAC_RUNTIME_ONNXRT = 13` promotes the first reserved
-runtime id.
+runtime id. A2.1 additionally gives the built-in CPU runtime provider-backed
+session ops and migrates llama.cpp blocking generate through that path. This is
+still not a full engine-session cut-over: several engines still own their
+primitive-specific sessions and some llama.cpp APIs still use the extracted
+native handle.
 
 ### 7.1 Concrete op signatures
 
@@ -233,9 +249,20 @@ queries used by the router, diagnostics, and future SDK introspection.
 | `runtimes/onnxrt` | Executable adapter. Owns shared `OrtEnv`, ORT session creation, generic run, and host buffer allocation. | `engines/onnx` links `rac_runtime_onnxrt`; the RAG embedding provider includes the thin `rac_runtime_onnxrt.h` wrapper, not raw ORT headers. ONNX engine metadata declares `RAC_RUNTIME_ONNXRT` as required. |
 | `runtimes/coreml` | Executable metadata/runtime helper. Owns default `MLModelConfiguration`, model loading, and CoreML availability/capability reporting. | `diffusion-coreml` loads all `MLModel` bundles through `rac_coreml_load_model_in_dir`; `whisperkit_coreml` gates capability on `rac_coreml_runtime_require_available`. CoreML prediction-specific code remains in engines. |
 | `runtimes/metal` | Executable metadata/runtime helper. Owns default `MTLDevice`, command queue, Metal-backed `alloc_buffer/free_buffer`, and availability checks. | `metalrt` wrappers call `rac_metal_runtime_require_available` before touching the private MetalRT C API. Private engine-specific handles stay in `engines/metalrt`. |
-| `runtimes/cpu` | Built-in descriptor/helper runtime. | CPU remains process-default and provides device/capability metadata. It still does not own arbitrary engine sessions. |
+| `runtimes/cpu` | Built-in descriptor/helper runtime with provider-backed session dispatch. | CPU remains process-default, provides device/capability metadata, and delegates sessions to registered `rac_cpu_runtime_provider_t` entries. llama.cpp registers a provider for blocking text generation; streaming / LoRA / context remain staged on the native handle. |
 
-### 7.3 Remaining direct ownership
+### 7.3 Phase A vs Phase B checklist
+
+| Capability | Phase A status | Phase B exit criterion |
+| --- | --- | --- |
+| Runtime ABI + registry | Done: `rac_runtime_vtable_t`, `rac_runtime_registry`, ABI-version rejection, static registration, and runtime list/lookup APIs exist. | Keep ABI stable while adding tests for session-bearing runtimes. |
+| Router awareness | Done: engine scoring consults `rac_runtime_is_available` and runtime metadata. | Add a router-selected engine integration test that proves runtime session dispatch occurred. |
+| CPU runtime | Done as descriptor/helper runtime plus provider-backed `create_session`, `run_session`, and `destroy_session`. | Expand beyond the first llama.cpp blocking-generate path and decide whether CPU remains provider-driven or gains engine-independent tensor sessions. |
+| ONNX Runtime | Partially executable: shared ORT environment/session helper exists and RAG embeddings use the wrapper. | Migrate remaining ONNX engine session ownership through the runtime vtable or document all compatibility shims. |
+| CoreML / Metal | Helper runtimes own availability, configuration, device, queue, and buffer readiness. | Move primitive-specific prediction / private-handle execution behind typed runtime I/O once the ABI grows those descriptors. |
+| Tests | Registry and static-loader tests pass; router tests prove availability scoring. | Add engine-to-runtime execution tests that assert `create_session` / `run_session` calls, not just registry presence. |
+
+### 7.4 Remaining direct ownership
 
 The extraction is intentionally adapter-based:
 

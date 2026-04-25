@@ -17,7 +17,7 @@
  * Reference: sdk/runanywhere-swift/.../Public/Extensions/Solutions/
  */
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SolutionConfig } from '../../generated/solutions';
+import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {

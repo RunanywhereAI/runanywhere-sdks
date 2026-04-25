@@ -83,7 +83,7 @@ export type {
   VoiceAgentConfig,
   VoiceTurnResult,
   // v3.1: VoiceSessionEventType / VoiceSessionEvent / VoiceSessionCallback
-  // DELETED. Use VoiceEvent (ts-proto) from '../generated/voice_events'.
+  // DELETED. Use VoiceEvent (ts-proto) from '@runanywhere/proto-ts/voice_events'.
   VoiceAgentMetrics,
 } from './VoiceAgentTypes';
 

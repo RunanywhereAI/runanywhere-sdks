@@ -15,8 +15,7 @@
 # `sherpa_onnx` target exists when onnx's CMake runs (see engines/CMakeLists.txt).
 #
 # The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
-# engines/onnx keeps only generic ONNX Runtime services and temporary legacy
-# rac_*_onnx_* shims that forward to this target.
+# engines/onnx keeps only generic ONNX Runtime services and embeddings.
 # =============================================================================
 
 option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONNX)" ON)
@@ -249,6 +248,7 @@ set(SHERPA_BACKEND_SOURCES
     rac_stt_sherpa.cpp
     rac_tts_sherpa.cpp
     rac_vad_sherpa.cpp
+    rac_onnx_compat.cpp
     rac_backend_sherpa_register.cpp
     wakeword_sherpa.cpp
     rac_plugin_entry_sherpa.cpp

@@ -54,6 +54,10 @@ export class ModelRegistryAdapter {
     defaultModule = module;
   }
 
+  static clearDefaultModule(): void {
+    defaultModule = null;
+  }
+
   /** Returns the installed module, or `null` if no backend has loaded yet. */
   static tryDefault(): ModelRegistryAdapter | null {
     if (!defaultModule) return null;

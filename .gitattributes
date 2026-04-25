@@ -18,6 +18,8 @@ sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**  linguist-generate
 # TypeScript (RN + Web)
 sdk/runanywhere-react-native/packages/core/src/generated/**  linguist-generated=true -diff
 sdk/runanywhere-web/packages/core/src/generated/**  linguist-generated=true -diff
+sdk/runanywhere-proto-ts/src/**  linguist-generated=true -diff
+sdk/runanywhere-proto-ts/dist/**  linguist-generated=true -diff
 
 # Python (future SDK; directory exists once generate_python.sh runs)
 sdk/runanywhere-python/src/runanywhere/generated/**  linguist-generated=true -diff
@@ -32,4 +34,7 @@ sdk/runanywhere-react-native/packages/*/nitrogen/generated/**  linguist-generate
 **/*.pb.cc  linguist-generated=true -diff
 **/*.pb.h  linguist-generated=true -diff
 **/*.pb.dart  linguist-generated=true -diff
+**/*.pbjson.dart  linguist-generated=true -diff
+**/*.pbenum.dart  linguist-generated=true -diff
+**/*.pbserver.dart  linguist-generated=true -diff
 **/*.pb.swift  linguist-generated=true -diff

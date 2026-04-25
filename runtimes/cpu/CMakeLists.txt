@@ -6,9 +6,9 @@
 # The CPU runtime is always available on every host. We build it as an
 # OBJECT library and fold its objects into rac_commons (mirrors the
 # metalrt approach), so there is no separate librac_runtime_cpu.* to ship.
-# Consumers who want to force a static link for iOS / WASM static-linking
-# reference `rac_runtime_static_marker_cpu` — emitted by
-# RAC_STATIC_RUNTIME_REGISTER(cpu) inside rac_runtime_cpu.cpp.
+# CPU registration is bootstrapped explicitly by rac_runtime_registry.cpp.
+# The CPU TU intentionally does not emit a RAC_STATIC_RUNTIME_REGISTER marker;
+# that macro path is covered by the runtime loader fixture tests.
 # =============================================================================
 
 add_library(rac_runtime_cpu OBJECT

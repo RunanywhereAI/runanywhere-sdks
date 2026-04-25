@@ -19,6 +19,15 @@ repos:
         args: ['--maxkb=1000']
       - id: check-merge-conflict
 
+  # Repository hygiene
+  - repo: local
+    hooks:
+      - id: no-root-object-artifacts
+        name: No root object artifacts
+        entry: bash -c 'if ls ./*.o ./*.a ./*.so ./*.dylib >/dev/null 2>&1; then echo "Root build artifacts are not allowed. Run git clean -fdX or move them under build/."; exit 1; fi'
+        language: system
+        pass_filenames: false
+
   # Android Lint temporarily disabled due to compilation issues
   # - repo: local
   #   hooks:

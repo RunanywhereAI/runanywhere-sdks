@@ -102,6 +102,7 @@ const registerChatTools = () => {
 
       try {
         const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const response = await fetch(url);
 
         if (!response.ok) {

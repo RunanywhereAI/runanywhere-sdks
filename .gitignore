@@ -244,6 +244,8 @@ examples/web/RunAnywhereAI/node_modules/
 # External repositories and distribution
 EXTERNAL/
 dist/
+!sdk/runanywhere-proto-ts/dist/
+!sdk/runanywhere-proto-ts/dist/**
 
 # MLC-LLM submodule build artifacts (submodule is inside MLC module, similar to llama.cpp)
 sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/build/

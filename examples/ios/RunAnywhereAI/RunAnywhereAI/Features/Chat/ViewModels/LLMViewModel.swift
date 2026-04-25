@@ -443,6 +443,9 @@ final class LLMViewModel {
             }
         }
 
+        // SAMPLE_HTTP_CARVE_OUT: LoRA adapters are demo-owned external files,
+        // not SDK-managed model artifacts. Keep this local until the SDK
+        // exposes a public arbitrary-URL download helper.
         let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
 
         // Validate GGUF magic bytes before saving

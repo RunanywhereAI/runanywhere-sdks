@@ -25,6 +25,8 @@ extern "C" {
 
 /* Defined in rac_backend_llamacpp_register.cpp (non-static since Phase 8). */
 extern const rac_llm_service_ops_t g_llamacpp_ops;
+rac_result_t rac_llamacpp_cpu_runtime_register(void);
+void rac_llamacpp_cpu_runtime_unregister(void);
 
 /* GAP 04 Phase 11: declare which runtimes + model formats this plugin serves
  * so the EngineRouter can score it against the caller's preferred_runtime
@@ -51,6 +53,10 @@ static const uint32_t k_llamacpp_formats[] = {
 };
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
+static void llamacpp_on_unload(void) {
+    rac_llamacpp_cpu_runtime_unregister();
+}
+
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
@@ -65,7 +71,7 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
         .formats_count    = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
     },
     /* capability_check */ nullptr,
-    /* on_unload        */ nullptr,
+    /* on_unload        */ llamacpp_on_unload,
 
     /* llm_ops          */ &g_llamacpp_ops,
     /* stt_ops          */ nullptr,
@@ -82,6 +88,7 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp) {
+    (void)rac_llamacpp_cpu_runtime_register();
     return &g_llamacpp_engine_vtable;
 }
 

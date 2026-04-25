@@ -4,15 +4,11 @@
  *
  * Task T4.1 — see `sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md`.
  *
- * The CPU runtime is always available on every supported host. Its role in
- * the MVP is to guarantee the runtime registry is non-empty and to expose a
- * canonical `RAC_RUNTIME_CPU` descriptor (device info + capabilities) that
- * engines can consult as a fallback. It intentionally does NOT implement
- * `create_session` / `run_session`: compute-capable engines
- * (llama.cpp-CPU, ONNX Runtime CPU EP) keep their own dispatch paths in
- * this phase. When the engine→runtime migration (§7 of the design doc)
- * lands, those engines will move their session code into dedicated runtime
- * plugins that populate these slots.
+ * The CPU runtime is always available on every supported host. It guarantees
+ * the runtime registry is non-empty and exposes a canonical `RAC_RUNTIME_CPU`
+ * descriptor (device info + capabilities). Session execution is delegated to
+ * CPU providers registered by engine plugins, which keeps rac_commons from
+ * linking directly against engine implementations such as llama.cpp.
  *
  * Lifecycle:
  *   init    — no-op, reports success.
@@ -21,20 +17,29 @@
  *                 so the `device_id` reflects the actual host CPU.
  *   capabilities — static, advertises FP16 + quantised paths which every
  *                  modern CPU backend supports via NEON / AVX / VNNI.
+ *   sessions — delegated to registered rac_cpu_runtime_provider_t entries.
  */
 
 #include "rac_runtime_entry_cpu.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <mutex>
+#include <new>
+#include <vector>
 
 #include "rac/core/rac_error.h"
+#include "rac/plugin/rac_cpu_runtime_provider.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 #include "rac/router/rac_hardware_profile.h"
 
 namespace {
+
+constexpr uint64_t kCpuSessionMagic = 0x5241434350555345ull; /* "RACCPUSE" */
 
 /* --------------------------------------------------------------------------
  * Metadata (lives in .rodata; registry does NOT copy).
@@ -53,6 +58,61 @@ const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_EMBED,
     RAC_PRIMITIVE_RERANK,
 };
+
+struct CpuRuntimeSession {
+    uint64_t magic = kCpuSessionMagic;
+    rac_cpu_runtime_provider_t provider{};
+    rac_runtime_session_t* provider_session = nullptr;
+};
+
+std::mutex& provider_mutex() {
+    static std::mutex mutex;
+    return mutex;
+}
+
+std::vector<rac_cpu_runtime_provider_t>& providers() {
+    static std::vector<rac_cpu_runtime_provider_t> entries;
+    return entries;
+}
+
+bool primitive_is_supported(rac_primitive_t primitive) {
+    for (rac_primitive_t supported : k_supported_primitives) {
+        if (supported == primitive) return true;
+    }
+    return false;
+}
+
+bool provider_supports_format(const rac_cpu_runtime_provider_t& provider,
+                              uint32_t model_format) {
+    if (provider.formats == nullptr || provider.formats_count == 0 || model_format == 0) {
+        return true;
+    }
+    for (size_t i = 0; i < provider.formats_count; ++i) {
+        if (provider.formats[i] == model_format) return true;
+    }
+    return false;
+}
+
+bool find_provider(const rac_runtime_session_desc_t* desc,
+                   rac_cpu_runtime_provider_t* out_provider) {
+    std::lock_guard<std::mutex> lock(provider_mutex());
+    for (const auto& provider : providers()) {
+        if (provider.primitive == desc->primitive &&
+            provider_supports_format(provider, desc->model_format)) {
+            *out_provider = provider;
+            return true;
+        }
+    }
+    return false;
+}
+
+CpuRuntimeSession* as_cpu_session(rac_runtime_session_t* session) {
+    auto* cpu_session = reinterpret_cast<CpuRuntimeSession*>(session);
+    if (cpu_session == nullptr || cpu_session->magic != kCpuSessionMagic) {
+        return nullptr;
+    }
+    return cpu_session;
+}
 
 /* --------------------------------------------------------------------------
  * Vtable op implementations.
@@ -112,6 +172,67 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
     return RAC_SUCCESS;
 }
 
+rac_result_t cpu_create_session(const rac_runtime_session_desc_t* desc,
+                                rac_runtime_session_t** out) {
+    if (out == nullptr || desc == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out = nullptr;
+
+    if (!primitive_is_supported(desc->primitive)) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    if ((desc->model_path == nullptr || desc->model_path[0] == '\0') &&
+        (desc->model_blob == nullptr || desc->model_blob_bytes == 0)) {
+        return RAC_ERROR_INVALID_PATH;
+    }
+
+    rac_cpu_runtime_provider_t provider{};
+    if (!find_provider(desc, &provider)) {
+        return RAC_ERROR_NOT_IMPLEMENTED;
+    }
+
+    rac_runtime_session_t* provider_session = nullptr;
+    rac_result_t rc = provider.create_session(desc, &provider_session);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (provider_session == nullptr) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+
+    auto* session = new (std::nothrow) CpuRuntimeSession();
+    if (session == nullptr) {
+        provider.destroy_session(provider_session);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    session->provider = provider;
+    session->provider_session = provider_session;
+    *out = reinterpret_cast<rac_runtime_session_t*>(session);
+    return RAC_SUCCESS;
+}
+
+rac_result_t cpu_run_session(rac_runtime_session_t* session,
+                             const rac_runtime_io_t* inputs, size_t n_in,
+                             rac_runtime_io_t* outputs, size_t n_out) {
+    auto* cpu_session = as_cpu_session(session);
+    if (cpu_session == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    if (n_in > 0 && inputs == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (n_out > 0 && outputs == nullptr) return RAC_ERROR_NULL_POINTER;
+    return cpu_session->provider.run_session(
+        cpu_session->provider_session, inputs, n_in, outputs, n_out);
+}
+
+void cpu_destroy_session(rac_runtime_session_t* session) {
+    auto* cpu_session = as_cpu_session(session);
+    if (cpu_session == nullptr) return;
+    cpu_session->magic = 0;
+    if (cpu_session->provider.destroy_session != nullptr &&
+        cpu_session->provider_session != nullptr) {
+        cpu_session->provider.destroy_session(cpu_session->provider_session);
+    }
+    delete cpu_session;
+}
+
 /* --------------------------------------------------------------------------
  * Vtable singleton. Every op slot is filled explicitly (including the
  * intentionally-NULL session ops) so layout matches the header exactly and
@@ -136,9 +257,9 @@ const rac_runtime_vtable_t k_cpu_vtable = {
     },
     /* .init            = */ cpu_init,
     /* .destroy         = */ cpu_destroy,
-    /* .create_session  = */ nullptr,
-    /* .run_session     = */ nullptr,
-    /* .destroy_session = */ nullptr,
+    /* .create_session  = */ cpu_create_session,
+    /* .run_session     = */ cpu_run_session,
+    /* .destroy_session = */ cpu_destroy_session,
     /* .alloc_buffer    = */ nullptr,
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ cpu_device_info,
@@ -155,6 +276,59 @@ const rac_runtime_vtable_t k_cpu_vtable = {
 
 extern "C" RAC_API const rac_runtime_vtable_t* rac_runtime_entry_cpu(void) {
     return &k_cpu_vtable;
+}
+
+extern "C" RAC_API rac_result_t rac_cpu_runtime_register_provider(
+    const rac_cpu_runtime_provider_t* provider) {
+    if (provider == nullptr || provider->name == nullptr ||
+        provider->create_session == nullptr || provider->run_session == nullptr ||
+        provider->destroy_session == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (!primitive_is_supported(provider->primitive)) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    std::lock_guard<std::mutex> lock(provider_mutex());
+    auto& entries = providers();
+    auto it = std::find_if(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.name != nullptr && std::strcmp(entry.name, provider->name) == 0;
+    });
+    try {
+        if (it != entries.end()) {
+            *it = *provider;
+        } else {
+            entries.push_back(*provider);
+        }
+    } catch (const std::bad_alloc&) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    return RAC_SUCCESS;
+}
+
+extern "C" RAC_API void rac_cpu_runtime_unregister_provider(const char* name) {
+    if (name == nullptr) return;
+    std::lock_guard<std::mutex> lock(provider_mutex());
+    auto& entries = providers();
+    entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const auto& entry) {
+        return entry.name != nullptr && std::strcmp(entry.name, name) == 0;
+    }), entries.end());
+}
+
+extern "C" RAC_API rac_result_t rac_cpu_runtime_get_provider_session(
+    rac_runtime_session_t* session,
+    const char** out_provider_name,
+    rac_runtime_session_t** out_provider_session) {
+    if (out_provider_session == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out_provider_session = nullptr;
+    if (out_provider_name) *out_provider_name = nullptr;
+
+    auto* cpu_session = as_cpu_session(session);
+    if (cpu_session == nullptr) return RAC_ERROR_INVALID_HANDLE;
+
+    if (out_provider_name) *out_provider_name = cpu_session->provider.name;
+    *out_provider_session = cpu_session->provider_session;
+    return RAC_SUCCESS;
 }
 
 /* Registration:

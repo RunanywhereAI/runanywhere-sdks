@@ -151,7 +151,8 @@ elseif(ANDROID)
 
         # Sherpa-ONNX Android prebuilts only ship the C API header.
         # The ONNX C++ API headers (onnxruntime_cxx_api.h etc.) are header-only
-        # wrappers needed by wakeword_onnx.cpp.  Download them if missing.
+        # wrappers still consumed by Sherpa wakeword compatibility code.
+        # Download them if missing.
         if(NOT EXISTS "${ONNX_HEADER_PATH}/onnxruntime_cxx_api.h")
             set(ONNX_CXX_HEADER_DIR "${CMAKE_BINARY_DIR}/_deps/onnxruntime-cxx-headers")
             file(MAKE_DIRECTORY "${ONNX_CXX_HEADER_DIR}")

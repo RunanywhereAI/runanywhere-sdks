@@ -265,6 +265,7 @@ async function registerDemoTools(): Promise<void> {
       const location = args.location?.type === 'string' ? args.location.value : 'San Francisco';
       try {
         // Geocode the location
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`);
         const geoData = await geoRes.json();
         if (!geoData.results?.length) {
@@ -273,6 +274,7 @@ async function registerDemoTools(): Promise<void> {
         const { latitude, longitude, name } = geoData.results[0];
 
         // Get weather
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const wxRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code`);
         const wxData = await wxRes.json();
         const current = wxData.current;
