@@ -3,12 +3,8 @@
 #
 # GAP 06 T5.3 — see v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md.
 #
-# Wraps Apple's compiled Stable Diffusion MLModel bundles
-# (.mlmodelc / .mlpackage) behind the rac_diffusion_service_ops_t vtable.
-# Uses Apple's ml-stable-diffusion bridge pattern: four CoreML models —
-# TextEncoder, Unet, VAEDecoder, SafetyChecker — loaded + orchestrated
-# from Obj-C++. iOS / iPadOS / macOS only; forces OFF everywhere else so
-# the plugin never shows up in the router on non-Apple hosts.
+# Wraps Apple's compiled Stable Diffusion MLModel bundles (.mlmodelc /
+# .mlpackage) behind the rac_diffusion_service_ops_t vtable.
 # =============================================================================
 
 if(APPLE)
@@ -25,6 +21,9 @@ endif()
 message(STATUS "Configuring CoreML Diffusion backend...")
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+if(NOT TARGET rac_runtime_coreml)
+    message(FATAL_ERROR "RAC_BACKEND_DIFFUSION_COREML requires rac_runtime_coreml.")
+endif()
 
 # Objective-C++ language is enabled at root level (CMakeLists.txt) so
 # CMAKE_OBJCXX_COMPILE_OBJECT is populated when this subdirectory runs.
@@ -43,9 +42,11 @@ rac_add_engine_plugin(diffusion_coreml
     SOURCES             ${DIFFUSION_COREML_SOURCES}
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+    COMPILE_DEFINITIONS RAC_DIFFUSION_COREML_GENERATE_AVAILABLE=1
     LINK_LIBRARIES      "-framework Foundation"
                         "-framework CoreML"
                         "-framework Accelerate"
+                        rac_runtime_coreml
     RUNTIMES            CORE_ML ANE
     FORMATS             COREML
 )

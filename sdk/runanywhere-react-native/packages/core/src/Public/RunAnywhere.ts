@@ -267,12 +267,6 @@ export const RunAnywhere = {
   },
 
   /**
-   * Register device with backend if not already registered
-   * Uses native C++ DeviceBridge + platform HTTP (URLSession/OkHttp)
-   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-   * @internal
-   */
-  /**
    * Authenticate with backend to get JWT access/refresh tokens.
    *
    * Delegates the full round-trip (request build + HTTP transport via
@@ -351,6 +345,12 @@ export const RunAnywhere = {
     return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
   },
 
+  /**
+   * Register device with backend if not already registered.
+   * Uses native C++ DeviceBridge + shared rac_http_client_* transport.
+   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+   * @internal
+   */
   async _registerDeviceIfNeeded(
     environment: SDKEnvironment,
     supabaseKey?: string,
@@ -371,7 +371,8 @@ export const RunAnywhere = {
       const native = requireNativeModule();
 
       // Call native registerDevice which goes through:
-      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
+      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed
+      // → http_post callback → rac_http_client_*.
       // This exactly mirrors Swift's flow!
       // Empty `buildToken` is only emitted in development mode so native can
       // apply its baked-in dev fallback.
@@ -672,6 +673,7 @@ export const RunAnywhere = {
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  deleteAllModels: Models.deleteAllModels,
   checkCompatibility: Models.checkCompatibility,
   registerModel: Models.registerModel,
   registerMultiFileModel: Models.registerMultiFileModel,

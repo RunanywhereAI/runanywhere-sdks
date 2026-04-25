@@ -1,5 +1,5 @@
 # =============================================================================
-# ONNX Backend - STT, TTS, VAD via ONNX Runtime and Sherpa-ONNX
+# ONNX Backend - generic ONNX Runtime services
 # =============================================================================
 
 # T5.4: per-engine build toggle owned locally. Emscripten has no in-tree
@@ -49,40 +49,11 @@ if(TARGET nlohmann_json AND RAC_PLATFORM_IOS)
 endif()
 
 # =============================================================================
-# ONNX Runtime
-# =============================================================================
-
-include(FetchONNXRuntime)
-
-# =============================================================================
-# Sherpa-ONNX availability (discovered by engines/sherpa/CMakeLists.txt)
-# =============================================================================
-# GAP 06 T5.1 — the Sherpa-ONNX prebuilt discovery logic moved out of this
-# file and into engines/sherpa/CMakeLists.txt (which MUST be added_subdirectory
-# BEFORE engines/onnx — see engines/CMakeLists.txt).
-#
-# engines/sherpa exposes:
-#   - A GLOBAL IMPORTED target `sherpa_onnx` when the prebuilt is present.
-#   - A CACHE INTERNAL flag `RAC_SHERPA_ONNX_AVAILABLE` (0/1) that mirrors
-#     the on/off state of that target.
-# Onnx consumes them below so its Sherpa-backed STT/TTS/VAD implementation
-# in onnx_backend.cpp keeps working during T5.1 phase 1. Phase 2 migrates
-# those ops to engines/sherpa and onnx drops its speech capability.
-
-if(RAC_SHERPA_ONNX_AVAILABLE)
-    set(SHERPA_ONNX_AVAILABLE ON)
-    set(SHERPA_HEADER_PATH "${RAC_SHERPA_ONNX_HEADER_PATH}")
-else()
-    set(SHERPA_ONNX_AVAILABLE OFF)
-endif()
-
-# =============================================================================
-# ONNX Backend Library (STT, TTS, VAD + RAG embeddings)
+# ONNX Backend Library (generic ONNX Runtime + RAG embeddings)
 # =============================================================================
 # Diffusion is Apple CoreML-only; no ONNX diffusion in this backend.
 # v3.1.2: target declaration migrated to rac_add_engine_plugin() macro
-# (cmake/plugins.cmake). Sherpa-ONNX cross-platform IMPORTED setup above
-# stays inline — engine-specific.
+# (cmake/plugins.cmake).
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 
@@ -90,10 +61,8 @@ include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
 get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons" ABSOLUTE)
 
 set(ONNX_BACKEND_SOURCES
-    onnx_backend.cpp
     rac_onnx.cpp
     rac_backend_onnx_register.cpp
-    wakeword_onnx.cpp
     rac_plugin_entry_onnx.cpp
 )
 
@@ -118,15 +87,19 @@ if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
     message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
 endif()
 
-# Compose link libs + compile defs + sherpa-ONNX header path.
-set(ONNX_LINK_LIBS onnxruntime nlohmann_json::nlohmann_json)
+# Compose link libs + compile defs. ORT C API ownership lives in
+# runtimes/onnxrt; this engine uses only its thin session wrapper.
+set(ONNX_LINK_LIBS rac_runtime_onnxrt nlohmann_json::nlohmann_json)
 set(ONNX_COMPILE_DEFS RAC_ONNX_BUILDING RAC_HAS_ONNX)
-if(SHERPA_ONNX_AVAILABLE)
-    list(APPEND ONNX_LINK_LIBS sherpa_onnx)
-    list(APPEND ONNX_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=1)
-    list(APPEND ONNX_EXTRA_INCLUDES ${SHERPA_HEADER_PATH})
-else()
-    list(APPEND ONNX_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=0)
+if(NOT TARGET rac_runtime_onnxrt)
+    message(FATAL_ERROR "RAC_BACKEND_ONNX requires rac_runtime_onnxrt. Enable RAC_RUNTIME_ONNXRT or disable RAC_BACKEND_ONNX.")
+endif()
+set(RAC_ONNX_SHERPA_COMPAT_AVAILABLE OFF)
+if(TARGET rac_backend_sherpa)
+    list(APPEND ONNX_LINK_LIBS rac_backend_sherpa)
+    list(APPEND ONNX_COMPILE_DEFS RAC_ONNX_SHERPA_COMPAT=1)
+    list(APPEND ONNX_EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../sherpa)
+    set(RAC_ONNX_SHERPA_COMPAT_AVAILABLE ON)
 endif()
 
 # v3.1.2: TARGET_NAME=rac_backend_onnx preserves the historical CMake
@@ -153,7 +126,7 @@ rac_add_engine_plugin(onnx
                         ${RAC_COMMONS_ROOT_DIR}/src
                         ${ONNX_EXTRA_INCLUDES}
     COMPILE_DEFINITIONS ${ONNX_COMPILE_DEFS}
-    RUNTIMES            CPU CORE_ML NNAPI
+    RUNTIMES            ONNXRT
     FORMATS             ONNX
 )
 
@@ -254,6 +227,6 @@ endif()
 
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
-message(STATUS "  Sherpa-ONNX:  ${SHERPA_ONNX_AVAILABLE}")
+message(STATUS "  Speech compatibility shims: ${RAC_ONNX_SHERPA_COMPAT_AVAILABLE}")
 message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

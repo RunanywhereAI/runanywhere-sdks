@@ -254,15 +254,15 @@ public:
     // Note: getEnvironment() already defined above in "SDK Environment" section
 
     // =========================================================================
-    // HTTP Methods for Device Registration
+    // HTTP Methods for Device Registration / Telemetry
     // Matches Swift: CppBridge+Device.swift http_post callback
     // =========================================================================
 
     /**
-     * @brief Synchronous HTTP POST for device registration
+     * @brief Synchronous HTTP POST for device registration / telemetry
      *
-     * Uses native URLSession (iOS) or HttpURLConnection (Android).
-     * Required by C++ rac_device_manager which expects synchronous HTTP.
+     * Uses the shared native rac_http_client_* transport. Required by C++
+     * rac_device_manager, whose callback API expects synchronous HTTP.
      *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string

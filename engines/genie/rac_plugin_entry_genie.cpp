@@ -2,15 +2,16 @@
  * @file rac_plugin_entry_genie.cpp
  * @brief Unified-ABI entry point for the Qualcomm Genie (NPU) backend.
  *
- * GAP 02 + GAP 06 T5.2. Shell plugin: every llm_ops entry returns
- * RAC_ERROR_BACKEND_UNAVAILABLE when the Genie SDK is absent. Phase 2
- * fills in real Genie C API wiring behind `RAC_GENIE_SDK_AVAILABLE=1`.
+ * GAP 02 + GAP 06 T5.2. Shell plugin: the entry point remains inspectable,
+ * but registration is rejected and no LLM/routing metadata is advertised
+ * until real Genie LLM ops are wired. SDK discovery alone is not enough:
+ * the current public implementation still returns
+ * RAC_ERROR_BACKEND_UNAVAILABLE from every LLM op.
  *
  * The ABI surface intentionally stays identical in both modes so that
  * downstream SDKs (runanywhere_genie Flutter plugin, Kotlin Genie
- * module) can call through the router without platform-specific
- * branches — a routed request simply surfaces the backpressure error
- * code when the SDK is missing.
+ * module) can load the shell without platform-specific branches while the
+ * router only sees Genie when the Qualcomm SDK-backed ops are real.
  */
 
 #include "genie_backend.h"
@@ -18,6 +19,14 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/llm/rac_llm_service.h"
+
+#if defined(RAC_GENIE_SDK_AVAILABLE) && RAC_GENIE_SDK_AVAILABLE && \
+    defined(__ANDROID__) && \
+    defined(RAC_GENIE_LLM_OPS_AVAILABLE) && RAC_GENIE_LLM_OPS_AVAILABLE
+#define RAC_GENIE_ROUTABLE 1
+#else
+#define RAC_GENIE_ROUTABLE 0
+#endif
 
 namespace {
 
@@ -67,15 +76,18 @@ void genie_llm_destroy(void* /*impl*/) {
      * is NULL. Safe to call. */
 }
 
-// capability_check runs during rac_plugin_register. On non-Android hosts
-// (where a Snapdragon NPU cannot exist) reject the plugin quietly so it
-// doesn't clutter the router's primitive tables with an entry that will
-// never win scoring.
+// capability_check runs during rac_plugin_register. Reject the shell so the
+// router never sees Genie as an eligible LLM backend in public/default builds.
+// Non-Android hosts are rejected because the runtime targets Snapdragon Android.
 rac_result_t genie_capability_check(void) {
-#if defined(__ANDROID__)
-    return RAC_SUCCESS;
-#else
+#if !defined(RAC_GENIE_SDK_AVAILABLE) || !RAC_GENIE_SDK_AVAILABLE
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
+#elif !defined(__ANDROID__)
     return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+#elif !defined(RAC_GENIE_LLM_OPS_AVAILABLE) || !RAC_GENIE_LLM_OPS_AVAILABLE
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
+#else
+    return RAC_SUCCESS;
 #endif
 }
 
@@ -103,6 +115,7 @@ extern "C" const rac_llm_service_ops_t g_genie_llm_ops = {
 
 extern "C" {
 
+#if RAC_GENIE_ROUTABLE
 static const rac_runtime_id_t k_genie_runtimes[] = {
     RAC_RUNTIME_QNN,
     RAC_RUNTIME_CPU,
@@ -111,26 +124,61 @@ static const rac_runtime_id_t k_genie_runtimes[] = {
 static const uint32_t k_genie_formats[] = {
     3,  /* MODEL_FORMAT_ONNX — Genie ingests QNN-compiled ONNX bundles */
 };
+#endif
 
 static const rac_engine_vtable_t g_genie_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
         .name             = "genie",
-        .display_name     = "Qualcomm Genie (NPU)",
+        .display_name     =
+#if RAC_GENIE_ROUTABLE
+            "Qualcomm Genie (NPU)",
+#else
+            "Qualcomm Genie (NPU) [ops unavailable]",
+#endif
         .engine_version   = nullptr,
-        /* High priority on Snapdragon hosts; capability_check gates
-         * non-Android so priority here doesn't leak on desktop. */
-        .priority         = 200,
+        /* High priority only when the SDK-backed Android engine is eligible. */
+        .priority         =
+#if RAC_GENIE_ROUTABLE
+            200,
+#else
+            0,
+#endif
         .capability_flags = 0,
-        .runtimes         = k_genie_runtimes,
-        .runtimes_count   = sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
-        .formats          = k_genie_formats,
-        .formats_count    = sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
+        .runtimes         =
+#if RAC_GENIE_ROUTABLE
+            k_genie_runtimes,
+#else
+            nullptr,
+#endif
+        .runtimes_count   =
+#if RAC_GENIE_ROUTABLE
+            sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
+#else
+            0,
+#endif
+        .formats          =
+#if RAC_GENIE_ROUTABLE
+            k_genie_formats,
+#else
+            nullptr,
+#endif
+        .formats_count    =
+#if RAC_GENIE_ROUTABLE
+            sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
+#else
+            0,
+#endif
     },
     /* capability_check */ genie_capability_check,
     /* on_unload        */ nullptr,
 
-    /* llm_ops          */ &g_genie_llm_ops,
+    /* llm_ops          */
+#if RAC_GENIE_ROUTABLE
+    &g_genie_llm_ops,
+#else
+    nullptr,
+#endif
     /* stt_ops          */ nullptr,
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,

@@ -24,7 +24,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
  *  `VoiceEvent.decode(bytes)` accepts it directly without a copy.
  *  The Nitro C++ side heap-copies the proto arena bytes before
  *  dispatch, so holding onto the array past the callback is safe. */
-export type OnProtoBytes = (bytes: Uint8Array) => void;
+export type OnProtoBytes = (bytes: ArrayBuffer) => void;
 
 /** Callback fired when the agent's event stream terminates normally. */
 export type OnStreamDone = () => void;

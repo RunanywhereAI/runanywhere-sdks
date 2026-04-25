@@ -19,7 +19,8 @@ Pod::Spec.new do |s|
   # =============================================================================
   puts "[RunAnywhereONNX] Using bundled xcframeworks from npm package"
   s.vendored_frameworks = [
-    "ios/Frameworks/RABackendONNX.xcframework"
+    "ios/Frameworks/RABackendONNX.xcframework",
+    "ios/Frameworks/RABackendSherpa.xcframework"
   ]
 
   # Source files
@@ -45,6 +46,7 @@ Pod::Spec.new do |s|
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) HAS_ONNX=1",
     "DEFINES_MODULE" => "YES",
     "SWIFT_OBJC_INTEROP_MODE" => "objcxx",
+    "OTHER_LDFLAGS" => "$(inherited) -lc++ -larchive -lbz2 -lz",
   }
 
   s.libraries = "c++"

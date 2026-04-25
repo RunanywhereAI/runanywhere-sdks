@@ -52,10 +52,14 @@ message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_common
 # =============================================================================
 # Collect core bridge source files
 file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
+file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
+    ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
+    ${HYBRID_CORE_DOMAIN_SOURCES}
+    ../cpp/HybridVoiceAgent.cpp
     ${BRIDGE_SOURCES}
 )
 
@@ -123,6 +127,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
 )
 
 # Link RACommons - REQUIRED for core functionality

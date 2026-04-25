@@ -181,6 +181,7 @@ public:
     const std::string& prompt,
     const std::string& optionsJson,
     const std::function<void(const std::string&, bool)>& callback) override;
+  std::shared_ptr<Promise<double>> getLLMHandle() override;
   std::shared_ptr<Promise<bool>> cancelGeneration() override;
   std::shared_ptr<Promise<std::string>> generateStructured(
     const std::string& prompt,
@@ -290,7 +291,7 @@ public:
 
   std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
-  std::shared_ptr<Promise<double>> getVoiceAgentHandle();
+  std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
   std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
   std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) override;

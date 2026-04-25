@@ -15,34 +15,43 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) as local path dependencies. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the [RunAnywhere Flutter SDK](../../../sdk/runanywhere-flutter/) through local path dependencies. A clean clone needs Flutter packages plus the Android JNI libraries and iOS XCFrameworks staged into the Flutter plugin packages.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Flutter 3.10+ and Dart 3+ on `PATH`.
+- Android Studio with Android SDK 24+, platform tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+- Xcode 15+ and CocoaPods for iOS simulator builds.
+- JDK 17 and enough disk for native artifacts and downloaded AI models.
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the Flutter SDK directory
-cd runanywhere-sdks/sdk/runanywhere-flutter
-
-# 2. Run the setup script (~10-20 minutes on first run)
-#    This builds the native C++ frameworks/libraries and enables local mode
-./scripts/build-flutter.sh --setup
-
-# 3. Navigate to this sample app
-cd ../../examples/flutter/RunAnywhereAI
-
-# 4. Install dependencies
+cd examples/flutter/RunAnywhereAI
 flutter pub get
 
-# 5. For iOS: Install pods
-cd ios && pod install && cd ..
+# Build or refresh local native artifacts when the checkout has no staged binaries.
+cd ../../..
+./scripts/build-core-android.sh arm64-v8a
+./scripts/build-core-xcframework.sh
+cd examples/flutter/RunAnywhereAI
 
-# 6. Run the app
-flutter run
-
-# Or open in Android Studio / VS Code and run from there
+flutter analyze
+flutter build apk --debug
+flutter build ios --simulator --debug
 ```
+
+Notes:
+
+- `scripts/build-core-android.sh` stages JNI libraries into `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs`.
+- `scripts/build-core-xcframework.sh` stages `RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework` into the Flutter plugin `ios/Frameworks` directories.
+- `runanywhere_genie` is Android/Snapdragon-only; iOS builds do not expect a Genie XCFramework.
+- If the iOS build reports stale Pods or generated Flutter config, run `cd ios && pod install && cd ..` after `flutter pub get`.
+- `scripts/verify.sh` runs `pub get`, analysis, APK build, and optional iOS/native artifact refresh gates.
 
 ### How It Works
 

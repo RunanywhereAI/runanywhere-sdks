@@ -34,17 +34,13 @@ public enum CancelParity {
                 NSLocalizedDescriptionKey: "input too short",
             ])
         }
-        let readMagic: UInt32 = data.withUnsafeBytes {
-            $0.load(fromByteOffset: 0, as: UInt32.self)
-        }
+        let readMagic = readUInt32LE(data, at: 0)
         guard readMagic == magic else {
             throw NSError(domain: "CancelParity", code: 2, userInfo: [
                 NSLocalizedDescriptionKey: "bad magic",
             ])
         }
-        let count: UInt32 = data.withUnsafeBytes {
-            $0.load(fromByteOffset: 4, as: UInt32.self)
-        }
+        let count = readUInt32LE(data, at: 4)
 
         var cursor = 8
         var lines: [String] = []
@@ -55,9 +51,7 @@ public enum CancelParity {
 
         for i in 0..<Int(count) {
             guard cursor + 4 <= data.count else { break }
-            let len: UInt32 = data.withUnsafeBytes {
-                $0.load(fromByteOffset: cursor, as: UInt32.self)
-            }
+            let len = readUInt32LE(data, at: cursor)
             cursor += 4
             guard cursor + Int(len) <= data.count else { break }
             let frame = data.subdata(in: cursor..<cursor + Int(len))
@@ -111,5 +105,12 @@ public enum CancelParity {
         var ts = timespec()
         clock_gettime(CLOCK_MONOTONIC, &ts)
         return Int64(ts.tv_sec) * 1_000_000_000 + Int64(ts.tv_nsec)
+    }
+
+    private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {
+        UInt32(data[offset])
+            | (UInt32(data[offset + 1]) << 8)
+            | (UInt32(data[offset + 2]) << 16)
+            | (UInt32(data[offset + 3]) << 24)
     }
 }

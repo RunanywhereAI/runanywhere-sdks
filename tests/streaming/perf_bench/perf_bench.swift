@@ -2,8 +2,7 @@
 //
 // v3.1: real implementation. Reads /tmp/perf_input.bin (produced by
 // tests/streaming/perf_bench/perf_producer.cpp), decodes each VoiceEvent
-// via swift-protobuf, extracts the producer-side timestamp from
-// `metrics.created_at_ns`, and writes per-event delta_ns to
+// via swift-protobuf, and writes per-event decode delta_ns to
 // /tmp/perf_bench.swift.log.
 //
 // Runner integration: sdk/runanywhere-swift/Tests/PerfBenchTests.swift
@@ -43,15 +42,11 @@ public enum PerfBench {
         guard data.count >= 8 else {
             throw PerfBenchError.inputTooShort(size: data.count)
         }
-        let readMagic: UInt32 = data.withUnsafeBytes {
-            $0.load(fromByteOffset: 0, as: UInt32.self)
-        }
+        let readMagic = readUInt32LE(data, at: 0)
         guard readMagic == magic else {
             throw PerfBenchError.badMagic(got: readMagic, expected: magic)
         }
-        let count: UInt32 = data.withUnsafeBytes {
-            $0.load(fromByteOffset: 4, as: UInt32.self)
-        }
+        let count = readUInt32LE(data, at: 4)
 
         var deltas: [Int64] = []
         deltas.reserveCapacity(Int(count))
@@ -60,30 +55,25 @@ public enum PerfBench {
         var cursor = 8
         for _ in 0..<count {
             guard cursor + 4 <= data.count else { break }
-            let len: UInt32 = data.withUnsafeBytes {
-                $0.load(fromByteOffset: cursor, as: UInt32.self)
-            }
+            let len = readUInt32LE(data, at: cursor)
             cursor += 4
             guard cursor + Int(len) <= data.count else { break }
             let frame = data.subdata(in: cursor..<cursor + Int(len))
             cursor += Int(len)
 
-            // Mark consumer-receive timestamp BEFORE decode — proto-decode
-            // cost is part of the latency the consumer actually pays.
-            let recvNs = monotonicNs()
-
             do {
+                // Mirror the Dart/Kotlin consumers: measure decode cost on a
+                // single local monotonic clock. Producer timestamps use a
+                // separate process-local steady-clock epoch.
+                let startNs = monotonicNs()
                 let event = try RAVoiceEvent(serializedBytes: frame)
+                let decodeNs = monotonicNs() - startNs
                 if case let .metrics(metrics) = event.payload {
                     if metrics.createdAtNs > 0 {
-                        deltas.append(recvNs - metrics.createdAtNs)
                         nonEmpty += 1
-                        continue
                     }
                 }
-                // No metrics arm (or zero timestamp) — record zero; the
-                // aggregator filters zero values when computing percentiles.
-                deltas.append(0)
+                deltas.append(max(0, decodeNs))
             } catch {
                 // Malformed frame: skip rather than abort the whole run.
                 deltas.append(0)
@@ -106,6 +96,13 @@ public enum PerfBench {
         var ts = timespec()
         clock_gettime(CLOCK_MONOTONIC, &ts)
         return Int64(ts.tv_sec) * 1_000_000_000 + Int64(ts.tv_nsec)
+    }
+
+    private static func readUInt32LE(_ data: Data, at offset: Int) -> UInt32 {
+        UInt32(data[offset])
+            | (UInt32(data[offset + 1]) << 8)
+            | (UInt32(data[offset + 2]) << 16)
+            | (UInt32(data[offset + 3]) << 24)
     }
 
     static func writeDeltas(_ deltas: [Int64], to path: String) throws {

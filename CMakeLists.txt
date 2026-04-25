@@ -203,6 +203,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/idl/CMakeLists.txt")
     add_subdirectory(idl)
 endif()
 
+# runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
+# to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
+# is always folded into rac_commons; adapter runtimes are linked by their
+# owning engines. See sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
+    add_subdirectory(runtimes)
+endif()
+
 # engines/ — top-level engine plugin directory. 5 migrated backends
 # (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) live here.
 # Historical note: three stub engines (sherpa, genie, diffusion-coreml)
@@ -213,14 +221,6 @@ endif()
 # QNN SDK integration work is funded.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
-endif()
-
-# runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
-# to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
-# is always folded into rac_commons; extracted ORT/CoreML/Metal runtimes land
-# here as follow-ups. See sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
-    add_subdirectory(runtimes)
 endif()
 
 # Fold the built-in CPU runtime's OBJECTs into rac_commons so there is no
@@ -234,6 +234,9 @@ endif()
 # rac_commons here so Apple SDKs still get a single commons archive.
 if(TARGET rac_backend_metalrt)
     target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
+    if(TARGET rac_runtime_metal)
+        target_link_libraries(rac_commons PUBLIC rac_runtime_metal)
+    endif()
     if(APPLE)
         target_link_libraries(rac_commons PUBLIC
             "-framework Metal"
@@ -264,6 +267,60 @@ endif()
 # from this root option to the commons cache slot of the same name.
 if(RAC_BUILD_TESTS)
     enable_testing()
+    # Commons/tests is configured before engines/ in the root build, so the
+    # Genie plugin-entry test is wired here once rac_backend_genie exists.
+    if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie AND NOT TARGET test_plugin_entry_genie)
+        add_executable(test_plugin_entry_genie
+            sdk/runanywhere-commons/tests/test_plugin_entry_genie.cpp)
+        target_include_directories(test_plugin_entry_genie PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/genie
+        )
+        target_link_libraries(test_plugin_entry_genie PRIVATE
+            rac_commons
+            rac_backend_genie
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_plugin_entry_genie PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_plugin_entry_genie PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_plugin_entry_genie PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_plugin_entry_genie PRIVATE cxx_std_17)
+        add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
+    endif()
+
+    if(APPLE AND RAC_BACKEND_DIFFUSION_COREML
+       AND TARGET rac_backend_diffusion_coreml
+       AND NOT TARGET test_diffusion_coreml_generate)
+        add_executable(test_diffusion_coreml_generate
+            sdk/runanywhere-commons/tests/test_diffusion_coreml_generate.cpp)
+        target_include_directories(test_diffusion_coreml_generate PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/tests
+            ${CMAKE_CURRENT_SOURCE_DIR}/sdk/runanywhere-commons/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/engines/diffusion-coreml
+        )
+        target_link_libraries(test_diffusion_coreml_generate PRIVATE
+            rac_commons
+            rac_backend_diffusion_coreml
+        )
+        if(TARGET archive_static)
+            target_link_libraries(test_diffusion_coreml_generate PRIVATE archive_static)
+        endif()
+        if(TARGET zlibstatic)
+            target_link_libraries(test_diffusion_coreml_generate PRIVATE zlibstatic)
+        endif()
+        if(TARGET bz2_bundled)
+            target_link_libraries(test_diffusion_coreml_generate PRIVATE bz2_bundled)
+        endif()
+        target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)
+        add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
+    endif()
+
     # GAP 09 / v2 close-out Phase 4 — cross-SDK parity test harness.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/streaming/CMakeLists.txt")
         add_subdirectory(tests/streaming)

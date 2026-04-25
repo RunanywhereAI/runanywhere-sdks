@@ -642,8 +642,8 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_analytics.cpp
     # Wake Word — high-level service scaffold was removed in Phase F of the
     # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
-    # consumers call engines/onnx/wakeword_onnx.cpp directly via the
-    # rac_wakeword_onnx_* API. The shared types in
+    # consumers call the speech backend's rac_wakeword_onnx_* compatibility
+    # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp

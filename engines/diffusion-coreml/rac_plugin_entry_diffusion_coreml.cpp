@@ -2,10 +2,8 @@
  * @file rac_plugin_entry_diffusion_coreml.cpp
  * @brief Unified-ABI plugin entry for the CoreML diffusion engine.
  *
- * GAP 02 + GAP 06 T5.3. Apple-only. The plugin registers
- * `diffusion_ops` against the GAP 02 vtable; the router routes
- * `RAC_PRIMITIVE_DIFFUSION` to this plugin once it's loaded (see
- * rac_diffusion_service.cpp which already calls rac_plugin_route).
+ * GAP 02 + GAP 06 T5.3. Apple-only Stable Diffusion plugin backed by
+ * CoreML MLModel components.
  */
 
 #include "diffusion_coreml_backend.h"
@@ -13,6 +11,13 @@
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
+
+#if defined(__APPLE__) && \
+    defined(RAC_DIFFUSION_COREML_GENERATE_AVAILABLE) && RAC_DIFFUSION_COREML_GENERATE_AVAILABLE
+#define RAC_DIFFUSION_COREML_ROUTABLE 1
+#else
+#define RAC_DIFFUSION_COREML_ROUTABLE 0
+#endif
 
 namespace {
 
@@ -82,11 +87,15 @@ rac_result_t ops_create(const char* model_id, const char* config_json,
     return RAC_SUCCESS;
 }
 
+rac_result_t diffusion_coreml_capability_check(void) {
 #if !defined(__APPLE__)
-rac_result_t capability_check_non_apple(void) {
     return RAC_ERROR_CAPABILITY_UNSUPPORTED;
-}
+#elif RAC_DIFFUSION_COREML_ROUTABLE
+    return RAC_SUCCESS;
+#else
+    return RAC_ERROR_BACKEND_UNAVAILABLE;
 #endif
+}
 
 }  // namespace
 
@@ -104,6 +113,7 @@ extern "C" const rac_diffusion_service_ops_t g_diffusion_coreml_ops = {
 
 extern "C" {
 
+#if RAC_DIFFUSION_COREML_ROUTABLE
 static const rac_runtime_id_t k_dcoreml_runtimes[] = {
     RAC_RUNTIME_COREML,
     RAC_RUNTIME_ANE,
@@ -112,33 +122,54 @@ static const rac_runtime_id_t k_dcoreml_runtimes[] = {
 static const uint32_t k_dcoreml_formats[] = {
     5,  /* MODEL_FORMAT_COREML */
 };
+#endif
 
 static const rac_engine_vtable_t g_diffusion_coreml_engine_vtable = {
     /* metadata */ {
         .abi_version      = RAC_PLUGIN_API_VERSION,
-        /* NOTE: rac_diffusion_service.cpp routes via
-         * hints.preferred_engine_name = framework_to_plugin_name(...) which
-         * maps RAC_FRAMEWORK_COREML → "platform". The plugin name here is
-         * kept distinct ("diffusion-coreml") so tooling + tests can refer
-         * to it unambiguously; the router will still pick it up via
-         * RAC_PRIMITIVE_DIFFUSION + format hint because it's the sole
-         * diffusion_ops provider. A follow-up tightens the service's
-         * framework_to_plugin_name mapping once more engines show up. */
+        /* The plugin name is kept distinct ("diffusion-coreml") so tooling
+         * can refer to it unambiguously. */
         .name             = "diffusion-coreml",
-        .display_name     = "Apple CoreML Diffusion",
-        .engine_version   = nullptr,
-        .priority         = 100,
-        .capability_flags = 0,
-        .runtimes         = k_dcoreml_runtimes,
-        .runtimes_count   = sizeof(k_dcoreml_runtimes) / sizeof(k_dcoreml_runtimes[0]),
-        .formats          = k_dcoreml_formats,
-        .formats_count    = sizeof(k_dcoreml_formats) / sizeof(k_dcoreml_formats[0]),
-    },
-#if defined(__APPLE__)
-    /* capability_check */ nullptr,
+        .display_name     =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            "Apple CoreML Diffusion",
 #else
-    /* capability_check */ capability_check_non_apple,
+            "Apple CoreML Diffusion [generate unavailable]",
 #endif
+        .engine_version   = nullptr,
+        .priority         =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            100,
+#else
+            0,
+#endif
+        .capability_flags = 0,
+        .runtimes         =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            k_dcoreml_runtimes,
+#else
+            nullptr,
+#endif
+        .runtimes_count   =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            sizeof(k_dcoreml_runtimes) / sizeof(k_dcoreml_runtimes[0]),
+#else
+            0,
+#endif
+        .formats          =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            k_dcoreml_formats,
+#else
+            nullptr,
+#endif
+        .formats_count    =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+            sizeof(k_dcoreml_formats) / sizeof(k_dcoreml_formats[0]),
+#else
+            0,
+#endif
+    },
+    /* capability_check */ diffusion_coreml_capability_check,
     /* on_unload        */ nullptr,
 
     /* llm_ops          */ nullptr,
@@ -148,7 +179,12 @@ static const rac_engine_vtable_t g_diffusion_coreml_engine_vtable = {
     /* embedding_ops    */ nullptr,
     /* rerank_ops       */ nullptr,
     /* vlm_ops          */ nullptr,
-    /* diffusion_ops    */ &g_diffusion_coreml_ops,
+    /* diffusion_ops    */
+#if RAC_DIFFUSION_COREML_ROUTABLE
+    &g_diffusion_coreml_ops,
+#else
+    nullptr,
+#endif
 
     nullptr, nullptr, nullptr, nullptr, nullptr,
     nullptr, nullptr, nullptr, nullptr, nullptr,

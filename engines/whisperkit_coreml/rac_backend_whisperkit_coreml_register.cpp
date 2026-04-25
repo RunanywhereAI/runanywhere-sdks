@@ -157,6 +157,17 @@ rac_result_t rac_backend_whisperkit_coreml_register(void) {
         return RAC_ERROR_MODULE_ALREADY_REGISTERED;
     }
 
+#if defined(__APPLE__)
+    if (rac_whisperkit_coreml_stt_is_available() != RAC_TRUE) {
+        RAC_LOG_WARNING(LOG_CAT,
+                        "WhisperKit CoreML callbacks are not fully registered; "
+                        "not advertising STT capability");
+        return RAC_ERROR_BACKEND_UNAVAILABLE;
+    }
+#else
+    return RAC_ERROR_CAPABILITY_UNSUPPORTED;
+#endif
+
     rac_module_info_t module_info = {};
     module_info.id = MODULE_ID;
     module_info.name = "WhisperKit CoreML";

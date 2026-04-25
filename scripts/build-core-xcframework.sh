@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# build-core-xcframework.sh — wraps the ios-device + ios-simulator CMake
-# presets and runs `xcodebuild -create-xcframework` to produce the three
-# `.xcframework` bundles the Swift SDK consumes on iOS:
+# build-core-xcframework.sh — wraps the ios-device, ios-simulator, and
+# macos-release CMake presets and runs `xcodebuild -create-xcframework` to
+# produce the `.xcframework` bundles the Swift SDK consumes on Apple platforms:
 #
 #   sdk/runanywhere-swift/Binaries/RACommons.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
@@ -13,8 +13,9 @@
 # rac_add_engine_plugin(...), so on iOS (RAC_STATIC_PLUGINS=ON) they still
 # produce standalone `librac_backend_<name>.a` archives alongside
 # `librac_commons.a`. All three have to be re-packaged into
-# `.xcframework`s containing an ios-arm64 slice AND an
-# ios-arm64_x86_64-simulator slice, which is what this script does.
+# `.xcframework`s containing an ios-arm64 slice, an ios-arm64-simulator slice,
+# and (for RACommons, which the macOS Swift harness links directly) a
+# macos-arm64 slice, which is what this script does.
 #
 # Environment knobs:
 #   RAC_BACKEND_ONNX=OFF     skip the ONNX backend (used when the operator
@@ -129,6 +130,32 @@ merge_commons_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
+merge_commons_macos_slice() {
+    local build_root="$1"
+    local output="$2"
+    local arch="$3"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/commons"
+    local inputs=(
+        "${build_root}/sdk/runanywhere-commons/librac_commons.a"
+        "${build_root}/_deps/libarchive-build/libarchive/libarchive.a"
+    )
+
+    # macOS uses the system libcurl when CMake finds CURL::libcurl. iOS cannot
+    # rely on a system archive, so that slice still bundles curl_fetched above.
+    local bundled_curl="${build_root}/_deps/curl_fetched-build/lib/libcurl.a"
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${bundled_curl}" ]; then
+        inputs+=("${bundled_curl}")
+    fi
+
+    local prepared=()
+    local input
+    for input in "${inputs[@]}"; do
+        prepared+=("$(prepare_archive_input "${input}" "${arch}" "${scratch_dir}")")
+    done
+
+    merge_static_archives "${output}" "${prepared[@]}"
+}
+
 find_onnxruntime_ios_archive() {
     local slice_dir="$1"
     local arch_dir
@@ -196,18 +223,17 @@ merge_onnx_backend_slice() {
     local output="$3"
     local arch="$4"
     local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/onnx"
-    # GAP 06 T5.1 phase 1 note: the onnx engine on iOS still contains the
-    # Sherpa-backed STT/TTS/VAD class bodies (onnx_backend.cpp). We keep
-    # the sherpa-onnx static archives folded into RABackendONNX.xcframework
-    # below so that downstream consumers on SPM don't have to link a third
-    # xcframework before phase 2 migrates the class bodies to engines/sherpa.
-    # engines/sherpa ships its own RABackendSherpa.xcframework (via
-    # merge_sherpa_backend_slice) for Apple consumers that want to opt into
-    # the peer plugin directly.
+    # ONNX owns generic ONNX Runtime services. Its compatibility speech shims
+    # still reference Sherpa C entry points, so keep this archive self-contained
+    # for consumers that link only RABackendONNX.
     local inputs=(
         "${build_root}/engines/onnx/${slice_dir}/librac_backend_onnx.a"
+        "${build_root}/runtimes/onnxrt/${slice_dir}/librac_runtime_onnxrt.a"
         "$(find_onnxruntime_ios_archive "${slice_dir}")"
     )
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a" ]; then
+        inputs+=("${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a")
+    fi
     local sherpa_dir
 
     if [ "${slice_dir}" = "Release-iphoneos" ]; then
@@ -234,10 +260,8 @@ merge_onnx_backend_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
-# GAP 06 T5.1 — Sherpa engine slice. For now the .a only contains the
-# plugin entry + shell (primitive ops NULL pending phase 2), so we
-# optionally fold in the sherpa-onnx prebuilt archive too; the xcframework
-# stays usable as the long-term owner of the sherpa plugin target.
+# Sherpa engine slice. Fold in the sherpa-onnx prebuilt archives because this
+# xcframework owns the speech implementation objects and their static deps.
 merge_sherpa_backend_slice() {
     local build_root="$1"
     local slice_dir="$2"
@@ -295,7 +319,8 @@ run rm -rf "${STAGING_DIR}"
 run mkdir -p "${STAGING_DIR}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 1 & 2. Configure + build both iOS slices (device + simulator).
+# 1 & 2. Configure + build iOS slices (device + simulator) plus the macOS
+#        commons slice used by `swift test` on local development machines.
 # ────────────────────────────────────────────────────────────────────────────
 cmake_extra=""
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
@@ -320,6 +345,23 @@ fi
 echo "▶ Build ios-simulator (Release)"
 run cmake --build --preset ios-simulator --config Release
 
+echo "▶ Configure macos-release"
+macos_cmake_args=(
+    "-DRAC_BUILD_BACKENDS=ON"
+    "-DRAC_BACKEND_RAG=ON"
+    "-DRAC_BACKEND_LLAMACPP=OFF"
+    "-DRAC_BACKEND_ONNX=OFF"
+    "-DRAC_BACKEND_SHERPA=OFF"
+    "-DRAC_BACKEND_WHISPERKIT_COREML=OFF"
+    "-DRAC_BACKEND_DIFFUSION_COREML=OFF"
+    "-DRAC_BACKEND_METALRT=OFF"
+    "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
+    "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
+)
+run cmake --preset macos-release "${macos_cmake_args[@]}"
+echo "▶ Build macos-release"
+run cmake --build --preset macos-release --target rac_commons
+
 # ────────────────────────────────────────────────────────────────────────────
 # 3. Locate archives and package each target as an xcframework with both
 #    device + simulator slices.
@@ -331,6 +373,7 @@ run cmake --build --preset ios-simulator --config Release
 # ────────────────────────────────────────────────────────────────────────────
 DEV_BIN="${REPO_ROOT}/build/ios-device"
 SIM_BIN="${REPO_ROOT}/build/ios-simulator"
+MAC_BIN="${REPO_ROOT}/build/macos-release"
 
 # find_lib <subdir-under-bin> <libname>
 find_lib() {
@@ -386,17 +429,45 @@ build_xcframework_from_paths() {
     fi
 }
 
+# build_xcframework_from_paths_with_macos <device-lib> <simulator-lib> <macos-lib> <xcframework-name> [--with-headers]
+build_xcframework_from_paths_with_macos() {
+    local dev_lib="$1"
+    local sim_lib="$2"
+    local mac_lib="$3"
+    local xcf_name="$4"
+    local mode="${5:-}"
+
+    local xcf="${DEST}/${xcf_name}"
+    echo "▶ Create-xcframework → ${xcf}"
+    run rm -rf "${xcf}"
+    if [ "${mode}" = "--with-headers" ]; then
+        run xcodebuild -create-xcframework \
+            -library "${dev_lib}" -headers "${COMMONS_HEADERS}" \
+            -library "${sim_lib}" -headers "${COMMONS_HEADERS}" \
+            -library "${mac_lib}" -headers "${COMMONS_HEADERS}" \
+            -output  "${xcf}"
+    else
+        run xcodebuild -create-xcframework \
+            -library "${dev_lib}" \
+            -library "${sim_lib}" \
+            -library "${mac_lib}" \
+            -output  "${xcf}"
+    fi
+}
+
 COMMONS_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_commons.a"
 COMMONS_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_commons.a"
+COMMONS_MAC_LIB="${STAGING_DIR}/Release-macos/librac_commons.a"
 merge_commons_slice "${DEV_BIN}" "Release-iphoneos" "${COMMONS_DEV_LIB}" "arm64"
 merge_commons_slice "${SIM_BIN}" "Release-iphonesimulator" "${COMMONS_SIM_LIB}" "arm64"
+merge_commons_macos_slice "${MAC_BIN}" "${COMMONS_MAC_LIB}" "arm64"
 
 LLAMACPP_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_llamacpp.a"
 LLAMACPP_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_llamacpp.a"
 merge_llamacpp_backend_slice "${DEV_BIN}" "Release-iphoneos" "${LLAMACPP_DEV_LIB}" "arm64"
 merge_llamacpp_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${LLAMACPP_SIM_LIB}" "arm64"
 
-build_xcframework_from_paths "${COMMONS_DEV_LIB}" "${COMMONS_SIM_LIB}" "RACommons.xcframework" --with-headers
+build_xcframework_from_paths_with_macos "${COMMONS_DEV_LIB}" "${COMMONS_SIM_LIB}" "${COMMONS_MAC_LIB}" "RACommons.xcframework" --with-headers
 build_xcframework_from_paths "${LLAMACPP_DEV_LIB}" "${LLAMACPP_SIM_LIB}" "RABackendLLAMACPP.xcframework"
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     ONNX_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_onnx.a"
@@ -408,10 +479,7 @@ else
     echo "▶ Skipping RABackendONNX.xcframework (RAC_BACKEND_ONNX=OFF)"
 fi
 
-# GAP 06 T5.1 — RABackendSherpa.xcframework as a peer of RABackendONNX.
-# Builds when RAC_BACKEND_SHERPA is not explicitly OFF (default ON). Shares
-# the sherpa-onnx iOS prebuilt with ONNX during T5.1 phase 1; phase 2 will
-# make this the sole owner once the source migration lands.
+# RABackendSherpa.xcframework as the speech peer of RABackendONNX.
 if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
     SHERPA_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_sherpa.a"
     SHERPA_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_sherpa.a"

@@ -57,7 +57,8 @@ const rac_whisperkit_coreml_stt_callbacks_t* rac_whisperkit_coreml_stt_get_callb
 
 rac_bool_t rac_whisperkit_coreml_stt_is_available(void) {
     std::lock_guard<std::mutex> lock(g_callbacks_mutex);
-    return g_callbacks_set && g_callbacks.can_handle != nullptr && g_callbacks.create != nullptr
+    return g_callbacks_set && g_callbacks.can_handle != nullptr &&
+                   g_callbacks.create != nullptr && g_callbacks.transcribe != nullptr
                ? RAC_TRUE
                : RAC_FALSE;
 }

@@ -1,7 +1,9 @@
 // RunAnywhere Genie Backend - Android
 //
-// This plugin bundles RABackendGenie native libraries (.so files) for Android.
-// RABackendGenie provides LLM text generation capabilities using Qualcomm Genie NPU.
+// This experimental plugin can bundle RABackendGenie native libraries (.so files)
+// for Android/Snapdragon devices. Functional LLM routing is disabled by default
+// and requires Qualcomm Genie SDK-backed native ops; missing/incomplete binaries
+// are treated as backend-unavailable.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -91,11 +93,11 @@ dependencies {
 // =============================================================================
 task downloadNativeLibs {
     group = 'runanywhere'
-    description = 'Download RABackendGenie native libraries from GitHub releases'
+    description = 'Download experimental RABackendGenie Android native library shell from GitHub releases'
 
     doLast {
         if (shouldDownloadAndroidLibs()) {
-            println "📦 Remote mode: Downloading RABackendGenie Android native libraries..."
+            println "📦 Remote mode: Downloading experimental RABackendGenie Android native libraries..."
 
             def jniLibsDir = file('build/jniLibs')
             if (jniLibsDir.exists()) {
@@ -123,7 +125,7 @@ task downloadNativeLibs {
             } catch (Exception e) {
                 println "⚠️  Could not download RABackendGenie native libraries: ${e.message}"
                 println "⚠️  Continuing without Genie binaries — loadLibrary will fail gracefully at runtime."
-                println "⚠️  To build with the engine, either host the release at ${downloadUrl} or set testLocal=true with local .so files."
+                println "⚠️  To enable the engine, either host the release at ${downloadUrl} or set testLocal=true with Qualcomm Genie SDK-built local .so files."
                 return
             }
 
@@ -178,7 +180,7 @@ task downloadNativeLibs {
                 // GeniePlugin.kt wraps System.loadLibrary in try/catch, so missing
                 // .so surfaces as a runtime capability gate, not a build-time error.
                 println "⚠️  No Genie native libraries found in src/main/jniLibs/ — continuing."
-                println "⚠️  Add librac_backend_genie_jni.so to enable the NPU backend at runtime."
+                println "⚠️  Add Qualcomm Genie SDK-built librac_backend_genie_jni.so to enable the NPU backend at runtime."
             } else {
                 println "✅ Using local native libraries"
             }

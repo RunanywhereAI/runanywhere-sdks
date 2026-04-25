@@ -226,6 +226,12 @@ task downloadNativeLibs {
             return
         }
 
+        fileTree(dir: jniLibsDir, include: "**/libc++_shared.so").files.each { staleStdlib ->
+            if (staleStdlib.delete()) {
+                logger.lifecycle("[RunAnywhereCore] Removed bundled libc++_shared.so: ${staleStdlib}")
+            }
+        }
+
         // Check if libs are already bundled for ALL requested ABIs (npm install case)
         def requestedAbis = reactNativeArchitectures()
         def allAbisBundled = requestedAbis.every { abi ->

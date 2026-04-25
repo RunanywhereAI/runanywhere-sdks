@@ -31,7 +31,13 @@
 #endif
 
 // =============================================================================
-// HTTP Download (Platform Adapter)
+// HTTP Download (Platform Adapter Fallback)
+//
+// Public RN model downloads bypass this Objective-C path and call
+// HybridRunAnywhereCore::downloadModel -> rac_http_download_execute. This
+// fallback remains registered on the RACommons platform adapter for
+// platform-adapter-only consumers that request an async download before going
+// through the Nitro public API.
 // =============================================================================
 
 static const int RAC_SUCCESS = 0;
@@ -619,158 +625,7 @@ bool PlatformAdapter_isTablet(void) {
 }
 
 // ============================================================================
-// HTTP POST for Device Registration (Synchronous)
-// Matches Swift's CppBridge+Device.swift http_post callback
-// ============================================================================
-
-/**
- * Synchronous HTTP POST for device registration
- * Called from C++ device manager callbacks
- *
- * @param url Full URL to POST to
- * @param jsonBody JSON body string
- * @param supabaseKey Supabase API key (for dev mode, can be NULL)
- * @param outStatusCode Pointer to store HTTP status code
- * @param outResponseBody Pointer to store response body (must be freed by caller)
- * @param outErrorMessage Pointer to store error message (must be freed by caller)
- * @return true if request succeeded (2xx or 409)
- */
-bool PlatformAdapter_httpPostSync(
-    const char* url,
-    const char* jsonBody,
-    const char* supabaseKey,
-    int* outStatusCode,
-    char** outResponseBody,
-    char** outErrorMessage
-) {
-    @autoreleasepool {
-        if (!url || !jsonBody || !outStatusCode) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid arguments");
-            return false;
-        }
-
-        *outStatusCode = 0;
-        if (outResponseBody) *outResponseBody = NULL;
-        if (outErrorMessage) *outErrorMessage = NULL;
-
-        NSString* urlStr = [NSString stringWithUTF8String:url];
-        NSString* bodyStr = [NSString stringWithUTF8String:jsonBody];
-        NSString* apiKey = supabaseKey ? [NSString stringWithUTF8String:supabaseKey] : nil;
-
-        if (!urlStr || !bodyStr) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid URL or body");
-            return false;
-        }
-
-        NSURL* nsUrl = [NSURL URLWithString:urlStr];
-        if (!nsUrl) {
-            if (outErrorMessage) *outErrorMessage = strdup("Invalid URL format");
-            return false;
-        }
-
-        NSLog(@"[PlatformAdapterBridge] HTTP POST to: %@", urlStr);
-
-        // For Supabase device registration, add ?on_conflict=device_id for UPSERT
-        // This matches Swift's HTTPService.swift logic
-        if ([urlStr containsString:@"/rest/v1/sdk_devices"]) {
-            if (![urlStr containsString:@"on_conflict="]) {
-                NSString* separator = [urlStr containsString:@"?"] ? @"&" : @"?";
-                urlStr = [NSString stringWithFormat:@"%@%@on_conflict=device_id", urlStr, separator];
-                nsUrl = [NSURL URLWithString:urlStr];
-                NSLog(@"[PlatformAdapterBridge] Added on_conflict for UPSERT: %@", urlStr);
-            }
-        }
-
-        // Create request
-        NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:nsUrl];
-        request.HTTPMethod = @"POST";
-        request.HTTPBody = [bodyStr dataUsingEncoding:NSUTF8StringEncoding];
-        request.timeoutInterval = 30.0;
-
-        // Headers
-        [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-        [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-
-        // Supabase headers (for device registration UPSERT)
-        if (apiKey) {
-            [request setValue:apiKey forHTTPHeaderField:@"apikey"];
-            [request setValue:[NSString stringWithFormat:@"Bearer %@", apiKey] forHTTPHeaderField:@"Authorization"];
-            [request setValue:@"resolution=merge-duplicates" forHTTPHeaderField:@"Prefer"];
-        }
-
-        // Synchronous request using semaphore (like Swift SDK)
-        __block NSData* responseData = nil;
-        __block NSHTTPURLResponse* httpResponse = nil;
-        __block NSError* error = nil;
-
-        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-
-        NSURLSessionDataTask* task = [[NSURLSession sharedSession]
-            dataTaskWithRequest:request
-            completionHandler:^(NSData* data, NSURLResponse* response, NSError* err) {
-                responseData = data;
-                httpResponse = (NSHTTPURLResponse*)response;
-                error = err;
-                dispatch_semaphore_signal(semaphore);
-            }];
-
-        [task resume];
-
-        // Wait with 30 second timeout
-        dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC);
-        long result = dispatch_semaphore_wait(semaphore, timeout);
-
-        if (result != 0) {
-            if (outErrorMessage) *outErrorMessage = strdup("Request timed out");
-            NSLog(@"[PlatformAdapterBridge] HTTP POST timed out");
-            return false;
-        }
-
-        if (error) {
-            if (outErrorMessage) *outErrorMessage = strdup([[error localizedDescription] UTF8String]);
-            NSLog(@"[PlatformAdapterBridge] HTTP POST error: %@", error);
-            return false;
-        }
-
-        *outStatusCode = (int)httpResponse.statusCode;
-
-        // Store response body
-        if (responseData && outResponseBody) {
-            NSString* bodyString = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-            if (bodyString) {
-                *outResponseBody = strdup([bodyString UTF8String]);
-            }
-        }
-
-        // 2xx or 409 (conflict/already exists) = success for device registration
-        BOOL isSuccess = (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) ||
-                         httpResponse.statusCode == 409;
-
-        // Log response body for debugging (especially on errors)
-        NSString* responseBodyStr = nil;
-        if (responseData) {
-            responseBodyStr = [[NSString alloc] initWithData:responseData encoding:NSUTF8StringEncoding];
-        }
-        
-        if (!isSuccess) {
-            NSLog(@"[PlatformAdapterBridge] HTTP POST failed with status=%ld, response: %@",
-                  (long)httpResponse.statusCode, responseBodyStr ?: @"(empty)");
-            if (outErrorMessage) {
-                NSString* errorMsg = [NSString stringWithFormat:@"HTTP %ld: %@", 
-                    (long)httpResponse.statusCode, responseBodyStr ?: @"Unknown error"];
-                *outErrorMessage = strdup([errorMsg UTF8String]);
-            }
-        }
-
-        NSLog(@"[PlatformAdapterBridge] HTTP POST completed: status=%d success=%d",
-              *outStatusCode, isSuccess);
-
-        return isSuccess;
-    }
-}
-
-// ============================================================================
-// HTTP Download (Async)
+// HTTP Download (Async Platform Adapter Fallback)
 // ============================================================================
 
 int PlatformAdapter_httpDownload(

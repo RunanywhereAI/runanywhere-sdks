@@ -175,7 +175,7 @@ RunAnywhere.registerTool(
     ],
   },
   async (args) => {
-    // Your tool implementation
+    // Example app/tool code may call fetch; SDK internals use native C++ HTTP.
     const response = await fetch(`https://api.weather.com?q=${args.location}`);
     const data = await response.json();
     return { temperature: data.temp, condition: data.condition };

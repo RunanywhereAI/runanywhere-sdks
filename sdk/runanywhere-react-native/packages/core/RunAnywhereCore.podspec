@@ -28,8 +28,14 @@ Pod::Spec.new do |s|
   s.source_files = [
     "ios/**/*.{swift}",
     "ios/**/*.{h,m,mm}",
+    "cpp/HybridLLM.cpp",
+    "cpp/HybridLLM.hpp",
     "cpp/HybridRunAnywhereCore.cpp",
+    "cpp/HybridRunAnywhereCore+*.cpp",
+    "cpp/HybridRunAnywhereCore+Common.hpp",
     "cpp/HybridRunAnywhereCore.hpp",
+    "cpp/HybridVoiceAgent.cpp",
+    "cpp/HybridVoiceAgent.hpp",
     "cpp/bridges/**/*.{cpp,hpp}",
   ]
 

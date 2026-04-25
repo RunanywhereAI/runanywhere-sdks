@@ -47,6 +47,11 @@ public extension RunAnywhere {
             }
         }
     }
+
+    /// Cancel an active model download.
+    static func cancelDownload(_ modelId: String) {
+        DownloadAdapter.shared.cancelDownload(taskId: modelId)
+    }
 }
 
 // MARK: - Storage Extensions
@@ -93,6 +98,23 @@ public extension RunAnywhere {
         try await CppBridge.ModelRegistry.shared.updateDownloadStatus(modelId: modelId, localPath: nil)
         // Emit via C++ event system
         CppBridge.Events.emitModelDeleted(modelId: modelId)
+    }
+
+    /// Delete a stored model by ID while preserving its registry entry.
+    static func deleteModel(_ modelId: String) async throws {
+        let models = try await availableModels()
+        guard let model = models.first(where: { $0.id == modelId }) else {
+            throw SDKError.general(.modelNotFound, "Model not found: \(modelId)")
+        }
+        try await deleteStoredModel(modelId, framework: model.framework)
+    }
+
+    /// Delete all downloaded models while keeping catalog entries registered.
+    static func deleteAllModels() async throws {
+        let models = try await availableModels()
+        for model in models where model.localPath != nil {
+            try await deleteStoredModel(model.id, framework: model.framework)
+        }
     }
 
     /// Get base directory URL

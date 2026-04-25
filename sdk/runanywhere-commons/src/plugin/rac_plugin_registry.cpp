@@ -304,6 +304,7 @@ const char* rac_runtime_name(rac_runtime_id_t r) {
         case RAC_RUNTIME_NNAPI:       return "nnapi";
         case RAC_RUNTIME_WEBGPU:      return "webgpu";
         case RAC_RUNTIME_WASM_SIMD:   return "wasm_simd";
+        case RAC_RUNTIME_ONNXRT:      return "onnxrt";
         case RAC_RUNTIME_UNSPECIFIED: return "unspecified";
         default:                      return "unknown";
     }

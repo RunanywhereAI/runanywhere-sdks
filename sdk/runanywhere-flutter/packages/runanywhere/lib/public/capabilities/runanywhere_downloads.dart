@@ -80,6 +80,14 @@ class RunAnywhereDownloads {
     }
   }
 
+  /// Cancel an active model download if the adapter still owns it.
+  Future<void> cancelDownload(String modelId) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKError.notInitialized();
+    }
+    ModelDownloadService.shared.cancelDownload(modelId);
+  }
+
   /// Delete a stored model from the C++ registry + disk.
   Future<void> delete(String modelId) async {
     if (!SdkState.shared.isInitialized) {
@@ -109,6 +117,17 @@ class RunAnywhereDownloads {
 
     await DartBridgeModelRegistry.instance.updateDownloadStatus(modelId, null);
     EventBus.shared.publish(SDKModelEvent.deleted(modelId: modelId));
+  }
+
+  /// Delete every downloaded model while keeping registry entries available.
+  Future<void> deleteAllModels() async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKError.notInitialized();
+    }
+    final storedModels = await list();
+    for (final storedModel in storedModels) {
+      await delete(storedModel.modelInfo.id);
+    }
   }
 
   /// Clear cached files managed by the native file manager.

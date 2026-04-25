@@ -6,25 +6,30 @@
 # Paths match the output directories from idl/codegen/generate_*.sh.
 
 # Swift
-sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**  linguist-generated=true
+sdk/runanywhere-swift/Sources/RunAnywhere/Generated/**  linguist-generated=true -diff
 
 # Kotlin
-sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**  linguist-generated=true
+sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/generated/**  linguist-generated=true -diff
+sdk/runanywhere-kotlin/build/generated/**  linguist-generated=true -diff
 
 # Dart
-sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**  linguist-generated=true
+sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**  linguist-generated=true -diff
 
 # TypeScript (RN + Web)
-sdk/runanywhere-react-native/packages/core/src/generated/**  linguist-generated=true
-sdk/runanywhere-web/packages/core/src/generated/**  linguist-generated=true
+sdk/runanywhere-react-native/packages/core/src/generated/**  linguist-generated=true -diff
+sdk/runanywhere-web/packages/core/src/generated/**  linguist-generated=true -diff
 
 # Python (future SDK; directory exists once generate_python.sh runs)
-sdk/runanywhere-python/src/runanywhere/generated/**  linguist-generated=true
+sdk/runanywhere-python/src/runanywhere/generated/**  linguist-generated=true -diff
 
 # C++
-sdk/runanywhere-commons/src/generated/proto/**  linguist-generated=true
+sdk/runanywhere-commons/src/generated/proto/**  linguist-generated=true -diff
 
 # Mirror Nitrogen's existing output tree for consistency.
-sdk/runanywhere-react-native/packages/core/nitrogen/generated/**  linguist-generated=true
-sdk/runanywhere-react-native/packages/llamacpp/nitrogen/generated/**  linguist-generated=true
-sdk/runanywhere-react-native/packages/onnx/nitrogen/generated/**  linguist-generated=true
+sdk/runanywhere-react-native/packages/*/nitrogen/generated/**  linguist-generated=true -diff
+
+# Protobuf compiler outputs can appear in multiple SDK language targets.
+**/*.pb.cc  linguist-generated=true -diff
+**/*.pb.h  linguist-generated=true -diff
+**/*.pb.dart  linguist-generated=true -diff
+**/*.pb.swift  linguist-generated=true -diff

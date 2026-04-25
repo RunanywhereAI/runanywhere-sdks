@@ -2,11 +2,10 @@
  * @file genie_backend.cpp
  * @brief Qualcomm Genie engine shell implementation.
  *
- * GAP 06 T5.2. Every op in this file is a stub that either forwards to
- * the real Genie C API (when `RAC_GENIE_SDK_AVAILABLE=1`) or returns
- * `RAC_ERROR_BACKEND_UNAVAILABLE`. This means the engine compiles on
- * every host regardless of SDK availability; runtime failures remain
- * the explicit backpressure signal.
+ * GAP 06 T5.2. This shell compiles on every host regardless of SDK
+ * availability. When `RAC_GENIE_SDK_AVAILABLE=0`, registration is rejected
+ * before the router can select Genie; any direct stub invocation still returns
+ * `RAC_ERROR_BACKEND_UNAVAILABLE`.
  */
 
 #include "genie_backend.h"
@@ -33,8 +32,9 @@ const char* genie_backend_build_info(void) {
 
 rac_result_t genie_backend_unavailable(void) {
     RAC_LOG_WARNING("Genie",
-                    "Genie backend invoked but RAC_GENIE_SDK_AVAILABLE=0. "
-                    "Build with -DRAC_GENIE_SDK_ROOT=<qnn-sdk-path> to enable.");
+                    "Genie backend unavailable. It requires an Android build "
+                    "with -DRAC_BACKEND_GENIE=ON, "
+                    "-DRAC_GENIE_SDK_ROOT=<qnn-sdk-path>, and SDK-backed LLM ops.");
     return RAC_ERROR_BACKEND_UNAVAILABLE;
 }
 

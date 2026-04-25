@@ -21,29 +21,44 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere Kotlin SDK](../../../sdk/runanywhere-kotlin/) as a local Gradle included build. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the [RunAnywhere Kotlin SDK](../../../sdk/runanywhere-kotlin/) as local Gradle project dependencies. A clean clone needs Android SDK/NDK configuration plus locally staged JNI libraries before the app can package real SDK backends.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Android Studio Hedgehog or newer.
+- Android SDK 24+, platform tools, build tools, CMake, and NDK; export `ANDROID_HOME` and `ANDROID_NDK_HOME`.
+- JDK 17 on `PATH`.
+- An arm64-v8a device is recommended for runtime smoke tests; emulator builds are useful for compile checks.
+
+Create `local.properties` from your Android SDK location if Android Studio has not created it:
+
+```properties
+sdk.dir=/path/to/Android/sdk
+```
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the Kotlin SDK directory
-cd runanywhere-sdks/sdk/runanywhere-kotlin
+cd examples/android/RunAnywhereAI
 
-# 2. Run the setup script (~10-15 minutes on first run)
-#    This builds the native C++ JNI libraries and sets testLocal=true
-./scripts/build-kotlin.sh --setup
+# Build or refresh local SDK JNI artifacts when this checkout has no staged binaries.
+cd ../../..
+./scripts/build-core-android.sh arm64-v8a
+cd examples/android/RunAnywhereAI
 
-# 3. Open this sample app in Android Studio
-#    File > Open > examples/android/RunAnywhereAI
-
-# 4. Wait for Gradle sync to complete
-
-# 5. Connect an Android device (ARM64 recommended) or use an emulator
-
-# 6. Click Run
+./gradlew :app:assembleDebug
 ```
+
+Notes:
+
+- `settings.gradle.kts` wires the sample to `sdk/runanywhere-kotlin` and its local backend modules.
+- `scripts/build-core-android.sh` stages JNI libraries into the Kotlin SDK core and backend module `jniLibs` directories.
+- Keep `local.properties` machine-local; do not commit host-specific SDK paths.
+- `scripts/verify.sh` checks SDK/NDK configuration and runs `./gradlew :app:assembleDebug`; set `REFRESH_NATIVE=1` to rebuild the local JNI artifacts first.
 
 ### How It Works
 

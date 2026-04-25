@@ -126,6 +126,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
     rac_commons
     rac_backend_llamacpp
 )

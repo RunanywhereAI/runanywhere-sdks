@@ -805,6 +805,18 @@ export async function deleteModel(modelId: string): Promise<boolean> {
 }
 
 /**
+ * Delete all downloaded models while keeping catalog entries registered.
+ */
+export async function deleteAllModels(): Promise<boolean> {
+  const downloaded = await getDownloadedModels();
+  let ok = true;
+  for (const model of downloaded) {
+    ok = (await deleteModel(model.id)) && ok;
+  }
+  return ok;
+}
+
+/**
  * Check if a model is compatible with the current device
  * Returns RAM and storage compatibility info
  */

@@ -53,9 +53,9 @@ export class VoiceAgentStreamAdapter {
         try {
           const unsubscribe = NitroVoiceAgent.subscribeProtoEvents(
             handle,
-            (bytes: Uint8Array) => {
+            (bytes: ArrayBuffer) => {
               try {
-                onMessage(VoiceEvent.decode(bytes));
+                onMessage(VoiceEvent.decode(new Uint8Array(bytes)));
               } catch (e) {
                 onError(e instanceof Error ? e : new Error(String(e)));
               }

@@ -29,6 +29,7 @@ import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSStorage } from '../Infrastructure/OPFSStorage';
 import { SDKError, SDKErrorCode } from '../Foundation/ErrorTypes';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import { ModelRegistryAdapter, type RefreshOptions } from '../Adapters/ModelRegistryAdapter';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -172,6 +173,10 @@ export const RunAnywhere = {
     return ModelManager.downloadModel(modelId);
   },
 
+  cancelDownload(modelId: string): boolean {
+    return ModelManager.cancelDownload(modelId);
+  },
+
   async loadModel(modelId: string): Promise<boolean> {
     return ModelManager.loadModel(modelId);
   },
@@ -190,6 +195,18 @@ export const RunAnywhere = {
 
   async deleteModel(modelId: string): Promise<void> {
     return ModelManager.deleteModel(modelId);
+  },
+
+  async deleteAllModels(): Promise<void> {
+    return ModelManager.deleteAllModels();
+  },
+
+  refreshModelRegistry(options: RefreshOptions = {}): boolean {
+    return ModelRegistryAdapter.tryDefault()?.refresh({
+      includeRemoteCatalog: options.includeRemoteCatalog ?? true,
+      rescanLocal: options.rescanLocal ?? true,
+      pruneOrphans: options.pruneOrphans ?? false,
+    }) ?? false;
   },
 
   // =========================================================================

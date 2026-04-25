@@ -234,14 +234,19 @@ pattern of `test_plugin_entry_llamacpp` and `test_plugin_entry_onnx`.
 
 | Priority | Name              | Primitives served            | Platforms  |
 |----------|-------------------|------------------------------|------------|
-| 120      | metalrt           | LLM + STT + TTS + VLM        | Apple      |
-| 110      | whisperkit_coreml | STT                          | Apple      |
+| 120      | metalrt           | LLM + STT + TTS + VLM        | Apple, only when the private engine binary is linked |
+| 110      | whisperkit_coreml | STT                          | Apple, only after Swift callbacks are registered |
 | 100      | llamacpp          | LLM (vlm via llamacpp_vlm)   | All        |
 | 100      | llamacpp_vlm      | VLM                          | All        |
 | 100      | platform          | LLM + TTS + Diffusion        | Apple (FoundationModels, AVSpeech, CoreML) |
 |  95      | mlx (example)     | LLM                          | Apple only |
+|  90      | sherpa            | STT + TTS + VAD              | All, only when Sherpa-ONNX ops are compiled |
 |  90      | whispercpp        | STT                          | All        |
 |  80      | onnx              | STT + TTS + VAD + Embeddings + Wakeword | All |
+
+Shell or partially wired engines must use priority `0`, leave runtime/format
+metadata empty, and reject registration from `capability_check()` until every
+advertised primitive has a non-null op slot backed by real implementation code.
 
 Pick your priority within the existing range:
 - 0–40: experimental / CPU fallback engines

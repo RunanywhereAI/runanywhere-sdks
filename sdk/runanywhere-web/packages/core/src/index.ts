@@ -75,7 +75,7 @@ export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
 // Web site goes through the same HTTP transport as Swift/Kotlin/RN/Flutter.
 // Backend packages install their Emscripten module via
 // HTTPAdapter.setDefaultModule(module) after WASM load.
-export { HTTPAdapter, DownloadStatus } from './Adapters/HTTPAdapter';
+export { HTTPAdapter, DownloadStatus, HTTP_FETCH_CARVE_OUTS } from './Adapters/HTTPAdapter';
 export type {
   HTTPRequest,
   HTTPResponse,

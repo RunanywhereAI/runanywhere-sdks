@@ -153,6 +153,14 @@ export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;
   downloadModel(modelId: string, onProgress?: (p: DownloadProgress) => void): Promise<void>;
+  cancelDownload(modelId: string): boolean;
+  deleteModel(modelId: string): Promise<void>;
+  deleteAllModels(): Promise<void>;
+  refreshModelRegistry(options?: {
+    includeRemoteCatalog?: boolean;
+    rescanLocal?: boolean;
+    pruneOrphans?: boolean;
+  }): boolean;
   loadModel(modelId: string): Promise<boolean>;
   unloadAll(): Promise<void>;
   shutdown(): void;

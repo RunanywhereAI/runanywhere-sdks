@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include "rac/core/rac_logger.h"
+#include "rac_runtime_metal.h"
 
 static const char* LOG_CAT = "LLM.MetalRT";
 
@@ -33,6 +34,8 @@ rac_result_t rac_llm_metalrt_create(const char* model_path, rac_handle_t* out_ha
     if (out_handle == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
+    rac_result_t runtime_rc = rac_metal_runtime_require_available();
+    if (runtime_rc != RAC_SUCCESS) return runtime_rc;
 
     auto* impl = new (std::nothrow) rac_llm_metalrt_impl();
     if (!impl) {

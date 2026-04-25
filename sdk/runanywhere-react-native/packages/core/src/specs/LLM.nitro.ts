@@ -15,7 +15,7 @@
 import type { HybridObject } from 'react-native-nitro-modules';
 
 /** Callback fired once per serialized LLMStreamEvent proto message. */
-export type OnLLMProtoBytes = (bytes: Uint8Array) => void;
+export type OnLLMProtoBytes = (bytes: ArrayBuffer) => void;
 
 /** Callback fired when the token stream terminates (stop / length). */
 export type OnLLMStreamDone = () => void;

@@ -118,7 +118,7 @@ final class StreamingParityTests: XCTestCase {
         return events
     }
 
-    func test_voiceAgent_streamsExpectedEvents() throws {
+    func test_parity_voiceAgent_streamsExpectedEvents() throws {
         let golden = try loadGolden()
         let actual = swiftGoldenSequence().map(formatEvent)
         XCTAssertEqual(actual, golden,

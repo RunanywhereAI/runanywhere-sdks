@@ -2,21 +2,16 @@
  * @file HTTPBridge.hpp
  * @brief HTTP bridge documentation
  *
- * NOTE: HTTP is handled entirely by the JavaScript/platform layer.
+ * NOTE: React Native HTTP transport is now owned by native C++.
  *
- * In Swift, HTTPService.swift handles all HTTP requests.
- * In React Native, the JS layer (HTTPService.ts) handles HTTP.
- *
- * C++ does NOT make HTTP requests directly. Instead:
- * 1. C++ provides JSON building functions (rac_auth_request_to_json, etc.)
- * 2. JS layer makes the HTTP request
- * 3. C++ parses the response (rac_auth_response_from_json, etc.)
- * 4. C++ stores state (rac_state_set_auth, etc.)
+ * Public Nitro methods use rac_http_client_* directly for auth and ad-hoc
+ * requests. This bridge remains as shared configuration storage for C++
+ * components that need base URL / API key state.
  *
  * This bridge provides:
  * - Configuration storage (base URL, API key)
  * - Authorization header management
- * - HTTP executor registration (for C++ components that need to make requests)
+ * - Optional HTTP executor registration for legacy/platform-adapter callers
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+HTTP.swift
  */
@@ -42,8 +37,7 @@ struct HTTPResponse {
 };
 
 /**
- * HTTP executor callback type
- * Platform provides this to handle HTTP requests
+ * HTTP executor callback type for legacy/platform-adapter callers.
  */
 using HTTPExecutor = std::function<HTTPResponse(
     const std::string& method,
@@ -55,9 +49,8 @@ using HTTPExecutor = std::function<HTTPResponse(
 /**
  * HTTPBridge - HTTP configuration and executor registration
  *
- * NOTE: Actual HTTP requests are made by the JS layer, not C++.
- * This bridge handles configuration and provides an executor for
- * C++ components that need HTTP access.
+ * NOTE: Public RN HTTP requests use rac_http_client_* directly. This bridge
+ * handles configuration and keeps an optional executor for legacy callers.
  */
 class HTTPBridge {
 public:
@@ -104,8 +97,8 @@ public:
     /**
      * Register HTTP executor (called by platform)
      *
-     * This allows C++ components to make HTTP requests through the platform.
-     * The platform handles the actual network operations.
+     * This allows legacy C++ components to make HTTP requests through an
+     * injected executor. Public RN callers use rac_http_client_* directly.
      */
     void setHTTPExecutor(HTTPExecutor executor);
 

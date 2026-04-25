@@ -10,6 +10,11 @@ import XCTest
 
 final class PerfBenchTests: XCTestCase {
     override func setUpWithError() throws {
+        if let producer = Self.firstExistingProducer() {
+            try Self.runProducer(producer)
+            return
+        }
+
         guard FileManager.default.fileExists(atPath: PerfBench.defaultInputPath) else {
             throw XCTSkip(
                 "perf_bench input missing at \(PerfBench.defaultInputPath). " +
@@ -19,13 +24,29 @@ final class PerfBenchTests: XCTestCase {
         }
     }
 
-    func testPerfBenchDecodesAndEmitsDeltas() throws {
+    private static func firstExistingProducer() -> String? {
+        [
+            "build/macos-debug/tests/streaming/perf_bench/perf_producer",
+            "build/macos-release/tests/streaming/perf_bench/perf_producer",
+        ].first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    private static func runProducer(_ path: String) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = ["--emit-binary", PerfBench.defaultInputPath]
+        try process.run()
+        process.waitUntilExit()
+        XCTAssertEqual(process.terminationStatus, 0, "perf_producer failed")
+    }
+
+    func test_perfBenchDecodesAndEmitsDeltas() throws {
         let result = try PerfBench.run()
         XCTAssertGreaterThan(result.count, 0, "expected >0 events decoded")
         XCTAssertGreaterThan(result.nonEmpty, 0, "expected >0 non-empty deltas")
     }
 
-    func testPerfBenchP50UnderOneMillisecond() throws {
+    func test_perfBenchP50UnderOneMillisecond() throws {
         let result = try PerfBench.run()
         guard let p50 = PerfBench.p50(result.deltas) else {
             XCTFail("no non-zero deltas — producer likely not emitting metrics arm")

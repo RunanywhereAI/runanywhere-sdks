@@ -92,9 +92,9 @@ typedef enum rac_runtime_id {
     RAC_RUNTIME_NNAPI       = 10,  /**< Android Neural Networks API. */
     RAC_RUNTIME_WEBGPU      = 11,  /**< Browser WebGPU. */
     RAC_RUNTIME_WASM_SIMD   = 12,  /**< Browser WebAssembly + SIMD. */
+    RAC_RUNTIME_ONNXRT      = 13,  /**< ONNX Runtime process runtime (Env/session owner). */
 
     /* Reserved slots — promote in order, never reorder. */
-    RAC_RUNTIME_RESERVED_13 = 13,
     RAC_RUNTIME_RESERVED_14 = 14,
     RAC_RUNTIME_RESERVED_15 = 15,
     RAC_RUNTIME_RESERVED_16 = 16,

@@ -193,6 +193,48 @@ class ModelDownloadService {
     }
   }
 
+  /// Download a caller-managed file through the commons download runner.
+  ///
+  /// This is intended for backend packages that already own their model
+  /// destination layout but should still use the shared native transport.
+  Future<void> downloadFile({
+    required String downloadId,
+    required Uri url,
+    required File destination,
+    void Function(int bytesDownloaded, int totalBytes)? onProgress,
+  }) async {
+    final cancel = _CancelToken();
+    _active[downloadId] = cancel;
+
+    try {
+      await destination.parent.create(recursive: true);
+
+      final controller = _ProgressController();
+      final downloadFuture = _runDownload(
+        url: url.toString(),
+        destination: destination.path,
+        cancel: cancel,
+        onProgress: controller.push,
+      );
+
+      await for (final progress in _bridge(downloadFuture, controller.stream)) {
+        onProgress?.call(progress.bytesDownloaded, progress.totalBytes);
+      }
+
+      final result = await downloadFuture;
+      if (result.status != _DlStatus.ok) {
+        final httpStatus =
+            result.httpStatus > 0 ? ' (http=${result.httpStatus})' : '';
+        final error = result.error != null ? ': ${result.error}' : '';
+        throw Exception(
+          'Download failed for $url: ${result.status.name}$httpStatus$error',
+        );
+      }
+    } finally {
+      _active.remove(downloadId);
+    }
+  }
+
   // --------------------------------------------------------------------------
   // Multi-file download (e.g. embedding model + vocab.txt)
   // --------------------------------------------------------------------------
@@ -241,10 +283,10 @@ class ModelDownloadService {
 
         await for (final progress
             in _bridge(downloadFuture, controller.stream)) {
-          final fileProgress = model.downloadSize != null &&
-                  model.downloadSize! > 0
-              ? progress.bytesDownloaded / model.downloadSize!
-              : 0.0;
+          final fileProgress =
+              model.downloadSize != null && model.downloadSize! > 0
+                  ? progress.bytesDownloaded / model.downloadSize!
+                  : 0.0;
           final overallProgress = (fileIndex + fileProgress) / totalFiles;
           yield ModelDownloadProgress(
             modelId: modelId,
@@ -474,8 +516,13 @@ class ModelDownloadService {
             ffi.Pointer<ffi.Void>,
             ffi.Pointer<ffi.Void>,
             ffi.Pointer<ffi.Void>),
-        int Function(ffi.Pointer<Utf8>, ffi.Pointer<Utf8>, ffi.Pointer<ffi.Void>,
-            ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>, ffi.Pointer<ffi.Void>)>(
+        int Function(
+            ffi.Pointer<Utf8>,
+            ffi.Pointer<Utf8>,
+            ffi.Pointer<ffi.Void>,
+            ffi.Pointer<ffi.Void>,
+            ffi.Pointer<ffi.Void>,
+            ffi.Pointer<ffi.Void>)>(
       'rac_extract_archive_native',
     );
 
@@ -733,7 +780,8 @@ class _SendPortMessage {
 // progress callback (which runs on the worker's thread).
 bool _workerCancelled = false;
 
-int _progressCallback(int bytesWritten, int totalBytes, ffi.Pointer<ffi.Void> _) {
+int _progressCallback(
+    int bytesWritten, int totalBytes, ffi.Pointer<ffi.Void> _) {
   _workerSendPort?.send(_ProgressMessage(bytesWritten, totalBytes));
   return _workerCancelled ? 0 /* RAC_FALSE */ : 1 /* RAC_TRUE */;
 }

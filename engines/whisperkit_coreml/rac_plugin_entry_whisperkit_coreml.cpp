@@ -11,8 +11,10 @@
 
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
+#include "rac/backends/rac_stt_whisperkit_coreml.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/core/rac_error.h"
+#include "rac_runtime_coreml.h"
 
 extern "C" {
 
@@ -20,7 +22,11 @@ extern const rac_stt_service_ops_t g_whisperkit_coreml_stt_ops;
 
 static rac_result_t whisperkit_coreml_capability_check(void) {
 #if defined(__APPLE__)
-    return RAC_SUCCESS;
+    rac_result_t runtime_rc = rac_coreml_runtime_require_available();
+    if (runtime_rc != RAC_SUCCESS) return runtime_rc;
+    return rac_whisperkit_coreml_stt_is_available() == RAC_TRUE
+               ? RAC_SUCCESS
+               : RAC_ERROR_BACKEND_UNAVAILABLE;
 #else
     return RAC_ERROR_CAPABILITY_UNSUPPORTED;
 #endif

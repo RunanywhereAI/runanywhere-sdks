@@ -5,20 +5,22 @@
  * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
  * T4.1 extension — see sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
  *
- * Scoring stack (all weights deliberately small and well-separated so the
- * ordering is easy to reason about when debugging a routing decision):
+ * Scoring stack (all weights deliberately explicit so a routing decision can
+ * be explained as primitive/model/runtime/hardware components):
  *
- *   base        = metadata.priority
- *   +30         preferred_runtime declared AND hardware-profile confirmed
- *   +15         any declared runtime is registered in the L1 runtime registry
- *   +10         model-format match
- *   +10000      pinned-engine name match (short-circuit; beats all scoring)
- *   -1000       hard reject: primitive not served OR pinned-name mismatch
+ *   base               = metadata.priority
+ *   primitive          = hard gate: requested primitive must have an ops slot
+ *   runtime_compat     = +40 when a declared runtime is registered
+ *   hardware_profile   = +20 when preferred_runtime is declared, registered,
+ *                        and supported by the hardware profile
+ *   model_format       = +10 when requested model format is declared
+ *   pinned_engine      = +10000 name match short-circuit
+ *   reject             = -1000 primitive miss, pin mismatch, or declared
+ *                        runtime set with no registered runtime
  *
- * The T4.1 +15 bonus makes the router prefer engines whose compute runtime
- * has actually been loaded in-process over ones that merely *could* run on
- * this host. It is strictly smaller than the +30 preferred_runtime bonus so
- * callers who explicitly request a runtime keep control of the decision.
+ * Descriptor-only legacy plugins (`metadata.runtimes == NULL`) remain routable
+ * by priority. New plugins that declare runtimes are treated as executable
+ * contracts: no registered runtime, no route.
  */
 
 #include "rac/router/rac_engine_router.h"
@@ -35,6 +37,12 @@ namespace router {
 
 namespace {
 
+constexpr int kRejectScore = -1000;
+constexpr int kPinnedEngineBonus = 10000;
+constexpr int kRuntimeCompatibilityWeight = 40;
+constexpr int kHardwareProfileWeight = 20;
+constexpr int kModelFormatWeight = 10;
+
 /** Snapshot the global registry's vtables for `primitive`, descending priority.
  *  Uses the C ABI `rac_plugin_list` so we don't reach into registry internals. */
 std::vector<const rac_engine_vtable_t*> snapshot_for_primitive(rac_primitive_t p) {
@@ -48,6 +56,34 @@ std::vector<const rac_engine_vtable_t*> snapshot_for_primitive(rac_primitive_t p
     return v;
 }
 
+bool declares_runtime(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
+    if (runtime == RAC_RUNTIME_UNSPECIFIED || vt.metadata.runtimes == nullptr) return false;
+    for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
+        if (vt.metadata.runtimes[i] == runtime) return true;
+    }
+    return false;
+}
+
+bool has_registered_declared_runtime(const rac_engine_vtable_t& vt) {
+    if (vt.metadata.runtimes == nullptr || vt.metadata.runtimes_count == 0) return true;
+    for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
+        if (rac_runtime_is_available(vt.metadata.runtimes[i])) return true;
+    }
+    return false;
+}
+
+bool preferred_runtime_registered(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
+    return declares_runtime(vt, runtime) && rac_runtime_is_available(runtime);
+}
+
+bool matches_model_format(const rac_engine_vtable_t& vt, uint32_t format) {
+    if (format == 0 || vt.metadata.formats == nullptr) return false;
+    for (size_t i = 0; i < vt.metadata.formats_count; ++i) {
+        if (vt.metadata.formats[i] == format) return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 EngineRouter::EngineRouter(const HardwareProfile& profile) : profile_(profile) {}
@@ -58,59 +94,38 @@ bool EngineRouter::serves(const rac_engine_vtable_t& vt, rac_primitive_t p) cons
 
 int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) const {
     /* Hard reject: vtable does not serve the requested primitive. */
-    if (!serves(vt, req.primitive)) return -1000;
+    if (!serves(vt, req.primitive)) return kRejectScore;
 
     /* Hard reject: pinned engine name mismatch. */
     if (!req.pinned_engine.empty()) {
         if (vt.metadata.name == nullptr ||
             req.pinned_engine != vt.metadata.name) {
-            return -1000;
+            return kRejectScore;
         }
         /* Pinned-name match is itself a strong signal — give a large bonus
          * so it wins even against higher-priority unpinned plugins. */
-        return 10000 + vt.metadata.priority;
+        return kPinnedEngineBonus + vt.metadata.priority;
     }
+
+    if (!has_registered_declared_runtime(vt)) return kRejectScore;
 
     /* Base score = plugin's declared priority. */
     int s = vt.metadata.priority;
 
-    /* GAP 04 Phase 11: +30 when the caller's preferred_runtime is both
-     * (a) declared on the plugin and (b) actually available on the host. */
-    if (req.preferred_runtime != RAC_RUNTIME_UNSPECIFIED &&
-        profile_.supports_runtime(req.preferred_runtime) &&
-        vt.metadata.runtimes != nullptr) {
-        for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-            if (vt.metadata.runtimes[i] == req.preferred_runtime) {
-                s += 30;
-                break;
-            }
-        }
+    if (vt.metadata.runtimes != nullptr && vt.metadata.runtimes_count > 0) {
+        s += kRuntimeCompatibilityWeight;
     }
 
-    /* T4.1: +15 when any of the plugin's declared runtimes is *registered*
-     * in the L1 runtime registry. A registered runtime is a strictly
-     * stronger signal than hardware presence alone (it means someone has
-     * already loaded and initialised the runtime plugin), so we layer this
-     * bonus on top of the preferred-runtime bonus above. Capped at a single
-     * +15 per plugin so declaring many runtimes doesn't farm points. */
-    if (vt.metadata.runtimes != nullptr) {
-        for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-            if (rac_runtime_is_available(vt.metadata.runtimes[i])) {
-                s += 15;
-                break;
-            }
-        }
+    if (req.preferred_runtime != RAC_RUNTIME_UNSPECIFIED &&
+        preferred_runtime_registered(vt, req.preferred_runtime) &&
+        profile_.supports_runtime(req.preferred_runtime)) {
+        s += kHardwareProfileWeight;
     }
 
     /* +10 when the caller's model format matches one of the plugin's
      * declared formats. 0 = no format hint; skip the check. */
-    if (req.format != 0 && vt.metadata.formats != nullptr) {
-        for (size_t i = 0; i < vt.metadata.formats_count; ++i) {
-            if (vt.metadata.formats[i] == req.format) {
-                s += 10;
-                break;
-            }
-        }
+    if (matches_model_format(vt, req.format)) {
+        s += kModelFormatWeight;
     }
 
     return s;
@@ -132,7 +147,7 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     for (auto* vt : candidates) {
         if (vt == nullptr) continue;
         int s = score(*vt, req);
-        if (s > -1000) {
+        if (s > kRejectScore) {
             scored.push_back({s, vt});
         }
     }

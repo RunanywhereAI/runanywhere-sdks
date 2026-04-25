@@ -15,6 +15,9 @@
       "kotlin": "HybridRunAnywhereDeviceInfo",
       "swift": "HybridRunAnywhereDeviceInfo"
     },
+    "LLM": {
+      "cpp": "HybridLLM"
+    },
     "VoiceAgent": {
       "cpp": "HybridVoiceAgent"
     }

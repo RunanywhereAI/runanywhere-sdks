@@ -75,9 +75,9 @@ export class LLMStreamAdapter {
         try {
           const unsubscribe = NitroLLM.subscribeProtoEvents(
             handle,
-            (bytes: Uint8Array) => {
+            (bytes: ArrayBuffer) => {
               try {
-                const event = LLMStreamEvent.decode(bytes);
+                const event = LLMStreamEvent.decode(new Uint8Array(bytes));
                 onMessage(event);
                 if (event.isFinal) onDone();
               } catch (e) {

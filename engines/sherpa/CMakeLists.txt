@@ -14,15 +14,9 @@
 # This CMakeLists.txt MUST be added BEFORE engines/onnx so the imported
 # `sherpa_onnx` target exists when onnx's CMake runs (see engines/CMakeLists.txt).
 #
-# T5.1 Phase 2 follow-up: the STT/TTS/VAD implementation source still lives
-# in engines/onnx/onnx_backend.cpp — the plan is to migrate those classes
-# (ONNXSTT / ONNXTTS / ONNXVAD → SherpaSTT / SherpaTTS / SherpaVAD) into
-# this directory and expose them as stt_ops/tts_ops/vad_ops on the
-# `"sherpa"` engine vtable. Until that migration lands, the sherpa engine
-# plugin registers with NULL primitive slots; the onnx engine continues
-# to serve Sherpa-backed STT/TTS/VAD under its legacy name. See
-# v2_gap_specs/GAP_06_ENGINES_TOPLEVEL_REORG.md for the source-migration
-# plan.
+# The runtime source for STT/TTS/VAD and wakeword compatibility lives here;
+# engines/onnx keeps only generic ONNX Runtime services and temporary legacy
+# rac_*_onnx_* shims that forward to this target.
 # =============================================================================
 
 option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONNX)" ON)
@@ -35,6 +29,33 @@ if(NOT RAC_BACKEND_SHERPA)
 endif()
 
 message(STATUS "Configuring Sherpa-ONNX backend...")
+
+include(FetchContent)
+include(LoadVersions)
+
+if(NOT DEFINED NLOHMANN_JSON_VERSION)
+    set(NLOHMANN_JSON_VERSION "3.11.3")
+endif()
+
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v${NLOHMANN_JSON_VERSION}
+    GIT_SHALLOW    TRUE
+)
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(nlohmann_json)
+
+if(TARGET nlohmann_json AND RAC_PLATFORM_IOS)
+    set_target_properties(nlohmann_json PROPERTIES
+        CXX_STANDARD 11
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+    )
+endif()
+
+include(FetchONNXRuntime)
 
 # =============================================================================
 # Sherpa-ONNX prebuilt discovery (moved from engines/onnx/CMakeLists.txt)
@@ -209,9 +230,8 @@ endif()
 # =============================================================================
 # Sherpa Plugin Library
 # =============================================================================
-# Shell plugin entry. Primitive ops (stt/tts/vad) are NULL in this phase;
-# phase 2 migrates the existing Sherpa-backed implementations from
-# engines/onnx/onnx_backend.cpp here. The target exists so:
+# The target ships as a peer of librac_backend_onnx and owns the
+# Sherpa-backed speech primitives.
 #   - librac_backend_sherpa.so ships as its own artifact on every platform
 #     (Android / Linux / macOS / iOS / Windows);
 #   - staging scripts (build-core-android.sh, build-core-xcframework.sh)
@@ -226,11 +246,16 @@ get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../s
 
 set(SHERPA_BACKEND_SOURCES
     sherpa_backend.cpp
+    rac_stt_sherpa.cpp
+    rac_tts_sherpa.cpp
+    rac_vad_sherpa.cpp
+    rac_backend_sherpa_register.cpp
+    wakeword_sherpa.cpp
     rac_plugin_entry_sherpa.cpp
 )
 
-set(SHERPA_LINK_LIBS "")
-set(SHERPA_COMPILE_DEFS RAC_SHERPA_BUILDING)
+set(SHERPA_LINK_LIBS onnxruntime nlohmann_json::nlohmann_json)
+set(SHERPA_COMPILE_DEFS RAC_SHERPA_BUILDING RAC_ONNX_BUILDING RAC_HAS_ONNX RAC_SHERPA_SPEECH_OPS_AVAILABLE=1)
 if(SHERPA_ONNX_AVAILABLE)
     list(APPEND SHERPA_LINK_LIBS sherpa_onnx)
     list(APPEND SHERPA_COMPILE_DEFS SHERPA_ONNX_AVAILABLE=1)
@@ -240,12 +265,13 @@ endif()
 
 rac_add_engine_plugin(sherpa
     TARGET_NAME         rac_backend_sherpa
-    CXX_STANDARD        17
+    CXX_STANDARD        20
     SHARED_ONLY
     SOURCES             ${SHERPA_BACKEND_SOURCES}
     LINK_LIBRARIES      ${SHERPA_LINK_LIBS}
     INCLUDE_DIRECTORIES ${RAC_COMMONS_ROOT_DIR}/include
                         ${RAC_COMMONS_ROOT_DIR}/include/rac/backends
+                        ${RAC_COMMONS_ROOT_DIR}/src
     COMPILE_DEFINITIONS ${SHERPA_COMPILE_DEFS}
     RUNTIMES            CPU
     FORMATS             ONNX

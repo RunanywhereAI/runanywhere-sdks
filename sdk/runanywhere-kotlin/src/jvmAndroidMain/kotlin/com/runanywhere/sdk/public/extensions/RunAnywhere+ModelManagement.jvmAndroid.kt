@@ -34,12 +34,14 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 
 // MARK: - Multi-File Model Companion Storage
 
 /** Stores companion file (url → filename) pairs for multi-file models, keyed by modelId. */
 private val modelCompanionFiles = mutableMapOf<String, List<Pair<String, String>>>()
 private val companionFilesLock = Any()
+private val activeDownloadIdsByModel = ConcurrentHashMap<String, String>()
 
 internal actual fun registerCompanionFilesInternal(modelId: String, companionFiles: List<Pair<String, String>>) {
     synchronized(companionFilesLock) {
@@ -644,6 +646,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     expectedChecksum = null,
                 ) ?: throw SDKError.download("Failed to start download for model: $modelId")
 
+            activeDownloadIdsByModel[modelId] = downloadId
             downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
 
             // 9. Wait for download to complete (suspends until callback fires)
@@ -724,6 +727,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // Close with exception so collectors receive the error
             close(e)
         } finally {
+            activeDownloadIdsByModel.remove(modelId)
             // Clean up listener
             CppBridgeDownload.downloadListener = null
         }
@@ -981,7 +985,10 @@ actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Update C++ registry to mark download cancelled
+    val activeDownloadId = activeDownloadIdsByModel.remove(modelId)
+    if (activeDownloadId != null) {
+        CppBridgeDownload.cancelDownload(activeDownloadId)
+    }
     CppBridgeModelRegistry.updateDownloadStatus(modelId, null)
 }
 
@@ -1005,24 +1012,35 @@ actual suspend fun RunAnywhere.deleteAllModels() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Would need to parse and delete each - simplified
+    val downloaded = CppBridgeModelRegistry.getDownloaded()
+    downloaded.forEach { model ->
+        val localPath = model.localPath
+        if (!localPath.isNullOrEmpty()) {
+            runCatching { File(localPath).deleteRecursively() }
+                .onFailure { modelsLogger.warning("Failed to delete ${model.modelId} at $localPath: ${it.message}") }
+        }
+        CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, model.modelId)
+        CppBridgeModelRegistry.updateDownloadStatus(model.modelId, null)
+    }
+    synchronized(modelCacheLock) {
+        registeredModels.replaceAll { it.copy(localPath = null) }
+    }
 }
 
-actual suspend fun RunAnywhere.refreshModelRegistry() {
+actual suspend fun RunAnywhere.refreshModelRegistry(
+    includeRemoteCatalog: Boolean,
+    rescanLocal: Boolean,
+    pruneOrphans: Boolean,
+) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
     modelsLogger.info("Refreshing model registry via rac_model_registry_refresh")
-    // Route through the unified commons C ABI (T4.9). Local rescan / orphan
-    // pruning require platform file-IO callbacks that the Kotlin SDK does
-    // not wire into JNI today, so we only request the remote catalog step.
-    // Callers that have already populated the registry via registerModel()
-    // will see the backend assignments merged back in after this call.
     val rc =
         RunAnywhereBridge.racModelRegistryRefresh(
-            includeRemoteCatalog = true,
-            rescanLocal = false,
-            pruneOrphans = false,
+            includeRemoteCatalog = includeRemoteCatalog,
+            rescanLocal = rescanLocal,
+            pruneOrphans = pruneOrphans,
         )
     if (rc != 0) {
         modelsLogger.warning("refreshModelRegistry returned non-zero rc=$rc")

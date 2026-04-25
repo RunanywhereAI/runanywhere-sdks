@@ -333,9 +333,17 @@ expect suspend fun RunAnywhere.deleteModel(modelId: String)
 expect suspend fun RunAnywhere.deleteAllModels()
 
 /**
- * Refresh the model registry from remote.
+ * Refresh the model registry.
+ *
+ * @param includeRemoteCatalog Fetch the backend model assignment catalog.
+ * @param rescanLocal Rescan local model storage where supported.
+ * @param pruneOrphans Clear local paths for missing files where supported.
  */
-expect suspend fun RunAnywhere.refreshModelRegistry()
+expect suspend fun RunAnywhere.refreshModelRegistry(
+    includeRemoteCatalog: Boolean = true,
+    rescanLocal: Boolean = true,
+    pruneOrphans: Boolean = false,
+)
 
 // MARK: - Model Loading
 

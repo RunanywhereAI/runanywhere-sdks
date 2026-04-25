@@ -7,7 +7,7 @@
  *   sdk/runanywhere-commons/include/rac/infrastructure/http/rac_http_download.h
  *
  * Why this exists:
- *   Before T3.13 every Web SDK site re-implemented HTTP with `fetch()`
+ *   Before T3.13 every Web SDK site re-implemented HTTP with browser fetch
  *   + ad-hoc progress loops. Parity with the other SDKs (Swift /
  *   Kotlin / React Native / Flutter) now routes through the commons
  *   HTTP C ABI so redirects, resume, checksum, and progress semantics
@@ -21,15 +21,14 @@
  *   a hard dependency on any specific backend. Core callers that want
  *   to issue HTTP requests ask for `HTTPAdapter.tryDefault()`; when
  *   no backend has loaded yet, the helper returns `null` and the
- *   caller is expected to fall back to browser `fetch()` with a
- *   documented comment explaining why that path is still acceptable
- *   (bootstrap / small manifest loads).
+ *   caller may fall back to browser fetch only for the carve-outs
+ *   documented in `HTTP_FETCH_CARVE_OUTS`.
  *
  * Threading / blocking:
  *   `_rac_http_request_send` / `_rac_http_request_stream` /
  *   `_rac_http_download_execute` block the calling thread inside
  *   libcurl. Emscripten serves network I/O through the browser's
- *   fetch()/XHR under the hood, so on the main thread these calls
+ *   fetch/XHR under the hood, so on the main thread these calls
  *   must be run via `ccall({ async: true })` (ASYNCIFY / JSPI). The
  *   adapter always uses `{ async: true }` so it works from either a
  *   dedicated worker or the main thread without caller-side changes.
@@ -38,6 +37,17 @@
 import { SDKLogger } from '../Foundation/SDKLogger';
 
 const logger = new SDKLogger('HTTPAdapter');
+
+/**
+ * The only legitimate direct browser-fetch carve-outs in the Web SDK.
+ * Everything else should route through `HTTPAdapter` once a backend
+ * Emscripten module with `rac_http_*` exports is available.
+ */
+export const HTTP_FETCH_CARVE_OUTS = {
+  bootstrapOnly: 'bootstrap-only: fetches the WASM/glue asset needed before any HTTPAdapter-capable module exists',
+  browserOnlyBlobImport: 'browser-only blob import: fetches JavaScript text that must be patched and imported from a Blob URL',
+  noWasmModuleRegisteredFallback: 'fallback when no WASM module registered: preserves pure-core or ONNX-only browser usage before an HTTPAdapter default exists',
+} as const;
 
 // ---------------------------------------------------------------------------
 // Module shape — the minimum Emscripten surface HTTPAdapter needs.

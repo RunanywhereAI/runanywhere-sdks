@@ -23,6 +23,9 @@ endif()
 message(STATUS "Configuring WhisperKit CoreML backend...")
 
 include(${CMAKE_SOURCE_DIR}/cmake/plugins.cmake)
+if(NOT TARGET rac_runtime_coreml)
+    message(FATAL_ERROR "RAC_BACKEND_WHISPERKIT_COREML requires rac_runtime_coreml.")
+endif()
 
 set(WHISPERKIT_COREML_BACKEND_SOURCES
     rac_stt_whisperkit_coreml.cpp
@@ -38,7 +41,8 @@ rac_add_engine_plugin(whisperkit_coreml
     CXX_STANDARD        20
     SOURCES             ${WHISPERKIT_COREML_BACKEND_SOURCES}
     INCLUDE_DIRECTORIES ${CMAKE_SOURCE_DIR}/include
-    RUNTIMES            ANE
+    LINK_LIBRARIES      rac_runtime_coreml
+    RUNTIMES            CORE_ML ANE
     FORMATS             COREML
 )
 

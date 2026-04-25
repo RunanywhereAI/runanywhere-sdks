@@ -6,10 +6,9 @@
  * @brief Shell header for the Qualcomm Genie / NPU engine plugin.
  *
  * GAP 06 T5.2. The public surface is intentionally minimal until the
- * Qualcomm Genie C API is wired. The *shape* of the engine plugin —
- * name, priority, runtime flags, ops table slots — is fixed here so
- * phase 2 only has to fill in concrete handle allocation + Genie
- * dialog lifecycle calls.
+ * Qualcomm Genie C API is wired. Without the Qualcomm SDK, the plugin shell
+ * stays buildable but rejects registration so the router cannot advertise it
+ * as a functional LLM backend.
  *
  * ### Qualcomm Genie C API brief
  *
@@ -33,7 +32,7 @@
  *
  * None of those types are referenced here because the repo does not
  * vendor the Qualcomm headers. Phase 2 introduces a translation unit
- * gated on `RAC_GENIE_SDK_AVAILABLE` that owns the real C API handles.
+ * gated on `RAC_GENIE_SDK_AVAILABLE=1` that owns the real C API handles.
  */
 
 #include "rac/core/rac_error.h"

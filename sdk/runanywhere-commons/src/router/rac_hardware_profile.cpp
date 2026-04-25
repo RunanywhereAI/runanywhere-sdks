@@ -223,6 +223,7 @@ void HardwareProfile::refresh() {
 bool HardwareProfile::supports_runtime(rac_runtime_id_t r) const {
     switch (r) {
         case RAC_RUNTIME_CPU:       return true;  /* always available */
+        case RAC_RUNTIME_ONNXRT:    return true;  /* host runtime; EP selection happens inside ORT */
         case RAC_RUNTIME_METAL:     return has_metal;
         case RAC_RUNTIME_COREML:    return has_coreml;
         case RAC_RUNTIME_ANE:       return has_ane;

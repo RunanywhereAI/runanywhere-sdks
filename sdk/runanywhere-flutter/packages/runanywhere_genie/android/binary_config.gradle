@@ -2,6 +2,8 @@
 // BINARY CONFIGURATION FOR RUNANYWHERE FLUTTER SDK - ANDROID (Genie Package)
 // =============================================================================
 // This file controls whether to use local or remote native libraries (.so files).
+// Genie is experimental and Android/Snapdragon-only; functional routing is
+// disabled by default and requires Qualcomm Genie SDK-backed native ops.
 // Similar to Swift Package.swift's testLocal flag.
 //
 // Set to `true` to use local binaries from android/src/main/jniLibs/
@@ -33,7 +35,8 @@ ext {
     binariesRepo = "runanywhere-sdks"
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
-    // Android native libraries package
+    // Android native libraries package. The asset must contain native binaries
+    // with Qualcomm Genie SDK-backed LLM ops; otherwise the backend remains unavailable.
     genieAndroidUrl = "${binariesBaseUrl}/genie-v${genieVersion}/RABackendGENIE-android-arm64-v8a-v${genieVersion}.zip"
 
     // Helper method to check if we should download

@@ -7,7 +7,7 @@
  * Architecture:
  * - Creates rac_telemetry_manager_t via WASM
  * - Registers an HTTP callback that C++ calls when events need sending
- * - The HTTP callback POSTs the telemetry batch directly via browser `fetch`
+ * - The HTTP callback POSTs the telemetry batch through HTTPAdapter
  * - Calls rac_telemetry_manager_http_complete() with the result
  * - Also provides AnalyticsEventCallback for forwarding events from AnalyticsEventsBridge
  *
@@ -16,8 +16,8 @@
  * - Generated with crypto.randomUUID() on first run
  */
 
-import { SDKLogger, SDKEnvironment } from '@runanywhere/web';
-import type { DeviceInfoData } from '@runanywhere/web';
+import { SDKLogger, SDKEnvironment, HTTPAdapter } from '@runanywhere/web';
+import type { DeviceInfoData, HTTPHeader } from '@runanywhere/web';
 import type { LlamaCppModule } from './LlamaCppBridge';
 
 const logger = new SDKLogger('TelemetryService');
@@ -78,7 +78,7 @@ export function getOrCreateDeviceId(): string {
 
 /**
  * Manages the lifecycle of the C++ telemetry manager and bridges HTTP calls
- * to browser fetch for telemetry event batching and delivery.
+ * to HTTPAdapter for telemetry event batching and delivery.
  */
 export class TelemetryService {
   private static _instance: TelemetryService | null = null;
@@ -343,29 +343,19 @@ export class TelemetryService {
       }
 
       const url = this.buildURL(endpoint);
-      // T3.13: Telemetry POSTs are small JSON envelopes going to the
-      // same origin as the SDK config — they fall under the task's
-      // "small JSON manifest loads" exception for keeping browser
-      // fetch(). Migrating this to HTTPAdapter would require threading
-      // an Emscripten module through the TelemetryService bootstrap
-      // BEFORE rac_init completes (since rac_init wires up the HTTP
-      // callback), which reintroduces a chicken-and-egg coupling that
-      // the existing design explicitly avoids.
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: this.buildHeaders(endpoint),
-        body: JSON.stringify(body),
-      });
+      const response = await this.postTelemetry(url, endpoint, JSON.stringify(body));
 
       // Device registration is idempotent — a 409 means we're already
       // registered and is not an error.
-      if (!response.ok && !(response.status === 409 && this.isDeviceRegistrationPath(endpoint))) {
+      if (response.status < 200 || response.status >= 300) {
+        if (response.status === 409 && this.isDeviceRegistrationPath(endpoint)) {
+          return '';
+        }
         logger.debug(`Telemetry POST HTTP ${response.status}: ${endpoint}`);
         return null;
       }
 
-      const text = await response.text();
-      return text || '';
+      return response.body ? new TextDecoder().decode(response.body) : '';
     } catch (err) {
       logger.debug(`Telemetry POST failed (${environment}): ${err instanceof Error ? err.message : String(err)}`);
       return null;
@@ -394,19 +384,35 @@ export class TelemetryService {
     return `${base}${endpoint}`;
   }
 
-  private buildHeaders(path: string): Record<string, string> {
-    return {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-SDK-Client': SDK_CLIENT,
-      'X-SDK-Version': SDK_VERSION,
-      'X-Platform': SDK_PLATFORM,
-      'apikey': this._supabaseKey,
-      'Authorization': `Bearer ${this._supabaseKey}`,
-      'Prefer': this.isDeviceRegistrationPath(path)
-        ? 'resolution=merge-duplicates'
-        : 'return=representation',
-    };
+  private async postTelemetry(url: string, endpoint: string, jsonBody: string): Promise<{ status: number; body: Uint8Array | null }> {
+    const http = HTTPAdapter.tryDefault()
+      ?? new HTTPAdapter(this._module! as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
+
+    return http.request({
+      method: 'POST',
+      url,
+      headers: this.buildHeaders(endpoint),
+      body: new TextEncoder().encode(jsonBody),
+      followRedirects: true,
+    });
+  }
+
+  private buildHeaders(path: string): HTTPHeader[] {
+    return [
+      { name: 'Content-Type', value: 'application/json' },
+      { name: 'Accept', value: 'application/json' },
+      { name: 'X-SDK-Client', value: SDK_CLIENT },
+      { name: 'X-SDK-Version', value: SDK_VERSION },
+      { name: 'X-Platform', value: SDK_PLATFORM },
+      { name: 'apikey', value: this._supabaseKey },
+      { name: 'Authorization', value: `Bearer ${this._supabaseKey}` },
+      {
+        name: 'Prefer',
+        value: this.isDeviceRegistrationPath(path)
+          ? 'resolution=merge-duplicates'
+          : 'return=representation',
+      },
+    ];
   }
 
   private isDeviceRegistrationPath(path: string): boolean {

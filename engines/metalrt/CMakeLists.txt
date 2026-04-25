@@ -9,8 +9,8 @@
 #      - Every metalrt_* symbol resolves to a no-op returning a sentinel.
 #      - The public repo links cleanly. At runtime, the wrappers + vtable
 #        registration short-circuit to RAC_ERROR_BACKEND_UNAVAILABLE before
-#        invoking these stubs, so loadModel(..., framework: .metalrt) returns
-#        a clean error instead of a crash.
+#        invoking these stubs. The plugin entry also rejects registration and
+#        exposes NULL primitive slots so routing never chooses a stub backend.
 #
 #   2) Engine IS available (internal / authorized builds):
 #      - RAC_METALRT_ENGINE_AVAILABLE=ON.
@@ -35,6 +35,10 @@ else()
 endif()
 if(NOT RAC_BACKEND_METALRT)
     return()
+endif()
+
+if(NOT TARGET rac_runtime_metal)
+    message(FATAL_ERROR "RAC_BACKEND_METALRT requires rac_runtime_metal.")
 endif()
 
 option(RAC_METALRT_ENGINE_AVAILABLE
@@ -117,6 +121,7 @@ endif()
 # Apple frameworks are always needed on this target (the wrappers reference
 # Metal-framework types in some paths even without the engine).
 target_link_libraries(rac_backend_metalrt PRIVATE
+    rac_runtime_metal
     "-framework Metal"
     "-framework Foundation"
     "-framework Accelerate"

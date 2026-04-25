@@ -33,8 +33,10 @@ target_sources(
   # Autolinking Setup
   ../nitrogen/generated/android/runanywherecoreOnLoad.cpp
   # Shared Nitrogen C++ sources
+  ../nitrogen/generated/shared/c++/HybridLLMSpec.cpp
   ../nitrogen/generated/shared/c++/HybridRunAnywhereCoreSpec.cpp
   ../nitrogen/generated/shared/c++/HybridRunAnywhereDeviceInfoSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridVoiceAgentSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridRunAnywhereDeviceInfoSpec.cpp
 )

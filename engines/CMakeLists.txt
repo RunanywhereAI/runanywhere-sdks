@@ -31,9 +31,8 @@ endif()
 
 # T5.1: sherpa must come BEFORE onnx. engines/sherpa owns Sherpa-ONNX
 # prebuilt discovery and publishes the GLOBAL IMPORTED target `sherpa_onnx`
-# + CACHE INTERNAL flag `RAC_SHERPA_ONNX_AVAILABLE` that engines/onnx
-# consumes while its Sherpa-backed STT/TTS/VAD migration (T5.1 phase 2)
-# is in flight.
+# + CACHE INTERNAL flag `RAC_SHERPA_ONNX_AVAILABLE`; engines/onnx may still
+# consume the sherpa target for temporary legacy C API compatibility shims.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/sherpa/CMakeLists.txt")
     add_subdirectory(sherpa)
 endif()

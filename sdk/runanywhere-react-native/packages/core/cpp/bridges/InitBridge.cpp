@@ -10,6 +10,7 @@
 #include "PlatformDownloadBridge.h"
 #include "rac_model_paths.h"
 #include "rac_environment.h"  // For rac_sdk_init, rac_sdk_config_t
+#include "rac/infrastructure/http/rac_http_client.h"
 #include <cstring>
 #include <cstdlib>
 #include <chrono>
@@ -17,6 +18,7 @@
 #include <mutex>
 #include <tuple>
 #include <unordered_map>
+#include <vector>
 
 // Platform-specific logging and bridges
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -35,13 +37,11 @@ extern JavaVM* g_javaVM;
 // Use cached class and method references from cpp-adapter.cpp
 // These are set in JNI_OnLoad to avoid FindClass from background threads
 extern jclass g_platformAdapterBridgeClass;
-extern jclass g_httpResponseClass;
 extern jmethodID g_secureSetMethod;
 extern jmethodID g_secureGetMethod;
 extern jmethodID g_secureDeleteMethod;
 extern jmethodID g_secureExistsMethod;
 extern jmethodID g_getPersistentDeviceUUIDMethod;
-extern jmethodID g_httpPostSyncMethod;
 extern jmethodID g_getDeviceModelMethod;
 extern jmethodID g_getOSVersionMethod;
 extern jmethodID g_getChipNameMethod;
@@ -53,11 +53,6 @@ extern jmethodID g_getGPUFamilyMethod;
 extern jmethodID g_isTabletMethod;
 extern jmethodID g_httpDownloadMethod;
 extern jmethodID g_httpDownloadCancelMethod;
-// HttpResponse field IDs
-extern jfieldID g_httpResponse_successField;
-extern jfieldID g_httpResponse_statusCodeField;
-extern jfieldID g_httpResponse_responseBodyField;
-extern jfieldID g_httpResponse_errorMessageField;
 
 // Helper to get JNIEnv for current thread
 static JNIEnv* getJNIEnv() {
@@ -187,79 +182,6 @@ namespace AndroidBridge {
         
         LOGD("getPersistentDeviceUUID (Android): %s", uuid.c_str());
         return uuid;
-    }
-
-    // HTTP POST for device registration (synchronous)
-    // Returns: (success, statusCode, responseBody, errorMessage)
-    std::tuple<bool, int, std::string, std::string> httpPostSync(
-        const std::string& url,
-        const std::string& jsonBody,
-        const std::string& supabaseKey
-    ) {
-        JNIEnv* env = getJNIEnv();
-        if (!env) {
-            return {false, 0, "", "JNI not available"};
-        }
-        
-        // Use cached references from JNI_OnLoad
-        if (!g_platformAdapterBridgeClass || !g_httpPostSyncMethod) {
-            LOGE("PlatformAdapterBridge class or httpPostSync method not cached");
-            return {false, 0, "", "Bridge class/method not cached"};
-        }
-        
-        if (!g_httpResponseClass || !g_httpResponse_successField) {
-            LOGE("HttpResponse class or fields not cached");
-            return {false, 0, "", "HttpResponse class/fields not cached"};
-        }
-        
-        LOGI("httpPostSync to: %s", url.c_str());
-        
-        jstring jUrl = env->NewStringUTF(url.c_str());
-        jstring jBody = env->NewStringUTF(jsonBody.c_str());
-        jstring jKey = supabaseKey.empty() ? nullptr : env->NewStringUTF(supabaseKey.c_str());
-        
-        jobject response = env->CallStaticObjectMethod(g_platformAdapterBridgeClass, g_httpPostSyncMethod, jUrl, jBody, jKey);
-        
-        env->DeleteLocalRef(jUrl);
-        env->DeleteLocalRef(jBody);
-        if (jKey) env->DeleteLocalRef(jKey);
-        
-        if (!response) {
-            LOGE("httpPostSync returned null response");
-            return {false, 0, "", "httpPostSync returned null"};
-        }
-        
-        // Extract fields from HttpResponse using cached field IDs
-        bool success = env->GetBooleanField(response, g_httpResponse_successField);
-        int statusCode = env->GetIntField(response, g_httpResponse_statusCodeField);
-        
-        std::string responseBody;
-        jstring jResponseBody = (jstring)env->GetObjectField(response, g_httpResponse_responseBodyField);
-        if (jResponseBody) {
-            const char* str = env->GetStringUTFChars(jResponseBody, nullptr);
-            if (str) {
-                responseBody = str;
-                env->ReleaseStringUTFChars(jResponseBody, str);
-            }
-            env->DeleteLocalRef(jResponseBody);
-        }
-        
-        std::string errorMessage;
-        jstring jErrorMessage = (jstring)env->GetObjectField(response, g_httpResponse_errorMessageField);
-        if (jErrorMessage) {
-            const char* str = env->GetStringUTFChars(jErrorMessage, nullptr);
-            if (str) {
-                errorMessage = str;
-                env->ReleaseStringUTFChars(jErrorMessage, str);
-            }
-            env->DeleteLocalRef(jErrorMessage);
-        }
-        
-        env->DeleteLocalRef(response);
-        
-        LOGI("httpPostSync result: success=%d statusCode=%d", success, statusCode);
-        
-        return {success, statusCode, responseBody, errorMessage};
     }
 
     // Device info methods - use cached references from JNI_OnLoad
@@ -513,16 +435,8 @@ extern "C" {
     bool PlatformAdapter_getArchitecture(char** outValue);
     bool PlatformAdapter_getGPUFamily(char** outValue);
     
-    // HTTP
-    bool PlatformAdapter_httpPostSync(
-        const char* url,
-        const char* jsonBody,
-        const char* supabaseKey,
-        int* outStatusCode,
-        char** outResponseBody,
-        char** outErrorMessage
-    );
-
+    // Platform HTTP download fallback used only by the RACommons platform adapter.
+    // Public RN downloads use HybridRunAnywhereCore::downloadModel -> rac_http_download_execute.
     int PlatformAdapter_httpDownload(
         const char* url,
         const char* destinationPath,
@@ -565,6 +479,72 @@ struct http_download_context {
 static std::mutex g_http_download_mutex;
 static std::unordered_map<std::string, http_download_context> g_http_downloads;
 static std::atomic<uint64_t> g_http_download_counter{0};
+
+static std::string appendOnConflictForSupabaseUpsert(const std::string& url) {
+    if (url.find("/rest/v1/sdk_devices") == std::string::npos ||
+        url.find("on_conflict=") != std::string::npos) {
+        return url;
+    }
+
+    return url + (url.find('?') == std::string::npos ? "?" : "&") + "on_conflict=device_id";
+}
+
+static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
+    const std::string& url,
+    const std::string& jsonBody,
+    const std::string& apiKey
+) {
+    std::string finalUrl = appendOnConflictForSupabaseUpsert(url);
+
+    std::vector<rac_http_header_kv_t> headers = {
+        {"Content-Type", "application/json"},
+        {"Accept", "application/json"},
+    };
+    std::string bearer;
+    if (!apiKey.empty()) {
+        headers.push_back({"apikey", apiKey.c_str()});
+        bearer = "Bearer " + apiKey;
+        headers.push_back({"Authorization", bearer.c_str()});
+        headers.push_back({"Prefer", "resolution=merge-duplicates"});
+    }
+
+    rac_http_client_t* client = nullptr;
+    rac_result_t createResult = rac_http_client_create(&client);
+    if (createResult != RAC_SUCCESS || !client) {
+        return {false, 0, "", "rac_http_client_create failed: " + std::to_string(createResult)};
+    }
+
+    rac_http_request_t req{};
+    req.method = "POST";
+    req.url = finalUrl.c_str();
+    req.headers = headers.data();
+    req.header_count = headers.size();
+    req.body_bytes = reinterpret_cast<const uint8_t*>(jsonBody.data());
+    req.body_len = jsonBody.size();
+    req.timeout_ms = 30000;
+    req.follow_redirects = RAC_TRUE;
+    req.expected_checksum_hex = nullptr;
+
+    rac_http_response_t resp{};
+    rac_result_t sendResult = rac_http_request_send(client, &req, &resp);
+    rac_http_client_destroy(client);
+
+    if (sendResult != RAC_SUCCESS) {
+        rac_http_response_free(&resp);
+        return {false, 0, "", "rac_http_request_send failed: " + std::to_string(sendResult)};
+    }
+
+    std::string responseBody;
+    if (resp.body_bytes && resp.body_len > 0) {
+        responseBody.assign(reinterpret_cast<const char*>(resp.body_bytes), resp.body_len);
+    }
+    int statusCode = resp.status;
+    rac_http_response_free(&resp);
+
+    bool success = (statusCode >= 200 && statusCode < 300) || statusCode == 409;
+    std::string errorMessage = success ? "" : "HTTP " + std::to_string(statusCode) + ": " + responseBody;
+    return {success, statusCode, responseBody, errorMessage};
+}
 
 // =============================================================================
 // C Callback Implementations (called by RACommons)
@@ -984,7 +964,9 @@ void InitBridge::registerPlatformAdapter() {
     // Error tracking
     adapter_.track_error = platformTrackErrorCallback;
 
-    // HTTP download (platform adapter)
+    // HTTP download fallback for RACommons platform-adapter-only callers.
+    // Public RN model downloads use HybridRunAnywhereCore::downloadModel,
+    // which calls rac_http_download_execute directly.
     adapter_.http_download = platformHttpDownloadCallback;
     adapter_.http_download_cancel = platformHttpDownloadCancelCallback;
 
@@ -1449,7 +1431,7 @@ bool InitBridge::isTablet() {
 }
 
 // =============================================================================
-// HTTP POST for Device Registration (Synchronous)
+// HTTP POST for Device Registration / Telemetry (Synchronous)
 // Matches Swift: CppBridge+Device.swift http_post callback
 // =============================================================================
 
@@ -1458,42 +1440,10 @@ std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
     const std::string& jsonBody,
     const std::string& supabaseKey
 ) {
-    LOGI("httpPostSync to: %s", url.c_str());
-
-#if defined(ANDROID) || defined(__ANDROID__)
-    // Android: Call JNI to PlatformAdapterBridge.httpPostSync
-    return AndroidBridge::httpPostSync(url, jsonBody, supabaseKey);
-
-#elif defined(__APPLE__)
-    // iOS: Call PlatformAdapter_httpPostSync via extern C
-    int statusCode = 0;
-    char* responseBody = nullptr;
-    char* errorMessage = nullptr;
-
-    bool success = PlatformAdapter_httpPostSync(
-        url.c_str(),
-        jsonBody.c_str(),
-        supabaseKey.empty() ? nullptr : supabaseKey.c_str(),
-        &statusCode,
-        &responseBody,
-        &errorMessage
-    );
-
-    std::string responseBodyStr = responseBody ? responseBody : "";
-    std::string errorMessageStr = errorMessage ? errorMessage : "";
-
-    // Free allocated strings
-    if (responseBody) free(responseBody);
-    if (errorMessage) free(errorMessage);
-
-    LOGI("httpPostSync result: success=%d statusCode=%d", success, statusCode);
-    return {success, statusCode, responseBodyStr, errorMessageStr};
-
-#else
-    // Unsupported platform
-    LOGE("httpPostSync: Unsupported platform");
-    return {false, 0, "", "Unsupported platform"};
-#endif
+    LOGI("httpPostSync via rac_http_client_* to: %s", url.c_str());
+    auto result = postJsonViaRacHttpClient(url, jsonBody, supabaseKey);
+    LOGI("httpPostSync result: success=%d statusCode=%d", std::get<0>(result), std::get<1>(result));
+    return result;
 }
 
 } // namespace bridges

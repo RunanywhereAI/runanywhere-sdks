@@ -10,16 +10,17 @@
 # directory publishes a shell plugin that:
 #
 #   - Compiles cleanly with or without the Genie SDK present.
-#   - Registers a "genie" engine in the GAP 02 plugin registry on Android
-#     arm64 hosts, gated by RAC_BACKEND_GENIE.
-#   - Exposes llm_ops whose every entry point returns
-#     RAC_ERROR_BACKEND_UNAVAILABLE when the SDK is absent. Phase 2 fills in
-#     the real C API wiring behind #if defined(RAC_GENIE_SDK_AVAILABLE).
+#   - Keeps the "genie" plugin shell buildable behind RAC_BACKEND_GENIE.
+#   - Rejects registration with RAC_ERROR_BACKEND_UNAVAILABLE until the
+#     SDK-backed LLM ops are real, so the router cannot select the shell as a
+#     functional backend. Future real wiring should define
+#     RAC_GENIE_LLM_OPS_AVAILABLE=1.
 #
 # Defaulting OFF because the SDK + NPU firmware are not available on CI
 # hosts — enabling the plugin on such hosts would only surface runtime
 # failures. Downstream Android builds can set -DRAC_BACKEND_GENIE=ON plus
-# RAC_GENIE_SDK_ROOT=<qnn-sdk-path> to wire the real engine.
+# RAC_GENIE_SDK_ROOT=<qnn-sdk-path> to compile against Qualcomm headers; the
+# plugin only becomes routable once SDK-backed LLM ops are wired.
 # =============================================================================
 
 option(RAC_BACKEND_GENIE "Build Qualcomm Genie (Snapdragon NPU) LLM backend shell" OFF)
@@ -51,14 +52,16 @@ set(GENIE_COMPILE_DEFS RAC_GENIE_BUILDING)
 set(GENIE_INCLUDE_DIRS
     ${RAC_COMMONS_ROOT_DIR}/include
     ${RAC_COMMONS_ROOT_DIR}/include/rac/backends)
+set(GENIE_PLUGIN_RUNTIMES "")
+set(GENIE_PLUGIN_FORMATS "")
 
-# Optional real SDK integration: when the user provides RAC_GENIE_SDK_ROOT
-# and it contains the expected headers/lib, define RAC_GENIE_SDK_AVAILABLE
-# so genie_backend.cpp can replace its RAC_ERROR_BACKEND_UNAVAILABLE stubs
-# with real Genie C API calls. Kept conditional so CI / public builds keep
-# compiling without access to Qualcomm's distribution.
+# Optional SDK discovery: when the user provides RAC_GENIE_SDK_ROOT and it
+# contains the expected headers, define RAC_GENIE_SDK_AVAILABLE so the shell can
+# compile against Qualcomm's distribution. SDK discovery does not make Genie
+# routable; only real SDK-backed LLM ops may advertise runtime/format metadata.
 if(DEFINED RAC_GENIE_SDK_ROOT AND EXISTS "${RAC_GENIE_SDK_ROOT}/include/GenieCommon.h")
     message(STATUS "  Genie SDK discovered at: ${RAC_GENIE_SDK_ROOT}")
+    set(RAC_GENIE_SDK_AVAILABLE 1)
     list(APPEND GENIE_INCLUDE_DIRS "${RAC_GENIE_SDK_ROOT}/include")
     list(APPEND GENIE_COMPILE_DEFS RAC_GENIE_SDK_AVAILABLE=1)
 
@@ -76,8 +79,20 @@ if(DEFINED RAC_GENIE_SDK_ROOT AND EXISTS "${RAC_GENIE_SDK_ROOT}/include/GenieCom
         endif()
     endforeach()
 else()
+    set(RAC_GENIE_SDK_AVAILABLE 0)
     list(APPEND GENIE_COMPILE_DEFS RAC_GENIE_SDK_AVAILABLE=0)
-    message(STATUS "  Genie SDK absent — shell will return RAC_ERROR_BACKEND_UNAVAILABLE")
+    message(STATUS "  Genie SDK absent — shell will reject registration with RAC_ERROR_BACKEND_UNAVAILABLE")
+endif()
+
+# The public shell intentionally has no SDK-backed LLM operations yet. Keep this
+# as a local build fact, not a user-facing option, so SDK discovery alone cannot
+# make the router see Genie as a functional backend.
+set(RAC_GENIE_LLM_OPS_AVAILABLE 0)
+list(APPEND GENIE_COMPILE_DEFS RAC_GENIE_LLM_OPS_AVAILABLE=0)
+
+if(RAC_GENIE_SDK_AVAILABLE AND RAC_GENIE_LLM_OPS_AVAILABLE)
+    set(GENIE_PLUGIN_RUNTIMES QNN CPU)
+    set(GENIE_PLUGIN_FORMATS ONNX)
 endif()
 
 rac_add_engine_plugin(genie
@@ -88,8 +103,8 @@ rac_add_engine_plugin(genie
     LINK_LIBRARIES      ${GENIE_LINK_LIBS}
     INCLUDE_DIRECTORIES ${GENIE_INCLUDE_DIRS}
     COMPILE_DEFINITIONS ${GENIE_COMPILE_DEFS}
-    RUNTIMES            QNN CPU
-    FORMATS             ONNX
+    RUNTIMES            ${GENIE_PLUGIN_RUNTIMES}
+    FORMATS             ${GENIE_PLUGIN_FORMATS}
 )
 
 if(RAC_PLATFORM_ANDROID)
@@ -100,4 +115,5 @@ endif()
 
 message(STATUS "Genie Backend Configuration:")
 message(STATUS "  SDK available: ${RAC_GENIE_SDK_AVAILABLE}")
+message(STATUS "  LLM ops:       ${RAC_GENIE_LLM_OPS_AVAILABLE}")
 message(STATUS "  Platform:      ${RAC_PLATFORM_NAME}")

@@ -8,10 +8,9 @@
 # plugins (engines/) and register via the `rac_runtime_register` surface
 # declared in include/rac/plugin/rac_runtime_registry.h.
 #
-# Today only the built-in CPU runtime is wired. ORT/CoreML/Metal extraction
-# from their host engines is the follow-up work described in §7 of the
-# design doc; until that lands, the existing engine plugins keep their
-# internal ORT/CoreML/Metal calls unchanged.
+# CPU is always built in. ORT/CoreML/Metal are adapter runtimes: they own
+# shared lifecycle helpers while engines continue to own primitive-specific
+# tensor marshaling.
 #
 # Adding a new in-tree runtime:
 #   1. Create runtimes/<name>/{CMakeLists.txt, rac_runtime_<name>.cpp}.
@@ -22,4 +21,16 @@
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cpu/CMakeLists.txt")
     add_subdirectory(cpu)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnxrt/CMakeLists.txt")
+    add_subdirectory(onnxrt)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/coreml/CMakeLists.txt")
+    add_subdirectory(coreml)
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/metal/CMakeLists.txt")
+    add_subdirectory(metal)
 endif()

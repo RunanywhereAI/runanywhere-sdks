@@ -8,10 +8,6 @@
  * Class: ONNXBridge
  */
 
-#include "rac_stt_onnx.h"
-#include "rac_tts_onnx.h"
-#include "rac_vad_onnx.h"
-
 #include <jni.h>
 
 #include <cstring>
@@ -64,17 +60,17 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegis
         return static_cast<jint>(result);
     }
 
-    // v3 Phase B9: list TRANSCRIBE plugins for debug visibility.
+    // v3 Phase B9: list EMBED plugins for debug visibility.
     {
         const rac_engine_vtable_t* plugins[16] = {};
         size_t plugin_count = 0;
         rac_result_t list_result =
-            rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
-        LOGi("After ONNX registration - TRANSCRIBE plugins: count=%zu, result=%d", plugin_count,
+            rac_plugin_list(RAC_PRIMITIVE_EMBED, plugins, 16, &plugin_count);
+        LOGi("After ONNX registration - EMBED plugins: count=%zu, result=%d", plugin_count,
              list_result);
     }
 
-    LOGi("ONNX backend registered successfully (STT + TTS + VAD)");
+    LOGi("ONNX backend registered successfully (generic ONNX services)");
     return RAC_SUCCESS;
 }
 
@@ -104,7 +100,7 @@ Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeIsRegistered(JNIEnv* env, jc
     const rac_engine_vtable_t* plugins[16] = {};
     size_t plugin_count = 0;
     rac_result_t result =
-        rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+        rac_plugin_list(RAC_PRIMITIVE_EMBED, plugins, 16, &plugin_count);
     if (result == RAC_SUCCESS) {
         for (size_t i = 0; i < plugin_count; ++i) {
             if (plugins[i] && plugins[i]->metadata.name &&

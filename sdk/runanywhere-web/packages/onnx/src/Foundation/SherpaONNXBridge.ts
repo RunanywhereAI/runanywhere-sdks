@@ -196,14 +196,10 @@ export class SherpaONNXBridge {
       const wasmBinaryUrl = baseUrl + 'sherpa-onnx.wasm';
 
       // Pre-fetch the WASM binary to avoid Emscripten's sync XHR
-      // (the Node.js-targeted build uses sync fetch which fails in browsers).
-      //
-      // T3.13: This fetch() is intentionally NOT routed through the
-      // WASM-backed HTTPAdapter because it IS the bootstrap for the
-      // WASM runtime itself — there is no WASM module available to
-      // call into until this binary has been instantiated.
+      // (the Node.js-targeted build uses sync browser loading that fails here).
       logger.info(`Fetching sherpa-onnx WASM binary from ${wasmBinaryUrl}`);
-      const wasmResponse = await fetch(wasmBinaryUrl);
+      // HTTP_FETCH_CARVE_OUTS.bootstrapOnly: the WASM binary is required before any Sherpa module exists.
+      const wasmResponse = await fetch(wasmBinaryUrl); // fetch() carve-out: bootstrap-only WASM binary.
       if (!wasmResponse.ok) {
         throw new Error(`Failed to fetch sherpa-onnx.wasm: ${wasmResponse.status} ${wasmResponse.statusText}`);
       }
@@ -426,7 +422,7 @@ export class SherpaONNXBridge {
    *   1. If any backend has registered an HTTPAdapter default module
    *      (typically `@runanywhere/web-llamacpp`), stream through the
    *      commons libcurl C ABI for parity with the other SDKs.
-   *   2. Otherwise fall back to browser `fetch()` — unavoidable when
+   *   2. Otherwise fall back to browser fetch — unavoidable when
    *      the consumer only uses `@runanywhere/web-onnx` and no other
    *      backend has loaded. Sherpa's own WASM does NOT ship the
    *      `rac_http_*` exports, so we can't route through its module.
@@ -459,8 +455,8 @@ export class SherpaONNXBridge {
       return;
     }
 
-    // Bootstrap path: no backend with HTTP exports has loaded.
-    const response = await fetch(url);
+    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: ONNX-only consumers may not load a commons HTTP module.
+    const response = await fetch(url); // fetch() carve-out: fallback when no WASM module registered.
     if (!response.ok) {
       throw new SDKError(
         SDKErrorCode.NetworkError,

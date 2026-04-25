@@ -22,7 +22,6 @@ import 'dart:ffi' as ffi;
 import 'dart:ffi' show NativeCallable;
 import 'dart:typed_data' show Uint8List;
 
-import 'package:ffi/ffi.dart' show calloc;
 // Wire-via-protoc generated VoiceEvent — see GAP 01 codegen output at
 // sdk/runanywhere-flutter/packages/runanywhere/lib/generated/voice_events.pb.dart.
 import 'package:runanywhere/core/native/rac_native.dart' show RacNative;
@@ -30,9 +29,8 @@ import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
 
 /// Streams [VoiceEvent]s from a C++ voice agent handle.
 ///
-/// One adapter holds one C-side callback registration. Multiple
-/// concurrent subscribers should each create their own adapter — the C++
-/// dispatcher fans out one event per subscription.
+/// Multiple concurrent [stream] subscribers for the same native handle
+/// share one C callback registration and receive the same decoded events.
 class VoiceAgentStreamAdapter {
   VoiceAgentStreamAdapter(this._handle);
 
@@ -41,57 +39,119 @@ class VoiceAgentStreamAdapter {
   /// Open a new event subscription. The returned broadcast stream emits
   /// one [VoiceEvent] per agent event until cancelled or the agent ends.
   Stream<VoiceEvent> stream() {
+    final fanOut = _VoiceFanOutRegistry.fanOutFor(_handle);
     late StreamController<VoiceEvent> controller;
-    NativeCallable<_CCallbackNative>? nativeCb;
 
-    void onListen() {
-      // Build the C-callable trampoline: receives raw bytes, decodes via
-      // protobuf-dart, pushes onto the controller. NativeCallable keeps
-      // the Dart side reachable from the C side as long as we hold it.
-      nativeCb = NativeCallable<_CCallbackNative>.listener((
-        ffi.Pointer<ffi.Uint8> bytesPtr,
-        int bytesLen,
-        ffi.Pointer<ffi.Void> _,
-      ) {
-        if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
-        // Copy off the C buffer (per ABI: only valid for callback duration).
-        final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
-        try {
-          controller.add(VoiceEvent.fromBuffer(copy));
-        } catch (e, st) {
-          controller.addError(e, st);
+    controller = StreamController<VoiceEvent>(
+      onListen: () {
+        final attached = fanOut.attach(controller);
+        if (!attached) {
+          controller.addError(StateError(
+            'rac_voice_agent_set_proto_callback failed '
+            '(Protobuf may not be linked)',
+          ));
+          unawaited(controller.close());
         }
-      });
+      },
+      onCancel: () => fanOut.detach(controller),
+    );
+    return controller.stream;
+  }
+}
 
-      final rc = RacNative.bindings.rac_voice_agent_set_proto_callback(
-        _handle,
-        nativeCb!.nativeFunction,
-        ffi.nullptr,
-      );
-      if (rc != 0) {
-        nativeCb!.close();
-        nativeCb = null;
-        controller.addError(StateError(
-          'rac_voice_agent_set_proto_callback failed: $rc '
-          '(Protobuf may not be linked)',
-        ));
+class _VoiceFanOutRegistry {
+  static final Map<int, _VoiceHandleFanOut> _fanOuts = {};
+
+  static _VoiceHandleFanOut fanOutFor(ffi.Pointer<ffi.Void> handle) {
+    return _fanOuts.putIfAbsent(
+      handle.address,
+      () => _VoiceHandleFanOut(handle, () => _fanOuts.remove(handle.address)),
+    );
+  }
+}
+
+class _VoiceHandleFanOut {
+  _VoiceHandleFanOut(this._handle, this._onTornDown);
+
+  final ffi.Pointer<ffi.Void> _handle;
+  final void Function() _onTornDown;
+  final Set<StreamController<VoiceEvent>> _controllers = {};
+  NativeCallable<_CCallbackNative>? _nativeCb;
+
+  bool attach(StreamController<VoiceEvent> controller) {
+    if (_nativeCb == null && !_install()) {
+      return false;
+    }
+    _controllers.add(controller);
+    return true;
+  }
+
+  void detach(StreamController<VoiceEvent> controller) {
+    _controllers.remove(controller);
+    if (_controllers.isEmpty) {
+      _tearDown();
+    }
+  }
+
+  bool _install() {
+    final cb = NativeCallable<_CCallbackNative>.listener((
+      ffi.Pointer<ffi.Uint8> bytesPtr,
+      int bytesLen,
+      ffi.Pointer<ffi.Void> _,
+    ) {
+      if (bytesLen <= 0 || bytesPtr == ffi.nullptr) return;
+      final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+      try {
+        _broadcast(VoiceEvent.fromBuffer(copy));
+      } catch (e, st) {
+        _broadcastError(e, st);
+      }
+    });
+
+    final rc = RacNative.bindings.rac_voice_agent_set_proto_callback(
+      _handle,
+      cb.nativeFunction,
+      ffi.nullptr,
+    );
+    if (rc != 0) {
+      cb.close();
+      return false;
+    }
+
+    _nativeCb = cb;
+    return true;
+  }
+
+  void _broadcast(VoiceEvent event) {
+    final snapshot = List<StreamController<VoiceEvent>>.from(_controllers);
+    for (final controller in snapshot) {
+      if (!controller.isClosed) {
+        controller.add(event);
+      }
+    }
+  }
+
+  void _broadcastError(Object error, StackTrace stackTrace) {
+    final snapshot = List<StreamController<VoiceEvent>>.from(_controllers);
+    _controllers.clear();
+    for (final controller in snapshot) {
+      if (!controller.isClosed) {
+        controller.addError(error, stackTrace);
         unawaited(controller.close());
       }
     }
+    _tearDown();
+  }
 
-    void onCancel() {
-      RacNative.bindings.rac_voice_agent_set_proto_callback(
-        _handle, ffi.nullptr, ffi.nullptr,
-      );
-      nativeCb?.close();
-      nativeCb = null;
-    }
-
-    controller = StreamController<VoiceEvent>(
-      onListen: onListen,
-      onCancel: onCancel,
+  void _tearDown() {
+    final cb = _nativeCb;
+    if (cb == null) return;
+    RacNative.bindings.rac_voice_agent_set_proto_callback(
+      _handle, ffi.nullptr, ffi.nullptr,
     );
-    return controller.stream;
+    cb.close();
+    _nativeCb = null;
+    _onTornDown();
   }
 }
 
@@ -102,7 +162,3 @@ typedef _CCallbackNative = ffi.Void Function(
   ffi.Size,
   ffi.Pointer<ffi.Void>,
 );
-
-// Suppress unused-import lint while bindings package shape stabilizes.
-// ignore: unused_element
-void _silenceUnusedCalloc() => calloc;

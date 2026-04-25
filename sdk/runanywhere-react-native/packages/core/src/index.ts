@@ -244,6 +244,7 @@ export {
   downloadModel,
   cancelDownload,
   deleteModel,
+  deleteAllModels,
   registerModel,
   registerMultiFileModel,
   refreshModelRegistry,

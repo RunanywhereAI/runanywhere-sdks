@@ -211,6 +211,16 @@ rac_link_archive_deps(test_engine_router)
 target_compile_features(test_engine_router PRIVATE cxx_std_17)
 add_test(NAME engine_router_tests COMMAND test_engine_router)
 
+add_executable(test_engine_capability_honesty test_engine_capability_honesty.cpp)
+target_include_directories(test_engine_capability_honesty PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_engine_capability_honesty PRIVATE rac_commons)
+rac_link_archive_deps(test_engine_capability_honesty)
+target_compile_features(test_engine_capability_honesty PRIVATE cxx_std_17)
+add_test(NAME engine_capability_honesty_tests COMMAND test_engine_capability_honesty)
+
 add_executable(test_hardware_profile test_hardware_profile.cpp)
 target_include_directories(test_hardware_profile PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -355,6 +365,35 @@ if(RAC_BACKEND_ONNX AND TARGET rac_backend_onnx)
     rac_link_archive_deps(test_plugin_entry_onnx)
     target_compile_features(test_plugin_entry_onnx PRIVATE cxx_std_17)
     add_test(NAME plugin_entry_onnx_tests COMMAND test_plugin_entry_onnx)
+endif()
+
+if(RAC_BACKEND_GENIE AND TARGET rac_backend_genie)
+    add_executable(test_plugin_entry_genie test_plugin_entry_genie.cpp)
+    target_include_directories(test_plugin_entry_genie PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/genie
+    )
+    target_link_libraries(test_plugin_entry_genie PRIVATE rac_commons rac_backend_genie)
+    rac_link_archive_deps(test_plugin_entry_genie)
+    target_compile_features(test_plugin_entry_genie PRIVATE cxx_std_17)
+    add_test(NAME plugin_entry_genie_tests COMMAND test_plugin_entry_genie)
+endif()
+
+if(APPLE AND RAC_BACKEND_DIFFUSION_COREML AND TARGET rac_backend_diffusion_coreml)
+    add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
+    target_include_directories(test_diffusion_coreml_generate PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/engines/diffusion-coreml
+    )
+    target_link_libraries(test_diffusion_coreml_generate PRIVATE
+        rac_commons
+        rac_backend_diffusion_coreml
+    )
+    rac_link_archive_deps(test_diffusion_coreml_generate)
+    target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)
+    add_test(NAME diffusion_coreml_generate_tests COMMAND test_diffusion_coreml_generate)
 endif()
 
 # --- test_core: Always built (no backend dependency) ---

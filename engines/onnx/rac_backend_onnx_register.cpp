@@ -1,381 +1,25 @@
 /**
  * @file rac_backend_onnx_register.cpp
- * @brief RunAnywhere Core - ONNX Backend RAC Registration
- *
- * Registers the ONNX backend with the module and service registries.
- * Provides vtable implementations for STT, TTS, and VAD services.
+ * @brief ONNX Runtime backend registration for generic ONNX model services.
  */
 
-#include "rac_stt_onnx.h"
-#include "rac_tts_onnx.h"
-#include "rac_vad_onnx.h"
-
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
 
 #include "rac/backends/rac_embeddings_onnx.h"
-
-// std::filesystem is not available on Emscripten/WASM
-#ifndef __EMSCRIPTEN__
-#include <filesystem>
-namespace fs = std::filesystem;
-#endif
-
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
-#include "rac/features/stt/rac_stt_service.h"
-#include "rac/features/tts/rac_tts_service.h"
-#include "rac/features/vad/rac_vad_service.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
-
-// =============================================================================
-// STT VTABLE IMPLEMENTATION
-// =============================================================================
 
 namespace {
 
 const char* LOG_CAT = "ONNX";
-
-/**
- * Convert Int16 PCM audio to Float32 normalized to [-1.0, 1.0].
- * SDKs may send Int16 audio but Sherpa-ONNX expects Float32.
- */
-static std::vector<float> convert_int16_to_float32(const void* int16_data, size_t byte_count) {
-    const int16_t* samples = static_cast<const int16_t*>(int16_data);
-    size_t num_samples = byte_count / sizeof(int16_t);
-
-    std::vector<float> float_samples(num_samples);
-    for (size_t i = 0; i < num_samples; ++i) {
-        float_samples[i] = static_cast<float>(samples[i]) / 32768.0f;
-    }
-
-    return float_samples;
-}
-
-// Initialize (no-op for ONNX - model loaded during create)
-static rac_result_t onnx_stt_vtable_initialize(void* impl, const char* model_path) {
-    (void)impl;
-    (void)model_path;
-    return RAC_SUCCESS;
-}
-
-// Transcribe - converts Int16 PCM to Float32 for Sherpa-ONNX
-static rac_result_t onnx_stt_vtable_transcribe(void* impl, const void* audio_data,
-                                               size_t audio_size, const rac_stt_options_t* options,
-                                               rac_stt_result_t* out_result) {
-    if (!audio_data || audio_size == 0 || !out_result) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-    // Minimum ~0.05s at 16kHz 16-bit to avoid Sherpa crash on empty/tiny input
-    if (audio_size < 1600) {
-        out_result->text = nullptr;
-        out_result->confidence = 0.0f;
-        return RAC_SUCCESS;
-    }
-    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
-    return rac_stt_onnx_transcribe(impl, float_samples.data(), float_samples.size(), options,
-                                   out_result);
-}
-
-// Stream transcription - uses ONNX streaming API
-static rac_result_t onnx_stt_vtable_transcribe_stream(void* impl, const void* audio_data,
-                                                      size_t audio_size,
-                                                      const rac_stt_options_t* options,
-                                                      rac_stt_stream_callback_t callback,
-                                                      void* user_data) {
-    (void)options;
-
-    rac_handle_t stream = nullptr;
-    rac_result_t result = rac_stt_onnx_create_stream(impl, &stream);
-    if (result != RAC_SUCCESS) {
-        return result;
-    }
-
-    std::vector<float> float_samples = convert_int16_to_float32(audio_data, audio_size);
-
-    result = rac_stt_onnx_feed_audio(impl, stream, float_samples.data(), float_samples.size());
-    if (result != RAC_SUCCESS) {
-        rac_stt_onnx_destroy_stream(impl, stream);
-        return result;
-    }
-
-    rac_stt_onnx_input_finished(impl, stream);
-
-    char* text = nullptr;
-    result = rac_stt_onnx_decode_stream(impl, stream, &text);
-    if (result == RAC_SUCCESS && callback && text) {
-        callback(text, RAC_TRUE, user_data);
-    }
-
-    rac_stt_onnx_destroy_stream(impl, stream);
-    if (text)
-        free(text);
-
-    return result;
-}
-
-// Get info
-static rac_result_t onnx_stt_vtable_get_info(void* impl, rac_stt_info_t* out_info) {
-    if (!out_info)
-        return RAC_ERROR_NULL_POINTER;
-
-    out_info->is_ready = RAC_TRUE;
-    out_info->supports_streaming = rac_stt_onnx_supports_streaming(impl);
-    out_info->current_model = nullptr;
-
-    return RAC_SUCCESS;
-}
-
-// Cleanup
-static rac_result_t onnx_stt_vtable_cleanup(void* impl) {
-    (void)impl;
-    return RAC_SUCCESS;
-}
-
-// Destroy
-static void onnx_stt_vtable_destroy(void* impl) {
-    if (impl) {
-        rac_stt_onnx_destroy(impl);
-    }
-}
-
-// v3 Phase B3: ONNX STT `create` adapter called by commons rac_stt_create()
-// through rac_plugin_route. Replaces the legacy rac_service_provider_t factory.
-static rac_result_t onnx_stt_create_impl(const char* model_id,
-                                         const char* /*config_json*/,
-                                         void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
-    *out_impl = nullptr;
-    RAC_LOG_INFO(LOG_CAT, "onnx_stt_create_impl: model=%s",
-                 model_id ? model_id : "(default)");
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t rc = rac_stt_onnx_create(model_id, nullptr, &backend_handle);
-    if (rc != RAC_SUCCESS) return rc;
-    *out_impl = backend_handle;
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_stt_vtable_get_languages(void* impl, char** out_json) {
-    return rac_stt_onnx_get_languages(impl, out_json);
-}
-
-static rac_result_t onnx_stt_vtable_detect_language(void* impl, const void* audio_data,
-                                                    size_t audio_size,
-                                                    const rac_stt_options_t* options,
-                                                    char** out_language) {
-    return rac_stt_onnx_detect_language(impl, audio_data, audio_size, options, out_language);
-}
-
-}  // namespace (close anon — ops struct must have external linkage)
-
-// Phase 1 / B3 fix: g_onnx_stt_ops is declared `extern const` from
-// rac_plugin_entry_onnx.cpp (external linkage). Defining it inside the
-// anonymous namespace gives it internal linkage and only worked because
-// rac_backend_onnx is currently STATIC (both TUs end up in the same
-// final image). A SHARED build of rac_backend_onnx would surface the
-// linkage mismatch as undefined behaviour. Wrapping in extern "C" makes
-// the definition match the declaration.
-extern "C" const rac_stt_service_ops_t g_onnx_stt_ops = {
-    .initialize = onnx_stt_vtable_initialize,
-    .transcribe = onnx_stt_vtable_transcribe,
-    .transcribe_stream = onnx_stt_vtable_transcribe_stream,
-    .get_info = onnx_stt_vtable_get_info,
-    .cleanup = onnx_stt_vtable_cleanup,
-    .destroy = onnx_stt_vtable_destroy,
-    .create = onnx_stt_create_impl,
-    .get_languages = onnx_stt_vtable_get_languages,
-    .detect_language = onnx_stt_vtable_detect_language,
-};
-
-namespace {  // reopen for the next batch of static helpers
-
-// =============================================================================
-// TTS VTABLE IMPLEMENTATION
-// =============================================================================
-
-static rac_result_t onnx_tts_vtable_initialize(void* impl) {
-    (void)impl;
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_tts_vtable_synthesize(void* impl, const char* text,
-                                               const rac_tts_options_t* options,
-                                               rac_tts_result_t* out_result) {
-    return rac_tts_onnx_synthesize(impl, text, options, out_result);
-}
-
-static rac_result_t onnx_tts_vtable_synthesize_stream(void* impl, const char* text,
-                                                      const rac_tts_options_t* options,
-                                                      rac_tts_stream_callback_t callback,
-                                                      void* user_data) {
-    rac_tts_result_t result = {};
-    rac_result_t status = rac_tts_onnx_synthesize(impl, text, options, &result);
-    if (status == RAC_SUCCESS && callback) {
-        callback(result.audio_data, result.audio_size, user_data);
-    }
-    rac_tts_result_free(&result);
-    return status;
-}
-
-static rac_result_t onnx_tts_vtable_stop(void* impl) {
-    rac_tts_onnx_stop(impl);
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_tts_vtable_get_info(void* impl, rac_tts_info_t* out_info) {
-    (void)impl;
-    if (!out_info)
-        return RAC_ERROR_NULL_POINTER;
-
-    out_info->is_ready = RAC_TRUE;
-    out_info->is_synthesizing = RAC_FALSE;
-    out_info->available_voices = nullptr;
-    out_info->num_voices = 0;
-
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_tts_vtable_cleanup(void* impl) {
-    (void)impl;
-    return RAC_SUCCESS;
-}
-
-static void onnx_tts_vtable_destroy(void* impl) {
-    if (impl) {
-        rac_tts_onnx_destroy(impl);
-    }
-}
-
-// v3 Phase B3: ONNX TTS `create` adapter.
-static rac_result_t onnx_tts_create_impl(const char* model_id,
-                                         const char* /*config_json*/,
-                                         void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
-    *out_impl = nullptr;
-    RAC_LOG_INFO(LOG_CAT, "onnx_tts_create_impl: model=%s",
-                 model_id ? model_id : "(default)");
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t rc = rac_tts_onnx_create(model_id, nullptr, &backend_handle);
-    if (rc != RAC_SUCCESS) return rc;
-    *out_impl = backend_handle;
-    return RAC_SUCCESS;
-}
-
-static rac_result_t onnx_tts_vtable_get_languages(void* impl, char** out_json) {
-    return rac_tts_onnx_get_languages(impl, out_json);
-}
-
-}  // namespace (close anon — see B3 note above)
-
-extern "C" const rac_tts_service_ops_t g_onnx_tts_ops = {
-    .initialize = onnx_tts_vtable_initialize,
-    .synthesize = onnx_tts_vtable_synthesize,
-    .synthesize_stream = onnx_tts_vtable_synthesize_stream,
-    .stop = onnx_tts_vtable_stop,
-    .get_info = onnx_tts_vtable_get_info,
-    .cleanup = onnx_tts_vtable_cleanup,
-    .destroy = onnx_tts_vtable_destroy,
-    .create = onnx_tts_create_impl,
-    .get_languages = onnx_tts_vtable_get_languages,
-};
-
-namespace {
-
-// =============================================================================
-// MODULE IDENTITY
-// =============================================================================
-
 const char* const MODULE_ID = "onnx";
-
-// v3 Phase B3: The legacy rac_service_request_t factories
-// (onnx_stt_can_handle, onnx_stt_create, onnx_tts_can_handle,
-// onnx_tts_create, onnx_vad_can_handle, onnx_vad_create) and their
-// PROVIDER_NAME constants have been removed. Model/framework gating is
-// handled by the router through rac_plugin_entry_onnx.cpp's
-// g_onnx_engine_vtable.metadata.formats table; impl allocation goes
-// through the per-primitive g_onnx_*_ops.create adapters defined above.
-
-// =============================================================================
-// VAD VTABLE OPERATIONS
-// =============================================================================
-
-static rac_result_t onnx_vad_vtable_process(void* impl, const float* samples, size_t num_samples,
-                                            rac_bool_t* out_is_speech) {
-    return rac_vad_onnx_process(static_cast<rac_handle_t>(impl), samples, num_samples,
-                                out_is_speech);
-}
-
-static rac_result_t onnx_vad_vtable_start(void* impl) {
-    return rac_vad_onnx_start(static_cast<rac_handle_t>(impl));
-}
-
-static rac_result_t onnx_vad_vtable_stop(void* impl) {
-    return rac_vad_onnx_stop(static_cast<rac_handle_t>(impl));
-}
-
-static rac_result_t onnx_vad_vtable_reset(void* impl) {
-    return rac_vad_onnx_reset(static_cast<rac_handle_t>(impl));
-}
-
-static rac_result_t onnx_vad_vtable_set_threshold(void* impl, float threshold) {
-    return rac_vad_onnx_set_threshold(static_cast<rac_handle_t>(impl), threshold);
-}
-
-static rac_bool_t onnx_vad_vtable_is_speech_active(void* impl) {
-    return rac_vad_onnx_is_speech_active(static_cast<rac_handle_t>(impl));
-}
-
-static void onnx_vad_vtable_destroy(void* impl) {
-    if (impl) {
-        rac_vad_onnx_destroy(static_cast<rac_handle_t>(impl));
-    }
-}
-
-// v3 Phase B3: ONNX VAD `initialize` — Silero-style VAD models require
-// per-instance model loading. When the backend's rac_vad_onnx_create
-// already accepts model_path (it does), initialize here is a no-op
-// success. Kept explicitly to honor the new ABI.
-static rac_result_t onnx_vad_vtable_initialize(void* /*impl*/, const char* /*model_path*/) {
-    return RAC_SUCCESS;
-}
-
-// v3 Phase B3: ONNX VAD `create` adapter.
-static rac_result_t onnx_vad_create_impl(const char* model_id,
-                                         const char* /*config_json*/,
-                                         void** out_impl) {
-    if (!out_impl) return RAC_ERROR_NULL_POINTER;
-    *out_impl = nullptr;
-    RAC_LOG_INFO(LOG_CAT, "onnx_vad_create_impl: model=%s",
-                 model_id ? model_id : "(default)");
-    rac_handle_t backend_handle = nullptr;
-    rac_result_t rc = rac_vad_onnx_create(model_id, nullptr, &backend_handle);
-    if (rc != RAC_SUCCESS || !backend_handle) {
-        RAC_LOG_ERROR(LOG_CAT, "rac_vad_onnx_create failed: %d", rc);
-        return (rc == RAC_SUCCESS) ? RAC_ERROR_UNKNOWN : rc;
-    }
-    *out_impl = backend_handle;
-    return RAC_SUCCESS;
-}
-
-}  // namespace (close anon — see B3 note above)
-
-extern "C" const rac_vad_service_ops_t g_onnx_vad_ops = {
-    .process = onnx_vad_vtable_process,
-    .start = onnx_vad_vtable_start,
-    .stop = onnx_vad_vtable_stop,
-    .reset = onnx_vad_vtable_reset,
-    .set_threshold = onnx_vad_vtable_set_threshold,
-    .is_speech_active = onnx_vad_vtable_is_speech_active,
-    .destroy = onnx_vad_vtable_destroy,
-    .initialize = onnx_vad_vtable_initialize,
-    .create = onnx_vad_create_impl,
-};
-
-namespace {
 
 // =============================================================================
 // STORAGE AND DOWNLOAD STRATEGIES
@@ -508,10 +152,9 @@ rac_result_t rac_backend_onnx_register(void) {
     module_info.id = MODULE_ID;
     module_info.name = "ONNX Runtime";
     module_info.version = "1.0.0";
-    module_info.description = "STT/TTS/VAD backend using ONNX Runtime";
-    rac_capability_t capabilities[] = {RAC_CAPABILITY_STT, RAC_CAPABILITY_TTS, RAC_CAPABILITY_VAD};
-    module_info.capabilities = capabilities;
-    module_info.num_capabilities = 3;
+    module_info.description = "ONNX Runtime backend";
+    module_info.capabilities = nullptr;
+    module_info.num_capabilities = 0;
 
     rac_result_t result = rac_module_register(&module_info);
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
@@ -520,15 +163,10 @@ rac_result_t rac_backend_onnx_register(void) {
 
     rac_storage_strategy_register(RAC_FRAMEWORK_ONNX, &g_onnx_storage_strategy);
     rac_download_strategy_register(RAC_FRAMEWORK_ONNX, &g_onnx_download_strategy);
-
-    // v3 Phase B3: per-primitive plugin registration happens via
-    // rac_plugin_entry_onnx() (see rac_plugin_entry_onnx.cpp). We still
-    // register the commons-side embeddings provider here — B7 migrates it.
     rac_backend_onnx_embeddings_register();
 
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (module + strategies + embeddings; "
-                          "STT/TTS/VAD plugin registration via rac_plugin_entry_onnx)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (module + strategies + embeddings)");
     return RAC_SUCCESS;
 }
 

@@ -78,6 +78,10 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
+# Verification logs: keep small Markdown summaries under verification/, but
+# do not commit raw build logs (they can be multi-megabyte local artifacts).
+verification/**/*.log
+
 # IDE - IntelliJ IDEA / Android Studio
 # User-specific stuff
 .idea/workspace.xml
@@ -230,6 +234,9 @@ sdk/runanywhere-web/packages/onnx/dist/
 sdk/runanywhere-web/wasm/build/
 sdk/runanywhere-web/packages/core/wasm/
 sdk/runanywhere-web/packages/onnx/wasm/
+sdk/runanywhere-web/packages/*/wasm/*.wasm
+sdk/runanywhere-web/packages/*/wasm/*.wasm.map
+sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
 sdk/runanywhere-web/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
@@ -382,6 +389,8 @@ sdk/runanywhere-react-native/packages/*/prebuilt/
 
 # Flutter - Local builds
 sdk/runanywhere-flutter/ios/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework.zip
 sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)

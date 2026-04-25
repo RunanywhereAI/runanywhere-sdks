@@ -5,10 +5,10 @@
  * @file diffusion_coreml_backend.h
  * @brief C-callable surface for the CoreML diffusion engine.
  *
- * GAP 06 T5.3. Implementation lives in `diffusion_coreml_backend.mm`
- * (Objective-C++). The plugin entry (`rac_plugin_entry_diffusion_coreml.cpp`)
- * is pure C++ and fills the rac_diffusion_service_ops_t vtable with
- * thin forwarders over the functions declared here.
+ * Implementation lives in `diffusion_coreml_backend.mm` (Objective-C++).
+ * The plugin entry (`rac_plugin_entry_diffusion_coreml.cpp`) is pure C++
+ * and fills the rac_diffusion_service_ops_t vtable with thin forwarders
+ * over the functions declared here.
  */
 
 #include "rac/core/rac_error.h"
@@ -60,19 +60,17 @@ rac_result_t rac_diffusion_coreml_initialize(rac_diffusion_coreml_impl_t* impl,
                                              const rac_diffusion_config_t* config);
 
 /**
- * @brief Run text-to-image denoising.
+ * @brief Run text-to-image denoising through TextEncoder, Unet, and VAEDecoder.
  *
- * T5.3 ships the engine shell: the CoreML MLModel handles are loaded but
- * the full SD denoising loop (tokenizer → text embeddings → unet sample
- * → VAE decode → RGBA) is a phase 2 deliverable. Until then this
- * returns `RAC_ERROR_NOT_SUPPORTED` with a clear diagnostic.
+ * Returns `RAC_ERROR_NOT_SUPPORTED` for unsupported bundle layouts or modes
+ * (for example img2img/inpainting), not for supported text-to-image bundles.
  */
 rac_result_t rac_diffusion_coreml_generate(rac_diffusion_coreml_impl_t* impl,
                                            const rac_diffusion_options_t* options,
                                            rac_diffusion_result_t* out_result);
 
 /**
- * @brief Generate with progress callback. Same status as generate().
+ * @brief Generate with progress callback.
  */
 rac_result_t rac_diffusion_coreml_generate_with_progress(
     rac_diffusion_coreml_impl_t* impl,

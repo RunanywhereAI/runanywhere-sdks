@@ -38,7 +38,7 @@ internally). This forced three problems:
 
 ## 2. Goals & non-goals
 
-**Goals (MVP, this task):**
+**Goals (MVP through Phase 6):**
 
 - A C ABI (`rac_runtime_vtable_t`) that wraps a compute runtime's lifecycle,
   session management, and buffer allocation.
@@ -47,16 +47,19 @@ internally). This forced three problems:
   guarantees as the engine registry.
 - A built-in **CPU runtime** registered at startup, so every host has at
   least one runtime available and the registry is never empty.
-- Engine-router awareness: the router scores engine plugins higher when a
-  declared runtime is *both* (a) on the plugin's `runtimes[]` list and
-  (b) currently registered (i.e. actually loadable).
+- Engine-router awareness: the router rejects engine plugins that declare
+  executable runtimes when none of those runtimes is currently registered,
+  then scores surviving candidates with explicit primitive, model-format,
+  runtime-compatibility, and hardware-profile weights.
+- Adapter runtime extraction for ONNX Runtime, CoreML, and Metal so engines
+  call thin runtime helpers for shared session/model/device lifecycles instead
+  of directly owning every L1 object.
 
 **Non-goals (follow-up work):**
 
-- Splitting ONNX Runtime / CoreML / Metal out of existing engine plugins
-  into stand-alone runtime plugins. The engine→runtime migration path is
-  documented below (§7) but not executed in T4.1 — existing engines keep
-  their internal ORT/CoreML calls unchanged.
+- Full zero-copy tensor exchange between runtime plugins and engines. Phase 6
+  introduces executable adapter runtimes, but primitive-specific tensor
+  marshaling remains in engines until the vtable grows typed tensor ownership.
 - GPU/ANE buffer sharing between runtimes (zero-copy handoff of tensor
   memory).
 - Runtime hot-plug / refcount-driven unload. The CPU runtime lives for the
@@ -186,21 +189,67 @@ registry). Its vtable:
 The CPU runtime uses the same `RAC_STATIC_PLUGIN_REGISTER`-style mechanism
 used for engine plugins, so it survives iOS / WASM static-linking.
 
-## 7. Engine → runtime migration path (follow-up)
+## 7. Executable runtime extraction status
 
-This section is the contract for the next PR (T4.2+).
+Phase 6 promotes the registry from descriptor-only to executable adapter
+runtimes. The public ABI remains additive: `rac_runtime_vtable_t` keeps the
+same op slots, and `RAC_RUNTIME_ONNXRT = 13` promotes the first reserved
+runtime id.
 
-| Engine consumer              | Runtime to extract    | Notes                                                                                                                 |
-| ---------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `engines/onnx/onnx_backend`  | `runtimes/onnxrt`     | Hoist `Ort::Env` + session cache out of the engine so ONNX-VAD and ONNX-STT share one ORT process env.                |
-| `engines/whisperkit_coreml`  | `runtimes/coreml`     | Extract the `MLModel` load + `MLComputeUnits` selection; `diffusion-coreml` will reuse it.                            |
-| `engines/metalrt`            | `runtimes/metal`      | Move Metal buffer + MTLDevice provisioning behind `alloc_buffer`; MetalRT becomes one client of the `metal` runtime.  |
-| `engines/llamacpp` (CPU)     | `runtimes/cpu`        | No code split — llama.cpp already runs on CPU; simply validates `rac_runtime_get_by_id(RAC_RUNTIME_CPU)` is non-NULL. |
+### 7.1 Concrete op signatures
 
-When a runtime is extracted, the owning engine's CMake loses its direct
-dependency on the runtime SDK (e.g. `engines/onnx/CMakeLists.txt` drops
-`find_package(onnxruntime)`) and gains a `target_link_libraries(…
-runtime_onnxrt)` edge instead.
+The executable contract is the same C ABI declared in
+`rac_runtime_vtable.h`:
+
+```c
+rac_result_t (*create_session)(const rac_runtime_session_desc_t* desc,
+                               rac_runtime_session_t** out);
+
+rac_result_t (*run_session)(rac_runtime_session_t* session,
+                            const rac_runtime_io_t* inputs,
+                            size_t n_in,
+                            rac_runtime_io_t* outputs,
+                            size_t n_out);
+
+void (*destroy_session)(rac_runtime_session_t* session);
+
+rac_result_t (*alloc_buffer)(size_t bytes, rac_runtime_buffer_t** out);
+void (*free_buffer)(rac_runtime_buffer_t* buffer);
+
+rac_result_t (*device_info)(rac_runtime_device_info_t* out);
+rac_result_t (*capabilities)(rac_runtime_capabilities_t* out);
+```
+
+`create_session` consumes a stable `rac_runtime_session_desc_t`: primitive,
+model format, model path or in-memory blob, and JSON options. `run_session`
+consumes named `rac_runtime_io_t` tensors; runtimes own any opaque session or
+buffer handles they return. `device_info` and `capabilities` are safe metadata
+queries used by the router, diagnostics, and future SDK introspection.
+
+### 7.2 Migration matrix
+
+| Runtime | Current status | Engine contract |
+| --- | --- | --- |
+| `runtimes/onnxrt` | Executable adapter. Owns shared `OrtEnv`, ORT session creation, generic run, and host buffer allocation. | `engines/onnx` links `rac_runtime_onnxrt`; the RAG embedding provider includes the thin `rac_runtime_onnxrt.h` wrapper, not raw ORT headers. ONNX engine metadata declares `RAC_RUNTIME_ONNXRT` as required. |
+| `runtimes/coreml` | Executable metadata/runtime helper. Owns default `MLModelConfiguration`, model loading, and CoreML availability/capability reporting. | `diffusion-coreml` loads all `MLModel` bundles through `rac_coreml_load_model_in_dir`; `whisperkit_coreml` gates capability on `rac_coreml_runtime_require_available`. CoreML prediction-specific code remains in engines. |
+| `runtimes/metal` | Executable metadata/runtime helper. Owns default `MTLDevice`, command queue, Metal-backed `alloc_buffer/free_buffer`, and availability checks. | `metalrt` wrappers call `rac_metal_runtime_require_available` before touching the private MetalRT C API. Private engine-specific handles stay in `engines/metalrt`. |
+| `runtimes/cpu` | Built-in descriptor/helper runtime. | CPU remains process-default and provides device/capability metadata. It still does not own arbitrary engine sessions. |
+
+### 7.3 Remaining direct ownership
+
+The extraction is intentionally adapter-based:
+
+- Sherpa wake-word still uses ORT C++ APIs directly under `engines/sherpa`
+  because it is a separate Sherpa-owned ONNX stack.
+- CoreML diffusion still uses `MLFeatureProvider`, `MLMultiArray`, and
+  `MLModel` prediction APIs inside the engine because those are
+  primitive-specific tensor layouts.
+- MetalRT still owns private `metalrt_*` engine handles; `runtimes/metal`
+  owns only common device/queue/buffer readiness.
+
+The next migration step is to promote typed tensor descriptors and output
+ownership into reserved runtime vtable slots, then move more primitive-specific
+`run_session` paths behind the runtime ABI.
 
 ## 8. Testing
 
