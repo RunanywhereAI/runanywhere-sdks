@@ -5,7 +5,7 @@ name: IDL drift check
 # a generated file, this job fails with ::error::IDL-generated code is out of
 # sync with .proto sources. Fixing the PR is a one-liner locally:
 #
-#   ./idl/codegen/generate_all.sh && git add -A && git commit --amend --no-edit
+#   ./idl/codegen/generate_all.sh && (cd sdk/runanywhere-proto-ts && npm install --package-lock=false && npm run build) && git add -A && git commit --amend --no-edit
 
 on:
   pull_request:
@@ -16,6 +16,7 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
+      - 'sdk/runanywhere-proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
       - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
@@ -32,6 +33,7 @@ on:
       - 'sdk/runanywhere-flutter/packages/runanywhere/lib/generated/**'
       - 'sdk/runanywhere-react-native/packages/core/src/generated/**'
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
+      - 'sdk/runanywhere-proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
       - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
@@ -101,6 +103,12 @@ jobs:
       - name: Regenerate all bindings
         run: ./idl/codegen/generate_all.sh
 
+      - name: Build shared TypeScript proto package
+        run: |
+          cd sdk/runanywhere-proto-ts
+          npm install --package-lock=false
+          npm run build
+
       - name: Fail on drift
         run: |
           if ! git diff --exit-code --stat; then
@@ -109,6 +117,7 @@ jobs:
             echo "To fix locally:"
             echo "  ./scripts/setup-toolchain.sh"
             echo "  ./idl/codegen/generate_all.sh"
+            echo "  (cd sdk/runanywhere-proto-ts && npm install --package-lock=false && npm run build)"
             echo "  git add -A && git commit -m 'chore(codegen): regenerate bindings'"
             exit 1
           fi

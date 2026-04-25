@@ -211,14 +211,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
     add_subdirectory(runtimes)
 endif()
 
-# engines/ — top-level engine plugin directory. 5 migrated backends
-# (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) live here.
-# Historical note: three stub engines (sherpa, genie, diffusion-coreml)
-# were removed in Phase F of the v2 close-out — see
-# docs/v2_closeout_engine_decisions.md. Sherpa ships through engines/onnx
-# via RAC_USE_SHERPA_ONNX; CoreML diffusion ships inside rac_commons; a
-# real QNN Genie plugin will be reintroduced with actual ops when the
-# QNN SDK integration work is funded.
+# engines/ — top-level engine plugin directory. Migrated backends
+# (llamacpp, onnx, whispercpp, whisperkit_coreml, metalrt) and net-new
+# entries (sherpa, genie, diffusion-coreml) live here. Sherpa owns speech
+# primitives and legacy ONNX-named speech compatibility; ONNX owns embeddings
+# and ONNXRT-backed generic services.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/engines/CMakeLists.txt")
     add_subdirectory(engines)
 endif()
