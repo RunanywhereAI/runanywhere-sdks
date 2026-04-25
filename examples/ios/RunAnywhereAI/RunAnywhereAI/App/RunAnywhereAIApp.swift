@@ -241,8 +241,6 @@ struct RunAnywhereAIApp: App {
             )
         }
         // Qwen 2.5 1.5B - LoRA-compatible base model (has publicly available GGUF LoRA adapters)
-        // swiftlint:disable:next todo
-        // TODO: #1 [Portal Integration] Remove once portal delivers model + adapter pairings
         if let qwen15BURL = URL(string: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf") {
             RunAnywhere.registerModel(
                 id: "qwen2.5-1.5b-instruct-q4_k_m",

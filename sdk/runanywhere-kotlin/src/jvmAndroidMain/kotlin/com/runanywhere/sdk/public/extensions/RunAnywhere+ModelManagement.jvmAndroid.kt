@@ -33,15 +33,15 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
+import java.util.concurrent.ConcurrentHashMap
 
 // MARK: - Multi-File Model Companion Storage
 
 /** Stores companion file (url → filename) pairs for multi-file models, keyed by modelId. */
 private val modelCompanionFiles = mutableMapOf<String, List<Pair<String, String>>>()
 private val companionFilesLock = Any()
+private val activeDownloadIdsByModel = ConcurrentHashMap<String, String>()
 
 internal actual fun registerCompanionFilesInternal(modelId: String, companionFiles: List<Pair<String, String>>) {
     synchronized(companionFilesLock) {
@@ -406,103 +406,76 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
         CppBridgeEvents.emitDownloadStarted(modelId, modelInfo.downloadSize ?: 0)
 
         // 5. Check for multi-file model (e.g., VLM with model + mmproj)
-        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern
+        // Mirrors iOS AlamofireDownloadService.downloadMultiFileModel() pattern.
+        // v2 close-out Phase H: delegates per-file HTTP transport to the
+        // native libcurl runner in commons (`downloadFileWithNativeRunner`).
+        // Per-file progress is converted to combined-progress via `index/count`
+        // offset + scale, matching the iOS Alamofire pattern.
         val multiFileDescriptors = getMultiFileDescriptors(modelId)
         if (multiFileDescriptors != null && multiFileDescriptors.size > 1) {
             downloadLogger.info("Multi-file model detected with ${multiFileDescriptors.size} files")
 
             try {
-                // Create model directory (path = {models_dir}/{type_dir}/{modelId}/)
                 val modelDirPath = CppBridgeModelPaths.getModelPath(modelId, modelType)
                 val modelDir = File(modelDirPath)
                 modelDir.mkdirs()
                 downloadLogger.info("Created model directory: ${modelDir.absolutePath}")
 
-                var totalBytesDownloaded = 0L
                 val fileCount = multiFileDescriptors.size
+                var totalBytesDownloaded = 0L
                 var lastProgressEmitTime = 0L
 
-                // Download each file sequentially (matches iOS pattern)
                 for ((index, fileDescriptor) in multiFileDescriptors.withIndex()) {
                     val fileDestination = File(modelDir, fileDescriptor.filename)
                     downloadLogger.info("Downloading file ${index + 1}/$fileCount: ${fileDescriptor.filename}")
                     downloadLogger.info("  URL: ${fileDescriptor.url}")
                     downloadLogger.info("  Destination: ${fileDestination.absolutePath}")
 
+                    val fileSizeBefore = if (fileDestination.exists()) fileDestination.length() else 0L
                     withContext(Dispatchers.IO) {
-                        val url = java.net.URL(fileDescriptor.url)
-                        val connection = url.openConnection() as java.net.HttpURLConnection
-                        connection.connectTimeout = 30_000 // 30s for initial connection
-                        connection.readTimeout = 300_000 // 5 min for large model file transfers
-                        connection.setRequestProperty("User-Agent", "RunAnywhere-SDK/1.0")
-
-                        try {
-                            val responseCode = connection.responseCode
-                            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                                throw SDKError.download(
-                                    "HTTP $responseCode downloading ${fileDescriptor.filename}",
-                                )
-                            }
-
-                            val fileTotalBytes = connection.contentLengthLong
-                            var fileBytesRead = 0L
-                            val buffer = ByteArray(8192)
-
-                            connection.inputStream.use { input ->
-                                FileOutputStream(fileDestination).use { output ->
-                                    var len: Int
-                                    while (input.read(buffer).also { len = it } != -1) {
-                                        output.write(buffer, 0, len)
-                                        fileBytesRead += len
-
-                                        // Throttle progress emissions to every 200ms
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastProgressEmitTime >= 200) {
-                                            lastProgressEmitTime = now
-                                            // iOS pattern: offset + (fileProgress * scale)
-                                            val fileProgress =
-                                                if (fileTotalBytes > 0) {
-                                                    fileBytesRead.toFloat() / fileTotalBytes
-                                                } else {
-                                                    0f
-                                                }
-                                            val combinedProgress =
-                                                (index.toFloat() + fileProgress) / fileCount
-
-                                            trySend(
-                                                DownloadProgress(
-                                                    modelId = modelId,
-                                                    progress = combinedProgress,
-                                                    bytesDownloaded = totalBytesDownloaded + fileBytesRead,
-                                                    totalBytes = modelInfo.downloadSize,
-                                                    state = DownloadState.DOWNLOADING,
-                                                ),
-                                            )
-
-                                            // Emit SDK event every ~5% overall
-                                            val progressPercent = (combinedProgress * 100).toInt()
-                                            if (progressPercent % 5 == 0) {
-                                                CppBridgeEvents.emitDownloadProgress(
-                                                    modelId,
-                                                    combinedProgress.toDouble(),
-                                                    totalBytesDownloaded + fileBytesRead,
-                                                    modelInfo.downloadSize ?: 0,
-                                                )
-                                            }
+                        downloadFileWithNativeRunner(
+                            url = fileDescriptor.url,
+                            destFile = fileDestination,
+                            progressCallback = { fileProgress ->
+                                val now = System.currentTimeMillis()
+                                if (now - lastProgressEmitTime >= 200) {
+                                    lastProgressEmitTime = now
+                                    val combinedProgress =
+                                        (index.toFloat() + fileProgress) / fileCount
+                                    val fileBytesRead =
+                                        if (fileDestination.exists()) {
+                                            fileDestination.length() - fileSizeBefore
+                                        } else {
+                                            0L
                                         }
+                                    trySend(
+                                        DownloadProgress(
+                                            modelId = modelId,
+                                            progress = combinedProgress,
+                                            bytesDownloaded = totalBytesDownloaded + fileBytesRead,
+                                            totalBytes = modelInfo.downloadSize,
+                                            state = DownloadState.DOWNLOADING,
+                                        ),
+                                    )
+                                    val progressPercent = (combinedProgress * 100).toInt()
+                                    if (progressPercent % 5 == 0) {
+                                        CppBridgeEvents.emitDownloadProgress(
+                                            modelId,
+                                            combinedProgress.toDouble(),
+                                            totalBytesDownloaded + fileBytesRead,
+                                            modelInfo.downloadSize ?: 0,
+                                        )
                                     }
                                 }
-                            }
-
-                            totalBytesDownloaded += fileBytesRead
-                            downloadLogger.info(
-                                "Completed file ${index + 1}/$fileCount: " +
-                                    "${fileDescriptor.filename} ($fileBytesRead bytes)",
-                            )
-                        } finally {
-                            connection.disconnect()
-                        }
+                            },
+                        )
                     }
+                    val finalFileBytes = fileDestination.length() - fileSizeBefore
+                    totalBytesDownloaded += finalFileBytes
+                    downloadLogger.info(
+                        "Completed file ${index + 1}/$fileCount: " +
+                            "${fileDescriptor.filename} ($finalFileBytes bytes)",
+                    )
                 }
 
                 // All files downloaded — update registry with directory path
@@ -673,6 +646,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
                     expectedChecksum = null,
                 ) ?: throw SDKError.download("Failed to start download for model: $modelId")
 
+            activeDownloadIdsByModel[modelId] = downloadId
             downloadLogger.info("Download queued with ID: $downloadId, waiting for completion...")
 
             // 9. Wait for download to complete (suspends until callback fires)
@@ -753,6 +727,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> {
             // Close with exception so collectors receive the error
             close(e)
         } finally {
+            activeDownloadIdsByModel.remove(modelId)
             // Clean up listener
             CppBridgeDownload.downloadListener = null
         }
@@ -930,7 +905,7 @@ private suspend fun downloadEmbeddingModelFiles(
         logger.info("Downloading [$filename] from: $url")
 
         withContext(Dispatchers.IO) {
-            downloadFileWithHttpURLConnection(url, destFile) { _ -> }
+            downloadFileWithNativeRunner(url, destFile) { _ -> }
         }
 
         val overallProgress = (index + 1f) / fileCount
@@ -963,63 +938,57 @@ private suspend fun downloadEmbeddingModelFiles(
 }
 
 /**
- * Download a file using HttpURLConnection with redirect support.
+ * Download a single file via the native libcurl runner in runanywhere-commons.
+ *
+ * v2 close-out Phase H: replaces ~50 LOC of HttpURLConnection + redirect
+ * loop. Redirects, timeouts, TLS verification, and backoff are all handled
+ * by commons (`rac_http_download_execute`). Progress is reported as a
+ * fraction (0.0..1.0) for parity with the old helper's signature.
+ *
+ * Throws [IOException] on network / HTTP / file-write / checksum failure —
+ * matches the previous contract so callers don't need to know the
+ * `DownloadError.*` enum.
  */
-private fun downloadFileWithHttpURLConnection(
+private fun downloadFileWithNativeRunner(
     url: String,
     destFile: File,
     progressCallback: (Float) -> Unit,
 ) {
-    var currentUrl = url
-    var remainingRedirects = 10
-
-    while (remainingRedirects-- > 0) {
-        val connection = java.net.URL(currentUrl).openConnection() as HttpURLConnection
-        connection.connectTimeout = 30_000
-        connection.readTimeout = 120_000
-        connection.instanceFollowRedirects = false
-        connection.connect()
-
-        val responseCode = connection.responseCode
-        if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-            responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-            responseCode == 307 ||
-            responseCode == 308
-        ) {
-            val location = connection.getHeaderField("Location")
-            connection.disconnect()
-            if (location.isNullOrBlank()) throw IOException("Redirect with no Location header from: $currentUrl")
-            currentUrl = location
-            continue
-        }
-
-        val totalBytes = connection.contentLengthLong
-        var bytesDownloaded = 0L
-
-        connection.inputStream.use { input ->
-            destFile.outputStream().use { output ->
-                val buffer = ByteArray(8 * 1024)
-                var bytesRead: Int
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                    bytesDownloaded += bytesRead
-                    if (totalBytes > 0) {
-                        progressCallback(bytesDownloaded.toFloat() / totalBytes.toFloat())
-                    }
-                }
+    destFile.parentFile?.mkdirs()
+    val listener =
+        com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener { bytes, total ->
+            if (total > 0) {
+                progressCallback(bytes.toFloat() / total.toFloat())
             }
+            true
         }
-        connection.disconnect()
-        return
+    val outStatus = IntArray(1)
+    val rc =
+        RunAnywhereBridge.racHttpDownloadExecute(
+            url = url,
+            destPath = destFile.absolutePath,
+            expectedSha256Hex = null,
+            resumeFromByte = 0L,
+            timeoutMs = 120_000,
+            listener = listener,
+            outHttpStatus = outStatus,
+        )
+    if (rc != CppBridgeDownload.DownloadError.NONE) {
+        throw IOException(
+            "Download failed for $url: ${CppBridgeDownload.DownloadError.getName(rc)} " +
+                "(http_status=${outStatus[0]})",
+        )
     }
-    throw IOException("Too many redirects for URL: $url")
 }
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Update C++ registry to mark download cancelled
+    val activeDownloadId = activeDownloadIdsByModel.remove(modelId)
+    if (activeDownloadId != null) {
+        CppBridgeDownload.cancelDownload(activeDownloadId)
+    }
     CppBridgeModelRegistry.updateDownloadStatus(modelId, null)
 }
 
@@ -1043,15 +1012,39 @@ actual suspend fun RunAnywhere.deleteAllModels() {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Would need to parse and delete each - simplified
+    val downloaded = CppBridgeModelRegistry.getDownloaded()
+    downloaded.forEach { model ->
+        val localPath = model.localPath
+        if (!localPath.isNullOrEmpty()) {
+            runCatching { File(localPath).deleteRecursively() }
+                .onFailure { modelsLogger.warning("Failed to delete ${model.modelId} at $localPath: ${it.message}") }
+        }
+        CppBridgeStorage.delete(CppBridgeStorage.StorageNamespace.DOWNLOADS, model.modelId)
+        CppBridgeModelRegistry.updateDownloadStatus(model.modelId, null)
+    }
+    synchronized(modelCacheLock) {
+        registeredModels.replaceAll { it.copy(localPath = null) }
+    }
 }
 
-actual suspend fun RunAnywhere.refreshModelRegistry() {
+actual suspend fun RunAnywhere.refreshModelRegistry(
+    includeRemoteCatalog: Boolean,
+    rescanLocal: Boolean,
+    pruneOrphans: Boolean,
+) {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
-    // Trigger registry refresh via native call
-    // TODO: Implement via CppBridge
+    modelsLogger.info("Refreshing model registry via rac_model_registry_refresh")
+    val rc =
+        RunAnywhereBridge.racModelRegistryRefresh(
+            includeRemoteCatalog = includeRemoteCatalog,
+            rescanLocal = rescanLocal,
+            pruneOrphans = pruneOrphans,
+        )
+    if (rc != 0) {
+        modelsLogger.warning("refreshModelRegistry returned non-zero rc=$rc")
+    }
 }
 
 actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {

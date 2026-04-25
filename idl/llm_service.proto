@@ -1,0 +1,81 @@
+// RunAnywhere IDL — LLM token streaming service.
+//
+// GAP 09 Phase 12. Server-streaming rpc returning per-token deltas during
+// LLM generation. Replaces the 5 hand-written token-stream implementations
+// (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
+// RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas      = true;
+option java_multiple_files   = true;
+option java_package          = "ai.runanywhere.proto.v1";
+option java_outer_classname  = "LLMServiceProto";
+option objc_class_prefix     = "RAV1";
+option swift_prefix          = "RA";
+
+message LLMGenerateRequest {
+    string prompt           = 1;
+    int32  max_tokens       = 2;
+    float  temperature      = 3;
+    float  top_p            = 4;
+    int32  top_k            = 5;
+    string system_prompt    = 6;
+    bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
+}
+
+// v2 close-out Phase G-2: unified per-token streaming event. Replaces
+// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
+// callbackFlow / StreamController / tokenQueue. One serialized event
+// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
+// from voice_events.proto so frontends can reuse gap-detection logic.
+message LLMStreamEvent {
+    // Monotonic per-process sequence number. Useful for frontends that
+    // need to detect gaps or out-of-order delivery.
+    uint64 seq             = 1;
+
+    // Wall-clock timestamp captured at the C++ edge, in microseconds
+    // since Unix epoch. Frontends may re-timestamp for UI display.
+    int64  timestamp_us    = 2;
+
+    // Generated token text. Empty on terminal events where only
+    // finish_reason or error_message is populated.
+    string token           = 3;
+
+    // True on the last event of a generation.
+    bool   is_final        = 4;
+
+    // Token semantic category (answer / thought / tool-call).
+    LLMTokenKind kind      = 5;
+
+    // Backend-provided token id when the engine exposes it; 0 = unset
+    // (proto3 scalar default).
+    uint32 token_id        = 6;
+
+    // Per-token log-probability when supported; 0.0 = unset.
+    float  logprob         = 7;
+
+    // Reason the stream stopped: "stop", "length", "cancelled", "error",
+    // "" = unset (proto3 scalar default). Only populated when is_final.
+    string finish_reason   = 8;
+
+    // Error message on failure events (kind may be unset, is_final true).
+    // Empty on success.
+    string error_message   = 9;
+}
+
+enum LLMTokenKind {
+    LLM_TOKEN_KIND_UNSPECIFIED = 0;
+    LLM_TOKEN_KIND_ANSWER      = 1;
+    LLM_TOKEN_KIND_THOUGHT     = 2;
+    LLM_TOKEN_KIND_TOOL_CALL   = 3;
+}
+
+service LLM {
+    // Server-streaming: emits one LLMStreamEvent per generated token
+    // until is_final=true. Cancellation aborts the underlying generation
+    // via the existing rac_llm_cancel() C ABI.
+    rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
+}

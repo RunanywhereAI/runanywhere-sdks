@@ -28,7 +28,8 @@
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
-#include "rac/infrastructure/network/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_download.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
 
@@ -503,6 +504,110 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_generation_time_ms(v
 }
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_diffusion_result_safety_flagged(void) {
     return (int)offsetof(rac_diffusion_result_t, safety_flagged);
+}
+
+// =============================================================================
+// HTTP CLIENT STRUCT HELPERS
+//
+// T3.13 — Web SDK migrates off hand-rolled fetch() onto the commons libcurl-
+// backed C ABI. Rather than hard-coding struct layouts in TypeScript
+// (which breaks on wasm32 padding / future field additions), expose
+// sizeof() and offsetof() for every field the TS HTTPAdapter touches.
+// =============================================================================
+
+// ---- rac_http_request_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_request(void) {
+    return (int)sizeof(rac_http_request_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_method(void) {
+    return (int)offsetof(rac_http_request_t, method);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_url(void) {
+    return (int)offsetof(rac_http_request_t, url);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_headers(void) {
+    return (int)offsetof(rac_http_request_t, headers);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_header_count(void) {
+    return (int)offsetof(rac_http_request_t, header_count);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_body_bytes(void) {
+    return (int)offsetof(rac_http_request_t, body_bytes);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_body_len(void) {
+    return (int)offsetof(rac_http_request_t, body_len);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_timeout_ms(void) {
+    return (int)offsetof(rac_http_request_t, timeout_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_follow_redirects(void) {
+    return (int)offsetof(rac_http_request_t, follow_redirects);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_request_expected_checksum_hex(void) {
+    return (int)offsetof(rac_http_request_t, expected_checksum_hex);
+}
+
+// ---- rac_http_response_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_response(void) {
+    return (int)sizeof(rac_http_response_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_status(void) {
+    return (int)offsetof(rac_http_response_t, status);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_headers(void) {
+    return (int)offsetof(rac_http_response_t, headers);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_header_count(void) {
+    return (int)offsetof(rac_http_response_t, header_count);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_body_bytes(void) {
+    return (int)offsetof(rac_http_response_t, body_bytes);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_body_len(void) {
+    return (int)offsetof(rac_http_response_t, body_len);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_response_redirected_url(void) {
+    return (int)offsetof(rac_http_response_t, redirected_url);
+}
+
+// ---- rac_http_header_kv_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_header_kv(void) {
+    return (int)sizeof(rac_http_header_kv_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_header_kv_name(void) {
+    return (int)offsetof(rac_http_header_kv_t, name);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_header_kv_value(void) {
+    return (int)offsetof(rac_http_header_kv_t, value);
+}
+
+// ---- rac_http_download_request_t ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_sizeof_http_download_request(void) {
+    return (int)sizeof(rac_http_download_request_t);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_url(void) {
+    return (int)offsetof(rac_http_download_request_t, url);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_destination_path(void) {
+    return (int)offsetof(rac_http_download_request_t, destination_path);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_headers(void) {
+    return (int)offsetof(rac_http_download_request_t, headers);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_header_count(void) {
+    return (int)offsetof(rac_http_download_request_t, header_count);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_timeout_ms(void) {
+    return (int)offsetof(rac_http_download_request_t, timeout_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_follow_redirects(void) {
+    return (int)offsetof(rac_http_download_request_t, follow_redirects);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_resume_from_byte(void) {
+    return (int)offsetof(rac_http_download_request_t, resume_from_byte);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_http_download_request_expected_sha256_hex(void) {
+    return (int)offsetof(rac_http_download_request_t, expected_sha256_hex);
 }
 
 // =============================================================================

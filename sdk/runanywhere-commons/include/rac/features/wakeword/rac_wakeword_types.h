@@ -160,7 +160,7 @@ typedef struct rac_wakeword_info {
  * for the duration of the callback.
  *
  * @param event Detection event (valid only during callback)
- * @param user_data User context passed to rac_wakeword_set_callback
+ * @param user_data User context set alongside the callback function
  */
 typedef void (*rac_wakeword_callback_fn)(const rac_wakeword_event_t* event, void* user_data);
 

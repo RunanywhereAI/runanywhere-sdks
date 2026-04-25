@@ -1,7 +1,8 @@
 /**
  * PlatformAdapterBridge.kt
  *
- * JNI bridge for platform-specific operations (secure storage).
+ * JNI bridge for platform-specific operations (secure storage, device info,
+ * and platform-adapter download fallback).
  * Called from C++ via JNI.
  *
  * Reference: sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/security/SecureStorage.kt
@@ -98,106 +99,12 @@ object PlatformAdapterBridge {
     }
 
     // ========================================================================
-    // HTTP POST for Device Registration (Synchronous)
-    // Matches Kotlin SDK's CppBridgeDevice.httpPost
+    // HTTP Download (Async, Platform Adapter Fallback)
     // ========================================================================
 
     /**
-     * HTTP response data class
-     */
-    data class HttpResponse(
-        val success: Boolean,
-        val statusCode: Int,
-        val responseBody: String?,
-        val errorMessage: String?
-    )
-
-    /**
-     * Synchronous HTTP POST for device registration
-     * Called from C++ device manager callbacks via JNI
-     *
-     * @param url Full URL to POST to
-     * @param jsonBody JSON body string
-     * @param supabaseKey Supabase API key (for dev mode, can be null)
-     * @return HttpResponse with result
-     */
-    @JvmStatic
-    fun httpPostSync(url: String, jsonBody: String, supabaseKey: String?): HttpResponse {
-        Log.d(TAG, "httpPostSync to: $url")
-        // Log first 300 chars of JSON body for debugging
-        Log.d(TAG, "httpPostSync body (first 300 chars): ${jsonBody.take(300)}")
-
-        // For Supabase device registration, add ?on_conflict=device_id for UPSERT
-        // This matches Swift's HTTPService.swift logic
-        var finalUrl = url
-        if (url.contains("/rest/v1/sdk_devices") && !url.contains("on_conflict=")) {
-            val separator = if (url.contains("?")) "&" else "?"
-            finalUrl = "$url${separator}on_conflict=device_id"
-            Log.d(TAG, "Added on_conflict for UPSERT: $finalUrl")
-        }
-
-        return try {
-            val urlConnection = java.net.URL(finalUrl).openConnection() as java.net.HttpURLConnection
-            urlConnection.requestMethod = "POST"
-            urlConnection.connectTimeout = 30000
-            urlConnection.readTimeout = 30000
-            urlConnection.doOutput = true
-
-            // Headers
-            urlConnection.setRequestProperty("Content-Type", "application/json")
-            urlConnection.setRequestProperty("Accept", "application/json")
-
-            // Supabase headers (for device registration UPSERT)
-            if (!supabaseKey.isNullOrEmpty()) {
-                urlConnection.setRequestProperty("apikey", supabaseKey)
-                urlConnection.setRequestProperty("Authorization", "Bearer $supabaseKey")
-                urlConnection.setRequestProperty("Prefer", "resolution=merge-duplicates")
-            }
-
-            // Write body
-            urlConnection.outputStream.use { os ->
-                os.write(jsonBody.toByteArray(Charsets.UTF_8))
-            }
-
-            val statusCode = urlConnection.responseCode
-            val responseBody = try {
-                urlConnection.inputStream.bufferedReader().use { it.readText() }
-            } catch (e: Exception) {
-                urlConnection.errorStream?.bufferedReader()?.use { it.readText() }
-            }
-
-            // 2xx or 409 (conflict/already exists) = success for device registration
-            val isSuccess = statusCode in 200..299 || statusCode == 409
-
-            Log.d(TAG, "httpPostSync completed: status=$statusCode success=$isSuccess")
-            if (!isSuccess) {
-                Log.e(TAG, "httpPostSync error response: $responseBody")
-            }
-
-            HttpResponse(
-                success = isSuccess,
-                statusCode = statusCode,
-                responseBody = responseBody,
-                errorMessage = if (!isSuccess) "HTTP $statusCode" else null
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "httpPostSync error", e)
-            HttpResponse(
-                success = false,
-                statusCode = 0,
-                responseBody = null,
-                errorMessage = e.message ?: "Unknown error"
-            )
-        }
-    }
-
-    // ========================================================================
-    // HTTP Download (Async, Platform Adapter)
-    // ========================================================================
-
-    /**
-     * Start an HTTP download (async).
-     * Called from C++ platform adapter with a provided taskId.
+     * Start an HTTP download for RACommons platform-adapter-only callers.
+     * Public RN model downloads use native C++ rac_http_download_execute.
      */
     @JvmStatic
     fun httpDownload(url: String, destinationPath: String, taskId: String): Int {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -9,7 +10,7 @@ import 'package:runanywhere_ai/features/models/model_types.dart';
 ///
 /// View for adding models from URLs.
 class AddModelFromURLView extends StatefulWidget {
-  final void Function(ModelInfo) onModelAdded;
+  final Future<void> Function() onModelAdded;
 
   const AddModelFromURLView({
     super.key,
@@ -36,8 +37,8 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
 
   final List<LLMFramework> _availableFrameworks = [
     LLMFramework.llamaCpp,
-    LLMFramework.mediaPipe,
     LLMFramework.onnxRuntime,
+    LLMFramework.genie,
   ];
 
   @override
@@ -387,33 +388,41 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
       final sizeText = _sizeController.text.trim();
       final estimatedSize = sizeText.isNotEmpty ? int.tryParse(sizeText) : null;
 
-      // TODO: Use RunAnywhere SDK to add model
-      // final modelInfo = await RunAnywhere.addModelFromURL(
-      //   url,
-      //   name: name,
-      //   type: _selectedFramework.rawValue,
-      // );
-
-      // Create placeholder model for demo
-      final modelInfo = ModelInfo(
-        id: 'custom-${DateTime.now().millisecondsSinceEpoch}',
+      sdk.RunAnywhereSDK.instance.models.register(
         name: name,
-        category: ModelCategory.language,
-        format: ModelFormat.gguf,
-        downloadURL: url,
-        memoryRequired: estimatedSize,
-        compatibleFrameworks: [_selectedFramework],
-        preferredFramework: _selectedFramework,
+        url: Uri.parse(url),
+        framework: _toSDKFramework(_selectedFramework),
+        modality: sdk.ModelCategory.language,
+        memoryRequirement: estimatedSize,
         supportsThinking: _supportsThinking,
       );
 
-      widget.onModelAdded(modelInfo);
+      await widget.onModelAdded();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _errorMessage = 'Failed to add model: $e';
         _isAdding = false;
       });
+    }
+  }
+
+  sdk.InferenceFramework _toSDKFramework(LLMFramework framework) {
+    switch (framework) {
+      case LLMFramework.llamaCpp:
+        return sdk.InferenceFramework.llamaCpp;
+      case LLMFramework.onnxRuntime:
+        return sdk.InferenceFramework.onnx;
+      case LLMFramework.genie:
+        return sdk.InferenceFramework.genie;
+      case LLMFramework.foundationModels:
+        return sdk.InferenceFramework.foundationModels;
+      case LLMFramework.systemTTS:
+        return sdk.InferenceFramework.systemTTS;
+      case LLMFramework.mediaPipe:
+      case LLMFramework.whisperKit:
+      case LLMFramework.unknown:
+        throw UnsupportedError('Unsupported framework for URL import: ${framework.displayName}');
     }
   }
 }

@@ -1,0 +1,103 @@
+// RunAnywhere v2 IDL — pipeline configuration passed from frontends to core.
+//
+// Frontends never construct DAGs directly. They pass a PipelineSpec (usually
+// loaded from a YAML template bundled with the solution package) to the core,
+// which validates it and compiles it into a live streaming graph.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "PipelineProto";
+option objc_class_prefix         = "RAV1";
+option swift_prefix              = "RA";
+
+// A pipeline is a labelled DAG of operators connected by typed edges. There
+// are no cycles. Every input edge has a resolvable producer; every output
+// edge has at least one consumer.
+message PipelineSpec {
+    string                 name      = 1;   // Human-readable, e.g. "voice_agent_basic"
+    repeated OperatorSpec  operators = 2;
+    repeated EdgeSpec      edges     = 3;
+    PipelineOptions        options   = 4;
+}
+
+message OperatorSpec {
+    // Unique within the spec, used as the prefix in edge endpoints like
+    // "stt.final" or "llm.token".
+    string name = 1;
+
+    // The primitive the operator implements: "generate_text", "transcribe",
+    // "synthesize", "detect_voice", "embed", "rerank", "tokenize", "window",
+    // or a solution-declared custom operator ("AudioSource", "AudioSink",
+    // "SentenceDetector", "VectorSearch", "ContextBuild").
+    string type = 2;
+
+    // Free-form parameters interpreted by the operator. The C++ loader
+    // validates required keys per type before instantiating.
+    map<string, string> params = 3;
+
+    // Optional override of the engine that will serve this operator. When
+    // empty, the L3 router picks based on capability + model format.
+    string pinned_engine = 4;
+
+    // Optional model identifier (resolved against the model registry).
+    string model_id = 5;
+
+    // Affinity hint: run this operator on CPU, GPU, or Neural Engine. The
+    // scheduler may override if the requested device is unavailable.
+    DeviceAffinity device = 6;
+}
+
+enum DeviceAffinity {
+    DEVICE_AFFINITY_UNSPECIFIED = 0;
+    DEVICE_AFFINITY_ANY         = 1;
+    DEVICE_AFFINITY_CPU         = 2;
+    DEVICE_AFFINITY_GPU         = 3;
+    DEVICE_AFFINITY_ANE         = 4;   // Apple Neural Engine
+}
+
+message EdgeSpec {
+    // Endpoints are formatted "<operator_name>.<port_name>".
+    // Source port names are operator-specific output channels; sink port
+    // names are operator-specific input channels. Typing is enforced by the
+    // pipeline validator.
+    string from     = 1;
+    string to       = 2;
+
+    // Channel depth override. Proto3 scalars have no presence bit, so the
+    // sentinel value 0 means "use the per-edge default (16 for PCM, 256 for
+    // tokens, 32 for sentences)". uint32 keeps the wire representation
+    // identical to int32 on the happy path while making negative inputs
+    // statically unrepresentable.
+    uint32 capacity = 3;
+
+    EdgePolicy policy = 4;
+}
+
+enum EdgePolicy {
+    EDGE_POLICY_UNSPECIFIED = 0;
+    // Producer blocks when channel is full (default, safest).
+    EDGE_POLICY_BLOCK       = 1;
+    // Oldest item is dropped when channel is full (audio routing only).
+    EDGE_POLICY_DROP_OLDEST = 2;
+    // Newest item is dropped when channel is full (pager coalescing).
+    EDGE_POLICY_DROP_NEWEST = 3;
+}
+
+message PipelineOptions {
+    // Maximum end-to-end latency budget in milliseconds. The pipeline emits
+    // a MetricsEvent with is_over_budget=true if exceeded.
+    int32  latency_budget_ms = 1;
+
+    // When true, the pipeline emits MetricsEvent on every VAD barge-in and
+    // on pipeline stop.
+    bool   emit_metrics      = 2;
+
+    // When true, the pipeline validates the DAG for deadlocks and
+    // disconnected edges before running.
+    bool   strict_validation = 3;
+}

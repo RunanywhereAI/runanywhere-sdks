@@ -168,14 +168,7 @@ public actor DiffusionPlatformService {
             }
 
             do {
-                let (data, response) = try await URLSession.shared.data(from: remoteURL)
-
-                guard let httpResponse = response as? HTTPURLResponse,
-                      httpResponse.statusCode == 200 else {
-                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    throw SDKError.diffusion(.initializationFailed, "Failed to download \(filename): HTTP \(statusCode)")
-                }
-
+                let data = try await HTTPClientAdapter.fetchURL(remoteURL)
                 try data.write(to: fileURL)
                 logger.info("Downloaded tokenizer file: \(filename) (\(data.count) bytes)")
             } catch let error as SDKError {

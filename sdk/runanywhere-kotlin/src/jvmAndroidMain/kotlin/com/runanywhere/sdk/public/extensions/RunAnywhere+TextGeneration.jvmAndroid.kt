@@ -2,26 +2,32 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * JVM/Android actual implementations for text generation (LLM) operations.
+ * JVM/Android actual implementations for text generation (LLM).
+ *
+ * v2 close-out Phase G-2: the hand-rolled `callbackFlow { CppBridgeLLM.generateStream(...)
+ * { token -> trySend(token) } }` shim and `generateStreamWithMetrics`
+ * variant were DELETED. The public `generateStream` now delegates to
+ * [`LLMStreamAdapter`] which owns the single
+ * `rac_llm_set_stream_proto_callback` registration for the handle.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.LLMStreamEvent
+import com.runanywhere.sdk.adapters.LLMStreamAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKError
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationOptions
 import com.runanywhere.sdk.public.extensions.LLM.LLMGenerationResult
-import com.runanywhere.sdk.public.extensions.LLM.LLMStreamingResult
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 
 private val llmLogger = SDKLogger.llm
 
@@ -42,9 +48,7 @@ actual suspend fun RunAnywhere.generate(
 
     val opts = options ?: LLMGenerationOptions.DEFAULT
     val startTime = System.currentTimeMillis()
-    llmLogger.debug("Generating response for prompt: ${prompt.take(50)}${if (prompt.length > 50) "..." else ""}")
 
-    // Convert to CppBridgeLLM config
     val config =
         CppBridgeLLM.GenerationConfig(
             maxTokens = opts.maxTokens,
@@ -53,14 +57,12 @@ actual suspend fun RunAnywhere.generate(
             systemPrompt = opts.systemPrompt,
         )
 
-    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=false")
+    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}")
 
-    // Call CppBridgeLLM to generate
     val cppResult = CppBridgeLLM.generate(prompt, config)
 
     val endTime = System.currentTimeMillis()
     val latencyMs = (endTime - startTime).toDouble()
-    llmLogger.info("Generation complete: ${cppResult.tokensGenerated} tokens in ${latencyMs.toLong()}ms (${String.format("%.1f", cppResult.tokensPerSecond)} tok/s)")
 
     return LLMGenerationResult(
         text = cppResult.text,
@@ -77,69 +79,21 @@ actual suspend fun RunAnywhere.generate(
     )
 }
 
+// Dedicated scope for the background C++ driver launched by generateStream.
+// The collector's lifetime (via LLMStreamAdapter's callbackFlow awaitClose)
+// controls when the adapter unregisters; this scope just keeps the C++
+// call alive and lets `CppBridgeLLM.cancel()` abort it cooperatively.
+private val llmStreamDriverScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
 actual fun RunAnywhere.generateStream(
     prompt: String,
     options: LLMGenerationOptions?,
-): Flow<String> =
-    callbackFlow {
-        if (!isInitialized) {
-            throw SDKError.notInitialized("SDK not initialized")
-        }
-
-        ensureServicesReady()
-
-        val opts = options ?: LLMGenerationOptions.DEFAULT
-
-        llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=true")
-
-        val config =
-            CppBridgeLLM.GenerationConfig(
-                maxTokens = opts.maxTokens,
-                temperature = opts.temperature,
-                topP = opts.topP,
-                systemPrompt = opts.systemPrompt,
-            )
-
-        // Launch generation on IO dispatcher — tied to this callbackFlow's scope
-        val job =
-            launch(Dispatchers.IO) {
-                try {
-                    CppBridgeLLM.generateStream(prompt, config) { token ->
-                        trySend(token)
-                        true // Continue generation
-                    }
-                } finally {
-                    channel.close()
-                }
-            }
-
-        // When collector cancels, cancel both the coroutine and native generation
-        awaitClose {
-            job.cancel()
-            CppBridgeLLM.cancel()
-        }
-    }
-
-actual suspend fun RunAnywhere.generateStreamWithMetrics(
-    prompt: String,
-    options: LLMGenerationOptions?,
-): LLMStreamingResult {
+): Flow<LLMStreamEvent> {
     if (!isInitialized) {
         throw SDKError.notInitialized("SDK not initialized")
     }
 
-    ensureServicesReady()
-
     val opts = options ?: LLMGenerationOptions.DEFAULT
-    val resultDeferred = CompletableDeferred<LLMGenerationResult>()
-    val startTime = System.currentTimeMillis()
-
-    var fullText = ""
-    var tokenCount = 0
-    var firstTokenTime: Long? = null
-
-    llmLogger.info("[PARAMS] generateStreamWithMetrics: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}, system_prompt=${opts.systemPrompt?.let { "set(${it.length} chars)" } ?: "nil"}, streaming=true")
-
     val config =
         CppBridgeLLM.GenerationConfig(
             maxTokens = opts.maxTokens,
@@ -148,61 +102,38 @@ actual suspend fun RunAnywhere.generateStreamWithMetrics(
             systemPrompt = opts.systemPrompt,
         )
 
-    val tokenStream =
-        callbackFlow {
-            val job =
-                launch(Dispatchers.IO) {
-                    try {
-                        val cppResult =
-                            CppBridgeLLM.generateStream(prompt, config) { token ->
-                                if (firstTokenTime == null) {
-                                    firstTokenTime = System.currentTimeMillis()
-                                }
-                                fullText += token
-                                tokenCount++
-                                trySend(token)
-                                true // Continue generation
-                            }
+    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, top_p=${opts.topP}, max_tokens=${opts.maxTokens}")
 
-                        // Build final result after generation completes
-                        val endTime = System.currentTimeMillis()
-                        val latencyMs = (endTime - startTime).toDouble()
-                        val timeToFirstTokenMs = firstTokenTime?.let { (it - startTime).toDouble() }
+    val handle = CppBridgeLLM.getHandle()
+    val adapter = LLMStreamAdapter(handle)
 
-                        val result =
-                            LLMGenerationResult(
-                                text = fullText,
-                                tokensUsed = tokenCount,
-                                modelUsed = CppBridgeLLM.getLoadedModelId() ?: "unknown",
-                                latencyMs = latencyMs,
-                                framework = "llamacpp",
-                                tokensPerSecond = cppResult.tokensPerSecond.toDouble(),
-                                timeToFirstTokenMs = timeToFirstTokenMs,
-                                responseTokens = tokenCount,
-                            )
-                        resultDeferred.complete(result)
-                    } catch (e: Exception) {
-                        resultDeferred.completeExceptionally(e)
-                    } finally {
-                        channel.close()
+    // Kick off the C++ driver once the collector subscribes so every
+    // registered proto collector sees the full token sequence. The driver
+    // coroutine re-emits via the C++ dispatcher's proto fan-out; the
+    // struct-callback arg is null because we consume events via the
+    // adapter, not the per-token struct callback.
+    return adapter.stream()
+        .onStart {
+            llmStreamDriverScope.launch {
+                try {
+                    CppBridgeLLM.generateStream(prompt, config) { _ ->
+                        /* No-op: events are delivered to the collector via
+                         * the proto-byte callback set by LLMStreamAdapter.
+                         * Returning true keeps the C++ loop running. */
+                        true
                     }
+                } catch (e: Throwable) {
+                    llmLogger.warn("generateStream driver failed: ${e.message}")
                 }
-
-            awaitClose {
-                job.cancel()
+            }
+        }
+        .onCompletion { cause ->
+            if (cause != null) {
                 CppBridgeLLM.cancel()
             }
         }
-
-    return coroutineScope {
-        LLMStreamingResult(
-            stream = tokenStream,
-            result = async { resultDeferred.await() },
-        )
-    }
 }
 
 actual fun RunAnywhere.cancelGeneration() {
-    // Cancel any ongoing generation via CppBridge
     CppBridgeLLM.cancel()
 }

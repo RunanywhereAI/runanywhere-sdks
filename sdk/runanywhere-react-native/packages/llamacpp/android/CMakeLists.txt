@@ -19,12 +19,8 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_llamacpp.so")
-    message(WARNING "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_llamacpp:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereLlama] RABackendLlamaCPP not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_llamacpp.so\n"
+                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_llamacpp SHARED IMPORTED)
@@ -77,6 +73,10 @@ include_directories(
     "src/main/cpp"
     "../cpp"
     "../cpp/bridges"
+    # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
+    # Sharing avoids re-fetching the dependency and keeps both packages on the
+    # same JSON version.
+    "${CMAKE_SOURCE_DIR}/../../core/cpp/third_party"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from core package (flat access for all subdirectories)
     "${CORE_INCLUDE_DIR}"
@@ -126,6 +126,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
     rac_commons
     rac_backend_llamacpp
 )

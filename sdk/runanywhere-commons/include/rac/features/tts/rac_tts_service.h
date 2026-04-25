@@ -49,6 +49,23 @@ typedef struct rac_tts_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new TTS service instance.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     *
+     * For TTS, `model_id` is a voice ID or voice-model path.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
+
+    /**
+     * Enumerate synthesis languages the backend currently supports (derived
+     * from the loaded voice(s)) as a JSON array, e.g. "[\"en\",\"de\"]".
+     * Callee allocates with malloc; caller MUST free via free(). Leave this
+     * slot NULL to return RAC_ERROR_NOT_SUPPORTED from the generic dispatcher.
+     */
+    rac_result_t (*get_languages)(void* impl, char** out_json);
 } rac_tts_service_ops_t;
 
 /**
@@ -154,6 +171,18 @@ RAC_API void rac_tts_destroy(rac_handle_t handle);
  * @param result Result to free
  */
 RAC_API void rac_tts_result_free(rac_tts_result_t* result);
+
+/**
+ * @brief Get supported languages for the loaded TTS model as a JSON array string.
+ *
+ * Dispatches through the backend vtable. Returns RAC_ERROR_NOT_SUPPORTED if the
+ * backend does not enumerate languages.
+ *
+ * @param handle      Service handle
+ * @param out_json    Output: malloc'd JSON string (e.g. "[\"en\",\"de\"]"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json);
 
 #ifdef __cplusplus
 }

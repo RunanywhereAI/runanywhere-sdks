@@ -26,8 +26,12 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     with SingleTickerProviderStateMixin {
   // Session state
   VoiceSessionState _sessionState = VoiceSessionState.disconnected;
-  sdk.VoiceSessionHandle? _voiceSession;
-  StreamSubscription<sdk.VoiceSessionEvent>? _eventSubscription;
+
+  // v3.1: proto-event subscription replaces the deprecated
+  // VoiceSessionHandle / VoiceSessionEvent consumption. The
+  // adapter is owned by the active stream subscription below;
+  // nothing else needs to reach it.
+  StreamSubscription<sdk.VoiceEvent>? _eventSubscription;
 
   // Conversation
   final List<_ConversationTurn> _conversation = [];
@@ -103,10 +107,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   /// NOTE: Voice agent API is not yet fully implemented in SDK
   Future<void> _refreshComponentStates() async {
     try {
-      // Use SDK public API to check loaded states (matches Swift pattern)
-      final currentModelId = sdk.RunAnywhere.currentModelId;
-      final sttModelId = sdk.RunAnywhere.currentSTTModelId;
-      final ttsVoiceId = sdk.RunAnywhere.currentTTSVoiceId;
+      final currentModelId = sdk.RunAnywhereSDK.instance.llm.currentModelId;
+      final sttModelId = sdk.RunAnywhereSDK.instance.stt.currentModelId;
+      final ttsVoiceId = sdk.RunAnywhereSDK.instance.tts.currentVoiceId;
 
       if (!mounted) return;
       setState(() {
@@ -147,8 +150,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     });
 
     try {
-      // Check if voice agent is ready using SDK API
-      if (!sdk.RunAnywhere.isVoiceAgentReady) {
+      if (!sdk.RunAnywhereSDK.instance.voice.isReady) {
         setState(() {
           _sessionState = VoiceSessionState.error;
           _errorMessage = 'Please load STT, LLM, and TTS models first';
@@ -156,18 +158,18 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
         return;
       }
 
-      // Use SDK's startVoiceSession API (matches Swift: RunAnywhere.startVoiceSession())
-      _voiceSession = await sdk.RunAnywhere.startVoiceSession(
-        config: const sdk.VoiceSessionConfig(),
-      );
+      // v4: voice capability owns adapter construction. Initialize
+      // against loaded models then subscribe to the proto VoiceEvent
+      // stream — symmetric with `instance.llm.generateStream(...)`.
+      final voice = sdk.RunAnywhereSDK.instance.voice;
+      await voice.initializeWithLoadedModels();
 
-      // Listen to session events
-      _eventSubscription = _voiceSession!.events.listen(
-        _handleSessionEvent,
+      _eventSubscription = voice.eventStream().listen(
+        _handleProtoEvent,
         onError: (Object error) {
           setState(() {
             _sessionState = VoiceSessionState.error;
-            _errorMessage = 'Voice session error: $error';
+            _errorMessage = 'Voice agent error: $error';
           });
         },
       );
@@ -186,58 +188,101 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     }
   }
 
-  void _handleSessionEvent(sdk.VoiceSessionEvent event) {
-    if (event is sdk.VoiceSessionListening) {
-      setState(() {
-        _sessionState = VoiceSessionState.listening;
-        _audioLevel = event.audioLevel;
-        // Update speech detected based on audio level threshold
-        _isSpeechDetected = event.audioLevel > 0.1;
-      });
-    } else if (event is sdk.VoiceSessionSpeechStarted) {
-      setState(() {
-        _isSpeechDetected = true;
-      });
-    } else if (event is sdk.VoiceSessionTranscribed) {
-      setState(() {
-        _currentTranscript = event.text;
-        _sessionState = VoiceSessionState.processing;
-      });
-    } else if (event is sdk.VoiceSessionResponded) {
-      setState(() {
-        _assistantResponse = event.text;
-      });
-    } else if (event is sdk.VoiceSessionSpeaking) {
-      setState(() {
-        _sessionState = VoiceSessionState.speaking;
-      });
-    } else if (event is sdk.VoiceSessionTurnCompleted) {
-      // Add completed turn to conversation
-      if (event.transcript.isNotEmpty) {
+  /// Drive UI state from canonical VoiceEvent proto messages (v3.1).
+  ///
+  /// Switches on `event.whichPayload()`. Turn-completion aggregation (was
+  /// VoiceSessionTurnCompleted) is rebuilt locally from the proto state
+  /// transitions.
+  void _handleProtoEvent(sdk.VoiceEvent event) {
+    switch (event.whichPayload()) {
+      case sdk.VoiceEvent_Payload.state:
+        final state = event.state;
+        switch (state.current) {
+          case sdk.PipelineState.PIPELINE_STATE_IDLE:
+            setState(() {
+              _sessionState = VoiceSessionState.listening;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_LISTENING:
+            setState(() {
+              _sessionState = VoiceSessionState.listening;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_THINKING:
+            setState(() {
+              _sessionState = VoiceSessionState.processing;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_SPEAKING:
+            setState(() {
+              _sessionState = VoiceSessionState.speaking;
+            });
+            break;
+          case sdk.PipelineState.PIPELINE_STATE_STOPPED:
+            unawaited(_stopConversation());
+            break;
+          default:
+            break;
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.vad:
+        final vad = event.vad;
+        if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_START) {
+          setState(() {
+            _isSpeechDetected = true;
+          });
+        } else if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+          setState(() {
+            _isSpeechDetected = false;
+            _sessionState = VoiceSessionState.processing;
+          });
+        }
+        break;
+
+      case sdk.VoiceEvent_Payload.userSaid:
+        final text = event.userSaid.text;
         setState(() {
-          _conversation.add(_ConversationTurn(
-            role: ConversationRole.user,
-            text: event.transcript,
-          ));
-          if (event.response.isNotEmpty) {
+          _currentTranscript = text;
+          if (text.isNotEmpty) {
+            // Turn-completion aggregation: when the user said transcript
+            // arrives, append the user turn. The assistant turn is
+            // appended when thinking→speaking transition fires.
             _conversation.add(_ConversationTurn(
-              role: ConversationRole.assistant,
-              text: event.response,
+              role: ConversationRole.user,
+              text: text,
             ));
           }
-          _currentTranscript = '';
-          _assistantResponse = '';
-          _sessionState = VoiceSessionState.listening;
         });
-      }
-    } else if (event is sdk.VoiceSessionError) {
-      setState(() {
-        _sessionState = VoiceSessionState.error;
-        _errorMessage = event.message;
-      });
-    } else if (event is sdk.VoiceSessionStopped) {
-      // Properly clean up subscriptions and controllers instead of just setting state
-      unawaited(_stopConversation());
+        break;
+
+      case sdk.VoiceEvent_Payload.assistantToken:
+        // Streaming per-token for typewriter UX. Previously .Responded batched.
+        final token = event.assistantToken.text;
+        setState(() {
+          _assistantResponse += token;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.audio:
+        setState(() {
+          _sessionState = VoiceSessionState.speaking;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.error:
+        final err = event.error;
+        setState(() {
+          _sessionState = VoiceSessionState.error;
+          _errorMessage = err.message;
+        });
+        break;
+
+      case sdk.VoiceEvent_Payload.interrupted:
+      case sdk.VoiceEvent_Payload.metrics:
+      case sdk.VoiceEvent_Payload.notSet:
+        // No UX impact today.
+        break;
     }
   }
 
@@ -248,8 +293,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     await _eventSubscription?.cancel();
     _eventSubscription = null;
 
-    _voiceSession?.stop();
-    _voiceSession = null;
+    // The adapter's Stream onCancel deregisters the C-side callback —
+    // cancelling _eventSubscription above is sufficient cleanup.
 
     setState(() {
       _sessionState = VoiceSessionState.disconnected;

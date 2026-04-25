@@ -162,71 +162,9 @@ data class VoiceAgentConfiguration(
     val vadEnergyThreshold: Float = 0.005f,
 )
 
-// MARK: - Voice Session Events
-
-/**
- * Events emitted during a voice session.
- * Mirrors Swift VoiceSessionEvent exactly.
- */
-sealed class VoiceSessionEvent {
-    /** Session started and ready */
-    data object Started : VoiceSessionEvent()
-
-    /** Listening for speech with current audio level (0.0 - 1.0) */
-    data class Listening(
-        val audioLevel: Float,
-    ) : VoiceSessionEvent()
-
-    /** Speech detected, started accumulating audio */
-    data object SpeechStarted : VoiceSessionEvent()
-
-    /** Speech ended, processing audio */
-    data object Processing : VoiceSessionEvent()
-
-    /** Got transcription from STT */
-    data class Transcribed(
-        val text: String,
-    ) : VoiceSessionEvent()
-
-    /** Got response from LLM */
-    data class Responded(
-        val text: String,
-    ) : VoiceSessionEvent()
-
-    /** Playing TTS audio */
-    data object Speaking : VoiceSessionEvent()
-
-    /** Complete turn result */
-    data class TurnCompleted(
-        val transcript: String,
-        val response: String,
-        val audio: ByteArray?,
-    ) : VoiceSessionEvent() {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (other == null || this::class != other::class) return false
-            other as TurnCompleted
-            return transcript == other.transcript &&
-                response == other.response &&
-                audio.contentEquals(other.audio)
-        }
-
-        override fun hashCode(): Int {
-            var result = transcript.hashCode()
-            result = 31 * result + response.hashCode()
-            result = 31 * result + (audio?.contentHashCode() ?: 0)
-            return result
-        }
-    }
-
-    /** Session stopped */
-    data object Stopped : VoiceSessionEvent()
-
-    /** Error occurred */
-    data class Error(
-        val message: String,
-    ) : VoiceSessionEvent()
-}
+// v3.1: VoiceSessionEvent sealed class + Companion.from(...) mapper
+// DELETED. Use VoiceEvent (Wire-generated from idl/voice_events.proto)
+// via VoiceAgentStreamAdapter(handle).stream().
 
 // MARK: - Voice Session Configuration
 

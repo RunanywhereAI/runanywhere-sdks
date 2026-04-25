@@ -22,12 +22,79 @@
 
 // Main entry point
 export { RunAnywhere } from './Public/RunAnywhere';
+export type { StorageBackend } from './Public/RunAnywhere';
 
-// Voice orchestration (cross-backend, uses provider interfaces)
-export { VoiceAgent, VoiceAgentSession, PipelineState } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export type { VoiceAgentModels, VoiceTurnResult, VoiceAgentEventData, VoiceAgentEventCallback } from './Public/Extensions/RunAnywhere+VoiceAgent';
+// Voice orchestration — two paths:
+//   1. VoicePipeline      — TS-side composition (STT -> LLM -> TTS) via ExtensionPoint.
+//   2. VoiceAgentStreamAdapter — WASM proto-stream (VoiceEvent) parity with iOS/Android/Flutter/RN.
+//      Also accepts a custom VoiceAgentStreamTransport for TS-backed / test transports.
 export { VoicePipeline } from './Public/Extensions/RunAnywhere+VoicePipeline';
+export { PipelineState } from './Public/Extensions/VoiceAgentTypes';
 export type { VoicePipelineCallbacks, VoicePipelineOptions, VoicePipelineTurnResult } from './Public/Extensions/VoicePipelineTypes';
+export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
+export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
+export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
+
+// LLM proto-byte streaming (GAP 09 — symmetric to VoiceAgentStreamAdapter).
+// Used by backend packages (e.g. @runanywhere/web-llamacpp) to expose a
+// platform-agnostic AsyncIterable<LLMStreamEvent> over the C++ proto callback.
+export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
+export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
+export type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+export { LLMTokenKind } from '@runanywhere/proto-ts/llm_service';
+
+// Solutions runtime (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+// Construct via `RunAnywhere.solutions.run(...)` (preferred) or directly via
+// `SolutionAdapter.run(...)`. Returns a `SolutionHandle` whose verbs map 1:1
+// to `rac_solution_*` in the C ABI.
+export {
+  SolutionAdapter,
+  SolutionHandle,
+  type SolutionRunInput,
+} from './Adapters/SolutionAdapter';
+export {
+  VoiceEvent,
+  UserSaidEvent,
+  AssistantTokenEvent,
+  AudioFrameEvent,
+  VADEvent,
+  InterruptedEvent,
+  StateChangeEvent,
+  ErrorEvent,
+  MetricsEvent,
+  TokenKind,
+  AudioEncoding,
+  VADEventType,
+  InterruptReason,
+  PipelineState as VoiceEventPipelineState,
+} from '@runanywhere/proto-ts/voice_events';
+export { clearRunanywhereModule, setRunanywhereModule } from './runtime/EmscriptenModule';
+export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
+
+// HTTP adapter (T3.13) — wraps the commons libcurl-backed C ABI so every
+// Web site goes through the same HTTP transport as Swift/Kotlin/RN/Flutter.
+// Backend packages install their Emscripten module via
+// HTTPAdapter.setDefaultModule(module) after WASM load.
+export { HTTPAdapter, DownloadStatus, HTTP_FETCH_CARVE_OUTS } from './Adapters/HTTPAdapter';
+export type {
+  HTTPRequest,
+  HTTPResponse,
+  HTTPHeader,
+  HTTPModule,
+  ChunkHandler,
+  DownloadRequest,
+  DownloadProgressHandler,
+} from './Adapters/HTTPAdapter';
+
+// Model registry refresh (T4.9) — wraps the commons
+// `rac_model_registry_refresh` C ABI so the web surface is symmetric with
+// Swift / Kotlin / RN / Flutter. Backend packages install their Emscripten
+// module via `ModelRegistryAdapter.setDefaultModule(module)` after load.
+export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter';
+export type {
+  ModelRegistryModule,
+  RefreshOptions,
+} from './Adapters/ModelRegistryAdapter';
 
 // Types
 export * from './types';
@@ -37,6 +104,7 @@ export { SDKError, SDKErrorCode, isSDKError } from './Foundation/ErrorTypes';
 export { SDKLogger, LogLevel } from './Foundation/SDKLogger';
 export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
+export { AsyncQueue } from './Foundation/AsyncQueue';
 export type { AccelerationMode } from './Foundation/WASMBridge';
 export type {
   AllOffsets,
@@ -94,7 +162,5 @@ export { inferModelFromFilename, sanitizeId } from './Infrastructure/ModelFileIn
 export type { InferredModelMeta } from './Infrastructure/ModelFileInference';
 
 // Services
-export { HTTPService } from './services/HTTPService';
-export type { HTTPServiceConfig, DevModeConfig } from './services/HTTPService';
 export { AnalyticsEmitter } from './services/AnalyticsEmitter';
 export type { AnalyticsEmitterBackend } from './services/AnalyticsEmitter';

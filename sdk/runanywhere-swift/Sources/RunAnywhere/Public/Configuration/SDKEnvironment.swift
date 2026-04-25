@@ -1,60 +1,109 @@
+//
+//  SDKEnvironment.swift
+//  RunAnywhere SDK
+//
+//  SDK Environment mode — determines how data is handled.
+//
+//  GAP 01 Phase 2: `SDKEnvironment` is a typealias for the proto3-generated
+//  `RASDKEnvironment` (idl/model_types.proto). The hand-written enum was
+//  removed; all C-bridge helpers, validation, and UX behaviour are
+//  preserved as extensions.
+//
+
 import CRACommons
 import Foundation
+import SwiftProtobuf
 
-/// SDK Environment mode - determines how data is handled
-public enum SDKEnvironment: String, CaseIterable, Sendable {
-    /// Development/testing mode - may use local data, verbose logging
-    case development
+// MARK: - Typealias
 
-    /// Staging mode - testing with real services
-    case staging
+/// SDK Environment mode — determines how data is handled.
+public typealias SDKEnvironment = RASDKEnvironment
 
-    /// Production mode - live environment
-    case production
+// MARK: - Codable (wire format = lowercase)
+
+extension RASDKEnvironment: Codable {
+    public init(from decoder: Swift.Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        switch raw.lowercased() {
+        case "development": self = .development
+        case "staging":     self = .staging
+        case "production":  self = .production
+        default:            self = .unspecified
+        }
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(self.wireString)
+    }
+}
+
+// MARK: - Extensions (preserved from the hand-written enum)
+
+public extension RASDKEnvironment {
+    /// Lowercase wire string ("development" / "staging" / "production").
+    var wireString: String {
+        switch self {
+        case .development: return "development"
+        case .staging:     return "staging"
+        case .production:  return "production"
+        default:           return "unspecified"
+        }
+    }
+
+    /// Parse a wire-format string back into a case.
+    static func fromWireString(_ s: String) -> RASDKEnvironment? {
+        switch s.lowercased() {
+        case "development": return .development
+        case "staging":     return .staging
+        case "production":  return .production
+        default:            return nil
+        }
+    }
+
+    /// All three deployable environments, excluding `.unspecified` /
+    /// `UNRECOGNIZED`. Preserves the `CaseIterable.allCases` semantics of
+    /// the pre-IDL hand-written enum.
+    static var deployableCases: [RASDKEnvironment] {
+        [.development, .staging, .production]
+    }
 
     // MARK: - C++ Bridge
 
-    /// Convert to C++ environment type for cross-platform consistency
+    /// Convert to C++ environment type for cross-platform consistency.
     var cEnvironment: rac_environment_t {
         switch self {
         case .development: return RAC_ENV_DEVELOPMENT
-        case .staging: return RAC_ENV_STAGING
-        case .production: return RAC_ENV_PRODUCTION
+        case .staging:     return RAC_ENV_STAGING
+        case .production:  return RAC_ENV_PRODUCTION
+        default:           return RAC_ENV_DEVELOPMENT
         }
     }
 
-    /// Human-readable description
-    public var description: String {
+    /// Human-readable description.
+    var description: String {
         switch self {
-        case .development:
-            return "Development Environment"
-        case .staging:
-            return "Staging Environment"
-        case .production:
-            return "Production Environment"
+        case .development: return "Development Environment"
+        case .staging:     return "Staging Environment"
+        case .production:  return "Production Environment"
+        default:           return "Unspecified Environment"
         }
     }
 
-    /// Check if this is a production environment (uses C++)
-    public var isProduction: Bool {
-        rac_env_is_production(cEnvironment)
-    }
+    /// Check if this is a production environment (uses C++).
+    var isProduction: Bool { rac_env_is_production(cEnvironment) }
 
-    /// Check if this is a testing environment (uses C++)
-    public var isTesting: Bool {
-        rac_env_is_testing(cEnvironment)
-    }
+    /// Check if this is a testing environment (uses C++).
+    var isTesting: Bool { rac_env_is_testing(cEnvironment) }
 
-    /// Check if this environment requires a valid backend URL (uses C++)
-    public var requiresBackendURL: Bool {
-        rac_env_requires_backend_url(cEnvironment)
-    }
+    /// Check if this environment requires a valid backend URL (uses C++).
+    var requiresBackendURL: Bool { rac_env_requires_backend_url(cEnvironment) }
 
     // MARK: - Build Configuration Validation
 
-    /// Check if the current build configuration is compatible with this environment
-    /// Production environment is only allowed in Release builds
-    public var isCompatibleWithCurrentBuild: Bool {
+    /// Check if the current build configuration is compatible with this
+    /// environment. Production is only allowed in Release builds.
+    var isCompatibleWithCurrentBuild: Bool {
         switch self {
         case .development, .staging:
             return true
@@ -64,11 +113,13 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
             #else
             return true
             #endif
+        default:
+            return false
         }
     }
 
-    /// Returns true if we're running in a DEBUG build
-    public static var isDebugBuild: Bool {
+    /// Returns true if we're running in a DEBUG build.
+    static var isDebugBuild: Bool {
         #if DEBUG
         return true
         #else
@@ -78,47 +129,39 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
 
     // MARK: - Environment-Specific Settings
 
-    /// Determine logging verbosity based on environment
-    public var defaultLogLevel: LogLevel {
+    /// Determine logging verbosity based on environment.
+    var defaultLogLevel: LogLevel {
         switch self {
         case .development: return .debug
-        case .staging: return .info
-        case .production: return .warning
+        case .staging:     return .info
+        case .production:  return .warning
+        default:           return .info
         }
     }
 
-    /// Should send telemetry data (production only) - uses C++
-    public var shouldSendTelemetry: Bool {
-        rac_env_should_send_telemetry(cEnvironment)
-    }
+    /// Should send telemetry data (production only) — uses C++.
+    var shouldSendTelemetry: Bool { rac_env_should_send_telemetry(cEnvironment) }
 
-    /// Should use mock data sources (development only)
-    public var useMockData: Bool {
-        self == .development // Keep simple - no C++ equivalent
-    }
+    /// Should use mock data sources (development only).
+    var useMockData: Bool { self == .development }
 
-    /// Should sync with backend (non-development) - uses C++
-    public var shouldSyncWithBackend: Bool {
-        rac_env_should_sync_with_backend(cEnvironment)
-    }
+    /// Should sync with backend (non-development) — uses C++.
+    var shouldSyncWithBackend: Bool { rac_env_should_sync_with_backend(cEnvironment) }
 
-    /// Requires API authentication (non-development) - uses C++
-    public var requiresAuthentication: Bool {
-        rac_env_requires_auth(cEnvironment)
-    }
+    /// Requires API authentication (non-development) — uses C++.
+    var requiresAuthentication: Bool { rac_env_requires_auth(cEnvironment) }
 }
 
-/// SDK initialization parameters
+/// SDK initialization parameters.
 public struct SDKInitParams {
-    /// API key for authentication
+    /// API key for authentication.
     public let apiKey: String
 
-    /// Base URL for API requests
-    /// - Required for staging and production environments
-    /// - Optional for development (uses placeholder if not provided)
+    /// Base URL for API requests. Required for staging/production; optional
+    /// for development (uses placeholder if not provided).
     public let baseURL: URL
 
-    /// Environment mode (development/staging/production)
+    /// Environment mode (development/staging/production).
     public let environment: SDKEnvironment
 
     // MARK: - Default Development URL
@@ -134,12 +177,7 @@ public struct SDKInitParams {
 
     // MARK: - Initializers
 
-    /// Create initialization parameters for staging or production
-    /// - Parameters:
-    ///   - apiKey: Your RunAnywhere API key (required)
-    ///   - baseURL: Base URL for API requests (required, must be valid HTTPS URL)
-    ///   - environment: Environment mode (default: production)
-    /// - Throws: SDKError if validation fails
+    /// Create initialization parameters for staging or production.
     public init(
         apiKey: String,
         baseURL: URL,
@@ -149,16 +187,10 @@ public struct SDKInitParams {
         self.baseURL = baseURL
         self.environment = environment
 
-        // Validate based on environment
         try Self.validate(apiKey: apiKey, baseURL: baseURL, environment: environment)
     }
 
-    /// Convenience initializer with string URL for staging or production
-    /// - Parameters:
-    ///   - apiKey: Your RunAnywhere API key
-    ///   - baseURL: Base URL string for API requests
-    ///   - environment: Environment mode (default: production)
-    /// - Throws: SDKError if URL is invalid or validation fails
+    /// Convenience initializer with string URL for staging or production.
     public init(
         apiKey: String,
         baseURL: String,
@@ -170,9 +202,7 @@ public struct SDKInitParams {
         try self.init(apiKey: apiKey, baseURL: url, environment: environment)
     }
 
-    /// Convenience initializer for development mode (no URL required)
-    /// - Parameter apiKey: Optional API key (not required for development)
-    /// - Note: Development mode uses Supabase internally for dev analytics
+    /// Convenience initializer for development mode (no URL required).
     public init(forDevelopmentWithAPIKey apiKey: String = "") {
         self.apiKey = apiKey
         self.baseURL = Self.developmentPlaceholderURL
@@ -181,13 +211,6 @@ public struct SDKInitParams {
 
     // MARK: - Validation (Uses C++ for cross-platform consistency)
 
-    /// Validate initialization parameters based on environment
-    /// Uses C++ validation logic for cross-platform consistency.
-    /// - Parameters:
-    ///   - apiKey: The API key to validate
-    ///   - baseURL: The base URL to validate
-    ///   - environment: The target environment
-    /// - Throws: SDKError if validation fails
     private static func validate(
         apiKey: String,
         baseURL: URL,
@@ -195,14 +218,8 @@ public struct SDKInitParams {
     ) throws {
         let logger = SDKLogger(category: "SDKInitParams")
 
-        // Note: We allow any environment in DEBUG builds to support developer testing
-        // with custom backends. The environment parameter is informational for
-        // logging and behavior configuration, not a security boundary.
-
-        // Call C++ validation for API key and URL
         let cEnv = environment.cEnvironment
 
-        // Validate API key via C++
         let apiKeyResult = apiKey.withCString { ptr in
             rac_validate_api_key(ptr, cEnv)
         }
@@ -218,7 +235,6 @@ public struct SDKInitParams {
             }
         }
 
-        // Validate URL via C++
         let urlResult = baseURL.absoluteString.withCString { ptr in
             rac_validate_base_url(ptr, cEnv)
         }
@@ -227,12 +243,10 @@ public struct SDKInitParams {
             throw SDKError.general(.validationFailed, message)
         }
 
-        // Log warnings for staging HTTP (C++ validates but doesn't warn)
         if environment == .staging, baseURL.scheme?.lowercased() == "http" {
             logger.warning("Using HTTP for staging environment. Consider using HTTPS for security.")
         }
 
-        // Log warnings for staging localhost (C++ validates but doesn't warn)
         if environment == .staging, let host = baseURL.host?.lowercased() {
             if host.contains("localhost") || host.contains("127.0.0.1") ||
                host.contains("example.com") || host.contains(".local") {

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
@@ -77,9 +76,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     });
   }
 
-  /// Sync model state from SDK (matches Swift pattern)
+  /// Sync model state from SDK (v4.0 API).
   Future<void> _syncModelState() async {
-    final model = await sdk.RunAnywhere.currentLLMModel();
+    final model = await sdk.RunAnywhereSDK.instance.llm.currentModel();
     if (mounted) {
       setState(() {
         _loadedModelName = model?.name;
@@ -91,7 +90,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   bool get _canSend =>
       _controller.text.isNotEmpty &&
       !_isGenerating &&
-      sdk.RunAnywhere.isModelLoaded;
+      sdk.RunAnywhereSDK.instance.llm.isLoaded;
 
   Future<void> _sendMessage() async {
     if (!_canSend) return;
@@ -201,7 +200,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final messageIndex = _messages.length - 1;
 
     try {
-      final result = await RunAnywhereTools.generateWithTools(
+      final result = await sdk.RunAnywhereSDK.instance.tools.generateWithTools(
         prompt,
         options: ToolCallingOptions(
           maxToolCalls: 3,
@@ -322,10 +321,21 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final contentBuffer = StringBuffer();
 
     try {
-      final streamingResult =
-          await sdk.RunAnywhere.generateStream(prompt, options: options);
+      // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
+      // collect token text off each non-terminal event.
+      final eventStream = sdk.RunAnywhereSDK.instance.llm
+          .generateStream(prompt, options: options);
 
-      await for (final token in streamingResult.stream) {
+      await for (final event in eventStream) {
+        if (event.isFinal) {
+          if (event.errorMessage.isNotEmpty) {
+            throw Exception(event.errorMessage);
+          }
+          break;
+        }
+        final token = event.token;
+        if (token.isEmpty) continue;
+
         if (_timeToFirstToken == null && _generationStartTime != null) {
           _timeToFirstToken =
               DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -388,7 +398,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     final modelName = _loadedModelName;
 
     try {
-      final result = await sdk.RunAnywhere.generate(prompt, options: options);
+      final result = await sdk.RunAnywhereSDK.instance.llm
+          .generate(prompt, options: options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -554,7 +565,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   Widget _buildModelStatusBanner() {
     // Use local state synced from SDK (matches Swift pattern)
     LLMFramework? framework;
-    if (sdk.RunAnywhere.isModelLoaded && _loadedFramework != null) {
+    if (sdk.RunAnywhereSDK.instance.llm.isLoaded && _loadedFramework != null) {
       framework = _mapInferenceFramework(_loadedFramework);
     }
 

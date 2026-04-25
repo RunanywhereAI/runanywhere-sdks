@@ -9,7 +9,9 @@
     "baseUrl": ".",
     "paths": {
       "@runanywhere/core": ["./src"],
-      "@runanywhere/core/*": ["./src/*"]
+      "@runanywhere/core/*": ["./src/*"],
+      "@runanywhere/proto-ts": ["../../../runanywhere-proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../runanywhere-proto-ts/dist/*"]
     }
   },
   "include": ["src/**/*"],

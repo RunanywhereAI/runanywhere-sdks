@@ -41,7 +41,7 @@ public final class SentryManager: @unchecked Sendable {
 
         SentrySDK.start { options in
             options.dsn = configuredDSN
-            options.environment = environment.rawValue
+            options.environment = environment.wireString
             options.enableCrashHandler = true
             options.enableAutoBreadcrumbTracking = true
             options.enableAppHangTracking = true

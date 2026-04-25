@@ -6,10 +6,12 @@
 #include "rag_backend.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <unordered_set>
 
 #include "rac/core/rac_logger.h"
+#include "rag_pipeline_graph.h"
 
 #define LOG_TAG "RAG.Backend"
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
@@ -350,123 +352,72 @@ RAGBackend::fuse_results(const std::vector<SearchResult>& dense_results,
 }
 
 // =============================================================================
-// Context helpers
+// Query — GraphScheduler-driven DAG
 // =============================================================================
-
-std::string RAGBackend::build_context(const std::vector<SearchResult>& results) const {
-    static constexpr size_t kCharsPerToken = 4;
-    const size_t max_chars = config_.max_context_tokens * kCharsPerToken;
-
-    std::string context;
-    for (size_t i = 0; i < results.size(); ++i) {
-        const std::string& chunk_text = results[i].text;
-        size_t separator_len = (i > 0) ? 2 : 0;  // "\n\n"
-
-        if (context.size() + separator_len + chunk_text.size() > max_chars) {
-            LOGI("Context budget reached at chunk %zu/%zu (%zu chars, limit ~%zu)", i,
-                 results.size(), context.size(), max_chars);
-            break;
-        }
-
-        if (i > 0)
-            context += "\n\n";
-        context += chunk_text;
-    }
-    return context;
-}
-
-std::string RAGBackend::format_prompt(const std::string& query, const std::string& context) const {
-    std::string prompt = config_.prompt_template;
-
-    for (size_t pos = prompt.find("{query}"); pos != std::string::npos;
-         pos = prompt.find("{query}", pos + query.size())) {
-        prompt.replace(pos, 7, query);
-    }
-
-    for (size_t pos = prompt.find("{context}"); pos != std::string::npos;
-         pos = prompt.find("{context}", pos + context.size())) {
-        prompt.replace(pos, 9, context);
-    }
-
-    return prompt;
-}
-
-// =============================================================================
-// Query — insert top N chunks then generate
-// =============================================================================
+//
+// GAP 05 / T4.6: the entire orchestration (embed → retrieve → assemble →
+// generate) now lives in `run_rag_query()` which builds and runs a typed
+// `GraphScheduler` per call. This method is just the snapshot+dispatch
+// shim that hands the right inputs to the graph and translates its
+// `RAGGraphResult` into the legacy `rac_llm_result_t` + metadata JSON
+// pair that the public C ABI returns.
 
 rac_result_t RAGBackend::query(const std::string& question, const rac_llm_options_t* options,
-                               rac_llm_result_t* out_result, nlohmann::json& out_metadata) {
-    rac_handle_t llm;
-    size_t embedding_dimension;
-    float similarity_threshold;
-    size_t top_k;
-    bool initialized;
+                               rac_llm_result_t* out_result, nlohmann::json& out_metadata,
+                               std::function<bool(const std::string&)> on_token) {
+    RAGGraphInputs g_in;
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        llm = llm_service_;
-        embedding_dimension = config_.embedding_dimension;
-        similarity_threshold = config_.similarity_threshold;
-        top_k = config_.top_k;
-        initialized = initialized_;
-    }
-
-    if (!initialized || !llm) {
-        LOGE("Pipeline not initialized or LLM service not available");
-        return RAC_ERROR_INVALID_STATE;
-    }
-
-    // 1. Retrieve top-k chunks
-    auto search_results =
-        search_with_embedding(question, top_k, embedding_dimension, similarity_threshold);
-
-    if (search_results.empty()) {
-        LOGI("No relevant documents found");
-        if (out_result) {
-            out_result->text =
-                rac_strdup("I don't have enough information to answer that question.");
-            out_result->completion_tokens = 0;
-            out_result->prompt_tokens = 0;
-            out_result->total_tokens = 0;
-            out_result->total_time_ms = 0;
-            out_result->tokens_per_second = 0;
-            out_result->time_to_first_token_ms = 0;
+        if (!initialized_ || !llm_service_) {
+            LOGE("Pipeline not initialized or LLM service not available");
+            return RAC_ERROR_INVALID_STATE;
         }
+        g_in.llm_service = llm_service_;
+        g_in.embeddings_service = embeddings_service_;
+        g_in.vector_store = vector_store_.get();
+        g_in.bm25_index = bm25_index_.get();
+        g_in.embedding_dimension = config_.embedding_dimension;
+        g_in.top_k = config_.top_k;
+        g_in.similarity_threshold = config_.similarity_threshold;
+        g_in.max_context_tokens = config_.max_context_tokens;
+        g_in.prompt_template = config_.prompt_template;
+    }
+
+    g_in.question = question;
+    g_in.llm_options = options ? *options : RAC_LLM_OPTIONS_DEFAULT;
+    g_in.system_prompt = kSystemPrompt;
+
+    auto t_start = std::chrono::high_resolution_clock::now();
+    RAGGraphResult g_out;
+    rac_result_t status = run_rag_query(g_in, std::move(on_token), g_out);
+    auto t_end = std::chrono::high_resolution_clock::now();
+    const double total_ms =
+        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+    if (status != RAC_SUCCESS) return status;
+
+    if (out_result) {
+        out_result->text =
+            !g_out.answer.empty() ? rac_strdup(g_out.answer.c_str()) : nullptr;
+        out_result->completion_tokens = 0;
+        out_result->prompt_tokens = 0;
+        out_result->total_tokens = 0;
+        out_result->total_time_ms = total_ms;
+        out_result->tokens_per_second = 0;
+        out_result->time_to_first_token_ms = 0;
+    }
+
+    if (g_out.sources.empty()) {
         out_metadata["reason"] = "no_context";
         return RAC_SUCCESS;
     }
 
-    // 2. Build context from retrieved chunks
-    std::string assembled_context = build_context(search_results);
-    LOGI("Built context from %zu chunks (%zu chars)", search_results.size(),
-         assembled_context.size());
-
-    // 3. Format the full prompt using the prompt template (context + query together)
-    std::string full_prompt = format_prompt(question, assembled_context);
-
-    // 4. Generate via standard rac_llm_generate so the chat template is applied
-    //    uniformly to the entire prompt (system + context + question).
-    //    This avoids the KV cache / chat template mismatch that occurs when raw
-    //    context is injected via append_context and only the query gets templated.
-    rac_llm_options_t rag_options = options ? *options : RAC_LLM_OPTIONS_DEFAULT;
-    if (!rag_options.system_prompt || rag_options.system_prompt[0] == '\0') {
-        rag_options.system_prompt = kSystemPrompt.c_str();
-    }
-
-    rac_result_t status = rac_llm_generate(llm, full_prompt.c_str(), &rag_options, out_result);
-
-    if (status != RAC_SUCCESS) {
-        LOGE("rac_llm_generate failed: %d", status);
-        return status;
-    }
-
-    // 6. Populate metadata
-    out_metadata["chunks_used"] = search_results.size();
-    out_metadata["context_used"] = assembled_context;
+    out_metadata["chunks_used"] = g_out.sources.size();
+    out_metadata["context_used"] = g_out.assembled_context;
 
     nlohmann::json sources = nlohmann::json::array();
-    for (const auto& result : search_results) {
+    for (const auto& result : g_out.sources) {
         nlohmann::json source;
         source["id"] = result.id;
         source["score"] = result.score;
@@ -477,7 +428,6 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
         sources.push_back(source);
     }
     out_metadata["sources"] = sources;
-
     return RAC_SUCCESS;
 }
 

@@ -304,6 +304,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     }
 
     private fun fetchUrl(urlString: String): String {
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         val url = URL(urlString)
         val connection = url.openConnection() as HttpURLConnection
         connection.requestMethod = "GET"

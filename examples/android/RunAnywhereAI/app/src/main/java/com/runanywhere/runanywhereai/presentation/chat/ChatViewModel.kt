@@ -332,8 +332,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         Timber.i("📤 Starting streaming generation")
 
         try {
-            // Use SDK streaming generation - returns Flow<String>
-            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { token ->
+            // v2 close-out Phase G-2: generateStream now returns
+            // Flow<LLMStreamEvent>; collect token text off each event.
+            RunAnywhere.generateStream(prompt, getGenerationOptions()).collect { event ->
+                if (event.is_final) {
+                    if (event.error_message.isNotEmpty()) {
+                        throw RuntimeException(event.error_message)
+                    }
+                    return@collect
+                }
+                val token = event.token
+                if (token.isEmpty()) return@collect
                 fullResponse += token
                 totalTokensReceived++
 

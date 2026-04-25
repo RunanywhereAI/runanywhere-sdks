@@ -187,11 +187,17 @@ native/
 
 ## 4. Core Components & Responsibilities
 
-### 4.1 RunAnywhere (Public API)
+### 4.1 RunAnywhereSDK (Public API)
 
-**Purpose**: Single entry point for all SDK operations as a static class.
+**Purpose**: Lifecycle singleton + capability dispatcher. The v4 entry
+point is `RunAnywhereSDK.instance`; each capability (LLM/STT/TTS/VLM/
+Voice/Models/Downloads/Tools/RAG) is a property on it, implemented by
+its own class under `lib/public/capabilities/`.
 
-**Location**: `lib/public/runanywhere.dart`
+**Location**: `lib/public/runanywhere_v4.dart` (singleton),
+`lib/public/capabilities/*.dart` (capability surfaces), and
+`lib/internal/sdk_state.dart` + `lib/internal/sdk_init.dart` (shared
+package-internal state + initialization helpers).
 
 **Key Responsibilities**:
 - SDK initialization with environment configuration

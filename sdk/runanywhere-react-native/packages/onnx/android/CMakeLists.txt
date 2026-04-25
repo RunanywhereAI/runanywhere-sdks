@@ -19,12 +19,8 @@ set(JNILIB_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${ANDROID_ABI})
 # Downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_backend_onnx.so")
-    message(WARNING "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_onnx:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereONNX] RABackendONNX not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_backend_onnx.so\n"
+                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_backend_onnx SHARED IMPORTED)
@@ -164,6 +160,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
     rac_commons
     rac_backend_onnx
     onnxruntime

@@ -16,26 +16,65 @@ extension LLMViewModel {
         options: LLMGenerationOptions,
         messageIndex: Int
     ) async throws {
+        // v2 close-out Phase G-2: generateStream now returns
+        // AsyncStream<RALLMStreamEvent>. Compute metrics locally from the
+        // event sequence (no separate metrics Task — the terminal event
+        // carries finish_reason and we derive the rest).
         var fullResponse = ""
+        var tokenCount = 0
+        var firstTokenTime: Date?
+        let startTime = Date()
+        var finishReason = ""
+        var terminalError = ""
 
-        let streamingResult = try await RunAnywhere.generateStream(prompt, options: options)
-        let stream = streamingResult.stream
-        let metricsTask = streamingResult.result
-
-        for try await token in stream {
-            fullResponse += token
-            let displayText = Self.stripThinkTags(from: fullResponse)
-            await updateMessageContent(at: messageIndex, content: displayText)
-            NotificationCenter.default.post(
-                name: Notification.Name("MessageContentUpdated"),
-                object: nil
-            )
+        let eventStream = try await RunAnywhere.generateStream(prompt, options: options)
+        for await event in eventStream {
+            if !event.token.isEmpty {
+                if firstTokenTime == nil { firstTokenTime = Date() }
+                fullResponse += event.token
+                tokenCount += 1
+                let displayText = Self.stripThinkTags(from: fullResponse)
+                await updateMessageContent(at: messageIndex, content: displayText)
+                NotificationCenter.default.post(
+                    name: Notification.Name("MessageContentUpdated"),
+                    object: nil
+                )
+            }
+            if event.isFinal {
+                finishReason = event.finishReason
+                terminalError = event.errorMessage
+                break
+            }
         }
 
-        let sdkResult = try await metricsTask.value
+        if !terminalError.isEmpty {
+            throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: terminalError,
+            ])
+        }
+
+        _ = finishReason
+        let totalLatency = Date().timeIntervalSince(startTime) * 1000
+        let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
+
+        let modelId = ModelListViewModel.shared.currentModel?.id ?? "unknown"
+        let result = LLMGenerationResult(
+            text: Self.stripThinkTags(from: fullResponse),
+            thinkingContent: nil,
+            inputTokens: max(1, prompt.count / 4),
+            tokensUsed: tokenCount,
+            modelUsed: modelId,
+            latencyMs: totalLatency,
+            framework: "llamacpp",
+            tokensPerSecond: totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0,
+            timeToFirstTokenMs: ttft,
+            thinkingTokens: nil,
+            responseTokens: tokenCount
+        )
+
         await updateMessageWithResult(
             at: messageIndex,
-            result: sdkResult,
+            result: result,
             prompt: prompt,
             options: options,
             wasInterrupted: false

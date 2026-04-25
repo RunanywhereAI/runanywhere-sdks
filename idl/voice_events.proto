@@ -1,0 +1,158 @@
+// RunAnywhere v2 IDL — streaming events emitted by the VoiceAgent solution.
+//
+// Every frontend binds to this schema via its native proto3 codegen
+// (swift-protobuf, Wire, protobuf.dart, ts-proto). There is NO hand-written
+// event type in any frontend adapter.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "VoiceEventsProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+
+// ---------------------------------------------------------------------------
+// Sum type emitted on the output edge of the VoiceAgent pipeline.
+// ---------------------------------------------------------------------------
+message VoiceEvent {
+    // Monotonic pipeline-local sequence number. Useful for frontends that
+    // need to detect gaps after reconnection or out-of-order delivery.
+    uint64 seq            = 1;
+
+    // Wall-clock timestamp captured at the C++ edge, in microseconds since
+    // Unix epoch. Frontends may re-timestamp for UI display.
+    int64  timestamp_us   = 2;
+
+    // Exactly one of the following is populated on every event.
+    oneof payload {
+        UserSaidEvent     user_said        = 10;
+        AssistantTokenEvent assistant_token = 11;
+        AudioFrameEvent   audio            = 12;
+        VADEvent          vad              = 13;
+        InterruptedEvent  interrupted      = 14;
+        StateChangeEvent  state            = 15;
+        ErrorEvent        error            = 16;
+        MetricsEvent      metrics          = 17;
+    }
+}
+
+// User speech finalized by STT (is_final=false → partial hypothesis).
+message UserSaidEvent {
+    string text           = 1;
+    bool   is_final       = 2;
+    float  confidence     = 3;    // 0.0..1.0, engine-dependent
+    int64  audio_start_us = 4;
+    int64  audio_end_us   = 5;
+}
+
+// Single token decoded by the LLM. is_final=true on the last token of a
+// response (end-of-stream marker).
+message AssistantTokenEvent {
+    string text           = 1;
+    bool   is_final       = 2;
+    TokenKind kind        = 3;
+}
+
+enum TokenKind {
+    TOKEN_KIND_UNSPECIFIED = 0;
+    TOKEN_KIND_ANSWER      = 1;   // Regular content token
+    TOKEN_KIND_THOUGHT     = 2;   // Chain-of-thought token (qwen3, deepseek-r1)
+    TOKEN_KIND_TOOL_CALL   = 3;   // Parsed tool-call directive
+}
+
+// A chunk of synthesized PCM audio, ready for the sink. The frontend is
+// expected to copy the bytes out; the C ABI does NOT retain ownership.
+message AudioFrameEvent {
+    bytes pcm             = 1;    // f32 little-endian interleaved
+    int32 sample_rate_hz  = 2;    // usually 24000 for Kokoro, 22050 for Piper
+    int32 channels        = 3;    // 1 for mono
+    AudioEncoding encoding = 4;
+}
+
+enum AudioEncoding {
+    AUDIO_ENCODING_UNSPECIFIED = 0;
+    AUDIO_ENCODING_PCM_F32_LE  = 1;
+    AUDIO_ENCODING_PCM_S16_LE  = 2;
+}
+
+// Voice Activity Detection output. Frontends usually do not need this —
+// exposed for debugging and custom UIs (waveform highlighting, etc.).
+message VADEvent {
+    VADEventType type     = 1;
+    int64  frame_offset_us = 2;
+}
+
+enum VADEventType {
+    VAD_EVENT_UNSPECIFIED        = 0;
+    VAD_EVENT_VOICE_START        = 1;
+    VAD_EVENT_VOICE_END_OF_UTTERANCE = 2;
+    VAD_EVENT_BARGE_IN           = 3;
+    VAD_EVENT_SILENCE            = 4;
+}
+
+// Assistant playback was interrupted by a barge-in. The reason distinguishes
+// user barge-in from app-initiated cancel.
+message InterruptedEvent {
+    InterruptReason reason = 1;
+    string          detail = 2;
+}
+
+enum InterruptReason {
+    INTERRUPT_REASON_UNSPECIFIED = 0;
+    INTERRUPT_REASON_USER_BARGE_IN = 1;
+    INTERRUPT_REASON_APP_STOP    = 2;
+    INTERRUPT_REASON_AUDIO_ROUTE_CHANGE = 3;
+    INTERRUPT_REASON_TIMEOUT     = 4;
+}
+
+// Pipeline lifecycle state. Ordered — callers can compare numerically.
+message StateChangeEvent {
+    PipelineState previous = 1;
+    PipelineState current  = 2;
+}
+
+enum PipelineState {
+    PIPELINE_STATE_UNSPECIFIED = 0;
+    PIPELINE_STATE_IDLE      = 1;
+    PIPELINE_STATE_LISTENING = 2;
+    PIPELINE_STATE_THINKING  = 3;
+    PIPELINE_STATE_SPEAKING  = 4;
+    PIPELINE_STATE_STOPPED   = 5;
+}
+
+// Terminal or recoverable error in the pipeline. Frontends map these to
+// their native error types.
+message ErrorEvent {
+    int32  code           = 1;   // See ra_status_t in core/abi/ra_primitives.h
+    string message        = 2;
+    string component      = 3;   // "llm", "stt", "tts", "vad", "pipeline", ...
+    bool   is_recoverable = 4;
+}
+
+// Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop.
+message MetricsEvent {
+    double stt_final_ms       = 1;
+    double llm_first_token_ms = 2;
+    double tts_first_audio_ms = 3;
+    double end_to_end_ms      = 4;
+    int64  tokens_generated   = 5;
+    int64  audio_samples_played = 6;
+
+    // True when `end_to_end_ms` exceeded the `PipelineOptions.latency_budget_ms`
+    // configured for this run. Frontends can surface this to the UI for SLO
+    // dashboards without re-computing the threshold themselves.
+    bool   is_over_budget     = 7;
+
+    // v3.1: monotonic producer-side timestamp in nanoseconds. Set by the
+    // producer (C++ dispatcher) at event-emit time; read by consumers
+    // (5-SDK perf_bench + p50 benchmark CI) to compute event-to-frontend
+    // latency without relying on wall-clock sync. Encoded as int64 so
+    // std::chrono::steady_clock::now().time_since_epoch() values fit
+    // directly (2^63 ns ≈ 292 years of runtime headroom).
+    int64  created_at_ns      = 8;
+}

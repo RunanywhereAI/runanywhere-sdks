@@ -38,12 +38,13 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
         do {
-            // Warmup: short generate, discard
+            // v2 close-out Phase G-2: generateStream returns
+            // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
+            // tokens/sec from the event sequence directly.
             let warmupStart = Date()
             let warmupOptions = LLMGenerationOptions(maxTokens: 5, temperature: 0.0)
-            let warmupResult = try await RunAnywhere.generateStream("Hello", options: warmupOptions)
-            for try await _ in warmupResult.stream {}
-            _ = try await warmupResult.result.value
+            let warmupEvents = try await RunAnywhere.generateStream("Hello", options: warmupOptions)
+            for await event in warmupEvents where event.isFinal { break }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
 
             // Benchmark
@@ -60,25 +61,34 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
                 + "covering perceptrons, activation functions, backpropagation, gradient descent, "
                 + "loss functions, convolutional layers, recurrent layers, transformers, attention "
                 + "mechanisms, and training procedures. Be as thorough as possible."
-            let streamResult = try await RunAnywhere.generateStream(prompt, options: options)
-            for try await _ in streamResult.stream {}
-            let result = try await streamResult.result.value
+            let benchEvents = try await RunAnywhere.generateStream(prompt, options: options)
+
+            var tokenCount = 0
+            var firstTokenTime: Date?
+            for await event in benchEvents {
+                if !event.token.isEmpty {
+                    if firstTokenTime == nil { firstTokenTime = Date() }
+                    tokenCount += 1
+                }
+                if event.isFinal { break }
+            }
+            let inputTokens = max(1, prompt.count / 4)
 
             let e2eMs = Date().timeIntervalSince(benchStart) * 1000
             metrics.endToEndLatencyMs = e2eMs
-            metrics.ttftMs = result.timeToFirstTokenMs
-            metrics.tokensPerSecond = result.tokensPerSecond
-            metrics.inputTokens = result.inputTokens
-            metrics.outputTokens = result.tokensUsed
+            metrics.ttftMs = firstTokenTime.map { $0.timeIntervalSince(benchStart) * 1000 }
+            metrics.tokensPerSecond = e2eMs > 0 ? Double(tokenCount) / (e2eMs / 1000.0) : 0
+            metrics.inputTokens = inputTokens
+            metrics.outputTokens = tokenCount
 
-            if let ttft = result.timeToFirstTokenMs, ttft > 0 {
+            if let ttft = metrics.ttftMs, ttft > 0 {
                 let decodeMs = e2eMs - ttft
-                let decodeTokens = max(result.tokensUsed - 1, 0)
+                let decodeTokens = max(tokenCount - 1, 0)
                 if decodeMs > 0, decodeTokens > 0 {
                     metrics.decodeTokensPerSecond = Double(decodeTokens) / (decodeMs / 1000.0)
                 }
-                if result.inputTokens > 0 {
-                    metrics.prefillTokensPerSecond = Double(result.inputTokens) / (ttft / 1000.0)
+                if inputTokens > 0 {
+                    metrics.prefillTokensPerSecond = Double(inputTokens) / (ttft / 1000.0)
                 }
             }
 

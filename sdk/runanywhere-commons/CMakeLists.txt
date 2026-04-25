@@ -30,17 +30,21 @@ option(RAC_BUILD_TESTS "Build unit tests" OFF)
 option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
-option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
-option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
+
+# T5.4: per-engine RAC_BACKEND_<name> options now live in engines/<name>/CMakeLists.txt.
+# Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
-# WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend
-option(RAC_BACKEND_WHISPERCPP "Build WhisperCPP backend" OFF)
-if(APPLE)
-    option(RAC_BACKEND_WHISPERKIT_COREML "Build WhisperKit CoreML backend (Apple Neural Engine STT)" ON)
-    option(RAC_BACKEND_METALRT "Build MetalRT backend (custom Metal GPU kernels, Apple only)" OFF)
-else()
-    set(RAC_BACKEND_WHISPERKIT_COREML OFF CACHE BOOL "" FORCE)
-    set(RAC_BACKEND_METALRT OFF CACHE BOOL "" FORCE)
+
+# Emscripten: force the RAG backend OFF. FetchONNXRuntime.cmake has no WASM
+# binary distribution (it expects headers under third_party/onnxruntime-wasm/
+# which are not vendored in this tree), so the RAG ONNX embedding TUs fail
+# to compile with `onnxruntime_c_api.h: file not found`. The ONNX WASM story
+# is delivered by `onnxruntime-web` (JavaScript package) from the frontend;
+# commons does not need an in-module ONNX runtime on WASM.
+# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip this back to
+# default ON when the onnxruntime-wasm third_party package lands.
+if(EMSCRIPTEN)
+    set(RAC_BACKEND_RAG OFF CACHE BOOL "" FORCE)
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 
@@ -111,6 +115,13 @@ message(STATUS "Platform: ${RAC_PLATFORM_NAME}")
 
 include(FetchContent)
 
+# Cross-compilation targets that bundle zlib/BZip2 need a stable archive
+# output directory so downstream FetchContent projects can consume concrete
+# file paths instead of unresolved logical library names.
+if(MSVC OR ANDROID OR EMSCRIPTEN)
+    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
+endif()
+
 # nlohmann/json - header-only JSON library (used by JNI, backends, server)
 if(NOT DEFINED NLOHMANN_JSON_VERSION)
     set(NLOHMANN_JSON_VERSION "3.11.3")
@@ -139,7 +150,18 @@ endif()
 # Windows (MSVC) and some cross-compilation targets don't ship zlib.
 # We try system first; if not found, build from source so libarchive gets it.
 # -----------------------------------------------------------------------------
-find_package(ZLIB QUIET)
+set(_RAC_FORCE_BUNDLED_ZLIB OFF)
+if(EMSCRIPTEN)
+    set(_RAC_FORCE_BUNDLED_ZLIB ON)
+endif()
+
+if(_RAC_FORCE_BUNDLED_ZLIB)
+    message(STATUS "Emscripten build: forcing bundled zlib")
+    set(ZLIB_FOUND FALSE)
+else()
+    find_package(ZLIB QUIET)
+endif()
+
 if(NOT ZLIB_FOUND)
     message(STATUS "System zlib not found — bundling from source...")
     FetchContent_Declare(
@@ -160,14 +182,27 @@ if(NOT ZLIB_FOUND)
     FetchContent_MakeAvailable(zlib_src)
     set(BUILD_SHARED_LIBS ${_SAVED_BSL_ZLIB})
 
-    # Set cache variables so libarchive's find_package(ZLIB) picks up our build.
-    # For multi-config generators (Visual Studio), we point to the static lib
-    # output. The actual path is resolved at build time via target_link_libraries.
+    if((ANDROID OR EMSCRIPTEN) AND TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
+        )
+        set(_RAC_ZLIB_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    endif()
+
+    # Set cache variables so libarchive/curl's find_package(ZLIB) picks up our
+    # build. Android/Emscripten need the concrete archive path here; passing
+    # the logical target name through cache variables leaks raw `zlibstatic`
+    # / `-lzlibstatic` entries into downstream link lines.
     set(ZLIB_INCLUDE_DIR "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
     set(ZLIB_INCLUDE_DIRS "${zlib_src_SOURCE_DIR};${zlib_src_BINARY_DIR}" CACHE PATH "" FORCE)
-    # Use the CMake target name directly - this works because we link manually below
-    set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
-    set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    if(ANDROID OR EMSCRIPTEN)
+        set(ZLIB_LIBRARY "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(ZLIB_LIBRARY_RELEASE "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(ZLIB_LIBRARIES "${_RAC_ZLIB_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+    else()
+        set(ZLIB_LIBRARY zlibstatic CACHE STRING "" FORCE)
+        set(ZLIB_LIBRARIES zlibstatic CACHE STRING "" FORCE)
+    endif()
     set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
     # Create an imported ZLIB::ZLIB target that points to our zlibstatic
     if(NOT TARGET ZLIB::ZLIB)
@@ -190,7 +225,18 @@ endif()
 # Android NDK and Emscripten don't ship libbz2. macOS/iOS have it in the SDK.
 # We try system first; if not found, build from source so libarchive gets it.
 # -----------------------------------------------------------------------------
-find_package(BZip2 QUIET)
+set(_RAC_FORCE_BUNDLED_BZIP2 OFF)
+if(ANDROID OR EMSCRIPTEN)
+    set(_RAC_FORCE_BUNDLED_BZIP2 ON)
+endif()
+
+if(_RAC_FORCE_BUNDLED_BZIP2)
+    message(STATUS "${RAC_PLATFORM_NAME}: forcing bundled BZip2")
+    set(BZIP2_FOUND FALSE)
+else()
+    find_package(BZip2 QUIET)
+endif()
+
 if(NOT BZIP2_FOUND)
     message(STATUS "System BZip2 not found — bundling from source for cross-compilation...")
     FetchContent_Declare(
@@ -212,9 +258,23 @@ if(NOT BZIP2_FOUND)
     target_include_directories(bz2_bundled PUBLIC ${bzip2_src_SOURCE_DIR})
     set_target_properties(bz2_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-    # Set cache variables so libarchive's find_package(BZip2) picks up our build
+    if((ANDROID OR EMSCRIPTEN) AND TARGET bz2_bundled)
+        set_target_properties(bz2_bundled PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}"
+        )
+        set(_RAC_BZIP2_LIBRARY_PATH "${RAC_BUNDLED_LIB_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}bz2_bundled${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    endif()
+
+    # Set cache variables so libarchive's find_package(BZip2) picks up our
+    # build. Android/Emscripten again need the concrete archive path.
     set(BZIP2_INCLUDE_DIR "${bzip2_src_SOURCE_DIR}" CACHE PATH "" FORCE)
-    set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    if(ANDROID OR EMSCRIPTEN)
+        set(BZIP2_LIBRARY "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(BZIP2_LIBRARY_RELEASE "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+        set(BZIP2_LIBRARIES "${_RAC_BZIP2_LIBRARY_PATH}" CACHE FILEPATH "" FORCE)
+    else()
+        set(BZIP2_LIBRARIES bz2_bundled CACHE STRING "" FORCE)
+    endif()
     set(BZIP2_FOUND TRUE CACHE BOOL "" FORCE)
     # On MSVC, set output to a known location so the linker can find it
     if(MSVC AND TARGET bz2_bundled)
@@ -289,8 +349,14 @@ endif()
 # "bz2_bundled.lib" by bare filename. The linker can't find them because they
 # are built into <config>/ subdirectories. Fix: redirect their output to a
 # single known directory and add it to the global linker search path.
+#
+# The same issue surfaces under Android (NDK + Ninja + ld.lld) and Emscripten:
+# libarchive's internal find_package(BZip2) stores BZIP2_LIBRARIES as the bare
+# string "bz2_bundled", which its build then emits into the transitive link
+# line as "-lbz2_bundled" rather than a full path to libbz2_bundled.a. Pin the
+# archive to a known directory and add it to the linker search path so the
+# `-l` lookup succeeds.
 if(MSVC)
-    set(RAC_BUNDLED_LIB_DIR "${CMAKE_BINARY_DIR}/_bundled_libs")
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
         string(TOUPPER "${_cfg}" _CFG)
         if(TARGET zlibstatic)
@@ -303,9 +369,96 @@ if(MSVC)
         endif()
     endforeach()
     link_directories("${RAC_BUNDLED_LIB_DIR}")
+elseif(ANDROID OR EMSCRIPTEN)
+    if(TARGET bz2_bundled)
+        set_target_properties(bz2_bundled PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")
+    endif()
+    if(TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES
+            ARCHIVE_OUTPUT_DIRECTORY "${RAC_BUNDLED_LIB_DIR}")
+    endif()
+    link_directories("${RAC_BUNDLED_LIB_DIR}")
 endif()
 
 message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
+
+# =============================================================================
+# libcurl (v2 close-out Phase H — HTTP transport into commons)
+# =============================================================================
+# Used by src/infrastructure/http/rac_http_client_curl.cpp. Prefer the
+# system package (brew/apt/NDK/Xcode SDK); only fall back to
+# FetchContent on targets where libcurl isn't reliably on the
+# CMAKE_PREFIX_PATH (Windows MSVC, some CI runners).
+find_package(CURL QUIET)
+if(NOT CURL_FOUND)
+    message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
+    if(NOT DEFINED CURL_FETCH_VERSION)
+        set(CURL_FETCH_VERSION "curl-7_88_1")
+    endif()
+    FetchContent_Declare(
+        curl_fetched
+        GIT_REPOSITORY https://github.com/curl/curl.git
+        GIT_TAG        ${CURL_FETCH_VERSION}
+        GIT_SHALLOW    TRUE
+    )
+    set(BUILD_CURL_EXE      OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS   OFF CACHE BOOL "" FORCE)
+    set(CURL_ENABLE_EXPORT_TARGET OFF CACHE BOOL "" FORCE)
+    set(CURL_STATICLIB      ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_LDAP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_LDAPS  ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_RTSP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_DICT   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_FILE   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_FTP    ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_GOPHER ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_IMAP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_MQTT   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_POP3   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_SMB    ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_SMTP   ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_TELNET ON  CACHE BOOL "" FORCE)
+    set(CURL_DISABLE_TFTP   ON  CACHE BOOL "" FORCE)
+    set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
+    # Pick a TLS backend sensibly per platform when bundling. Apple/Windows
+    # use the native provider so we don't pull OpenSSL into the iOS
+    # xcframework or the Windows DLL. `CURL_USE_SECTRANSP` / `CURL_USE_SCHANNEL`
+    # are the curl 7.86+ variable names; the pre-7.86 `CMAKE_USE_*` names
+    # are no longer honoured by curl 7.88.1. Explicitly disable OpenSSL so
+    # curl's CMake doesn't fall through to `find_package(OpenSSL REQUIRED)`
+    # which has no valid target on the iOS sysroot.
+    if(APPLE)
+        set(CURL_USE_SECTRANSP ON  CACHE BOOL "" FORCE)
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+    elseif(WIN32)
+        set(CURL_USE_SCHANNEL ON  CACHE BOOL "" FORCE)
+        set(CURL_USE_OPENSSL  OFF CACHE BOOL "" FORCE)
+    elseif(EMSCRIPTEN)
+        # WASM runtime: HTTPS flows through the browser's fetch() API via
+        # Emscripten FETCH, not libcurl. Compile curl without TLS.
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
+    elseif(ANDROID)
+        # Android: frontend layer (OkHttp / HttpURLConnection) is the HTTPS
+        # transport. Desktop/iOS curl is the only consumer of TLS via commons.
+        # Disable curl's TLS backend here; revisit in v0.21 if commons HTTPS
+        # on Android becomes required (would wire NDK BoringSSL).
+        set(CURL_USE_OPENSSL   OFF CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_HTTPS ON  CACHE BOOL "" FORCE)
+    endif()
+    FetchContent_MakeAvailable(curl_fetched)
+    # The target built by curl's CMake is `libcurl` (static).
+    if(TARGET libcurl AND NOT TARGET CURL::libcurl)
+        add_library(CURL::libcurl ALIAS libcurl)
+    elseif(TARGET libcurl_static AND NOT TARGET CURL::libcurl)
+        add_library(CURL::libcurl ALIAS libcurl_static)
+    endif()
+    set(CURL_FOUND TRUE CACHE BOOL "" FORCE)
+    message(STATUS "Bundled libcurl ready (${CURL_FETCH_VERSION})")
+else()
+    message(STATUS "Using system libcurl: ${CURL_LIBRARIES}")
+endif()
 
 # =============================================================================
 # SERVER DEPENDENCIES (FetchContent)
@@ -412,7 +565,20 @@ set(RAC_CORE_SOURCES
 set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/events/event_publisher.cpp
     src/infrastructure/registry/module_registry.cpp
-    src/infrastructure/registry/service_registry.cpp
+    # v3.0.0 (C1): legacy service_registry.cpp DELETED. Plugin registration
+    # now flows exclusively through rac_plugin_registry.cpp below.
+    src/plugin/rac_plugin_registry.cpp
+    # GAP 03 Phase 1: dynamic plugin loader (dlopen path; gated by RAC_PLUGIN_MODE_SHARED).
+    src/plugin/plugin_loader.cpp
+    # T4.1: L1 runtime-plugin registry (CPU / Metal / CoreML / CUDA / …). The
+    # built-in CPU runtime plugin lives under runtimes/cpu/ and is folded into
+    # rac_commons by the root CMakeLists so the registry is never empty.
+    src/plugin/rac_runtime_registry.cpp
+    # GAP 04 Phase 9-10: HardwareProfile + EngineRouter (hardware-aware plugin scoring).
+    src/router/rac_hardware_profile.cpp
+    src/router/rac_engine_router.cpp
+    # GAP 04 Phase 12: C ABI wrapper around EngineRouter (rac_plugin_route).
+    src/router/rac_route.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
@@ -427,14 +593,22 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/network/environment.cpp
     src/infrastructure/network/endpoints.cpp
     src/infrastructure/network/api_types.cpp
-    src/infrastructure/network/http_client.cpp
     src/infrastructure/network/auth_manager.cpp
     src/infrastructure/network/development_config.cpp
+    # v2 close-out Phase H — native HTTP transport (libcurl-backed).
+    # Replaces the HttpURLConnection path in CppBridgeDownload.kt.
+    src/infrastructure/http/rac_http_client_curl.cpp
+    src/infrastructure/http/rac_http_download.cpp
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
     src/infrastructure/extraction/rac_extraction.cpp
+    # v3.1 Phase 9: DAG streaming runtime (GAP 05 Phase 2). The primitives
+    # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
+    # MemoryPool / PipelineNode) are header-only templates; only the
+    # non-templated GraphScheduler has a .cpp to compile here.
+    src/graph/graph_scheduler.cpp
 )
 
 # Feature sources - LLM, STT, TTS, VAD, Wake Word, VLM, Diffusion (iOS/Apple only)
@@ -445,7 +619,14 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
+    # v2 close-out Phase 5: thinking-content split (replaces Swift
+    # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
+    src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
+    # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
+    # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
+    # AsyncThrowingStream / callbackFlow / tokenQueue shims).
+    src/features/llm/rac_llm_stream.cpp
     # STT
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
@@ -458,8 +639,11 @@ set(RAC_FEATURES_SOURCES
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
-    # Wake Word
-    src/features/wakeword/wakeword_service.cpp
+    # Wake Word — high-level service scaffold was removed in Phase F of the
+    # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
+    # consumers call the speech backend's rac_wakeword_onnx_* compatibility
+    # API directly. The shared types in
+    # include/rac/features/wakeword/rac_wakeword_types.h remain.
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
@@ -474,6 +658,13 @@ set(RAC_FEATURES_SOURCES
     src/features/embeddings/embeddings_component.cpp
     # Voice Agent
     src/features/voice_agent/voice_agent.cpp
+    # GAP 09 Phase 15: proto-byte event ABI (coexists with struct callback).
+    src/features/voice_agent/rac_voice_event_abi.cpp
+    # GAP 05 Phase 2: GraphScheduler-driven VAD→STT→LLM→TTS pipeline.
+    # First v3.1 Phase 9 DAG consumer; replaces the in-line process_stream
+    # orchestration with typed PipelineNodes + bounded StreamEdge
+    # backpressure + hierarchical CancelToken propagation.
+    src/features/voice_agent/voice_agent_pipeline.cpp
     # Result memory management (weak symbol fallbacks)
     # On MSVC, each service .cpp already provides strong definitions,
     # so result_free.cpp (which uses __attribute__((weak)) on GCC/Clang)
@@ -488,22 +679,32 @@ if(APPLE AND RAC_BUILD_PLATFORM)
         src/features/platform/rac_tts_platform.cpp
         src/features/platform/rac_diffusion_platform.cpp
         src/features/platform/rac_backend_platform_register.cpp
+        src/features/platform/rac_plugin_entry_platform.cpp
     )
     message(STATUS "Building platform services: Apple Foundation Models, System TTS, CoreML Diffusion")
 else()
     set(RAC_PLATFORM_SOURCES "")
 endif()
 
-# WhisperKit CoreML backend (Apple-only, no external deps → compiled into rac_commons)
-if(APPLE AND RAC_BACKEND_WHISPERKIT_COREML)
-    set(RAC_WHISPERKIT_COREML_SOURCES
-        src/backends/whisperkit_coreml/rac_stt_whisperkit_coreml.cpp
-        src/backends/whisperkit_coreml/rac_backend_whisperkit_coreml_register.cpp
-    )
-    message(STATUS "Building WhisperKit CoreML backend (compiled into rac_commons)")
-else()
-    set(RAC_WHISPERKIT_COREML_SOURCES "")
-endif()
+# T5.4: WhisperKit CoreML sources are owned by engines/whisperkit_coreml/
+# which declares its own rac_backend_whisperkit_coreml target (via
+# rac_add_engine_plugin). Commons no longer compiles those TUs directly.
+
+# T4.7 Solutions C ABI — always-built fallback.
+#
+# The full SolutionRunner implementation (rac_solution.cpp + companions)
+# requires Protobuf and is added to rac_commons inside the Protobuf_FOUND
+# block below. On cross-compilation targets (iOS / Android / WASM) Protobuf
+# is typically not discoverable, so without this stub TU every downstream
+# binding (Swift facade, JNI thunks, RN HybridRunAnywhereCore, Flutter FFI,
+# Web exports) would fail to link against the rac_solution_* symbols.
+#
+# rac_solution_stub.cpp is gated on `#ifndef RAC_HAVE_PROTOBUF`, so when the
+# Protobuf branch defines RAC_HAVE_PROTOBUF=1 the stub TU compiles to an
+# empty object and the real symbols from rac_solution.cpp win at link time.
+set(RAC_SOLUTIONS_STUB_SOURCES
+    src/solutions/rac_solution_stub.cpp
+)
 
 # Combine all sources
 set(RAC_COMMONS_SOURCES
@@ -511,7 +712,7 @@ set(RAC_COMMONS_SOURCES
     ${RAC_INFRASTRUCTURE_SOURCES}
     ${RAC_FEATURES_SOURCES}
     ${RAC_PLATFORM_SOURCES}
-    ${RAC_WHISPERKIT_COREML_SOURCES}
+    ${RAC_SOLUTIONS_STUB_SOURCES}
 )
 
 # =============================================================================
@@ -545,6 +746,28 @@ if(RAC_BUILD_SHARED)
     )
 endif()
 
+# Android: override the hidden-visibility preset for rac_commons. The JNI
+# shared library librunanywhere_jni.so dynamic-links against librac_commons.so
+# and needs every rac_* C ABI function resolvable at link time. Several
+# functions in the public C headers are still missing the `RAC_API`
+# visibility attribute (rac_plugin_list, rac_llm_{extract,strip}_thinking,
+# rac_llm_split_thinking_tokens, rac_voice_agent_set_proto_callback,
+# rac_llm_{,un}set_stream_proto_callback); hiding them breaks the JNI link
+# with `undefined symbol` errors. Forcing default visibility on this target
+# matches the macOS/iOS xcframework behaviour, where commons is a static
+# archive and every symbol is visible to downstream consumers. The override
+# is target-scoped so engine backends keep their hidden-visibility hardening.
+# TODO(v0.21): annotate all remaining legacy C ABI functions with RAC_API
+# and drop this Android-specific override.
+if(ANDROID)
+    set_target_properties(rac_commons PROPERTIES
+        C_VISIBILITY_PRESET   default
+        CXX_VISIBILITY_PRESET default
+        VISIBILITY_INLINES_HIDDEN OFF
+    )
+    target_compile_options(rac_commons PRIVATE -fvisibility=default)
+endif()
+
 # libarchive - native archive extraction
 # PUBLIC on Windows because MSVC static libs don't propagate transitive deps
 if(WIN32)
@@ -561,6 +784,94 @@ else()
     target_link_libraries(rac_commons PRIVATE archive_static)
 endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
+
+# libcurl — PUBLIC so tests and SDK adapters (rac_commons_jni) pick it
+# up transitively.
+if(TARGET CURL::libcurl)
+    target_link_libraries(rac_commons PUBLIC CURL::libcurl)
+else()
+    target_link_libraries(rac_commons PUBLIC ${CURL_LIBRARIES})
+    target_include_directories(rac_commons PUBLIC ${CURL_INCLUDE_DIRS})
+endif()
+
+# =============================================================================
+# Protobuf — optional, gates RAC_HAVE_PROTOBUF
+#
+# v2 close-out Phase 2: when Protobuf is available, link the generated
+# voice_events / model_types / pipeline / solutions C++ classes into
+# rac_commons + define RAC_HAVE_PROTOBUF so rac_voice_event_abi.cpp can
+# serialize VoiceEvent and dispatch the proto-byte callback wired up by
+# the GAP 09 Phase 15 ABI. When Protobuf is missing, the same source files
+# fall back to the FEATURE_NOT_AVAILABLE path declared in the header.
+# =============================================================================
+
+find_package(Protobuf QUIET)
+
+# v2 close-out: SHARED builds need absl symbols (see cmake/protobuf.cmake).
+# Find absl independently here too for standalone-commons builds that
+# bypass the root CMake.
+if(NOT DEFINED RAC_ABSL_LIBS)
+    find_package(absl QUIET CONFIG)
+    if(absl_FOUND)
+        set(RAC_ABSL_LIBS absl::log absl::log_internal_check_op absl::hash absl::strings absl::status)
+    else()
+        set(RAC_ABSL_LIBS "")
+    endif()
+endif()
+if(Protobuf_FOUND)
+    set(_RAC_PROTO_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto)
+    if(EXISTS ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc)
+        target_sources(rac_commons PRIVATE
+            ${_RAC_PROTO_GEN_DIR}/voice_events.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/model_types.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/pipeline.pb.cc
+            ${_RAC_PROTO_GEN_DIR}/solutions.pb.cc
+            # v2 close-out Phase G-2: LLMStreamEvent for the proto-byte
+            # LLM stream ABI (rac_llm_stream.cpp).
+            ${_RAC_PROTO_GEN_DIR}/llm_service.pb.cc
+        )
+        target_include_directories(rac_commons PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated/proto>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/generated>
+            ${Protobuf_INCLUDE_DIRS}
+        )
+        # Prefer the modern imported target when available so transitive deps
+        # (absl, etc.) flow through without us listing them by hand.
+        if(TARGET protobuf::libprotobuf)
+            target_link_libraries(rac_commons PUBLIC protobuf::libprotobuf)
+        else()
+            target_link_libraries(rac_commons PUBLIC ${Protobuf_LIBRARIES})
+        endif()
+        # v2 close-out: when SHARED, absl symbols must resolve at link
+        # time. RAC_ABSL_LIBS comes from cmake/protobuf.cmake (or the
+        # block above for standalone-commons). PUBLIC so consumers
+        # (engine plugins built as SHARED) inherit the deps.
+        if(RAC_ABSL_LIBS)
+            target_link_libraries(rac_commons PUBLIC ${RAC_ABSL_LIBS})
+        endif()
+        target_compile_definitions(rac_commons PUBLIC RAC_HAVE_PROTOBUF=1)
+        message(STATUS "Protobuf: linked voice_events.pb + RAC_HAVE_PROTOBUF=1 (Phase 2)")
+
+        # T4.7: SolutionRunner + PipelineExecutor + C ABI. Gated on
+        # Protobuf because the implementation walks PipelineSpec /
+        # SolutionConfig messages directly. The neutral operator
+        # registry keeps the subsystem engine-agnostic; real backends
+        # register their factories at startup.
+        target_sources(rac_commons PRIVATE
+            src/solutions/operator_registry.cpp
+            src/solutions/pipeline_executor.cpp
+            src/solutions/solution_converter.cpp
+            src/solutions/solution_runner.cpp
+            src/solutions/config_loader.cpp
+            src/solutions/rac_solution.cpp
+        )
+        message(STATUS "T4.7: SolutionRunner + PipelineExecutor compiled into rac_commons")
+    else()
+        message(STATUS "Protobuf found but src/generated/proto/*.pb.cc absent — proto event ABI inactive")
+    endif()
+else()
+    message(STATUS "Protobuf not found — rac_voice_agent_set_proto_callback returns FEATURE_NOT_AVAILABLE")
+endif()
 
 # Platform-specific linking
 if(APPLE)
@@ -583,6 +894,37 @@ if(RAC_PLATFORM_WINDOWS)
     target_compile_definitions(rac_commons PRIVATE RAC_PLATFORM_WINDOWS=1)
     # ws2_32 = Winsock, shlwapi = path utilities
     target_link_libraries(rac_commons PUBLIC ws2_32 shlwapi)
+endif()
+
+# =============================================================================
+# GAP 03: Plugin Loading Mode (static vs. dynamic)
+# =============================================================================
+# Two paths share one plugin entry-point convention:
+#   - STATIC: plugin TUs compiled directly into rac_commons; registration
+#     happens at process start via RAC_STATIC_PLUGIN_REGISTER(<name>).
+#     iOS App Store + WebAssembly forbid dlopen, so they MUST use this path.
+#   - SHARED: plugin TUs build standalone *.so / *.dylib / *.dll loaded at
+#     runtime via rac_registry_load_plugin(path) (dlopen + dlsym).
+#
+# RAC_STATIC_PLUGINS:
+#   ON  → STATIC mode (default on iOS / Emscripten / forced)
+#   OFF → SHARED mode (default on Android / Linux / macOS / Windows)
+if(RAC_PLATFORM_IOS OR EMSCRIPTEN)
+    set(RAC_STATIC_PLUGINS ON CACHE BOOL
+        "Link engine plugins statically into rac_commons (forced ON on iOS/WASM)" FORCE)
+else()
+    option(RAC_STATIC_PLUGINS
+        "Link engine plugins statically into rac_commons (default OFF: use dlopen)" OFF)
+endif()
+
+if(RAC_STATIC_PLUGINS)
+    target_compile_definitions(rac_commons PUBLIC RAC_PLUGIN_MODE_STATIC=1)
+    message(STATUS "Plugin mode: STATIC (engine plugins linked into rac_commons)")
+else()
+    target_compile_definitions(rac_commons PUBLIC RAC_PLUGIN_MODE_SHARED=1)
+    message(STATUS "Plugin mode: SHARED (engine plugins loaded via rac_registry_load_plugin)")
+    # ${CMAKE_DL_LIBS} expands to -ldl on Linux/Android, empty on macOS/Win.
+    target_link_libraries(rac_commons PUBLIC ${CMAKE_DL_LIBS})
 endif()
 
 set_target_properties(rac_commons PROPERTIES
@@ -628,74 +970,33 @@ if(RAC_BUILD_JNI)
 endif()
 
 # =============================================================================
-# BACKENDS (LlamaCPP, ONNX, WhisperCPP)
+# COMMONS-LOCAL BACKENDS (RAG)
+#
+# T5.4: engine plugins (LlamaCPP, ONNX, WhisperCPP, WhisperKit CoreML, MetalRT)
+# are wired exclusively from engines/<name>/CMakeLists.txt via the root
+# add_subdirectory(engines) path. Commons no longer instantiates or forwards
+# engine targets — only commons-local OBJECT libraries (RAG) are folded into
+# rac_commons below.
 # =============================================================================
 
-if(RAC_BUILD_BACKENDS)
-    message(STATUS "Building ML backends...")
+if(RAC_BUILD_BACKENDS AND RAC_BACKEND_RAG
+   AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
+    message(STATUS "Building RAG pipeline (USearch) — folded into rac_commons")
+    add_subdirectory(src/features/rag)
 
-    if(RAC_BACKEND_LLAMACPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/llamacpp/CMakeLists.txt")
-        message(STATUS "  - LlamaCPP backend")
-        add_subdirectory(src/backends/llamacpp)
-    endif()
+    # RAG is an OBJECT library. Fold its compiled objects into rac_commons
+    # so there is no separate librac_backend_rag binary to distribute.
+    target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_rag>)
 
-    if(RAC_BACKEND_ONNX AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/onnx/CMakeLists.txt")
-        message(STATUS "  - ONNX backend")
-        add_subdirectory(src/backends/onnx)
-    endif()
-
-    if(RAC_BACKEND_WHISPERCPP AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/whispercpp/CMakeLists.txt")
-        message(STATUS "  - WhisperCPP backend")
-        add_subdirectory(src/backends/whispercpp)
-    endif()
-
-    if(RAC_BACKEND_METALRT AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/backends/metalrt/CMakeLists.txt")
-        message(STATUS "  - MetalRT backend — folded into rac_commons")
-        add_subdirectory(src/backends/metalrt)
-
-        # MetalRT is an OBJECT library. Fold its compiled objects into
-        # rac_commons so there is no separate rac_backend_metalrt artifact
-        # to distribute — mirrors how RAG is integrated. Public builds ship
-        # stub implementations; engine-enabled builds link the private
-        # libmetalrt_engine.a via RAC_METALRT_ENGINE_LIB propagated from
-        # the subdirectory.
-        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_metalrt>)
-
-        # Apple frameworks are needed wherever the wrappers are compiled.
-        if(APPLE)
-            target_link_libraries(rac_commons PUBLIC
-                "-framework Metal"
-                "-framework Foundation"
-                "-framework Accelerate"
-            )
-        endif()
-
-        # If the engine is available, link the private static lib onto
-        # rac_commons so the OBJECT target's unresolved metalrt_* symbols
-        # resolve in the final archive.
-        if(RAC_METALRT_ENGINE_LIB)
-            target_link_libraries(rac_commons PUBLIC ${RAC_METALRT_ENGINE_LIB})
-        endif()
-    endif()
-
-    if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/features/rag/CMakeLists.txt")
-        message(STATUS "  - RAG pipeline (USearch) — folded into rac_commons")
-        add_subdirectory(src/features/rag)
-
-        # RAG is an OBJECT library. Fold its compiled objects into rac_commons
-        # so there is no separate librac_backend_rag binary to distribute.
-        target_sources(rac_commons PRIVATE $<TARGET_OBJECTS:rac_backend_rag>)
-
-        # Propagate RAG's non-cyclic dependencies manually.
-        # We intentionally do NOT use target_link_libraries(rac_commons PRIVATE rac_backend_rag)
-        # because that would transitively pull in rac_backend_onnx (via the ONNX embedding
-        # provider) and create a shared-library cycle:
-        #   rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons
-        # nlohmann_json is already linked project-wide (line 116).
-        # Apple frameworks used by RAG (Accelerate) need explicit propagation.
-        if(APPLE)
-            target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
-        endif()
+    # Propagate RAG's non-cyclic dependencies manually.
+    # We intentionally do NOT use target_link_libraries(rac_commons PRIVATE rac_backend_rag)
+    # because that would transitively pull in rac_backend_onnx (via the ONNX embedding
+    # provider) and create a shared-library cycle:
+    #   rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons
+    # nlohmann_json is already linked project-wide.
+    # Apple frameworks used by RAG (Accelerate) need explicit propagation.
+    if(APPLE)
+        target_link_libraries(rac_commons PUBLIC "-framework Accelerate")
     endif()
 endif()
 
@@ -765,7 +1066,8 @@ if(RAC_PLATFORM_WINDOWS)
     message(STATUS "  Platform:     Windows (MSVC)")
 endif()
 if(RAC_BUILD_BACKENDS)
-    message(STATUS "  Backends:     LlamaCPP=${RAC_BACKEND_LLAMACPP}, ONNX=${RAC_BACKEND_ONNX}, WhisperCPP=${RAC_BACKEND_WHISPERCPP}, WhisperKitCoreML=${RAC_BACKEND_WHISPERKIT_COREML}, MetalRT=${RAC_BACKEND_METALRT}")
+    # T5.4: per-engine RAC_BACKEND_<name> status is printed by each
+    # engines/<name>/CMakeLists.txt; commons only reports its RAG flag.
     if(RAC_BACKEND_RAG)
         message(STATUS "  RAG pipeline: Enabled (folded into rac_commons)")
     endif()

@@ -240,7 +240,7 @@ final class LLMViewModel {
             conversationStore.addMessage(userMessage, to: conversation)
         }
 
-        // Create placeholder assistant message
+        // Append an empty assistant message slot that streaming tokens are written into.
         let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
 
@@ -443,6 +443,9 @@ final class LLMViewModel {
             }
         }
 
+        // SAMPLE_HTTP_CARVE_OUT: LoRA adapters are demo-owned external files,
+        // not SDK-managed model artifacts. Keep this local until the SDK
+        // exposes a public arbitrary-URL download helper.
         let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
 
         // Validate GGUF magic bytes before saving
@@ -514,9 +517,7 @@ final class LLMViewModel {
     }()
 
     logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), "
-        + "maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), "
-        + "systemPrompt=\(systemPromptInfo)"
+        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
     )
 
     return LLMGenerationOptions(
@@ -546,8 +547,7 @@ final class LLMViewModel {
         UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
 
         logger.info(
-            "Settings applied - Temperature: \(temperature), "
-            + "MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
+            "Settings applied - Temperature: \(temperature), MaxTokens: \(maxTokens), SystemPrompt: \(savedSystemPrompt ?? "nil")"
         )
     }
 

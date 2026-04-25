@@ -17,11 +17,14 @@
 #include <jni.h>
 
 #include <condition_variable>
+#include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <mutex>
 #include <new>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -36,6 +39,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/llm/rac_tool_calling.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -43,12 +47,23 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/infrastructure/device/rac_device_manager.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_download.h"
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/file_management/rac_file_manager.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 #include "rac/infrastructure/model_management/rac_lora_registry.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/features/voice_agent/rac_voice_agent.h"
+#include "rac/features/voice_agent/rac_voice_event_abi.h"
+#include "rac/solutions/rac_solution.h"
+// v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
+#include "rac/features/llm/rac_llm_stream.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
@@ -65,6 +80,22 @@ static const char* JNI_LOG_TAG = "JNI.Commons";
 #define LOGe(...) RAC_LOG_ERROR(JNI_LOG_TAG, __VA_ARGS__)
 #define LOGw(...) RAC_LOG_WARNING(JNI_LOG_TAG, __VA_ARGS__)
 #define LOGd(...) RAC_LOG_DEBUG(JNI_LOG_TAG, __VA_ARGS__)
+
+// =============================================================================
+// JNI AttachCurrentThread signature shim
+// =============================================================================
+// The `AttachCurrentThread` parameter type differs between JVM headers:
+//   - Android NDK jni.h (r27+):  AttachCurrentThread(JNIEnv**, void*)
+//   - Oracle / Temurin  jni.h:   AttachCurrentThread(void**,   void*)
+// NDK r27 tightened parameter-type checking, so the previous
+// `reinterpret_cast<void**>(&env)` no longer compiles on Android. Pick
+// the right cast per platform. `GetEnv` still takes `void**` on both
+// platforms and does not need this shim.
+#ifdef __ANDROID__
+#define RAC_JNI_ATTACH_ENVPP(envpp) (envpp)
+#else
+#define RAC_JNI_ATTACH_ENVPP(envpp) (reinterpret_cast<void**>(envpp))
+#endif
 
 // =============================================================================
 // Global State for Platform Adapter JNI Callbacks
@@ -121,7 +152,10 @@ static JNIEnv* getJNIEnv() {
     int status = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (status == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+        // Use RAC_JNI_ATTACH_ENVPP to bridge the Android NDK vs Oracle/Temurin
+        // parameter-type difference (see shim definition near the top of
+        // this file). NDK r27 no longer tolerates the prior `void**` cast.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
             return nullptr;
         }
     }
@@ -492,19 +526,24 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentLoadMode
     LOGi("racLlmComponentLoadModel path=%s, id=%s, name=%s", path.c_str(), id.c_str(),
          name.c_str());
 
-    // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result = rac_service_list_providers(RAC_CAPABILITY_TEXT_GENERATION,
-                                                          &provider_names, &provider_count);
-    LOGi("Before load_model - TEXT_GENERATION providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    // rac_service_list_providers deleted; rac_plugin_list fills an
+    // array of vtables sorted by priority.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result = rac_plugin_list(RAC_PRIMITIVE_GENERATE_TEXT, plugins, 16,
+                                                   &plugin_count);
+        LOGi("Before load_model - GENERATE_TEXT plugins: count=%zu, list_result=%d",
+             plugin_count, list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for GENERATE_TEXT!");
         }
-    } else {
-        LOGw("NO providers registered for TEXT_GENERATION!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
@@ -739,7 +778,7 @@ static rac_bool_t llm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("Failed to attach thread for streaming callback");
@@ -1295,11 +1334,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmComponentIsLoaded
                                                                                : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject streamCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
-}
-
 // =============================================================================
 // JNI FUNCTIONS - LLM LoRA Adapter Management
 // =============================================================================
@@ -1608,18 +1642,22 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentLoadMode
          name.c_str());
 
     // Debug: List registered providers BEFORE loading
-    const char** provider_names = nullptr;
-    size_t provider_count = 0;
-    rac_result_t list_result =
-        rac_service_list_providers(RAC_CAPABILITY_STT, &provider_names, &provider_count);
-    LOGi("Before load_model - STT providers: count=%zu, list_result=%d", provider_count,
-         list_result);
-    if (provider_names && provider_count > 0) {
-        for (size_t i = 0; i < provider_count; i++) {
-            LOGi("  Provider[%zu]: %s", i, provider_names[i] ? provider_names[i] : "NULL");
+    // v3 Phase B9: debug-log registered plugins BEFORE loading.
+    {
+        const rac_engine_vtable_t* plugins[16] = {};
+        size_t plugin_count = 0;
+        rac_result_t list_result =
+            rac_plugin_list(RAC_PRIMITIVE_TRANSCRIBE, plugins, 16, &plugin_count);
+        LOGi("Before load_model - TRANSCRIBE plugins: count=%zu, list_result=%d", plugin_count,
+             list_result);
+        if (plugin_count > 0) {
+            for (size_t i = 0; i < plugin_count; ++i) {
+                LOGi("  Plugin[%zu]: %s", i,
+                     plugins[i] && plugins[i]->metadata.name ? plugins[i]->metadata.name : "NULL");
+            }
+        } else {
+            LOGw("NO plugins registered for TRANSCRIBE!");
         }
-    } else {
-        LOGw("NO providers registered for STT!");
     }
 
     // Pass model_path, model_id, and model_name separately to C++ lifecycle
@@ -1701,6 +1739,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     json_obj["duration_ms"] = result.processing_time_ms;
     json_obj["completion_reason"] = 1;  // END_OF_AUDIO
     json_obj["confidence"] = result.confidence;
+
+    // v2 close-out (E-5): emit word-level timestamps when the backend
+    // populated them. Times are converted from milliseconds (C ABI) to
+    // seconds (frontend convention) so Kotlin/Swift/Dart see them in the
+    // same units used by Whisper/Sherpa client examples.
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
     std::string json_result = json_obj.dump();
 
     rac_stt_result_free(&result);
@@ -1712,11 +1769,154 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeFile(
     JNIEnv* env, jclass clazz, jlong handle, jstring audioPath, jstring configJson) {
-    // NOTE: rac_stt_component_transcribe_file does not exist in current API
-    // This is a stub - actual implementation would need to read file and call transcribe
-    if (handle == 0)
-        return nullptr;
-    return env->NewStringUTF("{\"error\": \"transcribe_file not implemented\"}");
+    if (handle == 0 || audioPath == nullptr) {
+        return env->NewStringUTF("{\"error\":\"invalid_handle_or_path\"}");
+    }
+
+    const char* audio_path = env->GetStringUTFChars(audioPath, nullptr);
+    if (audio_path == nullptr) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_path\"}");
+    }
+
+    rac_stt_options_t options = RAC_STT_OPTIONS_DEFAULT;
+    std::string language_override;
+
+    if (configJson != nullptr) {
+        const char* json_str = env->GetStringUTFChars(configJson, nullptr);
+        if (json_str != nullptr) {
+            try {
+                auto json = nlohmann::json::parse(json_str);
+                if (json.contains("sample_rate") && json["sample_rate"].is_number_integer()) {
+                    const int sample_rate = json["sample_rate"].get<int>();
+                    if (sample_rate > 0) {
+                        options.sample_rate = sample_rate;
+                    }
+                }
+                if (json.contains("language") && json["language"].is_string()) {
+                    language_override = json["language"].get<std::string>();
+                    options.language = language_override.c_str();
+                }
+            } catch (const nlohmann::json::exception& e) {
+                LOGe("Failed to parse STT transcribeFile config JSON: %s", e.what());
+            }
+            env->ReleaseStringUTFChars(configJson, json_str);
+        }
+    }
+
+    std::ifstream file(audio_path, std::ios::binary | std::ios::ate);
+    env->ReleaseStringUTFChars(audioPath, audio_path);
+
+    if (!file.is_open()) {
+        return env->NewStringUTF("{\"error\":\"failed_to_open_audio_file\"}");
+    }
+
+    std::streamsize file_size = file.tellg();
+    if (file_size <= 0) {
+        return env->NewStringUTF("{\"error\":\"audio_file_is_empty\"}");
+    }
+
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> file_data(static_cast<size_t>(file_size));
+    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) {
+        return env->NewStringUTF("{\"error\":\"failed_to_read_audio_file\"}");
+    }
+
+    const uint8_t* data = file_data.data();
+    const size_t data_size = file_data.size();
+    int32_t sample_rate = options.sample_rate;
+
+    if (data_size < 44) {
+        return env->NewStringUTF("{\"error\":\"file_too_small_for_wav\"}");
+    }
+    if (data[0] != 'R' || data[1] != 'I' || data[2] != 'F' || data[3] != 'F') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_riff\"}");
+    }
+    if (data[8] != 'W' || data[9] != 'A' || data[10] != 'V' || data[11] != 'E') {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_wave\"}");
+    }
+
+    size_t pos = 12;
+    size_t audio_data_offset = 0;
+    size_t audio_data_size = 0;
+
+    while (pos + 8 < data_size) {
+        char chunk_id[5] = {0};
+        std::memcpy(chunk_id, &data[pos], 4);
+
+        uint32_t chunk_size = 0;
+        std::memcpy(&chunk_size, &data[pos + 4], sizeof(chunk_size));
+
+        if (std::strcmp(chunk_id, "fmt ") == 0) {
+            if (pos + 8 + chunk_size <= data_size && chunk_size >= 16) {
+                std::memcpy(&sample_rate, &data[pos + 12], sizeof(sample_rate));
+                if (sample_rate <= 0 || sample_rate > 48000) {
+                    sample_rate = options.sample_rate;
+                }
+            }
+        } else if (std::strcmp(chunk_id, "data") == 0) {
+            audio_data_offset = pos + 8;
+            audio_data_size = chunk_size;
+            break;
+        }
+
+        pos += 8 + chunk_size;
+        if (chunk_size % 2 != 0) {
+            ++pos;
+        }
+    }
+
+    if (audio_data_size == 0 || audio_data_offset + audio_data_size > data_size) {
+        return env->NewStringUTF("{\"error\":\"invalid_wav_missing_data_chunk\"}");
+    }
+
+    if (audio_data_size < 3200) {
+        return env->NewStringUTF("{\"error\":\"recording_too_short_to_transcribe\"}");
+    }
+
+    options.sample_rate = sample_rate;
+
+    rac_stt_result_t result = {};
+    rac_result_t status = rac_stt_component_transcribe(
+        reinterpret_cast<rac_handle_t>(handle),
+        &data[audio_data_offset],
+        audio_data_size,
+        &options,
+        &result);
+
+    if (status != RAC_SUCCESS) {
+        LOGe("STT transcribeFile failed with status: %d", status);
+        rac_stt_result_free(&result);
+        nlohmann::json error_json;
+        error_json["error"] = "transcription_failed";
+        error_json["status"] = status;
+        const std::string error_result = error_json.dump();
+        return env->NewStringUTF(error_result.c_str());
+    }
+
+    nlohmann::json json_obj;
+    json_obj["text"] = result.text ? std::string(result.text) : "";
+    json_obj["language"] = result.detected_language ? std::string(result.detected_language) : "en";
+    json_obj["duration_ms"] = result.processing_time_ms;
+    json_obj["completion_reason"] = 1;
+    json_obj["confidence"] = result.confidence;
+
+    if (result.words != nullptr && result.num_words > 0) {
+        nlohmann::json words_arr = nlohmann::json::array();
+        for (size_t i = 0; i < result.num_words; ++i) {
+            const rac_stt_word_t& w = result.words[i];
+            nlohmann::json word;
+            word["word"] = w.text ? std::string(w.text) : "";
+            word["start_time"] = static_cast<double>(w.start_ms) / 1000.0;
+            word["end_time"] = static_cast<double>(w.end_ms) / 1000.0;
+            word["confidence"] = w.confidence;
+            words_arr.push_back(std::move(word));
+        }
+        json_obj["word_timestamps"] = std::move(words_arr);
+    }
+
+    const std::string json_result = json_obj.dump();
+    rac_stt_result_free(&result);
+    return env->NewStringUTF(json_result.c_str());
 }
 
 JNIEXPORT jstring JNICALL
@@ -1759,20 +1959,52 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    // Return empty array for now
-    return env->NewStringUTF("[]");
+    if (handle == 0)
+        return nullptr;
+
+    char* json = nullptr;
+    rac_result_t rc = rac_stt_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentDetectLanguage(
     JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData) {
-    // Return null for now - language detection not implemented
-    return nullptr;
-}
+    if (handle == 0 || audioData == nullptr)
+        return nullptr;
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject partialCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    const jsize size = env->GetArrayLength(audioData);
+    if (size <= 0)
+        return nullptr;
+
+    jbyte* bytes = env->GetByteArrayElements(audioData, nullptr);
+    if (!bytes)
+        return nullptr;
+
+    char* detected = nullptr;
+    rac_result_t rc = rac_stt_component_detect_language(reinterpret_cast<rac_handle_t>(handle),
+                                                        bytes, static_cast<size_t>(size),
+                                                        &detected);
+    env->ReleaseByteArrayElements(audioData, bytes, JNI_ABORT);
+
+    if (rc != RAC_SUCCESS || !detected) {
+        if (detected)
+            free(detected);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(detected);
+    free(detected);
+    return result;
 }
 
 // =============================================================================
@@ -1873,16 +2105,57 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
 
     std::string textStr = getCString(env, text);
     std::string pathStr = getCString(env, outputPath);
+    if (pathStr.empty()) {
+        LOGe("racTtsComponentSynthesizeToFile: output path is empty");
+        return -1;
+    }
+
     rac_tts_options_t options = {};
     rac_tts_result_t result = {};
 
     rac_result_t status = rac_tts_component_synthesize(reinterpret_cast<rac_handle_t>(handle),
                                                        textStr.c_str(), &options, &result);
 
-    // TODO: Write result to file
-    rac_tts_result_free(&result);
+    if (status != RAC_SUCCESS) {
+        LOGe("racTtsComponentSynthesizeToFile: synthesize failed with code %d", status);
+        rac_tts_result_free(&result);
+        return -1;
+    }
 
-    return status == RAC_SUCCESS ? 0 : -1;
+    if (result.audio_data == nullptr || result.audio_size == 0) {
+        LOGe("racTtsComponentSynthesizeToFile: empty audio buffer returned");
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    // Write raw PCM bytes to disk. Caller is responsible for wrapping in a
+    // WAV container if desired; mirroring iOS CppBridge+TTS which writes the
+    // raw rac_tts_result_t.audio_data buffer the synthesizer produced.
+    std::ofstream out(pathStr, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        LOGe("racTtsComponentSynthesizeToFile: failed to open %s for writing", pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    out.write(reinterpret_cast<const char*>(result.audio_data),
+              static_cast<std::streamsize>(result.audio_size));
+    const bool writeOk = out.good();
+    out.close();
+
+    if (!writeOk) {
+        LOGe("racTtsComponentSynthesizeToFile: write failed (wrote partial data)");
+        std::remove(pathStr.c_str());
+        rac_tts_result_free(&result);
+        return -1;
+    }
+
+    const int64_t durationMs = result.duration_ms;
+    LOGi("racTtsComponentSynthesizeToFile: wrote %zu bytes (%lld ms audio) -> %s",
+         result.audio_size, (long long)durationMs, pathStr.c_str());
+
+    rac_tts_result_free(&result);
+    return static_cast<jlong>(durationMs);
 }
 
 JNIEXPORT void JNICALL
@@ -1941,12 +2214,21 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentGetLanguages(JNIEnv* env,
                                                                                      jclass clazz,
                                                                                      jlong handle) {
-    return env->NewStringUTF("[]");
-}
+    if (handle == 0)
+        return nullptr;
 
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject audioCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
+    char* json = nullptr;
+    rac_result_t rc = rac_tts_component_get_supported_languages(
+        reinterpret_cast<rac_handle_t>(handle), &json);
+    if (rc != RAC_SUCCESS || !json) {
+        if (json)
+            free(json);
+        return nullptr;
+    }
+
+    jstring result = env->NewStringUTF(json);
+    free(json);
+    return result;
 }
 
 // =============================================================================
@@ -2085,12 +2367,6 @@ JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentGetSampleRates(
     JNIEnv* env, jclass clazz, jlong handle) {
     return env->NewStringUTF("[16000]");
-}
-
-JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetCallbacks(
-    JNIEnv* env, jclass clazz, jobject frameCallback, jobject speechStartCallback,
-    jobject speechEndCallback, jobject progressCallback) {
-    // TODO: Implement callback registration
 }
 
 // =============================================================================
@@ -2444,6 +2720,33 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryUpdateD
     return static_cast<jint>(result);
 }
 
+// racModelRegistryRefresh — T4.9.
+// Mirrors the C ABI rac_model_registry_refresh(handle, opts). We do not wire
+// discovery callbacks from the JVM here (Kotlin discovery currently runs in
+// Java-side code via registerModel + filesystem helpers), so only the
+// include_remote_catalog branch needs transport — which reuses the model
+// assignment callbacks already registered at SDK init.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryRefresh(
+    JNIEnv* env, jclass /*clazz*/, jboolean includeRemoteCatalog, jboolean rescanLocal,
+    jboolean pruneOrphans) {
+    rac_model_registry_handle_t registry = rac_get_model_registry();
+    if (!registry) {
+        LOGe("racModelRegistryRefresh: registry not initialized");
+        return RAC_ERROR_NOT_INITIALIZED;
+    }
+
+    rac_model_registry_refresh_opts_t opts = {};
+    opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE;
+    opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE;
+    opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE;
+    opts.discovery_callbacks = nullptr;
+
+    rac_result_t result = rac_model_registry_refresh(registry, opts);
+    LOGi("racModelRegistryRefresh result=%d", result);
+    return static_cast<jint>(result);
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Model Assignment (rac_model_assignment.h)
 // =============================================================================
@@ -2478,10 +2781,12 @@ static rac_result_t model_assignment_http_get_callback(const char* endpoint,
 
     JNIEnv* env = nullptr;
     bool did_attach = false;
-    jint get_result = g_model_assignment_state.jvm->GetEnv((void**)&env, JNI_VERSION_1_6);
+    jint get_result = g_model_assignment_state.jvm->GetEnv(
+        reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
 
     if (get_result == JNI_EDETACHED) {
-        if (g_model_assignment_state.jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+        if (g_model_assignment_state.jvm->AttachCurrentThread(
+                RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
             did_attach = true;
         } else {
             LOGe("model_assignment_http_get_callback: failed to attach thread");
@@ -3897,9 +4202,52 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallBuildInitial
     JNIEnv* env, jclass clazz, jstring userPrompt, jstring toolsJson, jstring optionsJson) {
     std::string userStr = getCString(env, userPrompt);
     std::string toolsStr = getCString(env, toolsJson);
+    std::string optionsStr = getCString(env, optionsJson);
 
-    // Parse options if provided (simplified - use defaults for now)
-    rac_tool_calling_options_t options = {5, RAC_TRUE, 0.7f, 1024, nullptr, RAC_FALSE, RAC_FALSE};
+    // Defaults (all 8 fields of rac_tool_calling_options_t incl. format)
+    rac_tool_calling_options_t options =
+        RAC_TOOL_CALLING_OPTIONS_DEFAULT;
+
+    // Parse optionsJson so Kotlin-side fields (format, temperature, etc.) are honored.
+    // Keeps a stable std::string for the system_prompt so the char* stays valid for
+    // the duration of the rac_tool_call_build_initial_prompt call below.
+    std::string systemPromptStorage;
+    std::string formatStorage;
+    if (!optionsStr.empty()) {
+        try {
+            auto opts = nlohmann::json::parse(optionsStr);
+            if (opts.contains("maxToolCalls") && opts["maxToolCalls"].is_number_integer()) {
+                options.max_tool_calls = opts["maxToolCalls"].get<int32_t>();
+            }
+            if (opts.contains("autoExecute") && opts["autoExecute"].is_boolean()) {
+                options.auto_execute = opts["autoExecute"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("temperature") && opts["temperature"].is_number()) {
+                options.temperature = opts["temperature"].get<float>();
+            }
+            if (opts.contains("maxTokens") && opts["maxTokens"].is_number_integer()) {
+                options.max_tokens = opts["maxTokens"].get<int32_t>();
+            }
+            if (opts.contains("systemPrompt") && opts["systemPrompt"].is_string()) {
+                systemPromptStorage = opts["systemPrompt"].get<std::string>();
+                options.system_prompt = systemPromptStorage.c_str();
+            }
+            if (opts.contains("replaceSystemPrompt") && opts["replaceSystemPrompt"].is_boolean()) {
+                options.replace_system_prompt =
+                    opts["replaceSystemPrompt"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("keepToolsAvailable") && opts["keepToolsAvailable"].is_boolean()) {
+                options.keep_tools_available =
+                    opts["keepToolsAvailable"].get<bool>() ? RAC_TRUE : RAC_FALSE;
+            }
+            if (opts.contains("format") && opts["format"].is_string()) {
+                formatStorage = opts["format"].get<std::string>();
+                options.format = rac_tool_call_format_from_name(formatStorage.c_str());
+            }
+        } catch (const std::exception& e) {
+            LOGe("racToolCallBuildInitialPrompt: failed to parse optionsJson: %s", e.what());
+        }
+    }
 
     char* prompt = nullptr;
     rac_result_t rc =
@@ -4205,7 +4553,7 @@ static rac_bool_t vlm_stream_callback_token(const char* token, void* user_data) 
 
         jint result = ctx->jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
         if (result == JNI_EDETACHED) {
-            if (ctx->jvm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
+            if (ctx->jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) == JNI_OK) {
                 needsDetach = true;
             } else {
                 LOGe("VLM: Failed to attach thread for streaming callback");
@@ -4817,6 +5165,945 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetSto
 
     std::string jsonStr = j.dump();
     return env->NewStringUTF(jsonStr.c_str());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Auth Manager (rac_auth_*)
+// =============================================================================
+//
+// v2.1 quick-wins Item 4 / GAP 08 #2. 16 thunks wrapping rac_auth_manager.h
+// so the Kotlin CppBridgeAuth can delegate state + token logic to native
+// instead of duplicating it. The HTTP transport stays in Kotlin (no JNI
+// httpPost helper); native owns request building + response parsing +
+// state via rac_auth_build_*_request and rac_auth_handle_*_response.
+//
+// Storage callbacks (rac_secure_storage_t) are wired through the existing
+// g_jvm pattern via a Kotlin KeyStoreBridge object — see
+// nativeAuthInitWithCallbacks for the wiring. Pass nullptr for in-memory-only
+// auth (development / unit tests).
+//
+// All thunks here are JvmStatic on RunAnywhereBridge (jclass receiver), not
+// instance methods (jobject) — matches the racLog / racConfigureLogging
+// pattern at the top of this file rather than the nativeFooBar pattern at
+// the bottom.
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthInit(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    // No-storage-callbacks variant: in-memory only. Production callers
+    // should use racAuthInitWithCallbacks once that's wired (v2.1-2 PR
+    // adds the KeyStoreBridge bridge).
+    rac_auth_init(nullptr);
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthReset(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_reset();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthIsAuthenticated(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_is_authenticated() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthNeedsRefresh(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return rac_auth_needs_refresh() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetAccessToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token = rac_auth_get_access_token();
+    return token ? env->NewStringUTF(token) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetDeviceId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_device_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetUserId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_user_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetOrganizationId(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* id = rac_auth_get_organization_id();
+    return id ? env->NewStringUTF(id) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildAuthenticateRequest(
+    JNIEnv* env, jclass /*cls*/,
+    jstring apiKey, jstring baseUrl, jstring deviceId,
+    jstring platform, jstring sdkVersion, jint environment) {
+    // Maps Kotlin-side credentials to the C rac_sdk_config_t. Kotlin
+    // calls this with the AuthenticationRequest fields it already knows
+    // about; the C side builds the JSON request body.
+    std::string apiKeyStr     = getCString(env, apiKey);
+    std::string baseUrlStr    = getCString(env, baseUrl);
+    std::string deviceIdStr   = getCString(env, deviceId);
+    std::string platformStr   = getCString(env, platform);
+    std::string sdkVersionStr = getCString(env, sdkVersion);
+
+    rac_sdk_config_t cfg = {};
+    cfg.environment = static_cast<rac_environment_t>(environment);
+    cfg.api_key     = apiKeyStr.empty()   ? nullptr : apiKeyStr.c_str();
+    cfg.base_url    = baseUrlStr.empty()  ? nullptr : baseUrlStr.c_str();
+    cfg.device_id   = deviceIdStr.empty() ? nullptr : deviceIdStr.c_str();
+    cfg.platform    = platformStr.empty() ? nullptr : platformStr.c_str();
+    cfg.sdk_version = sdkVersionStr.empty() ? nullptr : sdkVersionStr.c_str();
+
+    char* json = rac_auth_build_authenticate_request(&cfg);
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);  // C ABI says caller frees
+    return out;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthBuildRefreshRequest(
+    JNIEnv* env, jclass /*cls*/) {
+    char* json = rac_auth_build_refresh_request();
+    if (!json) return nullptr;
+    jstring out = env->NewStringUTF(json);
+    free(json);
+    return out;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleAuthenticateResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_authenticate_response(json.c_str()));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthHandleRefreshResponse(
+    JNIEnv* env, jclass /*cls*/, jstring jsonResponse) {
+    std::string json = getCString(env, jsonResponse);
+    return static_cast<jint>(rac_auth_handle_refresh_response(json.c_str()));
+}
+
+// Returns a 2-element String[]: [token-or-null, "true"/"false" needs_refresh].
+// Kotlin unpacks via the existing typed wrapper; this avoids out-param games.
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthGetValidToken(
+    JNIEnv* env, jclass /*cls*/) {
+    const char* token        = nullptr;
+    bool        needsRefresh = false;
+    int rc = rac_auth_get_valid_token(&token, &needsRefresh);
+    if (rc < 0) return nullptr;
+
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+    if (token) {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(token));
+    }
+    env->SetObjectArrayElement(arr, 1,
+        env->NewStringUTF(needsRefresh ? "true" : "false"));
+    return arr;
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthClear(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    rac_auth_clear();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthLoadStoredTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_load_stored_tokens());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racAuthSaveTokens(
+    JNIEnv* /*env*/, jclass /*cls*/) {
+    return static_cast<jint>(rac_auth_save_tokens());
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLM Thinking (rac_llm_thinking.h)
+// =============================================================================
+//
+// v3-readiness Phase A8 / GAP 08 #6. 3 thunks wrapping the C ABI
+// `rac_llm_extract_thinking` / `rac_llm_strip_thinking` /
+// `rac_llm_split_thinking_tokens`. These give the Kotlin SDK the same
+// <think>-tag parsing behavior Swift's CppBridge+LLMThinking.swift
+// already has (commit a8cc072c's post-audit baseline matrix had Kotlin
+// / Dart / RN / Web all missing this).
+//
+// Return style: Object[] / long[] wrappers so Kotlin can destructure
+// the multi-out-param C shape into a tuple cleanly. The same approach
+// as racAuthGetValidToken (Phase A1 predecessor).
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmExtractThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_response      = nullptr;
+    size_t      out_response_len  = 0;
+    const char* out_thinking      = nullptr;
+    size_t      out_thinking_len  = 0;
+
+    rac_result_t rc = rac_llm_extract_thinking(
+        textStr.c_str(),
+        &out_response, &out_response_len,
+        &out_thinking, &out_thinking_len);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    // Return String[2]: [response, thinking-or-null].
+    jclass strCls = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(2, strCls, nullptr);
+
+    // Response is never NULL on success (empty string at minimum).
+    if (out_response) {
+        // Copy into a stable NUL-terminated buffer (C ABI only guarantees
+        // the pointer + length; the buffer may not be NUL-terminated on
+        // its own even though the implementation happens to NUL-terminate
+        // today).
+        std::string resp(out_response, out_response_len);
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(resp.c_str()));
+    } else {
+        env->SetObjectArrayElement(arr, 0, env->NewStringUTF(""));
+    }
+
+    if (out_thinking) {
+        std::string think(out_thinking, out_thinking_len);
+        env->SetObjectArrayElement(arr, 1, env->NewStringUTF(think.c_str()));
+    } else {
+        // Index 1 stays null — Kotlin reads as `String?`.
+    }
+    return arr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmStripThinking(
+    JNIEnv* env, jclass /*cls*/, jstring text) {
+    if (!text) return nullptr;
+    std::string textStr = getCString(env, text);
+
+    const char* out_stripped     = nullptr;
+    size_t      out_stripped_len = 0;
+    rac_result_t rc = rac_llm_strip_thinking(
+        textStr.c_str(), &out_stripped, &out_stripped_len);
+    if (RAC_FAILED(rc) || !out_stripped) return nullptr;
+
+    std::string stripped(out_stripped, out_stripped_len);
+    return env->NewStringUTF(stripped.c_str());
+}
+
+// Returns int[2]: [thinking_tokens, response_tokens]. Kotlin unpacks
+// into a Pair<Int, Int>.
+JNIEXPORT jintArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSplitThinkingTokens(
+    JNIEnv* env, jclass /*cls*/,
+    jint totalCompletionTokens,
+    jstring responseText,
+    jstring thinkingText) {
+    std::string respStr  = responseText ? getCString(env, responseText) : "";
+    std::string thinkStr = thinkingText ? getCString(env, thinkingText) : "";
+
+    int32_t thinking_tokens = 0;
+    int32_t response_tokens = 0;
+    rac_result_t rc = rac_llm_split_thinking_tokens(
+        totalCompletionTokens,
+        respStr.empty()  ? nullptr : respStr.c_str(),
+        thinkStr.empty() ? nullptr : thinkStr.c_str(),
+        &thinking_tokens, &response_tokens);
+    if (RAC_FAILED(rc)) return nullptr;
+
+    jintArray arr = env->NewIntArray(2);
+    jint buf[2] = { static_cast<jint>(thinking_tokens),
+                    static_cast<jint>(response_tokens) };
+    env->SetIntArrayRegion(arr, 0, 2, buf);
+    return arr;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - VoiceAgentStreamAdapter (rac_voice_agent_set_proto_callback)
+// =============================================================================
+//
+// v3-readiness Phase A1 / GAP 09 #6. Closes the broken Kotlin streaming path
+// the 3-agent audit flagged: VoiceAgentStreamAdapter.kt declared
+// nativeRegisterCallback / nativeUnregisterCallback with no matching JNI
+// symbols, which would throw UnsatisfiedLinkError at runtime.
+//
+// Pattern: one registration = one heap-allocated VaStreamCallbackCtx holding
+// a global ref to the Kotlin Function1<ByteArray, Unit> lambda + the cached
+// Function1.invoke() method ID. The C trampoline resolves JNIEnv* on the
+// fly (audio dispatcher threads are attached via AttachCurrentThread) and
+// forwards bytes back to the JVM.
+//
+// ABI limitation: rac_voice_agent_set_proto_callback has ONE callback slot
+// per voice-agent handle. Multiple concurrent stream() calls on the same
+// handle will REPLACE each other — documented on the Kotlin companion.
+
+namespace {
+
+struct VaStreamCallbackCtx {
+    jobject   lambda_ref;       // Global ref to Kotlin Function1<ByteArray, Unit>
+    jclass    function1_cls;    // Global ref to kotlin.jvm.functions.Function1
+    jmethodID invoke_mid;       // Function1.invoke(Object)
+};
+
+void va_stream_trampoline(const uint8_t* event_bytes,
+                          size_t         event_size,
+                          void*          user_data) {
+    if (!user_data || !event_bytes || !g_jvm) return;
+
+    auto* ctx = static_cast<VaStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env          = nullptr;
+    bool    needs_detach = false;
+    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        // `void**` cast matches the working GetEnv pattern above and the
+        // host-JDK signature on macOS/Linux; Android NDK's `JNIEnv**` is
+        // binary-compatible.
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(
+            jbytes, 0, static_cast<jsize>(event_size),
+            reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;  // INVALID_CALLBACK_ID on the Kotlin side
+    }
+
+    // 1. Global-ref the lambda so it survives past this thunk.
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef) return 0;
+
+    // 2. Resolve + cache Function1.invoke(Object)
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx           = new VaStreamCallbackCtx{};
+    ctx->lambda_ref     = lambdaRef;
+    ctx->function1_cls  = function1Cls;
+    ctx->invoke_mid     = invokeMid;
+
+    rac_voice_agent_handle_t racHandle =
+        reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
+    rac_result_t rc =
+        rac_voice_agent_set_proto_callback(racHandle, &va_stream_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0) return;
+
+    rac_voice_agent_handle_t racHandle =
+        reinterpret_cast<rac_voice_agent_handle_t>(static_cast<uintptr_t>(handle));
+    // Clear the C-side slot first so no further callbacks fire.
+    rac_voice_agent_set_proto_callback(racHandle, nullptr, nullptr);
+
+    auto* ctx = reinterpret_cast<VaStreamCallbackCtx*>(
+        static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
+// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
+// =============================================================================
+//
+// v2 close-out Phase G-2. Same pattern as VaStreamCallbackCtx above — one
+// heap-allocated LlmStreamCallbackCtx per registration, Function1.invoke()
+// method ID cached, trampoline attaches the thread if needed.
+//
+// The C ABI has ONE callback slot per LLM component handle. Kotlin's
+// LLMStreamAdapter builds per-handle fan-out on top (same shape as
+// VoiceAgentStreamAdapter.HandleFanOut).
+
+namespace {
+
+struct LlmStreamCallbackCtx {
+    jobject   lambda_ref;
+    jclass    function1_cls;
+    jmethodID invoke_mid;
+};
+
+void llm_stream_trampoline(const uint8_t* event_bytes,
+                           size_t         event_size,
+                           void*          user_data) {
+    if (!user_data || !event_bytes || !g_jvm) return;
+
+    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
+
+    JNIEnv* env          = nullptr;
+    bool    needs_detach = false;
+    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+    if (getEnvRc == JNI_EDETACHED) {
+        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
+            return;
+        }
+        needs_detach = true;
+    } else if (getEnvRc != JNI_OK) {
+        return;
+    }
+
+    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
+    if (jbytes) {
+        env->SetByteArrayRegion(
+            jbytes, 0, static_cast<jsize>(event_size),
+            reinterpret_cast<const jbyte*>(event_bytes));
+        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        env->DeleteLocalRef(jbytes);
+    }
+
+    if (needs_detach) {
+        g_jvm->DetachCurrentThread();
+    }
+}
+
+}  // namespace
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeRegisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
+    if (!kotlinCallback || handle == 0) {
+        return 0;
+    }
+
+    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
+    if (!lambdaRef) return 0;
+
+    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
+    if (!localFunction1) {
+        env->DeleteGlobalRef(lambdaRef);
+        return 0;
+    }
+    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
+    env->DeleteLocalRef(localFunction1);
+    jmethodID invokeMid =
+        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
+    if (!invokeMid) {
+        env->DeleteGlobalRef(lambdaRef);
+        env->DeleteGlobalRef(function1Cls);
+        return 0;
+    }
+
+    auto* ctx           = new LlmStreamCallbackCtx{};
+    ctx->lambda_ref     = lambdaRef;
+    ctx->function1_cls  = function1Cls;
+    ctx->invoke_mid     = invokeMid;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_result_t rc =
+        rac_llm_set_stream_proto_callback(racHandle, &llm_stream_trampoline, ctx);
+    if (rc != RAC_SUCCESS) {
+        env->DeleteGlobalRef(ctx->lambda_ref);
+        env->DeleteGlobalRef(ctx->function1_cls);
+        delete ctx;
+        return 0;
+    }
+
+    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeUnregisterCallback(
+    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
+    if (callbackId == 0) return;
+
+    rac_handle_t racHandle =
+        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
+    rac_llm_unset_stream_proto_callback(racHandle);
+
+    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(
+        static_cast<uintptr_t>(callbackId));
+    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
+    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
+    delete ctx;
+}
+
+// =============================================================================
+// Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
+// handle to feed VoiceAgentStreamAdapter. Mirrors Swift's
+// CppBridge.VoiceAgent.shared.getHandle() pattern.)
+// =============================================================================
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreateStandalone(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_voice_agent_handle_t handle = nullptr;
+    rac_result_t result = rac_voice_agent_create_standalone(&handle);
+    if (result != RAC_SUCCESS) {
+        LOGe("racVoiceAgentCreateStandalone failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentInitializeWithLoadedModels(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_voice_agent_initialize_with_loaded_models(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle)));
+}
+
+JNIEXPORT jboolean JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentIsReady(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    rac_bool_t is_ready = RAC_FALSE;
+    rac_result_t result = rac_voice_agent_is_ready(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), &is_ready);
+    return (result == RAC_SUCCESS && is_ready == RAC_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_voice_agent_destroy(reinterpret_cast<rac_voice_agent_handle_t>(handle));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
+// =============================================================================
+//
+// T4.7/T4.8 — proto-byte / YAML driven L5 solution runtime. One-to-one
+// mapping over `rac_solution_*`; the Kotlin handle is the C handle cast
+// to jlong. 0 from create_from_* signals failure and the handle was
+// never allocated, so destroy is a no-op for it.
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromProto(
+    JNIEnv* env, jclass clazz, jbyteArray configBytes) {
+    (void)clazz;
+    if (configBytes == nullptr) return 0L;
+
+    const jsize len = env->GetArrayLength(configBytes);
+    jbyte* bytes = env->GetByteArrayElements(configBytes, nullptr);
+    if (bytes == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_proto(
+        static_cast<const void*>(bytes), static_cast<size_t>(len), &handle);
+
+    env->ReleaseByteArrayElements(configBytes, bytes, JNI_ABORT);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromProto failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCreateFromYaml(
+    JNIEnv* env, jclass clazz, jstring yamlText) {
+    (void)clazz;
+    if (yamlText == nullptr) return 0L;
+
+    const char* utf = env->GetStringUTFChars(yamlText, nullptr);
+    if (utf == nullptr) return 0L;
+
+    rac_solution_handle_t handle = nullptr;
+    const rac_result_t result = rac_solution_create_from_yaml(utf, &handle);
+
+    env->ReleaseStringUTFChars(yamlText, utf);
+
+    if (result != RAC_SUCCESS) {
+        LOGe("racSolutionCreateFromYaml failed: %d", result);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStart(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_start(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionStop(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_stop(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCancel(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_cancel(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionFeed(
+    JNIEnv* env, jclass clazz, jlong handle, jstring item) {
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    if (item == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+
+    const char* utf = env->GetStringUTFChars(item, nullptr);
+    if (utf == nullptr) return static_cast<jint>(RAC_ERROR_OUT_OF_MEMORY);
+
+    const rac_result_t result =
+        rac_solution_feed(reinterpret_cast<rac_solution_handle_t>(handle), utf);
+
+    env->ReleaseStringUTFChars(item, utf);
+    return static_cast<jint>(result);
+}
+
+JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionCloseInput(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    return static_cast<jint>(rac_solution_close_input(reinterpret_cast<rac_solution_handle_t>(handle)));
+}
+
+JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSolutionDestroy(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return;
+    rac_solution_destroy(reinterpret_cast<rac_solution_handle_t>(handle));
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP download (v2 close-out Phase H)
+// =============================================================================
+//
+// Single synchronous entrypoint that Kotlin's CppBridgeDownload shim calls
+// from its own worker thread. The JNI call blocks until the download
+// completes, fails, or is cancelled. Progress is forwarded back to Kotlin
+// via a NativeDownloadProgressListener instance whose `onProgress(long,
+// long): Boolean` method is invoked on every libcurl chunk — returning
+// `false` cancels the download.
+//
+// This replaces the 1.3 KLOC HttpURLConnection loop previously implemented
+// entirely in Kotlin (see docs/v2_closeout_phase_h_report.md).
+
+namespace {
+
+struct DownloadProgressCtx {
+    JNIEnv* env;                // thread-local
+    jobject listener;           // local ref, valid for the JNI call
+    jmethodID on_progress_mid;  // method ID (not cached globally — Kotlin
+                                // class may change across JNI_OnLoad cycles)
+};
+
+rac_bool_t jni_download_progress_cb(uint64_t bytes_written, uint64_t total_bytes, void* user) {
+    auto* ctx = static_cast<DownloadProgressCtx*>(user);
+    if (!ctx || !ctx->env || !ctx->listener || !ctx->on_progress_mid) {
+        return RAC_TRUE;  // no listener = can't cancel
+    }
+    jboolean keep = ctx->env->CallBooleanMethod(ctx->listener, ctx->on_progress_mid,
+                                                static_cast<jlong>(bytes_written),
+                                                static_cast<jlong>(total_bytes));
+    if (ctx->env->ExceptionCheck()) {
+        ctx->env->ExceptionDescribe();
+        ctx->env->ExceptionClear();
+        // Any Kotlin-side exception treated as "continue" — the download
+        // completes and the listener can log from its exception handler.
+        return RAC_TRUE;
+    }
+    return keep == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+}
+
+}  // namespace
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring urlStr, jstring destPathStr, jstring expectedShaStr,
+    jlong resumeFromByte, jint timeoutMs, jobject listener, jintArray outHttpStatus) {
+
+    if (!urlStr || !destPathStr) {
+        return static_cast<jint>(RAC_HTTP_DL_INVALID_URL);
+    }
+
+    const char* url = env->GetStringUTFChars(urlStr, nullptr);
+    const char* dest = env->GetStringUTFChars(destPathStr, nullptr);
+    const char* sha = expectedShaStr ? env->GetStringUTFChars(expectedShaStr, nullptr) : nullptr;
+
+    rac_http_download_request_t req{};
+    req.url = url;
+    req.destination_path = dest;
+    req.timeout_ms = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = resumeFromByte > 0 ? static_cast<uint64_t>(resumeFromByte) : 0;
+    req.expected_sha256_hex = (sha && sha[0] != '\0') ? sha : nullptr;
+
+    DownloadProgressCtx ctx{};
+    ctx.env = env;
+    ctx.listener = listener;
+    if (listener) {
+        jclass listener_cls = env->GetObjectClass(listener);
+        if (listener_cls) {
+            ctx.on_progress_mid = env->GetMethodID(listener_cls, "onProgress", "(JJ)Z");
+            env->DeleteLocalRef(listener_cls);
+        }
+    }
+
+    int32_t http_status = 0;
+    rac_http_download_status_t status = rac_http_download_execute(
+        &req, listener ? jni_download_progress_cb : nullptr, &ctx, &http_status);
+
+    if (outHttpStatus) {
+        jint tmp = static_cast<jint>(http_status);
+        env->SetIntArrayRegion(outHttpStatus, 0, 1, &tmp);
+    }
+
+    env->ReleaseStringUTFChars(urlStr, url);
+    env->ReleaseStringUTFChars(destPathStr, dest);
+    if (sha) env->ReleaseStringUTFChars(expectedShaStr, sha);
+
+    return static_cast<jint>(status);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Native HTTP request/response (v2.1 quick-wins, T3.5)
+// =============================================================================
+//
+// Single blocking entrypoint for buffered HTTP request/response. Wraps
+// rac_http_client_create + rac_http_request_send + rac_http_response_free
+// + rac_http_client_destroy into one call so Kotlin never touches the
+// curl handle lifecycle (matches Swift's URLSession-based parity layer).
+//
+// Replaces the HttpURLConnection paths in:
+//   - CppBridgeAuth.kt  (POST authenticate / refresh)
+//   - CppBridgeHTTP.kt  (generic GET/POST/PUT/DELETE)
+//   - CppBridgeTelemetry.kt (POST telemetry batches)
+//   - data/network/HttpClient.kt (deleted)
+
+namespace {
+
+// Returns a freshly-allocated NativeHttpResponse. Caller-owned local refs.
+jobject build_native_http_response(JNIEnv* env, jint statusCode, const uint8_t* body,
+                                   size_t body_len, const rac_http_header_kv_t* headers,
+                                   size_t header_count, const char* error_message) {
+    jclass strCls = env->FindClass("java/lang/String");
+
+    // Body: empty array when the transport layer produced no bytes.
+    jbyteArray jBody = env->NewByteArray(static_cast<jsize>(body_len));
+    if (body && body_len > 0) {
+        env->SetByteArrayRegion(jBody, 0, static_cast<jsize>(body_len),
+                                reinterpret_cast<const jbyte*>(body));
+    }
+
+    // Headers: parallel String[] arrays (avoids Map<String,String> marshaling
+    // and keeps the JNI signature simple).
+    jobjectArray jKeys = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    jobjectArray jVals = env->NewObjectArray(static_cast<jsize>(header_count), strCls, nullptr);
+    for (size_t i = 0; i < header_count; ++i) {
+        if (headers[i].name) {
+            jstring k = env->NewStringUTF(headers[i].name);
+            env->SetObjectArrayElement(jKeys, static_cast<jsize>(i), k);
+            env->DeleteLocalRef(k);
+        }
+        if (headers[i].value) {
+            jstring v = env->NewStringUTF(headers[i].value);
+            env->SetObjectArrayElement(jVals, static_cast<jsize>(i), v);
+            env->DeleteLocalRef(v);
+        }
+    }
+
+    jstring jErr = error_message ? env->NewStringUTF(error_message) : nullptr;
+
+    jclass respCls =
+        env->FindClass("com/runanywhere/sdk/native/bridge/NativeHttpResponse");
+    if (!respCls) {
+        LOGe("build_native_http_response: NativeHttpResponse class not found");
+        return nullptr;
+    }
+    jmethodID ctor = env->GetMethodID(
+        respCls, "<init>", "(I[B[Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)V");
+    if (!ctor) {
+        LOGe("build_native_http_response: NativeHttpResponse ctor not found");
+        env->DeleteLocalRef(respCls);
+        return nullptr;
+    }
+    jobject obj = env->NewObject(respCls, ctor, statusCode, jBody, jKeys, jVals, jErr);
+    env->DeleteLocalRef(respCls);
+    return obj;
+}
+
+}  // namespace
+
+JNIEXPORT jobject JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpRequestExecute(
+    JNIEnv* env, jclass /*clazz*/, jstring jMethod, jstring jUrl, jobjectArray jHeaderKeys,
+    jobjectArray jHeaderValues, jbyteArray jBody, jint timeoutMs, jboolean followRedirects) {
+
+    if (!jMethod || !jUrl) {
+        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
+                                          "Invalid argument: method/url is null");
+    }
+
+    // Pin Kotlin strings for the request lifetime. rac_http_request_t
+    // requires the pointers stay valid until rac_http_request_send returns.
+    const char* method = env->GetStringUTFChars(jMethod, nullptr);
+    const char* url    = env->GetStringUTFChars(jUrl, nullptr);
+
+    // Copy headers into stable std::string storage so the KV array
+    // remains valid after we release the Kotlin String handles.
+    jsize headerCount = 0;
+    if (jHeaderKeys && jHeaderValues) {
+        jsize k = env->GetArrayLength(jHeaderKeys);
+        jsize v = env->GetArrayLength(jHeaderValues);
+        headerCount = k < v ? k : v;
+    }
+    std::vector<std::string> hNames;
+    std::vector<std::string> hValues;
+    std::vector<rac_http_header_kv_t> hKVs;
+    hNames.reserve(static_cast<size_t>(headerCount));
+    hValues.reserve(static_cast<size_t>(headerCount));
+    hKVs.reserve(static_cast<size_t>(headerCount));
+    for (jsize i = 0; i < headerCount; ++i) {
+        auto jk = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderKeys, i));
+        auto jv = reinterpret_cast<jstring>(env->GetObjectArrayElement(jHeaderValues, i));
+        if (!jk || !jv) {
+            if (jk) env->DeleteLocalRef(jk);
+            if (jv) env->DeleteLocalRef(jv);
+            continue;
+        }
+        hNames.emplace_back(getCString(env, jk));
+        hValues.emplace_back(getCString(env, jv));
+        env->DeleteLocalRef(jk);
+        env->DeleteLocalRef(jv);
+    }
+    for (size_t i = 0; i < hNames.size(); ++i) {
+        rac_http_header_kv_t kv{};
+        kv.name  = hNames[i].c_str();
+        kv.value = hValues[i].c_str();
+        hKVs.push_back(kv);
+    }
+
+    // Body bytes: copy into std::vector so we can safely pass a raw pointer.
+    std::vector<uint8_t> bodyBuf;
+    if (jBody) {
+        jsize n = env->GetArrayLength(jBody);
+        bodyBuf.resize(static_cast<size_t>(n));
+        if (n > 0) {
+            env->GetByteArrayRegion(jBody, 0, n, reinterpret_cast<jbyte*>(bodyBuf.data()));
+        }
+    }
+
+    rac_http_request_t req{};
+    req.method          = method;
+    req.url             = url;
+    req.headers         = hKVs.empty() ? nullptr : hKVs.data();
+    req.header_count    = hKVs.size();
+    req.body_bytes      = bodyBuf.empty() ? nullptr : bodyBuf.data();
+    req.body_len        = bodyBuf.size();
+    req.timeout_ms      = timeoutMs > 0 ? timeoutMs : 0;
+    req.follow_redirects = followRedirects == JNI_TRUE ? RAC_TRUE : RAC_FALSE;
+
+    rac_http_client_t* client = nullptr;
+    rac_result_t crc = rac_http_client_create(&client);
+    if (crc != RAC_SUCCESS || !client) {
+        env->ReleaseStringUTFChars(jMethod, method);
+        env->ReleaseStringUTFChars(jUrl, url);
+        return build_native_http_response(env, -1, nullptr, 0, nullptr, 0,
+                                          "Failed to create HTTP client");
+    }
+
+    rac_http_response_t resp{};
+    rac_result_t rc = rac_http_request_send(client, &req, &resp);
+
+    jobject result = nullptr;
+    if (rc != RAC_SUCCESS) {
+        const char* errMsg = "HTTP transport error";
+        switch (rc) {
+            case RAC_ERROR_NETWORK_ERROR: errMsg = "Network error"; break;
+            case RAC_ERROR_TIMEOUT:       errMsg = "Request timeout"; break;
+            case RAC_ERROR_CANCELLED:     errMsg = "Request cancelled"; break;
+            case RAC_ERROR_INVALID_ARGUMENT: errMsg = "Invalid HTTP argument"; break;
+            case RAC_ERROR_OUT_OF_MEMORY: errMsg = "Out of memory"; break;
+            default: break;
+        }
+        result = build_native_http_response(env, -1, nullptr, 0, nullptr, 0, errMsg);
+    } else {
+        result = build_native_http_response(env, static_cast<jint>(resp.status), resp.body_bytes,
+                                            resp.body_len, resp.headers, resp.header_count,
+                                            nullptr);
+    }
+
+    rac_http_response_free(&resp);
+    rac_http_client_destroy(client);
+
+    env->ReleaseStringUTFChars(jMethod, method);
+    env->ReleaseStringUTFChars(jUrl, url);
+
+    return result;
 }
 
 }  // extern "C"

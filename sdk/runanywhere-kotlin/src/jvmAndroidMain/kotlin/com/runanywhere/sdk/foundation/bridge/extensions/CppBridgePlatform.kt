@@ -59,7 +59,6 @@ object CppBridgePlatform {
 
         /** Platform vision/image understanding service */
         const val VISION = 6
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Kotlin/Android; not exposed
 
         /**
          * Get a human-readable name for the service type.
@@ -584,10 +583,6 @@ object CppBridgePlatform {
             // Initialize service availability cache
             initializeServiceAvailability()
 
-            // Register the platform callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetPlatformCallbacks()
-
             isRegistered = true
 
             CppBridgePlatformAdapter.logCallback(
@@ -1098,26 +1093,6 @@ object CppBridgePlatform {
     // ========================================================================
 
     /**
-     * Native method to set the platform callbacks with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetPlatformCallbacks()
-
-    /**
-     * Native method to unset the platform callbacks.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_platform_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetPlatformCallbacks()
-
-    /**
      * Native method to send a streaming token to C++.
      *
      * @param token The token text
@@ -1128,36 +1103,6 @@ object CppBridgePlatform {
      */
     @JvmStatic
     external fun nativeOnStreamingToken(token: String, isFinal: Boolean): Boolean
-
-    /**
-     * Native method to check if platform LLM is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_llm_available()
-     */
-    @JvmStatic
-    external fun nativeIsLLMAvailable(): Int
-
-    /**
-     * Native method to check if platform TTS is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_tts_available()
-     */
-    @JvmStatic
-    external fun nativeIsTTSAvailable(): Int
-
-    /**
-     * Native method to check if platform STT is available.
-     *
-     * @return The availability status
-     *
-     * C API: rac_platform_is_stt_available()
-     */
-    @JvmStatic
-    external fun nativeIsSTTAvailable(): Int
 
     // ========================================================================
     // LIFECYCLE MANAGEMENT
@@ -1173,9 +1118,6 @@ object CppBridgePlatform {
             if (!isRegistered) {
                 return
             }
-
-            // TODO: Call native unregistration
-            // nativeUnsetPlatformCallbacks()
 
             platformListener = null
             platformProvider = null
@@ -1324,8 +1266,6 @@ object CppBridgePlatform {
         serviceAvailability[ServiceType.STT] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.EMBEDDING] = AvailabilityStatus.UNKNOWN
         serviceAvailability[ServiceType.VISION] = AvailabilityStatus.UNKNOWN
-        // 5 = IMAGE_GENERATION (diffusion) not supported on Android
-        serviceAvailability[5] = AvailabilityStatus.UNKNOWN
     }
 
     /**

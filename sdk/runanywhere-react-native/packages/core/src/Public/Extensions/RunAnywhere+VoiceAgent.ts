@@ -211,6 +211,25 @@ export async function voiceAgentSynthesizeSpeech(
 }
 
 /**
+ * Get the native voice-agent handle as a JS number.
+ *
+ * Forwards to `RunAnywhereCore.getVoiceAgentHandle()` (Nitro spec, v3.1).
+ * Pass the returned handle to `VoiceAgentStreamAdapter` to subscribe to
+ * the proto-encoded `VoiceEvent` stream. Mirrors Swift
+ * `RunAnywhere.voiceAgentHandle()` and Kotlin `RunAnywhere.voiceAgentHandle()`.
+ *
+ * @returns handle as number (0 if voice agent not yet initialized).
+ */
+export async function getVoiceAgentHandle(): Promise<number> {
+  if (!isNativeModuleAvailable()) {
+    throw new Error('Native module not available');
+  }
+
+  const native = requireNativeModule();
+  return native.getVoiceAgentHandle();
+}
+
+/**
  * Cleanup voice agent resources
  */
 export async function cleanupVoiceAgent(): Promise<void> {

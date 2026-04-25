@@ -2,6 +2,8 @@
 // BINARY CONFIGURATION FOR RUNANYWHERE FLUTTER SDK - ANDROID (Genie Package)
 // =============================================================================
 // This file controls whether to use local or remote native libraries (.so files).
+// Genie is experimental and Android/Snapdragon-only; functional routing is
+// disabled by default and requires Qualcomm Genie SDK-backed native ops.
 // Similar to Swift Package.swift's testLocal flag.
 //
 // Set to `true` to use local binaries from android/src/main/jniLibs/
@@ -9,9 +11,14 @@
 // =============================================================================
 
 ext {
-    // Set this to true for local development/testing
-    // Set to false for production builds (downloads from GitHub releases)
-    useLocalNatives = false
+    // Canonical name (matches Swift/Kotlin/RN and the runanywhere core plugin).
+    // Defaults to true so monorepo developers building via
+    // `scripts/build-core-android.sh` consume local .so files (or an empty
+    // jniLibs dir if the closed-source Genie backend isn't available locally —
+    // the Flutter plugin's GeniePlugin.kt tolerates a missing .so at runtime).
+    // Overridable via the root Gradle property `runanywhere.useLocalNatives`.
+    def localNativesProp = project.findProperty("runanywhere.useLocalNatives")
+    useLocalNatives = localNativesProp != null ? localNativesProp.toString().toBoolean() : true
     testLocal = useLocalNatives  // legacy alias
 
     // =============================================================================
@@ -28,7 +35,8 @@ ext {
     binariesRepo = "runanywhere-sdks"
     binariesBaseUrl = "https://github.com/${binariesGitHubOrg}/${binariesRepo}/releases/download"
 
-    // Android native libraries package
+    // Android native libraries package. The asset must contain native binaries
+    // with Qualcomm Genie SDK-backed LLM ops; otherwise the backend remains unavailable.
     genieAndroidUrl = "${binariesBaseUrl}/genie-v${genieVersion}/RABackendGENIE-android-arm64-v8a-v${genieVersion}.zip"
 
     // Helper method to check if we should download

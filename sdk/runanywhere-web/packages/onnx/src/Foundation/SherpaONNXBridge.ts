@@ -14,7 +14,7 @@
  * The sherpa-onnx module is lazy-loaded on first use of STT/TTS/VAD.
  */
 
-import { SDKError, SDKErrorCode, SDKLogger } from '@runanywhere/web';
+import { SDKError, SDKErrorCode, SDKLogger, HTTPAdapter } from '@runanywhere/web';
 
 const logger = new SDKLogger('SherpaONNX');
 
@@ -196,9 +196,10 @@ export class SherpaONNXBridge {
       const wasmBinaryUrl = baseUrl + 'sherpa-onnx.wasm';
 
       // Pre-fetch the WASM binary to avoid Emscripten's sync XHR
-      // (the Node.js-targeted build uses sync fetch which fails in browsers)
+      // (the Node.js-targeted build uses sync browser loading that fails here).
       logger.info(`Fetching sherpa-onnx WASM binary from ${wasmBinaryUrl}`);
-      const wasmResponse = await fetch(wasmBinaryUrl);
+      // HTTP_FETCH_CARVE_OUTS.bootstrapOnly: the WASM binary is required before any Sherpa module exists.
+      const wasmResponse = await fetch(wasmBinaryUrl); // fetch() carve-out: bootstrap-only WASM binary.
       if (!wasmResponse.ok) {
         throw new Error(`Failed to fetch sherpa-onnx.wasm: ${wasmResponse.status} ${wasmResponse.statusText}`);
       }
@@ -416,6 +417,15 @@ export class SherpaONNXBridge {
 
   /**
    * Download a file from a URL and write it to the sherpa-onnx FS.
+   *
+   * Transport selection (T3.13):
+   *   1. If any backend has registered an HTTPAdapter default module
+   *      (typically `@runanywhere/web-llamacpp`), stream through the
+   *      commons libcurl C ABI for parity with the other SDKs.
+   *   2. Otherwise fall back to browser fetch — unavoidable when
+   *      the consumer only uses `@runanywhere/web-onnx` and no other
+   *      backend has loaded. Sherpa's own WASM does NOT ship the
+   *      `rac_http_*` exports, so we can't route through its module.
    */
   async downloadAndWrite(
     url: string,
@@ -424,7 +434,29 @@ export class SherpaONNXBridge {
   ): Promise<void> {
     logger.info(`Downloading ${url} -> ${fsPath}`);
 
-    const response = await fetch(url);
+    const http = HTTPAdapter.tryDefault();
+    if (http) {
+      const chunks: Uint8Array[] = [];
+      let loaded = 0;
+      let declaredTotal = 0;
+      await http.stream({ url }, (chunk, totalWritten, contentLength) => {
+        chunks.push(chunk);
+        loaded = totalWritten;
+        if (contentLength > 0) declaredTotal = contentLength;
+        onProgress?.(loaded, declaredTotal);
+      });
+      const combined = new Uint8Array(loaded);
+      let offset = 0;
+      for (const c of chunks) {
+        combined.set(c, offset);
+        offset += c.length;
+      }
+      this.writeFile(fsPath, combined);
+      return;
+    }
+
+    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: ONNX-only consumers may not load a commons HTTP module.
+    const response = await fetch(url); // fetch() carve-out: fallback when no WASM module registered.
     if (!response.ok) {
       throw new SDKError(
         SDKErrorCode.NetworkError,
@@ -436,13 +468,11 @@ export class SherpaONNXBridge {
     const reader = response.body?.getReader();
 
     if (!reader) {
-      // Fallback: read all at once
       const buffer = await response.arrayBuffer();
       this.writeFile(fsPath, new Uint8Array(buffer));
       return;
     }
 
-    // Stream download with progress
     const chunks: Uint8Array[] = [];
     let loaded = 0;
 
@@ -454,7 +484,6 @@ export class SherpaONNXBridge {
       onProgress?.(loaded, contentLength);
     }
 
-    // Combine chunks
     const combined = new Uint8Array(loaded);
     let offset = 0;
     for (const chunk of chunks) {

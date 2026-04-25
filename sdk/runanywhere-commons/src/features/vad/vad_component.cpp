@@ -24,6 +24,10 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/router/rac_route.h"
+#include "rac/router/rac_routing_hints.h"
 
 // =============================================================================
 // INTERNAL STRUCTURES
@@ -423,22 +427,37 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     free(component->loaded_model_id);
     component->loaded_model_id = nullptr;
 
-    // Create VAD service via the service registry
-    rac_service_request_t request = {};
-    request.capability = RAC_CAPABILITY_VAD;
-    request.identifier = model_path;
-
-    rac_handle_t service_handle = nullptr;
-    rac_result_t result = rac_service_create(RAC_CAPABILITY_VAD, &request, &service_handle);
-    if (result != RAC_SUCCESS) {
-        log_error("VAD.Component", "Failed to create VAD service from registry");
-        return result;
+    // v3 Phase B8: route through the plugin registry.
+    // VAD doesn't take a framework hint from the model_info registry
+    // today (Swift VADCapability only passes model_path), so we rely
+    // purely on format/priority scoring. onnx_vad (priority 100) will
+    // win for model-based VAD; energy VAD is not plugin-registered
+    // since it's not a full ops-based engine.
+    const rac_engine_vtable_t* vt = nullptr;
+    rac_result_t result = rac_plugin_route(RAC_PRIMITIVE_DETECT_VOICE,
+                                           /*format=*/0,
+                                           /*hints=*/nullptr, &vt);
+    if (result != RAC_SUCCESS || !vt || !vt->vad_ops || !vt->vad_ops->create) {
+        log_error("VAD.Component", "rac_plugin_route failed for VAD");
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
     }
 
-    if (!service_handle) {
-        log_error("VAD.Component", "Service registry returned null handle");
-        return RAC_ERROR_NO_CAPABLE_PROVIDER;
+    void* impl = nullptr;
+    result = vt->vad_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    if (result != RAC_SUCCESS || !impl) {
+        log_error("VAD.Component", "Plugin create failed for VAD");
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
     }
+
+    auto* service = static_cast<rac_vad_service_t*>(malloc(sizeof(rac_vad_service_t)));
+    if (!service) {
+        if (vt->vad_ops->destroy) vt->vad_ops->destroy(impl);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    service->ops = vt->vad_ops;
+    service->impl = impl;
+    service->model_id = model_path ? strdup(model_path) : nullptr;
+    rac_handle_t service_handle = service;
 
     // The service registry returns a rac_vad_service_t* (vtable-wrapped)
     component->model_service = reinterpret_cast<rac_vad_service_t*>(service_handle);

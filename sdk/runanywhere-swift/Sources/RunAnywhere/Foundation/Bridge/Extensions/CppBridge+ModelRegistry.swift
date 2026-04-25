@@ -81,7 +81,7 @@ extension CppBridge {
                 throw SDKError.general(.initializationFailed, "Registry not initialized")
             }
 
-            logger.info("Saving model: \(model.id), Swift framework: \(model.framework.rawValue) (\(model.framework.displayName))")
+            logger.info("Saving model: \(model.id), Swift framework: \(model.framework.wireString) (\(model.framework.displayName))")
             var cModel = model.toCModelInfo()
             logger.info("Converted to C++: framework=\(cModel.framework) (expected CoreML=8, Unknown=99)")
             defer { freeCModelInfo(&cModel) }
@@ -125,7 +125,7 @@ extension CppBridge {
                 if let model = models[i] {
                     let cFramework = model.pointee.framework
                     let modelInfo = ModelInfo(from: model.pointee)
-                    logger.debug("Retrieved model: \(modelInfo.id), C++ framework=\(cFramework), Swift framework=\(modelInfo.framework.rawValue)")
+                    logger.debug("Retrieved model: \(modelInfo.id), C++ framework=\(cFramework), Swift framework=\(modelInfo.framework.wireString)")
                     modelInfos.append(modelInfo)
                 }
             }
@@ -275,6 +275,49 @@ extension CppBridge {
                 discoveredCount: Int(result.discovered_count),
                 unregisteredCount: Int(result.unregistered_count)
             )
+        }
+
+        // MARK: - Refresh (T4.9)
+
+        /// Unified registry refresh — bridges `rac_model_registry_refresh`.
+        ///
+        /// Each flag is independent:
+        ///   - `includeRemoteCatalog`: fetches the model assignment catalog
+        ///     from the backend (requires assignment callbacks to have been
+        ///     registered at SDK init).
+        ///   - `rescanLocal`: rescans the on-disk model directories and
+        ///     links any newly downloaded models back to the registry.
+        ///   - `pruneOrphans`: clears `localPath` on models whose recorded
+        ///     path no longer exists on disk.
+        @discardableResult
+        public func refresh(
+            includeRemoteCatalog: Bool = true,
+            rescanLocal: Bool = true,
+            pruneOrphans: Bool = false
+        ) -> Bool {
+            guard let handle = handle else {
+                logger.warning("Refresh: Registry not initialized")
+                return false
+            }
+
+            logger.info("Refreshing registry: remote=\(includeRemoteCatalog), rescan=\(rescanLocal), prune=\(pruneOrphans)")
+
+            var callbacks = makeDiscoveryCallbacks()
+            let needsCallbacks = rescanLocal || pruneOrphans
+            let status = withUnsafePointer(to: &callbacks) { cbPtr -> rac_result_t in
+                var opts = rac_model_registry_refresh_opts_t()
+                opts.include_remote_catalog = includeRemoteCatalog ? RAC_TRUE : RAC_FALSE
+                opts.rescan_local = rescanLocal ? RAC_TRUE : RAC_FALSE
+                opts.prune_orphans = pruneOrphans ? RAC_TRUE : RAC_FALSE
+                opts.discovery_callbacks = needsCallbacks ? cbPtr : nil
+                return rac_model_registry_refresh(handle, opts)
+            }
+
+            if status != RAC_SUCCESS {
+                logger.warning("Refresh returned non-success status: \(status)")
+                return false
+            }
+            return true
         }
 
         // MARK: - Discovery Callbacks

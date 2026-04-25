@@ -16,8 +16,21 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_primitive.h"
+#include "rac/router/rac_route.h"
+#include "rac/router/rac_routing_hints.h"
 
 static const char* LOG_CAT = "VLM.Service";
+
+static const char* framework_to_plugin_name(rac_inference_framework_t fw) {
+    switch (fw) {
+        case RAC_FRAMEWORK_LLAMACPP:           return "llamacpp_vlm";
+        case RAC_FRAMEWORK_ONNX:               return "onnx";
+        case RAC_FRAMEWORK_METALRT:            return "metalrt";
+        default:                               return nullptr;
+    }
+}
 
 // =============================================================================
 // SERVICE CREATION - Routes through Service Registry
@@ -70,23 +83,42 @@ rac_result_t rac_vlm_create(const char* model_id, rac_handle_t* out_handle) {
                         result, static_cast<int>(framework));
     }
 
-    // Build service request
-    rac_service_request_t request = {};
-    request.identifier = model_id;
-    request.capability = RAC_CAPABILITY_VISION_LANGUAGE;
-    request.framework = framework;
-    request.model_path = model_path;
+    // v3 Phase B8: route through the plugin registry. VLM config_json
+    // is emitted by registry lookups for multi-file VLM models (mmproj_path,
+    // etc.) — today we pass nullptr; future PR will wire up config_json
+    // from the model_info's extra fields.
+    rac_routing_hints_t hints = {};
+    hints.preferred_engine_name = framework_to_plugin_name(framework);
 
-    RAC_LOG_INFO(LOG_CAT, "Service request: framework=%d, model_path=%s",
-                 static_cast<int>(request.framework),
-                 request.model_path ? request.model_path : "NULL");
-
-    // Service registry returns an rac_vlm_service_t* with vtable already set
-    result = rac_service_create(RAC_CAPABILITY_VISION_LANGUAGE, &request, out_handle);
-
+    const rac_engine_vtable_t* vt = nullptr;
+    result = rac_plugin_route(RAC_PRIMITIVE_VLM,
+                              /*format=*/0, &hints, &vt);
     if (model_info) {
         rac_model_info_free(model_info);
+        model_info = nullptr;
     }
+    if (result != RAC_SUCCESS || !vt || !vt->vlm_ops || !vt->vlm_ops->create) {
+        RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
+    }
+    RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
+
+    void* impl = nullptr;
+    result = vt->vlm_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    if (result != RAC_SUCCESS || !impl) {
+        RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
+        return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
+    }
+
+    auto* service = static_cast<rac_vlm_service_t*>(malloc(sizeof(rac_vlm_service_t)));
+    if (!service) {
+        if (vt->vlm_ops->destroy) vt->vlm_ops->destroy(impl);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    service->ops = vt->vlm_ops;
+    service->impl = impl;
+    service->model_id = strdup(model_id);
+    *out_handle = service;
 
     if (result != RAC_SUCCESS) {
         RAC_LOG_ERROR(LOG_CAT, "Failed to create service via registry: %d", result);

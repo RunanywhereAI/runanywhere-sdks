@@ -194,7 +194,7 @@ extension RunAnywhere {
         }
 
         // Find files with the expected extension in model folder
-        let expectedExtension = model.format.rawValue.lowercased()
+        let expectedExtension = model.format.wireString.lowercased()
         if let modelFile = findModelFile(in: modelFolder, extensions: [expectedExtension, "gguf", "bin"]) {
             logger.info("Found model file: \(modelFile.lastPathComponent)")
             return modelFile
@@ -485,5 +485,29 @@ extension RunAnywhere {
         try? await ensureServicesReady()
         let result = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
         return result.discoveredCount
+    }
+
+    /// Refresh the model registry — T4.9.
+    ///
+    /// Routes through the unified C ABI `rac_model_registry_refresh` so the
+    /// same semantics run on every platform (Swift / Kotlin / RN / Flutter /
+    /// Web).
+    ///
+    /// - Parameters:
+    ///   - includeRemoteCatalog: fetch model assignments from the backend.
+    ///   - rescanLocal: rescan on-disk model folders and link downloads.
+    ///   - pruneOrphans: clear `localPath` on models whose file is missing.
+    public static func refreshModelRegistry(
+        includeRemoteCatalog: Bool = true,
+        rescanLocal: Bool = true,
+        pruneOrphans: Bool = false
+    ) async {
+        guard isInitialized else { return }
+        try? await ensureServicesReady()
+        await CppBridge.ModelRegistry.shared.refresh(
+            includeRemoteCatalog: includeRemoteCatalog,
+            rescanLocal: rescanLocal,
+            pruneOrphans: pruneOrphans
+        )
     }
 }

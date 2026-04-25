@@ -1,21 +1,202 @@
 /**
- * Voice Tab - Voice Assistant with pipeline setup and particle animation
- * Matches iOS VoiceAssistantView.
+ * Voice Tab — Voice Assistant driven by VoiceEvent cases off a
+ * `VoiceAgentStreamAdapter.stream()` async iterable.
  *
- * Pipeline flow:  Mic → STT → LLM (streaming) → TTS → Speaker
+ * Cross-SDK parity: the iOS, Android, Flutter, and React Native samples
+ * all consume the same `AsyncIterable<VoiceEvent>` shape coming off
+ * their platform's `VoiceAgentStreamAdapter`. On Web, the adapter can
+ * be backed by either:
+ *
+ *   1. A WASM voice-agent handle (`new VoiceAgentStreamAdapter(handle)`)
+ *      — the fully native path, parity with mobile.
+ *   2. A custom `VoiceAgentStreamTransport` — the pluggable path used
+ *      here, because until the Web WASM voice-agent bindings land the
+ *      sample drives the orchestration through `VoicePipeline` on the
+ *      TS side.
+ *
+ * Either way, the UI code that consumes the events is identical, which
+ * is the whole point of GAP 09 Phase 19 and the v0.20 close-out.
+ *
+ * Pipeline: Mic -> VAD -> STT -> LLM (streaming) -> TTS -> Speaker.
  */
 
 import type { TabLifecycle } from '../app';
 import { showModelSelectionSheet } from '../components/model-selection';
 import { ModelManager, ModelCategory, ensureVADLoaded } from '../services/model-manager';
-import { VoicePipeline, PipelineState, AudioCapture, AudioPlayback, SpeechActivity } from '../../../../../sdk/runanywhere-web/packages/core/src/index';
+import {
+  VoicePipeline,
+  VoiceAgentStreamAdapter,
+  AudioCapture,
+  AudioPlayback,
+  SpeechActivity,
+  type VoiceAgentStreamTransport,
+  type VoiceEvent,
+  VADEventType,
+  PipelineState as VoicePipelinePhase,
+} from '../../../../../sdk/runanywhere-web/packages/core/src/index';
 import { VAD } from '../../../../../sdk/runanywhere-web/packages/onnx/src/index';
 
 /** Shared AudioCapture instance for this view (replaces app-level MicCapture singleton). */
 const micCapture = new AudioCapture();
 
-/** SDK VoicePipeline: orchestrates STT -> LLM (streaming) -> TTS. */
-const pipeline = new VoicePipeline();
+// ---------------------------------------------------------------------------
+// VoicePipeline-backed VoiceAgentStreamTransport
+// ---------------------------------------------------------------------------
+// Bridges `VoicePipeline` (TS-side orchestrator) to the canonical
+// `VoiceAgentStreamTransport` contract from the generated codegen. Apps
+// that don't want the WASM proto-stream path still get the same
+// `AsyncIterable<VoiceEvent>` surface.
+//
+// When the Web WASM voice-agent bindings land, this factory is replaced
+// with `new VoiceAgentStreamAdapter(handle)` and this file stays the
+// same (state machine, UI, cancel behaviour — all unchanged).
+
+interface PipelineTransportOptions {
+  readonly pipeline: VoicePipeline;
+  readonly maxTokens: number;
+  readonly temperature: number;
+  readonly systemPrompt: string;
+}
+
+/**
+ * Create a transport that wraps a `VoicePipeline.processTurn()` call and
+ * emits proto `VoiceEvent`s through the generated stream surface.
+ * Each turn is triggered by calling `feedTurn(audio)`; `cancel()` cancels
+ * the current in-flight generation.
+ */
+function createPipelineTransport(opts: PipelineTransportOptions): {
+  transport: VoiceAgentStreamTransport;
+  feedTurn: (audio: Float32Array) => void;
+  cancel: () => void;
+} {
+  let emitMessage: ((evt: VoiceEvent) => void) | null = null;
+  let emitError: ((err: Error) => void) | null = null;
+  let seq = 0;
+  const nowUs = (): number => Math.floor(performance.now() * 1000);
+
+  const emit = (arm: Partial<VoiceEvent>): void => {
+    if (!emitMessage) return;
+    emitMessage({
+      seq: seq++,
+      timestampUs: nowUs(),
+      userSaid: undefined,
+      assistantToken: undefined,
+      audio: undefined,
+      vad: undefined,
+      interrupted: undefined,
+      state: undefined,
+      error: undefined,
+      metrics: undefined,
+      ...arm,
+    });
+  };
+
+  const pipelinePhaseToProto = (phase: VoicePipelinePhase): number => {
+    // Map the app-level pipeline phase to the proto PipelineState enum
+    // values used by StateChangeEvent — see idl/voice_events.proto.
+    // 0 UNSPECIFIED, 1 IDLE, 2 LISTENING, 3 THINKING, 4 SPEAKING, 5 STOPPED.
+    switch (phase) {
+      case VoicePipelinePhase.Idle: return 1;
+      case VoicePipelinePhase.Listening: return 2;
+      case VoicePipelinePhase.ProcessingSTT:
+      case VoicePipelinePhase.GeneratingResponse: return 3;
+      case VoicePipelinePhase.PlayingTTS: return 4;
+      case VoicePipelinePhase.Cooldown: return 5;
+      case VoicePipelinePhase.Error: return 0;
+      default: return 0;
+    }
+  };
+
+  let previousProtoState = 0;
+
+  const feedTurn = (audio: Float32Array): void => {
+    emit({ vad: { type: VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE, frameOffsetUs: 0 } });
+
+    opts.pipeline
+      .processTurn(
+        audio,
+        {
+          maxTokens: opts.maxTokens,
+          temperature: opts.temperature,
+          systemPrompt: opts.systemPrompt,
+        },
+        {
+          onStateChange: (phase) => {
+            const current = pipelinePhaseToProto(phase);
+            emit({ state: { previous: previousProtoState, current } });
+            previousProtoState = current;
+          },
+          onTranscription: (text) => {
+            emit({
+              userSaid: {
+                text,
+                isFinal: true,
+                confidence: 1.0,
+                audioStartUs: 0,
+                audioEndUs: nowUs(),
+              },
+            });
+          },
+          onResponseToken: (token) => {
+            emit({ assistantToken: { text: token, isFinal: false, kind: 1 } });
+          },
+          onResponseComplete: () => {
+            emit({ assistantToken: { text: '', isFinal: true, kind: 1 } });
+          },
+          onSynthesisComplete: (audioData, sampleRate) => {
+            const pcmBytes = new Uint8Array(
+              audioData.buffer,
+              audioData.byteOffset,
+              audioData.byteLength,
+            );
+            emit({
+              audio: {
+                pcm: pcmBytes,
+                sampleRateHz: sampleRate,
+                channels: 1,
+                encoding: 1,
+              },
+            });
+          },
+          onError: (err) => {
+            emit({
+              error: {
+                code: 0,
+                message: err.message,
+                component: 'pipeline',
+                isRecoverable: false,
+              },
+            });
+            emitError?.(err);
+          },
+        },
+      )
+      .catch((err: unknown) => {
+        const e = err instanceof Error ? err : new Error(String(err));
+        emit({
+          error: { code: 0, message: e.message, component: 'pipeline', isRecoverable: false },
+        });
+        emitError?.(e);
+      });
+  };
+
+  const cancel = (): void => {
+    opts.pipeline.cancel();
+  };
+
+  const transport: VoiceAgentStreamTransport = {
+    subscribe(_req, onMessage, onError, _onDone) {
+      emitMessage = onMessage;
+      emitError = onError;
+      return () => {
+        emitMessage = null;
+        emitError = null;
+      };
+    },
+  };
+
+  return { transport, feedTurn, cancel };
+}
 
 // ---------------------------------------------------------------------------
 // Pipeline step definitions
@@ -37,6 +218,12 @@ const PIPELINE_STEPS: PipelineStep[] = [
 // Minimum audio segment (samples at 16kHz) to process — ~0.5s
 const MIN_AUDIO_SAMPLES = 8000;
 
+// Proto PipelineState values (see idl/voice_events.proto) used in the
+// StateChangeEvent arm. Inlined so this file doesn't have to import the
+// proto enum just for switch labels.
+const PROTO_STATE_THINKING = 3;
+const PROTO_STATE_SPEAKING = 4;
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -55,6 +242,30 @@ let sessionActive = false;
 let vadActive = false;
 /** Unsubscribe function for VAD speech activity callback. */
 let unsubscribeVAD: (() => void) | null = null;
+
+/** The VoicePipeline instance owned by this view. */
+const pipeline = new VoicePipeline();
+
+/**
+ * VoiceAgentStreamAdapter bound to a VoicePipeline-backed transport. On
+ * mobile (iOS/Android/Flutter/RN) this would be
+ * `new VoiceAgentStreamAdapter(handle)`; the consumer code below is
+ * identical either way. When the Web WASM voice-agent bindings land we
+ * swap the transport for a handle and delete `createPipelineTransport`.
+ */
+const { transport: pipelineTransport, feedTurn, cancel: cancelTurn } = createPipelineTransport({
+  pipeline,
+  maxTokens: 150,
+  temperature: 0.7,
+  systemPrompt:
+    'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.',
+});
+const adapter = new VoiceAgentStreamAdapter(pipelineTransport);
+
+/** The active `AsyncIterator<VoiceEvent>` subscription, if any. */
+let eventIterator: AsyncIterator<VoiceEvent> | null = null;
+/** Accumulated assistant response text for the current turn. */
+let accumulatedResponse = '';
 
 interface Particle {
   x: number; y: number;
@@ -158,29 +369,21 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
     showModelSelectionSheet(ModelCategory.SpeechSynthesis, { coexist: true });
   });
 
-  // Start Voice Assistant button
   container.querySelector('#voice-start-btn')!.addEventListener('click', () => {
     transitionToVoiceInterface();
   });
 
-  // Back button from voice interface → setup
   container.querySelector('#voice-back-btn')!.addEventListener('click', () => {
     transitionToSetup();
   });
 
-  // Mic button
   container.querySelector('#voice-mic-btn')!.addEventListener('click', toggleMic);
 
-  // Subscribe to model changes so we can update pipeline state
   ModelManager.onChange(() => refreshPipelineUI());
-
-  // Initial pipeline UI check (in case models are already loaded)
   refreshPipelineUI();
 
-  // Return lifecycle callbacks for tab-switching cleanup
   return {
     onDeactivate(): void {
-      // Stop mic, VAD, particles, and cancel any in-flight generation
       if (sessionActive) {
         stopSession();
         console.log('[Voice] Tab deactivated — session stopped');
@@ -193,7 +396,6 @@ export function initVoiceTab(el: HTMLElement): TabLifecycle {
 // Pipeline State & UI
 // ---------------------------------------------------------------------------
 
-/** Refresh setup card states and start button based on loaded models */
 function refreshPipelineUI(): void {
   const startBtn = container.querySelector('#voice-start-btn') as HTMLButtonElement | null;
   if (!startBtn) return;
@@ -209,7 +411,6 @@ function refreshPipelineUI(): void {
     const loadedModel = ModelManager.getLoadedModel(step.modality);
 
     if (loadedModel) {
-      // Model is loaded — show checkmark and model name
       if (statusEl) {
         statusEl.textContent = loadedModel.name;
         (statusEl as HTMLElement).classList.add('text-green');
@@ -219,7 +420,6 @@ function refreshPipelineUI(): void {
       }
       card.classList.add('loaded');
     } else {
-      // Not loaded — show default state
       if (statusEl) {
         statusEl.textContent = step.defaultStatus;
         (statusEl as HTMLElement).classList.remove('text-green');
@@ -236,7 +436,6 @@ function refreshPipelineUI(): void {
   startBtn.disabled = !allReady;
 }
 
-/** Switch from pipeline setup → voice interface */
 function transitionToVoiceInterface(): void {
   state = 'idle';
   const setup = container.querySelector('#voice-setup') as HTMLElement;
@@ -245,7 +444,6 @@ function transitionToVoiceInterface(): void {
   if (iface) iface.classList.remove('hidden');
 }
 
-/** Switch from voice interface → pipeline setup */
 function transitionToSetup(): void {
   stopSession();
   state = 'setup';
@@ -256,7 +454,7 @@ function transitionToSetup(): void {
 }
 
 // ---------------------------------------------------------------------------
-// UI Helpers
+// UI helpers
 // ---------------------------------------------------------------------------
 
 function setStatus(text: string): void {
@@ -275,7 +473,7 @@ function setMicActive(active: boolean): void {
 }
 
 // ---------------------------------------------------------------------------
-// Mic Toggle — starts / stops the continuous conversation session
+// Mic toggle
 // ---------------------------------------------------------------------------
 
 async function toggleMic(): Promise<void> {
@@ -287,25 +485,21 @@ async function toggleMic(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Continuous conversation session  (matches iOS VoiceSessionHandle)
-//
-//   ┌──────────────────────────────────────────────┐
-//   │  [listening] ──(VAD silence)──► [processing]  │
-//   │       ▲                              │        │
-//   │       └──── [speaking] ◄─────────────┘        │
-//   └──────────────────────────────────────────────┘
+// Continuous conversation session
 // ---------------------------------------------------------------------------
 
 async function startSession(): Promise<void> {
   sessionActive = true;
   setMicActive(true);
   setResponse('');
+  await openEventStream();
   await startListening();
 }
 
 function stopSession(): void {
   sessionActive = false;
-  pipeline.cancel();
+  cancelTurn();
+  closeEventStream();
   stopVoiceVAD();
   if (micCapture.isCapturing) micCapture.stop();
   VAD.reset();
@@ -315,14 +509,12 @@ function stopSession(): void {
   setStatus('Tap to speak');
 }
 
-/** Begin capturing audio and monitoring with SDK VAD */
 async function startListening(): Promise<void> {
   if (!sessionActive) return;
 
   state = 'listening';
   setStatus('Listening...');
 
-  // Ensure Silero VAD model is loaded (auto-downloads, ~5MB)
   const vadReady = await ensureVADLoaded();
   if (!vadReady) {
     setStatus('Failed to load VAD model');
@@ -342,10 +534,9 @@ async function startListening(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// VAD — SDK Silero VAD (replaces energy-threshold approach)
+// VAD
 // ---------------------------------------------------------------------------
 
-/** AudioCapture onChunk callback — feeds audio to SDK VAD. */
 function onVoiceChunk(samples: Float32Array): void {
   if (!vadActive || state !== 'listening') return;
   VAD.processSamples(samples);
@@ -355,7 +546,6 @@ function startVoiceVAD(): void {
   stopVoiceVAD();
   vadActive = true;
 
-  // Subscribe to speech activity events from the SDK VAD
   unsubscribeVAD = VAD.onSpeechActivity((activity) => {
     if (!sessionActive || state !== 'listening') return;
 
@@ -364,15 +554,16 @@ function startVoiceVAD(): void {
     } else if (activity === SpeechActivity.Ended) {
       console.log('[Voice] Speech ended (Silero)');
 
-      // Pop the completed speech segment
       const segment = VAD.popSpeechSegment();
       if (segment && segment.samples.length >= MIN_AUDIO_SAMPLES) {
         console.log(`[Voice] Processing segment: ${segment.samples.length} samples (${(segment.samples.length / 16000).toFixed(1)}s)`);
-        // Stop mic during processing (will restart after TTS)
         stopVoiceVAD();
         micCapture.stop();
         stopParticles();
-        runPipeline(segment.samples);
+        state = 'processing';
+        accumulatedResponse = '';
+        setResponse('');
+        feedTurn(segment.samples);
       }
     }
   });
@@ -386,91 +577,108 @@ function stopVoiceVAD(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Voice Pipeline:  Audio → STT → LLM (streaming) → TTS → Speaker → Listen
-//
-// Uses VoicePipeline from the SDK which orchestrates STT → LLM → TTS
-// with streaming callbacks. The example app only handles UI updates.
+// VoiceEvent consumption — identical shape to iOS/Android/Flutter/RN.
 // ---------------------------------------------------------------------------
 
-async function runPipeline(audioData: Float32Array): Promise<void> {
-  state = 'processing';
+async function openEventStream(): Promise<void> {
+  closeEventStream();
+  const iterable = adapter.stream({ eventFilter: '' });
+  eventIterator = iterable[Symbol.asyncIterator]();
+  consumeEventStream(eventIterator).catch((err) => {
+    console.error('[Voice] Event stream error:', err);
+    setStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
+  });
+}
 
+function closeEventStream(): void {
+  if (eventIterator?.return) {
+    void eventIterator.return(undefined as never);
+  }
+  eventIterator = null;
+}
+
+async function consumeEventStream(iterator: AsyncIterator<VoiceEvent>): Promise<void> {
+  while (true) {
+    const { value: event, done } = await iterator.next();
+    if (done || !event) return;
+    handleVoiceEvent(event);
+  }
+}
+
+function handleVoiceEvent(event: VoiceEvent): void {
+  if (event.userSaid) {
+    const text = event.userSaid.text;
+    if (!text) {
+      console.log('[Voice] No speech detected');
+      return;
+    }
+    console.log(`[Voice] User said: "${text}"`);
+    setResponse(
+      `<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(text)}</div>` +
+      `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`,
+    );
+    setStatus('Thinking...');
+    return;
+  }
+
+  if (event.assistantToken) {
+    if (event.assistantToken.isFinal) return;
+    accumulatedResponse += event.assistantToken.text;
+    const outputSpan = container.querySelector('#voice-llm-output');
+    if (outputSpan) outputSpan.textContent = accumulatedResponse;
+    return;
+  }
+
+  if (event.state) {
+    if (event.state.current === PROTO_STATE_THINKING) {
+      setStatus('Thinking...');
+    } else if (event.state.current === PROTO_STATE_SPEAKING) {
+      state = 'speaking';
+      setStatus('Speaking...');
+    }
+    return;
+  }
+
+  if (event.audio) {
+    // A TTS audio chunk. Copy the bytes back to a Float32Array (PCM f32
+    // little-endian, per AudioEncoding.AUDIO_ENCODING_PCM_F32_LE).
+    const pcm = event.audio.pcm;
+    const f32 = new Float32Array(
+      pcm.buffer.slice(pcm.byteOffset, pcm.byteOffset + pcm.byteLength),
+    );
+    const sampleRate = event.audio.sampleRateHz;
+    console.log(`[Voice] TTS: playing ${(f32.length / sampleRate).toFixed(1)}s of audio`);
+    void playAudioThenResume(f32, sampleRate);
+    return;
+  }
+
+  if (event.vad) {
+    if (event.vad.type === VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
+      setStatus('Transcribing...');
+    }
+    return;
+  }
+
+  if (event.error) {
+    console.error('[Voice] VoiceEvent error:', event.error);
+    setStatus(`Error: ${event.error.message}`);
+    return;
+  }
+}
+
+async function playAudioThenResume(samples: Float32Array, sampleRate: number): Promise<void> {
+  const player = new AudioPlayback({ sampleRate });
   try {
-    setStatus('Transcribing...');
-    console.log(`[Voice] STT: ${(audioData.length / 16000).toFixed(1)}s of audio`);
+    await player.play(samples, sampleRate);
+  } finally {
+    player.dispose();
+  }
 
-    // Prepare a response container for streaming LLM output
-    const responseEl = container.querySelector('#voice-response');
-
-    await pipeline.processTurn(audioData, {
-      maxTokens: 150,
-      temperature: 0.7,
-      systemPrompt:
-        'You are a helpful voice assistant. Keep responses concise — 1-3 sentences. Be conversational and friendly.',
-    }, {
-      onStateChange: (s) => {
-        if (s === PipelineState.ProcessingSTT) setStatus('Transcribing...');
-        else if (s === PipelineState.GeneratingResponse) setStatus('Thinking...');
-        else if (s === PipelineState.PlayingTTS) {
-          state = 'speaking';
-          setStatus('Speaking...');
-        }
-      },
-
-      onTranscription: (text) => {
-        if (!text) {
-          console.log('[Voice] No speech detected');
-          return;
-        }
-        console.log(`[Voice] STT result: "${text}"`);
-        setResponse(`<div class="text-secondary mb-sm"><strong>You:</strong> ${escapeHtml(text)}</div>`);
-        setStatus('Thinking...');
-        // Append streaming response container
-        if (responseEl) {
-          responseEl.innerHTML += `<div><strong>Assistant:</strong> <span id="voice-llm-output"></span></div>`;
-        }
-      },
-
-      onResponseToken: (_token, accumulated) => {
-        const outputSpan = container.querySelector('#voice-llm-output');
-        if (outputSpan) outputSpan.textContent = accumulated;
-      },
-
-      onResponseComplete: (text, llmResult) => {
-        const outputSpan = container.querySelector('#voice-llm-output');
-        if (outputSpan) outputSpan.textContent = text;
-        console.log(`[Voice] LLM: ${llmResult.tokensUsed} tokens, ${llmResult.tokensPerSecond.toFixed(1)} tok/s`);
-      },
-
-      onSynthesisComplete: async (audio, sampleRate) => {
-        console.log(`[Voice] TTS: playing ${(audio.length / sampleRate).toFixed(1)}s of audio`);
-        const player = new AudioPlayback({ sampleRate });
-        await player.play(audio, sampleRate);
-        player.dispose();
-      },
-
-      onError: (err) => {
-        console.error('[Voice] Pipeline error:', err);
-        setStatus(`Error: ${err.message}`);
-      },
-    });
-
-    // Resume listening (continuous mode) or go idle
-    if (sessionActive) {
-      await startListening();
-    } else {
-      state = 'idle';
-      setStatus('Tap to speak');
-    }
-  } catch (err) {
-    console.error('[Voice] Pipeline error:', err);
-    const msg = err instanceof Error ? err.message : String(err);
-    setStatus(`Error: ${msg}`);
-    if (sessionActive) {
-      await startListening();
-    } else {
-      state = 'idle';
-    }
+  if (sessionActive) {
+    await startListening();
+  } else {
+    state = 'idle';
+    setStatus('Tap to speak');
   }
 }
 
@@ -479,7 +687,7 @@ function escapeHtml(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Particle Animation (Canvas2D approximation of Metal shader)
+// Particle animation (Canvas2D approximation of Metal shader)
 // ---------------------------------------------------------------------------
 
 function startParticles(): void {
@@ -542,15 +750,12 @@ function updateParticles(level: number): void {
     const dy = cy - p.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Orbit + push out with audio energy
     p.vx += (dy / dist) * 0.03 + (Math.random() - 0.5) * energy;
     p.vy += (-dx / dist) * 0.03 + (Math.random() - 0.5) * energy;
 
-    // Pull toward center
     p.vx += dx * 0.0005;
     p.vy += dy * 0.0005;
 
-    // Damping
     p.vx *= 0.98;
     p.vy *= 0.98;
 

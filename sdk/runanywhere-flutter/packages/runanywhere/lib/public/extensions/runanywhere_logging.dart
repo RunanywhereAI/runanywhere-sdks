@@ -1,17 +1,11 @@
-/// RunAnywhere + Logging
-///
-/// Public API for configuring SDK logging.
-/// Mirrors Swift's RunAnywhere+Logging.swift.
-library runanywhere_logging;
+// SPDX-License-Identifier: Apache-2.0
+//
+// runanywhere_logging.dart — SDK logging configuration.
+// Mirrors Swift `RunAnywhere+Logging.swift`.
 
 import 'package:runanywhere/native/dart_bridge_telemetry.dart';
-import 'package:runanywhere/public/runanywhere.dart';
 
-// =============================================================================
-// Log Level Enum
-// =============================================================================
-
-/// SDK Log levels
+/// SDK log levels.
 enum SDKLogLevel {
   trace,
   debug,
@@ -20,7 +14,7 @@ enum SDKLogLevel {
   error,
   fatal;
 
-  /// Convert to C++ log level
+  /// Convert to the C++ log level integer (matches the native enum).
   int toC() {
     switch (this) {
       case SDKLogLevel.trace:
@@ -39,11 +33,7 @@ enum SDKLogLevel {
   }
 }
 
-// =============================================================================
-// Logging Configuration
-// =============================================================================
-
-/// Configuration for SDK logging
+/// SDK logging configuration.
 class LoggingConfiguration {
   final SDKLogLevel minimumLevel;
   final bool localLoggingEnabled;
@@ -55,14 +45,14 @@ class LoggingConfiguration {
     this.sentryEnabled = false,
   });
 
-  /// Development configuration - verbose logging
+  /// Development preset — verbose logging, no Sentry.
   static const development = LoggingConfiguration(
     minimumLevel: SDKLogLevel.debug,
     localLoggingEnabled: true,
     sentryEnabled: false,
   );
 
-  /// Production configuration - minimal logging
+  /// Production preset — minimal logging, Sentry on.
   static const production = LoggingConfiguration(
     minimumLevel: SDKLogLevel.warning,
     localLoggingEnabled: false,
@@ -70,50 +60,45 @@ class LoggingConfiguration {
   );
 }
 
-// =============================================================================
-// RunAnywhere Logging Extensions
-// =============================================================================
+/// Static helpers for configuring SDK logging.
+class RunAnywhereLogging {
+  RunAnywhereLogging._();
 
-/// Extension methods for logging configuration
-extension RunAnywhereLogging on RunAnywhere {
-  /// Configure logging with a predefined configuration
+  /// Apply a predefined [LoggingConfiguration].
   static void configureLogging(LoggingConfiguration config) {
     setLogLevel(config.minimumLevel);
     setLocalLoggingEnabled(config.localLoggingEnabled);
     // Sentry is handled by DartBridgeTelemetry
   }
 
-  /// Set minimum log level for SDK logging
+  /// Set minimum SDK log level.
   static void setLogLevel(SDKLogLevel level) {
     SDKLoggerConfig.shared.setMinLevel(level);
   }
 
-  /// Enable or disable local console logging
+  /// Enable / disable local console logging.
   static void setLocalLoggingEnabled(bool enabled) {
     SDKLoggerConfig.shared.setLocalLoggingEnabled(enabled);
   }
 
-  /// Enable verbose debugging mode
+  /// Convenience: enable / disable verbose debug logging.
   static void setDebugMode(bool enabled) {
     setLogLevel(enabled ? SDKLogLevel.debug : SDKLogLevel.info);
     setLocalLoggingEnabled(enabled);
   }
 
-  /// Force flush all pending logs
+  /// Flush any pending log buffers.
   static void flushLogs() {
     DartBridgeTelemetry.flush();
   }
 }
 
-// =============================================================================
-// SDK Logger Configuration
-// =============================================================================
-
-/// Singleton for SDK logger configuration
+/// Singleton holding the currently-configured log level +
+/// local-console toggle. C++ logging is configured during
+/// `DartBridge.initialize()` based on environment.
 class SDKLoggerConfig {
-  static final SDKLoggerConfig shared = SDKLoggerConfig._();
-
   SDKLoggerConfig._();
+  static final SDKLoggerConfig shared = SDKLoggerConfig._();
 
   SDKLogLevel _minLevel = SDKLogLevel.info;
   bool _localLoggingEnabled = true;
@@ -123,8 +108,6 @@ class SDKLoggerConfig {
 
   void setMinLevel(SDKLogLevel level) {
     _minLevel = level;
-    // C++ logging is configured during DartBridge.initialize() based on environment
-    // Re-initializing here is not needed as the level is set on the Dart side
   }
 
   void setLocalLoggingEnabled(bool enabled) {

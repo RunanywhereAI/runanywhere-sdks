@@ -20,8 +20,13 @@ import {
 import { SDKLogger, LogLevel } from '../Logging';
 
 /**
- * Legacy SDK error code enum (string-based).
- * @deprecated Prefer using ErrorCode (numeric) for new code.
+ * SDK error code enum (string-based).
+ *
+ * v3.1 audit fix: the @deprecated marker was misleading — this enum is
+ * still the canonical user-facing error-code shape for SDKError
+ * constructor calls. The numeric `ErrorCode` type is the wire-format
+ * encoding; the SDKError class maps between them. Kept without
+ * deprecation annotation.
  */
 export enum SDKErrorCode {
   NotInitialized = 'notInitialized',

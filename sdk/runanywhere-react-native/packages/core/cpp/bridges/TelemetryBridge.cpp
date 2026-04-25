@@ -297,7 +297,7 @@ static void telemetryHttpCallback(
 
     LOGI("Telemetry POST to: %s", fullURL.c_str());
 
-    // Use platform-native HTTP (same as device registration)
+    // Use shared native C++ HTTP transport (same as device registration).
     auto [success, statusCode, responseBody, errorMessage] =
         InitBridge::shared().httpPostSync(fullURL, json, apiKey);
 

@@ -5,7 +5,11 @@
     "rootDir": "./src",
     "declarationDir": "./dist/types",
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"],
+      "@runanywhere/proto-ts": ["../../../runanywhere-proto-ts/dist/index.d.ts"],
+      "@runanywhere/proto-ts/*": ["../../../runanywhere-proto-ts/dist/*"]
+    }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "wasm", "**/*.test.ts", "**/*.spec.ts", "**/*.test-d.ts"]

@@ -165,9 +165,6 @@ object CppBridgeState {
     }
 
     @Volatile
-    private var isRegistered: Boolean = false
-
-    @Volatile
     private var sdkState: Int = SDKState.UNINITIALIZED
 
     @Volatile
@@ -240,40 +237,6 @@ object CppBridgeState {
          */
         fun onError(errorCode: Int, errorMessage: String)
     }
-
-    /**
-     * Register the state callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // Initialize component states
-            initializeComponentStates()
-
-            // Register the state callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetStateCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "State callbacks registered. SDK State: ${SDKState.getName(sdkState)}",
-            )
-        }
-    }
-
-    /**
-     * Check if the state callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     /**
      * Get the current SDK state.
@@ -551,97 +514,8 @@ object CppBridgeState {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the state callbacks with C++ core.
-     *
-     * Registers [getSDKStateCallback], [setSDKStateCallback],
-     * [getComponentStateCallback], [setComponentStateCallback], etc. with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_state_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetStateCallbacks()
-
-    /**
-     * Native method to unset the state callbacks.
-     *
-     * Called during shutdown to clean up native resources.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_state_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetStateCallbacks()
-
-    /**
-     * Native method to get the C++ SDK state.
-     *
-     * @return The C++ SDK state
-     *
-     * C API: rac_get_state()
-     */
-    @JvmStatic
-    external fun nativeGetState(): Int
-
-    /**
-     * Native method to check if C++ SDK is initialized.
-     *
-     * @return true if initialized, false otherwise
-     *
-     * C API: rac_is_initialized()
-     */
-    @JvmStatic
-    external fun nativeIsInitialized(): Boolean
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the state callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetStateCallbacks()
-
-            stateListener = null
-            componentStates.clear()
-            componentErrors.clear()
-            lastError = null
-            lastErrorCode = 0
-            sdkState = SDKState.UNINITIALIZED
-            healthStatus = HealthStatus.HEALTHY
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
     // UTILITY FUNCTIONS
     // ========================================================================
-
-    /**
-     * Initialize component states to NOT_CREATED.
-     */
-    private fun initializeComponentStates() {
-        componentStates[ComponentType.LLM] = ComponentState.NOT_CREATED
-        componentStates[ComponentType.STT] = ComponentState.NOT_CREATED
-        componentStates[ComponentType.TTS] = ComponentState.NOT_CREATED
-        componentStates[ComponentType.VAD] = ComponentState.NOT_CREATED
-        componentStates[ComponentType.VOICE_AGENT] = ComponentState.NOT_CREATED
-    }
 
     /**
      * Update health status based on component states.

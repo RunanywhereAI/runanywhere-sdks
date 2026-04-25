@@ -25,7 +25,6 @@ export {
   transcribeBuffer,
   transcribeStream,
   transcribeFile,
-  startStreamingSTT,
   stopStreamingSTT,
   isStreamingSTT,
 } from './RunAnywhere+STT';
@@ -44,7 +43,6 @@ export {
   isSpeaking,
   stopSpeaking,
   availableTTSVoices,
-  getTTSVoices,
   getTTSVoiceInfo,
   stopSynthesis,
   cancelTTS,
@@ -83,18 +81,8 @@ export {
   cleanupVoiceAgent,
 } from './RunAnywhere+VoiceAgent';
 
-// Voice Session
-export {
-  startVoiceSession,
-  startVoiceSessionWithCallback,
-  createVoiceSession,
-  DEFAULT_VOICE_SESSION_CONFIG,
-} from './RunAnywhere+VoiceSession';
-export type {
-  VoiceSessionConfig,
-  VoiceSessionEvent,
-  VoiceSessionEventCallback
-} from './RunAnywhere+VoiceSession';
+// v3.1: Voice Session exports DELETED. Use VoiceAgentStreamAdapter from
+// the package root (`@runanywhere/core`) for streaming voice events.
 
 // Structured Output
 export {
@@ -128,8 +116,10 @@ export {
   downloadModel,
   cancelDownload,
   deleteModel,
+  deleteAllModels,
   registerModel,
   registerMultiFileModel,
+  refreshModelRegistry,
 } from './RunAnywhere+Models';
 
 // Audio Utilities
@@ -182,6 +172,10 @@ export {
   ragGetDocumentCount,
   ragGetStatistics,
 } from './RunAnywhere+RAG';
+
+// Solutions Runtime (T4.7 / T4.8)
+export { solutions, SolutionHandle } from './RunAnywhere+Solutions';
+export type { SolutionRunArgs } from './RunAnywhere+Solutions';
 
 // Vision Language Model
 export {

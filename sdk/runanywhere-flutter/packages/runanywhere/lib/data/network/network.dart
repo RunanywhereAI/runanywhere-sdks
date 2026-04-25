@@ -1,22 +1,15 @@
 /// Network Services
 ///
 /// Centralized network layer for RunAnywhere Flutter SDK.
-/// Uses the http package for HTTP requests.
-///
-/// Matches React Native SDK network layer structure.
+/// HTTP transport is backed by the commons Phase H client
+/// (`rac_http_client_*`) via [HTTPClientAdapter].
 library network;
 
-// API client
-export 'api_client.dart' show APIClient, AuthTokenProvider;
+// Commons-backed HTTP client (FFI)
+export 'package:runanywhere/adapters/http_client_adapter.dart'
+    show HTTPClientAdapter, HttpClientResponse, HttpClientException;
 
-// API endpoints
-export 'api_endpoint.dart'
-    show APIEndpoint, APIEndpointPath, APIEndpointEnvironment;
-
-// Core HTTP service
-export 'http_service.dart' show HTTPService;
-
-// Models
+// Auth response models
 export 'models/auth/authentication_response.dart'
     show AuthenticationResponse, RefreshTokenResponse;
 
@@ -32,9 +25,6 @@ export 'network_configuration.dart'
         isDevelopment,
         isProduction,
         isStaging;
-
-// Network service protocol
-export 'network_service.dart' show NetworkService;
 
 // Telemetry
 export 'telemetry_service.dart'

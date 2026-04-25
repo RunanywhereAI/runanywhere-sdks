@@ -353,11 +353,16 @@ object RunAnywhereToolCalling {
                 temperature = temperature ?: 0.7f,
             )
 
-        val tokenFlow = RunAnywhere.generateStream(prompt, genOptions)
+        // v2 close-out Phase G-2: generateStream now emits LLMStreamEvent;
+        // collect token text off each non-terminal event.
+        val eventFlow = RunAnywhere.generateStream(prompt, genOptions)
 
         val responseText = StringBuilder()
-        tokenFlow.collect { token ->
-            responseText.append(token)
+        eventFlow.collect { event ->
+            if (event.token.isNotEmpty()) responseText.append(event.token)
+            if (event.is_final && event.error_message.isNotEmpty()) {
+                throw com.runanywhere.sdk.foundation.errors.SDKError.llm(event.error_message)
+            }
         }
 
         return responseText.toString()

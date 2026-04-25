@@ -4,7 +4,7 @@
 #include <climits>
 #include <cstdlib>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 
 #ifdef _WIN32
 #include <windows.h>

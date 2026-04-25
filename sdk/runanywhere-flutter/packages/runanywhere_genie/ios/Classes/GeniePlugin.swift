@@ -3,9 +3,9 @@ import UIKit
 
 /// RunAnywhere Genie Flutter Plugin - iOS Implementation
 ///
-/// This is a stub plugin for the Flutter plugin system.
-/// Genie NPU backend is Android/Snapdragon only - this plugin provides
-/// platform channel compatibility but no actual NPU functionality on iOS.
+/// Genie NPU routing is Android/Snapdragon only and requires SDK-backed native
+/// ops. On iOS this plugin exists so the Flutter package can register cleanly
+/// without claiming runtime NPU support on an unsupported platform.
 public class GeniePlugin: NSObject, FlutterPlugin {
 
     public static func register(with registrar: FlutterPluginRegistrar) {

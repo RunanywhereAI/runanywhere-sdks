@@ -102,6 +102,7 @@ const registerChatTools = () => {
 
       try {
         const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+        // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -227,7 +228,6 @@ export const ChatScreen: React.FC = () => {
     createConversation,
     setCurrentConversation,
     addMessage,
-    updateMessage,
   } = useConversationStore();
 
   // Local state
@@ -336,35 +336,17 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Check if a model is loaded
-   * Note: If a model is already loaded from a previous session, we set a placeholder.
-   * For proper tool calling format detection, the user should select a model through the UI.
+   * Check if a model is loaded from a previous session.
+   *
+   * The SDK can confirm a model is loaded but doesn't expose which one, so we
+   * intentionally leave `currentModel` as null and let the model-required empty
+   * state prompt the user to pick one (required anyway for tool-call format
+   * detection). No stand-in model entry is inserted.
    */
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
       console.warn('[ChatScreen] Text model loaded:', isLoaded);
-      if (isLoaded) {
-        // Model is loaded but we don't know which one - set placeholder
-        // User should select a model through UI for proper format detection
-        setCurrentModel({
-          id: 'loaded-model',
-          name: 'Loaded Model (select model for tool calling)',
-          category: ModelCategory.Language,
-          compatibleFrameworks: [LLMFramework.LlamaCpp],
-          preferredFramework: LLMFramework.LlamaCpp,
-          isDownloaded: true,
-          isAvailable: true,
-          supportsThinking: false,
-        });
-        // Register tools if model already loaded
-        registerChatTools();
-        const tools = RunAnywhere.getRegisteredTools();
-        setRegisteredToolCount(tools.length);
-        console.warn(
-          '[ChatScreen] Model loaded from previous session. For LFM2 tool calling, please select the model again.'
-        );
-      }
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
     }
@@ -474,17 +456,11 @@ export const ChatScreen: React.FC = () => {
     setInputText('');
     setIsLoading(true);
 
-    // Create placeholder assistant message
+    // The assistant message is appended only once the response arrives. The
+    // <TypingIndicator /> rendered while isLoading is true communicates the
+    // "thinking" state to the user, so no stand-in row is inserted.
     const assistantMessageId = generateId();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: MessageRole.Assistant,
-      content: 'Thinking...',
-      timestamp: new Date(),
-    };
-    await addMessage(assistantMessage, currentConversation.id);
 
-    // Scroll to bottom
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -581,7 +557,7 @@ export const ChatScreen: React.FC = () => {
         },
       };
 
-      updateMessage(finalMessage, currentConversation.id);
+      await addMessage(finalMessage, currentConversation.id);
 
       // Final scroll to bottom
       setTimeout(() => {
@@ -590,8 +566,7 @@ export const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('[ChatScreen] Generation error:', error);
 
-      // Update the placeholder message with error
-      updateMessage(
+      await addMessage(
         {
           id: assistantMessageId,
           role: MessageRole.Assistant,
@@ -603,7 +578,7 @@ export const ChatScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentConversation, currentModel, addMessage, updateMessage]);
+  }, [inputText, currentConversation, currentModel, addMessage]);
 
   /**
    * Create a new conversation (clears current chat)

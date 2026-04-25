@@ -1,7 +1,12 @@
 /**
  * FileSystem.ts
  *
- * File system service using react-native-fs for model downloads and storage.
+ * File system service — path resolution, directory management, and archive
+ * extraction via the native module. HTTP download transport lives in
+ * native C++ (rac_http_download_execute); react-native-fs is used here
+ * only for local file operations (Documents/Caches paths, exists/mkdir,
+ * etc.).
+ *
  * Matches Swift SDK's path structure: Documents/RunAnywhere/Models/{framework}/{modelId}/
  */
 
@@ -33,20 +38,9 @@ function getNativeModule(): { extractArchive: (archivePath: string, destPath: st
   return _nativeModuleGetter ? _nativeModuleGetter() : null;
 }
 
-// Types for react-native-fs (defined locally to avoid module resolution issues)
-interface RNFSDownloadBeginCallbackResult {
-  jobId: number;
-  statusCode: number;
-  contentLength: number;
-  headers: Record<string, string>;
-}
-
-interface RNFSDownloadProgressCallbackResult {
-  jobId: number;
-  contentLength: number;
-  bytesWritten: number;
-}
-
+// Types for react-native-fs (defined locally to avoid module resolution issues).
+// Only the filesystem primitives we still need — HTTP download lives in
+// native C++ (rac_http_download_execute).
 interface RNFSStatResult {
   name: string;
   path: string;
@@ -56,25 +50,6 @@ interface RNFSStatResult {
   mtime: number;
   isFile: () => boolean;
   isDirectory: () => boolean;
-}
-
-interface RNFSDownloadResult {
-  jobId: number;
-  statusCode: number;
-  bytesWritten: number;
-}
-
-interface RNFSDownloadFileOptions {
-  fromUrl: string;
-  toFile: string;
-  headers?: Record<string, string>;
-  background?: boolean;
-  progressDivider?: number;
-  begin?: (res: RNFSDownloadBeginCallbackResult) => void;
-  progress?: (res: RNFSDownloadProgressCallbackResult) => void;
-  resumable?: () => void;
-  connectionTimeout?: number;
-  readTimeout?: number;
 }
 
 interface RNFSModule {
@@ -90,8 +65,6 @@ interface RNFSModule {
   unlink: (path: string) => Promise<void>;
   stat: (path: string) => Promise<RNFSStatResult>;
   getFSInfo: () => Promise<{ totalSpace: number; freeSpace: number }>;
-  downloadFile: (options: RNFSDownloadFileOptions) => { jobId: number; promise: Promise<RNFSDownloadResult> };
-  stopDownload: (jobId: number) => void;
 }
 
 // Try to import react-native-fs
@@ -106,9 +79,6 @@ try {
 // Constants matching Swift SDK path structure
 const RUN_ANYWHERE_DIR = 'RunAnywhere';
 const MODELS_DIR = 'Models';
-
-/** Tracks active RNFS download jobIds by modelId for cancellation support. */
-const activeDownloadJobs = new Map<string, number>();
 
 /**
  * Describes a single file within a multi-file model.
@@ -141,29 +111,13 @@ export const MultiFileModelCache = {
 };
 
 /**
- * Download progress information
+ * Download progress information (still re-exported because
+ * services/index.ts and upstream packages depend on the type shape).
  */
 export interface DownloadProgress {
   bytesWritten: number;
   contentLength: number;
   progress: number;
-}
-
-/**
- * Check if a URL points to an archive that needs extraction.
- * C++ handles actual format detection via rac_detect_archive_type().
- */
-function isArchiveUrl(url: string): boolean {
-  const lowercased = url.toLowerCase();
-  return (
-    lowercased.includes('.tar.bz2') ||
-    lowercased.includes('.tbz2') ||
-    lowercased.includes('.tar.gz') ||
-    lowercased.includes('.tgz') ||
-    lowercased.includes('.tar.xz') ||
-    lowercased.includes('.txz') ||
-    lowercased.includes('.zip')
-  );
 }
 
 /**
@@ -321,131 +275,6 @@ export const FileSystem = {
   },
 
   /**
-   * Download a model file
-   */
-  async downloadModel(
-    modelId: string,
-    url: string,
-    onProgress?: (progress: DownloadProgress) => void,
-    framework?: string
-  ): Promise<string> {
-    if (!RNFS) {
-      throw new Error('react-native-fs not installed');
-    }
-
-    const fw = framework || inferFramework(modelId);
-    const folder = this.getModelFolder(modelId, fw);
-    const baseId = getBaseModelId(modelId);
-
-    // Ensure directory structure exists
-    await this.ensureDirectory(this.getRunAnywhereDirectory());
-    await this.ensureDirectory(this.getModelsDirectory());
-    await this.ensureDirectory(this.getFrameworkDirectory(fw));
-    await this.ensureDirectory(folder);
-
-    // Determine destination path
-    let destPath: string;
-    const needsExtraction = isArchiveUrl(url);
-    if (fw === 'LlamaCpp' && !needsExtraction) {
-      // Single GGUF/BIN file (not an archive)
-      const ext =
-        modelId.includes('.gguf') || url.includes('.gguf')
-          ? '.gguf'
-          : modelId.includes('.bin') || url.includes('.bin')
-            ? '.bin'
-            : '.gguf';
-      destPath = `${folder}/${baseId}${ext}`;
-    } else if (fw === 'ONNX' && !needsExtraction) {
-      // ONNX single-file model (.onnx)
-      const ext = modelId.includes('.onnx') || url.includes('.onnx') ? '.onnx' : '';
-      destPath = `${folder}/${baseId}${ext}`;
-    } else {
-      // For archives (ONNX or LlamaCpp VLM tar.gz), download to temp first
-      const tempName = `${baseId}_${Date.now()}.tmp`;
-      destPath = `${RNFS.CachesDirectoryPath}/${tempName}`;
-    }
-
-    logger.info(`Downloading model: ${modelId}`);
-    logger.debug(`URL: ${url}`);
-    logger.debug(`Destination: ${destPath}`);
-
-    // Check if already exists
-    const exists = await RNFS.exists(destPath);
-    if (exists && (fw === 'LlamaCpp' || (fw === 'ONNX' && !needsExtraction))) {
-      logger.info(`Model already exists: ${destPath}`);
-      return destPath;
-    }
-
-    // Download with progress
-    const downloadResult = RNFS.downloadFile({
-      fromUrl: url,
-      toFile: destPath,
-      background: true,
-      progressDivider: 1,
-      begin: (res) => {
-        logger.info(
-          `Download started: ${res.contentLength} bytes, status: ${res.statusCode}`
-        );
-      },
-      progress: (res) => {
-        const progress = res.contentLength > 0
-          ? res.bytesWritten / res.contentLength
-          : 0;
-
-        if (onProgress) {
-          onProgress({
-            bytesWritten: res.bytesWritten,
-            contentLength: res.contentLength,
-            progress,
-          });
-        }
-      },
-    });
-
-    // Track jobId for cancellation support
-    activeDownloadJobs.set(modelId, downloadResult.jobId);
-
-    let result;
-    try {
-      result = await downloadResult.promise;
-    } finally {
-      activeDownloadJobs.delete(modelId);
-    }
-
-    if (result.statusCode !== 200) {
-      throw new Error(`Download failed with status: ${result.statusCode}`);
-    }
-
-    logger.info(`Download completed: ${result.bytesWritten} bytes`);
-
-    // For archives (ONNX or LlamaCpp VLM), extract to final location
-    if (needsExtraction) {
-      logger.info(`Extracting archive for ${fw}...`);
-
-      try {
-        const modelPath = await this.extractArchive(destPath, folder);
-        logger.info(`Extraction completed, model at: ${modelPath}`);
-
-        // Clean up the temporary archive file
-        await RNFS.unlink(destPath);
-
-        destPath = modelPath;
-      } catch (extractError) {
-        logger.error(`Archive extraction failed: ${extractError}`);
-        // Clean up temp file on failure
-        try {
-          await RNFS.unlink(destPath);
-        } catch {
-          // Ignore cleanup errors
-        }
-        throw new Error(`Archive extraction failed: ${extractError}`);
-      }
-    }
-
-    return destPath;
-  },
-
-  /**
    * Extract an archive to a destination folder.
    * Uses native C++ extraction via libarchive (auto-detects format).
    * Returns the extracted model path.
@@ -514,53 +343,6 @@ export const FileSystem = {
   },
 
   /**
-   * Download a single file to a specific destination path.
-   * Used by multi-file download orchestration in RunAnywhere+Models.
-   *
-   * Reference: Swift SDK's AlamofireDownloadService.performDownload()
-   */
-  async downloadFile(
-    url: string,
-    destinationPath: string,
-    onProgress?: (progress: DownloadProgress) => void
-  ): Promise<number> {
-    if (!RNFS) {
-      throw new Error('react-native-fs not installed');
-    }
-
-    const downloadResult = RNFS.downloadFile({
-      fromUrl: url,
-      toFile: destinationPath,
-      background: true,
-      progressDivider: 1,
-      begin: (res) => {
-        logger.info(`Download started: ${res.contentLength} bytes`);
-      },
-      progress: (res) => {
-        const progress = res.contentLength > 0
-          ? res.bytesWritten / res.contentLength
-          : 0;
-
-        if (onProgress) {
-          onProgress({
-            bytesWritten: res.bytesWritten,
-            contentLength: res.contentLength,
-            progress,
-          });
-        }
-      },
-    });
-
-    const result = await downloadResult.promise;
-
-    if (result.statusCode !== 200) {
-      throw new Error(`Download failed with status: ${result.statusCode}`);
-    }
-
-    return result.bytesWritten;
-  },
-
-  /**
    * Delete a model
    */
   async deleteModel(modelId: string, framework?: string): Promise<boolean> {
@@ -580,21 +362,6 @@ export const FileSystem = {
       logger.error(`Failed to delete model: ${modelId}`, { error });
       return false;
     }
-  },
-
-  /**
-   * Cancel an active download by modelId.
-   * Calls RNFS.stopDownload to abort the underlying HTTP request.
-   */
-  cancelDownload(modelId: string): boolean {
-    const jobId = activeDownloadJobs.get(modelId);
-    if (jobId != null && RNFS) {
-      RNFS.stopDownload(jobId);
-      activeDownloadJobs.delete(modelId);
-      logger.info(`Cancelled download for: ${modelId} (jobId=${jobId})`);
-      return true;
-    }
-    return false;
   },
 
   /**

@@ -74,6 +74,18 @@ public:
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
   std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) override;
 
+  // Native auth round-trip (request build + rac_http_client_* transport +
+  // AuthBridge state update). Mirrors HTTPClientAdapter on Swift / CppBridgeAuth
+  // on Kotlin — replaces the JS-side fetch + manual token plumbing.
+  std::shared_ptr<Promise<std::string>> authAuthenticate(
+    const std::string& apiKey,
+    const std::string& baseURL,
+    const std::string& deviceId,
+    const std::string& platform,
+    const std::string& sdkVersion) override;
+  std::shared_ptr<Promise<std::string>> authRefreshToken(
+    const std::string& baseURL) override;
+
   // ============================================================================
   // Device Registration - Delegates to DeviceBridge
   // ============================================================================
@@ -93,17 +105,22 @@ public:
   std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) override;
   std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) override;
+  std::shared_ptr<Promise<bool>> refreshModelRegistry(
+    bool includeRemoteCatalog,
+    bool rescanLocal,
+    bool pruneOrphans) override;
 
   // ============================================================================
-  // Download Service - Delegates to DownloadBridge
+  // Download Service - libcurl-backed rac_http_download_execute runner with
+  // a cancel-token registry so JS can abort in-flight downloads.
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> downloadModel(
-    const std::string& modelId,
+  std::shared_ptr<Promise<void>> downloadModel(
     const std::string& url,
-    const std::string& destPath) override;
-  std::shared_ptr<Promise<bool>> cancelDownload(const std::string& modelId) override;
-  std::shared_ptr<Promise<std::string>> getDownloadProgress(const std::string& modelId) override;
+    const std::string& destPath,
+    const std::string& cancelToken,
+    const std::function<void(double, double)>& onProgress) override;
+  std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) override;
 
   // ============================================================================
   // Storage - Delegates to StorageBridge
@@ -121,16 +138,20 @@ public:
   std::shared_ptr<Promise<std::string>> pollEvents() override;
 
   // ============================================================================
-  // HTTP Client - Delegates to HTTPBridge
+  // HTTP Client - libcurl-backed rac_http_client_* runner. `configureHttp`
+  // still stashes baseURL + apiKey in HTTPBridge so native consumers
+  // (DeviceBridge, telemetry) continue to resolve their base URL.
   // ============================================================================
 
   std::shared_ptr<Promise<bool>> configureHttp(
     const std::string& baseUrl,
     const std::string& apiKey) override;
-  std::shared_ptr<Promise<std::string>> httpPost(
-    const std::string& path,
-    const std::string& bodyJson) override;
-  std::shared_ptr<Promise<std::string>> httpGet(const std::string& path) override;
+  std::shared_ptr<Promise<std::string>> httpRequest(
+    const std::string& method,
+    const std::string& url,
+    const std::string& headersJson,
+    const std::string& bodyJson,
+    double timeoutMs) override;
 
   // ============================================================================
   // Utility Functions
@@ -160,11 +181,24 @@ public:
     const std::string& prompt,
     const std::string& optionsJson,
     const std::function<void(const std::string&, bool)>& callback) override;
+  std::shared_ptr<Promise<double>> getLLMHandle() override;
   std::shared_ptr<Promise<bool>> cancelGeneration() override;
   std::shared_ptr<Promise<std::string>> generateStructured(
     const std::string& prompt,
     const std::string& schema,
     const std::optional<std::string>& optionsJson) override;
+
+  // ============================================================================
+  // LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
+  // ============================================================================
+  std::shared_ptr<Promise<std::string>> llmExtractThinking(
+    const std::string& text);
+  std::shared_ptr<Promise<std::string>> llmStripThinking(
+    const std::string& text);
+  std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(
+    double totalCompletionTokens,
+    const std::string& responseText,
+    const std::string& thinkingText);
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)
@@ -257,6 +291,7 @@ public:
 
   std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
+  std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
   std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
   std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) override;
@@ -288,6 +323,24 @@ public:
   std::shared_ptr<Promise<bool>> ragClearDocuments() override;
   std::shared_ptr<Promise<double>> ragGetDocumentCount() override;
   std::shared_ptr<Promise<std::string>> ragGetStatistics() override;
+
+  // ============================================================================
+  // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8
+  //
+  // Delegates to the C ABI exposed by runanywhere-commons. Handles are
+  // returned to JS as doubles (the C pointer is round-tripped through a
+  // `double` — see HybridRunAnywhereCore.cpp for the ptr<->double
+  // conversion helpers).
+  // ============================================================================
+
+  std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) override;
+  std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) override;
+  std::shared_ptr<Promise<bool>> solutionStart(double handle) override;
+  std::shared_ptr<Promise<bool>> solutionStop(double handle) override;
+  std::shared_ptr<Promise<bool>> solutionCancel(double handle) override;
+  std::shared_ptr<Promise<bool>> solutionFeed(double handle, const std::string& item) override;
+  std::shared_ptr<Promise<bool>> solutionCloseInput(double handle) override;
+  std::shared_ptr<Promise<void>> solutionDestroy(double handle) override;
 
 private:
   // Thread safety

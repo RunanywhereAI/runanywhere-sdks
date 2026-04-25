@@ -358,7 +358,7 @@ private struct StoredModelRow: View {
                         .font(AppTypography.subheadlineMedium)
 
                     HStack(spacing: AppSpacing.smallMedium) {
-                        Text(model.format.rawValue.uppercased())
+                        Text(model.format.wireString.uppercased())
                             .font(AppTypography.caption2)
                             .padding(.horizontal, AppSpacing.small)
                             .padding(.vertical, AppSpacing.xxSmall)
@@ -417,7 +417,7 @@ private struct StoredModelRow: View {
                     HStack {
                         Text("Format:")
                             .font(AppTypography.caption2Medium)
-                        Text(model.format.rawValue.uppercased())
+                        Text(model.format.wireString.uppercased())
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                     }

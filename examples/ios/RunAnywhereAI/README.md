@@ -22,31 +22,51 @@
 
 ---
 
-## 🚀 Running This App (Local Development)
+## Running This App (Local Development)
 
-> **Important:** This sample app consumes the [RunAnywhere Swift SDK](../../../sdk/runanywhere-swift/) as a local Swift package. Before opening this project, you must first build the SDK's native libraries.
+> **Important:** This sample app consumes the repository root Swift package through `Package.swift`. A clean clone needs Swift package resolution and locally built iOS XCFrameworks before Xcode can link the native backends.
 
-### First-Time Setup
+### Clean-Clone Bring-Up
+
+Prerequisites:
+
+- Xcode 15+ with iOS 17+ simulator runtimes and command line tools selected.
+- Swift 5.9+.
+- CMake and Ninja for root native artifact generation.
+- Enough disk for XCFramework output and downloaded AI models.
+
+From a fresh checkout:
 
 ```bash
-# 1. Navigate to the Swift SDK directory
-cd runanywhere-sdks/sdk/runanywhere-swift
+cd examples/ios/RunAnywhereAI
 
-# 2. Run the setup script (~5-15 minutes on first run)
-#    This builds the native C++ frameworks and sets testLocal=true
-./scripts/build-swift.sh --setup
+# Build or refresh local Swift SDK binary targets.
+cd ../../..
+./scripts/build-core-xcframework.sh
+cd examples/ios/RunAnywhereAI
 
-# 3. Navigate to this sample app
-cd ../../examples/ios/RunAnywhereAI
+# Resolve local Swift package dependencies.
+swift package resolve
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -resolvePackageDependencies
 
-# 4. Open in Xcode
-open RunAnywhereAI.xcodeproj
-
-# 5. If Xcode shows package errors, reset caches:
-#    File > Packages > Reset Package Caches
-
-# 6. Build and Run (⌘+R)
+# Build the simulator app.
+xcodebuild \
+  -project RunAnywhereAI.xcodeproj \
+  -scheme RunAnywhereAI \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  build
 ```
+
+Notes:
+
+- The expected local XCFrameworks are `sdk/runanywhere-swift/Binaries/RACommons.xcframework`, `RABackendLLAMACPP.xcframework`, `RABackendONNX.xcframework`, and `RABackendSherpa.xcframework`.
+- If Xcode shows stale package errors, use **File > Packages > Reset Package Caches**, then rerun package resolution.
+- `scripts/verify.sh` checks package resolution, local XCFramework presence, and the simulator build gate.
 
 ### How It Works
 

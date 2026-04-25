@@ -52,7 +52,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   // Voice settings
   double _speechRate = 1.0;
-  final double _pitch = 1.0;
 
   // Model state
   LLMFramework? _selectedFramework;
@@ -138,7 +137,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
       debugPrint('🔄 Loading TTS voice: ${model.name}');
 
       // Load TTS voice via RunAnywhere SDK
-      await sdk.RunAnywhere.loadTTSVoice(model.id);
+      await sdk.RunAnywhereSDK.instance.tts.loadVoice(model.id);
 
       setState(() {
         _selectedFramework = model.preferredFramework ?? LLMFramework.systemTTS;
@@ -176,17 +175,15 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
     try {
       debugPrint('🔊 Generating speech with SDK...');
 
-      // Check if TTS voice is loaded via SDK (matches Swift: RunAnywhere.isTTSVoiceLoaded)
-      if (!sdk.RunAnywhere.isTTSVoiceLoaded) {
+      if (!sdk.RunAnywhereSDK.instance.tts.isLoaded) {
         throw Exception(
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      // Call SDK TTS synthesis API (matches Swift: RunAnywhere.synthesize(_:))
-      final result = await sdk.RunAnywhere.synthesize(
+      final result = await sdk.RunAnywhereSDK.instance.tts.synthesize(
         _textController.text,
         rate: _speechRate,
-        pitch: _pitch,
+        pitch: 1.0,
         volume: 1.0,
       );
 
@@ -444,23 +441,6 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
-          
-          /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
-          const SizedBox(height: AppSpacing.mediumLarge),
-
-          _buildSliderRow(
-            label: 'Pitch',
-            value: _pitch,
-            min: 0.5,
-            max: 2.0,
-            color: AppColors.primaryPurple,
-            onChanged: (value) {
-              setState(() {
-                _pitch = value;
-              });
-            },
-          ),
-          */
         ],
       ),
     );

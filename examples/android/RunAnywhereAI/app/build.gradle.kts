@@ -11,7 +11,7 @@ android {
     namespace = "com.runanywhere.runanywhereai"
     compileSdk = 36
 
-    ndkVersion = "27.0.12077973"
+    ndkVersion = (project.findProperty("racNdkVersion") as? String) ?: "27.0.12077973"
 
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")

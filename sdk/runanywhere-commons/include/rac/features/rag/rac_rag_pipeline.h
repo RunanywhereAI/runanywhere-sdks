@@ -237,6 +237,38 @@ RAC_API rac_result_t rac_rag_query(rac_rag_pipeline_t* pipeline, const rac_rag_q
                                    rac_rag_result_t* out_result);
 
 /**
+ * @brief Streaming token callback fired by `rac_rag_pipeline_query`.
+ *
+ * Return RAC_TRUE to keep generating, RAC_FALSE to request cancellation.
+ * The pointer is valid only for the duration of the call — copy if needed.
+ */
+typedef rac_bool_t (*rac_rag_token_callback_fn)(const char* token, void* user_data);
+
+/**
+ * @brief Streaming RAG query — runs the pipeline as a GraphScheduler DAG and
+ *        emits LLM tokens to `callback` as soon as each one is generated.
+ *
+ * Internally constructs a typed `Embed → Retrieve → ContextAssembly → LLM`
+ * graph (GAP 05 / T4.6), feeds the question in, and joins the scheduler
+ * after the LLM stream terminates. The final assembled answer is also
+ * written into `out_result` for callers that want both the streaming hook
+ * and the aggregate result. Pass `out_result = NULL` if you only care about
+ * the streamed tokens.
+ *
+ * @param pipeline   RAG pipeline handle
+ * @param query      Query parameters
+ * @param callback   Token callback (can be NULL)
+ * @param user_data  Opaque pointer forwarded to `callback`
+ * @param out_result Aggregate result (caller must `rac_rag_result_free`).
+ *                   Can be NULL.
+ * @return RAC_SUCCESS on success, error code otherwise
+ */
+RAC_API rac_result_t rac_rag_pipeline_query(rac_rag_pipeline_t* pipeline,
+                                            const rac_rag_query_t* query,
+                                            rac_rag_token_callback_fn callback, void* user_data,
+                                            rac_rag_result_t* out_result);
+
+/**
  * @brief Clear all documents from the pipeline
  *
  * @param pipeline RAG pipeline handle

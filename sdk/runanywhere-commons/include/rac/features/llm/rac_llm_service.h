@@ -95,6 +95,26 @@ typedef struct rac_llm_service_ops {
 
     /** Clear all KV cache state (optional, NULL if not supported) */
     rac_result_t (*clear_context)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new service instance.
+     *
+     * v3 (RAC_PLUGIN_API_VERSION=3u): replaces the legacy
+     * rac_service_provider_t::create callback from the deleted
+     * service_registry.cpp. Called by commons rac_llm_create() after
+     * rac_plugin_route picks this plugin; the returned impl is passed
+     * to every other ops method (initialize, generate, ..., destroy).
+     *
+     * @param model_id    Model ID or filesystem path. Caller-owned; copy if retaining.
+     * @param config_json Optional JSON config (NULL = backend defaults). Plugins
+     *                    that don't understand config_json MUST ignore it and
+     *                    succeed with defaults.
+     * @param out_impl    Receives heap-allocated backend handle.
+     *                    NULL on failure.
+     *
+     * @return RAC_SUCCESS on success; out_impl is NULL on failure.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_llm_service_ops_t;
 
 /**

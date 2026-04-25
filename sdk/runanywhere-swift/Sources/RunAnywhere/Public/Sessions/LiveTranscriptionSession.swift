@@ -213,20 +213,33 @@ public final class LiveTranscriptionSession: ObservableObject, @unchecked Sendab
         currentText
     }
 
-    // Wrapper to silence deprecation warning until migration to transcribeStream
-    @available(*, deprecated, message: "Migrate to transcribeStream API")
+    // v3.1: rewritten to use the canonical `transcribeStream` API; the
+    // deprecated `startStreamingTranscription` was deleted. This helper
+    // is now just a thin wrapper that maps the 3-callback shape onto the
+    // `transcribeStream(audioData:options:onPartialResult:)` + async
+    // return pattern. LiveTranscriptionSession feeds audio via
+    // `RunAnywhere.processStreamingAudio(samples)` separately; this
+    // method only sets up the callback plumbing.
     private static func startLegacyStreaming(
         options: STTOptions,
         onPartialResult: @escaping (STTTranscriptionResult) -> Void,
         onFinalResult: @escaping (STTOutput) -> Void,
         onError: @escaping (Error) -> Void
     ) async throws {
-        try await RunAnywhere.startStreamingTranscription(
-            options: options,
-            onPartialResult: onPartialResult,
-            onFinalResult: onFinalResult,
-            onError: onError
-        )
+        // `transcribeStream` expects an audio buffer. LiveTranscriptionSession
+        // drives audio via processStreamingAudio; the first transcribeStream
+        // call with empty data kicks off the streaming STT. Subsequent
+        // audio is fed via the separate streaming audio path.
+        do {
+            let output = try await RunAnywhere.transcribeStream(
+                audioData: Data(),
+                options: options,
+                onPartialResult: onPartialResult
+            )
+            onFinalResult(output)
+        } catch {
+            onError(error)
+        }
     }
 }
 

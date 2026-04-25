@@ -14,6 +14,9 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
+// v3.1: CRACommons needed for `rac_voice_agent_handle_t` passed between
+// `CppBridge.VoiceAgent.shared.getHandle()` and `VoiceAgentStreamAdapter(handle:)`.
+import CRACommons
 import Combine
 import os
 
@@ -166,7 +169,11 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Private State
 
-    private var session: VoiceSessionHandle?
+    // v3.1: migrated off the deprecated VoiceSessionHandle to the
+    // proto-stream VoiceAgentStreamAdapter. The adapter wraps the
+    // raw C voice-agent handle and emits RAVoiceEvent proto messages;
+    // we switch on `event.payload` in `handleProtoEvent(_:)` below.
+    private var adapter: VoiceAgentStreamAdapter?
     private var eventTask: Task<Void, Never>?
 
     // MARK: - Initialization State (for idempotency)
@@ -371,7 +378,17 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Conversation Control
 
-    /// Start a voice conversation session
+    /// Start a voice conversation using the proto-stream adapter.
+    ///
+    /// Pipeline:
+    ///   1. Initialize voice agent against already-loaded STT/LLM/TTS models.
+    ///   2. Grab the raw handle via CppBridge.VoiceAgent.
+    ///   3. Wrap with VoiceAgentStreamAdapter (proto bytes → AsyncStream<RAVoiceEvent>).
+    ///   4. Consume RAVoiceEvent proto messages + drive UI state.
+    ///
+    /// `RunAnywhere.startVoiceSession` and `VoiceSessionHandle` were
+    /// removed in the v2 close-out — only the adapter pattern is
+    /// supported now.
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")
@@ -383,28 +400,32 @@ final class VoiceAgentViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Connecting..."
         errorMessage = nil
-        
+
         // Clear previous conversation when starting a new one
         currentTranscript = ""
         assistantResponse = ""
 
         do {
-            let settings = SettingsViewModel.shared
-            let voiceConfig = VoiceSessionConfig(
-                continuousMode: false,
-                thinkingModeEnabled: settings.loadedModelSupportsThinking && settings.thinkingModeEnabled,
-                maxTokens: settings.maxTokens
-            )
-            session = try await RunAnywhere.startVoiceSession(config: voiceConfig)
+            // Initialize voice agent against the currently-loaded models.
+            // SettingsViewModel's continuousMode/thinking/maxTokens land at the C
+            // layer via a future config surface; v3.1 keeps the init minimal.
+            try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+
+            // Wrap the raw handle as an AsyncStream of proto events.
+            let handle = try await CppBridge.VoiceAgent.shared.getHandle()
+            let adapter = VoiceAgentStreamAdapter(handle: handle)
+            self.adapter = adapter
+
             sessionState = .listening
             currentStatus = "Listening..."
+
             eventTask = Task { [weak self] in
-                guard let session = self?.session else { return }
-                for await event in session.events {
-                    await MainActor.run { self?.handleSessionEvent(event) }
+                for await event in adapter.stream() {
+                    await MainActor.run { self?.handleProtoEvent(event) }
                 }
             }
-            logger.info("Voice session started successfully")
+
+            logger.info("Voice session started successfully (proto-stream adapter)")
         } catch {
             sessionState = .error(error.localizedDescription)
             currentStatus = "Error"
@@ -413,13 +434,12 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    /// Stop the current voice conversation
+    /// Stop the current voice conversation.
     func stopConversation() async {
         logger.info("Stopping voice session...")
         eventTask?.cancel()
         eventTask = nil
-        await session?.stop()
-        session = nil
+        adapter = nil  // The adapter's `onTermination` hook deregisters the C callback.
         sessionState = .disconnected
         currentStatus = "Ready"
         audioLevel = 0.0
@@ -427,48 +447,95 @@ final class VoiceAgentViewModel: ObservableObject {
         logger.info("Voice session stopped")
     }
 
+    /// Interrupt currently-playing speech. v3.1: handled at the C layer via
+    /// the voice agent's interrupted event. UI only needs to reset state;
+    /// actual audio-pipeline interruption is driven by the C++ agent when
+    /// VAD detects new speech or the user taps stop.
     func interruptSpeaking() async {
-        await session?.interruptPlayback()
+        // No-op at the Swift layer — the C voice agent owns barge-in.
+        // Future: expose rac_voice_agent_interrupt(handle) if needed.
+        logger.debug("interruptSpeaking: C-layer handled")
     }
 
-    /// Force send current audio buffer (for push-to-talk mode)
+    /// Push-to-talk: force-send the current audio buffer.
     func sendAudioNow() async {
-        await session?.sendNow()
-        logger.debug("Forced audio send")
+        // No-op at the Swift layer — the C voice agent's VAD triggers on
+        // end-of-utterance. Future: expose rac_voice_agent_force_commit(handle).
+        logger.debug("sendAudioNow: C-layer handled (relies on VAD end-of-utterance)")
     }
 
-    /// Resume listening on the current session (push-to-talk: user taps mic after turn completes)
+    /// Resume listening after a turn.
     func resumeListening() async {
-        await session?.resumeListening()
-        // State will be updated via handleSessionEvent when .listening event arrives
-        logger.debug("Resumed listening")
+        // No-op at the Swift layer — the C voice agent loops back to
+        // listening automatically when continuousMode is set. For
+        // push-to-talk, calling startConversation() again re-initializes.
+        logger.debug("resumeListening: C-layer handled")
     }
 
-    // MARK: - Session Event Handling
+    // MARK: - Proto Event Handling (v3.1)
 
-    // swiftlint:disable:next cyclomatic_complexity
-    private func handleSessionEvent(_ event: VoiceSessionEvent) {
-        switch event {
-        case .started: sessionState = .listening; currentStatus = "Listening..."
-        case .listening(let level):
-            audioLevel = level
-            // Transition to .listening state when listening resumes after a turn
-            // (e.g., push-to-talk via resumeListening()). Avoid clobbering
-            // transient states like .speaking or .processing.
-            if sessionState != .listening && sessionState != .speaking && sessionState != .processing {
+    /// Drive UI state from the canonical `RAVoiceEvent` proto.
+    ///
+    /// The old `handleSessionEvent(VoiceSessionEvent)` mapped 10 UX cases to
+    /// UI state. This version switches on the proto oneof `event.payload`
+    /// directly.
+    private func handleProtoEvent(_ event: RAVoiceEvent) {
+        switch event.payload {
+        case let .state(state):
+            switch state.current {
+            case .idle:
                 sessionState = .listening
                 currentStatus = "Listening..."
+            case .listening:
+                if sessionState != .listening && sessionState != .speaking && sessionState != .processing {
+                    sessionState = .listening
+                    currentStatus = "Listening..."
+                }
+            case .thinking:
+                sessionState = .processing
+                currentStatus = "Processing..."
+                isSpeechDetected = false
+            case .speaking:
+                sessionState = .speaking
+                currentStatus = "Speaking..."
+            case .stopped:
+                sessionState = .disconnected
+                currentStatus = "Ready"
+            default:
+                break
             }
-        case .speechStarted: isSpeechDetected = true; currentStatus = "Listening..."
-        case .processing: sessionState = .processing; currentStatus = "Processing..."; isSpeechDetected = false
-        case .transcribed(let text): currentTranscript = text
-        case .responded(let text, _): assistantResponse = text
-        case .speaking: sessionState = .speaking; currentStatus = "Speaking..."
-        case let .turnCompleted(transcript, response, _, _):
-            currentTranscript = transcript; assistantResponse = response
-            sessionState = .connected; currentStatus = "Ready"
-        case .stopped: sessionState = .disconnected; currentStatus = "Ready"
-        case .error(let message): logger.error("Session error: \(message)"); errorMessage = message
+
+        case let .vad(vad):
+            switch vad.type {
+            case .vadEventVoiceStart:
+                isSpeechDetected = true
+                currentStatus = "Listening..."
+            case .vadEventVoiceEndOfUtterance:
+                sessionState = .processing
+                currentStatus = "Processing..."
+                isSpeechDetected = false
+            default:
+                break
+            }
+
+        case let .userSaid(userSaid):
+            currentTranscript = userSaid.text
+
+        case let .assistantToken(token):
+            // Append incrementally; proto emits per-token streaming.
+            assistantResponse += token.text
+
+        case .audio:
+            sessionState = .speaking
+            currentStatus = "Speaking..."
+
+        case let .error(err):
+            logger.error("Voice agent error: \(err.message)")
+            errorMessage = err.message
+
+        case .interrupted, .metrics, .none:
+            // No UX-visible effect for these arms today.
+            break
         }
     }
 

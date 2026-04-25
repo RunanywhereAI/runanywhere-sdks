@@ -6,6 +6,11 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/
  */
 
+// v3.1: proto imports removed — legacy mapper helpers that used them
+// (voiceSessionEventFromProto / voiceSessionEventKindFromProto) were
+// deleted. Consumers import VoiceEvent directly from
+// '@runanywhere/proto-ts/voice_events' when they need it.
+
 /**
  * Component load state
  */
@@ -79,37 +84,10 @@ export interface VoiceTurnResult {
   sampleRate: number;
 }
 
-/**
- * Voice session event types
- */
-export type VoiceSessionEventType =
-  | 'started'
-  | 'speechDetected'
-  | 'transcriptionComplete'
-  | 'responseGenerated'
-  | 'speechSynthesized'
-  | 'turnComplete'
-  | 'error'
-  | 'ended';
-
-/**
- * Voice session event
- */
-export interface VoiceSessionEvent {
-  type: VoiceSessionEventType;
-  timestamp: number;
-  data?: {
-    transcription?: string;
-    response?: string;
-    audio?: string;
-    error?: string;
-  };
-}
-
-/**
- * Voice session callback
- */
-export type VoiceSessionCallback = (event: VoiceSessionEvent) => void;
+// v3.1: VoiceSessionEvent / VoiceSessionEventType interface +
+// voiceSessionEventFromProto + voiceSessionEventKindFromProto mappers +
+// VoiceSessionCallback DELETED. Use VoiceEvent (ts-proto) via
+// VoiceAgentStreamAdapter.stream() directly.
 
 /**
  * Voice agent metrics
@@ -157,20 +135,8 @@ export interface VoiceSessionConfig {
   systemPrompt?: string;
 }
 
-/**
- * Voice session events (matches Swift VoiceSessionEvent)
- */
-export type VoiceSessionEventKind =
-  | { type: 'started' }
-  | { type: 'listening'; audioLevel: number }
-  | { type: 'speechStarted' }
-  | { type: 'processing' }
-  | { type: 'transcribed'; text: string }
-  | { type: 'responded'; text: string }
-  | { type: 'speaking' }
-  | { type: 'turnCompleted'; transcript: string; response: string; audio?: string }
-  | { type: 'stopped' }
-  | { type: 'error'; message: string };
+// v3.1: VoiceSessionEventKind DELETED. Use VoiceEvent (ts-proto)
+// payload.$case switch directly.
 
 /**
  * Voice session error types

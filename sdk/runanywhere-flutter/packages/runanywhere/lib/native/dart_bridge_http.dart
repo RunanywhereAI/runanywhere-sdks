@@ -3,9 +3,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/ffi_types.dart';
@@ -16,11 +18,9 @@ import 'package:runanywhere/public/configuration/sdk_environment.dart';
 // HTTP Bridge
 // =============================================================================
 
-/// HTTP bridge - provides HTTP transport for C++ callbacks.
-/// Matches Swift's `CppBridge+HTTP.swift` and `HTTPService.swift`.
-///
-/// This is the central HTTP transport layer that other bridges use.
-/// C++ can request HTTP calls via callbacks, and this bridge executes them.
+/// HTTP bridge — provides HTTP transport for C++ callbacks.
+/// Backed by the Phase H commons HTTP client (`rac_http_client_*`) via
+/// [HTTPClientAdapter].
 class DartBridgeHTTP {
   DartBridgeHTTP._();
 
@@ -33,13 +33,10 @@ class DartBridgeHTTP {
   final Map<String, String> _defaultHeaders = {};
   bool _isConfigured = false;
 
-  /// Check if HTTP is configured
   bool get isConfigured => _isConfigured;
 
-  /// Get base URL
   String? get baseURL => _baseURL;
 
-  /// Configure HTTP settings
   Future<void> configure({
     required SDKEnvironment environment,
     String? apiKey,
@@ -55,7 +52,6 @@ class DartBridgeHTTP {
       _defaultHeaders.addAll(defaultHeaders);
     }
 
-    // Configure in C++ layer if available
     try {
       final lib = PlatformLoader.loadCommons();
       final configureFn = lib.lookupFunction<
@@ -82,102 +78,88 @@ class DartBridgeHTTP {
     _logger.debug('HTTP configured', metadata: {'baseURL': _baseURL});
   }
 
-  /// Update access token
   void setAccessToken(String? token) {
     _accessToken = token;
   }
 
-  /// Set API key
   void setApiKey(String key) {
     _apiKey = key;
   }
 
-  /// Add default header
   void addHeader(String key, String value) {
     _defaultHeaders[key] = value;
   }
 
-  /// Remove default header
   void removeHeader(String key) {
     _defaultHeaders.remove(key);
   }
 
-  /// Get all default headers
   Map<String, String> get headers => Map.unmodifiable(_defaultHeaders);
 
   // ============================================================================
   // HTTP Methods
   // ============================================================================
 
-  /// Perform GET request
   Future<HTTPResult> get(
     String endpoint, {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) async {
-    return _request(
-      method: 'GET',
-      endpoint: endpoint,
-      headers: headers,
-      requiresAuth: requiresAuth,
-      timeout: timeout,
-    );
-  }
+  }) =>
+      _request(
+        method: 'GET',
+        endpoint: endpoint,
+        headers: headers,
+        requiresAuth: requiresAuth,
+        timeout: timeout,
+      );
 
-  /// Perform POST request
   Future<HTTPResult> post(
     String endpoint, {
     Object? body,
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) async {
-    return _request(
-      method: 'POST',
-      endpoint: endpoint,
-      body: body,
-      headers: headers,
-      requiresAuth: requiresAuth,
-      timeout: timeout,
-    );
-  }
+  }) =>
+      _request(
+        method: 'POST',
+        endpoint: endpoint,
+        body: body,
+        headers: headers,
+        requiresAuth: requiresAuth,
+        timeout: timeout,
+      );
 
-  /// Perform PUT request
   Future<HTTPResult> put(
     String endpoint, {
     Object? body,
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) async {
-    return _request(
-      method: 'PUT',
-      endpoint: endpoint,
-      body: body,
-      headers: headers,
-      requiresAuth: requiresAuth,
-      timeout: timeout,
-    );
-  }
+  }) =>
+      _request(
+        method: 'PUT',
+        endpoint: endpoint,
+        body: body,
+        headers: headers,
+        requiresAuth: requiresAuth,
+        timeout: timeout,
+      );
 
-  /// Perform DELETE request
   Future<HTTPResult> delete(
     String endpoint, {
     Map<String, String>? headers,
     bool requiresAuth = true,
     Duration? timeout,
-  }) async {
-    return _request(
-      method: 'DELETE',
-      endpoint: endpoint,
-      headers: headers,
-      requiresAuth: requiresAuth,
-      timeout: timeout,
-    );
-  }
+  }) =>
+      _request(
+        method: 'DELETE',
+        endpoint: endpoint,
+        headers: headers,
+        requiresAuth: requiresAuth,
+        timeout: timeout,
+      );
 
-  /// Internal request handler
   Future<HTTPResult> _request({
     required String method,
     required String endpoint,
@@ -192,9 +174,8 @@ class DartBridgeHTTP {
     }
 
     try {
-      final url = Uri.parse('$_baseURL$endpoint');
+      final url = '$_baseURL$endpoint';
 
-      // Build headers
       final requestHeaders = <String, String>{
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -202,7 +183,6 @@ class DartBridgeHTTP {
         if (headers != null) ...headers,
       };
 
-      // Resolve token if auth is required (matches Swift's resolveToken pattern)
       if (requiresAuth) {
         final token = await _resolveToken(requiresAuth: true);
         if (token != null && token.isNotEmpty) {
@@ -212,49 +192,37 @@ class DartBridgeHTTP {
         }
       }
 
-      // Encode body
-      String? bodyString;
+      Uint8List? bodyBytes;
       if (body != null) {
         if (body is String) {
-          bodyString = body;
+          bodyBytes = Uint8List.fromList(utf8.encode(body));
+        } else if (body is Uint8List) {
+          bodyBytes = body;
         } else {
-          bodyString = jsonEncode(body);
+          bodyBytes = Uint8List.fromList(utf8.encode(jsonEncode(body)));
         }
       }
 
-      // Make request with timeout
-      final client = http.Client();
-      http.Response response;
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: method,
+        url: url,
+        headers: requestHeaders,
+        body: bodyBytes,
+        timeoutMs:
+            (timeout ?? const Duration(seconds: 30)).inMilliseconds,
+      );
 
-      try {
-        final request = http.Request(method, url);
-        request.headers.addAll(requestHeaders);
-        if (bodyString != null) {
-          request.body = bodyString;
-        }
-
-        final streamedResponse = await client
-            .send(request)
-            .timeout(timeout ?? const Duration(seconds: 30));
-        response = await http.Response.fromStream(streamedResponse);
-      } finally {
-        client.close();
-      }
-
-      // Handle 401 Unauthorized - attempt token refresh and retry once
       if (response.statusCode == 401 && requiresAuth && !isRetry) {
         _logger.debug('Received 401, attempting token refresh and retry...');
-        
+
         final authBridge = DartBridgeAuth.instance;
         final refreshResult = await authBridge.refreshToken();
-        
+
         if (refreshResult.isSuccess) {
           final newToken = authBridge.getAccessToken();
           if (newToken != null) {
             _accessToken = newToken;
             _logger.info('Token refreshed, retrying request...');
-            
-            // Retry the request with new token
             return _request(
               method: method,
               endpoint: endpoint,
@@ -270,22 +238,20 @@ class DartBridgeHTTP {
         }
       }
 
-      // Parse response
-      if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.isSuccess) {
         return HTTPResult.success(
           statusCode: response.statusCode,
           body: response.body,
           headers: response.headers,
         );
-      } else {
-        return HTTPResult(
-          isSuccess: false,
-          statusCode: response.statusCode,
-          body: response.body,
-          headers: response.headers,
-          error: _parseError(response.body, response.statusCode),
-        );
       }
+      return HTTPResult(
+        isSuccess: false,
+        statusCode: response.statusCode,
+        body: response.body,
+        headers: response.headers,
+        error: _parseError(response.body, response.statusCode),
+      );
     } catch (e) {
       _logger.error('HTTP request failed', metadata: {
         'method': method,
@@ -296,8 +262,6 @@ class DartBridgeHTTP {
     }
   }
 
-  /// Resolve valid token for request, refreshing if needed.
-  /// Matches Swift's HTTPService.resolveToken(requiresAuth:)
   Future<String?> _resolveToken({required bool requiresAuth}) async {
     if (!requiresAuth) {
       return _apiKey;
@@ -305,13 +269,11 @@ class DartBridgeHTTP {
 
     final authBridge = DartBridgeAuth.instance;
 
-    // Check if we have a valid token
     final currentToken = authBridge.getAccessToken();
     if (currentToken != null && !authBridge.needsRefresh()) {
       return currentToken;
     }
 
-    // Try refresh if authenticated
     if (authBridge.isAuthenticated()) {
       _logger.debug('Token needs refresh, attempting refresh...');
       final result = await authBridge.refreshToken();
@@ -327,14 +289,17 @@ class DartBridgeHTTP {
       }
     }
 
-    // Fallback to access token or API key
     if (_accessToken != null && _accessToken!.isNotEmpty) {
       return _accessToken;
     }
     return _apiKey;
   }
 
-  /// Download file
+  /// Stream a file from [url] into [destinationPath]. On non-2xx
+  /// responses the file is left untouched and a failure result is
+  /// returned. `onProgress` is best-effort (the blocking request does
+  /// not chunk-report; the hook is invoked with the final size when
+  /// the download completes).
   Future<HTTPResult> download(
     String url,
     String destinationPath, {
@@ -342,39 +307,36 @@ class DartBridgeHTTP {
     Duration? timeout,
   }) async {
     try {
-      final uri = url.startsWith('http') ? Uri.parse(url) : Uri.parse('$_baseURL$url');
-
-      final client = http.Client();
-      try {
-        final request = http.Request('GET', uri);
-        if (_accessToken != null) {
-          request.headers['Authorization'] = 'Bearer $_accessToken';
-        }
-
-        final streamedResponse = await client.send(request);
-
-        if (streamedResponse.statusCode >= 200 && streamedResponse.statusCode < 300) {
-          final file = await _saveStreamToFile(
-            streamedResponse.stream,
-            destinationPath,
-            streamedResponse.contentLength ?? 0,
-            onProgress,
-          );
-
-          return HTTPResult.success(
-            statusCode: streamedResponse.statusCode,
-            body: file,
-          );
-        } else {
-          return HTTPResult(
-            isSuccess: false,
-            statusCode: streamedResponse.statusCode,
-            error: 'Download failed with status ${streamedResponse.statusCode}',
-          );
-        }
-      } finally {
-        client.close();
+      final resolved = url.startsWith('http') ? url : '$_baseURL$url';
+      final extraHeaders = <String, String>{};
+      if (_accessToken != null) {
+        extraHeaders['Authorization'] = 'Bearer $_accessToken';
       }
+
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'GET',
+        url: resolved,
+        headers: extraHeaders,
+        timeoutMs: (timeout ?? const Duration(seconds: 30)).inMilliseconds,
+      );
+
+      if (!response.isSuccess) {
+        return HTTPResult(
+          isSuccess: false,
+          statusCode: response.statusCode,
+          error: 'Download failed with status ${response.statusCode}',
+        );
+      }
+
+      final file = File(destinationPath);
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+      onProgress?.call(response.bodyBytes.length, response.bodyBytes.length);
+
+      return HTTPResult.success(
+        statusCode: response.statusCode,
+        body: destinationPath,
+      );
     } catch (e) {
       return HTTPResult.failure(e.toString());
     }
@@ -404,27 +366,6 @@ class DartBridgeHTTP {
     } catch (e) {
       return 'HTTP error $statusCode';
     }
-  }
-
-  Future<String> _saveStreamToFile(
-    Stream<List<int>> stream,
-    String path,
-    int totalBytes,
-    void Function(int, int)? onProgress,
-  ) async {
-    // Note: In a real implementation, use dart:io File to save
-    // For now, just consume the stream
-    var downloaded = 0;
-    final chunks = <List<int>>[];
-
-    await for (final chunk in stream) {
-      chunks.add(chunk);
-      downloaded += chunk.length;
-      onProgress?.call(downloaded, totalBytes);
-    }
-
-    // Would save to file here
-    return path;
   }
 }
 
@@ -463,7 +404,6 @@ class HTTPResult {
   factory HTTPResult.failure(String error) =>
       HTTPResult(isSuccess: false, error: error);
 
-  /// Parse JSON body
   Map<String, dynamic>? get json {
     if (body == null) return null;
     try {
@@ -473,7 +413,6 @@ class HTTPResult {
     }
   }
 
-  /// Parse JSON array body
   List<dynamic>? get jsonArray {
     if (body == null) return null;
     try {

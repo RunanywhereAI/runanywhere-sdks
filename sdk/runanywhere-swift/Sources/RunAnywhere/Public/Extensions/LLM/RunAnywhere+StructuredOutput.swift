@@ -86,21 +86,28 @@ public extension RunAnywhere {
                 do {
                     var tokenIndex = 0
 
-                    // Stream tokens via public API
-                    let streamingResult = try await generateStream(content, options: effectiveOptions)
-                    for try await token in streamingResult.stream {
-                        let streamToken = StreamToken(
-                            text: token,
-                            timestamp: Date(),
-                            tokenIndex: tokenIndex
-                        )
-
-                        // Accumulate for parsing
-                        await accumulator.append(token)
-
-                        // Yield to UI
-                        continuation.yield(streamToken)
-                        tokenIndex += 1
+                    // v2 close-out Phase G-2: generateStream returns
+                    // AsyncStream<RALLMStreamEvent>; unwrap token text
+                    // per event and stop at the terminal is_final marker.
+                    let eventStream = try await generateStream(content, options: effectiveOptions)
+                    for await event in eventStream {
+                        let tokenText = event.token
+                        if !tokenText.isEmpty {
+                            let streamToken = StreamToken(
+                                text: tokenText,
+                                timestamp: Date(),
+                                tokenIndex: tokenIndex
+                            )
+                            await accumulator.append(tokenText)
+                            continuation.yield(streamToken)
+                            tokenIndex += 1
+                        }
+                        if event.isFinal {
+                            if !event.errorMessage.isEmpty {
+                                throw SDKError.llm(.generationFailed, event.errorMessage)
+                            }
+                            break
+                        }
                     }
 
                     await accumulator.markComplete()

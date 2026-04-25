@@ -76,16 +76,16 @@ RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swi
 │   rac_llm_service.h, rac_stt_service.h, rac_tts_service.h   │
 │   rac_vad_service.h, rac_voice_agent.h                      │
 └────────────────────────────┬────────────────────────────────┘
-                             │ vtable dispatch
+                             │ rac_engine_vtable_t dispatch
 ┌────────────────────────────▼────────────────────────────────┐
-│              Service & Module Registry                       │
-│   - Priority-based provider selection                        │
-│   - canHandle pattern for capability matching                │
-│   - Lazy service instantiation                               │
+│          Plugin Registry + Engine Router                     │
+│   - ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION)  │
+│   - Hardware-aware routing (Metal/ANE/CUDA/QNN)              │
+│   - Static register or dlopen-loaded (rac_registry_load_plugin) │
 └────────────────────────────┬────────────────────────────────┘
                              │
 ┌────────────────────────────▼────────────────────────────────┐
-│                     Backends (src/backends/)                │
+│                   Engine Plugins (engines/)                  │
 │   ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐   │
 │   │  llamacpp/  │  │      onnx/      │  │  whispercpp/  │   │
 │   │  LLM (GGUF) │  │ STT/TTS/VAD     │  │  STT (GGML)   │   │
@@ -298,12 +298,23 @@ rac_result_t rac_module_register(const rac_module_info_t* info);
 rac_result_t rac_module_unregister(const char* module_id);
 rac_result_t rac_module_list(const rac_module_info_t** out_modules, size_t* out_count);
 
-// Service Creation
-rac_result_t rac_service_register_provider(const rac_service_provider_t* provider);
-rac_result_t rac_service_create(rac_capability_t capability,
-                                const rac_service_request_t* request,
-                                rac_handle_t* out_handle);
+// Engine Plugin Registry (rac/plugin/rac_plugin_loader.h, rac_plugin_entry.h)
+//
+// Plugins publish a single rac_engine_vtable_t whose metadata.abi_version
+// must equal RAC_PLUGIN_API_VERSION (3u). Static builds use
+// RAC_STATIC_PLUGIN_REGISTER(<name>) at file scope in the engine's
+// rac_plugin_entry_<name>.cpp; shared builds expose the same entry symbol
+// for dlopen via rac_registry_load_plugin.
+rac_result_t rac_registry_load_plugin(const char* path);
+rac_result_t rac_registry_unload_plugin(const char* name);
+uint32_t     rac_plugin_api_version(void);
 ```
+
+> Historical: v2 used a separate capability-oriented service registry
+> (`rac_service_register_provider` / `rac_service_create`). That surface was
+> removed in the v3 ABI cut-over and replaced by the unified engine-plugin
+> vtable above. See `include/rac/plugin/rac_engine_vtable.h` for the 8 active
+> + 10 reserved primitive slots.
 
 ### LLM Service
 
@@ -432,6 +443,8 @@ typedef struct rac_platform_adapter {
 | **Sherpa-ONNX** | 1.12.18+ | STT/TTS/VAD via ONNX Runtime |
 | **ONNX Runtime** | 1.17.1+ | Neural network inference |
 | **nlohmann/json** | 3.11.3 | JSON parsing |
+| **libarchive** | 3.8.1 | ZIP / tar.gz / tar.bz2 model archive extraction |
+| **libcurl** | system or curl-7_88_1 | Native HTTP transport behind `rac_http_client_*` (v2 close-out Phase H). System package preferred; `FetchContent` fallback builds a static copy with platform-native TLS (SecureTransport on Apple, SChannel on Windows, OpenSSL elsewhere). |
 
 ### Binary Outputs
 

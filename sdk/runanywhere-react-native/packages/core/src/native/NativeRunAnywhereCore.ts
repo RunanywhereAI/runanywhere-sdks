@@ -281,9 +281,14 @@ export function requireFileSystemModule(): FileSystemModule {
       onProgress?: (progress: number) => void
     ): Promise<boolean> => {
       try {
-        await FileSystem.downloadModel(fileName, url, (progress: { progress: number }) => {
+        const native = requireNativeCoreModule();
+        const folder = FileSystem.getModelFolder(fileName);
+        await FileSystem.ensureDirectory(folder);
+        const destPath = `${folder}/${fileName}`;
+        const cancelToken = `fs-module::${fileName}::${Date.now()}`;
+        await native.downloadModel(url, destPath, cancelToken, (bytesWritten: number, totalBytes: number) => {
           if (onProgress) {
-            onProgress(progress.progress);
+            onProgress(totalBytes > 0 ? bytesWritten / totalBytes : 0);
           }
         });
         return true;

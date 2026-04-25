@@ -128,6 +128,32 @@ RAC_WHISPERCPP_API rac_bool_t rac_stt_whispercpp_is_ready(rac_handle_t handle);
  */
 RAC_WHISPERCPP_API void rac_stt_whispercpp_destroy(rac_handle_t handle);
 
+/**
+ * Enumerates languages supported by whisper.cpp as a JSON array of codes.
+ * Backed by whisper_lang_max_id() / whisper_lang_str().
+ *
+ * @param handle    Service handle
+ * @param out_json  Output: malloc'd JSON string (caller frees with free()).
+ * @return RAC_SUCCESS or error code
+ */
+RAC_WHISPERCPP_API rac_result_t rac_stt_whispercpp_get_languages(rac_handle_t handle,
+                                                                 char** out_json);
+
+/**
+ * Detects the language of a short PCM clip (Int16 mono) via whisper.cpp.
+ * Runs a transcription with detect_language=true and reads whisper_full_lang_id().
+ *
+ * @param handle        Service handle
+ * @param audio_data    Int16 PCM buffer
+ * @param audio_size    Size in bytes
+ * @param options       Optional options (language override, sample rate). Can be NULL.
+ * @param out_language  Output: malloc'd language code (e.g. "en"). Caller frees.
+ * @return RAC_SUCCESS or error code
+ */
+RAC_WHISPERCPP_API rac_result_t
+rac_stt_whispercpp_detect_language(rac_handle_t handle, const void* audio_data, size_t audio_size,
+                                   const rac_stt_options_t* options, char** out_language);
+
 // =============================================================================
 // BACKEND REGISTRATION
 // =============================================================================

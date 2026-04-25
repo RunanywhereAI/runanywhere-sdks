@@ -556,3 +556,29 @@ extern "C" rac_result_t rac_tts_component_get_metrics(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_tts_component*>(handle);
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
+
+// =============================================================================
+// LANGUAGE INTROSPECTION
+// =============================================================================
+
+extern "C" rac_result_t rac_tts_component_get_supported_languages(rac_handle_t handle,
+                                                                  char** out_json) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!out_json)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    *out_json = nullptr;
+
+    auto* component = reinterpret_cast<rac_tts_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("TTS.Component", "No voice loaded - cannot enumerate languages");
+        return result;
+    }
+
+    return rac_tts_get_languages(service, out_json);
+}

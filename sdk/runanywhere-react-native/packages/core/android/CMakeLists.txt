@@ -36,13 +36,8 @@ set(RAC_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/main/jniLibs/include)
 # RACommons is REQUIRED - it's downloaded via Gradle downloadNativeLibs task
 # =============================================================================
 if(NOT EXISTS "${JNILIB_DIR}/librac_commons.so")
-    message(WARNING "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
-                    "This ABI will not be functional. To fix, run: ./gradlew :runanywhere_core:downloadNativeLibs\n"
-                    "Or set reactNativeArchitectures=arm64-v8a in gradle.properties to skip this ABI.")
-    # Create a minimal stub library so the build can proceed for other ABIs
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp" "// Stub for missing ABI ${ANDROID_ABI}")
-    add_library(${PACKAGE_NAME} SHARED "${CMAKE_CURRENT_BINARY_DIR}/stub.cpp")
-    return()
+    message(FATAL_ERROR "[RunAnywhereCore] RACommons not found for ${ANDROID_ABI} at ${JNILIB_DIR}/librac_commons.so\n"
+                        "Run ./scripts/build-core-android.sh from the repo root or set reactNativeArchitectures to an ABI with staged natives.")
 endif()
 
 add_library(rac_commons SHARED IMPORTED)
@@ -57,17 +52,14 @@ message(STATUS "[RunAnywhereCore] Found RACommons at ${JNILIB_DIR}/librac_common
 # =============================================================================
 # Collect core bridge source files
 file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-# TODO: Re-enable ToolCallingBridge when commons library includes rac_tool_call_* functions
-# Currently disabled because these functions aren't in commons v0.1.4
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*ToolCallingBridge\\.cpp$")
-# TODO: Re-enable RAGBridge when commons library includes rac_rag_* functions
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*RAGBridge\\.cpp$")
-# TODO: Re-enable CompatibilityBridge when commons library includes rac_model_check_compatibility
-list(FILTER BRIDGE_SOURCES EXCLUDE REGEX ".*CompatibilityBridge\\.cpp$")
+file(GLOB HYBRID_CORE_DOMAIN_SOURCES "../cpp/HybridRunAnywhereCore+*.cpp")
 
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
+    ../cpp/HybridLLM.cpp
     ../cpp/HybridRunAnywhereCore.cpp
+    ${HYBRID_CORE_DOMAIN_SOURCES}
+    ../cpp/HybridVoiceAgent.cpp
     ${BRIDGE_SOURCES}
 )
 
@@ -135,6 +127,7 @@ target_link_libraries(
     ${PACKAGE_NAME}
     ${LOG_LIB}
     android
+    c++_shared
 )
 
 # Link RACommons - REQUIRED for core functionality

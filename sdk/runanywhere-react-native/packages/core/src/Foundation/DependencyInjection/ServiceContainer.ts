@@ -8,10 +8,7 @@
  */
 
 import { SDKLogger } from '../Logging/Logger/SDKLogger';
-import {
-  HTTPService,
-  SDKEnvironment,
-} from '../../services/Network';
+import { SDKEnvironment } from '../../services/Network';
 
 const logger = new SDKLogger('ServiceContainer');
 
@@ -56,18 +53,6 @@ export class ServiceContainer {
     }
 
     logger.debug(`API config stored: env=${this.environmentString}`);
-  }
-
-  // ==========================================================================
-  // Service Access
-  // ==========================================================================
-
-  /**
-   * Get the HTTP service instance
-   * Note: HTTP is primarily handled by native layer
-   */
-  public get httpService(): HTTPService {
-    return HTTPService.shared;
   }
 
   // ==========================================================================

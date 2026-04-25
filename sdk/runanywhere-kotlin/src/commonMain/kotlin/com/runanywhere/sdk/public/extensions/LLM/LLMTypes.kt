@@ -13,8 +13,6 @@ package com.runanywhere.sdk.public.extensions.LLM
 import com.runanywhere.sdk.core.types.ComponentConfiguration
 import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.core.types.SDKComponent
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
 // MARK: - LLM Configuration
@@ -153,19 +151,11 @@ data class LLMGenerationResult(
 )
 
 // MARK: - LLM Streaming Result
-
-/**
- * Container for streaming generation with metrics.
- * Mirrors Swift LLMStreamingResult.
- *
- * In Kotlin, we use Flow instead of AsyncThrowingStream.
- */
-data class LLMStreamingResult(
-    /** Flow of tokens as they are generated */
-    val stream: Flow<String>,
-    /** Deferred result that completes with final generation result including metrics */
-    val result: Deferred<LLMGenerationResult>,
-)
+//
+// v2 close-out Phase G-2: `LLMStreamingResult` was DELETED. Callers
+// consume `Flow<LLMStreamEvent>` from `RunAnywhere.generateStream(...)`
+// directly and derive metrics from the terminal event (`isFinal == true`,
+// carries `finishReason` + optional `errorMessage`).
 
 // MARK: - Thinking Tag Pattern
 

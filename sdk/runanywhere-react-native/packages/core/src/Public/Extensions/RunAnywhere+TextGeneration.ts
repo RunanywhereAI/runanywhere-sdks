@@ -21,6 +21,8 @@ import type {
   LLMStreamingResult,
   LLMGenerationResult,
 } from '../../types/LLMTypes';
+import { LLMStreamAdapter } from '../../Adapters/LLMStreamAdapter';
+import type { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
@@ -156,6 +158,12 @@ export async function generate(
  *
  * Matches Swift SDK: RunAnywhere.generateStream(_:options:)
  *
+ * v2 close-out / GAP 09: events flow through `LLMStreamAdapter`
+ *   C-callback → proto bytes → `LLMStreamEvent` → token string
+ * The struct-callback arg passed to `native.generateStream(...)` is a
+ * no-op driver — we consume tokens via the adapter's proto subscription
+ * and only need the underlying call to keep the C++ engine loop alive.
+ *
  * Example usage:
  * ```typescript
  * const streaming = await generateStream(prompt);
@@ -181,11 +189,8 @@ export async function generateStream(
   const native = requireNativeModule();
   const startTime = Date.now();
   let firstTokenTime: number | null = null;
-  let cancelled = false;
   let fullText = '';
   let tokenCount = 0;
-  let resolveResult: ((result: LLMGenerationResult) => void) | null = null;
-  let rejectResult: ((error: Error) => void) | null = null;
 
   const optionsJson = JSON.stringify({
     max_tokens: options?.maxTokens ?? 1000,
@@ -193,112 +198,90 @@ export async function generateStream(
     system_prompt: options?.systemPrompt ?? null,
   });
 
-  // Create the result promise
+  // Subscribe BEFORE driving the engine so we never miss early tokens
+  // emitted synchronously from inside the native generate call.
+  const handle = await native.getLLMHandle();
+  const eventIterator = new LLMStreamAdapter(handle)
+    .stream({
+      prompt,
+      maxTokens: options?.maxTokens ?? 1000,
+      temperature: options?.temperature ?? 0.7,
+      topP: 0,
+      topK: 0,
+      systemPrompt: options?.systemPrompt ?? '',
+      emitThoughts: false,
+    })
+    [Symbol.asyncIterator]();
+
+  let resolveResult!: (result: LLMGenerationResult) => void;
+  let rejectResult!: (error: Error) => void;
   const resultPromise = new Promise<LLMGenerationResult>((resolve, reject) => {
     resolveResult = resolve;
     rejectResult = reject;
   });
 
-  // Create async generator for tokens
-  async function* tokenGenerator(): AsyncGenerator<string> {
-    const tokenQueue: string[] = [];
-    let resolver: ((value: IteratorResult<string>) => void) | null = null;
-    let done = false;
-    let error: Error | null = null;
-
-    // Start streaming
-    native.generateStream(
-      prompt,
-      optionsJson,
-      (token: string, isComplete: boolean) => {
-        if (cancelled) return;
-
-        if (!isComplete && token) {
-          // Track first token time
-          if (firstTokenTime === null) {
-            firstTokenTime = Date.now();
-          }
-
-          fullText += token;
-          tokenCount++;
-
-          if (resolver) {
-            resolver({ value: token, done: false });
-            resolver = null;
-          } else {
-            tokenQueue.push(token);
-          }
-        }
-
-        if (isComplete) {
-          done = true;
-
-          // Build final result
-          const endTime = Date.now();
-          const latencyMs = endTime - startTime;
-          const timeToFirstTokenMs = firstTokenTime ? firstTokenTime - startTime : undefined;
-          const tokensPerSecond = latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
-
-          const finalResult: LLMGenerationResult = {
-            text: fullText,
-            thinkingContent: undefined,
-            inputTokens: Math.ceil(prompt.length / 4),
-            tokensUsed: tokenCount,
-            modelUsed: 'unknown',
-            latencyMs,
-            framework: 'unknown', // Backend-agnostic
-            tokensPerSecond,
-            timeToFirstTokenMs,
-            thinkingTokens: 0,
-            responseTokens: tokenCount,
-          };
-
-          if (resolveResult) {
-            resolveResult(finalResult);
-          }
-
-          if (resolver) {
-            resolver({ value: undefined as unknown as string, done: true });
-            resolver = null;
-          }
-
-          EventBus.publish('Generation', { type: 'completed' });
-        }
-      }
-    ).catch((err: Error) => {
-      error = err;
-      done = true;
-      if (rejectResult) {
-        rejectResult(err);
-      }
-      if (resolver) {
-        resolver({ value: undefined as unknown as string, done: true });
-      }
+  // Drive the C++ engine loop. Tokens are delivered to `eventIterator`
+  // via the adapter's proto-byte callback; the struct-callback is a
+  // no-op because we consume events via the adapter, not per-token.
+  native
+    .generateStream(prompt, optionsJson, () => {
+      /* events delivered via LLMStreamAdapter */
+    })
+    .catch((err: Error) => {
+      rejectResult(err);
       EventBus.publish('Generation', { type: 'failed', error: err.message });
+      void eventIterator.return?.();
     });
 
-    // Yield tokens
-    while (!done || tokenQueue.length > 0) {
-      if (tokenQueue.length > 0) {
-        yield tokenQueue.shift()!;
-      } else if (!done) {
-        const result = await new Promise<IteratorResult<string>>((resolve) => {
-          resolver = resolve;
-        });
-        if (result.done) break;
-        yield result.value;
-      }
-    }
+  async function* tokenGenerator(): AsyncGenerator<string> {
+    try {
+      while (true) {
+        const next = await eventIterator.next();
+        if (next.done) break;
+        const event: LLMStreamEvent = next.value;
 
-    if (error) {
-      throw error;
+        if (event.token) {
+          if (firstTokenTime === null) firstTokenTime = Date.now();
+          fullText += event.token;
+          tokenCount++;
+          yield event.token;
+        }
+
+        if (event.isFinal) {
+          if (event.errorMessage) {
+            const err = new Error(event.errorMessage);
+            rejectResult(err);
+            EventBus.publish('Generation', { type: 'failed', error: err.message });
+            throw err;
+          }
+          break;
+        }
+      }
+
+      const latencyMs = Date.now() - startTime;
+      resolveResult({
+        text: fullText,
+        thinkingContent: undefined,
+        inputTokens: Math.ceil(prompt.length / 4),
+        tokensUsed: tokenCount,
+        modelUsed: 'unknown',
+        latencyMs,
+        framework: 'unknown', // Backend-agnostic
+        tokensPerSecond: latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0,
+        timeToFirstTokenMs:
+          firstTokenTime !== null ? firstTokenTime - startTime : undefined,
+        thinkingTokens: 0,
+        responseTokens: tokenCount,
+      });
+      EventBus.publish('Generation', { type: 'completed' });
+    } finally {
+      await eventIterator.return?.();
     }
   }
 
-  // Cancel function
   const cancel = (): void => {
-    cancelled = true;
     cancelGeneration();
+    void eventIterator.return?.();
   };
 
   return {

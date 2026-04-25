@@ -14,7 +14,7 @@
 
 import type { LlamaCppModule } from './LlamaCppBridge';
 import { LlamaCppBridge } from './LlamaCppBridge';
-import { SDKLogger } from '@runanywhere/web';
+import { SDKLogger, HTTPAdapter, DownloadStatus } from '@runanywhere/web';
 
 const logger = new SDKLogger('PlatformAdapter');
 
@@ -376,7 +376,12 @@ export class PlatformAdapter {
   // -----------------------------------------------------------------------
 
   /**
-   * Perform an HTTP download using fetch() and stream to Emscripten FS.
+   * Perform an HTTP download through the commons libcurl-backed HTTP
+   * client (T3.13). Routes bytes directly into the Emscripten FS via
+   * `rac_http_download_execute`, firing the C progress/complete
+   * callbacks on the JS task queue so the C caller (e.g. the diffusion
+   * tokenizer vocab fetch, or the model download orchestrator) keeps
+   * its existing task-id-returning contract.
    */
   private async performDownload(
     m: LlamaCppModule,
@@ -386,58 +391,41 @@ export class PlatformAdapter {
     completeCbPtr: number,
     cbUserData: number,
   ): Promise<void> {
+    // Ensure parent directory exists on the Emscripten FS before the
+    // C client starts writing — rac_http_download_execute opens the
+    // file via fopen() which would otherwise fail with ENOENT.
+    const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
+    if (parentDir) {
+      try { m.FS.mkdir(parentDir); } catch { /* exists */ }
+    }
+
+    const http = new HTTPAdapter(m as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
+    let lastReported = 0;
+    let lastTotal = 0;
+
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      const status = await http.download(
+        { url, destinationPath: destPath, followRedirects: true },
+        (bytesWritten, totalBytes) => {
+          lastReported = bytesWritten;
+          lastTotal = totalBytes;
+          if (progressCbPtr !== 0) {
+            m.dynCall('viii', progressCbPtr, [bytesWritten, totalBytes, cbUserData]);
+          }
+        },
+      );
+
+      if (status !== DownloadStatus.OK) {
+        throw new Error(`rac_http_download_execute status=${status} for ${url}`);
       }
 
-      const contentLength = parseInt(response.headers.get('content-length') ?? '0', 10);
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('ReadableStream not supported');
-      }
-
-      const chunks: Uint8Array[] = [];
-      let downloaded = 0;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        chunks.push(value);
-        downloaded += value.length;
-
-        // Report progress via C callback
-        if (progressCbPtr !== 0) {
-          m.dynCall('viii', progressCbPtr, [downloaded, contentLength, cbUserData]);
-        }
-      }
-
-      // Combine chunks and write to Emscripten FS
-      const totalData = new Uint8Array(downloaded);
-      let offset = 0;
-      for (const chunk of chunks) {
-        totalData.set(chunk, offset);
-        offset += chunk.length;
-      }
-
-      // Ensure parent directory exists
-      const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
-      if (parentDir) {
-        try { m.FS.mkdir(parentDir); } catch { /* exists */ }
-      }
-
-      m.FS.writeFile(destPath, totalData);
-
-      // Report completion via C callback
       if (completeCbPtr !== 0) {
         const pathPtr = LlamaCppBridge.shared.allocString(destPath);
         m.dynCall('viii', completeCbPtr, [0, pathPtr, cbUserData]); // 0 = RAC_OK
         m._free(pathPtr);
       }
     } catch (error) {
-      logger.error(`Download failed for ${url}: ${error}`);
+      logger.error(`Download failed for ${url} (after ${lastReported}/${lastTotal} bytes): ${error}`);
       if (completeCbPtr !== 0) {
         const pathPtr = LlamaCppBridge.shared.allocString('');
         m.dynCall('viii', completeCbPtr, [-160, pathPtr, cbUserData]); // RAC_ERROR_DOWNLOAD_FAILED

@@ -171,40 +171,9 @@ public struct VoiceAgentConfiguration: Sendable {
     }
 }
 
-// MARK: - Voice Session Events
-
-/// Events emitted during a voice session
-public enum VoiceSessionEvent: Sendable {
-    /// Session started and ready
-    case started
-
-    /// Listening for speech with current audio level (0.0 - 1.0)
-    case listening(audioLevel: Float)
-
-    /// Speech detected, started accumulating audio
-    case speechStarted
-
-    /// Speech ended, processing audio
-    case processing
-
-    /// Got transcription from STT
-    case transcribed(text: String)
-
-    /// Got response from LLM (with optional thinking content)
-    case responded(text: String, thinkingContent: String? = nil)
-
-    /// Playing TTS audio
-    case speaking
-
-    /// Complete turn result (with optional thinking content)
-    case turnCompleted(transcript: String, response: String, thinkingContent: String? = nil, audio: Data?)
-
-    /// Session stopped
-    case stopped
-
-    /// Error occurred
-    case error(String)
-}
+// v3.1: VoiceSessionEvent enum + `from(_:)` mapper DELETED. Use
+// RAVoiceEvent (the proto-generated type) via
+// VoiceAgentStreamAdapter(handle:).stream().
 
 // MARK: - Voice Session Configuration
 

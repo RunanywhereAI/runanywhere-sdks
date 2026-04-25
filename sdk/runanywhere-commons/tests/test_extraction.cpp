@@ -19,7 +19,7 @@
 #include <cstring>
 #include <fstream>
 #include <string>
-#include "rac/core/rac_platform_compat.h"
+#include "core/internal/platform_compat.h"
 #include <vector>
 
 #ifdef _WIN32

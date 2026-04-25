@@ -10,8 +10,10 @@ import io.flutter.plugin.common.MethodChannel.Result
 /**
  * RunAnywhere Genie Flutter Plugin - Android Implementation
  *
- * This plugin provides the native bridge for the Genie NPU backend on Android.
- * The actual LLM functionality is provided by RABackendGenie native libraries (.so files).
+ * This experimental plugin provides the native shell bridge for Genie on Android.
+ * Functional LLM routing is disabled by default and requires RABackendGenie
+ * native ops built with the Qualcomm Genie SDK; missing or shell-only libraries
+ * keep the backend unavailable.
  */
 class GeniePlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
@@ -22,7 +24,7 @@ class GeniePlugin : FlutterPlugin, MethodCallHandler {
         private const val BACKEND_NAME = "Genie"
 
         init {
-            // Load Genie backend native libraries
+            // Load the experimental Genie backend shell when present.
             try {
                 System.loadLibrary("rac_backend_genie_jni")
             } catch (e: UnsatisfiedLinkError) {

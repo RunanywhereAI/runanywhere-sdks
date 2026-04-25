@@ -21,13 +21,13 @@ class ModelManager extends ChangeNotifier {
   // MARK: - Model Operations (matches Swift ModelManager.swift)
   // ============================================================================
 
-  /// Load a model by ModelInfo
+  /// Load a model by ModelInfo (v4.0 API).
   Future<void> loadModel(ModelInfo modelInfo) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      await RunAnywhere.loadModel(modelInfo.id);
+      await RunAnywhereSDK.instance.llm.load(modelInfo.id);
     } catch (e) {
       _error = e;
       rethrow;
@@ -37,13 +37,13 @@ class ModelManager extends ChangeNotifier {
     }
   }
 
-  /// Unload the current model
+  /// Unload the current model (v4.0 API).
   Future<void> unloadCurrentModel() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      await RunAnywhere.unloadModel();
+      await RunAnywhereSDK.instance.llm.unload();
     } catch (e) {
       _error = e;
       debugPrint('Failed to unload model: $e');
@@ -53,23 +53,19 @@ class ModelManager extends ChangeNotifier {
     }
   }
 
-  /// Get available models from SDK
+  /// Get available models from SDK (v4.0 API).
   Future<List<ModelInfo>> getAvailableModels() async {
     try {
-      return await RunAnywhere.availableModels();
+      return await RunAnywhereSDK.instance.models.available();
     } catch (e) {
       debugPrint('Failed to get available models: $e');
       return [];
     }
   }
 
-  /// Get current model (LLM)
+  /// Get current LLM model (v4.0 API).
   Future<ModelInfo?> getCurrentModel() async {
-    final modelId = RunAnywhere.currentModelId;
-    if (modelId == null) return null;
-
-    final models = await getAvailableModels();
-    return models.where((m) => m.id == modelId).firstOrNull;
+    return RunAnywhereSDK.instance.llm.currentModel();
   }
 
   /// Refresh state (for UI notification purposes)

@@ -473,6 +473,18 @@ export interface SDKInitOptions {
    */
   supabaseKey?: string;
 
+  /**
+   * Build token for device registration.
+   *
+   * Resolution order (highest precedence first):
+   *   1. This option.
+   *   2. `RUNANYWHERE_BUILD_TOKEN` environment variable (build-time).
+   *   3. Native development-mode fallback (development environment only).
+   *
+   * Production/staging apps must provide this via option or env var.
+   */
+  buildToken?: string;
+
   /** Enable debug logging */
   debug?: boolean;
 }

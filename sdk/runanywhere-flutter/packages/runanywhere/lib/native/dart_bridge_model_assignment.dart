@@ -4,8 +4,8 @@ import 'dart:async';
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/ffi_types.dart';
@@ -293,7 +293,7 @@ int _httpGetCallback(
   }
 }
 
-/// Perform HTTP GET (simplified)
+/// Perform HTTP GET via the commons FFI client.
 void _performHttpGet(
   String endpoint,
   bool requiresAuth,
@@ -301,7 +301,7 @@ void _performHttpGet(
 ) {
   final baseURL =
       DartBridgeModelAssignment._baseURL ?? 'https://api.runanywhere.ai';
-  final url = Uri.parse('$baseURL$endpoint');
+  final url = '$baseURL$endpoint';
 
   final headers = <String, String>{
     'Accept': 'application/json',
@@ -314,18 +314,22 @@ void _performHttpGet(
 
   unawaited(Future.microtask(() async {
     try {
-      final response = await http.get(url, headers: headers);
+      final response = await HTTPClientAdapter.shared.rawRequest(
+        method: 'GET',
+        url: url,
+        headers: headers,
+      );
 
-      outResponse.ref.result =
-          response.statusCode >= 200 && response.statusCode < 300
-              ? RacResultCode.success
-              : RacResultCode.errorNetworkError;
+      outResponse.ref.result = response.isSuccess
+          ? RacResultCode.success
+          : RacResultCode.errorNetworkError;
       outResponse.ref.statusCode = response.statusCode;
 
-      if (response.body.isNotEmpty) {
-        final bodyPtr = response.body.toNativeUtf8();
+      final body = response.body;
+      if (body.isNotEmpty) {
+        final bodyPtr = body.toNativeUtf8();
         outResponse.ref.responseBody = bodyPtr;
-        outResponse.ref.responseLength = response.body.length;
+        outResponse.ref.responseLength = body.length;
       }
     } catch (e) {
       outResponse.ref.result = RacResultCode.errorNetworkError;

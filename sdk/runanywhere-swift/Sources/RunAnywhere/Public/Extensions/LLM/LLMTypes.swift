@@ -330,24 +330,13 @@ public struct LLMGenerationResult: Sendable {
 }
 
 // MARK: - LLM Streaming Result
-
-/// Container for streaming generation with metrics
-public struct LLMStreamingResult: Sendable {
-
-    /// Stream of tokens as they are generated
-    public let stream: AsyncThrowingStream<String, Error>
-
-    /// Task that completes with final generation result including metrics
-    public let result: Task<LLMGenerationResult, Error>
-
-    public init(
-        stream: AsyncThrowingStream<String, Error>,
-        result: Task<LLMGenerationResult, Error>
-    ) {
-        self.stream = stream
-        self.result = result
-    }
-}
+//
+// v2 close-out Phase G-2: the `LLMStreamingResult` struct (stream +
+// metrics task) was DELETED. Callers now consume
+// `AsyncStream<RALLMStreamEvent>` returned by
+// `RunAnywhere.generateStream(...)` directly. Metrics can be computed
+// from the terminal event (is_final=true) which carries finish_reason,
+// timing, and any error_message.
 
 // MARK: - Thinking Tag Pattern
 

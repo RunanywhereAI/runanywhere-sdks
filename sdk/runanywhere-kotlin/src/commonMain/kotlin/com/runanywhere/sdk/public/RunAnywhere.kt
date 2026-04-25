@@ -43,6 +43,11 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * SDK environment configuration.
+ *
+ * GAP 01 Phase 3: this is the *single* `SDKEnvironment` in the Kotlin SDK.
+ * The duplicate declaration in `com.runanywhere.sdk.foundation.SDKLogger.kt`
+ * has been deleted. Drift against `idl/model_types.proto :: SDKEnvironment`
+ * is prevented by the `toProto()` / `fromProto()` bijection.
  */
 enum class SDKEnvironment(
     val cEnvironment: Int,
@@ -52,9 +57,26 @@ enum class SDKEnvironment(
     PRODUCTION(2),
     ;
 
+    /** Convert to the IDL-generated Wire enum. */
+    fun toProto(): ai.runanywhere.proto.v1.SDKEnvironment =
+        when (this) {
+            DEVELOPMENT -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+            STAGING     -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING
+            PRODUCTION  -> ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+        }
+
     companion object {
         fun fromCEnvironment(cEnvironment: Int): SDKEnvironment =
             entries.find { it.cEnvironment == cEnvironment } ?: DEVELOPMENT
+
+        /** Decode from the IDL-generated Wire enum; unspecified → DEVELOPMENT. */
+        fun fromProto(proto: ai.runanywhere.proto.v1.SDKEnvironment): SDKEnvironment =
+            when (proto) {
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> DEVELOPMENT
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_STAGING     -> STAGING
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION  -> PRODUCTION
+                ai.runanywhere.proto.v1.SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> DEVELOPMENT
+            }
     }
 }
 
@@ -71,7 +93,7 @@ enum class SDKEnvironment(
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
  * - LLM: RunAnywhere.chat(), RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: RunAnywhere.startVoiceSession()
+ * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
  *
  * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
  * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).

@@ -1,4 +1,12 @@
-/** RunAnywhere Web SDK - VoiceAgent Types */
+/**
+ * RunAnywhere Web SDK — VoicePipeline state machine enum.
+ *
+ * App-level pipeline phase used by the TS-side `VoicePipeline`
+ * orchestrator (STT -> LLM -> TTS). For the proto-stream
+ * `VoiceAgentStreamAdapter` path, consumers should match on the proto
+ * `PipelineState` exported from `@runanywhere/proto-ts/voice_events` (re-exported
+ * from the package root as `VoiceEventPipelineState`).
+ */
 
 export enum PipelineState {
   Idle = 'idle',
@@ -9,26 +17,3 @@ export enum PipelineState {
   Cooldown = 'cooldown',
   Error = 'error',
 }
-
-export interface VoiceAgentModels {
-  stt?: { path: string; id: string; name?: string };
-  llm?: { path: string; id: string; name?: string };
-  tts?: { path: string; id: string; name?: string };
-}
-
-export interface VoiceTurnResult {
-  speechDetected: boolean;
-  transcription?: string;
-  response?: string;
-  synthesizedAudio?: Float32Array;
-}
-
-export interface VoiceAgentEventData {
-  type: 'transcription' | 'response' | 'audioSynthesized' | 'vadTriggered' | 'error';
-  text?: string;
-  audioData?: Float32Array;
-  speechActive?: boolean;
-  errorCode?: number;
-}
-
-export type VoiceAgentEventCallback = (event: VoiceAgentEventData) => void;

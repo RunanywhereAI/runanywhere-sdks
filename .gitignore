@@ -78,6 +78,9 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
+# PR-local verification artifacts belong outside the repo.
+verification/
+
 # IDE - IntelliJ IDEA / Android Studio
 # User-specific stuff
 .idea/workspace.xml
@@ -122,6 +125,7 @@ gradle.properties
 
 # But keep project-level gradle properties if needed
 !gradle.properties.example
+!examples/flutter/RunAnywhereAI/android/gradle.properties
 
 # Also ignore .idea folders in subdirectories
 examples/intellij-plugin-demo/plugin/.idea/
@@ -197,6 +201,7 @@ node_modules/
 .npm
 .yarn/cache
 .yarn/install-state.gz
+.vite/
 
 # Flutter/Dart
 .dart_tool/
@@ -228,6 +233,9 @@ sdk/runanywhere-web/packages/onnx/dist/
 sdk/runanywhere-web/wasm/build/
 sdk/runanywhere-web/packages/core/wasm/
 sdk/runanywhere-web/packages/onnx/wasm/
+sdk/runanywhere-web/packages/*/wasm/*.wasm
+sdk/runanywhere-web/packages/*/wasm/*.wasm.map
+sdk/runanywhere-web/packages/*/wasm/*.data
 sdk/runanywhere-web/emsdk/
 sdk/runanywhere-web/package-lock.json
 examples/web/RunAnywhereAI/node_modules/
@@ -235,6 +243,8 @@ examples/web/RunAnywhereAI/node_modules/
 # External repositories and distribution
 EXTERNAL/
 dist/
+!sdk/runanywhere-proto-ts/dist/
+!sdk/runanywhere-proto-ts/dist/**
 
 # MLC-LLM submodule build artifacts (submodule is inside MLC module, similar to llama.cpp)
 sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/build/
@@ -380,6 +390,8 @@ sdk/runanywhere-react-native/packages/*/prebuilt/
 
 # Flutter - Local builds
 sdk/runanywhere-flutter/ios/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework
+sdk/runanywhere-flutter/packages/*/ios/Frameworks/*.xcframework.zip
 sdk/runanywhere-flutter/android/*.aar
 
 # React Native - Pre-built xcframeworks (build artifacts)
@@ -401,3 +413,23 @@ node_modules/
 
 # External starter-app clones for local reference (release.yml clones them fresh)
 external_examples/
+
+# PR-noise blocklist: planning/status docs are archived outside the repo.
+docs/release/
+docs/research/
+docs/rfcs/
+examples/SMOKE_MATRIX.md
+docs/API_PARITY_MATRIX.md
+docs/engine_plugin_authoring.md
+docs/graph_primitives.md
+docs/migrations/
+docs/plugins/
+docs/sdks/web-sdk.md
+engines/metalrt/README.md
+examples/web/RunAnywhereAI/README.md
+idl/README.md
+sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md
+sdk/runanywhere-commons/examples/solutions/README.md
+tests/streaming/README.md
+tests/streaming/cancel_parity/README.md
+tests/streaming/perf_bench/README.md

@@ -9,6 +9,7 @@
 #include "CompatibilityBridge.hpp"
 #include "DeviceBridge.hpp"
 
+#include <cerrno>
 #include <sys/statvfs.h>  // POSIX filesystem statistics
 
 // Platform-specific logging

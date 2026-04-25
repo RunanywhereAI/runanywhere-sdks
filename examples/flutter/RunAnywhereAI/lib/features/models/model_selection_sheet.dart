@@ -168,12 +168,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                   icon: Icons.memory,
                   value: device.chipName,
                 ),
-                _buildDeviceInfoRow(
-                  context,
-                  label: 'Memory',
-                  icon: Icons.storage,
-                  value: device.totalMemory.formattedFileSize,
-                ),
+                if (device.totalMemory > 0)
+                  _buildDeviceInfoRow(
+                    context,
+                    label: 'Memory',
+                    icon: Icons.storage,
+                    value: device.totalMemory.formattedFileSize,
+                  ),
                 if (device.neuralEngineAvailable)
                   _buildDeviceInfoRow(
                     context,
@@ -847,16 +848,15 @@ class _FlatModelRowState extends State<_FlatModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      // Get the SDK model by ID
-      final sdkModels = await sdk.RunAnywhere.availableModels();
+      final sdkModels = await sdk.RunAnywhereSDK.instance.models.available();
       final sdkModel = sdkModels.firstWhere(
-        (m) => m.id == widget.model.id,
+        (sdk.ModelInfo m) => m.id == widget.model.id,
         orElse: () =>
             throw Exception('Model not found in registry: ${widget.model.id}'),
       );
 
-      // Start the actual download using SDK's downloadModel
-      final downloadProgress = sdk.RunAnywhere.downloadModel(sdkModel.id);
+      final downloadProgress =
+          sdk.RunAnywhereSDK.instance.downloads.start(sdkModel.id);
 
       // Listen to real download progress
       await for (final progress in downloadProgress) {

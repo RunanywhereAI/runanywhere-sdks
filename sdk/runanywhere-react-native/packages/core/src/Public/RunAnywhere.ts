@@ -17,11 +17,7 @@ import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
 import { FileSystem } from '../services/FileSystem';
 import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
-import {
-  HTTPService,
-  SDKEnvironment as NetworkSDKEnvironment,
-  TelemetryService,
-} from '../services/Network';
+import { TelemetryService } from '../services/Network';
 
 import type {
   InitializationState,
@@ -45,13 +41,14 @@ import * as Storage from './Extensions/RunAnywhere+Storage';
 import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
-import * as VoiceSession from './Extensions/RunAnywhere+VoiceSession';
+// v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
 import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
 import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VLM';
+import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -167,35 +164,19 @@ export const RunAnywhere = {
         ? FileSystem.getDocumentsDirectory()
         : '';
 
-      // Configure network layer BEFORE native initialization
-      // This ensures HTTP is ready when C++ callbacks need it
+      // HTTP transport is owned by native C++ (rac_http_client_*). The JS
+      // layer only needs to stash the base URL / API key with the native
+      // HTTPBridge so downstream native consumers (DeviceBridge, telemetry)
+      // resolve the right endpoint.
       const envString = environment === SDKEnvironment.Development ? 'development'
         : environment === SDKEnvironment.Staging ? 'staging'
           : 'production';
 
-      // Map environment string to SDKEnvironment enum for HTTPService
-      const networkEnv = environment === SDKEnvironment.Development
-        ? NetworkSDKEnvironment.Development
-        : environment === SDKEnvironment.Staging
-          ? NetworkSDKEnvironment.Staging
-          : NetworkSDKEnvironment.Production;
+      await native.configureHttp(
+        options.baseURL || 'https://api.runanywhere.ai',
+        options.apiKey ?? ''
+      );
 
-      // Configure HTTPService with network settings
-      HTTPService.shared.configure({
-        baseURL: options.baseURL || 'https://api.runanywhere.ai',
-        apiKey: options.apiKey ?? '',
-        environment: networkEnv,
-      });
-
-      // Configure dev mode if Supabase credentials provided
-      if (options.supabaseURL && options.supabaseKey) {
-        HTTPService.shared.configureDev({
-          supabaseURL: options.supabaseURL,
-          supabaseKey: options.supabaseKey,
-        });
-      }
-
-      // For development mode, Supabase credentials will be passed to native
       if (environment === SDKEnvironment.Development && options.supabaseURL) {
         logger.debug('Development mode - Supabase config provided');
       }
@@ -226,7 +207,7 @@ export const RunAnywhere = {
       }
 
       // Initialize telemetry with device ID
-      TelemetryService.shared.configure(cachedDeviceId, networkEnv);
+      TelemetryService.shared.configure(cachedDeviceId, environment);
       TelemetryService.shared.trackSDKInit(envString, true);
 
       // For production/staging mode, authenticate with backend to get JWT tokens
@@ -249,10 +230,24 @@ export const RunAnywhere = {
         }
       }
 
+      // Resolve build token: explicit option wins over RUNANYWHERE_BUILD_TOKEN.
+      // For production/staging we require a real token (either source). Native
+      // C++ has a baked-in dev fallback used only when environment === development,
+      // so dev mode may proceed with an undefined token.
+      const resolvedBuildToken = this._resolveBuildToken(options.buildToken);
+      if (!resolvedBuildToken && environment !== SDKEnvironment.Development) {
+        const envName = environment === SDKEnvironment.Staging ? 'staging' : 'production';
+        throw new Error(
+          `Build token is required for ${envName} environment. ` +
+          'Pass `buildToken` in initialize() options or set the ' +
+          '`RUNANYWHERE_BUILD_TOKEN` environment variable at build time.'
+        );
+      }
+
       // Trigger device registration (non-blocking, best-effort)
       // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
       // Uses native C++ → platform HTTP (exactly like Swift)
-      this._registerDeviceIfNeeded(environment, options.supabaseKey).catch(err => {
+      this._registerDeviceIfNeeded(environment, options.supabaseKey, resolvedBuildToken).catch(err => {
         logger.warning(`Device registration failed (non-fatal): ${err.message}`);
       });
 
@@ -272,14 +267,12 @@ export const RunAnywhere = {
   },
 
   /**
-   * Register device with backend if not already registered
-   * Uses native C++ DeviceBridge + platform HTTP (URLSession/OkHttp)
-   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-   * @internal
-   */
-  /**
-   * Authenticate with backend to get JWT access/refresh tokens
-   * This matches Swift SDK's CppBridge.Auth.authenticate(apiKey:)
+   * Authenticate with backend to get JWT access/refresh tokens.
+   *
+   * Delegates the full round-trip (request build + HTTP transport via
+   * rac_http_client_* + AuthBridge state update) to native C++. This
+   * mirrors Swift's HTTPClientAdapter and Kotlin's CppBridgeAuth so there
+   * is a single HTTP code path across all SDKs.
    * @internal
    */
   async _authenticateWithBackend(
@@ -288,38 +281,20 @@ export const RunAnywhere = {
     deviceId: string
   ): Promise<boolean> {
     try {
-      const endpoint = '/api/v1/auth/sdk/authenticate';
-      const fullUrl = baseURL.replace(/\/$/, '') + endpoint;
-
-      // Use actual platform (ios/android) as backend only accepts these values
-      // This matches how Swift sends 'ios' and Kotlin sends 'android'
       const platform = Platform.OS === 'ios' ? 'ios' : 'android';
+      const native = requireNativeModule();
 
-      const requestBody = JSON.stringify({
-        api_key: apiKey,
-        device_id: deviceId,
-        platform: platform,
-        sdk_version: SDKConstants.version,
-      });
+      logger.debug(`Auth request to: ${baseURL.replace(/\/$/, '')}/api/v1/auth/sdk/authenticate`);
 
-      logger.debug(`Auth request to: ${fullUrl}`);
+      const responseJson = await native.authAuthenticate(
+        apiKey,
+        baseURL,
+        deviceId,
+        platform,
+        SDKConstants.version,
+      );
 
-      const response = await fetch(fullUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: requestBody,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        logger.error(`Authentication failed: HTTP ${response.status} - ${errorText}`);
-        return false;
-      }
-
-      const authResponse = await response.json() as {
+      let authResponse: {
         access_token: string;
         refresh_token: string;
         expires_in: number;
@@ -328,34 +303,21 @@ export const RunAnywhere = {
         user_id?: string;
         token_type: string;
       };
-
-      // Store tokens in HTTPService for subsequent requests
-      HTTPService.shared.setToken(authResponse.access_token);
-
-      // Store tokens in C++ AuthBridge for native HTTP requests (telemetry, device registration)
       try {
-        const native = requireNativeModule();
-        if (native && typeof native.setAuthTokens === 'function') {
-          await native.setAuthTokens(JSON.stringify(authResponse));
-          logger.debug('Auth tokens set in C++ AuthBridge');
-        } else {
-          logger.warning('setAuthTokens not available on native module - tokens stored in JS only');
-        }
-      } catch (nativeErr) {
-        logger.warning(`Failed to set auth tokens in native: ${nativeErr}`);
-        // Continue - tokens are still stored in HTTPService
+        authResponse = JSON.parse(responseJson);
+      } catch (parseErr) {
+        logger.error(`Auth response parse failed: ${parseErr}`);
+        return false;
       }
 
-      // Store tokens in secure storage for persistence
       try {
         await SecureStorageService.storeAuthTokens(
           authResponse.access_token,
           authResponse.refresh_token,
-          authResponse.expires_in
+          authResponse.expires_in,
         );
       } catch (storageErr) {
         logger.warning(`Failed to persist tokens: ${storageErr}`);
-        // Continue - tokens are still in memory
       }
 
       logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
@@ -367,24 +329,57 @@ export const RunAnywhere = {
     }
   },
 
+  /**
+   * Resolve the build token from explicit option or environment variable.
+   * Returns `undefined` when no token is available — callers must decide
+   * whether that is acceptable (only `SDKEnvironment.Development` is, via the
+   * native C++ baked-in dev fallback).
+   * @internal
+   */
+  _resolveBuildToken(explicit?: string): string | undefined {
+    if (explicit && explicit.length > 0) return explicit;
+    const fromEnv =
+      typeof process !== 'undefined' && process.env
+        ? process.env.RUNANYWHERE_BUILD_TOKEN
+        : undefined;
+    return fromEnv && fromEnv.length > 0 ? fromEnv : undefined;
+  },
+
+  /**
+   * Register device with backend if not already registered.
+   * Uses native C++ DeviceBridge + shared rac_http_client_* transport.
+   * Exactly matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
+   * @internal
+   */
   async _registerDeviceIfNeeded(
     environment: SDKEnvironment,
-    supabaseKey?: string
+    supabaseKey?: string,
+    buildToken?: string
   ): Promise<void> {
     const envString = environment === SDKEnvironment.Development ? 'development'
       : environment === SDKEnvironment.Staging ? 'staging'
         : 'production';
 
+    // Defensive: non-dev must have a token (initialize() already enforces this,
+    // but guard here too so we never silently register with an empty token).
+    if (!buildToken && environment !== SDKEnvironment.Development) {
+      logger.warning('Skipping device registration: no build token resolved.');
+      return;
+    }
+
     try {
       const native = requireNativeModule();
 
       // Call native registerDevice which goes through:
-      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed → http_post callback → native HTTP
+      // JS → C++ DeviceBridge → rac_device_manager_register_if_needed
+      // → http_post callback → rac_http_client_*.
       // This exactly mirrors Swift's flow!
+      // Empty `buildToken` is only emitted in development mode so native can
+      // apply its baked-in dev fallback.
       const success = await native.registerDevice(JSON.stringify({
         environment: envString,
-        supabaseKey: supabaseKey || '',
-        buildToken: '', // TODO: Add build token support if needed
+        supabaseKey: supabaseKey ?? '',
+        buildToken: buildToken ?? '',
       }));
 
       if (success) {
@@ -589,15 +584,14 @@ export const RunAnywhere = {
   voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
   voiceAgentGenerateResponse: VoiceAgent.voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
+  // Phase 1 / B4 fix: forwarder for the v3.1 Nitro `getVoiceAgentHandle()`
+  // method. The sample VoiceAssistantScreen calls `RunAnywhere.getVoiceAgentHandle()`
+  // to feed VoiceAgentStreamAdapter; previously missing from this facade.
+  getVoiceAgentHandle: VoiceAgent.getVoiceAgentHandle,
   cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
 
-  // ============================================================================
-  // Voice Session (Delegated to Extension)
-  // ============================================================================
-
-  startVoiceSession: VoiceSession.startVoiceSession,
-  startVoiceSessionWithCallback: VoiceSession.startVoiceSessionWithCallback,
-  createVoiceSession: VoiceSession.createVoiceSession,
+  // v3.1: Voice Session methods DELETED. Use VoiceAgentStreamAdapter
+  // for streaming; compose STT/LLM/TTS directly for one-shot turns.
 
   // ============================================================================
   // Structured Output (Delegated to Extension)
@@ -652,6 +646,15 @@ export const RunAnywhere = {
   ragGetStatistics: RAG.ragGetStatistics,
 
   // ============================================================================
+  // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+  // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
+  // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
+  // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
+  // ============================================================================
+
+  solutions: SolutionsCapability,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
@@ -670,6 +673,7 @@ export const RunAnywhere = {
   downloadModel: Models.downloadModel,
   cancelDownload: Models.cancelDownload,
   deleteModel: Models.deleteModel,
+  deleteAllModels: Models.deleteAllModels,
   checkCompatibility: Models.checkCompatibility,
   registerModel: Models.registerModel,
   registerMultiFileModel: Models.registerMultiFileModel,

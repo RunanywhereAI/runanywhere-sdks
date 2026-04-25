@@ -395,8 +395,8 @@ class _ModelRowState extends State<ModelRow> {
     try {
       debugPrint('📥 Starting download for model: ${widget.model.name}');
 
-      // Start the actual download using SDK
-      final progressStream = sdk.RunAnywhere.downloadModel(widget.model.id);
+      final progressStream =
+          sdk.RunAnywhereSDK.instance.downloads.start(widget.model.id);
 
       // Listen to real download progress
       await for (final progress in progressStream) {

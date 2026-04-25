@@ -33,17 +33,18 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("getModelPath", &HybridRunAnywhereCoreSpec::getModelPath);
       prototype.registerHybridMethod("registerModel", &HybridRunAnywhereCoreSpec::registerModel);
       prototype.registerHybridMethod("checkCompatibility", &HybridRunAnywhereCoreSpec::checkCompatibility);
+      prototype.registerHybridMethod("refreshModelRegistry", &HybridRunAnywhereCoreSpec::refreshModelRegistry);
       prototype.registerHybridMethod("downloadModel", &HybridRunAnywhereCoreSpec::downloadModel);
       prototype.registerHybridMethod("cancelDownload", &HybridRunAnywhereCoreSpec::cancelDownload);
-      prototype.registerHybridMethod("getDownloadProgress", &HybridRunAnywhereCoreSpec::getDownloadProgress);
       prototype.registerHybridMethod("getStorageInfo", &HybridRunAnywhereCoreSpec::getStorageInfo);
       prototype.registerHybridMethod("clearCache", &HybridRunAnywhereCoreSpec::clearCache);
       prototype.registerHybridMethod("deleteModel", &HybridRunAnywhereCoreSpec::deleteModel);
       prototype.registerHybridMethod("emitEvent", &HybridRunAnywhereCoreSpec::emitEvent);
       prototype.registerHybridMethod("pollEvents", &HybridRunAnywhereCoreSpec::pollEvents);
       prototype.registerHybridMethod("configureHttp", &HybridRunAnywhereCoreSpec::configureHttp);
-      prototype.registerHybridMethod("httpPost", &HybridRunAnywhereCoreSpec::httpPost);
-      prototype.registerHybridMethod("httpGet", &HybridRunAnywhereCoreSpec::httpGet);
+      prototype.registerHybridMethod("httpRequest", &HybridRunAnywhereCoreSpec::httpRequest);
+      prototype.registerHybridMethod("authAuthenticate", &HybridRunAnywhereCoreSpec::authAuthenticate);
+      prototype.registerHybridMethod("authRefreshToken", &HybridRunAnywhereCoreSpec::authRefreshToken);
       prototype.registerHybridMethod("getLastError", &HybridRunAnywhereCoreSpec::getLastError);
       prototype.registerHybridMethod("extractArchive", &HybridRunAnywhereCoreSpec::extractArchive);
       prototype.registerHybridMethod("getDeviceCapabilities", &HybridRunAnywhereCoreSpec::getDeviceCapabilities);
@@ -53,8 +54,12 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("unloadTextModel", &HybridRunAnywhereCoreSpec::unloadTextModel);
       prototype.registerHybridMethod("generate", &HybridRunAnywhereCoreSpec::generate);
       prototype.registerHybridMethod("generateStream", &HybridRunAnywhereCoreSpec::generateStream);
+      prototype.registerHybridMethod("getLLMHandle", &HybridRunAnywhereCoreSpec::getLLMHandle);
       prototype.registerHybridMethod("cancelGeneration", &HybridRunAnywhereCoreSpec::cancelGeneration);
       prototype.registerHybridMethod("generateStructured", &HybridRunAnywhereCoreSpec::generateStructured);
+      prototype.registerHybridMethod("llmExtractThinking", &HybridRunAnywhereCoreSpec::llmExtractThinking);
+      prototype.registerHybridMethod("llmStripThinking", &HybridRunAnywhereCoreSpec::llmStripThinking);
+      prototype.registerHybridMethod("llmSplitThinkingTokens", &HybridRunAnywhereCoreSpec::llmSplitThinkingTokens);
       prototype.registerHybridMethod("loadSTTModel", &HybridRunAnywhereCoreSpec::loadSTTModel);
       prototype.registerHybridMethod("isSTTModelLoaded", &HybridRunAnywhereCoreSpec::isSTTModelLoaded);
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
@@ -82,6 +87,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("isTelemetryInitialized", &HybridRunAnywhereCoreSpec::isTelemetryInitialized);
       prototype.registerHybridMethod("initializeVoiceAgent", &HybridRunAnywhereCoreSpec::initializeVoiceAgent);
       prototype.registerHybridMethod("initializeVoiceAgentWithLoadedModels", &HybridRunAnywhereCoreSpec::initializeVoiceAgentWithLoadedModels);
+      prototype.registerHybridMethod("getVoiceAgentHandle", &HybridRunAnywhereCoreSpec::getVoiceAgentHandle);
       prototype.registerHybridMethod("isVoiceAgentReady", &HybridRunAnywhereCoreSpec::isVoiceAgentReady);
       prototype.registerHybridMethod("getVoiceAgentComponentStates", &HybridRunAnywhereCoreSpec::getVoiceAgentComponentStates);
       prototype.registerHybridMethod("processVoiceTurn", &HybridRunAnywhereCoreSpec::processVoiceTurn);
@@ -101,6 +107,14 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ragClearDocuments", &HybridRunAnywhereCoreSpec::ragClearDocuments);
       prototype.registerHybridMethod("ragGetDocumentCount", &HybridRunAnywhereCoreSpec::ragGetDocumentCount);
       prototype.registerHybridMethod("ragGetStatistics", &HybridRunAnywhereCoreSpec::ragGetStatistics);
+      prototype.registerHybridMethod("solutionCreateFromProto", &HybridRunAnywhereCoreSpec::solutionCreateFromProto);
+      prototype.registerHybridMethod("solutionCreateFromYaml", &HybridRunAnywhereCoreSpec::solutionCreateFromYaml);
+      prototype.registerHybridMethod("solutionStart", &HybridRunAnywhereCoreSpec::solutionStart);
+      prototype.registerHybridMethod("solutionStop", &HybridRunAnywhereCoreSpec::solutionStop);
+      prototype.registerHybridMethod("solutionCancel", &HybridRunAnywhereCoreSpec::solutionCancel);
+      prototype.registerHybridMethod("solutionFeed", &HybridRunAnywhereCoreSpec::solutionFeed);
+      prototype.registerHybridMethod("solutionCloseInput", &HybridRunAnywhereCoreSpec::solutionCloseInput);
+      prototype.registerHybridMethod("solutionDestroy", &HybridRunAnywhereCoreSpec::solutionDestroy);
     });
   }
 

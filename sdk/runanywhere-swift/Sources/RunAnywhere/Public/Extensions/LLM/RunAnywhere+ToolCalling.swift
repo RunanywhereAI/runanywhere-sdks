@@ -340,11 +340,22 @@ public extension RunAnywhere {
             temperature: temperature ?? 0.3  // Lower temperature for consistent tool calling
         )
 
-        let streamResult = try await generateStream(prompt, options: genOptions)
+        // v2 close-out Phase G-2: generateStream now returns
+        // AsyncStream<RALLMStreamEvent>; collect the token text off each
+        // event and stop at the terminal is_final marker.
+        let eventStream = try await generateStream(prompt, options: genOptions)
 
         var responseText = ""
-        for try await token in streamResult.stream {
-            responseText += token
+        for await event in eventStream {
+            if !event.token.isEmpty {
+                responseText += event.token
+            }
+            if event.isFinal {
+                if !event.errorMessage.isEmpty {
+                    throw SDKError.llm(.generationFailed, event.errorMessage)
+                }
+                break
+            }
         }
 
         return responseText

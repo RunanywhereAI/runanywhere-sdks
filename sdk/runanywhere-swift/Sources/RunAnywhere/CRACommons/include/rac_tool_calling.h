@@ -92,23 +92,23 @@ typedef struct rac_tool_parameter {
  * @brief Tool definition
  */
 typedef struct rac_tool_definition {
-    const char* name;                         /**< Unique tool name (e.g., "get_weather") */
-    const char* description;                  /**< What the tool does */
-    const rac_tool_parameter_t* parameters;   /**< Array of parameters */
-    size_t num_parameters;                    /**< Number of parameters */
-    const char* category;                     /**< Optional category (can be NULL) */
+    const char* name;                       /**< Unique tool name (e.g., "get_weather") */
+    const char* description;                /**< What the tool does */
+    const rac_tool_parameter_t* parameters; /**< Array of parameters */
+    size_t num_parameters;                  /**< Number of parameters */
+    const char* category;                   /**< Optional category (can be NULL) */
 } rac_tool_definition_t;
 
 /**
  * @brief Parsed tool call from LLM output
  */
 typedef struct rac_tool_call {
-    rac_bool_t has_tool_call;        /**< Whether a tool call was found */
-    char* tool_name;                 /**< Name of tool to execute (owned, must free) */
-    char* arguments_json;            /**< Arguments as JSON string (owned, must free) */
-    char* clean_text;                /**< Text without tool call tags (owned, must free) */
-    int64_t call_id;                 /**< Unique call ID for tracking */
-    rac_tool_call_format_t format;   /**< Format that was detected/used for parsing */
+    rac_bool_t has_tool_call;      /**< Whether a tool call was found */
+    char* tool_name;               /**< Name of tool to execute (owned, must free) */
+    char* arguments_json;          /**< Arguments as JSON string (owned, must free) */
+    char* clean_text;              /**< Text without tool call tags (owned, must free) */
+    int64_t call_id;               /**< Unique call ID for tracking */
+    rac_tool_call_format_t format; /**< Format that was detected/used for parsing */
 } rac_tool_call_t;
 
 /**
@@ -128,16 +128,16 @@ typedef struct rac_tool_calling_options {
 /**
  * @brief Default tool calling options
  */
-#define RAC_TOOL_CALLING_OPTIONS_DEFAULT                                                           \
-    {                                                                                              \
-        5,         /* max_tool_calls */                                                            \
-            1,     /* auto_execute = true */                                                       \
-            0.7f,  /* temperature */                                                               \
-            1024,  /* max_tokens */                                                                \
-            RAC_NULL, /* system_prompt */                                                          \
-            0,     /* replace_system_prompt = false */                                             \
-            0,     /* keep_tools_available = false */                                              \
-            RAC_TOOL_FORMAT_DEFAULT /* format */                                                   \
+#define RAC_TOOL_CALLING_OPTIONS_DEFAULT                            \
+    {                                                               \
+        5,                      /* max_tool_calls */                \
+        1,                      /* auto_execute = true */           \
+        0.7f,                   /* temperature */                   \
+        1024,                   /* max_tokens */                    \
+        RAC_NULL,               /* system_prompt */                 \
+        0,                      /* replace_system_prompt = false */ \
+        0,                      /* keep_tools_available = false */  \
+        RAC_TOOL_FORMAT_DEFAULT /* format */                        \
     }
 
 // =============================================================================
@@ -194,10 +194,10 @@ RAC_API const char* rac_tool_call_format_name(rac_tool_call_format_t format);
  * @brief Detect which format is present in LLM output
  *
  * Checks for format-specific markers without fully parsing.
- * Returns RAC_TOOL_FORMAT_AUTO if no recognizable format is found.
+ * Returns RAC_TOOL_FORMAT_DEFAULT if no recognizable format is found.
  *
  * @param llm_output Raw LLM output text
- * @return Detected format, or RAC_TOOL_FORMAT_AUTO if none detected
+ * @return Detected format, or RAC_TOOL_FORMAT_DEFAULT if none detected
  */
 RAC_API rac_tool_call_format_t rac_tool_call_detect_format(const char* llm_output);
 
@@ -244,10 +244,9 @@ RAC_API rac_result_t rac_tool_call_format_prompt(const rac_tool_definition_t* de
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions,
-                                                             size_t num_definitions,
-                                                             rac_tool_call_format_t format,
-                                                             char** out_prompt);
+RAC_API rac_result_t rac_tool_call_format_prompt_with_format(
+    const rac_tool_definition_t* definitions, size_t num_definitions, rac_tool_call_format_t format,
+    char** out_prompt);
 
 /**
  * @brief Format tools from JSON array string (default format)
@@ -319,12 +318,9 @@ RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
  * @param out_prompt Output: Follow-up prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
  */
-RAC_API rac_result_t rac_tool_call_build_followup_prompt(const char* original_user_prompt,
-                                                         const char* tools_prompt,
-                                                         const char* tool_name,
-                                                         const char* tool_result_json,
-                                                         rac_bool_t keep_tools_available,
-                                                         char** out_prompt);
+RAC_API rac_result_t rac_tool_call_build_followup_prompt(
+    const char* original_user_prompt, const char* tools_prompt, const char* tool_name,
+    const char* tool_result_json, rac_bool_t keep_tools_available, char** out_prompt);
 
 // =============================================================================
 // JSON UTILITY API - All JSON handling happens here

@@ -1,14 +1,16 @@
-/// Qualcomm Genie NPU backend for RunAnywhere Flutter SDK.
+/// Experimental Qualcomm Genie NPU backend shell for RunAnywhere Flutter SDK.
 ///
-/// This package provides LLM (Language Model) capabilities via Qualcomm Genie NPU.
-/// It is a **thin wrapper** that registers the C++ backend with the service registry.
+/// Functional LLM routing is Android/Snapdragon-only and requires native
+/// binaries built with the Qualcomm Genie SDK. Without those binaries, the
+/// backend remains unavailable and is not selected by the native router.
+/// It is a **thin wrapper** around the native plugin shell. The package stays
+/// non-routable unless native registration succeeds with SDK-backed ops.
 ///
 /// ## Architecture (matches Swift/Kotlin exactly)
 ///
-/// The C++ backend (RABackendGenie) handles all business logic:
-/// - Service provider registration
-/// - Model loading and inference on Snapdragon NPU
-/// - Streaming generation
+/// The C++ backend shell handles registration. Model loading, inference, and
+/// streaming require a future SDK-backed implementation built with the
+/// Qualcomm Genie SDK; the public shell returns backend-unavailable.
 ///
 /// This Dart module just:
 /// 1. Calls `rac_backend_genie_register()` to register the backend
@@ -23,18 +25,19 @@
 /// // Initialize SDK
 /// await RunAnywhere.initialize();
 ///
-/// // Register Genie module (Android/Snapdragon only)
+/// // Register Genie module (experimental Android/Snapdragon only; requires Genie SDK binaries)
 /// await Genie.register();
 /// ```
 ///
 /// ## Capabilities
 ///
-/// - **LLM (Language Model)**: Text generation on Snapdragon NPU
-/// - **Streaming**: Token-by-token streaming generation
+/// - **LLM (Language Model)**: Disabled by default; enabled only after
+///   SDK-backed native registration succeeds on Android/Snapdragon.
+/// - **Streaming**: Not provided by the public shell.
 ///
 /// ## Platform Support
 ///
-/// - **Android**: Snapdragon devices with NPU support
+/// - **Android**: Snapdragon devices with Qualcomm Genie SDK-built native binaries
 /// - **iOS**: Not supported (Genie is Android/Snapdragon only)
 library runanywhere_genie;
 

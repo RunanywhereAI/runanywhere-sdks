@@ -148,9 +148,6 @@ object CppBridgeStorage {
             }
     }
 
-    @Volatile
-    private var isRegistered: Boolean = false
-
     private val lock = Any()
 
     /**
@@ -262,40 +259,6 @@ object CppBridgeStorage {
          */
         fun getAvailableSpace(): Long
     }
-
-    /**
-     * Register the storage callbacks with C++ core.
-     *
-     * This must be called during SDK initialization, after [CppBridgePlatformAdapter.register].
-     * It is safe to call multiple times; subsequent calls are no-ops.
-     */
-    fun register() {
-        synchronized(lock) {
-            if (isRegistered) {
-                return
-            }
-
-            // Initialize default quotas
-            initializeDefaultQuotas()
-
-            // Register the storage callbacks with C++ via JNI
-            // TODO: Call native registration
-            // nativeSetStorageCallbacks()
-
-            isRegistered = true
-
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.DEBUG,
-                TAG,
-                "Storage callbacks registered",
-            )
-        }
-    }
-
-    /**
-     * Check if the storage callbacks are registered.
-     */
-    fun isRegistered(): Boolean = isRegistered
 
     // ========================================================================
     // STORAGE CALLBACKS
@@ -724,89 +687,6 @@ object CppBridgeStorage {
     }
 
     // ========================================================================
-    // JNI NATIVE DECLARATIONS
-    // ========================================================================
-
-    /**
-     * Native method to set the storage callbacks with C++ core.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_storage_set_callbacks(...)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeSetStorageCallbacks()
-
-    /**
-     * Native method to unset the storage callbacks.
-     * Reserved for future native callback integration.
-     *
-     * C API: rac_storage_set_callbacks(nullptr)
-     */
-    @Suppress("unused")
-    @JvmStatic
-    private external fun nativeUnsetStorageCallbacks()
-
-    /**
-     * Native method to store data in C++ storage.
-     *
-     * C API: rac_storage_store(namespace, key, data, size, type)
-     */
-    @JvmStatic
-    external fun nativeStore(namespace: String, key: String, data: ByteArray, storageType: Int): Int
-
-    /**
-     * Native method to retrieve data from C++ storage.
-     *
-     * C API: rac_storage_retrieve(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeRetrieve(namespace: String, key: String, storageType: Int): ByteArray?
-
-    /**
-     * Native method to delete data from C++ storage.
-     *
-     * C API: rac_storage_delete(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeDelete(namespace: String, key: String, storageType: Int): Int
-
-    /**
-     * Native method to check if data exists in C++ storage.
-     *
-     * C API: rac_storage_has(namespace, key, type)
-     */
-    @JvmStatic
-    external fun nativeHas(namespace: String, key: String, storageType: Int): Boolean
-
-    // ========================================================================
-    // LIFECYCLE MANAGEMENT
-    // ========================================================================
-
-    /**
-     * Unregister the storage callbacks and clean up resources.
-     *
-     * Called during SDK shutdown.
-     */
-    fun unregister() {
-        synchronized(lock) {
-            if (!isRegistered) {
-                return
-            }
-
-            // TODO: Call native unregistration
-            // nativeUnsetStorageCallbacks()
-
-            storageListener = null
-            storageProvider = null
-            memoryStorage.clear()
-            namespaceQuotas.clear()
-            namespaceUsage.clear()
-            isRegistered = false
-        }
-    }
-
-    // ========================================================================
     // UTILITY FUNCTIONS
     // ========================================================================
 
@@ -1019,19 +899,6 @@ object CppBridgeStorage {
             }
 
         return File(File(baseDir, typeDir), namespace)
-    }
-
-    /**
-     * Initialize default storage quotas.
-     */
-    private fun initializeDefaultQuotas() {
-        namespaceQuotas[StorageNamespace.CONFIG] = 10L * 1024 * 1024 // 10 MB
-        namespaceQuotas[StorageNamespace.MODELS] = 50L * 1024 * 1024 // 50 MB
-        namespaceQuotas[StorageNamespace.INFERENCE_CACHE] = 100L * 1024 * 1024 // 100 MB
-        namespaceQuotas[StorageNamespace.PREFERENCES] = 1L * 1024 * 1024 // 1 MB
-        namespaceQuotas[StorageNamespace.SESSION] = 10L * 1024 * 1024 // 10 MB
-        namespaceQuotas[StorageNamespace.ANALYTICS] = 20L * 1024 * 1024 // 20 MB
-        namespaceQuotas[StorageNamespace.DOWNLOADS] = 10L * 1024 * 1024 // 10 MB
     }
 
     /**

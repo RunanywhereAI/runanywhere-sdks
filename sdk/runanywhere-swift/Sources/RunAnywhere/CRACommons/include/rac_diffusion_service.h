@@ -53,6 +53,13 @@ typedef struct rac_diffusion_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new diffusion service.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_diffusion_service_ops_t;
 
 /**
@@ -84,6 +91,21 @@ typedef struct rac_diffusion_service {
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_diffusion_create(const char* model_id, rac_handle_t* out_handle);
+
+/**
+ * @brief Create a diffusion service with configuration
+ *
+ * Routes through service registry to find appropriate backend, honoring
+ * configuration hints such as preferred framework when provided.
+ *
+ * @param model_id Model identifier (registry ID or path to model)
+ * @param config Optional configuration (can be NULL)
+ * @param out_handle Output: Handle to the created service
+ * @return RAC_SUCCESS or error code
+ */
+RAC_API rac_result_t rac_diffusion_create_with_config(const char* model_id,
+                                                      const rac_diffusion_config_t* config,
+                                                      rac_handle_t* out_handle);
 
 /**
  * @brief Initialize a diffusion service
@@ -120,10 +142,10 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
  * @param out_result Output: Generation result (caller must free with rac_diffusion_result_free)
  * @return RAC_SUCCESS or error code
  */
-RAC_API rac_result_t rac_diffusion_generate_with_progress(
-    rac_handle_t handle, const rac_diffusion_options_t* options,
-    rac_diffusion_progress_callback_fn progress_callback, void* user_data,
-    rac_diffusion_result_t* out_result);
+RAC_API rac_result_t
+rac_diffusion_generate_with_progress(rac_handle_t handle, const rac_diffusion_options_t* options,
+                                     rac_diffusion_progress_callback_fn progress_callback,
+                                     void* user_data, rac_diffusion_result_t* out_result);
 
 /**
  * @brief Get service information

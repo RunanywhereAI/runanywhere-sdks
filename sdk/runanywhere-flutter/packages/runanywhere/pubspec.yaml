@@ -20,9 +20,17 @@ dependencies:
     sdk: flutter
   # FFI (Foreign Function Interface)
   ffi: ^2.1.0
-  # HTTP and networking
-  http: ^1.2.1
+  # Networking: HTTP transport routed through the commons Phase H C ABI
+  # (rac_http_client_*, rac_http_download_execute).
   rxdart: ^0.27.7
+  # Protobuf runtime — consumed by the IDL-generated bindings in
+  # `lib/generated/` (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md).
+  # Pinned to match the pinned protoc_plugin version in
+  # scripts/setup-toolchain.sh / idl/codegen/generate_dart.sh.
+  protobuf: ^3.1.0
+  # `fixnum` is a transitive peer of `protobuf` — the generated bindings
+  # import it directly for `int64` field handling, so it must be declared.
+  fixnum: ^1.1.0
   # Storage
   shared_preferences: ^2.2.3
   path_provider: ^2.1.3

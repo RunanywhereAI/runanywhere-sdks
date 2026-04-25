@@ -5,10 +5,12 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'dart:typed_data';
+
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
-import 'package:http/http.dart' as http;
 
+import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -636,7 +638,7 @@ Future<void> _sendTelemetryHttp(
   try {
     final baseURL =
         DartBridgeTelemetry._baseURL ?? 'https://api.runanywhere.ai';
-    final url = Uri.parse('$baseURL$endpoint');
+    final url = '$baseURL$endpoint';
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -647,11 +649,15 @@ Future<void> _sendTelemetryHttp(
       headers['Authorization'] = 'Bearer ${DartBridgeTelemetry._accessToken}';
     }
 
-    final response = await http.post(url, headers: headers, body: body);
+    final response = await HTTPClientAdapter.shared.rawRequest(
+      method: 'POST',
+      url: url,
+      headers: headers,
+      body: Uint8List.fromList(utf8.encode(body)),
+    );
 
-    // Notify C++ of completion (optional - for retry logic)
     _notifyHttpComplete(
-      response.statusCode >= 200 && response.statusCode < 300,
+      response.isSuccess,
       response.body,
       null,
     );

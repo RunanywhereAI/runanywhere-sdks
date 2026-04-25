@@ -99,12 +99,9 @@ const VLMScreen: React.FC = () => {
     }
   }, [vlm]);
 
-  // Dismiss error (placeholder — hook does not expose setError yet).
-  // Retained for the error-banner callback once we add a clearError action.
-  const _handleDismissError = useCallback(() => {
-    // Reset error in next render to prevent flicker
-    // Since hook doesn't expose setError, we'll just let user retry
-  }, []);
+  const handleDismissError = useCallback(() => {
+    vlm.clearError();
+  }, [vlm]);
 
   // Main action button color
   const mainButtonColor = vlm.isAutoStreaming
@@ -220,9 +217,20 @@ const VLMScreen: React.FC = () => {
 
             {/* Error Banner */}
             {vlm.error && (
-              <View style={styles.errorBanner}>
+              <TouchableOpacity
+                style={styles.errorBanner}
+                onPress={handleDismissError}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss error"
+              >
                 <Text style={styles.errorText}>{vlm.error}</Text>
-              </View>
+                <Icon
+                  name="close"
+                  size={18}
+                  color={Colors.primaryRed}
+                  style={styles.errorDismissIcon}
+                />
+              </TouchableOpacity>
             )}
 
             {/* Description Content */}
@@ -470,10 +478,17 @@ const styles = StyleSheet.create({
     padding: Spacing.smallMedium,
     borderRadius: BorderRadius.regular,
     marginBottom: Spacing.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   errorText: {
     ...Typography.caption,
     color: Colors.primaryRed,
+    flex: 1,
+  },
+  errorDismissIcon: {
+    marginLeft: Spacing.small,
   },
   descriptionScroll: {
     flex: 1,

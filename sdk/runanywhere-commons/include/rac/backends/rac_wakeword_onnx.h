@@ -19,7 +19,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
-#include "rac/features/wakeword/rac_wakeword.h"
+#include "rac/features/wakeword/rac_wakeword_types.h"
 
 #ifdef __cplusplus
 extern "C" {

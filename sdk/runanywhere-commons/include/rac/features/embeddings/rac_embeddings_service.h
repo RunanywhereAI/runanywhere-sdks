@@ -3,8 +3,11 @@
  * @brief RunAnywhere Commons - Embeddings Service Interface
  *
  * Vtable-based service interface for embedding generation.
- * Backends (llama.cpp, ONNX) implement the ops vtable and register
- * via rac_service_register_provider().
+ * v3.0.0: backends register via the unified plugin registry — each
+ * engine's `rac_plugin_entry_<name>()` returns a `rac_engine_vtable_t`
+ * whose `embedding_ops` slot points at the ops struct defined by the
+ * backend (e.g. `g_onnx_embeddings_ops` in
+ * `sdk/runanywhere-commons/src/features/rag/rac_onnx_embeddings_register.cpp`).
  */
 
 #ifndef RAC_EMBEDDINGS_SERVICE_H
@@ -48,6 +51,13 @@ typedef struct rac_embeddings_service_ops {
 
     /** Destroy the service */
     void (*destroy)(void* impl);
+
+    /**
+     * Allocate a backend-specific impl for a new embeddings service.
+     * v3 replacement for the legacy rac_service_provider_t::create callback.
+     * See rac_llm_service_ops_t::create for the full semantics.
+     */
+    rac_result_t (*create)(const char* model_id, const char* config_json, void** out_impl);
 } rac_embeddings_service_ops_t;
 
 /**

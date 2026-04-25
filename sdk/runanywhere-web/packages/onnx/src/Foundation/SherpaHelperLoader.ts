@@ -102,7 +102,8 @@ async function doLoad<T>(
     : new URL(`../../wasm/sherpa/${filename}`, import.meta.url).href;
   logger.info(`Loading sherpa helper: ${filename}`);
 
-  const response = await fetch(url);
+  // HTTP_FETCH_CARVE_OUTS.browserOnlyBlobImport: the JS wrapper must be patched as text before Blob import.
+  const response = await fetch(url); // fetch() carve-out: browser-only blob import.
   if (!response.ok) {
     throw new SDKError(
       SDKErrorCode.WASMLoadFailed,

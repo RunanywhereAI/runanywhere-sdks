@@ -34,6 +34,7 @@ import {
   NativeModules,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Slider from '@react-native-community/slider';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
@@ -921,26 +922,19 @@ export const TTSScreen: React.FC = () => {
         <Text style={styles.sliderLabel}>{label}</Text>
         <Text style={styles.sliderValue}>{formatValue(value)}</Text>
       </View>
-      {/* TODO: Add @react-native-community/slider package */}
-      <View style={styles.sliderTrack}>
-        <View
-          style={[
-            styles.sliderFill,
-            { width: `${((value - min) / (max - min)) * 100}%` },
-          ]}
-        />
-        <TouchableOpacity
-          style={[
-            styles.sliderThumb,
-            { left: `${((value - min) / (max - min)) * 100}%` },
-          ]}
-          onPress={() => {
-            // Simple increment for demo
-            const newValue = value + step > max ? min : value + step;
-            onValueChange(Math.round(newValue * 10) / 10);
-          }}
-        />
-      </View>
+      <Slider
+        style={styles.slider}
+        value={value}
+        onValueChange={(v: number) =>
+          onValueChange(Math.round(v / step) * step)
+        }
+        minimumValue={min}
+        maximumValue={max}
+        step={step}
+        minimumTrackTintColor={Colors.primaryBlue}
+        maximumTrackTintColor={Colors.backgroundGray5}
+        thumbTintColor={Colors.primaryBlue}
+      />
     </View>
   );
 
@@ -1190,27 +1184,9 @@ const styles = StyleSheet.create({
     color: Colors.primaryBlue,
     fontWeight: '600',
   },
-  sliderTrack: {
-    height: 6,
-    backgroundColor: Colors.backgroundGray5,
-    borderRadius: 3,
-    position: 'relative',
-  },
-  sliderFill: {
-    height: '100%',
-    backgroundColor: Colors.primaryBlue,
-    borderRadius: 3,
-  },
-  sliderThumb: {
-    position: 'absolute',
-    top: -7,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.backgroundPrimary,
-    borderWidth: 2,
-    borderColor: Colors.primaryBlue,
-    marginLeft: -10,
+  slider: {
+    width: '100%',
+    height: 36,
   },
   playbackSection: {
     marginTop: Spacing.xLarge,

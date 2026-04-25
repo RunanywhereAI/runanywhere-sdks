@@ -43,7 +43,7 @@ public final class KeychainManager {
         try store(params.baseURL.absoluteString, for: KeychainKey.baseURL.rawValue)
 
         // Store environment
-        try store(params.environment.rawValue, for: KeychainKey.environment.rawValue)
+        try store(params.environment.wireString, for: KeychainKey.environment.rawValue)
 
         logger.info("SDK parameters stored securely in keychain")
     }
@@ -55,7 +55,7 @@ public final class KeychainManager {
               let urlString = try? retrieve(for: KeychainKey.baseURL.rawValue),
               let url = URL(string: urlString),
               let envString = try? retrieve(for: KeychainKey.environment.rawValue),
-              let environment = SDKEnvironment(rawValue: envString) else {
+              let environment = SDKEnvironment.fromWireString(envString) else {
             logger.debug("No stored SDK parameters found in keychain")
             return nil
         }

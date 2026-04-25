@@ -193,7 +193,8 @@ android {
                     jniLibs.srcDirs = [commonsDistDir]
                     logger.lifecycle("[RunAnywhereCore] Using LOCAL native libraries from: $commonsDistDir")
                 } else {
-                    logger.warn("[RunAnywhereCore] Local commons dist not found at: $commonsDistDir")
+                    jniLibs.srcDirs = [jniLibsDir]
+                    logger.lifecycle("[RunAnywhereCore] Using staged LOCAL native libraries from: $jniLibsDir")
                 }
             } else {
                 jniLibs.srcDirs = [jniLibsDir]
@@ -223,6 +224,12 @@ task downloadNativeLibs {
         if (useLocalBuild) {
             logger.lifecycle("[RunAnywhereCore] Skipping download - using local build mode")
             return
+        }
+
+        fileTree(dir: jniLibsDir, include: "**/libc++_shared.so").files.each { staleStdlib ->
+            if (staleStdlib.delete()) {
+                logger.lifecycle("[RunAnywhereCore] Removed bundled libc++_shared.so: ${staleStdlib}")
+            }
         }
 
         // Check if libs are already bundled for ALL requested ABIs (npm install case)

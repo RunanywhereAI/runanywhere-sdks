@@ -612,3 +612,62 @@ extern "C" rac_result_t rac_stt_component_get_metrics(rac_handle_t handle,
     auto* component = reinterpret_cast<rac_stt_component*>(handle);
     return rac_lifecycle_get_metrics(component->lifecycle, out_metrics);
 }
+
+// =============================================================================
+// LANGUAGE INTROSPECTION
+// =============================================================================
+
+extern "C" rac_result_t rac_stt_component_get_supported_languages(rac_handle_t handle,
+                                                                  char** out_json) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!out_json)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    *out_json = nullptr;
+
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+    std::lock_guard<std::mutex> lock(component->mtx);
+
+    rac_handle_t service = nullptr;
+    rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+    if (result != RAC_SUCCESS) {
+        log_error("STT.Component", "No model loaded - cannot enumerate languages");
+        return result;
+    }
+
+    return rac_stt_get_languages(service, out_json);
+}
+
+extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
+                                                          const void* audio_data, size_t audio_size,
+                                                          char** out_language) {
+    if (!handle)
+        return RAC_ERROR_INVALID_HANDLE;
+    if (!audio_data || audio_size == 0 || !out_language)
+        return RAC_ERROR_INVALID_ARGUMENT;
+
+    *out_language = nullptr;
+
+    auto* component = reinterpret_cast<rac_stt_component*>(handle);
+
+    rac_handle_t service = nullptr;
+    rac_stt_options_t local_options;
+    {
+        std::lock_guard<std::mutex> lock(component->mtx);
+
+        rac_result_t result = rac_lifecycle_require_service(component->lifecycle, &service);
+        if (result != RAC_SUCCESS) {
+            log_error("STT.Component", "No model loaded - cannot detect language");
+            return result;
+        }
+
+        local_options = component->default_options;
+    }
+
+    // Force detection path: ignore any sticky language setting in default options.
+    local_options.language = nullptr;
+    local_options.detect_language = RAC_TRUE;
+
+    return rac_stt_detect_language(service, audio_data, audio_size, &local_options, out_language);
+}

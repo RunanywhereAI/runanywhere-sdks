@@ -18,8 +18,8 @@ import { ModelCategory, ModelArtifactType, ModelFormat, ConfigurationSource } fr
 
 const logger = new SDKLogger('RunAnywhere.Models');
 
-// Track active downloads for cancellation
-const activeDownloads = new Map<string, number>();
+// Track active downloads so cancelDownload() can reach into native.
+const activeDownloads = new Set<string>();
 
 // ============================================================================
 // Model Registry Extension
@@ -152,11 +152,57 @@ export async function getDownloadedModels(): Promise<ModelInfo[]> {
 // ============================================================================
 
 /**
+ * Refresh the model registry — T4.9 unified cross-SDK surface.
+ *
+ * Routes to the native `refreshModelRegistry(include, rescan, prune)` Nitro
+ * method, which delegates to the commons C ABI `rac_model_registry_refresh`.
+ */
+export async function refreshModelRegistry(
+  options: {
+    includeRemoteCatalog?: boolean;
+    rescanLocal?: boolean;
+    pruneOrphans?: boolean;
+  } = {}
+): Promise<boolean> {
+  const includeRemoteCatalog = options.includeRemoteCatalog ?? true;
+  const rescanLocal = options.rescanLocal ?? false;
+  const pruneOrphans = options.pruneOrphans ?? false;
+
+  let nativeSucceeded = !includeRemoteCatalog;
+  if (includeRemoteCatalog) {
+    if (!isNativeModuleAvailable()) {
+      logger.warning('refreshModelRegistry: native module unavailable for remote catalog refresh');
+    } else {
+      const native = requireNativeModule();
+      try {
+        nativeSucceeded = await native.refreshModelRegistry(
+          includeRemoteCatalog,
+          rescanLocal,
+          pruneOrphans
+        );
+      } catch (error) {
+        logger.warning('refreshModelRegistry remote step failed:', { error });
+      }
+    }
+  }
+
+  let localSucceeded = !(rescanLocal || pruneOrphans);
+  if (rescanLocal || pruneOrphans) {
+    localSucceeded = await reconcileLocalRegistryModels({
+      rescanLocal,
+      pruneOrphans,
+    });
+  }
+
+  return nativeSucceeded && localSucceeded;
+}
+
+/**
  * Fetch model assignments for the current device from the backend.
  *
- * Note: Model assignments are automatically fetched during SDK initialization
- * (auto-fetch is enabled in the C++ layer). This method retrieves the cached
- * models from the registry.
+ * Updated for T4.9: when `forceRefresh` is true, routes through the unified
+ * `refreshModelRegistry` native surface to trigger a remote catalog fetch,
+ * then returns the freshly-populated registry contents.
  */
 export async function fetchModelAssignments(
   forceRefresh = false,
@@ -169,9 +215,13 @@ export async function fetchModelAssignments(
 
   await ensureServicesReady();
 
-  logger.info('Fetching model assignments...');
+  if (forceRefresh) {
+    logger.info('Fetching model assignments (forceRefresh)...');
+    await refreshModelRegistry({ includeRemoteCatalog: true });
+  } else {
+    logger.info('Fetching model assignments from cache...');
+  }
 
-  // Models are auto-fetched at SDK initialization and saved to the registry
   try {
     const models = await ModelRegistry.getAllModels();
     logger.info(`Successfully fetched ${models.length} model assignments`);
@@ -357,6 +407,97 @@ function inferFrameworkDir(framework: LLMFramework): string {
   }
 }
 
+function getPreferredFramework(model: ModelInfo): LLMFramework | null {
+  return model.preferredFramework ?? model.compatibleFrameworks[0] ?? null;
+}
+
+async function localPathExists(path: string): Promise<boolean> {
+  try {
+    if (await FileSystem.fileExists(path)) {
+      return true;
+    }
+    return await FileSystem.directoryExists(path);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveDownloadedLocalPath(model: ModelInfo): Promise<string | undefined> {
+  if (!FileSystem.isAvailable()) {
+    return undefined;
+  }
+
+  if (model.localPath && await localPathExists(model.localPath)) {
+    return model.localPath;
+  }
+
+  const framework = getPreferredFramework(model);
+  if (!framework) {
+    return undefined;
+  }
+
+  const frameworkDir = inferFrameworkDir(framework);
+  const exists = await FileSystem.modelExists(model.id, frameworkDir);
+  if (!exists) {
+    return undefined;
+  }
+
+  if (frameworkDir === 'ONNX') {
+    return FileSystem.getModelFolder(model.id, frameworkDir);
+  }
+
+  return FileSystem.getModelPath(model.id, frameworkDir);
+}
+
+async function reconcileLocalRegistryModels(options: {
+  rescanLocal: boolean;
+  pruneOrphans: boolean;
+}): Promise<boolean> {
+  if (!FileSystem.isAvailable()) {
+    logger.warning('refreshModelRegistry: react-native-fs unavailable for local reconciliation');
+    return false;
+  }
+
+  try {
+    const models = await ModelRegistry.getAllModels();
+    const now = new Date().toISOString();
+
+    for (const model of models) {
+      const discoveredPath =
+        options.rescanLocal || model.localPath
+          ? await resolveDownloadedLocalPath(model)
+          : undefined;
+
+      if (discoveredPath) {
+        if (!model.isDownloaded || model.localPath !== discoveredPath) {
+          await ModelRegistry.updateModel({
+            ...model,
+            localPath: discoveredPath,
+            isDownloaded: true,
+            isAvailable: true,
+            updatedAt: now,
+          });
+        }
+        continue;
+      }
+
+      if (options.pruneOrphans && (model.isDownloaded || model.localPath)) {
+        await ModelRegistry.updateModel({
+          ...model,
+          localPath: undefined,
+          isDownloaded: false,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logger.warning('refreshModelRegistry local reconciliation failed:', { error });
+    return false;
+  }
+}
+
 function inferFormat(url: string, framework?: LLMFramework): ModelFormat {
   const lower = url.toLowerCase();
   if (lower.includes('.gguf')) return ModelFormat.GGUF;
@@ -393,9 +534,35 @@ export interface DownloadProgress {
   progress: number;
 }
 
+function urlExtension(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes('.gguf')) return '.gguf';
+  if (lower.includes('.onnx')) return '.onnx';
+  if (lower.includes('.tar.bz2')) return '.tar.bz2';
+  if (lower.includes('.tar.gz')) return '.tar.gz';
+  if (lower.includes('.zip')) return '.zip';
+  return '';
+}
+
+function isArchiveUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('.tar.bz2') ||
+    lower.includes('.tar.gz') ||
+    lower.includes('.zip')
+  );
+}
+
+function buildCancelToken(modelId: string, suffix?: string): string {
+  return suffix ? `${modelId}::${suffix}` : modelId;
+}
+
 /**
- * Download a model
- * Uses react-native-fs for cross-platform downloads with progress tracking
+ * Download a model.
+ *
+ * Transport is owned by native C++ (libcurl via rac_http_download_execute);
+ * react-native-fs is only used for filesystem path resolution and existence
+ * checks. Cancellation is routed through the native cancel-token registry.
  */
 export async function downloadModel(
   modelId: string,
@@ -411,45 +578,48 @@ export async function downloadModel(
   }
 
   if (!FileSystem.isAvailable()) {
-    throw new Error('react-native-fs not installed - cannot download models');
+    throw new Error('react-native-fs not installed - cannot resolve model paths');
   }
 
-  // Use preferredFramework from modelInfo to ensure correct directory structure
+  if (!isNativeModuleAvailable()) {
+    throw new Error('Native module not available - cannot download models');
+  }
+
+  const native = requireNativeModule();
   const framework = modelInfo.preferredFramework;
 
-  activeDownloads.set(modelId, 1);
+  activeDownloads.add(modelId);
   let lastLoggedProgress = -1;
 
-  const progressHandler = (progress: { bytesWritten: number; contentLength: number; progress: number }) => {
-    const progressPct = Math.round(progress.progress * 100);
-    if (progressPct - lastLoggedProgress >= 10) {
-      logger.debug(`Download progress: ${progressPct}%`);
-      lastLoggedProgress = progressPct;
+  const emit = (bytesWritten: number, totalBytes: number, scaleOffset = 0, scale = 1) => {
+    const raw = totalBytes > 0 ? bytesWritten / totalBytes : 0;
+    const progress = scaleOffset + raw * scale;
+    const pct = Math.round(progress * 100);
+    if (pct - lastLoggedProgress >= 10) {
+      logger.debug(`Download progress: ${pct}%`);
+      lastLoggedProgress = pct;
     }
     if (onProgress) {
       onProgress({
         modelId,
-        bytesDownloaded: progress.bytesWritten,
-        totalBytes: progress.contentLength || modelInfo.downloadSize || 0,
-        progress: progress.progress,
+        bytesDownloaded: bytesWritten,
+        totalBytes: totalBytes || modelInfo.downloadSize || 0,
+        progress,
       });
     }
   };
 
   try {
-    // Multi-file model: download all files into the same directory
-    // Follows Swift SDK's AlamofireDownloadService.downloadMultiFileModel() pattern:
-    // - Sequential download of each file
-    // - Proportional progress distribution (offset/scale per file)
-    // - C++ path resolution via FileSystem.getModelFolder()
     const multiFileDescriptors = MultiFileModelCache.get(modelId);
     if (multiFileDescriptors && multiFileDescriptors.length > 0) {
-      logger.info('Starting multi-file download:', { modelId, fileCount: multiFileDescriptors.length });
+      logger.info('Starting multi-file download (native):', {
+        modelId,
+        fileCount: multiFileDescriptors.length,
+      });
 
       const frameworkDir = framework || 'ONNX';
       const destFolder = FileSystem.getModelFolder(modelId, frameworkDir);
 
-      // Ensure directory structure exists
       await FileSystem.ensureDirectory(FileSystem.getRunAnywhereDirectory());
       await FileSystem.ensureDirectory(FileSystem.getModelsDirectory());
       await FileSystem.ensureDirectory(FileSystem.getFrameworkDirectory(frameworkDir));
@@ -461,7 +631,6 @@ export async function downloadModel(
         const fileDescriptor = multiFileDescriptors[index];
         const fileDestination = `${destFolder}/${fileDescriptor.filename}`;
 
-        // Skip if file already exists
         if (await FileSystem.fileExists(fileDestination)) {
           logger.info(`File already exists, skipping: ${fileDescriptor.filename}`);
           continue;
@@ -469,24 +638,15 @@ export async function downloadModel(
 
         logger.info(`Downloading file ${index + 1}/${fileCount}: ${fileDescriptor.filename}`);
 
-        // Progress distribution: offset/scale pattern (mirrors Swift performDownload)
-        const progressOffset = index / fileCount;
-        const progressScale = 1.0 / fileCount;
+        const offset = index / fileCount;
+        const scale = 1.0 / fileCount;
+        const token = buildCancelToken(modelId, `${index}`);
 
-        await FileSystem.downloadFile(
+        await native.downloadModel(
           fileDescriptor.url,
           fileDestination,
-          (fileProgress) => {
-            const scaledProgress = progressOffset + (fileProgress.progress * progressScale);
-            if (onProgress) {
-              onProgress({
-                modelId,
-                bytesDownloaded: fileProgress.bytesWritten,
-                totalBytes: fileProgress.contentLength || modelInfo.downloadSize || 0,
-                progress: scaledProgress,
-              });
-            }
-          }
+          token,
+          (bytesWritten, totalBytes) => emit(bytesWritten, totalBytes, offset, scale),
         );
 
         logger.info(`Completed file ${index + 1}/${fileCount}: ${fileDescriptor.filename}`);
@@ -504,63 +664,97 @@ export async function downloadModel(
       return destFolder;
     }
 
-    // Single-file model: existing download logic
-    let extension = '';
-    if (modelInfo.downloadURL.includes('.gguf')) {
-      extension = '.gguf';
-    } else if (modelInfo.downloadURL.includes('.onnx')) {
-      extension = '.onnx';
-    } else if (modelInfo.downloadURL.includes('.tar.bz2')) {
-      extension = '.tar.bz2';
-    } else if (modelInfo.downloadURL.includes('.tar.gz')) {
-      extension = '.tar.gz';
-    } else if (modelInfo.downloadURL.includes('.zip')) {
-      extension = '.zip';
-    }
-    const fileName = `${modelId}${extension}`;
+    // Single-file model — decide destination (archive vs direct model file).
+    const frameworkDir = framework || 'LlamaCpp';
+    const folder = FileSystem.getModelFolder(modelId, frameworkDir);
+    await FileSystem.ensureDirectory(FileSystem.getRunAnywhereDirectory());
+    await FileSystem.ensureDirectory(FileSystem.getModelsDirectory());
+    await FileSystem.ensureDirectory(FileSystem.getFrameworkDirectory(frameworkDir));
+    await FileSystem.ensureDirectory(folder);
 
-    logger.info('Starting download (react-native-fs):', {
+    const needsExtraction = isArchiveUrl(modelInfo.downloadURL);
+    const extension = urlExtension(modelInfo.downloadURL);
+    const fileName = needsExtraction
+      ? `${modelId}_${Date.now()}.tmp`
+      : `${modelId}${extension}`;
+    const destPath = needsExtraction
+      ? `${FileSystem.getCacheDirectory()}/${fileName}`
+      : `${folder}/${fileName}`;
+
+    if (!needsExtraction && (await FileSystem.fileExists(destPath))) {
+      logger.info(`Model already exists on disk: ${destPath}`);
+      const updatedModel: ModelInfo = {
+        ...modelInfo,
+        localPath: destPath,
+        isDownloaded: true,
+      };
+      await ModelRegistry.registerModel(updatedModel);
+      return destPath;
+    }
+
+    logger.info('Starting download (native):', {
       modelId,
       url: modelInfo.downloadURL,
-    });
-
-    const destPath = await FileSystem.downloadModel(
-      fileName,
-      modelInfo.downloadURL,
-      progressHandler,
-      framework
-    );
-
-    logger.info('Download completed:', {
-      modelId,
       destPath,
     });
 
+    await native.downloadModel(
+      modelInfo.downloadURL,
+      destPath,
+      buildCancelToken(modelId),
+      (bytesWritten, totalBytes) => emit(bytesWritten, totalBytes),
+    );
+
+    let finalPath = destPath;
+    if (needsExtraction) {
+      logger.info(`Extracting archive for ${frameworkDir}...`);
+      try {
+        finalPath = await FileSystem.extractArchive(destPath, folder);
+        await FileSystem.deleteFile(destPath);
+      } catch (extractError) {
+        await FileSystem.deleteFile(destPath).catch(() => undefined);
+        throw new Error(`Archive extraction failed: ${extractError}`);
+      }
+    }
+
+    logger.info('Download completed:', { modelId, destPath: finalPath });
+
     const updatedModel: ModelInfo = {
       ...modelInfo,
-      localPath: destPath,
+      localPath: finalPath,
       isDownloaded: true,
     };
     await ModelRegistry.registerModel(updatedModel);
 
-    return destPath;
+    return finalPath;
   } finally {
     activeDownloads.delete(modelId);
   }
 }
 
 /**
- * Cancel an ongoing download
+ * Cancel an ongoing download via the native cancel-token registry.
+ * All cancel tokens emitted for this modelId (base + per-file for multi-file
+ * downloads) are signalled so the in-flight request aborts.
  */
 export async function cancelDownload(modelId: string): Promise<boolean> {
-  if (activeDownloads.has(modelId)) {
-    // Stop the native RNFS download job
-    FileSystem.cancelDownload(modelId);
-    activeDownloads.delete(modelId);
-    logger.info(`Cancelled download: ${modelId}`);
-    return true;
+  if (!activeDownloads.has(modelId)) return false;
+  if (!isNativeModuleAvailable()) return false;
+
+  const native = requireNativeModule();
+  const baseToken = buildCancelToken(modelId);
+  let cancelled = await native.cancelDownload(baseToken);
+  // Best-effort cancel for per-file tokens (multi-file downloads). We probe
+  // a bounded range because the file count is not retained here.
+  for (let i = 0; i < 64; i++) {
+    const token = buildCancelToken(modelId, `${i}`);
+    const ok = await native.cancelDownload(token);
+    cancelled = cancelled || ok;
+    if (!ok) break;
   }
-  return false;
+  activeDownloads.delete(modelId);
+  if (cancelled) logger.info(`Cancelled download: ${modelId}`);
+  return cancelled;
 }
 
 /**
@@ -608,6 +802,18 @@ export async function deleteModel(modelId: string): Promise<boolean> {
     logger.error('Delete model error:', { error });
     return false;
   }
+}
+
+/**
+ * Delete all downloaded models while keeping catalog entries registered.
+ */
+export async function deleteAllModels(): Promise<boolean> {
+  const downloaded = await getDownloadedModels();
+  let ok = true;
+  for (const model of downloaded) {
+    ok = (await deleteModel(model.id)) && ok;
+  }
+  return ok;
 }
 
 /**

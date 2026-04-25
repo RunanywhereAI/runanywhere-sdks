@@ -10,6 +10,16 @@ plugins {
     signing
 }
 
+// GAP 01 Phase 3 note:
+// Wire-generated Kotlin bindings under
+// `src/commonMain/kotlin/com/runanywhere/sdk/generated/` are committed to git
+// and refreshed by `./idl/codegen/generate_kotlin.sh`. The CI drift-check
+// (`.github/workflows/idl-drift-check.yml`) runs the same script and fails on
+// any diff, so a Gradle Wire plugin is not required for correctness. Adding
+// the plugin here causes the Kotlin DSL to clash with `kotlin { jvm() }`
+// source-set resolution under the current `agp 8.11 / kotlin 2.1 / gradle 8.x`
+// combo; revisit once Wire 5.x ships with full KMP DSL support.
+
 // Detekt
 detekt {
     buildUponDefaultConfig = true
@@ -47,7 +57,7 @@ group =
         else -> "io.github.sanchitmonga22" // Currently verified namespace
     }
 
-// Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback
+// Version: SDK_VERSION (CI) → VERSION (JitPack) → fallback (0.1.5-SNAPSHOT).
 val resolvedVersion =
     System.getenv("SDK_VERSION")?.removePrefix("v")
         ?: System.getenv("VERSION")?.removePrefix("v")
@@ -57,7 +67,7 @@ version = resolvedVersion
 logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)")
 
 // JNI library mode:
-//   useLocalNatives=true  → locally built libs from src/androidMain/jniLibs/ (run ./scripts/build-kotlin.sh --setup)
+//   useLocalNatives=true  → locally built libs staged by ./scripts/build-core-android.sh
 //   useLocalNatives=false → download pre-built libs from GitHub releases
 // rootProject checked first to support composite builds (app's gradle.properties takes precedence).
 // Legacy name `runanywhere.testLocal` still works as a fallback — emit a
@@ -154,6 +164,10 @@ kotlin {
 
                 // Okio for file system operations (replaces Files library from iOS)
                 implementation(libs.okio)
+
+                // Square Wire runtime — used by generated proto bindings
+                // under `com.runanywhere.sdk.generated.ai.runanywhere.proto.v1`.
+                api(libs.wire.runtime)
             }
         }
 
@@ -171,12 +185,9 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 implementation(libs.whisper.jni)
-                implementation(libs.okhttp)
-                implementation(libs.okhttp.logging)
                 implementation(libs.gson)
                 implementation(libs.commons.io)
 
-                implementation(libs.ktor.client.okhttp)
                 // Error tracking - Sentry (matches iOS SDK SentryDestination)
                 implementation(libs.sentry)
                 // org.json - available on Android via SDK, needed explicitly for JVM
@@ -189,9 +200,22 @@ kotlin {
         }
 
         jvmTest {
+            // Phase E + T7.2: the repo-level streaming fixtures live outside
+            // the Kotlin source tree but are imported by the JVM tests:
+            //   - tests/streaming/parity_test.kt      → StreamingParityTests
+            //   - tests/streaming/cancel_parity/*.kt  → CancelParity consumer
+            //   - tests/streaming/perf_bench/*.kt     → PerfBench consumer
+            // Mount the whole `tests/streaming` directory; Kotlin only picks
+            // up `.kt` files, so the C++/Swift/Dart/TS fixtures next to them
+            // are ignored.
+            kotlin.srcDir("../../tests/streaming")
             dependencies {
                 implementation(libs.junit)
                 implementation(libs.mockk)
+                // testRuns uses useJUnitPlatform(); to run classic JUnit 4
+                // test classes (org.junit.Test) under JUnit Platform we
+                // need the Vintage engine on the test runtime classpath.
+                runtimeOnly("org.junit.vintage:junit-vintage-engine:5.10.2")
             }
         }
 
@@ -250,17 +274,16 @@ android {
     // Backend-specific libs are in their own modules (runanywhere-core-llamacpp, runanywhere-core-onnx).
 }
 
+val buildCoreAndroidScript = projectDir.resolve("../../scripts/build-core-android.sh").canonicalFile
+
 // Build JNI libs locally (testLocal=true). Skips if libs exist unless rebuildCommons=true.
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
-    description = "Build JNI libraries locally from runanywhere-commons (when testLocal=true)"
+    description = "Build JNI libraries locally from the repo-root Android native build (when testLocal=true)"
 
     val jniLibsDir = file("src/androidMain/jniLibs")
     val llamaCppJniLibsDir = file("modules/runanywhere-core-llamacpp/src/androidMain/jniLibs")
     val onnxJniLibsDir = file("modules/runanywhere-core-onnx/src/androidMain/jniLibs")
-    val buildMarker = file(".commons-build-marker")
-    val buildKotlinScript = file("scripts/build-kotlin.sh")
-    val buildLocalScript = file("scripts/build-local.sh")
 
     // Only enable this task when testLocal=true
     onlyIf { testLocal }
@@ -270,7 +293,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
     // Set environment
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {
@@ -280,9 +303,18 @@ tasks.register<Exec>("buildLocalJniLibs") {
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
 
+        if (!buildCoreAndroidScript.exists()) {
+            throw GradleException("Missing Android build script: ${buildCoreAndroidScript.absolutePath}")
+        }
+
         // Check if we have existing libs
         // RAG pipeline is compiled into librac_commons.so; only the thin JNI bridge is separate
-        val hasMainLibs = jniLibsDir.resolve("arm64-v8a/libc++_shared.so").exists()
+        val hasMainLibs =
+            jniLibsDir.resolve("arm64-v8a/librac_commons.so").exists() &&
+                jniLibsDir.resolve("arm64-v8a/librunanywhere_jni.so").exists() &&
+                jniLibsDir.resolve("arm64-v8a/librac_backend_rag_jni.so").exists() &&
+                jniLibsDir.resolve("arm64-v8a/libc++_shared.so").exists() &&
+                jniLibsDir.resolve("arm64-v8a/libomp.so").exists()
         val hasLlamaCppLibs = llamaCppJniLibsDir.resolve("arm64-v8a/librac_backend_llamacpp_jni.so").exists()
         val hasOnnxLibs = onnxJniLibsDir.resolve("arm64-v8a/librac_backend_onnx_jni.so").exists()
 
@@ -295,16 +327,14 @@ tasks.register<Exec>("buildLocalJniLibs") {
             // Skip the exec by setting a dummy command
             commandLine("echo", "JNI libs up to date")
         } else if (!allLibsExist) {
-            // First time setup - use build-kotlin.sh --setup
-            logger.lifecycle("🆕 First-time setup: Running build-kotlin.sh --setup")
-            logger.lifecycle("   This will download dependencies and build everything...")
+            logger.lifecycle("🆕 First-time setup: Running build-core-android.sh")
+            logger.lifecycle("   This will build all Android ABIs and stage them into the Kotlin modules...")
             logger.lifecycle("")
-            commandLine("bash", buildKotlinScript.absolutePath, "--setup", "--skip-build")
+            commandLine("bash", buildCoreAndroidScript.absolutePath)
         } else if (rebuildCommons) {
-            // Force rebuild - use build-kotlin.sh with --rebuild-commons
-            logger.lifecycle("🔄 Rebuild requested: Running build-kotlin.sh --rebuild-commons")
+            logger.lifecycle("🔄 Rebuild requested: Running build-core-android.sh")
             logger.lifecycle("")
-            commandLine("bash", buildKotlinScript.absolutePath, "--local", "--rebuild-commons", "--skip-build")
+            commandLine("bash", buildCoreAndroidScript.absolutePath)
         }
     }
 
@@ -333,10 +363,10 @@ tasks.register<Exec>("buildLocalJniLibs") {
                 Local JNI build failed: No .so files found in $jniLibsDir
 
                 Run first-time setup:
-                  ./scripts/build-kotlin.sh --setup
+                  ./scripts/build-core-android.sh
 
                 Or download from releases:
-                  ./gradlew -Prunanywhere.testLocal=false assembleDebug
+                  ./gradlew -Prunanywhere.useLocalNatives=false assembleDebug
                 """.trimIndent(),
             )
         }
@@ -356,11 +386,11 @@ tasks.register<Exec>("setupLocalDevelopment") {
     description = "First-time setup: download dependencies, build commons, copy JNI libs"
 
     workingDir = projectDir
-    commandLine("bash", "scripts/build-kotlin.sh", "--setup", "--skip-build")
+    commandLine("bash", buildCoreAndroidScript.absolutePath)
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {
@@ -370,10 +400,9 @@ tasks.register<Exec>("setupLocalDevelopment") {
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
         logger.lifecycle("This will:")
-        logger.lifecycle("  1. Download dependencies (Sherpa-ONNX, etc.)")
-        logger.lifecycle("  2. Build runanywhere-commons for Android")
-        logger.lifecycle("  3. Copy JNI libraries to module directories")
-        logger.lifecycle("  4. Set testLocal=true in gradle.properties")
+        logger.lifecycle("  1. Build the Android native libraries for all ABIs")
+        logger.lifecycle("  2. Copy commons/backend JNI libraries to Kotlin module directories")
+        logger.lifecycle("  3. Stage runtime dependencies (ORT, Sherpa, libc++_shared, libomp)")
         logger.lifecycle("")
         logger.lifecycle("This may take 10-15 minutes on first run...")
         logger.lifecycle("")
@@ -393,11 +422,11 @@ tasks.register<Exec>("rebuildCommons") {
     description = "Rebuild runanywhere-commons C++ code (use after making C++ changes)"
 
     workingDir = projectDir
-    commandLine("bash", "scripts/build-kotlin.sh", "--local", "--rebuild-commons", "--skip-build")
+    commandLine("bash", buildCoreAndroidScript.absolutePath)
 
     environment(
         "ANDROID_NDK_HOME",
-        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/27.0.12077973",
+        System.getenv("ANDROID_NDK_HOME") ?: "${System.getProperty("user.home")}/Library/Android/sdk/ndk/${project.findProperty("racNdkVersion") ?: "27.0.12077973"}",
     )
 
     doFirst {
