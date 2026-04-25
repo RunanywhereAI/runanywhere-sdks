@@ -305,9 +305,6 @@ await subscription.cancel();   // deregisters the C-side callback
 - `InterruptedEvent` — barge-in / user cancel
 - `ErrorEvent` — non-recoverable error
 - `MetricsEvent` — per-turn latency breakdown (incl. `created_at_ns`)
-
-See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for migration of consumers using the deleted `VoiceSessionEvent` enum.
 ```
 
 ### Tool Calling

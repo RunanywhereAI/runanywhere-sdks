@@ -478,8 +478,7 @@ final class VoiceAgentViewModel: ObservableObject {
     ///
     /// The old `handleSessionEvent(VoiceSessionEvent)` mapped 10 UX cases to
     /// UI state. This version switches on the proto oneof `event.payload`
-    /// directly. See `docs/migrations/VoiceSessionEvent.md` for the full
-    /// case-by-case mapping.
+    /// directly.
     private func handleProtoEvent(_ event: RAVoiceEvent) {
         switch event.payload {
         case let .state(state):

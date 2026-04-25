@@ -206,7 +206,7 @@ endif()
 # runtimes/ — L1 compute-runtime plugins (T4.1). Mirrors engines/ but scoped
 # to compute targets (CPU, Metal, CoreML, CUDA, …). The built-in CPU runtime
 # is always folded into rac_commons; adapter runtimes are linked by their
-# owning engines. See sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+# owning engines.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/CMakeLists.txt")
     add_subdirectory(runtimes)
 endif()

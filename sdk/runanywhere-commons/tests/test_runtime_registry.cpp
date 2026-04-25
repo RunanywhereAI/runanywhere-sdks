@@ -6,7 +6,7 @@
  * style: pure C++ with no backend deps, links only `rac_commons`, runs on
  * every preset (macos, linux, ios, wasm).
  *
- * Scenarios (matches §8 of RUNTIME_VTABLE_DESIGN.md):
+ * Scenarios:
  *   1. register + get_by_id round-trip.
  *   2. unregister removes + subsequent get_by_id returns NULL.
  *   3. NULL vtable / NULL metadata.name / missing init or destroy → rejected.

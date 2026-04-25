@@ -337,9 +337,6 @@ job.cancel()                          // unwires the C-side callback
 CppBridgeVoiceAgent.destroy()         // tears down the native handle
 ```
 
-See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for migration of consumers using the deleted `VoiceSessionEvent` sealed class.
-
 ### Model Management
 
 ```kotlin

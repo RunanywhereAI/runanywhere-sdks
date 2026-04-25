@@ -164,8 +164,7 @@ data class VoiceAgentConfiguration(
 
 // v3.1: VoiceSessionEvent sealed class + Companion.from(...) mapper
 // DELETED. Use VoiceEvent (Wire-generated from idl/voice_events.proto)
-// via VoiceAgentStreamAdapter(handle).stream(). See
-// docs/migrations/VoiceSessionEvent.md for the canonical migration.
+// via VoiceAgentStreamAdapter(handle).stream().
 
 // MARK: - Voice Session Configuration
 

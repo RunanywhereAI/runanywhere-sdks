@@ -135,7 +135,7 @@ set(LLAMACPP_BACKEND_SOURCES
     rac_backend_llamacpp_register.cpp
     # GAP 02 Phase 8: unified engine plugin entry point. Coexists with the
     # legacy rac_backend_llamacpp_register() bootstrap; both wrap the same
-    # ops-struct. See docs/engine_plugin_authoring.md.
+    # ops-struct.
     rac_plugin_entry_llamacpp.cpp
 )
 

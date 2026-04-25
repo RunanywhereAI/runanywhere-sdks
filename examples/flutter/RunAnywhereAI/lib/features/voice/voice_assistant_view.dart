@@ -190,10 +190,9 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   /// Drive UI state from canonical VoiceEvent proto messages (v3.1).
   ///
-  /// Switches on `event.whichPayload()`. See
-  /// `docs/migrations/VoiceSessionEvent.md` for the 10-case → 8-payload
-  /// mapping guide. Turn-completion aggregation (was VoiceSessionTurnCompleted)
-  /// is rebuilt locally from the proto state transitions.
+  /// Switches on `event.whichPayload()`. Turn-completion aggregation (was
+  /// VoiceSessionTurnCompleted) is rebuilt locally from the proto state
+  /// transitions.
   void _handleProtoEvent(sdk.VoiceEvent event) {
     switch (event.whichPayload()) {
       case sdk.VoiceEvent_Payload.state:

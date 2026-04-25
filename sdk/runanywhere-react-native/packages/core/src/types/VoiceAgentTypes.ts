@@ -87,8 +87,7 @@ export interface VoiceTurnResult {
 // v3.1: VoiceSessionEvent / VoiceSessionEventType interface +
 // voiceSessionEventFromProto + voiceSessionEventKindFromProto mappers +
 // VoiceSessionCallback DELETED. Use VoiceEvent (ts-proto) via
-// VoiceAgentStreamAdapter.stream() directly. See
-// docs/migrations/VoiceSessionEvent.md for the canonical migration.
+// VoiceAgentStreamAdapter.stream() directly.
 
 /**
  * Voice agent metrics

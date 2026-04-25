@@ -5,7 +5,7 @@
  * the React Native SDK's ts-proto-generated VoiceEvent + asserts p50 < 1ms.
  *
  * Usage (requires /tmp/perf_input.bin to exist, produced by the C++
- * perf_producer — see tests/streaming/perf_bench/README.md):
+ * perf_producer):
  *
  *   cd sdk/runanywhere-react-native/packages/core && yarn jest \
  *     --config ../../../../tests/streaming/perf_bench/jest.rn.config.js

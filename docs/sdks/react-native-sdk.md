@@ -330,9 +330,6 @@ const result = await RunAnywhere.processVoiceTurn(audioBase64);
 // returns transcription + response + synthesized audio in one call
 ```
 
-See [docs/migrations/VoiceSessionEvent.md](../migrations/VoiceSessionEvent.md)
-for migration of consumers using the deleted `startVoiceSession` / `VoiceSessionHandle` API.
-
 ### Structured Output
 
 ```typescript

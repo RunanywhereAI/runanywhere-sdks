@@ -98,7 +98,7 @@ typedef struct rac_engine_metadata {
      *  scoring. The pointer must reference plugin-owned .rodata; the
      *  registry does not copy.
      *
-     *  T4.1 (`docs/RUNTIME_VTABLE_DESIGN.md`): runtimes are now first-class
+     *  T4.1: runtimes are now first-class
      *  plugins registered via `rac_runtime_register()`. The engine router
      *  gives plugins a small scoring bonus when at least one of their
      *  declared runtimes is *registered* in the runtime registry, on top of

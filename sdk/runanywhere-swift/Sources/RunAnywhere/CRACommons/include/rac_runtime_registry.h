@@ -19,10 +19,10 @@
 
 #include <stddef.h>
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
-#include "rac/plugin/rac_primitive.h"        /* rac_runtime_id_t */
-#include "rac/plugin/rac_runtime_vtable.h"
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_primitive.h"        /* rac_runtime_id_t */
+#include "rac_runtime_vtable.h"
 
 #ifdef __cplusplus
 extern "C" {

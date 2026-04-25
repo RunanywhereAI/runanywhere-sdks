@@ -3,7 +3,7 @@
  * @brief Engine-router scoring implementation.
  *
  * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- * T4.1 extension — see sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+ * T4.1 extension.
  *
  * Scoring stack (all weights deliberately explicit so a routing decision can
  * be explained as primitive/model/runtime/hardware components):

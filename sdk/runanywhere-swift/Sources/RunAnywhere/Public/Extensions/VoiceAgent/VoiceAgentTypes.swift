@@ -173,8 +173,7 @@ public struct VoiceAgentConfiguration: Sendable {
 
 // v3.1: VoiceSessionEvent enum + `from(_:)` mapper DELETED. Use
 // RAVoiceEvent (the proto-generated type) via
-// VoiceAgentStreamAdapter(handle:).stream(). See
-// docs/migrations/VoiceSessionEvent.md for the canonical migration.
+// VoiceAgentStreamAdapter(handle:).stream().
 
 // MARK: - Voice Session Configuration
 

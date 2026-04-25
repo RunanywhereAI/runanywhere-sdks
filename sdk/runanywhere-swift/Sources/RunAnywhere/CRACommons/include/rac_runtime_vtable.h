@@ -25,9 +25,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "rac/core/rac_error.h"
-#include "rac/core/rac_types.h"
-#include "rac/plugin/rac_primitive.h"   /* rac_runtime_id_t */
+#include "rac_error.h"
+#include "rac_types.h"
+#include "rac_primitive.h"   /* rac_runtime_id_t */
 
 #ifdef __cplusplus
 extern "C" {

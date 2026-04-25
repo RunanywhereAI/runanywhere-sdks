@@ -2,7 +2,7 @@
  * @file rac_runtime_cpu.cpp
  * @brief Built-in CPU runtime plugin.
  *
- * Task T4.1 — see `sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md`.
+ * Task T4.1.
  *
  * The CPU runtime is always available on every supported host. It guarantees
  * the runtime registry is non-empty and exposes a canonical `RAC_RUNTIME_CPU`

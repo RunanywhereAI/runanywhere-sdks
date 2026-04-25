@@ -2,7 +2,7 @@
  * @file rac_runtime_registry.cpp
  * @brief Runtime-plugin registry implementation — keyed by `rac_runtime_id_t`.
  *
- * Task T4.1 — see `docs/RUNTIME_VTABLE_DESIGN.md`.
+ * Task T4.1.
  *
  * Mirrors `rac_plugin_registry.cpp` but scoped to the L1 compute runtime
  * layer (CPU / Metal / CoreML / CUDA / …). The two registries are

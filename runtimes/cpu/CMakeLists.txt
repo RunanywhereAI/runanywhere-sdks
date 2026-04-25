@@ -1,7 +1,7 @@
 # =============================================================================
 # runtimes/cpu — built-in CPU runtime plugin.
 #
-# Task T4.1 — see sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+# Task T4.1.
 #
 # The CPU runtime is always available on every host. We build it as an
 # OBJECT library and fold its objects into rac_commons (mirrors the

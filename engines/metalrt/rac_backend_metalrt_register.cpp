@@ -454,7 +454,7 @@ rac_result_t rac_backend_metalrt_register(void) {
                     "MetalRT engine binary not linked — backend is a stub. "
                     "loadModel(..., framework: .metalrt) will fail with "
                     "BACKEND_UNAVAILABLE. Install the RABackendMetalRTBinary "
-                    "xcframework (see engines/metalrt/README.md) to enable it.");
+                    "xcframework to enable it.");
     state.registered = true;
     return RAC_SUCCESS;
 #endif

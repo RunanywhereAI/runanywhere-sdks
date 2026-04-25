@@ -1,7 +1,7 @@
 # =============================================================================
 # runtimes/ — top-level L1 runtime plugin directory
 #
-# Task T4.1 — see sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md.
+# Task T4.1.
 #
 # A "runtime" is the compute target an engine executes on (CPU, Apple Metal,
 # Core ML, CUDA, Vulkan, QNN, …). Runtime plugins are separate from engine

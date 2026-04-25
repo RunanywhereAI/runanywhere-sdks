@@ -184,9 +184,7 @@ RAC_API rac_result_t rac_module_get_info(const char* module_id, const rac_module
 //
 // New code uses the unified plugin registry from rac/plugin/rac_plugin_entry.h
 // (rac_plugin_register / rac_plugin_list) and the hardware-aware router
-// from rac/router/rac_route.h (rac_plugin_route). See
-// docs/engine_plugin_authoring.md §"Migrating off the legacy service registry"
-// for per-call-site translation.
+// from rac/router/rac_route.h (rac_plugin_route).
 // =============================================================================
 
 // =============================================================================

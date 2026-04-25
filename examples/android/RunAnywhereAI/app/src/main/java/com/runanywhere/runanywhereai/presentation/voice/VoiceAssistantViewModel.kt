@@ -895,9 +895,7 @@ class VoiceAssistantViewModel(
      * Handle canonical VoiceEvent proto messages (v3.1 — replaces the
      * deprecated handleVoiceSessionEvent).
      *
-     * Switches on the oneof `payload` field. See
-     * `docs/migrations/VoiceSessionEvent.md` for the 10-case → 8-payload
-     * mapping guide.
+     * Switches on the oneof `payload` field.
      */
     private fun handleProtoEvent(event: VoiceEvent) {
         when {

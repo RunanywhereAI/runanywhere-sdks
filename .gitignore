@@ -420,3 +420,16 @@ docs/research/
 docs/rfcs/
 examples/SMOKE_MATRIX.md
 docs/API_PARITY_MATRIX.md
+docs/engine_plugin_authoring.md
+docs/graph_primitives.md
+docs/migrations/
+docs/plugins/
+docs/sdks/web-sdk.md
+engines/metalrt/README.md
+examples/web/RunAnywhereAI/README.md
+idl/README.md
+sdk/runanywhere-commons/docs/RUNTIME_VTABLE_DESIGN.md
+sdk/runanywhere-commons/examples/solutions/README.md
+tests/streaming/README.md
+tests/streaming/cancel_parity/README.md
+tests/streaming/perf_bench/README.md
