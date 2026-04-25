@@ -389,8 +389,7 @@ message(STATUS "libarchive ready (v${LIBARCHIVE_VERSION})")
 # Used by src/infrastructure/http/rac_http_client_curl.cpp. Prefer the
 # system package (brew/apt/NDK/Xcode SDK); only fall back to
 # FetchContent on targets where libcurl isn't reliably on the
-# CMAKE_PREFIX_PATH (Windows MSVC, some CI runners). See
-# docs/rfcs/h1_http_client_vendor.md for the vendor decision.
+# CMAKE_PREFIX_PATH (Windows MSVC, some CI runners).
 find_package(CURL QUIET)
 if(NOT CURL_FOUND)
     message(STATUS "System libcurl not found — bundling curl-7_88_1 via FetchContent...")
@@ -787,7 +786,7 @@ endif()
 target_include_directories(rac_commons PRIVATE ${libarchive_SOURCE_DIR}/libarchive ${libarchive_BINARY_DIR})
 
 # libcurl — PUBLIC so tests and SDK adapters (rac_commons_jni) pick it
-# up transitively. See Phase H — docs/rfcs/h1_http_client_vendor.md.
+# up transitively.
 if(TARGET CURL::libcurl)
     target_link_libraries(rac_commons PUBLIC CURL::libcurl)
 else()

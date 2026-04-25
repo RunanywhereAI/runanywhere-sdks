@@ -33,8 +33,7 @@
 # Why this isn't fully automated (no `gh release upload` here):
 #   - Publishing requires `gh auth` on a release machine with the proper
 #     repo permissions; we intentionally keep the upload step operator-gated.
-#   - Same reason the tag/push steps happen outside this script — see
-#     docs/release/v0_20_0_release_plan.md Step 5.
+#   - Same reason the tag/push steps happen outside this script.
 
 set -euo pipefail
 
@@ -144,8 +143,8 @@ echo "▶ [3/3] Patching Package.swift checksums via sync-checksums.sh"
 "${REPO_ROOT}/scripts/sync-checksums.sh" "${DEST}"
 
 # ────────────────────────────────────────────────────────────────────────────
-# 4. Operator handoff. We INTENTIONALLY do not run `gh release upload` —
-#    see the docstring at the top of this file + v0_20_0_release_plan.md.
+# 4. Operator handoff. We INTENTIONALLY do not run `gh release upload`;
+#    see the docstring at the top of this file.
 # ────────────────────────────────────────────────────────────────────────────
 echo ""
 echo "✓ Release artifacts ready in: ${DEST}"

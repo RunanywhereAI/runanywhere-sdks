@@ -207,8 +207,6 @@ class stub at `Public/Extensions/RunAnywhere+VoiceAgent.ts`. Every
 method threw `SDKError.componentNotReady('VoiceAgent', …)` — it was
 never wired to anything. The class has been **deleted**, not
 deprecated. See
-[`docs/release/v0_20_0_release_plan.md`](../release/v0_20_0_release_plan.md)
-(§ 4 "Web SDK: `VoiceAgent` stub class DELETED") and
 [`docs/web_voiceagent_deletion_impact.md`](../web_voiceagent_deletion_impact.md)
 for the replacement matrix.
 
@@ -346,7 +344,6 @@ VAD.onSpeechActivity((activity) => {
 
 - [Web SDK impact audit — deletion of the stub `VoiceAgent` class](../web_voiceagent_deletion_impact.md)
 - [Cross-SDK voice migration guide (proto `VoiceEvent`)](../migrations/VoiceSessionEvent.md)
-- [v0.20.0 release plan](../release/v0_20_0_release_plan.md)
 - [RunAnywhere v2 architecture](../../runanywhere_v2_architecture.md)
 - Other SDK docs:
   [Flutter](./flutter-sdk.md),

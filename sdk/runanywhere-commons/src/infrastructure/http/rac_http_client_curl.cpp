@@ -3,7 +3,7 @@
  * @brief libcurl-backed implementation of the `rac_http_client_*` C ABI.
  *
  * See `include/rac/infrastructure/http/rac_http_client.h` for the
- * contract. See `docs/rfcs/h1_http_client_vendor.md` for why libcurl.
+ * contract; libcurl owns the native transport implementation.
  *
  * Threading: one libcurl easy handle per `rac_http_client_t`. The
  * handle is NOT shared across threads — callers allocate one per

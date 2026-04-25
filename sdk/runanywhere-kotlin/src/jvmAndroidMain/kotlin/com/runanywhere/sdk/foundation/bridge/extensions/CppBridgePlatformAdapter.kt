@@ -408,8 +408,7 @@ object CppBridgePlatformAdapter {
     // into the `rac_platform_adapter_t` struct, so this code was dead — all
     // Kotlin downloads now flow through `CppBridgeDownload` →
     // `RunAnywhereBridge.racHttpDownloadExecute(...)`.
-    // See: docs/rfcs/h1_http_client_vendor.md,
-    //      docs/v2_closeout_phase_h_report.md
+    // Native HTTP rationale now lives with the commons implementation.
     // ========================================================================
 
     // ========================================================================

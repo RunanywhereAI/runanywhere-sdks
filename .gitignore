@@ -78,9 +78,8 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
-# Verification logs: keep small Markdown summaries under verification/, but
-# do not commit raw build logs (they can be multi-megabyte local artifacts).
-verification/**/*.log
+# PR-local verification artifacts belong outside the repo.
+verification/
 
 # IDE - IntelliJ IDEA / Android Studio
 # User-specific stuff
@@ -414,3 +413,10 @@ node_modules/
 
 # External starter-app clones for local reference (release.yml clones them fresh)
 external_examples/
+
+# PR-noise blocklist: planning/status docs are archived outside the repo.
+docs/release/
+docs/research/
+docs/rfcs/
+examples/SMOKE_MATRIX.md
+docs/API_PARITY_MATRIX.md

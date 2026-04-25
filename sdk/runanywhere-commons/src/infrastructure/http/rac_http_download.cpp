@@ -3,8 +3,8 @@
  * @brief Implementation of `rac_http_download_execute` — native
  * download runner that replaces Kotlin's HttpURLConnection loop.
  *
- * v2 close-out Phase H. See `rac_http_download.h` for the contract
- * and `docs/rfcs/h1_http_client_vendor.md` for why libcurl.
+ * v2 close-out Phase H. See `rac_http_download.h` for the contract;
+ * libcurl owns the native transport implementation.
  *
  * The runner:
  *   1. Opens the destination file (append when resuming, truncate

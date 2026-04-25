@@ -20,8 +20,6 @@
  * The older executor-plugin ABI under `infrastructure/network` has
  * been removed from the build. New code must use this curl-backed ABI
  * for request/response and streaming download transport.
- *
- * Rationale: see `docs/rfcs/h1_http_client_vendor.md`.
  */
 
 #ifndef RAC_INFRASTRUCTURE_HTTP_RAC_HTTP_CLIENT_H
