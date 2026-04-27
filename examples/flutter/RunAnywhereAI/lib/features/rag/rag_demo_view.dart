@@ -96,10 +96,7 @@ class _RagDemoViewState extends State<RagDemoView> {
       return localPath;
     }
     final dir = Directory(localPath);
-    final ggufFile = dir
-        .listSync()
-        .whereType<File>()
-        .firstWhere(
+    final ggufFile = dir.listSync().whereType<File>().firstWhere(
           (f) => f.path.toLowerCase().endsWith('.gguf'),
           orElse: () => File(localPath),
         );
@@ -220,7 +217,7 @@ class _RagDemoViewState extends State<RagDemoView> {
 
   @override
   Widget build(BuildContext context) {
-    final capability = PlatformCapabilityService.shared;
+    const capability = PlatformCapabilityService.shared;
     if (!capability.supportsRag) {
       return Scaffold(
         appBar: AppBar(
@@ -457,8 +454,7 @@ class _RagDemoViewState extends State<RagDemoView> {
       ),
       decoration: BoxDecoration(
         color: AppColors.primaryRed.withValues(alpha: 0.1),
-        borderRadius:
-            BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
       ),
       child: Row(
         children: [
@@ -726,8 +722,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                       styleSheet: MarkdownStyleSheet(
                         p: AppTypography.body(context),
                         code: AppTypography.monospaced.copyWith(
-                          backgroundColor:
-                              AppColors.backgroundGray6(context),
+                          backgroundColor: AppColors.backgroundGray6(context),
                         ),
                       ),
                     ),
@@ -785,7 +780,9 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                 ),
                 const SizedBox(width: AppSpacing.xSmall),
                 Text(
-                  _showChunks ? 'Hide chunks' : 'Show $count chunk${count == 1 ? '' : 's'}',
+                  _showChunks
+                      ? 'Hide chunks'
+                      : 'Show $count chunk${count == 1 ? '' : 's'}',
                   style: AppTypography.caption(context).copyWith(
                     color: AppColors.primaryAccent,
                   ),
@@ -818,16 +815,14 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     final snippet = chunk.text.length > maxSnippetLength
         ? '${chunk.text.substring(0, maxSnippetLength)}...'
         : chunk.text;
-    final scorePercent =
-        (chunk.similarityScore * 100).toStringAsFixed(1);
+    final scorePercent = (chunk.similarityScore * 100).toStringAsFixed(1);
 
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.xSmall),
       padding: const EdgeInsets.all(AppSpacing.smallMedium),
       decoration: BoxDecoration(
         color: AppColors.backgroundGray6(context),
-        borderRadius:
-            BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+        borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
         border: Border.all(
           color: AppColors.borderMedium,
         ),
@@ -846,8 +841,8 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.badgeBlue,
-                  borderRadius: BorderRadius.circular(
-                      AppSpacing.cornerRadiusSmall),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusSmall),
                 ),
                 child: Text(
                   '$scorePercent%',

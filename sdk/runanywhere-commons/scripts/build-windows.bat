@@ -39,8 +39,15 @@ echo Usage: build-windows.bat [all^|llamacpp^|onnx] [--clean]
 exit /b 1
 
 :args_done
-for %%I in ("%~dp0.") do set "SCRIPT_HOME=%%~fI"
-for %%I in ("%SCRIPT_HOME%\..") do set "ROOT=%%~fI"
+if exist "%CD%\CMakeLists.txt" (
+  if exist "%CD%\scripts\windows\download-sherpa-onnx.bat" (
+    set "ROOT=%CD%"
+  ) else (
+    for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "(Split-Path -Path (Split-Path -Path '%~f0' -Parent) -Parent)"`) do set "ROOT=%%I"
+  )
+) else (
+  for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "(Split-Path -Path (Split-Path -Path '%~f0' -Parent) -Parent)"`) do set "ROOT=%%I"
+)
 set "WINDOWS_SCRIPT_DIR=%ROOT%\scripts\windows"
 set "BUILD_DIR=%ROOT%\build-windows-x64"
 set "DIST_DIR=%ROOT%\dist\windows\x64"
@@ -114,6 +121,19 @@ if /I "%BUILD_ONNX%"=="ON" (
   )
   copy /y "%BUILD_DIR%\src\backends\onnx\Release\rac_backend_onnx.dll" "%DIST_DIR%\rac_backend_onnx.dll" >nul
   if errorlevel 1 exit /b 1
+
+  set "FOUND_ONNX_RUNTIME=0"
+  for %%F in ("%BUILD_DIR%\_deps\onnxruntime-src\lib\onnxruntime*.dll") do (
+    if exist "%%~F" (
+      copy /y "%%~F" "%DIST_DIR%\" >nul
+      if errorlevel 1 exit /b 1
+      set "FOUND_ONNX_RUNTIME=1"
+    )
+  )
+  if "!FOUND_ONNX_RUNTIME!"=="0" (
+    echo ERROR: ONNX Runtime DLLs were not found in "%BUILD_DIR%\_deps\onnxruntime-src\lib".
+    exit /b 1
+  )
 )
 
 if /I "%BUILD_ONNX%"=="ON" (

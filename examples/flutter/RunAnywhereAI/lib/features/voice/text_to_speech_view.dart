@@ -151,7 +151,8 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               _ => LLMFramework.unknown,
             };
       _selectedModelName = currentVoice?.name;
-      _isSystemTTS = currentVoice?.framework == sdk.InferenceFramework.systemTTS;
+      _isSystemTTS =
+          currentVoice?.framework == sdk.InferenceFramework.systemTTS;
       _errorMessage = null;
     });
   }
@@ -271,7 +272,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
 
   @override
   Widget build(BuildContext context) {
-    final capability = PlatformCapabilityService.shared;
+    const capability = PlatformCapabilityService.shared;
     if (!capability.supportsTextToSpeech) {
       return Scaffold(
         appBar: AppBar(
@@ -429,7 +430,7 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
               });
             },
           ),
-          
+
           /* Pitch slider - Commented out for now as it is not implemented in the current TTS models. Once supported, we can have this back.
           const SizedBox(height: AppSpacing.mediumLarge),
 

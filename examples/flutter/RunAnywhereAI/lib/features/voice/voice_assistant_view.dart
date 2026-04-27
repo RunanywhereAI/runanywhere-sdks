@@ -8,8 +8,8 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
-import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
@@ -318,7 +318,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
   @override
   Widget build(BuildContext context) {
-    final capability = PlatformCapabilityService.shared;
+    const capability = PlatformCapabilityService.shared;
     if (!capability.supportsVoiceAssistant) {
       return Scaffold(
         appBar: AppBar(title: const Text('Voice Assistant')),

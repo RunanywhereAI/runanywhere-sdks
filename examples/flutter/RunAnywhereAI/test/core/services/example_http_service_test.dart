@@ -17,7 +17,7 @@ void main() {
     );
   });
 
-  test('does not build a proxy directive for SOCKS5 while disabled', () {
+  test('does not build a PAC PROXY directive for SOCKS5 schemes', () {
     const settings = ProxySettings(
       enabled: true,
       scheme: ProxyScheme.socks5,
@@ -26,5 +26,23 @@ void main() {
     );
 
     expect(ExampleHttpService.proxyDirectiveForTesting(settings), isNull);
+  });
+
+  test('throws when an enabled proxy uses an unsupported scheme', () {
+    const settings = ProxySettings(
+      enabled: true,
+      scheme: ProxyScheme.socks5,
+      host: 'proxy.local',
+      port: 1080,
+      bypassLocal: false,
+    );
+
+    expect(
+      () => ExampleHttpService.shared.findProxyDirectiveForTesting(
+        settings,
+        'example.com',
+      ),
+      throwsStateError,
+    );
   });
 }

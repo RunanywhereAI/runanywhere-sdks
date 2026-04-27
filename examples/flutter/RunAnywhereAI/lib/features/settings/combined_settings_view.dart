@@ -256,163 +256,172 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
     if (!mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(scope.displayName),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Enable Proxy'),
-                  value: proxyEnabled,
-                  onChanged: (value) {
-                    setDialogState(() {
-                      proxyEnabled = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: AppSpacing.smallMedium),
-                DropdownButtonFormField<ProxyScheme>(
-                  value: selectedScheme,
-                  decoration: const InputDecoration(
-                    labelText: 'Protocol',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: ProxyScheme.supportedValues
-                      .map(
-                        (scheme) => DropdownMenuItem(
-                          value: scheme,
-                          child: Text(scheme.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(scope.displayName),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Enable Proxy'),
+                    value: proxyEnabled,
+                    onChanged: (value) {
                       setDialogState(() {
-                        selectedScheme = value;
+                        proxyEnabled = value;
                       });
-                    }
-                  },
-                ),
-                const SizedBox(height: AppSpacing.mediumLarge),
-                TextField(
-                  controller: hostController,
-                  decoration: const InputDecoration(
-                    labelText: 'Host',
-                    hintText: '127.0.0.1',
-                    border: OutlineInputBorder(),
+                    },
                   ),
-                ),
-                const SizedBox(height: AppSpacing.mediumLarge),
-                TextField(
-                  controller: portController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Port',
-                    hintText: '7890',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.mediumLarge),
-                TextField(
-                  controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.mediumLarge),
-                TextField(
-                  controller: passwordController,
-                  obscureText: !showPassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        showPassword ? Icons.visibility_off : Icons.visibility,
-                      ),
-                      onPressed: () {
+                  const SizedBox(height: AppSpacing.smallMedium),
+                  DropdownButtonFormField<ProxyScheme>(
+                    value: selectedScheme,
+                    decoration: const InputDecoration(
+                      labelText: 'Protocol',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ProxyScheme.supportedValues
+                        .map(
+                          (scheme) => DropdownMenuItem(
+                            value: scheme,
+                            child: Text(scheme.displayName),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) {
                         setDialogState(() {
-                          showPassword = !showPassword;
+                          selectedScheme = value;
                         });
-                      },
+                      }
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.mediumLarge),
+                  TextField(
+                    controller: hostController,
+                    decoration: const InputDecoration(
+                      labelText: 'Host',
+                      hintText: '127.0.0.1',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.mediumLarge),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Bypass localhost'),
-                  subtitle: const Text(
-                      'Skip proxy for localhost, 127.0.0.1, and ::1'),
-                  value: bypassLocal,
-                  onChanged: (value) {
-                    setDialogState(() {
-                      bypassLocal = value;
-                    });
-                  },
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.mediumLarge),
+                  TextField(
+                    controller: portController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Port',
+                      hintText: '7890',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.mediumLarge),
+                  TextField(
+                    controller: usernameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Username',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.mediumLarge),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: !showPassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          showPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () {
+                          setDialogState(() {
+                            showPassword = !showPassword;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.mediumLarge),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Bypass localhost'),
+                    subtitle: const Text(
+                        'Skip proxy for localhost, 127.0.0.1, and ::1'),
+                    value: bypassLocal,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        bypassLocal = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final settings = ProxySettings(
-                  enabled: proxyEnabled,
-                  scheme: selectedScheme,
-                  host: hostController.text.trim(),
-                  port: int.tryParse(portController.text.trim()),
-                  username: usernameController.text.trim(),
-                  password: passwordController.text,
-                  bypassLocal: bypassLocal,
-                );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final settings = ProxySettings(
+                    enabled: proxyEnabled,
+                    scheme: selectedScheme,
+                    host: hostController.text.trim(),
+                    port: int.tryParse(portController.text.trim()),
+                    username: usernameController.text.trim(),
+                    password: passwordController.text,
+                    bypassLocal: bypassLocal,
+                  );
 
-                final result =
-                    await ProxySettingsService.shared.save(scope, settings);
-                if (!result.isValid) {
+                  final result =
+                      await ProxySettingsService.shared.save(scope, settings);
+                  if (!result.isValid) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            result.message ?? 'Invalid proxy settings',
+                          ),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  await _loadProxyConfiguration(scope);
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(
-                          result.message ?? 'Invalid proxy settings',
-                        ),
+                        content: Text('${scope.displayName} settings saved'),
                       ),
                     );
                   }
-                  return;
-                }
-
-                await _loadProxyConfiguration(scope);
-
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
-                }
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${scope.displayName} settings saved'),
-                    ),
-                  );
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      hostController.dispose();
+      portController.dispose();
+      usernameController.dispose();
+      passwordController.dispose();
+    }
   }
 
   Future<void> _clearProxyConfiguration(ProxyScope scope) async {

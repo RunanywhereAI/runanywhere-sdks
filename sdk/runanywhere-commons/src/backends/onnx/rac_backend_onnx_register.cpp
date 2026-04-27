@@ -647,7 +647,7 @@ rac_result_t rac_backend_onnx_unregister(void) {
     }
 
     #if RAC_ONNX_EMBEDDINGS_AVAILABLE
-    result = rac_backend_onnx_embeddings_unregister();
+    rac_result_t result = rac_backend_onnx_embeddings_unregister();
     if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_NOT_FOUND) {
         RAC_LOG_ERROR(LOG_CAT, "Failed to unregister ONNX embeddings provider: %d", result);
     }

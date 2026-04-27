@@ -106,9 +106,11 @@ class ProxySettingsService {
       return validation;
     }
 
+    final normalizedHost = settings.host.trim();
     final normalizedUsername = settings.username.trim();
     final normalizedPassword = settings.password.trim();
     final normalizedSettings = settings.copyWith(
+      host: normalizedHost,
       username: normalizedUsername,
       password: normalizedPassword,
     );
@@ -117,7 +119,7 @@ class ProxySettingsService {
     await prefs.setBool(_enabledKey(scope), normalizedSettings.enabled);
     await prefs.setString(
         _schemeKey(scope), normalizedSettings.scheme.wireValue);
-    await prefs.setString(_hostKey(scope), normalizedSettings.host.trim());
+    await prefs.setString(_hostKey(scope), normalizedSettings.host);
 
     if (normalizedSettings.port != null) {
       await prefs.setInt(_portKey(scope), normalizedSettings.port!);

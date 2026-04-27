@@ -138,6 +138,30 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+      'save keeps trimmed host consistent between cache and persisted settings',
+      () async {
+    const settings = ProxySettings(
+      enabled: true,
+      scheme: ProxyScheme.http,
+      host: '  proxy.runanywhere.ai  ',
+      port: 8080,
+      bypassLocal: true,
+    );
+
+    final result = await ProxySettingsService.shared.save(
+      ProxyScope.download,
+      settings,
+    );
+    final cached = ProxySettingsService.shared.getCurrent(ProxyScope.download);
+    final reloaded =
+        await ProxySettingsService.shared.load(ProxyScope.download);
+
+    expect(result.isValid, isTrue);
+    expect(cached.host, 'proxy.runanywhere.ai');
+    expect(reloaded.host, 'proxy.runanywhere.ai');
+  });
 }
 
 String _prefixed(String key) => 'com.runanywhere.RunAnywhereAI_$key';

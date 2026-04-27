@@ -16,6 +16,15 @@ import 'package:runanywhere/public/runanywhere.dart';
 
 typedef DownloadHttpClientFactory = Future<http.Client> Function(Uri url);
 
+class _DownloadCancelledException implements Exception {
+  const _DownloadCancelledException(this.modelId);
+
+  final String modelId;
+
+  @override
+  String toString() => 'Download cancelled for model: $modelId';
+}
+
 int _estimatePerFileDownloadSize(int? totalModelBytes, int totalFiles) {
   if (totalModelBytes == null || totalModelBytes <= 0 || totalFiles <= 0) {
     return 0;
@@ -27,8 +36,22 @@ double _calculateOverallMultiFileDownloadProgress({
   required int cumulativeDownloadedBytes,
   required int downloadedBytesForCurrentFile,
   required int totalModelBytes,
+  required int completedFiles,
+  required int totalFiles,
+  required int currentFileSizeEstimate,
 }) {
-  if (totalModelBytes <= 0) return 0;
+  if (totalModelBytes <= 0) {
+    if (totalFiles <= 0) {
+      return 0;
+    }
+
+    final currentFileProgress = currentFileSizeEstimate > 0
+        ? (downloadedBytesForCurrentFile / currentFileSizeEstimate)
+            .clamp(0.0, 1.0)
+        : 0.0;
+    return ((completedFiles + currentFileProgress) / totalFiles)
+        .clamp(0.0, 1.0);
+  }
 
   return ((cumulativeDownloadedBytes + downloadedBytesForCurrentFile) /
           totalModelBytes)
@@ -48,11 +71,17 @@ double calculateOverallMultiFileDownloadProgressForTesting({
   required int cumulativeDownloadedBytes,
   required int downloadedBytesForCurrentFile,
   required int totalModelBytes,
+  required int completedFiles,
+  required int totalFiles,
+  required int currentFileSizeEstimate,
 }) {
   return _calculateOverallMultiFileDownloadProgress(
     cumulativeDownloadedBytes: cumulativeDownloadedBytes,
     downloadedBytesForCurrentFile: downloadedBytesForCurrentFile,
     totalModelBytes: totalModelBytes,
+    completedFiles: completedFiles,
+    totalFiles: totalFiles,
+    currentFileSizeEstimate: currentFileSizeEstimate,
   );
 }
 
@@ -114,6 +143,15 @@ class ModelDownloadProgress {
         overallProgress: 1.0,
       );
 
+  factory ModelDownloadProgress.cancelled(String modelId) =>
+      ModelDownloadProgress(
+        modelId: modelId,
+        bytesDownloaded: 0,
+        totalBytes: 0,
+        stage: ModelDownloadStage.cancelled,
+        overallProgress: 0,
+      );
+
   factory ModelDownloadProgress.failed(String modelId, String error) =>
       ModelDownloadProgress(
         modelId: modelId,
@@ -145,6 +183,7 @@ class ModelDownloadService {
 
   final _logger = SDKLogger('ModelDownloadService');
   final Map<String, http.Client> _activeDownloads = {};
+  final Set<String> _cancelledDownloads = <String>{};
   DownloadHttpClientFactory? _clientFactory;
 
   void configureClientFactory(DownloadHttpClientFactory? factory) {
@@ -158,11 +197,18 @@ class ModelDownloadService {
     return http.Client();
   }
 
+  void _throwIfCancelled(String modelId) {
+    if (_cancelledDownloads.contains(modelId)) {
+      throw _DownloadCancelledException(modelId);
+    }
+  }
+
   /// Download a model by ID
   ///
   /// Returns a stream of download progress updates.
   Stream<ModelDownloadProgress> downloadModel(String modelId) async* {
     _logger.info('Starting download for model: $modelId');
+    _cancelledDownloads.remove(modelId);
 
     // Find the model
     final models = await RunAnywhere.availableModels();
@@ -197,11 +243,14 @@ class ModelDownloadService {
         try {
           final totalFiles = multiFile.files.length;
           final totalModelBytes = model.downloadSize ?? 0;
+          final estimatedPerFileSize =
+              _estimatePerFileDownloadSize(model.downloadSize, totalFiles);
           var cumulativeDownloaded = 0;
           _logger.info('Multi-file model: downloading $totalFiles files');
           yield ModelDownloadProgress.started(modelId, totalModelBytes);
 
           for (var i = 0; i < multiFile.files.length; i++) {
+            _throwIfCancelled(modelId);
             final descriptor = multiFile.files[i];
             final fileUrl = descriptor.url;
             if (fileUrl == null) {
@@ -218,6 +267,7 @@ class ModelDownloadService {
             _activeDownloads[modelId] = client;
             final request = http.Request('GET', fileUrl);
             try {
+              _throwIfCancelled(modelId);
               final response = await client.send(request);
 
               if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -228,11 +278,15 @@ class ModelDownloadService {
               final file = File(destPath);
               await file.create(recursive: true);
               final sink = file.openWrite();
+              final currentFileSizeEstimate = (response.contentLength ?? 0) > 0
+                  ? response.contentLength!
+                  : estimatedPerFileSize;
               var downloaded = 0;
               var completedSuccessfully = false;
 
               try {
                 await for (final chunk in response.stream) {
+                  _throwIfCancelled(modelId);
                   sink.add(chunk);
                   downloaded += chunk.length;
 
@@ -241,6 +295,9 @@ class ModelDownloadService {
                     cumulativeDownloadedBytes: cumulativeDownloaded,
                     downloadedBytesForCurrentFile: downloaded,
                     totalModelBytes: totalModelBytes,
+                    completedFiles: i,
+                    totalFiles: totalFiles,
+                    currentFileSizeEstimate: currentFileSizeEstimate,
                   );
                   yield ModelDownloadProgress(
                     modelId: modelId,
@@ -271,7 +328,6 @@ class ModelDownloadService {
               }
             } finally {
               client.close();
-              _activeDownloads.remove(modelId);
             }
           }
         } finally {
@@ -304,6 +360,7 @@ class ModelDownloadService {
 
       try {
         // Send HEAD request to get content length
+        _throwIfCancelled(modelId);
         final headResponse = await client.head(downloadUrl);
         final totalBytes =
             int.tryParse(headResponse.headers['content-length'] ?? '0') ??
@@ -314,6 +371,7 @@ class ModelDownloadService {
         yield ModelDownloadProgress.started(modelId, totalBytes);
 
         // Start download
+        _throwIfCancelled(modelId);
         final request = http.Request('GET', downloadUrl);
         final response = await client.send(request);
 
@@ -328,6 +386,7 @@ class ModelDownloadService {
         var downloaded = 0;
 
         await for (final chunk in response.stream) {
+          _throwIfCancelled(modelId);
           sink.add(chunk);
           downloaded += chunk.length;
 
@@ -388,6 +447,9 @@ class ModelDownloadService {
         client.close();
         _activeDownloads.remove(modelId);
       }
+    } on _DownloadCancelledException {
+      _logger.info('Download cancelled: $modelId');
+      yield ModelDownloadProgress.cancelled(modelId);
     } catch (e, stack) {
       _logger
           .error('Download failed: $e', metadata: {'stack': stack.toString()});
@@ -396,17 +458,20 @@ class ModelDownloadService {
         error: e.toString(),
       ));
       yield ModelDownloadProgress.failed(modelId, e.toString());
+    } finally {
+      _activeDownloads.remove(modelId);
+      _cancelledDownloads.remove(modelId);
     }
   }
 
   /// Cancel an active download
   void cancelDownload(String modelId) {
+    _cancelledDownloads.add(modelId);
     final client = _activeDownloads[modelId];
     if (client != null) {
       client.close();
-      _activeDownloads.remove(modelId);
-      _logger.info('Download cancelled: $modelId');
     }
+    _logger.info('Download cancel requested: $modelId');
   }
 
   /// Get the model storage directory.

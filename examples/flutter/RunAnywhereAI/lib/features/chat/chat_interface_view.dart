@@ -710,7 +710,9 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                         vertical: AppSpacing.mediumLarge,
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    onSubmitted: (_) {
+                      unawaited(_sendMessage());
+                    },
                     onChanged: (_) => setState(() {}),
                   ),
                 ),

@@ -10,6 +10,9 @@ void main() {
         cumulativeDownloadedBytes: 150,
         downloadedBytesForCurrentFile: 50,
         totalModelBytes: 400,
+        completedFiles: 1,
+        totalFiles: 4,
+        currentFileSizeEstimate: 100,
       ),
       closeTo(0.5, 0.0001),
     );
@@ -23,21 +26,27 @@ void main() {
         cumulativeDownloadedBytes: 380,
         downloadedBytesForCurrentFile: 40,
         totalModelBytes: 400,
+        completedFiles: 3,
+        totalFiles: 4,
+        currentFileSizeEstimate: 100,
       ),
       closeTo(1.0, 0.0001),
     );
   });
 
   test(
-      'multi-file download progress uses zero when total model size is unknown',
+      'multi-file download progress falls back to file progress when total model size is unknown',
       () {
     expect(
       calculateOverallMultiFileDownloadProgressForTesting(
-        cumulativeDownloadedBytes: 150,
+        cumulativeDownloadedBytes: 0,
         downloadedBytesForCurrentFile: 50,
         totalModelBytes: 0,
+        completedFiles: 1,
+        totalFiles: 2,
+        currentFileSizeEstimate: 100,
       ),
-      0,
+      closeTo(0.75, 0.0001),
     );
   });
 

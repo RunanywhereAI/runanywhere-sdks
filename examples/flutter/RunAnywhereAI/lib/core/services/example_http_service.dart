@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:runanywhere_ai/core/models/proxy_settings.dart';
 import 'package:runanywhere_ai/core/services/proxy_settings_service.dart';
@@ -71,23 +71,10 @@ class ExampleHttpService {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15);
 
-    if (!settings.enabled ||
-        !settings.isComplete ||
-        !settings.scheme.isSupportedInExampleApp ||
-        !_shouldUseProxy(settings, targetUri.host)) {
-      client.findProxy = (_) => 'DIRECT';
-      return client;
-    }
+    final proxyDirective = _findProxyDirective(settings, targetUri.host);
+    client.findProxy = (_) => proxyDirective ?? 'DIRECT';
 
-    final proxyDirective = _proxyDirectiveForSettings(settings);
-    if (proxyDirective == null) {
-      client.findProxy = (_) => 'DIRECT';
-      return client;
-    }
-
-    client.findProxy = (_) => proxyDirective;
-
-    if (settings.username.isNotEmpty) {
+    if (proxyDirective != null && settings.username.isNotEmpty) {
       client.authenticateProxy =
           (String host, int port, String scheme, String? realm) async {
         client.addProxyCredentials(
@@ -122,6 +109,30 @@ class ExampleHttpService {
         normalized != '::1';
   }
 
+  String? _findProxyDirective(ProxySettings settings, String host) {
+    if (!settings.enabled ||
+        !settings.isComplete ||
+        !_shouldUseProxy(settings, host)) {
+      return null;
+    }
+
+    if (!settings.scheme.isSupportedInExampleApp) {
+      throw StateError(
+        'Unsupported proxy scheme for enabled proxy: '
+        '${settings.scheme.displayName} (${settings.host.trim()})',
+      );
+    }
+
+    final proxyDirective = _proxyDirectiveForSettings(settings);
+    if (proxyDirective == null) {
+      throw StateError(
+        'Enabled proxy settings are invalid for ${settings.host.trim()}.',
+      );
+    }
+
+    return proxyDirective;
+  }
+
   static String? _proxyDirectiveForSettings(ProxySettings settings) {
     if (!settings.scheme.isSupportedInExampleApp ||
         settings.port == null ||
@@ -140,5 +151,13 @@ class ExampleHttpService {
   @visibleForTesting
   static String? proxyDirectiveForTesting(ProxySettings settings) {
     return _proxyDirectiveForSettings(settings);
+  }
+
+  @visibleForTesting
+  String? findProxyDirectiveForTesting(
+    ProxySettings settings,
+    String host,
+  ) {
+    return _findProxyDirective(settings, host);
   }
 }

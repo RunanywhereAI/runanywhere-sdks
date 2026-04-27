@@ -61,7 +61,6 @@ class SpeechToTextView extends StatefulWidget {
 class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Recording state
   bool _isRecording = false;
-  final bool _isProcessing = false;
   bool _isTranscribing = false;
   STTMode _selectedMode = STTMode.batch;
   String _transcribedText = '';
@@ -71,7 +70,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Model state
   LLMFramework? _selectedFramework;
   String? _selectedModelName;
-  bool _supportsLiveMode = true;
+  bool _supportsLiveMode = false;
 
   // Error state
   String? _errorMessage;
@@ -114,7 +113,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       useSafeArea: true,
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.stt,
-        onModelSelected: (model) async {
+        onModelSelected: (_) async {
           await _refreshModelState();
         },
       ),
@@ -126,14 +125,16 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     if (!mounted) return;
 
     setState(() {
-      _selectedFramework = currentModel == null
-          ? LLMFramework.unknown
-          : switch (currentModel.framework) {
-              sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
-              _ => LLMFramework.unknown,
-            };
+      _selectedFramework = switch (currentModel?.framework) {
+        sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
+        null => null,
+        _ => LLMFramework.unknown,
+      };
       _selectedModelName = currentModel?.name;
       _supportsLiveMode = false;
+      if (!_supportsLiveMode) {
+        _selectedMode = STTMode.batch;
+      }
       _errorMessage = null;
     });
   }
@@ -306,14 +307,14 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
                 child: ModelStatusBanner(
                   framework: _selectedFramework,
                   modelName: _selectedModelName,
-                  isLoading: _isProcessing && !_hasModelSelected,
+                  isLoading: false,
                   onSelectModel: _showModelSelectionSheet,
                 ),
               ),
 
               // Mode selector (only when model is selected)
               if (_hasModelSelected) ...[
-                _buildModeSelector(),
+                if (_supportsLiveMode) _buildModeSelector(),
                 _buildModeDescription(),
               ],
 
@@ -330,7 +331,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           ),
 
           // Model required overlay
-          if (!_hasModelSelected && !_isProcessing)
+          if (!_hasModelSelected)
             ModelRequiredOverlay(
               modality: ModelSelectionContext.stt,
               onSelectModel: _showModelSelectionSheet,
@@ -386,15 +387,6 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
               color: AppColors.textSecondary(context),
             ),
           ),
-          if (!_supportsLiveMode && _selectedMode == STTMode.live) ...[
-            const SizedBox(width: AppSpacing.smallMedium),
-            Text(
-              '(will use batch)',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.statusOrange,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -592,9 +584,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     }
 
     return GestureDetector(
-      onTap: !_isProcessing && !_isTranscribing && _hasModelSelected
-          ? _toggleRecording
-          : null,
+      onTap: !_isTranscribing && _hasModelSelected ? _toggleRecording : null,
       child: Container(
         width: 72,
         height: 72,
@@ -609,7 +599,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
             ),
           ],
         ),
-        child: _isProcessing || _isTranscribing
+        child: _isTranscribing
             ? const Padding(
                 padding: EdgeInsets.all(AppSpacing.xLarge),
                 child: CircularProgressIndicator(

@@ -244,6 +244,33 @@ static TestResult test_find_model_prefers_primary_gguf_over_mmproj() {
     return r;
 }
 
+static TestResult test_find_model_prefers_same_level_file_over_nested_match() {
+    TestResult r;
+    r.test_name = "find_model_prefers_same_level_file_over_nested_match";
+
+    std::string dir = create_temp_dir("same_level_first");
+    ASSERT_TRUE(!dir.empty(), "Failed to create temp dir");
+
+    mkdir_p(dir + "/000-nested");
+    write_dummy_file(dir + "/000-nested/nested-model.gguf");
+    write_dummy_file(dir + "/root-model.gguf");
+
+    char out_path[4096];
+    rac_result_t result = rac_find_model_path_after_extraction(
+        dir.c_str(), RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED, RAC_FRAMEWORK_LLAMACPP,
+        RAC_MODEL_FORMAT_GGUF, out_path, sizeof(out_path));
+
+    ASSERT_TRUE(result == RAC_SUCCESS, "Should find llama.cpp model path");
+
+    std::string found(out_path);
+    ASSERT_TRUE(found.find("root-model.gguf") != std::string::npos,
+                "Should prefer same-level file before nested directories");
+
+    remove_dir(dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_find_model_nested_directory() {
     TestResult r;
     r.test_name = "find_model_nested_directory";
@@ -500,6 +527,8 @@ int main(int argc, char** argv) {
     suite.add("find_model_nested_gguf", test_find_model_nested_gguf);
     suite.add("find_model_prefers_primary_gguf_over_mmproj",
               test_find_model_prefers_primary_gguf_over_mmproj);
+    suite.add("find_model_prefers_same_level_file_over_nested_match",
+              test_find_model_prefers_same_level_file_over_nested_match);
     suite.add("find_model_nested_directory", test_find_model_nested_directory);
     suite.add("find_model_directory_based_onnx", test_find_model_directory_based_onnx);
     suite.add("find_model_skips_hidden_files", test_find_model_skips_hidden_files);

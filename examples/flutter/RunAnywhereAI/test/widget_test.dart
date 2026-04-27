@@ -12,8 +12,14 @@ void main() {
     // Verify that the app renders without errors.
     // Avoid pumpAndSettle here because app startup may keep scheduling frames
     // (for example, animations/tickers), which can cause test timeouts.
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    const pumpStep = Duration(milliseconds: 100);
+    const maxAttempts = 20;
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      await tester.pump(pumpStep);
+      if (find.byType(RunAnywhereAIApp).evaluate().isNotEmpty) {
+        break;
+      }
+    }
 
     // Basic check that something rendered
     expect(find.byType(RunAnywhereAIApp), findsOneWidget);

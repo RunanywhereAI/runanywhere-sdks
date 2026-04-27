@@ -233,6 +233,8 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
 
 #if defined(_WIN32)
     std::error_code ec;
+    std::string found_model;
+    std::vector<std::string> subdirs;
     for (const auto& entry : std::filesystem::directory_iterator(directory, ec)) {
         const auto name = entry.path().filename().string();
         if (name == "." || name == "..") continue;
@@ -245,14 +247,20 @@ static bool find_single_model_file(const char* directory, int depth, int max_dep
                 if (is_auxiliary_model_file(name)) {
                     continue;
                 }
-                snprintf(out_path, path_size, "%s", full_path.c_str());
-                return true;
+                found_model = full_path;
+                break;
             }
         } else if (entry.is_directory(ec)) {
-            if (find_single_model_file(full_path.c_str(), depth + 1, max_depth, out_path,
-                                       path_size)) {
-                return true;
-            }
+            subdirs.push_back(full_path);
+        }
+    }
+    if (!found_model.empty()) {
+        snprintf(out_path, path_size, "%s", found_model.c_str());
+        return true;
+    }
+    for (const auto& subdir : subdirs) {
+        if (find_single_model_file(subdir.c_str(), depth + 1, max_depth, out_path, path_size)) {
+            return true;
         }
     }
     return false;

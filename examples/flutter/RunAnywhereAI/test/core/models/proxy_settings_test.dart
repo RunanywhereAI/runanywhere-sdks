@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere_ai/core/models/proxy_settings.dart';
 
 void main() {
-  test('supported proxy scheme values exclude SOCKS5 while disabled', () {
+  test('supported proxy scheme values exclude SOCKS5', () {
     expect(ProxyScheme.supportedValues, isNot(contains(ProxyScheme.socks5)));
     expect(ProxyScheme.supportedValues, contains(ProxyScheme.http));
     expect(ProxyScheme.supportedValues, contains(ProxyScheme.https));

@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/core/types/npu_chip.dart';
-import 'package:runanywhere/public/extensions/runanywhere_device.dart';
 import 'package:runanywhere/public/extensions/rag_module.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
@@ -364,9 +362,9 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // --- ONNX BACKEND (required for embeddings used by RAG) ---
     try {
       await Onnx.register();
-      debugPrint('✅ ONNX backend registered (Windows optional)');
+      debugPrint('✅ ONNX backend registered');
     } catch (e) {
-      debugPrint('⚠️ ONNX backend not available on this Windows build: $e');
+      debugPrint('⚠️ ONNX backend not available on this platform: $e');
     }
 
     // --- RAG BACKEND ---
@@ -374,7 +372,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       await RAGModule.register();
       debugPrint('✅ RAG backend registered');
     } catch (e) {
-      debugPrint('⚠️ RAG backend not available on this Windows build: $e');
+      debugPrint('⚠️ RAG backend not available on this platform: $e');
     }
 
     debugPrint('🎉 All modules and models registered');
