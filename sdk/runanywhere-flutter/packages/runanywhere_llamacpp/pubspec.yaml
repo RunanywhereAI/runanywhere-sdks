@@ -39,3 +39,5 @@ flutter:
         pluginClass: LlamaCppPlugin
       ios:
         pluginClass: LlamaCppPlugin
+      windows:
+        pluginClass: RunanywhereLlamacppPluginCApi

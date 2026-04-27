@@ -367,7 +367,7 @@ class _StructuredOutputViewState extends State<StructuredOutputView> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
       child: DropdownButtonFormField<int>(
-        initialValue: _selectedExampleIndex,
+        value: _selectedExampleIndex,
         decoration: InputDecoration(
           labelText: 'Example',
           border: OutlineInputBorder(

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:runanywhere/capabilities/voice/models/voice_session.dart';
 import 'package:runanywhere/capabilities/voice/models/voice_session_handle.dart';
 import 'package:runanywhere/core/types/model_types.dart';
@@ -15,6 +16,7 @@ import 'package:runanywhere/foundation/dependency_injection/service_container.da
 import 'package:runanywhere/foundation/error_types/sdk_error.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
+import 'package:runanywhere/internal/vlm_file_resolution.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
@@ -1183,7 +1185,8 @@ class RunAnywhere {
     required VLMImage image,
     VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
-    final result = await processImage(image, prompt: question, options: options);
+    final result =
+        await processImage(image, prompt: question, options: options);
     return result.text;
   }
 
@@ -1337,14 +1340,16 @@ class RunAnywhere {
       // Build result future that completes when stream is done
       final metricsFuture = controller.stream.toList().then((_) {
         final endTime = DateTime.now();
-        final totalTimeMs = endTime.difference(startTime).inMicroseconds / 1000.0;
+        final totalTimeMs =
+            endTime.difference(startTime).inMicroseconds / 1000.0;
         final tokensPerSecond =
             totalTimeMs > 0 ? allTokens.length / (totalTimeMs / 1000) : 0.0;
 
         // Calculate time to first token
         int? timeToFirstTokenMs;
         if (firstTokenTime != null) {
-          timeToFirstTokenMs = firstTokenTime!.difference(startTime).inMilliseconds;
+          timeToFirstTokenMs =
+              firstTokenTime!.difference(startTime).inMilliseconds;
         }
 
         logger.info(
@@ -1454,7 +1459,7 @@ class RunAnywhere {
       logger.info('VLM model folder: $modelFolder');
 
       // Resolve the actual model file path
-      final modelPath = await _resolveVLMModelFilePath(modelFolder, model);
+      final modelPath = await _resolveVLMModelFilePath(modelFolder);
       if (modelPath == null) {
         throw SDKError.modelNotFound(
           'Could not find main VLM model file in: $modelFolder',
@@ -1816,55 +1821,13 @@ class RunAnywhere {
   }
 
   /// Resolve VLM model file path (similar to LLM path resolution)
-  static Future<String?> _resolveVLMModelFilePath(
-    String modelFolder,
-    ModelInfo model,
-  ) async {
-    // If modelFolder points to a file (e.g. .gguf), use its parent directory
-    final file = File(modelFolder);
-    final dir = await file.exists() ? file.parent : Directory(modelFolder);
-    if (!await dir.exists()) return null;
-    final dirPath = dir.path;
-
-    try {
-      // List folder contents
-      final entities = await dir.list().toList();
-      final files =
-          entities.whereType<File>().map((f) => f.path.split('/').last).toList();
-
-      // Find .gguf files that are NOT mmproj files (main model)
-      final ggufFiles = files.where((f) => f.toLowerCase().endsWith('.gguf')).toList();
-      final mainModelFiles =
-          ggufFiles.where((f) => !f.toLowerCase().contains('mmproj')).toList();
-
-      if (mainModelFiles.isNotEmpty) {
-        return '$dirPath/${mainModelFiles.first}';
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
+  static Future<String?> _resolveVLMModelFilePath(String modelFolder) async {
+    return resolveVlmMainModelPath(modelFolder);
   }
 
   /// Find mmproj file in a directory
   static Future<String?> _findMmprojFile(String modelDirPath) async {
-    final dir = Directory(modelDirPath);
-    if (!await dir.exists()) return null;
-
-    try {
-      await for (final entity in dir.list()) {
-        if (entity is File) {
-          final name = entity.path.split('/').last.toLowerCase();
-          if (name.contains('mmproj') && name.endsWith('.gguf')) {
-            return entity.path;
-          }
-        }
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return findVlmMmprojPath(modelDirPath);
   }
 
   // ============================================================================
@@ -2276,6 +2239,21 @@ class RunAnywhere {
       case ModelDownloadStage.cancelled:
         return DownloadProgressState.cancelled;
     }
+  }
+
+  /// Configure a custom HTTP client factory for model downloads only.
+  ///
+  /// Passing `null` clears any custom download client factory and restores the
+  /// default client creation behavior.
+  ///
+  /// Any `http.Client` returned by [factory] is owned by the SDK and will be
+  /// closed after each download completes.
+  ///
+  /// This does not affect SDK API traffic such as telemetry, auth, or device registration.
+  static void configureDownloadHttpClientFactory(
+    Future<http.Client> Function(Uri url)? factory,
+  ) {
+    ModelDownloadService.shared.configureClientFactory(factory);
   }
 
   /// Delete a stored model

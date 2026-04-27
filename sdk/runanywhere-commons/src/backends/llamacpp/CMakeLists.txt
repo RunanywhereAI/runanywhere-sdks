@@ -73,6 +73,18 @@ elseif(RAC_PLATFORM_MACOS)
     set(GGML_METAL ON CACHE BOOL "" FORCE)
     set(GGML_ACCELERATE ON CACHE BOOL "" FORCE)
     set(GGML_METAL_EMBED_LIBRARY ON CACHE BOOL "" FORCE)  # Embed precompiled Metal shaders
+elseif(RAC_PLATFORM_WINDOWS)
+    set(GGML_METAL OFF CACHE BOOL "" FORCE)
+    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
+    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
+    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
+    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
+    set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
+    set(GGML_RPC OFF CACHE BOOL "" FORCE)
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+    message(STATUS "Configuring llama.cpp for Windows (CPU-only)")
 elseif(RAC_PLATFORM_LINUX)
     # Disable GPU backends not typically available on Linux ARM
     set(GGML_METAL OFF CACHE BOOL "" FORCE)
@@ -87,24 +99,24 @@ elseif(RAC_PLATFORM_LINUX)
         set(GGML_NEON ON CACHE BOOL "" FORCE)
         message(STATUS "Enabling NEON for Linux aarch64")
     endif()
-elseif(RAC_PLATFORM_WINDOWS)
-    # Windows: CPU-only by default, no Metal/CUDA/Vulkan
-    set(GGML_METAL OFF CACHE BOOL "" FORCE)
-    set(GGML_CUDA OFF CACHE BOOL "" FORCE)
-    set(GGML_VULKAN OFF CACHE BOOL "" FORCE)
-    set(GGML_OPENCL OFF CACHE BOOL "" FORCE)
-    set(GGML_HIPBLAS OFF CACHE BOOL "" FORCE)
-    set(GGML_SYCL OFF CACHE BOOL "" FORCE)
-    set(GGML_KOMPUTE OFF CACHE BOOL "" FORCE)
-    set(GGML_RPC OFF CACHE BOOL "" FORCE)
-    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
-    set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
-    message(STATUS "Configuring llama.cpp for Windows (CPU-only)")
 endif()
 
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Force static libraries for llama.cpp" FORCE)
 
 FetchContent_MakeAvailable(llamacpp)
+
+if(RAC_PLATFORM_WINDOWS)
+    if(TARGET llama)
+        target_compile_options(llama PRIVATE /Zc:char8_t-)
+    endif()
+    if(TARGET common)
+        set_target_properties(common PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+        )
+    endif()
+endif()
 
 # Android: map POSIX_MADV_* to MADV_* to avoid missing constants
 if(RAC_PLATFORM_ANDROID)
@@ -132,8 +144,11 @@ set(LLAMACPP_BACKEND_HEADERS
     llamacpp_backend.h
 )
 
-# Option to enable VLM multimodal support (requires mtmd from llama.cpp)
 option(RAC_VLM_USE_MTMD "Enable VLM multimodal support via llama.cpp mtmd" ON)
+if(NOT RAC_BUILD_VLM)
+    set(RAC_VLM_USE_MTMD OFF CACHE BOOL "" FORCE)
+endif()
+
 if(RAC_VLM_USE_MTMD)
     message(STATUS "VLM multimodal support enabled")
     # Add VLM Backend sources (Vision Language Model)
@@ -255,14 +270,15 @@ elseif(RAC_PLATFORM_MACOS)
         "-framework MetalKit"
     )
 
+elseif(RAC_PLATFORM_WINDOWS)
+    message(STATUS "Configuring LlamaCPP backend for Windows")
+    target_compile_definitions(rac_backend_llamacpp PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(rac_backend_llamacpp PUBLIC ws2_32)
+
 elseif(RAC_PLATFORM_LINUX)
     message(STATUS "Configuring LlamaCPP backend for Linux")
     # Linux-specific link libraries
     target_link_libraries(rac_backend_llamacpp PUBLIC pthread dl)
-
-elseif(RAC_PLATFORM_WINDOWS)
-    message(STATUS "Configuring LlamaCPP backend for Windows")
-    # No extra link libraries needed on Windows (threading is built-in)
 endif()
 
 # =============================================================================

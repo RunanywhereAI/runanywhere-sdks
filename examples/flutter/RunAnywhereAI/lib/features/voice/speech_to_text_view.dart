@@ -6,8 +6,10 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
+import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -59,7 +61,6 @@ class SpeechToTextView extends StatefulWidget {
 class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Recording state
   bool _isRecording = false;
-  bool _isProcessing = false;
   bool _isTranscribing = false;
   STTMode _selectedMode = STTMode.batch;
   String _transcribedText = '';
@@ -69,7 +70,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Model state
   LLMFramework? _selectedFramework;
   String? _selectedModelName;
-  bool _supportsLiveMode = true;
+  bool _supportsLiveMode = false;
 
   // Error state
   String? _errorMessage;
@@ -86,6 +87,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   void initState() {
     super.initState();
     unawaited(_checkMicrophonePermission());
+    unawaited(_refreshModelState());
   }
 
   @override
@@ -111,43 +113,30 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
       useSafeArea: true,
       builder: (sheetContext) => ModelSelectionSheet(
         context: ModelSelectionContext.stt,
-        onModelSelected: (model) async {
-          await _loadModel(model);
+        onModelSelected: (_) async {
+          await _refreshModelState();
         },
       ),
     ));
   }
 
-  /// Load STT model using RunAnywhere SDK directly (matches Swift STTViewModel pattern)
-  Future<void> _loadModel(ModelInfo model) async {
+  Future<void> _refreshModelState() async {
+    final currentModel = await sdk.RunAnywhere.currentSTTModel();
+    if (!mounted) return;
+
     setState(() {
-      _isProcessing = true;
+      _selectedFramework = switch (currentModel?.framework) {
+        sdk.InferenceFramework.onnx => LLMFramework.onnxRuntime,
+        null => null,
+        _ => LLMFramework.unknown,
+      };
+      _selectedModelName = currentModel?.name;
+      _supportsLiveMode = false;
+      if (!_supportsLiveMode) {
+        _selectedMode = STTMode.batch;
+      }
       _errorMessage = null;
     });
-
-    try {
-      debugPrint('🔄 Loading STT model: ${model.name}');
-
-      // Load STT model directly via SDK (matches Swift: RunAnywhere.loadSTTModel)
-      await sdk.RunAnywhere.loadSTTModel(model.id);
-
-      setState(() {
-        _selectedFramework =
-            model.preferredFramework ?? LLMFramework.whisperKit;
-        _selectedModelName = model.name;
-        // WhisperKit supports live mode, ONNX may have limitations
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
-        _isProcessing = false;
-      });
-
-      debugPrint('✅ STT model loaded: ${model.name}');
-    } catch (e) {
-      debugPrint('❌ Failed to load STT model: $e');
-      setState(() {
-        _errorMessage = 'Failed to load model: $e';
-        _isProcessing = false;
-      });
-    }
   }
 
   Future<void> _toggleRecording() async {
@@ -277,6 +266,19 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   Widget build(BuildContext context) {
+    const capability = PlatformCapabilityService.shared;
+    if (!capability.supportsSpeechToText) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Speech to Text'),
+        ),
+        body: UnsupportedFeatureView(
+          title: 'Speech-to-Text Unavailable',
+          message: capability.unsupportedMessage('Speech-to-Text'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Speech to Text'),
@@ -305,14 +307,14 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
                 child: ModelStatusBanner(
                   framework: _selectedFramework,
                   modelName: _selectedModelName,
-                  isLoading: _isProcessing && !_hasModelSelected,
+                  isLoading: false,
                   onSelectModel: _showModelSelectionSheet,
                 ),
               ),
 
               // Mode selector (only when model is selected)
               if (_hasModelSelected) ...[
-                _buildModeSelector(),
+                if (_supportsLiveMode) _buildModeSelector(),
                 _buildModeDescription(),
               ],
 
@@ -329,7 +331,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
           ),
 
           // Model required overlay
-          if (!_hasModelSelected && !_isProcessing)
+          if (!_hasModelSelected)
             ModelRequiredOverlay(
               modality: ModelSelectionContext.stt,
               onSelectModel: _showModelSelectionSheet,
@@ -385,15 +387,6 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
               color: AppColors.textSecondary(context),
             ),
           ),
-          if (!_supportsLiveMode && _selectedMode == STTMode.live) ...[
-            const SizedBox(width: AppSpacing.smallMedium),
-            Text(
-              '(will use batch)',
-              style: AppTypography.caption(context).copyWith(
-                color: AppColors.statusOrange,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -591,9 +584,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
     }
 
     return GestureDetector(
-      onTap: !_isProcessing && !_isTranscribing && _hasModelSelected
-          ? _toggleRecording
-          : null,
+      onTap: !_isTranscribing && _hasModelSelected ? _toggleRecording : null,
       child: Container(
         width: 72,
         height: 72,
@@ -608,7 +599,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
             ),
           ],
         ),
-        child: _isProcessing || _isTranscribing
+        child: _isTranscribing
             ? const Padding(
                 padding: EdgeInsets.all(AppSpacing.xLarge),
                 child: CircularProgressIndicator(

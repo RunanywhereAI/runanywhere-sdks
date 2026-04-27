@@ -26,6 +26,7 @@ namespace fs = std::filesystem;
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_platform_compat.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
@@ -247,6 +248,12 @@ rac_bool_t onnx_stt_can_handle(const rac_service_request_t* request, void* user_
 
     const char* path = request->identifier;
     RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: checking path=%s", path);
+
+    struct stat st;
+    if (stat(path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        RAC_LOG_INFO(LOG_CAT, "onnx_stt_can_handle: directory path exists -> TRUE");
+        return RAC_TRUE;
+    }
 
     if (strstr(path, "whisper") != nullptr || strstr(path, "zipformer") != nullptr ||
         strstr(path, "paraformer") != nullptr || strstr(path, "parakeet") != nullptr ||
@@ -616,10 +623,21 @@ rac_result_t rac_backend_onnx_register(void) {
     // The provider code is compiled into this backend; registration was
     // previously done by rac_backend_rag_register() when the sources lived
     // in the RAG OBJECT library.
-    rac_backend_onnx_embeddings_register();
+    #if RAC_ONNX_EMBEDDINGS_AVAILABLE
+    result = rac_backend_onnx_embeddings_register();
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to register ONNX embeddings provider: %d", result);
+        rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
+        rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);
+        rac_service_unregister_provider(STT_PROVIDER_NAME, RAC_CAPABILITY_STT);
+        rac_module_unregister(MODULE_ID);
+        return result;
+    }
+    #endif
 
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD + Embeddings)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (STT + TTS + VAD%s)",
+                 RAC_ONNX_EMBEDDINGS_AVAILABLE ? " + Embeddings" : "");
     return RAC_SUCCESS;
 }
 
@@ -628,7 +646,12 @@ rac_result_t rac_backend_onnx_unregister(void) {
         return RAC_ERROR_MODULE_NOT_FOUND;
     }
 
-    rac_backend_onnx_embeddings_unregister();
+    #if RAC_ONNX_EMBEDDINGS_AVAILABLE
+    rac_result_t result = rac_backend_onnx_embeddings_unregister();
+    if (result != RAC_SUCCESS && result != RAC_ERROR_MODULE_NOT_FOUND) {
+        RAC_LOG_ERROR(LOG_CAT, "Failed to unregister ONNX embeddings provider: %d", result);
+    }
+    #endif
     rac_model_strategy_unregister(RAC_FRAMEWORK_ONNX);
     rac_service_unregister_provider(VAD_PROVIDER_NAME, RAC_CAPABILITY_VAD);
     rac_service_unregister_provider(TTS_PROVIDER_NAME, RAC_CAPABILITY_TTS);

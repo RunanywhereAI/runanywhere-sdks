@@ -843,7 +843,10 @@ int _listDirectoryCallback(
       return RacResultCode.success;
     }
 
-    final entries = dir.listSync().map((e) => e.path.split('/').last).toList();
+    final entries = dir
+        .listSync()
+        .map((e) => e.path.replaceAll('\\', '/').split('/').last)
+        .toList();
     outCount.value = entries.length;
 
     if (entries.isEmpty) return RacResultCode.success;

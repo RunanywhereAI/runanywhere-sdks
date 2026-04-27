@@ -85,6 +85,11 @@ class OnnxBindings {
       );
     }
 
+    if (Platform.isWindows) {
+      PlatformLoader.loadCommons();
+      return PlatformLoader.loadLibrary('rac_backend_onnx');
+    }
+
     // On iOS/macOS, everything is statically linked
     return PlatformLoader.loadCommons();
   }

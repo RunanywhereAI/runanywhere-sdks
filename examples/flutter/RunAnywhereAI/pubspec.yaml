@@ -27,7 +27,7 @@ dependencies:
     path: ../../../sdk/runanywhere-flutter/packages/runanywhere_onnx
   provider: ^6.1.0
   flutter_markdown: ^0.6.18
-  record: ^6.1.0
+  record: ^5.2.0
   audioplayers: ^6.0.0
   permission_handler: ^11.1.0
   shared_preferences: ^2.2.2
@@ -47,6 +47,8 @@ dependencies:
   http: ^1.2.0
   # Camera access for VLM
   camera: ^0.11.0
+  # Windows implementation for camera; pin to a Dart 3.3 compatible release
+  camera_windows: 0.2.6+1
   # Image picker for gallery photos
   image_picker: ^1.0.0
   # Image manipulation (BGRA to RGB pixel conversion)

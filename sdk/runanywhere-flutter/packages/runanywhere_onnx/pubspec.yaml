@@ -41,3 +41,5 @@ flutter:
         pluginClass: OnnxPlugin
       ios:
         pluginClass: OnnxPlugin
+      windows:
+        pluginClass: RunanywhereOnnxPluginCApi

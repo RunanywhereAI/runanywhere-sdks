@@ -1,6 +1,9 @@
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:path/path.dart' as p;
+
 /// Platform-specific library loader for RunAnywhere core native library (RACommons).
 ///
 /// This loader is ONLY responsible for loading the core RACommons library.
@@ -235,10 +238,10 @@ class PlatformLoader {
   /// Load on Windows.
   static DynamicLibrary _loadWindows(String libraryName) {
     final dllName = '$libraryName.dll';
-    final paths = [
-      dllName,
-      './$dllName',
-    ];
+    final paths = _windowsLibrarySearchPaths(
+      libraryName,
+      resolvedExecutablePath: Platform.resolvedExecutable,
+    );
 
     for (final path in paths) {
       try {
@@ -250,6 +253,31 @@ class PlatformLoader {
 
     throw ArgumentError(
       'Could not load $dllName on Windows. Tried: ${paths.join(", ")}',
+    );
+  }
+
+  static List<String> _windowsLibrarySearchPaths(
+    String libraryName, {
+    required String resolvedExecutablePath,
+  }) {
+    final dllName = '$libraryName.dll';
+    final executableDir = File(resolvedExecutablePath).parent.path;
+    final windowsPath = p.Context(style: p.Style.windows);
+    return <String>[
+      windowsPath.join(executableDir, dllName),
+      windowsPath.join('.', dllName),
+      dllName,
+    ];
+  }
+
+  @visibleForTesting
+  static List<String> windowsLibrarySearchPathsForTesting(
+    String libraryName, {
+    required String resolvedExecutablePath,
+  }) {
+    return _windowsLibrarySearchPaths(
+      libraryName,
+      resolvedExecutablePath: resolvedExecutablePath,
     );
   }
 

@@ -31,6 +31,7 @@ option(RAC_BUILD_SHARED "Build shared libraries" OFF)
 option(RAC_BUILD_PLATFORM "Build platform backend (Apple Foundation Models, System TTS)" ON)
 option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" OFF)
 option(RAC_BACKEND_LLAMACPP "Build LlamaCPP backend" ON)
+option(RAC_BUILD_VLM "Build VLM multimodal support for llama.cpp backend" ON)
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 # WhisperCPP OFF by default - Sherpa-ONNX (NeMo CTC / Parakeet) is now the primary STT backend

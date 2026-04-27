@@ -1,22 +1,25 @@
 import 'dart:async';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:runanywhere/runanywhere.dart' as sdk;
-import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/features/vision/services/vision_camera_backend.dart';
+import 'package:runanywhere_ai/features/vision/services/vision_permission_gateway.dart';
+import 'package:runanywhere_ai/features/vision/services/vision_vlm_service.dart';
 
-/// VLMViewModel - State management for VLM camera view
-///
-/// Mirrors iOS VLMViewModel.swift exactly:
-/// - Camera management (authorization, initialization, disposal)
-/// - Model status tracking (loaded state, model name)
-/// - Single capture mode (camera frame → description)
-/// - Gallery photo mode (picked image → detailed description)
-/// - Auto-streaming mode (live 2.5s interval captures)
-/// - Token-by-token streaming display
-/// - Error handling and cancellation
 class VLMViewModel extends ChangeNotifier {
-  // MARK: - State Properties
+  VLMViewModel({
+    VisionCameraBackend? cameraBackend,
+    VisionPermissionGateway? permissionGateway,
+    VisionVlmService? vlmService,
+    Duration autoStreamInterval = const Duration(seconds: 2, milliseconds: 500),
+  })  : _cameraBackend = cameraBackend ?? CameraPluginVisionCameraBackend(),
+        _permissionGateway = permissionGateway ?? AppVisionPermissionGateway(),
+        _vlmService = vlmService ?? RunAnywhereVisionVlmService(),
+        _autoStreamInterval = autoStreamInterval;
+
+  final VisionCameraBackend _cameraBackend;
+  final VisionPermissionGateway _permissionGateway;
+  final VisionVlmService _vlmService;
+  final Duration _autoStreamInterval;
 
   bool _isModelLoaded = false;
   String? _loadedModelName;
@@ -26,8 +29,20 @@ class VLMViewModel extends ChangeNotifier {
   bool _isCameraAuthorized = false;
   bool _isCameraInitialized = false;
   bool _isAutoStreamingEnabled = false;
+  bool _hasCameraDevice = true;
+  bool _isDisposed = false;
 
-  // Getters
+  VisionCameraSession? _cameraSession;
+  Timer? _autoStreamTimer;
+  Future<void>? _initializeCameraFuture;
+
+  void _safeNotifyListeners() {
+    if (_isDisposed) {
+      return;
+    }
+    notifyListeners();
+  }
+
   bool get isModelLoaded => _isModelLoaded;
   String? get loadedModelName => _loadedModelName;
   bool get isProcessing => _isProcessing;
@@ -36,292 +51,289 @@ class VLMViewModel extends ChangeNotifier {
   bool get isCameraAuthorized => _isCameraAuthorized;
   bool get isCameraInitialized => _isCameraInitialized;
   bool get isAutoStreamingEnabled => _isAutoStreamingEnabled;
+  bool get hasCameraDevice => _hasCameraDevice;
+  VisionCameraSession? get cameraSession => _cameraSession;
 
-  // MARK: - Camera Management
-
-  CameraController? _cameraController;
-  CameraController? get cameraController => _cameraController;
-
-  Timer? _autoStreamTimer;
-  static const autoStreamInterval = Duration(seconds: 2, milliseconds: 500);
-
-  // MARK: - Camera Initialization
-
-  /// Initialize camera with back camera (or first available)
-  /// Request BGRA format (preferred for iOS, Android may fallback to YUV)
   Future<void> initializeCamera() async {
+    final existingInitialization = _initializeCameraFuture;
+    if (existingInitialization != null) {
+      return existingInitialization;
+    }
+
+    late final Future<void> initialization;
+    initialization = _initializeCameraInternal().whenComplete(() {
+      if (identical(_initializeCameraFuture, initialization)) {
+        _initializeCameraFuture = null;
+      }
+    });
+    _initializeCameraFuture = initialization;
+    return initialization;
+  }
+
+  Future<void> _initializeCameraInternal() async {
     try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        debugPrint('❌ No cameras available');
+      final devices = await _cameraBackend.listDevices();
+      if (_isDisposed) {
+        return;
+      }
+      if (devices.isEmpty) {
+        _hasCameraDevice = false;
+        _isCameraInitialized = false;
+        _error = 'No cameras available on this device.';
+        _safeNotifyListeners();
         return;
       }
 
-      // Select back camera (or first available)
-      final camera = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => cameras.first,
+      _hasCameraDevice = true;
+      final device = devices.firstWhere(
+        (camera) => camera.lensDirection == VisionCameraLensDirection.back,
+        orElse: () => devices.first,
       );
 
-      // Create controller with BGRA format request (iOS preferred, Android fallback to YUV)
-      _cameraController = CameraController(
-        camera,
-        ResolutionPreset.medium,
-        imageFormatGroup: ImageFormatGroup.bgra8888,
-      );
-
-      await _cameraController!.initialize();
+      await _cameraSession?.dispose();
+      if (_isDisposed) {
+        return;
+      }
+      final nextSession = _cameraBackend.createSession(device);
+      if (_isDisposed) {
+        unawaited(nextSession.dispose());
+        return;
+      }
+      try {
+        await nextSession.initialize();
+      } catch (_) {
+        await nextSession.dispose();
+        rethrow;
+      }
+      if (_isDisposed) {
+        unawaited(nextSession.dispose());
+        return;
+      }
+      _cameraSession = nextSession;
 
       _isCameraInitialized = true;
-      notifyListeners();
-
-      debugPrint('✅ Camera initialized: ${camera.lensDirection}');
+      _error = null;
+      _safeNotifyListeners();
     } catch (e) {
-      debugPrint('❌ Camera initialization failed: $e');
+      if (_isDisposed) {
+        return;
+      }
+      _isCameraInitialized = false;
       _error = 'Failed to initialize camera: $e';
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
-  /// Dispose camera controller
-  void disposeCamera() {
-    unawaited(_cameraController?.dispose());
-    _cameraController = null;
-    _isCameraInitialized = false;
-    notifyListeners();
-  }
-
-  /// Check and request camera permission
   Future<void> checkCameraAuthorization(BuildContext context) async {
     _isCameraAuthorized =
-        await PermissionService.shared.requestCameraPermission(context);
-    notifyListeners();
-  }
-
-  // MARK: - Model Management
-
-  /// Check if VLM model is loaded
-  Future<void> checkModelStatus() async {
-    _isModelLoaded = sdk.RunAnywhere.isVLMModelLoaded;
-    if (_isModelLoaded) {
-      _loadedModelName = sdk.RunAnywhere.currentVLMModelId;
-    } else {
-      _loadedModelName = null;
+        await _permissionGateway.requestCameraPermission(context);
+    if (_isDisposed) {
+      return;
     }
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
-  /// Handle model selection from sheet
-  /// Takes the app's ModelInfo and loads the SDK model by ID
+  Future<void> checkModelStatus() async {
+    _isModelLoaded = _vlmService.isModelLoaded;
+    _loadedModelName = _isModelLoaded ? _vlmService.currentModelId : null;
+    _safeNotifyListeners();
+  }
+
   Future<void> onModelSelected(
-      String modelId, String modelName, BuildContext context) async {
+    String modelId,
+    String modelName,
+    BuildContext context,
+  ) async {
     try {
-      debugPrint('🎯 Loading VLM model: $modelId');
-      await sdk.RunAnywhere.loadVLMModel(modelId);
+      await _vlmService.loadModel(modelId);
+      if (_isDisposed) {
+        return;
+      }
       _isModelLoaded = true;
       _loadedModelName = modelName;
-      notifyListeners();
-      debugPrint('✅ VLM model loaded: $modelName');
+      _error = null;
+      _safeNotifyListeners();
     } catch (e) {
-      debugPrint('❌ Failed to load VLM model: $e');
+      if (_isDisposed) {
+        return;
+      }
       _error = 'Failed to load model: $e';
-      notifyListeners();
+      _safeNotifyListeners();
       if (context.mounted) {
-        unawaited(
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load model: $e')),
-          ).closed.then((_) => null),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load model: $e')),
         );
       }
     }
   }
 
-  // MARK: - Image Processing - Single Capture
-
-  /// Describe the current camera frame (single capture mode)
-  /// Matches iOS describeCurrentFrame()
   Future<void> describeCurrentFrame() async {
-    if (_isProcessing || !_isCameraInitialized || _cameraController == null) {
+    if (_isDisposed ||
+        _isProcessing ||
+        !_isCameraInitialized ||
+        _cameraSession == null) {
       return;
     }
 
     _isProcessing = true;
     _error = null;
     _currentDescription = '';
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
-      // Capture image from camera
-      final xFile = await _cameraController!.takePicture();
-
-      // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
-
-      // Process image with streaming
-      final result = await sdk.RunAnywhere.processImageStream(
-        image,
+      final imagePath = await _cameraSession!.captureStill();
+      if (_isDisposed) {
+        return;
+      }
+      final tokens = _vlmService.processImageStream(
+        imagePath,
         prompt: 'Describe what you see briefly.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 200),
+        maxTokens: 200,
       );
 
-      // Listen to stream and append tokens
-      final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
+      final buffer = StringBuffer();
+      await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
         _currentDescription = buffer.toString();
-        notifyListeners();
+        _safeNotifyListeners();
       }
-
-      debugPrint('✅ Single capture complete: ${_currentDescription.length} chars');
     } catch (e) {
-      debugPrint('❌ Single capture error: $e');
+      if (_isDisposed) {
+        return;
+      }
       _error = e.toString();
-      notifyListeners();
+      _safeNotifyListeners();
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
-  // MARK: - Image Processing - Gallery Photo
-
-  /// Describe a picked image from gallery
-  /// Matches iOS describeImage(_:)
   Future<void> describePickedImage(String imagePath) async {
+    if (_isDisposed) {
+      return;
+    }
     _isProcessing = true;
     _error = null;
     _currentDescription = '';
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
-      // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(imagePath);
-
-      // Process image with streaming (more detailed prompt)
-      final result = await sdk.RunAnywhere.processImageStream(
-        image,
+      final tokens = _vlmService.processImageStream(
+        imagePath,
         prompt: 'Describe this image in detail.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 300),
+        maxTokens: 300,
       );
 
-      // Listen to stream and append tokens
-      final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
+      final buffer = StringBuffer();
+      await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
         _currentDescription = buffer.toString();
-        notifyListeners();
+        _safeNotifyListeners();
       }
-
-      debugPrint('✅ Gallery photo described: ${_currentDescription.length} chars');
     } catch (e) {
-      debugPrint('❌ Gallery photo error: $e');
+      if (_isDisposed) {
+        return;
+      }
       _error = e.toString();
-      notifyListeners();
+      _safeNotifyListeners();
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
-  // MARK: - Auto-Streaming (Live Mode)
-
-  /// Toggle auto-streaming mode
-  /// Matches iOS toggleAutoStreaming()
   void toggleAutoStreaming() {
     _isAutoStreamingEnabled = !_isAutoStreamingEnabled;
-    notifyListeners();
+    _safeNotifyListeners();
 
     if (_isAutoStreamingEnabled) {
-      _startAutoStreaming();
+      _autoStreamTimer?.cancel();
+      _autoStreamTimer = Timer.periodic(_autoStreamInterval, (_) {
+        if (!_isProcessing) {
+          unawaited(_describeCurrentFrameForAutoStream());
+        }
+      });
     } else {
       stopAutoStreaming();
     }
   }
 
-  /// Start auto-streaming with periodic timer
-  void _startAutoStreaming() {
-    _autoStreamTimer?.cancel();
-    _autoStreamTimer = Timer.periodic(autoStreamInterval, (timer) {
-      if (!_isProcessing) {
-        unawaited(_describeCurrentFrameForAutoStream());
-      }
-    });
-    debugPrint('🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
-  }
-
-  /// Stop auto-streaming
   void stopAutoStreaming() {
     _autoStreamTimer?.cancel();
     _autoStreamTimer = null;
     _isAutoStreamingEnabled = false;
-    notifyListeners();
-    debugPrint('⏹️ Auto-streaming stopped');
+    _safeNotifyListeners();
   }
 
-  /// Describe current frame for auto-stream (live mode)
-  /// Matches iOS describeCurrentFrameForAutoStream()
-  /// - Shorter prompt for quick responses
-  /// - Don't clear description (smooth transition)
-  /// - Errors only logged, not shown to user
   Future<void> _describeCurrentFrameForAutoStream() async {
-    if (_isProcessing || !_isCameraInitialized || _cameraController == null) {
+    if (_isDisposed ||
+        _isProcessing ||
+        !_isCameraInitialized ||
+        _cameraSession == null) {
       return;
     }
 
     _isProcessing = true;
-    notifyListeners();
-
-    // Build new description in local var (per iOS pattern)
-    String newDescription = '';
+    _safeNotifyListeners();
 
     try {
-      // Capture image from camera
-      final xFile = await _cameraController!.takePicture();
-
-      // Create VLMImage from file path
-      final image = sdk.VLMImage.filePath(xFile.path);
-
-      // Process image with streaming (shorter prompt for live mode)
-      final result = await sdk.RunAnywhere.processImageStream(
-        image,
+      final imagePath = await _cameraSession!.captureStill();
+      if (_isDisposed) {
+        return;
+      }
+      final tokens = _vlmService.processImageStream(
+        imagePath,
         prompt: 'Describe what you see in one sentence.',
-        options: const sdk.VLMGenerationOptions(maxTokens: 100),
+        maxTokens: 100,
       );
 
-      // Listen to stream and build description
-      final buffer = StringBuffer(newDescription);
-      await for (final token in result.stream) {
+      final buffer = StringBuffer();
+      await for (final token in tokens) {
+        if (_isDisposed) {
+          return;
+        }
         buffer.write(token);
-        newDescription = buffer.toString();
-        _currentDescription = newDescription;
-        notifyListeners();
+        _currentDescription = buffer.toString();
+        _safeNotifyListeners();
       }
-
-      debugPrint('🔴 Auto-stream capture complete: ${newDescription.length} chars');
-    } catch (e) {
-      // Only log errors in auto-stream mode (per iOS pattern)
-      debugPrint('⚠️ Auto-stream error (non-critical): $e');
-      // Don't set _error in auto-stream mode
+    } catch (e, st) {
+      if (_isDisposed) {
+        return;
+      }
+      debugPrint('Auto-stream capture/describe failed: $e\n$st');
+      _error = 'Auto-stream failed: $e';
+      stopAutoStreaming();
     } finally {
       _isProcessing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
-  // MARK: - Cancellation
+  Future<void> cancelGeneration() => _vlmService.cancelGeneration();
 
-  /// Cancel ongoing VLM generation
-  Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhere.cancelVLMGeneration());
-    debugPrint('🛑 VLM generation cancelled');
+  void disposeCamera() {
+    final session = _cameraSession;
+    _cameraSession = null;
+    _isCameraInitialized = false;
+    _safeNotifyListeners();
+    unawaited(session?.dispose());
   }
-
-  // MARK: - Cleanup
 
   @override
   void dispose() {
+    _isDisposed = true;
     _autoStreamTimer?.cancel();
-    unawaited(_cameraController?.dispose());
+    unawaited(_vlmService.cancelGeneration());
+    final session = _cameraSession;
+    _cameraSession = null;
+    unawaited(session?.dispose());
     super.dispose();
   }
 }

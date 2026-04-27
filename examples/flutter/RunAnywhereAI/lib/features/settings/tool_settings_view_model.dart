@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:runanywhere/public/runanywhere_tool_calling.dart';
 import 'package:runanywhere/public/types/tool_calling_types.dart';
+import 'package:runanywhere_ai/core/services/example_http_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Tool Settings ViewModel (mirroring iOS ToolSettingsViewModel)
@@ -113,14 +112,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
     Map<String, ToolValue> args,
   ) async {
     final rawLocation = args['location']?.stringValue;
-    
+
     // Require location argument - no hardcoded defaults
     if (rawLocation == null || rawLocation.isEmpty) {
       return {
         'error': const StringToolValue('Missing required argument: location'),
       };
     }
-    
+
     // Clean up location string - Open-Meteo works better with just city names
     // Remove common suffixes like ", CA", ", US", ", USA", etc.
     final location = _cleanLocationString(rawLocation);
@@ -131,13 +130,16 @@ class ToolSettingsViewModel extends ChangeNotifier {
         'https://geocoding-api.open-meteo.com/v1/search?name=${Uri.encodeComponent(location)}&count=5&language=en&format=json',
       );
 
-      final geocodeResponse = await http.get(geocodeUrl);
+      final geocodeResponse = await ExampleHttpService.shared.getJson(
+        geocodeUrl,
+      );
       if (geocodeResponse.statusCode != 200) {
-        throw Exception('Geocoding failed');
+        throw Exception(
+          'Geocoding failed with status ${geocodeResponse.statusCode}',
+        );
       }
 
-      final geocodeData =
-          jsonDecode(geocodeResponse.body) as Map<String, dynamic>;
+      final geocodeData = geocodeResponse.decodeJson();
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
@@ -156,13 +158,16 @@ class ToolSettingsViewModel extends ChangeNotifier {
         'https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph',
       );
 
-      final weatherResponse = await http.get(weatherUrl);
+      final weatherResponse = await ExampleHttpService.shared.getJson(
+        weatherUrl,
+      );
       if (weatherResponse.statusCode != 200) {
-        throw Exception('Weather fetch failed');
+        throw Exception(
+          'Weather fetch failed with status ${weatherResponse.statusCode}',
+        );
       }
 
-      final weatherData =
-          jsonDecode(weatherResponse.body) as Map<String, dynamic>;
+      final weatherData = weatherResponse.decodeJson();
       final current = weatherData['current'] as Map<String, dynamic>;
       final temp = current['temperature_2m'] as num? ?? 0;
       final humidity = current['relative_humidity_2m'] as num? ?? 0;
@@ -239,7 +244,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
   /// Removes common suffixes like ", CA", ", US", state abbreviations, etc.
   String _cleanLocationString(String location) {
     var cleaned = location.trim();
-    
+
     // Common patterns to remove: ", CA", ", NY", ", US", ", USA", ", United States"
     // Also handle variations like "CA" at the end
     final patterns = [
@@ -247,11 +252,11 @@ class ToolSettingsViewModel extends ChangeNotifier {
       RegExp(r',\s*[A-Z]{2}$'), // State abbreviations like ", CA", ", NY"
       RegExp(r',\s*[A-Z]{2},\s*(US|USA)$', caseSensitive: false), // ", CA, US"
     ];
-    
+
     for (final pattern in patterns) {
       cleaned = cleaned.replaceAll(pattern, '');
     }
-    
+
     // Also handle "SF" -> "San Francisco" for common abbreviations
     final abbreviations = {
       'SF': 'San Francisco',
@@ -259,12 +264,12 @@ class ToolSettingsViewModel extends ChangeNotifier {
       'LA': 'Los Angeles',
       'DC': 'Washington DC',
     };
-    
+
     final upperCleaned = cleaned.toUpperCase();
     if (abbreviations.containsKey(upperCleaned)) {
       return abbreviations[upperCleaned]!;
     }
-    
+
     return cleaned;
   }
 
@@ -292,8 +297,9 @@ class ToolSettingsViewModel extends ChangeNotifier {
     Map<String, ToolValue> args,
   ) async {
     // Try both 'expression' and 'input' keys - no hardcoded defaults
-    final expression = args['expression']?.stringValue ?? args['input']?.stringValue;
-    
+    final expression =
+        args['expression']?.stringValue ?? args['input']?.stringValue;
+
     if (expression == null || expression.isEmpty) {
       return {
         'error': const StringToolValue('Missing required argument: expression'),
@@ -369,7 +375,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
 
     return double.parse(expr);
   }
-  
+
   double _pow(double base, double exponent) {
     return math.pow(base, exponent).toDouble();
   }

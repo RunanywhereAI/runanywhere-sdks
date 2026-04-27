@@ -259,6 +259,31 @@ rac_shutdown();
 ./scripts/build-android.sh --check             # Verify 16KB alignment
 ```
 
+#### Windows (MSVC)
+```bat
+scripts\build-windows.bat llamacpp --clean
+```
+
+### Windows ONNX Dependencies
+
+For Windows STT/TTS/VAD builds, use:
+
+```bat
+cmd /c scripts\build-windows.bat onnx
+cmd /c scripts\build-windows.bat all
+```
+
+These commands automatically download Sherpa-ONNX Windows prebuilts into `third_party/sherpa-onnx-windows/`.
+
+Artifacts:
+- `dist/windows/x64/rac_commons.dll`
+- `dist/windows/x64/rac_backend_llamacpp.dll`
+
+Current Windows v1 notes:
+- Uses `Visual Studio 2022` + `MSVC` via CMake
+- Prioritizes direct-file model workflows such as `.gguf`
+- Native archive extraction is currently disabled in the Windows vertical slice
+
 ### Build Outputs
 
 #### iOS/macOS

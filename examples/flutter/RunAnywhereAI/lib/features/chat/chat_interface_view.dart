@@ -10,6 +10,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
@@ -127,7 +128,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
       final systemPrompt = systemPromptRaw.isNotEmpty ? systemPromptRaw : null;
 
-      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+      debugPrint(
+          '[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
 
       // Check if tool calling is enabled and has registered tools
       final toolSettings = ToolSettingsViewModel.shared;
@@ -184,7 +186,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
     // Auto-detect the tool calling format based on the loaded model
     final format = _detectToolCallFormat(modelName);
-    debugPrint('Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
+    debugPrint(
+        'Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
 
     // Add empty assistant message
     final assistantMessage = ChatMessage(
@@ -219,12 +222,12 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
       // Create ToolCallInfo from the result if tools were called
       ToolCallInfo? toolCallInfo;
-      debugPrint('📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
+      debugPrint(
+          '📊 Tool calling result: toolCalls=${result.toolCalls.length}, toolResults=${result.toolResults.length}');
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
-        final lastResult = result.toolResults.isNotEmpty
-            ? result.toolResults.last
-            : null;
+        final lastResult =
+            result.toolResults.isNotEmpty ? result.toolResults.last : null;
         debugPrint('📊 Creating ToolCallInfo for: ${lastCall.toolName}');
 
         toolCallInfo = ToolCallInfo(
@@ -236,7 +239,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           success: lastResult?.success ?? false,
           error: lastResult?.error,
         );
-        debugPrint('📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
+        debugPrint(
+            '📊 ToolCallInfo created: ${toolCallInfo.toolName}, success=${toolCallInfo.success}');
       } else {
         debugPrint('📊 No tool calls in result - badge will NOT show');
       }
@@ -454,16 +458,30 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Chat'),
-      actions: [
+        actions: [
           IconButton(
             icon: const Icon(Icons.article_outlined),
             onPressed: () {
               unawaited(
-                Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (context) => const RagDemoView(),
-                  ),
-                ),
+                () async {
+                  if (!PlatformCapabilityService.shared.supportsRag) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          PlatformCapabilityService.shared.unsupportedMessage(
+                            'Document Q&A',
+                          ),
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const RagDemoView(),
+                    ),
+                  );
+                }(),
               );
             },
             tooltip: 'Document Q&A',
@@ -684,15 +702,17 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
                     decoration: InputDecoration(
                       hintText: 'Type a message...',
                       border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                        borderRadius: BorderRadius.circular(
+                            AppSpacing.cornerRadiusBubble),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.large,
                         vertical: AppSpacing.mediumLarge,
                       ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
+                    onSubmitted: (_) {
+                      unawaited(_sendMessage());
+                    },
                     onChanged: (_) => setState(() {}),
                   ),
                 ),

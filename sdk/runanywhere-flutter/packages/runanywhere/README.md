@@ -83,6 +83,24 @@ Add microphone permission to `android/app/src/main/AndroidManifest.xml`:
 <uses-permission android:name="android.permission.RECORD_AUDIO" />
 ```
 
+## Windows Setup (Preview)
+
+Build native DLLs first:
+
+```bat
+cd sdk\runanywhere-commons
+call scripts\build-windows.bat llamacpp --clean
+```
+
+Then build the example app:
+
+```bat
+cd examples\flutter\RunAnywhereAI
+fvm flutter build windows
+```
+
+Current Windows vertical-slice support focuses on direct-file LLM workflows such as `.gguf` model download and chat generation.
+
 ---
 
 ## Quick Start
@@ -128,6 +146,7 @@ print(result.text);
 |----------|-----------------|
 | iOS      | 14.0+           |
 | Android  | API 24+         |
+| Windows  | Windows 10+ (preview) |
 
 ## Documentation
 
