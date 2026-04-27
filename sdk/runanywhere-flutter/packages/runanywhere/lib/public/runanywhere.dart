@@ -225,7 +225,6 @@ class RunAnywhere {
 
   /// Authenticate with backend for production/staging environments.
   /// Matches Swift: CppBridge.Auth.authenticate(apiKey:) in setupHTTP()
-  // ignore: unused_element
   static Future<void> _authenticateWithBackend(
     SDKInitParams params,
     SDKLogger logger,
@@ -1186,7 +1185,8 @@ class RunAnywhere {
     required VLMImage image,
     VLMGenerationOptions options = const VLMGenerationOptions(),
   }) async {
-    final result = await processImage(image, prompt: question, options: options);
+    final result =
+        await processImage(image, prompt: question, options: options);
     return result.text;
   }
 
@@ -1340,14 +1340,16 @@ class RunAnywhere {
       // Build result future that completes when stream is done
       final metricsFuture = controller.stream.toList().then((_) {
         final endTime = DateTime.now();
-        final totalTimeMs = endTime.difference(startTime).inMicroseconds / 1000.0;
+        final totalTimeMs =
+            endTime.difference(startTime).inMicroseconds / 1000.0;
         final tokensPerSecond =
             totalTimeMs > 0 ? allTokens.length / (totalTimeMs / 1000) : 0.0;
 
         // Calculate time to first token
         int? timeToFirstTokenMs;
         if (firstTokenTime != null) {
-          timeToFirstTokenMs = firstTokenTime!.difference(startTime).inMilliseconds;
+          timeToFirstTokenMs =
+              firstTokenTime!.difference(startTime).inMilliseconds;
         }
 
         logger.info(
@@ -1457,7 +1459,7 @@ class RunAnywhere {
       logger.info('VLM model folder: $modelFolder');
 
       // Resolve the actual model file path
-      final modelPath = await _resolveVLMModelFilePath(modelFolder, model);
+      final modelPath = await _resolveVLMModelFilePath(modelFolder);
       if (modelPath == null) {
         throw SDKError.modelNotFound(
           'Could not find main VLM model file in: $modelFolder',
@@ -1819,10 +1821,7 @@ class RunAnywhere {
   }
 
   /// Resolve VLM model file path (similar to LLM path resolution)
-  static Future<String?> _resolveVLMModelFilePath(
-    String modelFolder,
-    ModelInfo model,
-  ) async {
+  static Future<String?> _resolveVLMModelFilePath(String modelFolder) async {
     return resolveVlmMainModelPath(modelFolder);
   }
 
@@ -2243,6 +2242,12 @@ class RunAnywhere {
   }
 
   /// Configure a custom HTTP client factory for model downloads only.
+  ///
+  /// Passing `null` clears any custom download client factory and restores the
+  /// default client creation behavior.
+  ///
+  /// Any `http.Client` returned by [factory] is owned by the SDK and will be
+  /// closed after each download completes.
   ///
   /// This does not affect SDK API traffic such as telemetry, auth, or device registration.
   static void configureDownloadHttpClientFactory(

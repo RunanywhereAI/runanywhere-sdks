@@ -44,5 +44,35 @@ void main() {
       expect(resolvedMainModelPath, mainModel.path);
       expect(resolvedMmprojPath, mmproj.path);
     });
+
+    test(
+        'resolves main model path when given the main model file path instead of a directory',
+        () async {
+      final dir =
+          await Directory.systemTemp.createTemp('runanywhere_vlm_resolution_');
+      addTearDown(() async {
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      });
+
+      final mainModel = File(
+        '${dir.path}${Platform.pathSeparator}SmolVLM-500M-Instruct-Q8_0.gguf',
+      );
+      final mmproj = File(
+        '${dir.path}${Platform.pathSeparator}mmproj-SmolVLM-500M-Instruct-Q8_0.gguf',
+      );
+
+      await mainModel.writeAsString('main');
+      await mmproj.writeAsString('mmproj');
+
+      final resolvedMainModelPath = await resolveVlmMainModelPath(
+        mainModel.path,
+      );
+      final resolvedMmprojPath = await findVlmMmprojPath(dir.path);
+
+      expect(resolvedMainModelPath, mainModel.path);
+      expect(resolvedMmprojPath, mmproj.path);
+    });
   });
 }

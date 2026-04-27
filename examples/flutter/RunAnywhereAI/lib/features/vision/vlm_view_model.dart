@@ -34,6 +34,7 @@ class VLMViewModel extends ChangeNotifier {
 
   VisionCameraSession? _cameraSession;
   Timer? _autoStreamTimer;
+  Future<void>? _initializeCameraFuture;
 
   void _safeNotifyListeners() {
     if (_isDisposed) {
@@ -54,6 +55,22 @@ class VLMViewModel extends ChangeNotifier {
   VisionCameraSession? get cameraSession => _cameraSession;
 
   Future<void> initializeCamera() async {
+    final existingInitialization = _initializeCameraFuture;
+    if (existingInitialization != null) {
+      return existingInitialization;
+    }
+
+    late final Future<void> initialization;
+    initialization = _initializeCameraInternal().whenComplete(() {
+      if (identical(_initializeCameraFuture, initialization)) {
+        _initializeCameraFuture = null;
+      }
+    });
+    _initializeCameraFuture = initialization;
+    return initialization;
+  }
+
+  Future<void> _initializeCameraInternal() async {
     try {
       final devices = await _cameraBackend.listDevices();
       if (_isDisposed) {
@@ -151,7 +168,10 @@ class VLMViewModel extends ChangeNotifier {
   }
 
   Future<void> describeCurrentFrame() async {
-    if (_isDisposed || _isProcessing || !_isCameraInitialized || _cameraSession == null) {
+    if (_isDisposed ||
+        _isProcessing ||
+        !_isCameraInitialized ||
+        _cameraSession == null) {
       return;
     }
 
@@ -253,7 +273,10 @@ class VLMViewModel extends ChangeNotifier {
   }
 
   Future<void> _describeCurrentFrameForAutoStream() async {
-    if (_isDisposed || _isProcessing || !_isCameraInitialized || _cameraSession == null) {
+    if (_isDisposed ||
+        _isProcessing ||
+        !_isCameraInitialized ||
+        _cameraSession == null) {
       return;
     }
 
@@ -280,8 +303,13 @@ class VLMViewModel extends ChangeNotifier {
         _currentDescription = buffer.toString();
         _safeNotifyListeners();
       }
-    } catch (_) {
-      // Auto-stream failures stay non-blocking.
+    } catch (e, st) {
+      if (_isDisposed) {
+        return;
+      }
+      debugPrint('Auto-stream capture/describe failed: $e\n$st');
+      _error = 'Auto-stream failed: $e';
+      stopAutoStreaming();
     } finally {
       _isProcessing = false;
       _safeNotifyListeners();

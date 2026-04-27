@@ -2,27 +2,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/infrastructure/download/download_service.dart';
 
 void main() {
-  test('multi-file download progress reaches the current file boundary', () {
+  test(
+      'multi-file download progress uses cumulative bytes over total model size',
+      () {
     expect(
       calculateOverallMultiFileDownloadProgressForTesting(
-        completedFiles: 2,
-        totalFiles: 3,
-        downloadedBytesForCurrentFile: 100,
-        totalBytesForCurrentFile: 100,
+        cumulativeDownloadedBytes: 150,
+        downloadedBytesForCurrentFile: 50,
+        totalModelBytes: 400,
+      ),
+      closeTo(0.5, 0.0001),
+    );
+  });
+
+  test(
+      'multi-file download progress clamps to completion when bytes exceed total',
+      () {
+    expect(
+      calculateOverallMultiFileDownloadProgressForTesting(
+        cumulativeDownloadedBytes: 380,
+        downloadedBytesForCurrentFile: 40,
+        totalModelBytes: 400,
       ),
       closeTo(1.0, 0.0001),
     );
   });
 
-  test('multi-file download progress uses zero when file size is unknown', () {
+  test(
+      'multi-file download progress uses zero when total model size is unknown',
+      () {
     expect(
       calculateOverallMultiFileDownloadProgressForTesting(
-        completedFiles: 1,
-        totalFiles: 3,
+        cumulativeDownloadedBytes: 150,
         downloadedBytesForCurrentFile: 50,
-        totalBytesForCurrentFile: 0,
+        totalModelBytes: 0,
       ),
-      closeTo(1 / 3, 0.0001),
+      0,
     );
   });
 

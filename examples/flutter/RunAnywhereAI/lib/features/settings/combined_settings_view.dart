@@ -395,16 +395,16 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
 
                 await _loadProxyConfiguration(scope);
 
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${scope.displayName} settings saved'),
                     ),
                   );
-                }
-
-                if (dialogContext.mounted) {
-                  Navigator.pop(dialogContext);
                 }
               },
               child: const Text('Save'),

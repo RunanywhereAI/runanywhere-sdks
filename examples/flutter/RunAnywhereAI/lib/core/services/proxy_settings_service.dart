@@ -106,34 +106,45 @@ class ProxySettingsService {
       return validation;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_enabledKey(scope), settings.enabled);
-    await prefs.setString(_schemeKey(scope), settings.scheme.wireValue);
-    await prefs.setString(_hostKey(scope), settings.host.trim());
+    final normalizedUsername = settings.username.trim();
+    final normalizedPassword = settings.password.trim();
+    final normalizedSettings = settings.copyWith(
+      username: normalizedUsername,
+      password: normalizedPassword,
+    );
 
-    if (settings.port != null) {
-      await prefs.setInt(_portKey(scope), settings.port!);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_enabledKey(scope), normalizedSettings.enabled);
+    await prefs.setString(
+        _schemeKey(scope), normalizedSettings.scheme.wireValue);
+    await prefs.setString(_hostKey(scope), normalizedSettings.host.trim());
+
+    if (normalizedSettings.port != null) {
+      await prefs.setInt(_portKey(scope), normalizedSettings.port!);
     } else {
       await prefs.remove(_portKey(scope));
     }
 
-    await prefs.setBool(_bypassLocalKey(scope), settings.bypassLocal);
+    await prefs.setBool(
+      _bypassLocalKey(scope),
+      normalizedSettings.bypassLocal,
+    );
 
-    if (settings.username.isNotEmpty) {
+    if (normalizedUsername.isNotEmpty) {
       await KeychainHelper.saveString(
         key: _usernameKey(scope),
-        data: settings.username,
+        data: normalizedUsername,
       );
       await KeychainHelper.saveString(
         key: _passwordKey(scope),
-        data: settings.password,
+        data: normalizedPassword,
       );
     } else {
       await KeychainHelper.delete(_usernameKey(scope));
       await KeychainHelper.delete(_passwordKey(scope));
     }
 
-    _current[scope] = settings;
+    _current[scope] = normalizedSettings;
     return const ProxySettingsValidationResult.valid();
   }
 

@@ -15,7 +15,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // Initialize COM, so that it is available for use in the library and/or
   // plugins.
-  ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  const HRESULT co_initialize_result =
+      ::CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  const bool should_uninitialize_com =
+      SUCCEEDED(co_initialize_result) && co_initialize_result != RPC_E_CHANGED_MODE;
 
   flutter::DartProject project(L"data");
 
@@ -28,6 +31,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
   if (!window.Create(L"runanywhere_ai", origin, size)) {
+    if (should_uninitialize_com) {
+      ::CoUninitialize();
+    }
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
@@ -38,6 +44,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     ::DispatchMessage(&msg);
   }
 
-  ::CoUninitialize();
+  if (should_uninitialize_com) {
+    ::CoUninitialize();
+  }
   return EXIT_SUCCESS;
 }

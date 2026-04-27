@@ -22,6 +22,7 @@ class _FakeCameraSession implements VisionCameraSession {
     this.preview = const SizedBox(key: Key('fake-preview')),
     this.disposeCompleter,
     this.captureCompleter,
+    this.initializeCompleter,
     this.initializeError,
   });
 
@@ -29,6 +30,7 @@ class _FakeCameraSession implements VisionCameraSession {
   final Widget preview;
   final Completer<void>? disposeCompleter;
   final Completer<void>? captureCompleter;
+  final Completer<void>? initializeCompleter;
   final Object? initializeError;
   bool initialized = false;
   bool disposed = false;
@@ -56,6 +58,9 @@ class _FakeCameraSession implements VisionCameraSession {
 
   @override
   Future<void> initialize() async {
+    if (initializeCompleter != null) {
+      await initializeCompleter!.future;
+    }
     if (initializeError != null) {
       throw initializeError!;
     }
@@ -70,16 +75,20 @@ class _FakeCameraBackend implements VisionCameraBackend {
   _FakeCameraBackend({
     required this.devices,
     this.session,
+    this.sessionFactory,
   });
 
   final List<VisionCameraDevice> devices;
   final VisionCameraSession? session;
+  final VisionCameraSession Function()? sessionFactory;
   int createSessionCount = 0;
 
   @override
   VisionCameraSession createSession(VisionCameraDevice device) {
     createSessionCount += 1;
-    return session ?? _FakeCameraSession(capturePath: 'unused.jpg');
+    return sessionFactory?.call() ??
+        session ??
+        _FakeCameraSession(capturePath: 'unused.jpg');
   }
 
   @override
@@ -146,7 +155,8 @@ class _DelayedListCameraBackend implements VisionCameraBackend {
 }
 
 void main() {
-  testWidgets('initializeCamera reports friendly error when no devices are available',
+  testWidgets(
+      'initializeCamera reports friendly error when no devices are available',
       (tester) async {
     final viewModel = VLMViewModel(
       cameraBackend: _FakeCameraBackend(devices: const []),
@@ -160,7 +170,8 @@ void main() {
     expect(viewModel.error, 'No cameras available on this device.');
   });
 
-  testWidgets('onModelSelected updates loaded state through the injected VLM service',
+  testWidgets(
+      'onModelSelected updates loaded state through the injected VLM service',
       (tester) async {
     final fakeVlm = _FakeVlmService();
     final viewModel = VLMViewModel(
@@ -384,8 +395,7 @@ void main() {
     expect(fakeVlm.processedPaths, isEmpty);
   });
 
-  testWidgets(
-      'initializeCamera disposes failed session and does not retain it',
+  testWidgets('initializeCamera disposes failed session and does not retain it',
       (tester) async {
     final fakeSession = _FakeCameraSession(
       capturePath: 'frame.jpg',
@@ -413,5 +423,79 @@ void main() {
     expect(viewModel.cameraSession, isNull);
     expect(viewModel.isCameraInitialized, isFalse);
     expect(viewModel.error, contains('init failed'));
+  });
+
+  testWidgets('initializeCamera reuses the in-flight initialization work',
+      (tester) async {
+    final initializeCompleter = Completer<void>();
+    final sessions = <_FakeCameraSession>[];
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      sessionFactory: () {
+        final session = _FakeCameraSession(
+          capturePath: 'frame.jpg',
+          initializeCompleter: initializeCompleter,
+        );
+        sessions.add(session);
+        return session;
+      },
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: _FakeVlmService(),
+    );
+
+    final first = viewModel.initializeCamera();
+    final second = viewModel.initializeCamera();
+    await tester.pump();
+
+    expect(backend.createSessionCount, 1);
+    expect(sessions, hasLength(1));
+
+    initializeCompleter.complete();
+    await Future.wait([first, second]);
+
+    expect(viewModel.cameraSession, same(sessions.single));
+    expect(viewModel.isCameraInitialized, isTrue);
+  });
+
+  testWidgets('auto-stream failure surfaces error and exits live mode',
+      (tester) async {
+    final fakeSession = _FakeCameraSession(capturePath: 'frame.jpg');
+    final fakeVlm = _FakeVlmService()
+      ..nextStream = Stream<String>.error(StateError('auto-stream failed'));
+    final backend = _FakeCameraBackend(
+      devices: const [
+        VisionCameraDevice(
+          id: 'rear',
+          name: 'Rear Camera',
+          lensDirection: VisionCameraLensDirection.back,
+        ),
+      ],
+      session: fakeSession,
+    );
+    final viewModel = VLMViewModel(
+      cameraBackend: backend,
+      permissionGateway: _FakePermissionGateway(true),
+      vlmService: fakeVlm,
+      autoStreamInterval: const Duration(milliseconds: 1),
+    );
+
+    await viewModel.initializeCamera();
+    viewModel.toggleAutoStreaming();
+
+    await tester.pump(const Duration(milliseconds: 5));
+    await tester.pump();
+
+    expect(viewModel.isAutoStreamingEnabled, isFalse);
+    expect(viewModel.isProcessing, isFalse);
+    expect(viewModel.error, contains('auto-stream failed'));
   });
 }

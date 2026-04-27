@@ -8,8 +8,8 @@ import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/design_system/unsupported_feature_view.dart';
 import 'package:runanywhere_ai/core/services/audio_recording_service.dart';
-import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/core/services/permission_service.dart';
+import 'package:runanywhere_ai/core/services/platform_capability_service.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
 import 'package:runanywhere_ai/features/models/model_status_components.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
@@ -61,7 +61,7 @@ class SpeechToTextView extends StatefulWidget {
 class _SpeechToTextViewState extends State<SpeechToTextView> {
   // Recording state
   bool _isRecording = false;
-  bool _isProcessing = false;
+  final bool _isProcessing = false;
   bool _isTranscribing = false;
   STTMode _selectedMode = STTMode.batch;
   String _transcribedText = '';
@@ -88,6 +88,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
   void initState() {
     super.initState();
     unawaited(_checkMicrophonePermission());
+    unawaited(_refreshModelState());
   }
 
   @override
@@ -264,7 +265,7 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
 
   @override
   Widget build(BuildContext context) {
-    final capability = PlatformCapabilityService.shared;
+    const capability = PlatformCapabilityService.shared;
     if (!capability.supportsSpeechToText) {
       return Scaffold(
         appBar: AppBar(

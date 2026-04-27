@@ -107,6 +107,37 @@ void main() {
     expect(result.isValid, isFalse);
     expect(result.message, contains('SOCKS5'));
   });
+
+  test('save trims whitespace-only credentials instead of persisting them',
+      () async {
+    const settings = ProxySettings(
+      enabled: true,
+      scheme: ProxyScheme.http,
+      host: 'proxy.runanywhere.ai',
+      port: 8080,
+      username: '   ',
+      password: '   ',
+      bypassLocal: true,
+    );
+
+    final result = await ProxySettingsService.shared.save(
+      ProxyScope.general,
+      settings,
+    );
+    final reloaded = await ProxySettingsService.shared.load(ProxyScope.general);
+
+    expect(result.isValid, isTrue);
+    expect(reloaded.username, isEmpty);
+    expect(reloaded.password, isEmpty);
+    expect(
+      secureStore.containsKey(_prefixed(KeychainKeys.proxyGeneralUsername)),
+      isFalse,
+    );
+    expect(
+      secureStore.containsKey(_prefixed(KeychainKeys.proxyGeneralPassword)),
+      isFalse,
+    );
+  });
 }
 
 String _prefixed(String key) => 'com.runanywhere.RunAnywhereAI_$key';

@@ -1,7 +1,15 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+
+final SDKLogger _logger = SDKLogger('RunAnywhere.VLMFileResolution');
+
 String vlmPathBasename(String path) {
-  return path.replaceAll('\\', '/').split('/').last;
+  final context = path.contains(r'\')
+      ? p.Context(style: p.Style.windows)
+      : p.Context(style: p.Style.posix);
+  return context.basename(path);
 }
 
 Future<String?> resolveVlmMainModelPath(String modelFolder) async {
@@ -16,11 +24,18 @@ Future<String?> resolveVlmMainModelPath(String modelFolder) async {
         .where((path) => vlmPathBasename(path).toLowerCase().endsWith('.gguf'))
         .toList();
     final mainModelPaths = ggufPaths
-        .where((path) => !vlmPathBasename(path).toLowerCase().contains('mmproj'))
+        .where(
+            (path) => !vlmPathBasename(path).toLowerCase().contains('mmproj'))
         .toList();
 
     return mainModelPaths.isNotEmpty ? mainModelPaths.first : null;
-  } catch (_) {
+  } catch (e, st) {
+    _logger.error(
+      'Failed to resolve VLM main model path',
+      error: e,
+      stackTrace: st,
+      metadata: {'modelFolder': modelFolder, 'directory': dir.path},
+    );
     return null;
   }
 }
@@ -40,7 +55,13 @@ Future<String?> findVlmMmprojPath(String modelDirPath) async {
     }
 
     return null;
-  } catch (_) {
+  } catch (e, st) {
+    _logger.error(
+      'Failed to find VLM mmproj path',
+      error: e,
+      stackTrace: st,
+      metadata: {'modelDirPath': modelDirPath},
+    );
     return null;
   }
 }

@@ -24,18 +24,15 @@ int _estimatePerFileDownloadSize(int? totalModelBytes, int totalFiles) {
 }
 
 double _calculateOverallMultiFileDownloadProgress({
-  required int completedFiles,
-  required int totalFiles,
+  required int cumulativeDownloadedBytes,
   required int downloadedBytesForCurrentFile,
-  required int totalBytesForCurrentFile,
+  required int totalModelBytes,
 }) {
-  if (totalFiles <= 0) return 0;
+  if (totalModelBytes <= 0) return 0;
 
-  final fileProgress = totalBytesForCurrentFile > 0
-      ? (downloadedBytesForCurrentFile / totalBytesForCurrentFile)
-          .clamp(0.0, 1.0)
-      : 0.0;
-  return (completedFiles + fileProgress) / totalFiles;
+  return ((cumulativeDownloadedBytes + downloadedBytesForCurrentFile) /
+          totalModelBytes)
+      .clamp(0.0, 1.0);
 }
 
 @visibleForTesting
@@ -48,16 +45,14 @@ int estimatePerFileDownloadSizeForTesting({
 
 @visibleForTesting
 double calculateOverallMultiFileDownloadProgressForTesting({
-  required int completedFiles,
-  required int totalFiles,
+  required int cumulativeDownloadedBytes,
   required int downloadedBytesForCurrentFile,
-  required int totalBytesForCurrentFile,
+  required int totalModelBytes,
 }) {
   return _calculateOverallMultiFileDownloadProgress(
-    completedFiles: completedFiles,
-    totalFiles: totalFiles,
+    cumulativeDownloadedBytes: cumulativeDownloadedBytes,
     downloadedBytesForCurrentFile: downloadedBytesForCurrentFile,
-    totalBytesForCurrentFile: totalBytesForCurrentFile,
+    totalModelBytes: totalModelBytes,
   );
 }
 
@@ -224,11 +219,6 @@ class ModelDownloadService {
             final request = http.Request('GET', fileUrl);
             try {
               final response = await client.send(request);
-              final currentFileTotalBytes =
-                  response.contentLength != null && response.contentLength! > 0
-                      ? response.contentLength!
-                      : _estimatePerFileDownloadSize(
-                          model.downloadSize, totalFiles);
 
               if (response.statusCode < 200 || response.statusCode >= 300) {
                 throw Exception(
@@ -239,31 +229,46 @@ class ModelDownloadService {
               await file.create(recursive: true);
               final sink = file.openWrite();
               var downloaded = 0;
+              var completedSuccessfully = false;
 
-              await for (final chunk in response.stream) {
-                sink.add(chunk);
-                downloaded += chunk.length;
+              try {
+                await for (final chunk in response.stream) {
+                  sink.add(chunk);
+                  downloaded += chunk.length;
 
-                final overallProgress =
-                    _calculateOverallMultiFileDownloadProgress(
-                  completedFiles: i,
-                  totalFiles: totalFiles,
-                  downloadedBytesForCurrentFile: downloaded,
-                  totalBytesForCurrentFile: currentFileTotalBytes,
-                );
-                yield ModelDownloadProgress(
-                  modelId: modelId,
-                  bytesDownloaded: cumulativeDownloaded + downloaded,
-                  totalBytes: totalModelBytes,
-                  stage: ModelDownloadStage.downloading,
-                  overallProgress: overallProgress * 0.9,
-                );
+                  final overallProgress =
+                      _calculateOverallMultiFileDownloadProgress(
+                    cumulativeDownloadedBytes: cumulativeDownloaded,
+                    downloadedBytesForCurrentFile: downloaded,
+                    totalModelBytes: totalModelBytes,
+                  );
+                  yield ModelDownloadProgress(
+                    modelId: modelId,
+                    bytesDownloaded: cumulativeDownloaded + downloaded,
+                    totalBytes: totalModelBytes,
+                    stage: ModelDownloadStage.downloading,
+                    overallProgress: overallProgress * 0.9,
+                  );
+                }
+
+                await sink.flush();
+                cumulativeDownloaded += downloaded;
+                completedSuccessfully = true;
+                _logger.info('Downloaded: ${descriptor.destinationPath}');
+              } finally {
+                await sink.close();
+                if (!completedSuccessfully) {
+                  try {
+                    if (await file.exists()) {
+                      await file.delete();
+                    }
+                  } catch (e) {
+                    _logger.warning(
+                      'Failed to clean up partial file $destPath: $e',
+                    );
+                  }
+                }
               }
-
-              await sink.flush();
-              await sink.close();
-              cumulativeDownloaded += downloaded;
-              _logger.info('Downloaded: ${descriptor.destinationPath}');
             } finally {
               client.close();
               _activeDownloads.remove(modelId);

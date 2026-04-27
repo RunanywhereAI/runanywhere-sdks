@@ -6,18 +6,37 @@ set "CLEAN=0"
 
 :parse_args
 if "%~1"=="" goto args_done
-if /I "%~1"=="all" set "BACKENDS=all"
-if /I "%~1"=="llamacpp" set "BACKENDS=llamacpp"
-if /I "%~1"=="onnx" set "BACKENDS=onnx"
-if /I "%~1"=="--clean" set "CLEAN=1"
+set "ARG_MATCHED=0"
+if /I "%~1"=="all" (
+  set "BACKENDS=all"
+  set "ARG_MATCHED=1"
+)
+if /I "%~1"=="llamacpp" (
+  set "BACKENDS=llamacpp"
+  set "ARG_MATCHED=1"
+)
+if /I "%~1"=="onnx" (
+  set "BACKENDS=onnx"
+  set "ARG_MATCHED=1"
+)
+if /I "%~1"=="--clean" (
+  set "CLEAN=1"
+  set "ARG_MATCHED=1"
+)
 if /I "%~1"=="-h" goto usage
 if /I "%~1"=="--help" goto usage
+if "!ARG_MATCHED!"=="0" goto usage_error
 shift
 goto parse_args
 
 :usage
 echo Usage: build-windows.bat [all^|llamacpp^|onnx] [--clean]
 exit /b 0
+
+:usage_error
+echo ERROR: Unknown argument "%~1"
+echo Usage: build-windows.bat [all^|llamacpp^|onnx] [--clean]
+exit /b 1
 
 :args_done
 for %%I in ("%~dp0.") do set "SCRIPT_HOME=%%~fI"

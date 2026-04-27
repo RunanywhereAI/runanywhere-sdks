@@ -3,6 +3,21 @@ import 'package:flutter/widgets.dart';
 
 enum VisionCameraLensDirection { front, back, external, unknown }
 
+VisionCameraLensDirection _mapLensDirection(
+  CameraLensDirection lensDirection,
+) {
+  if (lensDirection == CameraLensDirection.front) {
+    return VisionCameraLensDirection.front;
+  }
+  if (lensDirection == CameraLensDirection.back) {
+    return VisionCameraLensDirection.back;
+  }
+  if (lensDirection == CameraLensDirection.external) {
+    return VisionCameraLensDirection.external;
+  }
+  return VisionCameraLensDirection.unknown;
+}
+
 class VisionCameraDevice {
   const VisionCameraDevice({
     required this.id,
@@ -33,7 +48,16 @@ abstract class VisionCameraBackend {
 class CameraPluginVisionCameraBackend implements VisionCameraBackend {
   @override
   VisionCameraSession createSession(VisionCameraDevice device) {
-    final description = device.handle! as CameraDescription;
+    final handle = device.handle;
+    if (handle is! CameraDescription) {
+      throw ArgumentError.value(
+        handle,
+        'device.handle',
+        'Expected CameraDescription for device ${device.id}.',
+      );
+    }
+
+    final description = handle;
     return _CameraPluginVisionCameraSession(
       CameraController(
         description,
@@ -51,11 +75,7 @@ class CameraPluginVisionCameraBackend implements VisionCameraBackend {
           (camera) => VisionCameraDevice(
             id: camera.name,
             name: camera.name,
-            lensDirection: switch (camera.lensDirection) {
-              CameraLensDirection.front => VisionCameraLensDirection.front,
-              CameraLensDirection.back => VisionCameraLensDirection.back,
-              CameraLensDirection.external => VisionCameraLensDirection.external,
-            },
+            lensDirection: _mapLensDirection(camera.lensDirection),
             handle: camera,
           ),
         )
