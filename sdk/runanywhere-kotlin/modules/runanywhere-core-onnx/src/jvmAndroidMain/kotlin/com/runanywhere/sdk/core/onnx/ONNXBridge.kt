@@ -59,6 +59,17 @@ internal object ONNXBridge {
                 // (provides librac_commons.so with service registry).
                 // The ONNX JNI provides backend registration functions.
                 System.loadLibrary("rac_backend_onnx_jni")
+                // B-RN-10-001 / B-FL-10-001: explicitly load librac_backend_sherpa.so so its
+                // ELF __attribute__((constructor)) auto-registers Sherpa STT/TTS/VAD
+                // primitives with the unified plugin registry. Without this load,
+                // `rac_plugin_route(STT/TTS/VAD)` returns -423 even though the .so ships
+                // in the APK. Wrapped in try/catch so non-Sherpa builds aren't blocked.
+                try {
+                    System.loadLibrary("rac_backend_sherpa")
+                    logger.info("rac_backend_sherpa loaded; Sherpa autoregister fired")
+                } catch (e: UnsatisfiedLinkError) {
+                    logger.warning("rac_backend_sherpa not present: ${e.message}")
+                }
                 nativeLibraryLoaded = true
                 logger.info("ONNX native library loaded successfully")
                 return true

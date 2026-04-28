@@ -29,6 +29,8 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -173,7 +175,7 @@ object CppBridgeDownload {
      * the transport.
      */
     @Volatile
-    var downloadProvider: DownloadProvider? = null
+    var downloadProvider: DownloadProvider? = HttpURLConnectionDownloadProvider
 
     /**
      * Per-download state. `status` / `error` / `*Bytes` are
@@ -682,4 +684,106 @@ object CppBridgeDownload {
             .replace("\n", "\\n")
             .replace("\r", "\\r")
             .replace("\t", "\\t")
+}
+
+/**
+ * Default Android download transport using `java.net.HttpURLConnection`.
+ *
+ * Installed automatically as the default `downloadProvider` because the
+ * bundled libcurl in `librac_commons.so` is built with HTTPS disabled on
+ * Android (see `sdk/runanywhere-commons/CMakeLists.txt:442-448`). This
+ * bypass uses the JVM's own HTTPS stack (BoringSSL/Conscrypt) which is
+ * always available on Android.
+ *
+ * Supports HTTP redirects (huggingface returns 302 to CAS bridge), TLS
+ * via the platform's CA store, and progress reporting.
+ */
+internal object HttpURLConnectionDownloadProvider : CppBridgeDownload.DownloadProvider {
+    private const val BUFFER_SIZE = 64 * 1024 // 64 KB
+    private const val MAX_REDIRECTS = 10
+    private const val CONNECT_TIMEOUT_MS = 30_000
+    private const val READ_TIMEOUT_MS = 120_000
+
+    override fun download(
+        url: String,
+        destinationPath: String,
+        progressCallback: (downloadedBytes: Long, totalBytes: Long) -> Unit,
+    ): Boolean {
+        var redirectCount = 0
+        var currentUrl = url
+        return try {
+            while (redirectCount < MAX_REDIRECTS) {
+                val conn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = CONNECT_TIMEOUT_MS
+                    readTimeout = READ_TIMEOUT_MS
+                    instanceFollowRedirects = false
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "RunAnywhere-SDK-Commons/1.0")
+                }
+                val code = conn.responseCode
+                when (code) {
+                    in 200..299 -> {
+                        val total = conn.contentLengthLong
+                        val destFile = File(destinationPath)
+                        destFile.parentFile?.mkdirs()
+                        FileOutputStream(destFile).use { out ->
+                            conn.inputStream.use { input ->
+                                val buffer = ByteArray(BUFFER_SIZE)
+                                var bytesRead = 0L
+                                var n: Int
+                                var lastReport = 0L
+                                while (input.read(buffer).also { n = it } != -1) {
+                                    out.write(buffer, 0, n)
+                                    bytesRead += n
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastReport >= 200 || bytesRead == total) {
+                                        progressCallback(bytesRead, total)
+                                        lastReport = now
+                                    }
+                                }
+                                progressCallback(bytesRead, total)
+                            }
+                        }
+                        conn.disconnect()
+                        return true
+                    }
+                    301, 302, 303, 307, 308 -> {
+                        val location = conn.getHeaderField("Location")
+                            ?: run { conn.disconnect(); return false }
+                        conn.disconnect()
+                        currentUrl = if (location.startsWith("http")) {
+                            location
+                        } else {
+                            URL(URL(currentUrl), location).toString()
+                        }
+                        redirectCount++
+                    }
+                    else -> {
+                        CppBridgePlatformAdapter.logCallback(
+                            CppBridgePlatformAdapter.LogLevel.ERROR,
+                            "HttpURLConnDL",
+                            "HTTP $code for $currentUrl",
+                        )
+                        conn.disconnect()
+                        return false
+                    }
+                }
+            }
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                "HttpURLConnDL",
+                "Too many redirects (>$MAX_REDIRECTS) starting from $url",
+            )
+            false
+        } catch (e: Exception) {
+            CppBridgePlatformAdapter.logCallback(
+                CppBridgePlatformAdapter.LogLevel.ERROR,
+                "HttpURLConnDL",
+                "Download exception: ${e.javaClass.simpleName}: ${e.message}",
+            )
+            false
+        }
+    }
+
+    override fun supportsResume(url: String): Boolean = false
 }

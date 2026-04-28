@@ -449,6 +449,28 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               color: AppColors.primaryPurple,
               onTap: _showTTSModelSelection,
             ),
+            const SizedBox(height: AppSpacing.smallMedium),
+            // B-FL-13-002: short-circuit row for the platform's built-in
+            // TTS engine — bypasses the model selection sheet entirely.
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Use system voice (no model required)'),
+              subtitle: const Text(
+                'Routes TTS through the OS engine instead of an on-device model.',
+              ),
+              value: _currentTTSModel == 'system-tts',
+              onChanged: (enabled) async {
+                if (enabled) {
+                  try {
+                    await sdk.RunAnywhereSDK.instance.tts.loadVoice('system-tts');
+                    await _refreshComponentStates();
+                  } catch (e) {
+                    debugPrint('Failed to load system-tts: $e');
+                  }
+                }
+              },
+            ),
 
             const Spacer(),
 

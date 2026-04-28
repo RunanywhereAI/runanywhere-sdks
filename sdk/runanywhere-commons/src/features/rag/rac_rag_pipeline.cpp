@@ -24,8 +24,24 @@
 #include "rac/features/llm/rac_llm_service.h"
 
 #define LOG_TAG "RAG.Pipeline"
+// B-AK-17-003: dual-route via __android_log_print on Android — see
+// rac_rag_jni.cpp / rac_embeddings_service.cpp for rationale.
+#ifdef __ANDROID__
+#include <android/log.h>
+#define LOGI(...)                                            \
+    do {                                                     \
+        __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__); \
+        RAC_LOG_INFO(LOG_TAG, __VA_ARGS__);                  \
+    } while (0)
+#define LOGE(...)                                            \
+    do {                                                     \
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__); \
+        RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__);                 \
+    } while (0)
+#else
 #define LOGI(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGE(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
+#endif
 
 using namespace runanywhere::rag;
 
@@ -122,22 +138,27 @@ rac_result_t rac_rag_pipeline_create_standalone(const rac_rag_config_t* config,
     rac_handle_t llm_handle = nullptr;
 
     try {
+        LOGI("create_standalone: embed_path=%s, llm_path=%s",
+             config->embedding_model_path,
+             config->llm_model_path ? config->llm_model_path : "(none)");
         // Create embeddings service via registry, forwarding any config JSON (e.g. vocab_path)
         rac_result_t result = rac_embeddings_create_with_config(
             config->embedding_model_path, config->embedding_config_json, &embed_handle);
         if (result != RAC_SUCCESS || !embed_handle) {
-            LOGE("Failed to create embeddings service: %d", result);
+            LOGE("Failed to create embeddings service: %d (handle=%p)", result, embed_handle);
             return result != RAC_SUCCESS ? result : RAC_ERROR_INITIALIZATION_FAILED;
         }
+        LOGI("create_standalone: embed_handle=%p", (void*)embed_handle);
 
         // Create LLM service via registry (optional — can be null for embed-only pipelines)
         if (config->llm_model_path) {
             result = rac_llm_create(config->llm_model_path, &llm_handle);
             if (result != RAC_SUCCESS || !llm_handle) {
-                LOGE("Failed to create LLM service: %d", result);
+                LOGE("Failed to create LLM service: %d (handle=%p)", result, llm_handle);
                 rac_embeddings_destroy(embed_handle);
                 return result != RAC_SUCCESS ? result : RAC_ERROR_INITIALIZATION_FAILED;
             }
+            LOGI("create_standalone: llm_handle=%p", (void*)llm_handle);
         }
 
         // Build pipeline config from legacy config

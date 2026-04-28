@@ -23,13 +23,29 @@ class GeniePlugin : FlutterPlugin, MethodCallHandler {
         private const val BACKEND_VERSION = "0.1.6"
         private const val BACKEND_NAME = "Genie"
 
+        /**
+         * Whether the Genie backend shell library is loaded and Genie features
+         * may be advertised to Dart. Devices without the .so (e.g. non-Snapdragon)
+         * keep this false; the plugin still answers method-channel pings but
+         * Dart code should treat Genie as unavailable.
+         */
+        @JvmStatic
+        var isNativeLibAvailable: Boolean = false
+            private set
+
         init {
             // Load the experimental Genie backend shell when present.
+            // Catch broadly so a bad .so or a Throwable from a transitive
+            // load never aborts plugin init (B-FL-1-001).
             try {
                 System.loadLibrary("rac_backend_genie_jni")
-            } catch (e: UnsatisfiedLinkError) {
-                // Library may not be available in all configurations
-                android.util.Log.w("Genie", "Failed to load rac_backend_genie_jni: ${e.message}")
+                isNativeLibAvailable = true
+            } catch (t: Throwable) {
+                isNativeLibAvailable = false
+                android.util.Log.w(
+                    "Genie",
+                    "rac_backend_genie_jni unavailable on this device — Genie features disabled: ${t.message}",
+                )
             }
         }
     }

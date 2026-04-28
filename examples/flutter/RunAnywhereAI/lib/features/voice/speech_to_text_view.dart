@@ -135,8 +135,11 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _selectedFramework =
             model.preferredFramework ?? LLMFramework.whisperKit;
         _selectedModelName = model.name;
-        // WhisperKit supports live mode, ONNX may have limitations
-        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit;
+        // B-FL-11-001: Sherpa-ONNX (LLMFramework.onnxRuntime) supports
+        // streaming transcription via its zipformer/RNN-T runtime. Allow
+        // Live mode for both WhisperKit and ONNX-backed STT models.
+        _supportsLiveMode = model.preferredFramework == LLMFramework.whisperKit ||
+            model.preferredFramework == LLMFramework.onnxRuntime;
         _isProcessing = false;
       });
 
@@ -147,6 +150,17 @@ class _SpeechToTextViewState extends State<SpeechToTextView> {
         _errorMessage = 'Failed to load model: $e';
         _isProcessing = false;
       });
+      // B-FL-10-002 / B-FL-12-002: surface load failures via SnackBar so the user
+      // sees them even if the inline error text is below the fold or behind a
+      // sheet animation.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('STT load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 

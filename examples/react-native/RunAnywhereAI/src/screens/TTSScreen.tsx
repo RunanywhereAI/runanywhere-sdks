@@ -35,6 +35,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
@@ -127,6 +128,9 @@ export const TTSScreen: React.FC = () => {
   const [audioFilePath, setAudioFilePath] = useState<string | null>(null);
   const [sampleRate, setSampleRate] = useState(22050);
   const [showModelSelection, setShowModelSelection] = useState(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Audio player refs - using react-native-sound directly
   const soundRef = useRef<typeof Sound | null>(null);
@@ -942,7 +946,7 @@ export const TTSScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       <Text style={styles.title}>Text to Speech</Text>
       {text && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -1125,7 +1129,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

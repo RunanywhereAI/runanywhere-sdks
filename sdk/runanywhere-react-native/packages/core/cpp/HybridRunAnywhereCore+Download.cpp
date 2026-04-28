@@ -4,6 +4,7 @@
  * Domain implementation for HybridRunAnywhereCore.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
+#include "bridges/PlatformDownloadBridge.h"
 
 namespace margelo::nitro::runanywhere {
 
@@ -11,35 +12,12 @@ using namespace ::runanywhere::bridges;
 
 // Download Service
 // ============================================================================
-// Download Service — libcurl-backed runner (rac_http_download_execute) with
-// cancel-token registry. Replaces the RNFS/job-id plumbing that used to live
-// in FileSystem.ts.
+// B-RN-3-001 fix: route model downloads through the platform-adapter
+// HTTP runner (Java HttpURLConnection on Android, NSURLSession on iOS) instead
+// of `rac_http_download_execute`. The bundled libcurl on Android is built with
+// `CURL_DISABLE_HTTPS=ON` (see commons CMakeLists.txt:442-448), so every native
+// HTTPS download was returning INVALID_URL / "Unsupported protocol".
 // ============================================================================
-
-namespace {
-
-// Progress trampoline — forwards rac_http_download progress to the JS callback
-// and honours the cancel flag registered against the caller's token.
-struct DownloadProgressContext {
-    std::function<void(double, double)> onProgress;
-    std::shared_ptr<std::atomic<bool>> cancelFlag;
-};
-
-rac_bool_t downloadProgressTrampoline(uint64_t bytesWritten, uint64_t totalBytes,
-                                      void* userData) {
-    auto* ctx = static_cast<DownloadProgressContext*>(userData);
-    if (!ctx) return RAC_TRUE;
-    if (ctx->cancelFlag && ctx->cancelFlag->load()) {
-        return RAC_FALSE;
-    }
-    if (ctx->onProgress) {
-        ctx->onProgress(static_cast<double>(bytesWritten),
-                        static_cast<double>(totalBytes));
-    }
-    return RAC_TRUE;
-}
-
-} // anonymous namespace
 
 std::shared_ptr<Promise<void>> HybridRunAnywhereCore::downloadModel(
     const std::string& url,
@@ -47,51 +25,42 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::downloadModel(
     const std::string& cancelToken,
     const std::function<void(double, double)>& onProgress) {
     return Promise<void>::async([this, url, destPath, cancelToken, onProgress]() -> void {
-        LOGI("Starting native download: %s -> %s", url.c_str(), destPath.c_str());
+        LOGI("Starting native download (platform adapter): %s -> %s",
+             url.c_str(), destPath.c_str());
 
         auto cancelFlag = downloadCancelRegistry().registerToken(cancelToken);
 
-        DownloadProgressContext ctx{onProgress, cancelFlag};
+        auto progressAdapter = [onProgress](int64_t downloaded, int64_t total) {
+            if (onProgress) {
+                onProgress(static_cast<double>(downloaded),
+                           static_cast<double>(total));
+            }
+        };
 
-        rac_http_download_request_t req{};
-        req.url = url.c_str();
-        req.destination_path = destPath.c_str();
-        req.headers = nullptr;
-        req.header_count = 0;
-        req.timeout_ms = 0;  // no timeout — model downloads can be large
-        req.follow_redirects = RAC_TRUE;
-        req.resume_from_byte = 0;
-        req.expected_sha256_hex = nullptr;
-
-        int32_t httpStatus = 0;
-        rac_http_download_status_t status = rac_http_download_execute(
-            &req, downloadProgressTrampoline, &ctx, &httpStatus);
+        int rc = ::runanywhere::platform::SyncHttpDownload(
+            url, destPath, progressAdapter, cancelFlag);
 
         downloadCancelRegistry().release(cancelToken);
 
-        if (status == RAC_HTTP_DL_OK) {
+        if (rc == RAC_SUCCESS) {
             LOGI("Download complete: %s", destPath.c_str());
             return;
         }
 
         std::string reason;
-        switch (status) {
-            case RAC_HTTP_DL_CANCELLED: reason = "cancelled"; break;
-            case RAC_HTTP_DL_TIMEOUT: reason = "timeout"; break;
-            case RAC_HTTP_DL_NETWORK_ERROR: reason = "network_error"; break;
-            case RAC_HTTP_DL_NETWORK_UNAVAILABLE: reason = "network_unavailable"; break;
-            case RAC_HTTP_DL_DNS_ERROR: reason = "dns_error"; break;
-            case RAC_HTTP_DL_SSL_ERROR: reason = "ssl_error"; break;
-            case RAC_HTTP_DL_SERVER_ERROR: reason = "server_error"; break;
-            case RAC_HTTP_DL_FILE_ERROR: reason = "file_error"; break;
-            case RAC_HTTP_DL_INSUFFICIENT_STORAGE: reason = "insufficient_storage"; break;
-            case RAC_HTTP_DL_INVALID_URL: reason = "invalid_url"; break;
-            case RAC_HTTP_DL_CHECKSUM_FAILED: reason = "checksum_failed"; break;
+        switch (rc) {
+            case RAC_ERROR_CANCELLED: reason = "cancelled"; break;
+            case RAC_ERROR_TIMEOUT: reason = "timeout"; break;
+            case RAC_ERROR_NETWORK_ERROR: reason = "network_error"; break;
+            case RAC_ERROR_NETWORK_UNAVAILABLE: reason = "network_unavailable"; break;
+            case RAC_ERROR_INVALID_PATH: reason = "invalid_path"; break;
+            case RAC_ERROR_INVALID_ARGUMENT: reason = "invalid_argument"; break;
+            case RAC_ERROR_DOWNLOAD_FAILED: reason = "download_failed"; break;
+            case RAC_ERROR_NOT_SUPPORTED: reason = "not_supported"; break;
             default: reason = "unknown"; break;
         }
         std::string msg = "download failed: " + reason + " (status=" +
-                          std::to_string(status) + ", http=" +
-                          std::to_string(httpStatus) + ")";
+                          std::to_string(rc) + ")";
         LOGE("%s", msg.c_str());
         setLastError(msg);
         throw std::runtime_error(msg);

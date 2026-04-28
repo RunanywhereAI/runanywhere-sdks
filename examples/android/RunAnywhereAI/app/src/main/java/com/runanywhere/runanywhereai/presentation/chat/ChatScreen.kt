@@ -120,7 +120,23 @@ fun ChatScreen(
             )
         }
     } else {
-        ConfigureTopBar(title = "Chat")
+        // Even on the Welcome (no-model) screen, expose History so users
+        // can revisit prior conversations without first loading a model
+        // (B-AK-8-001).
+        ConfigureTopBar(
+            title = "Chat",
+            actions = {
+                IconButton(onClick = {
+                    viewModel.ensureCurrentConversationInHistory()
+                    showingConversationList = true
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = "History",
+                    )
+                }
+            },
+        )
     }
 
     Box(

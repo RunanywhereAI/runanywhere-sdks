@@ -391,7 +391,7 @@ EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_vlm_result_tokens_per_second(void) {
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_json_schema(void) {
     return (int)offsetof(rac_structured_output_config_t, json_schema);
 }
-EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_include_schema(void) {
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_structured_output_config_include_schema_in_prompt(void) {
     return (int)offsetof(rac_structured_output_config_t, include_schema_in_prompt);
 }
 

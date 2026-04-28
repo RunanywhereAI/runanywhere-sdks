@@ -367,7 +367,13 @@ export class TelemetryService {
   // ---------------------------------------------------------------------------
 
   private get isHttpConfigured(): boolean {
-    return !!this._supabaseURL && !!this._supabaseKey;
+    if (!this._supabaseURL || !this._supabaseKey) return false;
+    // B-WEB-9-001 / B-FL-1-004: detect unfilled .env templates so the
+    // example apps don't try to POST telemetry to literal placeholder
+    // strings like "YOUR_SUPABASE_PROJECT_URL". Treat as no-op.
+    const urlLooksLikePlaceholder = /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i.test(this._supabaseURL);
+    const keyLooksLikePlaceholder = /YOUR_|<your|REPLACE_ME|PLACEHOLDER/i.test(this._supabaseKey);
+    return !urlLooksLikePlaceholder && !keyLooksLikePlaceholder;
   }
 
   private buildURL(path: string): string {

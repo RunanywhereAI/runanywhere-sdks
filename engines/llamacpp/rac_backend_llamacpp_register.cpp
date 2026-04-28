@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_cpu_runtime_provider.h"
+#include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
@@ -429,17 +430,29 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return result;
     }
 
-    // v3 Phase B1: plugin registration now happens via the unified
-    // rac_plugin_registry (see rac_plugin_entry_llamacpp.cpp). Static
-    // builds wire it through RAC_STATIC_PLUGIN_REGISTER (see
-    // rac_static_register_llamacpp.cpp); dynamic loads go through
-    // plugin_loader.cpp calling rac_plugin_register(rac_plugin_entry_llamacpp()).
-    // Backend registration function remains a no-op-ish entry point for
-    // callers that import RABackendLlamaCPP and expect a module_register
-    // side-effect.
+    // v3 Phase B1 + Android-fix: register with the unified plugin registry
+    // here as well. Originally this was supposed to happen via either:
+    //   - RAC_STATIC_PLUGIN_REGISTER (only active when RAC_PLUGIN_MODE_STATIC)
+    //   - dlopen + dlsym path in plugin_loader.cpp (only when host calls it)
+    // Neither runs on Android: the Kotlin/Flutter/RN SDKs load this .so
+    // directly via System.loadLibrary and call this function via JNI, never
+    // dlopen'ing through the plugin loader. As a result `rac_plugin_route`
+    // returns NOT_FOUND when the LLM service tries to route to "llamacpp",
+    // breaking model load on every Android app. Calling the registration
+    // here is idempotent (the registry deduplicates).
+    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp(void);
+    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");
+        }
+    }
+
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module_register only; "
-                          "plugin registration via rac_plugin_entry_llamacpp)");
+    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module + plugin)");
     return RAC_SUCCESS;
 }
 

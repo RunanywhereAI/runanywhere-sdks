@@ -10,7 +10,7 @@ import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/features/models/model_selection_sheet.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 
 /// ToolsView - Demonstrates tool calling functionality
 ///
@@ -26,8 +26,12 @@ class _ToolsViewState extends State<ToolsView> {
   final TextEditingController _promptController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  // Single source of truth for the tool-calling toggle (B-FL-2-001).
+  // The Settings tab also reads/writes this same singleton so toggling
+  // in one place reflects in the other.
+  final ToolSettingsViewModel _toolSettings = ToolSettingsViewModel.shared;
+
   // State
-  bool _toolCallingEnabled = true;
   bool _isGenerating = false;
   String? _errorMessage;
   List<ToolDefinition> _registeredTools = [];
@@ -39,31 +43,26 @@ class _ToolsViewState extends State<ToolsView> {
   // Model state
   String? _loadedModelName;
 
+  bool get _toolCallingEnabled => _toolSettings.toolCallingEnabled;
+
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSettings());
+    _toolSettings.addListener(_onToolSettingsChanged);
     unawaited(_syncModelState());
     _registerDemoTools();
   }
 
   @override
   void dispose() {
+    _toolSettings.removeListener(_onToolSettingsChanged);
     _promptController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _toolCallingEnabled = prefs.getBool('tool_calling_enabled') ?? true;
-    });
-  }
-
-  Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('tool_calling_enabled', _toolCallingEnabled);
+  void _onToolSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _syncModelState() async {
@@ -563,10 +562,9 @@ class _ToolsViewState extends State<ToolsView> {
         subtitle: const Text('Allow LLM to use external tools'),
         value: _toolCallingEnabled,
         onChanged: (value) {
-          setState(() {
-            _toolCallingEnabled = value;
-          });
-          unawaited(_saveSettings());
+          // Routes through ToolSettingsViewModel.shared so the Settings
+          // tab toggle stays in sync (B-FL-2-001).
+          _toolSettings.toolCallingEnabled = value;
         },
       ),
     );

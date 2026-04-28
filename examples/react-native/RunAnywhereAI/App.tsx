@@ -167,6 +167,13 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 600_000_000,
       }),
       RunAnywhere.registerModel({
+        id: 'qwen3-0.6b-q4_k_m',
+        name: 'Qwen3 0.6B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+        framework: LLMFramework.LlamaCpp,
+        memoryRequirement: 477_000_000,
+      }),
+      RunAnywhere.registerModel({
         id: 'llama-3.2-3b-instruct-q4_k_m',
         name: 'Llama 3.2 3B Instruct Q4_K_M (Tool Calling)',
         url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',

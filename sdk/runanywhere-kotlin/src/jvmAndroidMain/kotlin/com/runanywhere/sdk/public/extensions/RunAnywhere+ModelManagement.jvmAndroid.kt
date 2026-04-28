@@ -885,56 +885,85 @@ private suspend fun downloadEmbeddingModelFiles(
 
     // Target directory: {base}/models/embedding/{modelId}/
     val embeddingDir = File(File(CppBridgeModelPaths.getBaseDirectory(), "models/embedding"), modelId)
-    withContext(Dispatchers.IO) { embeddingDir.mkdirs() }
 
-    emit(
-        DownloadProgress(
-            modelId = modelId,
-            progress = 0f,
-            bytesDownloaded = 0,
-            totalBytes = totalSize,
-            state = DownloadState.DOWNLOADING,
-        ),
-    )
+    try {
+        withContext(Dispatchers.IO) { embeddingDir.mkdirs() }
 
-    val allFiles = listOf(primaryUrl to "model.onnx") + companionFiles
-    val fileCount = allFiles.size
-
-    allFiles.forEachIndexed { index, (url, filename) ->
-        val destFile = File(embeddingDir, filename)
-        logger.info("Downloading [$filename] from: $url")
-
-        withContext(Dispatchers.IO) {
-            downloadFileWithNativeRunner(url, destFile) { _ -> }
-        }
-
-        val overallProgress = (index + 1f) / fileCount
         emit(
             DownloadProgress(
                 modelId = modelId,
-                progress = overallProgress,
+                progress = 0f,
                 bytesDownloaded = 0,
                 totalBytes = totalSize,
-                state = if (overallProgress >= 1f) DownloadState.COMPLETED else DownloadState.DOWNLOADING,
+                state = DownloadState.DOWNLOADING,
             ),
         )
-        logger.info("Downloaded [$filename] to ${destFile.absolutePath}")
-    }
 
-    val dirPath = embeddingDir.absolutePath
+        val allFiles = listOf(primaryUrl to "model.onnx") + companionFiles
+        val fileCount = allFiles.size
 
-    // Update in-memory cache with local path
-    synchronized(modelCacheLock) {
-        val idx = registeredModels.indexOfFirst { it.id == modelId }
-        if (idx >= 0) {
-            registeredModels[idx] = registeredModels[idx].copy(localPath = dirPath)
+        allFiles.forEachIndexed { index, (url, filename) ->
+            val destFile = File(embeddingDir, filename)
+            logger.info("Downloading [$filename] from: $url")
+
+            withContext(Dispatchers.IO) {
+                downloadFileWithNativeRunner(url, destFile) { _ -> }
+            }
+
+            val overallProgress = (index + 1f) / fileCount
+            emit(
+                DownloadProgress(
+                    modelId = modelId,
+                    progress = overallProgress,
+                    bytesDownloaded = 0,
+                    totalBytes = totalSize,
+                    state = if (overallProgress >= 1f) DownloadState.COMPLETED else DownloadState.DOWNLOADING,
+                ),
+            )
+            logger.info("Downloaded [$filename] to ${destFile.absolutePath}")
         }
-    }
-    CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
-    CppBridgeStorage.storeString(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId, dirPath)
-    CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
 
-    logger.info("Embedding model ready at: $dirPath")
+        val dirPath = embeddingDir.absolutePath
+
+        // Update in-memory cache with local path
+        synchronized(modelCacheLock) {
+            val idx = registeredModels.indexOfFirst { it.id == modelId }
+            if (idx >= 0) {
+                registeredModels[idx] = registeredModels[idx].copy(localPath = dirPath)
+            }
+        }
+        CppBridgeModelRegistry.updateDownloadStatus(modelId, dirPath)
+        CppBridgeStorage.storeString(CppBridgeStorage.StorageNamespace.DOWNLOADS, modelId, dirPath)
+        CppBridgeEvents.emitDownloadCompleted(modelId, 0.0, 0)
+
+        logger.info("Embedding model ready at: $dirPath")
+    } catch (e: Throwable) {
+        // B-AK-19-001: a failed embedding download was leaving a 0-byte
+        // registry entry behind, making the model appear "downloaded" while
+        // the .onnx blob was missing. Roll back the registration and any
+        // partially-written files before rethrowing so the caller gets the
+        // raw error and the registry stays consistent.
+        logger.warning("Embedding model download failed for $modelId — rolling back: ${e.message}")
+        try {
+            CppBridgeModelRegistry.remove(modelId)
+        } catch (cleanup: Throwable) {
+            logger.warning("Cleanup of $modelId from registry failed: ${cleanup.message}")
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                if (embeddingDir.exists()) embeddingDir.deleteRecursively()
+            }
+        } catch (cleanup: Throwable) {
+            logger.warning("Cleanup of partial files for $modelId failed: ${cleanup.message}")
+        }
+        synchronized(modelCacheLock) {
+            val idx = registeredModels.indexOfFirst { it.id == modelId }
+            if (idx >= 0) {
+                registeredModels[idx] = registeredModels[idx].copy(localPath = null)
+            }
+        }
+        throw e
+    }
 }
 
 /**
@@ -955,6 +984,22 @@ private fun downloadFileWithNativeRunner(
     progressCallback: (Float) -> Unit,
 ) {
     destFile.parentFile?.mkdirs()
+
+    // Prefer the install-time DownloadProvider (HttpURLConnection on Android) over
+    // the libcurl-backed JNI runner. The JNI path is HTTPS-disabled on Android
+    // (commons CMakeLists.txt:442-448) so it always returns INVALID_URL. Embedding
+    // model download (companion-file flow) used to skip the provider check; this
+    // unifies it with the regular single-file flow in CppBridgeDownload.
+    CppBridgeDownload.downloadProvider?.let { provider ->
+        val ok = provider.download(url, destFile.absolutePath) { bytes, total ->
+            if (total > 0) progressCallback(bytes.toFloat() / total.toFloat())
+        }
+        if (!ok) {
+            throw IOException("Download failed for $url (DownloadProvider returned false)")
+        }
+        return
+    }
+
     val listener =
         com.runanywhere.sdk.native.bridge.NativeDownloadProgressListener { bytes, total ->
             if (total > 0) {
@@ -1123,16 +1168,36 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
                 modelsLogger.error("STT model path is not a directory (expected extracted model dir): $localPath")
                 return@withContext -1
             }
-            // C++ backend expects directory with encoder.onnx, decoder.onnx, tokens.txt
-            val hasEncoder = dir.listFiles()?.any { it.name.contains("encoder") && it.name.endsWith(".onnx") } == true
-            if (!hasEncoder) {
-                modelsLogger.error("STT model directory missing encoder.onnx: $localPath. Re-download the model.")
+            // C++ backend (sherpa_backend.cpp SherpaSTT::load_model) globs the
+            // directory for *encoder*.onnx, *decoder*.onnx, *tokens*.txt — the
+            // Sherpa-ONNX upstream archives use prefixed names like
+            // `tiny.en-encoder.onnx` / `tiny.en-encoder.int8.onnx`. We match
+            // the same substring rule here so the pre-check accepts every
+            // archive layout the native loader can actually consume.
+            val files = dir.listFiles().orEmpty()
+            val hasEncoder = files.any { it.name.contains("encoder") && it.name.endsWith(".onnx") }
+            val hasDecoder = files.any { it.name.contains("decoder") && it.name.endsWith(".onnx") }
+            val hasTokens = files.any { it.name == "tokens.txt" || (it.name.contains("tokens") && it.name.endsWith(".txt")) }
+            val hasSingleFileCtc = files.any { it.name == "model.onnx" || it.name == "model.int8.onnx" }
+            // Whisper / transducer models need both encoder + decoder; NeMo CTC
+            // ships a single `model.onnx` (or quantized variant) with tokens.
+            val hasUsableLayout = (hasEncoder && hasDecoder && hasTokens) || (hasSingleFileCtc && hasTokens)
+            if (!hasUsableLayout) {
+                modelsLogger.error(
+                    "STT model directory missing required files at $localPath. " +
+                        "Expected either (*encoder*.onnx + *decoder*.onnx + *tokens*.txt) " +
+                        "or (model.onnx|model.int8.onnx + tokens.txt). Re-download the model.",
+                )
                 return@withContext -1
             }
             CppBridgeSTT.loadModel(localPath, modelId, model.name)
         }
     if (result != 0) {
-        throw SDKError.stt("Failed to load STT model '$modelId' (error code: $result). Ensure the model is extracted and contains encoder.onnx, decoder.onnx, tokens.txt.")
+        throw SDKError.stt(
+            "Failed to load STT model '$modelId' (error code: $result). " +
+                "Ensure the model is extracted and contains either an *encoder*.onnx + *decoder*.onnx + *tokens*.txt " +
+                "set (Whisper / transducer) or a model.onnx + tokens.txt pair (NeMo CTC).",
+        )
     }
 }
 

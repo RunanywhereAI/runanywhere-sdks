@@ -35,6 +35,7 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -70,6 +71,9 @@ export const STTScreen: React.FC = () => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const [showModelSelection, setShowModelSelection] = useState(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Audio recording path ref (for batch mode only)
   const recordingPath = useRef<string | null>(null);
@@ -806,7 +810,7 @@ export const STTScreen: React.FC = () => {
    * Render header
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       <Text style={styles.title}>Speech to Text</Text>
       {transcript && (
         <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
@@ -994,7 +998,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

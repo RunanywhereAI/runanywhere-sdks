@@ -12,7 +12,9 @@ import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.unloadLLMModel
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Benchmarks LLM generation with short/medium/long token counts.
@@ -46,8 +48,13 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
             // compute TTFT + tokens/sec from the event sequence directly.
             val warmupStart = System.nanoTime()
             val warmupOptions = LLMGenerationOptions(maxTokens = 5, temperature = 0.0f)
-            RunAnywhere.generateStream("Hello", warmupOptions).collect { event ->
-                if (event.is_final) return@collect
+            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            withTimeoutOrNull(10_000L) {
+                RunAnywhere.generateStream("Hello", warmupOptions)
+                    .takeWhile { !it.is_final }
+                    .collect { _ ->
+                        // warmup only primes the model; no metrics needed
+                    }
             }
             val warmupTimeMs = (System.nanoTime() - warmupStart) / 1_000_000.0
 
@@ -58,12 +65,16 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
 
             var tokenCount = 0
             var firstTokenTimeNs: Long? = null
-            RunAnywhere.generateStream(prompt, options).collect { event ->
-                if (event.token.isNotEmpty()) {
-                    if (firstTokenTimeNs == null) firstTokenTimeNs = System.nanoTime()
-                    tokenCount++
-                }
-                if (event.is_final) return@collect
+            // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
+            withTimeoutOrNull(60_000L) {
+                RunAnywhere.generateStream(prompt, options)
+                    .takeWhile { !it.is_final }
+                    .collect { event ->
+                        if (event.token.isNotEmpty()) {
+                            if (firstTokenTimeNs == null) firstTokenTimeNs = System.nanoTime()
+                            tokenCount++
+                        }
+                    }
             }
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
             val ttftMs: Double? = firstTokenTimeNs?.let { (it - benchStart) / 1_000_000.0 }

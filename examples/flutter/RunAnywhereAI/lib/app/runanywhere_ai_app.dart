@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:ffi';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart';
@@ -37,8 +40,37 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // This prevents blocking the main thread during app startup
     // and allows the loading screen to display smoothly
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Eagerly resolve every bundled native library at startup so the
+      // 16KB-page-size warning fires once on cold-start (if at all),
+      // never mid-session when the user taps Send/Generate (B-FL-2-003 +
+      // B-FL-14-001).
+      _eagerLoadNativeLibraries();
       unawaited(_initializeSDK());
     });
+  }
+
+  /// Force [DynamicLibrary.open] for every .so we ship in jniLibs.
+  /// Failures are logged but do not abort startup — devices that can't
+  /// load a particular backend still get a working SDK with that
+  /// backend disabled.
+  void _eagerLoadNativeLibraries() {
+    if (!Platform.isAndroid) return;
+    const libs = <String>[
+      'librac_commons.so',
+      'librac_backend_llamacpp.so',
+      'librac_backend_genie.so',
+      'librac_backend_genie_jni.so',
+      'librunanywhere_genie.so',
+      'librunanywhere_llamacpp.so',
+    ];
+    for (final lib in libs) {
+      try {
+        DynamicLibrary.open(lib);
+        if (kDebugMode) debugPrint('🔗 Eager-loaded $lib');
+      } catch (e) {
+        if (kDebugMode) debugPrint('⚠️ Eager-load skipped for $lib: $e');
+      }
+    }
   }
 
   /// Normalize base URL by adding https:// if no scheme is present
@@ -135,10 +167,19 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
   }
 
+  /// True once we've registered modules + models exactly once. Without
+  /// this guard, hot-reload (or any second call) re-runs the entire
+  /// LlamaCpp.addModel block, which is wasteful (B-FL-3-002).
+  static bool _modulesRegistered = false;
+
   /// Register modules with their associated models
   /// Each module explicitly owns its models - the framework is determined by the module
   /// Matches iOS registerModulesAndModels pattern exactly
   Future<void> _registerModulesAndModels() async {
+    if (_modulesRegistered) {
+      debugPrint('📦 Modules already registered — skipping (B-FL-3-002)');
+      return;
+    }
     debugPrint('📦 Registering modules with their models...');
 
     // --- LLAMACPP MODULE ---
@@ -172,6 +213,13 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       url:
           'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
       memoryRequirement: 600000000,
+    );
+    LlamaCpp.addModel(
+      id: 'qwen3-0.6b-q4_k_m',
+      name: 'Qwen3 0.6B Q4_K_M',
+      url:
+          'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+      memoryRequirement: 477000000,
     );
     LlamaCpp.addModel(
       id: 'lfm2-350m-q4_k_m',
@@ -339,6 +387,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
 
     debugPrint('🎉 All modules and models registered');
+    _modulesRegistered = true;
   }
 
   @override

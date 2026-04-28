@@ -22,6 +22,7 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -46,8 +47,8 @@ import {
 import {
   PipelineState as VoiceEventPipelineState,
   VADEventType,
-} from '@runanywhere/core/src/generated/voice_events';
-import type { VoiceEvent } from '@runanywhere/core/src/generated/voice_events';
+} from '@runanywhere/proto-ts/dist/voice_events';
+import type { VoiceEvent } from '@runanywhere/proto-ts/dist/voice_events';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -70,9 +71,11 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [showModelInfo, setShowModelInfo] = useState(true);
   const [showModelSelection, setShowModelSelection] = useState(false);
-  const [modelSelectionType, setModelSelectionType] = useState<
-    'stt' | 'llm' | 'tts'
-  >('stt');
+  const [activeSelectionContext, setActiveSelectionContext] =
+    useState<ModelSelectionContext>(ModelSelectionContext.STT);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // v3.1: voice-agent adapter ref + unsubscribe. Replaces the deprecated
   // VoiceSessionHandle. The unsubscribe is returned by the adapter's
@@ -312,14 +315,6 @@ export const VoiceAssistantScreen: React.FC = () => {
   }, [isSessionActive, allModelsLoaded, handleProtoEvent]);
 
   /**
-   * Handle model selection - opens model selection sheet
-   */
-  const handleSelectModel = useCallback((type: 'stt' | 'llm' | 'tts') => {
-    setModelSelectionType(type);
-    setShowModelSelection(true);
-  }, []);
-
-  /**
    * Get context for model selection
    */
   const getSelectionContext = (
@@ -336,6 +331,14 @@ export const VoiceAssistantScreen: React.FC = () => {
   };
 
   /**
+   * Handle model selection - opens model selection sheet
+   */
+  const handleSelectModel = useCallback((type: 'stt' | 'llm' | 'tts') => {
+    setActiveSelectionContext(getSelectionContext(type));
+    setShowModelSelection(true);
+  }, []);
+
+  /**
    * Handle model selected from the sheet
    */
   const handleModelSelected = useCallback(
@@ -343,8 +346,8 @@ export const VoiceAssistantScreen: React.FC = () => {
       setShowModelSelection(false);
 
       try {
-        switch (modelSelectionType) {
-          case 'stt':
+        switch (activeSelectionContext) {
+          case ModelSelectionContext.STT:
             if (model.localPath) {
               const sttSuccess = await RunAnywhere.loadSTTModel(
                 model.localPath,
@@ -359,7 +362,7 @@ export const VoiceAssistantScreen: React.FC = () => {
               }
             }
             break;
-          case 'llm':
+          case ModelSelectionContext.LLM:
             if (model.localPath) {
               const llmSuccess = await RunAnywhere.loadModel(model.localPath);
               if (llmSuccess) {
@@ -371,7 +374,7 @@ export const VoiceAssistantScreen: React.FC = () => {
               }
             }
             break;
-          case 'tts':
+          case ModelSelectionContext.TTS:
             if (model.localPath) {
               const ttsSuccess = await RunAnywhere.loadTTSModel(
                 model.localPath,
@@ -391,7 +394,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         Alert.alert('Error', `Failed to load model: ${error}`);
       }
     },
-    [modelSelectionType]
+    [activeSelectionContext]
   );
 
   /**
@@ -539,7 +542,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
         <Text style={styles.title}>Voice Assistant</Text>
         <View style={styles.headerActions}>
           {allModelsLoaded && (
@@ -689,7 +692,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       {/* Model Selection Sheet */}
       <ModelSelectionSheet
         visible={showModelSelection}
-        context={getSelectionContext(modelSelectionType)}
+        context={activeSelectionContext}
         onClose={() => setShowModelSelection(false)}
         onModelSelected={handleModelSelected}
       />
@@ -707,7 +710,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

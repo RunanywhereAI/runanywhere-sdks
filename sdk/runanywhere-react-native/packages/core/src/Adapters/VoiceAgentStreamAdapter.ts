@@ -18,12 +18,12 @@
  */
 
 import { VoiceAgent as NitroVoiceAgent } from '../generated/NitroVoiceAgentSpec';
-import { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
-import { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
+import { VoiceAgentRequest } from '@runanywhere/proto-ts/dist/voice_agent_service';
+import { VoiceEvent } from '@runanywhere/proto-ts/dist/voice_events';
 import {
   streamVoiceAgent,
   VoiceAgentStreamTransport,
-} from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
+} from '@runanywhere/proto-ts/dist/streams/voice_agent_service_stream';
 
 /**
  * Adapter that exposes the C++ proto-byte voice agent callback as a

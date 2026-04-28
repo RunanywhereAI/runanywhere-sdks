@@ -10,6 +10,7 @@
 
 #include <jni.h>
 
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -17,12 +18,31 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
-// Route JNI logging through unified RAC_LOG_* system
+// B-AK-17-003: route JNI logging through __android_log_print directly on Android
+// rather than RAC_LOG_* which depends on the platform adapter being initialized
+// in the host process. The RAG flow loads its native libraries lazily on first
+// use, often AFTER the platform adapter is set up but with a logging callback
+// path that does not surface JNI/RAG/Embeddings categories in this app's
+// logcat capture (see RAC_LLM_SVC vs JNI.RAG observed-tag delta in
+// AK-17-phase6-final-v2.log). Using __android_log_print mirrors the proven
+// path that RAC_LLM_SVC uses, ensuring `nativeCreatePipeline` failures are
+// always diagnosable in logcat regardless of adapter state.
+#ifdef __ANDROID__
+#include <android/log.h>
+static const char* LOG_TAG = "JNI.RAG";
+#define LOGi(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#define LOGw(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#else
 static const char* LOG_TAG = "JNI.RAG";
 #define LOGi(...) RAC_LOG_INFO(LOG_TAG, __VA_ARGS__)
 #define LOGe(...) RAC_LOG_ERROR(LOG_TAG, __VA_ARGS__)
 #define LOGw(...) RAC_LOG_WARNING(LOG_TAG, __VA_ARGS__)
+#endif
 #include "rac/features/rag/rac_rag_pipeline.h"
 
 // Forward declarations
@@ -169,6 +189,40 @@ JNIEXPORT jlong JNICALL Java_com_runanywhere_sdk_rag_RAGBridge_nativeCreatePipel
 
     LOGi("nativeCreatePipeline: emb=%s, llm=%s, dim=%d, topK=%d", embPath,
          llmPath ? llmPath : "(none)", embeddingDimension, topK);
+    LOGi("nativeCreatePipeline: embCfg=%s", embCfg ? embCfg : "(none)");
+
+    // B-AK-17-002 / B-AK-17-003: expose plugin + runtime + filesystem state
+    // up-front so the next RAG creation failure surfaces the real cause
+    // (missing plugin, missing runtime, missing model file) right next to
+    // the error in logcat — even when the platform adapter logging path
+    // is silent for these categories.
+    {
+        const rac_engine_vtable_t* embed_plugins[8] = {};
+        size_t embed_count = 0;
+        rac_plugin_list(RAC_PRIMITIVE_EMBED, embed_plugins, 8, &embed_count);
+        LOGi("nativeCreatePipeline: EMBED plugins registered=%zu", embed_count);
+        for (size_t i = 0; i < embed_count; ++i) {
+            if (embed_plugins[i] && embed_plugins[i]->metadata.name) {
+                LOGi("  EMBED plugin[%zu]: %s (priority=%d)", i,
+                     embed_plugins[i]->metadata.name,
+                     embed_plugins[i]->metadata.priority);
+            }
+        }
+        // Verify the embedding model file is reachable from native code.
+        // The Kotlin layer resolves a directory like
+        //   .../models/embedding/all-minilm-l6-v2 -> .../model.onnx
+        // but if the resolved path doesn't exist on disk, ONNX session load
+        // fails and the pipeline never initializes.
+        FILE* f = fopen(embPath, "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            fclose(f);
+            LOGi("nativeCreatePipeline: embPath stat ok (size=%ld bytes)", sz);
+        } else {
+            LOGe("nativeCreatePipeline: embPath NOT readable: %s (errno=%d)", embPath, errno);
+        }
+    }
 
     rac_rag_config_t config = rac_rag_config_default();
     config.embedding_model_path = embPath;

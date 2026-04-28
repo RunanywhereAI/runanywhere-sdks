@@ -52,8 +52,11 @@ class DartBridgeEvents {
       _isRegistered = true;
       _logger.debug('Events callback registered');
     } catch (e) {
-      _logger.debug('Events registration not available: $e');
-      _isRegistered = true; // Mark as registered to avoid retry
+      // librac_commons.so may not export rac_events_register_callback in
+      // some configurations (B-FL-1-002). Log at warning so it's visible
+      // in non-debug builds, then mark as registered so we never retry.
+      _logger.warning('Events registration not available: $e');
+      _isRegistered = true;
     }
   }
 

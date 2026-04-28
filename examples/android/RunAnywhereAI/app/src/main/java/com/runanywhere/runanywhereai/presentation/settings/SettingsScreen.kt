@@ -146,7 +146,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
         // 2. Generation Settings Section
         SettingsSection(title = "Generation Settings", icon = null) {
-            // Temperature Slider
+            // Temperature Slider + editable TextField (B-AK-18-001).
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -157,10 +157,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         text = "Temperature",
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Text(
-                        text = String.format("%.1f", uiState.temperature),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    OutlinedTextField(
+                        value = String.format("%.1f", uiState.temperature),
+                        onValueChange = { input ->
+                            input.toFloatOrNull()?.coerceIn(0f, 2f)?.let {
+                                viewModel.updateTemperature(it)
+                            }
+                        },
+                        modifier = Modifier.width(80.dp),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 Slider(
@@ -175,7 +181,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
-            // Max Tokens Slider
+            // Max Tokens Slider + editable TextField (B-AK-18-001).
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -186,10 +192,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                         text = "Max Tokens",
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Text(
-                        text = uiState.maxTokens.toString(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    OutlinedTextField(
+                        value = uiState.maxTokens.toString(),
+                        onValueChange = { input ->
+                            input.toIntOrNull()?.coerceIn(50, 4096)?.let {
+                                viewModel.updateMaxTokens(it)
+                            }
+                        },
+                        modifier = Modifier.width(96.dp),
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 Slider(
@@ -798,10 +810,15 @@ fun ToolSettingsSection() {
 
     SettingsSection(title = "Tool Calling") {
         // Enable/Disable Toggle
+        // B-AK-7-002: wrap the entire row in `clickable` so taps anywhere on
+        // the label (not just the small switch hit-area) flip the toggle.
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .clickable {
+                        toolViewModel.setToolCallingEnabled(!toolState.toolCallingEnabled)
+                    }
                     .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,

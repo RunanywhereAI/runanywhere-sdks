@@ -28,12 +28,12 @@
  */
 
 import { LLM as NitroLLM } from '../generated/NitroLLMSpec';
-import type { LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
-import { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import type { LLMGenerateRequest } from '@runanywhere/proto-ts/dist/llm_service';
+import { LLMStreamEvent } from '@runanywhere/proto-ts/dist/llm_service';
 import {
   generateLLM,
   LLMStreamTransport,
-} from '@runanywhere/proto-ts/streams/llm_service_stream';
+} from '@runanywhere/proto-ts/dist/streams/llm_service_stream';
 
 /**
  * Adapter that exposes the C++ proto-byte LLM stream callback as a

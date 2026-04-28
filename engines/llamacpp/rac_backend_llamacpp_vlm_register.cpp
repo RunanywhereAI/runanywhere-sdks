@@ -18,6 +18,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 static const char* LOG_CAT = "VLM.LlamaCPP";
 
@@ -228,12 +229,22 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
         return result;
     }
 
-    // v3 Phase B2: plugin registration is the registry's job via
-    // rac_plugin_entry_llamacpp_vlm(). Module registration is the only
-    // remaining side-effect here (app-level capability discovery).
+    // Android-fix (same as LlamaCpp LLM register): also wire the unified
+    // plugin registry so `rac_plugin_route` finds VLM ops. Apple/iOS uses
+    // RAC_STATIC_PLUGIN_REGISTER; Android does neither path on its own.
+    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp_vlm(void);
+    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp_vlm();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp-vlm'");
+        }
+    }
+
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module_register only; "
-                          "plugin registration via rac_plugin_entry_llamacpp_vlm)");
+    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module + plugin)");
     return RAC_SUCCESS;
 }
 

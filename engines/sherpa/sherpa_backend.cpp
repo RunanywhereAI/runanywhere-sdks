@@ -135,25 +135,62 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
             return false;
         }
 
+        // Iteration order from readdir() is filesystem-dependent. To make
+        // model discovery deterministic across devices/extractions, we
+        // remember candidates separately and pick the preferred variant
+        // after the scan. Concretely: when both `*-encoder.onnx` and
+        // `*-encoder.int8.onnx` (quantized) exist (which is the case for
+        // Sherpa-ONNX Whisper archives like `sherpa-onnx-whisper-tiny.en`
+        // that ship `tiny.en-encoder.onnx` AND `tiny.en-encoder.int8.onnx`),
+        // we prefer the int8 variant because it is what Sherpa-ONNX
+        // recommends for on-device inference (smaller, faster, identical
+        // accuracy on Whisper-tiny) and matches what the Voice Assistant
+        // path (AK-15) successfully loads. Without this preference, the
+        // standalone STT path (AK-11/AK-12) sometimes ended up with the
+        // fp32 encoder paired against an int8 decoder (or vice versa) and
+        // SherpaOnnxCreateOfflineRecognizer rejected the mismatched pair
+        // → -111 RAC_ERROR_MODEL_LOAD_FAILED within ~5 ms.
+        std::string encoder_fp32, encoder_int8;
+        std::string decoder_fp32, decoder_int8;
+
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
             std::string filename = entry->d_name;
+            if (filename == "." || filename == "..")
+                continue;
             std::string full_path = model_path + "/" + filename;
 
-            if (filename.find("encoder") != std::string::npos && filename.size() > 5 &&
-                filename.substr(filename.size() - 5) == ".onnx") {
-                encoder_path = full_path;
-                RAC_LOG_DEBUG("Sherpa.STT", "Found encoder: %s", encoder_path.c_str());
-            } else if (filename.find("decoder") != std::string::npos && filename.size() > 5 &&
-                       filename.substr(filename.size() - 5) == ".onnx") {
-                decoder_path = full_path;
-                RAC_LOG_DEBUG("Sherpa.STT", "Found decoder: %s", decoder_path.c_str());
+            // Match *.onnx files containing "encoder" / "decoder" as a
+            // substring (handles the `tiny.en-encoder.onnx` /
+            // `tiny.en-encoder.int8.onnx` prefixed naming Sherpa-ONNX uses
+            // upstream). Splitting fp32/int8 makes the pairing decision
+            // explicit instead of relying on directory-iteration order.
+            bool is_onnx = filename.size() > 5 &&
+                           filename.substr(filename.size() - 5) == ".onnx";
+            bool is_int8 = filename.find(".int8.onnx") != std::string::npos;
+
+            if (is_onnx && filename.find("encoder") != std::string::npos) {
+                if (is_int8) {
+                    encoder_int8 = full_path;
+                } else {
+                    encoder_fp32 = full_path;
+                }
+                RAC_LOG_DEBUG("Sherpa.STT", "Found encoder candidate: %s",
+                              full_path.c_str());
+            } else if (is_onnx && filename.find("decoder") != std::string::npos) {
+                if (is_int8) {
+                    decoder_int8 = full_path;
+                } else {
+                    decoder_fp32 = full_path;
+                }
+                RAC_LOG_DEBUG("Sherpa.STT", "Found decoder candidate: %s",
+                              full_path.c_str());
             } else if (filename == "tokens.txt" || (filename.find("tokens") != std::string::npos &&
                                                     filename.find(".txt") != std::string::npos)) {
                 tokens_path = full_path;
                 RAC_LOG_DEBUG("Sherpa.STT", "Found tokens: %s", tokens_path.c_str());
             } else if ((filename == "model.int8.onnx" || filename == "model.onnx") &&
-                       encoder_path.empty()) {
+                       encoder_fp32.empty() && encoder_int8.empty()) {
                 // Single-file model (NeMo CTC, etc.) - prefer int8 if both exist
                 if (filename == "model.int8.onnx" || nemo_ctc_model_path.empty()) {
                     nemo_ctc_model_path = full_path;
@@ -163,6 +200,21 @@ bool SherpaSTT::load_model(const std::string& model_path, STTModelType model_typ
             }
         }
         closedir(dir);
+
+        // Pair selection: prefer matching int8 pair (encoder + decoder both
+        // quantized). Fall back to fp32 pair, then to whichever side exists.
+        // We deliberately avoid mixing fp32 encoder with int8 decoder because
+        // Sherpa-ONNX requires the pair to come from the same export.
+        if (!encoder_int8.empty() && !decoder_int8.empty()) {
+            encoder_path = encoder_int8;
+            decoder_path = decoder_int8;
+        } else if (!encoder_fp32.empty() && !decoder_fp32.empty()) {
+            encoder_path = encoder_fp32;
+            decoder_path = decoder_fp32;
+        } else {
+            encoder_path = !encoder_int8.empty() ? encoder_int8 : encoder_fp32;
+            decoder_path = !decoder_int8.empty() ? decoder_int8 : decoder_fp32;
+        }
 
         if (encoder_path.empty()) {
             std::string test_path = model_path + "/encoder.onnx";

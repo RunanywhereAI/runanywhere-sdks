@@ -37,7 +37,11 @@ class DartBridgePlatformServices {
       _isRegistered = true;
       _logger.debug('Platform services registered');
     } catch (e) {
-      _logger.debug('Platform services registration not available: $e');
+      // librac_commons.so may not export
+      // rac_platform_services_register_availability_callback in some
+      // configurations (B-FL-1-002). Log at warning so it's visible in
+      // non-debug builds, then mark as registered to avoid retry.
+      _logger.warning('Platform services registration not available: $e');
       _isRegistered = true;
     }
   }

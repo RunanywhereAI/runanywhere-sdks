@@ -245,6 +245,64 @@ export class LlamaCppBridge {
     }
   }
 
+  /**
+   * Switch the acceleration mode by tearing down the current WASM module and
+   * re-loading the variant for the requested mode. Keeps the singleton
+   * instance so that callers holding a reference to `LlamaCppBridge.shared`
+   * (e.g. ExtensionPoint, telemetry) keep working — only the underlying
+   * Emscripten module is replaced.
+   *
+   * Used by Qwen models that crash on WebGPU due to a llama.cpp Flash
+   * Attention cross-backend issue (see B-WEB-4-001). The CPU build does
+   * not auto-disable FA at load time and runs Qwen correctly.
+   *
+   * No-op if the bridge is already in the requested mode.
+   */
+  async switchToAcceleration(mode: 'webgpu' | 'cpu'): Promise<void> {
+    if (this._accelerationMode === mode && this._loaded) return;
+
+    if (this._loading) {
+      await this._loading;
+      if (this._accelerationMode === mode) return;
+    }
+
+    logger.info(`Switching LlamaCpp acceleration mode: ${this._accelerationMode} → ${mode}`);
+
+    // Tear down the current WASM module while keeping the singleton wrapper.
+    if (this._analyticsEventsBridge) {
+      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
+      this._analyticsEventsBridge = null;
+    }
+    if (this._telemetryService) {
+      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
+      this._telemetryService = null;
+    }
+    if (this._module && this._loaded) {
+      try { this._module._rac_shutdown(); } catch { /* ignore */ }
+    }
+    if (this._platformAdapter) {
+      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      this._platformAdapter = null;
+    }
+
+    HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    clearRunanywhereModule();
+
+    this._module = null;
+    this._loaded = false;
+    this._loading = null;
+    this._accelerationMode = 'cpu';
+
+    // Re-load with the explicit acceleration mode (no auto-detect / no fallback).
+    this._loading = this._doLoad(mode);
+    try {
+      await this._loading;
+    } finally {
+      this._loading = null;
+    }
+  }
+
   private async _doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     logger.info('Loading LlamaCpp WASM module...');
 
@@ -261,11 +319,14 @@ export class LlamaCppBridge {
 
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
 
-      // Persist the resolved URL so VLMWorkerBridge (and others) can read it
+      // Persist the resolved URL so VLMWorkerBridge (and others) can read it.
+      // Keep WebGPU and CPU URLs separate so a CPU fallback after a WebGPU
+      // failure does not reuse the WebGPU glue URL.
       if (useWebGPU) {
         this.webgpuWasmUrl = moduleUrl;
+      } else {
+        this.wasmUrl = moduleUrl;
       }
-      this.wasmUrl = moduleUrl;
 
       // Dynamic import of Emscripten glue JS
       const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);

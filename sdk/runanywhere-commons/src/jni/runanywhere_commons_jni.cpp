@@ -5503,7 +5503,7 @@ void va_stream_trampoline(const uint8_t* event_bytes,
 }  // namespace
 
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeRegisterCallback(
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeRegisterCallback(
     JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
     if (!kotlinCallback || handle == 0) {
         return 0;  // INVALID_CALLBACK_ID on the Kotlin side
@@ -5549,7 +5549,7 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeRegisterCallback
 }
 
 JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_nativeUnregisterCallback(
+Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeUnregisterCallback(
     JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
     if (callbackId == 0) return;
 
@@ -5625,7 +5625,7 @@ void llm_stream_trampoline(const uint8_t* event_bytes,
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeRegisterCallback(
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegisterCallback(
     JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
     if (!kotlinCallback || handle == 0) {
         return 0;
@@ -5669,7 +5669,7 @@ Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeRegisterCallback(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_nativeUnregisterCallback(
+Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeUnregisterCallback(
     JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
     if (callbackId == 0) return;
 
@@ -5887,12 +5887,20 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpDownloadExecute(
     jlong resumeFromByte, jint timeoutMs, jobject listener, jintArray outHttpStatus) {
 
     if (!urlStr || !destPathStr) {
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_dl_jni",
+                            "INVALID_URL early-return: urlStr=%p destPathStr=%p",
+                            static_cast<const void*>(urlStr),
+                            static_cast<const void*>(destPathStr));
         return static_cast<jint>(RAC_HTTP_DL_INVALID_URL);
     }
 
     const char* url = env->GetStringUTFChars(urlStr, nullptr);
     const char* dest = env->GetStringUTFChars(destPathStr, nullptr);
     const char* sha = expectedShaStr ? env->GetStringUTFChars(expectedShaStr, nullptr) : nullptr;
+    __android_log_print(ANDROID_LOG_INFO, "rac_http_dl_jni",
+                        "Starting download: url=[%s] dest=[%s] timeoutMs=%d",
+                        url ? url : "(null)", dest ? dest : "(null)",
+                        static_cast<int>(timeoutMs));
 
     rac_http_download_request_t req{};
     req.url = url;

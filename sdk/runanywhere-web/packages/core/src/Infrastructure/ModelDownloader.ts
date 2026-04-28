@@ -261,14 +261,16 @@ export class ModelDownloader {
     validateModelUrl(url);
 
     const http = HTTPAdapter.tryDefault();
-    if (http) {
+    const isHttps = url.startsWith('https://');
+    if (http && !isHttps) {
       return this.downloadFileViaWasm(http, url, onProgress);
     }
 
     // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: pure-core callers can download before a backend loads.
+    // Web also bypasses WASM curl for HTTPS because the libcurl WASM build lacks HTTPS support; fetch() handles TLS via the browser.
     const controller = cancelGroup ? this.registerAbortController(cancelGroup) : null;
     try {
-      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered.
+      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered, or HTTPS without WASM TLS.
       if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
 
       const total = Number(response.headers.get('content-length') || 0);
@@ -348,14 +350,16 @@ export class ModelDownloader {
     validateModelUrl(url);
 
     const http = HTTPAdapter.tryDefault();
-    if (http) {
+    const isHttps = url.startsWith('https://');
+    if (http && !isHttps) {
       return this.streamViaWasm(http, url, storageKey, onProgress);
     }
 
     // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: pure-core callers can stream before a backend loads.
+    // Web also bypasses WASM curl for HTTPS because the libcurl WASM build lacks HTTPS support; fetch() handles TLS via the browser.
     const controller = cancelGroup ? this.registerAbortController(cancelGroup) : null;
     try {
-      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered.
+      const response = await fetch(url, { signal: controller?.signal }); // fetch() carve-out: fallback when no WASM module registered, or HTTPS without WASM TLS.
       if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
       if (!response.body) return null;
 

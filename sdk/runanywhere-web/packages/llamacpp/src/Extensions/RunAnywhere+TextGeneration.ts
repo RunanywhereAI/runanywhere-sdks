@@ -33,8 +33,20 @@ import type {
   ModelLoadContext, HardwareAcceleration, EmscriptenRunanywhereModule,
 } from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
-import { Offsets } from '../Foundation/LlamaCppOffsets';
+import { Offsets, resetOffsets, loadOffsets } from '../Foundation/LlamaCppOffsets';
 import type { LLMGenerationOptions, LLMGenerationResult, LLMStreamingResult } from '@runanywhere/web';
+
+/**
+ * FA cross-backend bug — these architectures emit "Flash Attention was auto,
+ * set to disabled" at load time on the WebGPU build and crash after
+ * build_prompt() in rac_llm_component_generate_stream. llama.cpp auto-disables
+ * Flash Attention at load when the FA tensor lands on CPU while layer 0 is on
+ * WebGPU, but the WebGPU backend still tries to use the FA path at decode
+ * time. The CPU WASM build does not have this cross-backend issue.
+ * Force CPU build for these. SmolLM2 stays on WebGPU because it doesn't
+ * trigger FA. (B-WEB-4-001)
+ */
+const FA_AFFECTED_MODEL_PATTERN = /^(qwen|lfm2)/i;
 
 const logger = new SDKLogger('TextGeneration');
 
@@ -89,6 +101,27 @@ class TextGenerationImpl {
    */
   async loadModelFromData(ctx: ModelLoadContext): Promise<void> {
     const bridge = this.requireBridge();
+
+    // FA-affected models (Qwen, LFM2, ...) crash on WebGPU due to a llama.cpp
+    // FA cross-backend bug (B-WEB-4-001). Force the CPU WASM build before
+    // loading the model. The CPU build is fully functional and doesn't suffer
+    // from the FA disable-at-load / use-at-decode mismatch. SmolLM2 stays on
+    // WebGPU because it doesn't trigger the FA auto-disable at load time.
+    if (FA_AFFECTED_MODEL_PATTERN.test(ctx.model.id) && bridge.accelerationMode === 'webgpu') {
+      logger.info(
+        `FA-affected model detected (${ctx.model.id}) — switching bridge to CPU WASM ` +
+        '(WebGPU FA cross-backend bug, see B-WEB-4-001)',
+      );
+      // Drop any cached LLM component handle from the old WASM module.
+      this._llmComponentHandle = 0;
+      this._mountedPath = null;
+      // Tear down old offsets so they get re-read from the new WASM module.
+      resetOffsets();
+      await bridge.switchToAcceleration('cpu');
+      // Re-populate offsets cache against the new module.
+      loadOffsets();
+    }
+
     let modelPath: string | null = null;
     let isMounted = false;
 

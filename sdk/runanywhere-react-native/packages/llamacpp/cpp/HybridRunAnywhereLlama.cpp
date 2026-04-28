@@ -334,25 +334,55 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereLlama::generateStream(
     std::string fullResponse;
     std::string streamError;
 
-    LLMStreamCallbacks streamCallbacks;
-    streamCallbacks.onToken = [&callback, &fullResponse](const std::string& token) -> bool {
-      fullResponse += token;
+    // B-RN-4-001 fix: batch per-token callbacks before crossing the Nitro JS
+    // bridge. The JS event-loop / turbo-module dispatcher drops high-frequency
+    // callbacks fired from a worker thread (LLM emits 30-100 tokens/s while
+    // the bridge round-trip is ~10 ms). By coalescing tokens within a 50 ms
+    // window we cut the bridge call rate by 5-10x while keeping perceived
+    // streaming smooth (5-10 visible UI updates per second).
+    constexpr int kBatchFlushMs = 50;
+    std::string batchBuffer;
+    std::chrono::steady_clock::time_point lastFlush =
+        std::chrono::steady_clock::now();
+
+    auto flushBatch = [&callback, &batchBuffer]() {
+      if (batchBuffer.empty()) return;
       if (callback) {
-        callback(token, false);
+        callback(batchBuffer, false);
+      }
+      batchBuffer.clear();
+    };
+
+    LLMStreamCallbacks streamCallbacks;
+    streamCallbacks.onToken = [&](const std::string& token) -> bool {
+      fullResponse += token;
+      batchBuffer += token;
+      auto now = std::chrono::steady_clock::now();
+      if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastFlush)
+              .count() >= kBatchFlushMs) {
+        flushBatch();
+        lastFlush = now;
       }
       return true;
     };
-    streamCallbacks.onComplete = [&callback](const std::string&, int, double) {
+    streamCallbacks.onComplete = [&](const std::string&, int, double) {
+      flushBatch();  // emit any pending tokens before terminator
       if (callback) {
         callback("", true);
       }
     };
-    streamCallbacks.onError = [this, &streamError](int code, const std::string& message) {
+    streamCallbacks.onError = [this, &streamError, &flushBatch](int code,
+                                                                const std::string& message) {
+      flushBatch();
       setLastError(message);
       streamError = message;
     };
 
     LLMBridge::shared().generateStream(prompt, options, streamCallbacks);
+
+    // Defensive flush in case the native runner returned without firing
+    // onComplete or onError (e.g. cancellation).
+    flushBatch();
 
     if (!streamError.empty()) {
       throw std::runtime_error("LLMBridge: Stream generation failed: " + streamError);

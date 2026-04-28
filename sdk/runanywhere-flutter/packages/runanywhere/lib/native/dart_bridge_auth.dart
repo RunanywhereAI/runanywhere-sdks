@@ -449,11 +449,23 @@ class DartBridgeAuth {
   // ============================================================================
 
   /// Build authenticate request JSON via C++
+  ///
+  /// Populates all 6 fields of `rac_sdk_config_t` to match the C ABI exactly.
+  /// Previously only 3 fields were populated, causing C to read wild memory
+  /// at offsets 16-47 and segfault in `rac_auth_request_to_json`.
   String? _buildAuthenticateRequestJSON({
     required String apiKey,
     required String deviceId,
     String? buildToken,
   }) {
+    final platformPtr =
+        (Platform.isAndroid ? 'android' : 'ios').toNativeUtf8();
+    final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
+    final apiKeyPtr = apiKey.toNativeUtf8();
+    final deviceIdPtr = deviceId.toNativeUtf8();
+    final baseUrlPtr =
+        (_baseURL ?? _getDefaultBaseURL()).toNativeUtf8();
+
     try {
       final lib = PlatformLoader.loadCommons();
       final buildRequest = lib.lookupFunction<
@@ -462,14 +474,13 @@ class DartBridgeAuth {
               Pointer<RacSdkConfigStruct>)>('rac_auth_build_authenticate_request');
 
       final config = calloc<RacSdkConfigStruct>();
-      final apiKeyPtr = apiKey.toNativeUtf8();
-      final deviceIdPtr = deviceId.toNativeUtf8();
-      final buildTokenPtr = buildToken?.toNativeUtf8() ?? nullptr;
-
       try {
+        config.ref.environment = _environment.index;
         config.ref.apiKey = apiKeyPtr;
+        config.ref.baseUrl = baseUrlPtr;
         config.ref.deviceId = deviceIdPtr;
-        config.ref.buildToken = buildTokenPtr.cast<Utf8>();
+        config.ref.platform = platformPtr;
+        config.ref.sdkVersion = sdkVersionPtr;
 
         final result = buildRequest(config);
         if (result == nullptr) return null;
@@ -483,9 +494,6 @@ class DartBridgeAuth {
 
         return json;
       } finally {
-        calloc.free(apiKeyPtr);
-        calloc.free(deviceIdPtr);
-        if (buildTokenPtr != nullptr) calloc.free(buildTokenPtr);
         calloc.free(config);
       }
     } catch (e) {
@@ -501,6 +509,12 @@ class DartBridgeAuth {
       };
       _logger.debug('Auth request JSON: $json');
       return jsonEncode(json);
+    } finally {
+      calloc.free(apiKeyPtr);
+      calloc.free(deviceIdPtr);
+      calloc.free(baseUrlPtr);
+      calloc.free(platformPtr);
+      calloc.free(sdkVersionPtr);
     }
   }
 
@@ -905,11 +919,33 @@ base class RacSecureStorageCallbacksStruct extends Struct {
   external Pointer<Void> context;
 }
 
-/// SDK config struct for auth requests
+/// SDK config struct for auth requests.
+///
+/// MUST exactly match the C ABI defined in
+/// `sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h`:
+///
+/// ```c
+/// typedef struct {
+///     rac_environment_t environment;  // int32 (rac_environment_t is enum)
+///     const char* api_key;
+///     const char* base_url;
+///     const char* device_id;
+///     const char* platform;
+///     const char* sdk_version;
+/// } rac_sdk_config_t;
+/// ```
+///
+/// Previous 3-field layout (apiKey/deviceId/buildToken) caused the C side
+/// to read wild memory at offsets 16-47, segfaulting in
+/// `rac_auth_request_to_json` -> `json_escape_string`.
 base class RacSdkConfigStruct extends Struct {
+  @Int32()
+  external int environment;
   external Pointer<Utf8> apiKey;
+  external Pointer<Utf8> baseUrl;
   external Pointer<Utf8> deviceId;
-  external Pointer<Utf8> buildToken;
+  external Pointer<Utf8> platform;
+  external Pointer<Utf8> sdkVersion;
 }
 
 // =============================================================================

@@ -21,8 +21,10 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.generateStream
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Thread-safe tool registry for tool registration and lookup.
@@ -358,11 +360,18 @@ object RunAnywhereToolCalling {
         val eventFlow = RunAnywhere.generateStream(prompt, genOptions)
 
         val responseText = StringBuilder()
-        eventFlow.collect { event ->
-            if (event.token.isNotEmpty()) responseText.append(event.token)
-            if (event.is_final && event.error_message.isNotEmpty()) {
-                throw com.runanywhere.sdk.foundation.errors.SDKError.llm(event.error_message)
-            }
+        // B-AK-7-002: bound the collect with a timeout so a missing is_final never hangs the UI.
+        withTimeoutOrNull(60_000L) {
+            eventFlow
+                .takeWhile { !it.is_final }
+                .collect { event ->
+                    if (event.token.isNotEmpty()) {
+                        responseText.append(event.token)
+                    }
+                    if (event.is_final && event.error_message.isNotEmpty()) {
+                        throw com.runanywhere.sdk.foundation.errors.SDKError.llm(event.error_message)
+                    }
+                }
         }
 
         return responseText.toString()

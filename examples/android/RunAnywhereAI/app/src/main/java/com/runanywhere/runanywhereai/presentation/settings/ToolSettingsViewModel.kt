@@ -178,7 +178,12 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                     },
                 )
 
-                Timber.i("✅ Demo tools registered")
+                // B-AK-7-001: emit a single, easy-to-grep observability log
+                // line so QA can confirm the demo tools landed without
+                // scraping individual register lines.
+                val tools = RunAnywhereToolCalling.getRegisteredTools()
+                android.util.Log.i("ToolRegistry", "Registered ${tools.size} demo tools")
+                Timber.i("✅ Demo tools registered (count=${tools.size})")
                 refreshRegisteredTools()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to register demo tools")

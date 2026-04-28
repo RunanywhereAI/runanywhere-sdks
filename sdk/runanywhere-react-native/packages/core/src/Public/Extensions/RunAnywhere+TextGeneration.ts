@@ -21,8 +21,6 @@ import type {
   LLMStreamingResult,
   LLMGenerationResult,
 } from '../../types/LLMTypes';
-import { LLMStreamAdapter } from '../../Adapters/LLMStreamAdapter';
-import type { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
@@ -158,11 +156,16 @@ export async function generate(
  *
  * Matches Swift SDK: RunAnywhere.generateStream(_:options:)
  *
- * v2 close-out / GAP 09: events flow through `LLMStreamAdapter`
- *   C-callback → proto bytes → `LLMStreamEvent` → token string
- * The struct-callback arg passed to `native.generateStream(...)` is a
- * no-op driver — we consume tokens via the adapter's proto subscription
- * and only need the underlying call to keep the C++ engine loop alive.
+ * Wire-up: tokens are pushed by C++ via the struct-callback
+ * `(token: string, isComplete: boolean) => void` passed to
+ * `native.generateStream(...)`. The callback batches at ~50 ms inside
+ * `HybridRunAnywhereLlama.cpp` and emits a terminal call with
+ * `isComplete = true`. We adopt the same single-channel pattern as the
+ * VLM streaming path (`RunAnywhere+VLM.ts::processImageStream`) — no
+ * separate proto-byte channel, no `LLMStreamAdapter`. This fixes
+ * B-RN-4-001 where the LLM `LLMStreamAdapter`/`subscribeProtoEvents`
+ * channel never delivered tokens, leaving awaiters hung even though
+ * C++ generation completed.
  *
  * Example usage:
  * ```typescript
@@ -191,27 +194,13 @@ export async function generateStream(
   let firstTokenTime: number | null = null;
   let fullText = '';
   let tokenCount = 0;
+  let cancelled = false;
 
   const optionsJson = JSON.stringify({
     max_tokens: options?.maxTokens ?? 1000,
     temperature: options?.temperature ?? 0.7,
     system_prompt: options?.systemPrompt ?? null,
   });
-
-  // Subscribe BEFORE driving the engine so we never miss early tokens
-  // emitted synchronously from inside the native generate call.
-  const handle = await native.getLLMHandle();
-  const eventIterator = new LLMStreamAdapter(handle)
-    .stream({
-      prompt,
-      maxTokens: options?.maxTokens ?? 1000,
-      temperature: options?.temperature ?? 0.7,
-      topP: 0,
-      topK: 0,
-      systemPrompt: options?.systemPrompt ?? '',
-      emitThoughts: false,
-    })
-    [Symbol.asyncIterator]();
 
   let resolveResult!: (result: LLMGenerationResult) => void;
   let rejectResult!: (error: Error) => void;
@@ -220,68 +209,99 @@ export async function generateStream(
     rejectResult = reject;
   });
 
-  // Drive the C++ engine loop. Tokens are delivered to `eventIterator`
-  // via the adapter's proto-byte callback; the struct-callback is a
-  // no-op because we consume events via the adapter, not per-token.
-  native
-    .generateStream(prompt, optionsJson, () => {
-      /* events delivered via LLMStreamAdapter */
-    })
-    .catch((err: Error) => {
-      rejectResult(err);
-      EventBus.publish('Generation', { type: 'failed', error: err.message });
-      void eventIterator.return?.();
+  // Producer/consumer queue fed by the C++ struct-callback. When a token
+  // arrives we either hand it directly to a pending awaiter or buffer it.
+  const tokenQueue: string[] = [];
+  let resolver: ((value: IteratorResult<string>) => void) | null = null;
+  let done = false;
+  let error: Error | null = null;
+
+  const finalizeResult = (): void => {
+    const latencyMs = Date.now() - startTime;
+    const tokensPerSecond =
+      latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0;
+    resolveResult({
+      text: fullText,
+      thinkingContent: undefined,
+      inputTokens: Math.ceil(prompt.length / 4),
+      tokensUsed: tokenCount,
+      modelUsed: 'unknown',
+      latencyMs,
+      framework: 'unknown', // Backend-agnostic
+      tokensPerSecond,
+      timeToFirstTokenMs:
+        firstTokenTime !== null ? firstTokenTime - startTime : undefined,
+      thinkingTokens: 0,
+      responseTokens: tokenCount,
     });
+    EventBus.publish('Generation', { type: 'completed' });
+  };
 
-  async function* tokenGenerator(): AsyncGenerator<string> {
-    try {
-      while (true) {
-        const next = await eventIterator.next();
-        if (next.done) break;
-        const event: LLMStreamEvent = next.value;
+  // Drive the C++ engine. Tokens flow through the struct-callback —
+  // this is the same pattern used by VLM streaming (RN-14 confirmed).
+  native
+    .generateStream(prompt, optionsJson, (token: string, isComplete: boolean) => {
+      if (cancelled) return;
 
-        if (event.token) {
-          if (firstTokenTime === null) firstTokenTime = Date.now();
-          fullText += event.token;
-          tokenCount++;
-          yield event.token;
-        }
+      if (token) {
+        if (firstTokenTime === null) firstTokenTime = Date.now();
+        fullText += token;
+        tokenCount++;
 
-        if (event.isFinal) {
-          if (event.errorMessage) {
-            const err = new Error(event.errorMessage);
-            rejectResult(err);
-            EventBus.publish('Generation', { type: 'failed', error: err.message });
-            throw err;
-          }
-          break;
+        if (resolver) {
+          resolver({ value: token, done: false });
+          resolver = null;
+        } else {
+          tokenQueue.push(token);
         }
       }
 
-      const latencyMs = Date.now() - startTime;
-      resolveResult({
-        text: fullText,
-        thinkingContent: undefined,
-        inputTokens: Math.ceil(prompt.length / 4),
-        tokensUsed: tokenCount,
-        modelUsed: 'unknown',
-        latencyMs,
-        framework: 'unknown', // Backend-agnostic
-        tokensPerSecond: latencyMs > 0 ? (tokenCount / latencyMs) * 1000 : 0,
-        timeToFirstTokenMs:
-          firstTokenTime !== null ? firstTokenTime - startTime : undefined,
-        thinkingTokens: 0,
-        responseTokens: tokenCount,
-      });
-      EventBus.publish('Generation', { type: 'completed' });
-    } finally {
-      await eventIterator.return?.();
+      if (isComplete) {
+        done = true;
+        finalizeResult();
+
+        if (resolver) {
+          resolver({ value: undefined as unknown as string, done: true });
+          resolver = null;
+        }
+      }
+    })
+    .catch((err: Error) => {
+      error = err;
+      done = true;
+      rejectResult(err);
+      EventBus.publish('Generation', { type: 'failed', error: err.message });
+      if (resolver) {
+        resolver({ value: undefined as unknown as string, done: true });
+        resolver = null;
+      }
+    });
+
+  async function* tokenGenerator(): AsyncGenerator<string> {
+    while (!done || tokenQueue.length > 0) {
+      if (tokenQueue.length > 0) {
+        yield tokenQueue.shift()!;
+      } else if (!done) {
+        const next = await new Promise<IteratorResult<string>>((resolve) => {
+          resolver = resolve;
+        });
+        if (next.done) break;
+        yield next.value;
+      }
+    }
+    if (error) {
+      throw error;
     }
   }
 
   const cancel = (): void => {
+    cancelled = true;
     cancelGeneration();
-    void eventIterator.return?.();
+    if (resolver) {
+      done = true;
+      resolver({ value: undefined as unknown as string, done: true });
+      resolver = null;
+    }
   };
 
   return {

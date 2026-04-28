@@ -9,6 +9,7 @@
 import type { TabLifecycle } from '../app';
 import { ModelManager, ModelCategory, type ModelInfo } from '../services/model-manager';
 import { showModelSelectionSheet } from '../components/model-selection';
+import { ConversationsStore, type Conversation } from '../services/conversations-store';
 import type { ToolValue } from '../../../../../sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+ToolCalling';
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,9 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
     <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-actions">
+        <button class="btn btn-icon" id="chat-history-btn" title="Conversation History">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
         <button class="btn btn-icon" id="chat-new-btn" title="New Chat">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         </button>
@@ -124,6 +128,23 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
         </div>
       </div>
     </div>
+
+    <!-- Conversation History Drawer -->
+    <div class="conv-drawer hidden" id="chat-conv-drawer">
+      <div class="conv-drawer-backdrop" id="chat-conv-drawer-backdrop"></div>
+      <aside class="conv-drawer-panel" role="dialog" aria-label="Conversation history">
+        <div class="conv-drawer-header">
+          <h3>Conversations</h3>
+          <button class="btn btn-icon" id="chat-conv-close" aria-label="Close conversations">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="conv-drawer-actions">
+          <button class="btn btn-primary" id="chat-conv-new">+ New Chat</button>
+        </div>
+        <ul class="conv-list" id="chat-conv-list"></ul>
+      </aside>
+    </div>
   `;
 
   // Build floating circles for overlay
@@ -150,7 +171,25 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
   container.querySelector('#chat-get-started-btn')!.addEventListener('click', openModelSheet);
   toolbarModelEl.addEventListener('click', openModelSheet);
   toolsToggleBtn.addEventListener('click', toggleTools);
-  container.querySelector('#chat-new-btn')!.addEventListener('click', clearChat);
+  container.querySelector('#chat-new-btn')!.addEventListener('click', () => startNewConversation());
+
+  // Conversation history drawer
+  container.querySelector('#chat-history-btn')!.addEventListener('click', openConversationDrawer);
+  container.querySelector('#chat-conv-close')!.addEventListener('click', closeConversationDrawer);
+  container.querySelector('#chat-conv-drawer-backdrop')!.addEventListener('click', closeConversationDrawer);
+  container.querySelector('#chat-conv-new')!.addEventListener('click', () => {
+    startNewConversation();
+    closeConversationDrawer();
+  });
+
+  ConversationsStore.onChange(renderConversationList);
+
+  // Restore current conversation if any
+  const current = ConversationsStore.getCurrent();
+  if (current) {
+    restoreConversation(current);
+  }
+  renderConversationList();
 
   // Populate initial suggestion chips
   renderSuggestions();
@@ -170,6 +209,110 @@ export function initChatTab(el: HTMLElement): TabLifecycle {
       }
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Conversation Drawer
+// ---------------------------------------------------------------------------
+
+function openConversationDrawer(): void {
+  container.querySelector('#chat-conv-drawer')!.classList.remove('hidden');
+}
+
+function closeConversationDrawer(): void {
+  container.querySelector('#chat-conv-drawer')!.classList.add('hidden');
+}
+
+function renderConversationList(): void {
+  const listEl = container.querySelector('#chat-conv-list') as HTMLElement | null;
+  if (!listEl) return;
+
+  const conversations = ConversationsStore.getConversations();
+  const currentId = ConversationsStore.getCurrent()?.id;
+
+  if (conversations.length === 0) {
+    listEl.innerHTML = `<li class="conv-empty">No conversations yet</li>`;
+    return;
+  }
+
+  listEl.innerHTML = conversations.map(c => `
+    <li class="conv-item ${c.id === currentId ? 'active' : ''}" data-id="${c.id}">
+      <button class="conv-item-main" data-id="${c.id}">
+        <div class="conv-item-title">${escapeHtml(c.title)}</div>
+        <div class="conv-item-meta">${c.messages.length} messages</div>
+      </button>
+      <button class="conv-item-delete btn btn-icon" data-id="${c.id}" aria-label="Delete">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+      </button>
+    </li>
+  `).join('');
+
+  listEl.querySelectorAll<HTMLElement>('.conv-item-main').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id!;
+      const conv = ConversationsStore.setCurrent(id);
+      if (conv) {
+        restoreConversation(conv);
+        closeConversationDrawer();
+      }
+    });
+  });
+  listEl.querySelectorAll<HTMLElement>('.conv-item-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.id!;
+      ConversationsStore.delete(id);
+      const newCurrent = ConversationsStore.getCurrent();
+      if (newCurrent) {
+        restoreConversation(newCurrent);
+      } else {
+        clearChatUi();
+      }
+    });
+  });
+}
+
+/** Restore on-screen chat from a stored conversation (no SDK calls). */
+function restoreConversation(conv: Conversation): void {
+  messages = conv.messages.map(m => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: m.timestamp,
+  }));
+  messagesEl.innerHTML = '';
+  for (const msg of messages) {
+    renderMessage(msg);
+  }
+  updateEmptyState();
+}
+
+function startNewConversation(): void {
+  ConversationsStore.create();
+  clearChatUi();
+}
+
+function clearChatUi(): void {
+  if (isGenerating && cancelGeneration) {
+    cancelGeneration();
+    cancelGeneration = null;
+  }
+  isGenerating = false;
+  messages = [];
+  messagesEl.innerHTML = `
+    <div class="chat-empty-state" id="chat-empty-state">
+      <div class="empty-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <h3>Start a conversation</h3>
+      <p>Type a message below to get started</p>
+      <div class="suggestion-chips" id="chat-suggestions"></div>
+    </div>
+  `;
+  renderSuggestions();
+  inputEl.value = '';
+  onInputChange();
+  hideTypingIndicator();
 }
 
 // ---------------------------------------------------------------------------
@@ -417,30 +560,6 @@ function renderSuggestions(): void {
   });
 }
 
-/** Clear all messages and reset to empty state. */
-function clearChat(): void {
-  if (isGenerating && cancelGeneration) {
-    cancelGeneration();
-    cancelGeneration = null;
-  }
-  isGenerating = false;
-  messages = [];
-  messagesEl.innerHTML = `
-    <div class="chat-empty-state" id="chat-empty-state">
-      <div class="empty-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      </div>
-      <h3>Start a conversation</h3>
-      <p>Type a message below to get started</p>
-      <div class="suggestion-chips" id="chat-suggestions"></div>
-    </div>
-  `;
-  renderSuggestions();
-  inputEl.value = '';
-  onInputChange();
-  hideTypingIndicator();
-  console.log('[Chat] Conversation cleared');
-}
 
 // ---------------------------------------------------------------------------
 // Input Handling
@@ -479,6 +598,12 @@ async function sendMessage(): Promise<void> {
     timestamp: Date.now(),
   };
   messages.push(userMsg);
+  ConversationsStore.appendMessage({
+    id: userMsg.id,
+    role: 'user',
+    content: userMsg.content,
+    timestamp: userMsg.timestamp,
+  });
   updateEmptyState();
   renderMessage(userMsg);
   inputEl.value = '';
@@ -544,6 +669,12 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     modelId: loaded.id,
   };
   messages.push(assistantMsg);
+  ConversationsStore.appendMessage({
+    id: assistantMsg.id,
+    role: 'assistant',
+    content: '',
+    timestamp: assistantMsg.timestamp,
+  });
   const { bubbleEl, rowEl } = renderStreamingBubble(assistantMsg);
 
   for await (const token of stream) {
@@ -553,6 +684,7 @@ async function sendStreaming(text: string, loaded: ModelInfo): Promise<void> {
     await new Promise(r => setTimeout(r, 12));
   }
   cancelGeneration = null;
+  ConversationsStore.updateLastAssistantContent(assistantMsg.content);
 
   const finalResult = await resultPromise;
   console.log(
@@ -622,6 +754,12 @@ async function sendWithToolCalling(text: string, loaded: ModelInfo): Promise<voi
     toolCalls: toolCallInfos.length > 0 ? toolCallInfos : undefined,
   };
   messages.push(assistantMsg);
+  ConversationsStore.appendMessage({
+    id: assistantMsg.id,
+    role: 'assistant',
+    content: assistantMsg.content,
+    timestamp: assistantMsg.timestamp,
+  });
   renderMessage(assistantMsg);
 }
 

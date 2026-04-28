@@ -1889,6 +1889,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/core@workspace:packages/core"
   dependencies:
+    "@runanywhere/proto-ts": "file:../../../runanywhere-proto-ts"
     "@types/jest": ^29.5.12
     "@types/react": ~19.1.0
     jest: ^29.7.0
@@ -1944,6 +1945,16 @@ __metadata:
     react-native-nitro-modules: ">=0.31.3"
   languageName: unknown
   linkType: soft
+
+"@runanywhere/proto-ts@file:../../../runanywhere-proto-ts::locator=%40runanywhere%2Fcore%40workspace%3Apackages%2Fcore":
+  version: 0.19.13
+  resolution: "@runanywhere/proto-ts@file:../../../runanywhere-proto-ts#../../../runanywhere-proto-ts::hash=24a6c6&locator=%40runanywhere%2Fcore%40workspace%3Apackages%2Fcore"
+  dependencies:
+    long: ^5.2.3
+    protobufjs: ^7.2.6
+  checksum: 8f990b8d8e1f65d2e29a15fd555ba5a59c3cbabde5e409312f2af9be2449899ef9abda7effd8be21861949c2dfa013723a4ccf55117f96e54b6c3d0faee40c60
+  languageName: node
+  linkType: hard
 
 "@sigstore/bundle@npm:^2.3.2":
   version: 2.3.2

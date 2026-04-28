@@ -35,6 +35,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -118,6 +119,9 @@ const formatBytes = (bytes: number): string => {
 };
 
 export const SettingsScreen: React.FC = () => {
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
+
   // Settings state
   // NOTE: several state hooks below are intentionally retained for upcoming
   // settings UI (routing policy, capability flags, etc.). Prefixed with `_`
@@ -762,20 +766,16 @@ export const SettingsScreen: React.FC = () => {
       disabled={!onPress}
       activeOpacity={0.7}
     >
-           {' '}
       <View style={styles.settingRowLeft}>
-                <Icon name={icon} size={20} color={Colors.primaryBlue} />       {' '}
-        <Text style={styles.settingLabel}>{title}</Text>     {' '}
+                <Icon name={icon} size={20} color={Colors.primaryBlue} />
+        <Text style={styles.settingLabel}>{title}</Text>
       </View>
-           {' '}
       <View style={styles.settingRowRight}>
-                <Text style={styles.settingValue}>{value}</Text>       {' '}
+                <Text style={styles.settingValue}>{value}</Text>
         {showChevron && onPress && (
           <Icon name="chevron-forward" size={18} color={Colors.textTertiary} />
         )}
-             {' '}
       </View>
-         {' '}
     </TouchableOpacity>
   ); /**
    * Render slider setting
@@ -791,43 +791,32 @@ export const SettingsScreen: React.FC = () => {
     formatValue: (v: number) => string
   ) => (
     <View style={styles.sliderSetting}>
-           {' '}
       <View style={styles.sliderHeader}>
-                <Text style={styles.settingLabel}>{title}</Text>       {' '}
-        <Text style={styles.sliderValue}>{formatValue(value)}</Text>     {' '}
+                <Text style={styles.settingLabel}>{title}</Text>
+        <Text style={styles.sliderValue}>{formatValue(value)}</Text>
       </View>
-           {' '}
       <View style={styles.sliderControls}>
-               {' '}
         <TouchableOpacity
           style={styles.sliderButton}
           onPress={() => onChange(Math.max(min, value - step))}
         >
-                    <Icon name="remove" size={20} color={Colors.primaryBlue} /> 
-               {' '}
+                    <Icon name="remove" size={20} color={Colors.primaryBlue} />
         </TouchableOpacity>
-               {' '}
         <View style={styles.sliderTrack}>
-                   {' '}
           <View
             style={[
               styles.sliderFill,
               { width: `${((value - min) / (max - min)) * 100}%` },
             ]}
           />
-                 {' '}
         </View>
-               {' '}
         <TouchableOpacity
           style={styles.sliderButton}
           onPress={() => onChange(Math.min(max, value + step))}
         >
-                    <Icon name="add" size={20} color={Colors.primaryBlue} />   
-             {' '}
+                    <Icon name="add" size={20} color={Colors.primaryBlue} />
         </TouchableOpacity>
-             {' '}
       </View>
-         {' '}
     </View>
   ); /**
    * Render storage bar
@@ -841,23 +830,18 @@ export const SettingsScreen: React.FC = () => {
       totalAvailable > 0 ? (storageInfo.appStorage / totalAvailable) * 100 : 0;
     return (
       <View style={styles.storageBar}>
-               {' '}
         <View style={styles.storageBarTrack}>
-                   {' '}
           <View
             style={[
               styles.storageBarFill,
               { width: `${Math.min(usedPercent, 100)}%` },
             ]}
           />
-                 {' '}
         </View>
-               {' '}
         <Text style={styles.storageText}>
                     {formatBytes(storageInfo.appStorage)} of          {' '}
           {formatBytes(storageInfo.freeSpace)} available        {' '}
         </Text>
-             {' '}
       </View>
     );
   }; /**
@@ -880,60 +864,40 @@ export const SettingsScreen: React.FC = () => {
       0;
     return (
       <View key={model.id} style={styles.catalogModelRow}>
-               {' '}
         <View style={styles.catalogModelInfo}>
-                   {' '}
           <View style={styles.catalogModelHeader}>
-                       {' '}
-            <Text style={styles.catalogModelName}>{model.name}</Text>           {' '}
+            <Text style={styles.catalogModelName}>{model.name}</Text>
             <View style={styles.catalogModelBadge}>
-                           {' '}
               <Text style={styles.catalogModelBadgeText}>{model.category}</Text>
-                         {' '}
             </View>
-                     {' '}
           </View>
-                   {' '}
           {model.metadata?.description && (
             <Text style={styles.catalogModelDescription} numberOfLines={2}>
                             {model.metadata.description}           {' '}
             </Text>
           )}
-                   {' '}
           <View style={styles.catalogModelMeta}>
-                       {' '}
             <Text style={styles.catalogModelSize}>
                             {formatBytes(modelSize)}           {' '}
             </Text>
-                       {' '}
-            <Text style={styles.catalogModelFormat}>{frameworkName}</Text>     
-               {' '}
+            <Text style={styles.catalogModelFormat}>{frameworkName}</Text>
           </View>
-                   {' '}
           {isDownloading && (
             <View style={styles.downloadProgressContainer}>
-                           {' '}
               <View style={styles.downloadProgressTrack}>
-                               {' '}
                 <View
                   style={[
                     styles.downloadProgressFill,
                     { width: `${downloadProgress * 100}%` },
                   ]}
                 />
-                             {' '}
               </View>
-                           {' '}
               <Text style={styles.downloadProgressText}>
                                 {(downloadProgress * 100).toFixed(0)}%          
-                   {' '}
               </Text>
-                         {' '}
             </View>
           )}
-                 {' '}
         </View>
-               {' '}
         <TouchableOpacity
           style={[
             styles.catalogModelButton,
@@ -946,7 +910,6 @@ export const SettingsScreen: React.FC = () => {
               : handleDownloadModel(model)
           }
         >
-                   {' '}
           <Icon
             name={
               isDownloaded
@@ -964,31 +927,24 @@ export const SettingsScreen: React.FC = () => {
                   : Colors.primaryBlue
             }
           />
-                 {' '}
         </TouchableOpacity>
-             {' '}
       </View>
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-            {/* Header */}     {' '}
-      <View style={styles.header}>
-                <Text style={styles.title}>Settings</Text>       {' '}
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
+        <Text style={styles.title}>Settings</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={loadData}>
-                    <Icon name="refresh" size={22} color={Colors.primaryBlue} />
-                 {' '}
+          <Icon name="refresh" size={22} color={Colors.primaryBlue} />
         </TouchableOpacity>
-             {' '}
       </View>
-           {' '}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-               {' '}
-        {/* Generation Settings - Matches iOS CombinedSettingsView order */}   
-            {renderSectionHeader('Generation Settings')}       {' '}
+        {/* Generation Settings - Matches iOS CombinedSettingsView order */}
+            {renderSectionHeader('Generation Settings')}
         <View style={styles.section}>
-                   {' '}
           {renderSliderSetting(
             'Temperature',
             temperature,
@@ -998,7 +954,6 @@ export const SettingsScreen: React.FC = () => {
             SETTINGS_CONSTRAINTS.temperature.step,
             (v) => v.toFixed(1)
           )}
-                   {' '}
           {renderSliderSetting(
             'Max Tokens',
             maxTokens,
@@ -1008,11 +963,9 @@ export const SettingsScreen: React.FC = () => {
             SETTINGS_CONSTRAINTS.maxTokens.step,
             (v) => v.toLocaleString()
           )}
-                    {/* System Prompt Input */}         {' '}
+                    {/* System Prompt Input */}
           <View style={styles.systemPromptContainer}>
-                       {' '}
-            <Text style={styles.systemPromptLabel}>System Prompt</Text>         
-             {' '}
+            <Text style={styles.systemPromptLabel}>System Prompt</Text>
             <TextInput
               style={styles.systemPromptInput}
               value={systemPrompt}
@@ -1023,32 +976,25 @@ export const SettingsScreen: React.FC = () => {
               numberOfLines={3}
               textAlignVertical="top"
             />
-                     {' '}
           </View>
-                    {/* Save Settings Button */}         {' '}
+                    {/* Save Settings Button */}
           <TouchableOpacity
             style={styles.saveSettingsButton}
             onPress={saveGenerationSettings}
           >
-                       {' '}
             <Icon
               name="checkmark-circle-outline"
               size={20}
               color={Colors.textWhite}
             />
-                       {' '}
-            <Text style={styles.saveSettingsButtonText}>Save Settings</Text>   
-                 {' '}
+            <Text style={styles.saveSettingsButtonText}>Save Settings</Text>
           </TouchableOpacity>
-                 {' '}
         </View>
-                {/* API Configuration (Testing) */}       {' '}
-        {renderSectionHeader('API Configuration (Testing)')}       {' '}
+                {/* API Configuration (Testing) */}
+        {renderSectionHeader('API Configuration (Testing)')}
         <View style={styles.section}>
-                   {' '}
           <View style={styles.apiConfigRow}>
-                        <Text style={styles.apiConfigLabel}>API Key</Text>     
-                 {' '}
+                        <Text style={styles.apiConfigLabel}>API Key</Text>
             <Text
               style={[
                 styles.apiConfigValue,
@@ -1060,14 +1006,11 @@ export const SettingsScreen: React.FC = () => {
               ]}
             >
                             {apiKeyConfigured ? 'Configured' : 'Not Set'}       
-                 {' '}
             </Text>
-                     {' '}
           </View>
-                    <View style={styles.apiConfigDivider} />         {' '}
+                    <View style={styles.apiConfigDivider} />
           <View style={styles.apiConfigRow}>
-                        <Text style={styles.apiConfigLabel}>Base URL</Text>     
-                 {' '}
+                        <Text style={styles.apiConfigLabel}>Base URL</Text>
             <Text
               style={[
                 styles.apiConfigValue,
@@ -1079,28 +1022,21 @@ export const SettingsScreen: React.FC = () => {
               ]}
             >
                             {isBaseURLConfigured ? 'Configured' : 'Not Set'}   
-                     {' '}
             </Text>
-                     {' '}
           </View>
-                    <View style={styles.apiConfigDivider} />         {' '}
+                    <View style={styles.apiConfigDivider} />
           <View style={styles.apiConfigButtons}>
-                       {' '}
             <TouchableOpacity
               style={styles.apiConfigButton}
               onPress={handleConfigureApiKey}
             >
-                           {' '}
-              <Text style={styles.apiConfigButtonText}>Configure</Text>         
-               {' '}
+              <Text style={styles.apiConfigButtonText}>Configure</Text>
             </TouchableOpacity>
-                       {' '}
             {apiKeyConfigured && isBaseURLConfigured && (
               <TouchableOpacity
                 style={[styles.apiConfigButton, styles.apiConfigButtonClear]}
                 onPress={clearApiConfiguration}
               >
-                               {' '}
                 <Text
                   style={[
                     styles.apiConfigButtonText,
@@ -1109,35 +1045,25 @@ export const SettingsScreen: React.FC = () => {
                 >
                   Clear
                 </Text>
-                             {' '}
               </TouchableOpacity>
             )}
-                     {' '}
           </View>
-                   {' '}
           <Text style={styles.apiConfigHint}>
                         Configure custom API key and base URL for testing.
             Requires app restart.          {' '}
           </Text>
-                 {' '}
         </View>
-                {/* Tool Settings - Matches iOS ToolSettingsView */}       {' '}
-        {renderSectionHeader('Tool Settings')}       {' '}
+                {/* Tool Settings - Matches iOS ToolSettingsView */}
+        {renderSectionHeader('Tool Settings')}
         <View style={styles.section}>
-                    {/* Enable Tool Calling Toggle */}         {' '}
+                    {/* Enable Tool Calling Toggle */}
           <View style={styles.toolSettingRow}>
-                       {' '}
             <View style={styles.toolSettingInfo}>
-                           {' '}
-              <Text style={styles.toolSettingLabel}>Enable Tool Calling</Text> 
-                         {' '}
+              <Text style={styles.toolSettingLabel}>Enable Tool Calling</Text>
               <Text style={styles.toolSettingDescription}>
                                 Allow LLMs to call tools (APIs, functions)      
-                       {' '}
               </Text>
-                         {' '}
             </View>
-                       {' '}
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -1145,26 +1071,20 @@ export const SettingsScreen: React.FC = () => {
               ]}
               onPress={() => handleToggleToolCalling(!toolCallingEnabled)}
             >
-                           {' '}
               <View
                 style={[
                   styles.toggleKnob,
                   toolCallingEnabled && styles.toggleKnobActive,
                 ]}
               />
-                         {' '}
             </TouchableOpacity>
-                     {' '}
           </View>
-                   {' '}
           {toolCallingEnabled && (
             <>
-                            <View style={styles.apiConfigDivider} />           
-                               {/* Registered Tools Count */}             {' '}
+                            <View style={styles.apiConfigDivider} />
+                               {/* Registered Tools Count */}
               <View style={styles.toolSettingRow}>
-                               {' '}
-                <Text style={styles.toolSettingLabel}>Registered Tools</Text>   
-                           {' '}
+                <Text style={styles.toolSettingLabel}>Registered Tools</Text>
                 <Text
                   style={[
                     styles.toolSettingValue,
@@ -1178,230 +1098,168 @@ export const SettingsScreen: React.FC = () => {
                 >
                                     {registeredTools.length}{' '}
                   {registeredTools.length === 1 ? 'tool' : 'tools'}             
-                   {' '}
                 </Text>
-                             {' '}
               </View>
-                            {/* Demo Tools Button */}             {' '}
+                            {/* Demo Tools Button */}
               {registeredTools.length === 0 && (
                 <>
-                                    <View style={styles.apiConfigDivider} />   
-                               {' '}
+                                    <View style={styles.apiConfigDivider} />
                   <TouchableOpacity
                     style={styles.demoToolsButton}
                     onPress={registerDemoTools}
                   >
-                                       {' '}
                     <Icon
                       name="add-circle-outline"
                       size={20}
                       color={Colors.primaryBlue}
                     />
-                                       {' '}
                     <Text style={styles.demoToolsButtonText}>
                       Add Demo Tools
                     </Text>
-                                     {' '}
                   </TouchableOpacity>
-                                 {' '}
                 </>
               )}
-                            {/* Registered Tools List */}             {' '}
+                            {/* Registered Tools List */}
               {registeredTools.length > 0 && (
                 <>
-                                    <View style={styles.apiConfigDivider} />   
-                               {' '}
+                                    <View style={styles.apiConfigDivider} />
                   {registeredTools.map((tool, index) => (
                     <View key={tool.name} style={styles.toolRow}>
-                                           {' '}
                       <Icon
                         name="construct-outline"
                         size={18}
                         color={Colors.primaryBlue}
                       />
-                                           {' '}
                       <View style={styles.toolInfo}>
-                                               {' '}
-                        <Text style={styles.toolName}>{tool.name}</Text>       
-                                       {' '}
+                        <Text style={styles.toolName}>{tool.name}</Text>
                         <Text style={styles.toolDescription} numberOfLines={2}>
                           {tool.description}
                         </Text>
-                                               {' '}
                         {tool.parameters.length > 0 && (
                           <View style={styles.toolParams}>
-                                                       {' '}
                             {tool.parameters.map((p) => (
                               <View key={p.name} style={styles.toolParamChip}>
-                                                               {' '}
                                 <Text style={styles.toolParamText}>
                                   {p.name}
                                 </Text>
-                                                             {' '}
                               </View>
                             ))}
-                                                     {' '}
                           </View>
                         )}
-                                             {' '}
                       </View>
-                                           {' '}
                       {index < registeredTools.length - 1 && (
                         <View style={styles.apiConfigDivider} />
                       )}
-                                         {' '}
                     </View>
                   ))}
-                                    {/* Clear All Tools Button */}
-                                    <View style={styles.apiConfigDivider} />   
-                               {' '}
+                                    {/* Clear All Tools Button */}
+                                    <View style={styles.apiConfigDivider} />
                   <TouchableOpacity
                     style={styles.clearToolsButton}
                     onPress={clearAllTools}
                   >
-                                       {' '}
                     <Icon
                       name="trash-outline"
                       size={18}
                       color={Colors.statusRed}
                     />
-                                       {' '}
                     <Text style={styles.clearToolsButtonText}>
                       Clear All Tools
                     </Text>
-                                     {' '}
                   </TouchableOpacity>
-                                 {' '}
                 </>
               )}
-                         {' '}
             </>
           )}
-                   {' '}
           <Text style={styles.apiConfigHint}>
                         Tools allow the LLM to call external APIs and functions
             to get real-time data.          {' '}
           </Text>
-                 {' '}
         </View>
-                {/* Storage Overview - Matches iOS CombinedSettingsView */}     
-          {renderSectionHeader('Storage Overview')}       {' '}
+                {/* Storage Overview - Matches iOS CombinedSettingsView */}
+          {renderSectionHeader('Storage Overview')}
         <View style={styles.section}>
-                    {renderStorageBar()}         {' '}
+                    {renderStorageBar()}
           <View style={styles.storageDetails}>
-                        {/* Total Storage - App's total storage usage */}       
-               {' '}
+                        {/* Total Storage - App's total storage usage */}
             <View style={styles.storageDetailRow}>
-                           {' '}
-              <Text style={styles.storageDetailLabel}>Total Storage</Text>     
-                     {' '}
+              <Text style={styles.storageDetailLabel}>Total Storage</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.appStorage)}           
-                 {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Models Storage - Downloaded models size */}         
-             {' '}
+                        {/* Models Storage - Downloaded models size */}
             <View style={styles.storageDetailRow}>
-                           {' '}
-              <Text style={styles.storageDetailLabel}>Models</Text>             {' '}
+              <Text style={styles.storageDetailLabel}>Models</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.modelsStorage)}       
-                     {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Cache Size */}           {' '}
+                        {/* Cache Size */}
             <View style={styles.storageDetailRow}>
-                            <Text style={styles.storageDetailLabel}>Cache</Text>
-                           {' '}
+                            <Text style={styles.storageDetailLabel}>Cache</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.cacheSize)}           
-                 {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Available - Device free space */}           {' '}
+                        {/* Available - Device free space */}
             <View style={styles.storageDetailRow}>
-                           {' '}
-              <Text style={styles.storageDetailLabel}>Available</Text>         
-                 {' '}
+              <Text style={styles.storageDetailLabel}>Available</Text>
               <Text style={styles.storageDetailValue}>
                                 {formatBytes(storageInfo.freeSpace)}           
-                 {' '}
               </Text>
-                         {' '}
             </View>
-                     {' '}
           </View>
-                 {' '}
         </View>
-                {/* Model Catalog */}       {' '}
-        {renderSectionHeader('Model Catalog')}       {' '}
+                {/* Model Catalog */}
+        {renderSectionHeader('Model Catalog')}
         <View style={styles.section}>
-                   {' '}
           {availableModels.length === 0 ? (
             <Text style={styles.emptyText}>Loading models...</Text>
           ) : (
             availableModels.map(renderCatalogModelRow)
           )}
-                 {' '}
         </View>
-                {/* Storage Management */}       {' '}
-        {renderSectionHeader('Storage Management')}       {' '}
+                {/* Storage Management */}
+        {renderSectionHeader('Storage Management')}
         <View style={styles.section}>
-                   {' '}
           <TouchableOpacity
             style={styles.dangerButton}
             onPress={handleClearCache}
           >
-                       {' '}
             <Icon name="trash-outline" size={20} color={Colors.primaryOrange} />
-                        <Text style={styles.dangerButtonText}>Clear Cache</Text>
-                     {' '}
+                        <Text style={styles.dangerButtonText}>Clear Cache</Text>
           </TouchableOpacity>
-                   {' '}
           <TouchableOpacity
             style={[styles.dangerButton, styles.dangerButtonRed]}
             onPress={handleClearAllData}
           >
-                       {' '}
-            <Icon name="warning-outline" size={20} color={Colors.primaryRed} /> 
-                     {' '}
+            <Icon name="warning-outline" size={20} color={Colors.primaryRed} />
             <Text style={[styles.dangerButtonText, styles.dangerButtonTextRed]}>
                             Clear All Data            {' '}
             </Text>
-                     {' '}
           </TouchableOpacity>
-                 {' '}
         </View>
-                {/* Version Info */}       {' '}
+                {/* Version Info */}
         <View style={styles.versionContainer}>
-                    <Text style={styles.versionText}>RunAnywhere AI</Text>     
-              <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>     
-           {' '}
+                    <Text style={styles.versionText}>RunAnywhere AI</Text>
+              <Text style={styles.versionSubtext}>SDK v{sdkVersion}</Text>
         </View>
-             {' '}
       </ScrollView>
-            {/* API Configuration Modal */}     {' '}
+            {/* API Configuration Modal */}
       <Modal
         visible={showApiConfigModal}
         animationType="slide"
         transparent={true}
         onRequestClose={handleCancelApiConfig}
       >
-               {' '}
         <View style={styles.modalOverlay}>
-                   {' '}
           <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>API Configuration</Text>
-                        {/* API Key Input */}           {' '}
+                        <Text style={styles.modalTitle}>API Configuration</Text>
+                        {/* API Key Input */}
             <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>API Key</Text>     
-                     {' '}
+                            <Text style={styles.inputLabel}>API Key</Text>
               <View style={styles.passwordInputContainer}>
-                               {' '}
                 <TextInput
                   style={styles.passwordInput}
                   value={apiKey}
@@ -1412,32 +1270,24 @@ export const SettingsScreen: React.FC = () => {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                               {' '}
                 <TouchableOpacity
                   style={styles.passwordToggle}
                   onPress={() => setShowPassword(!showPassword)}
                 >
-                                   {' '}
                   <Icon
                     name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                     size={20}
                     color={Colors.textSecondary}
                   />
-                                 {' '}
                 </TouchableOpacity>
-                             {' '}
               </View>
-                           {' '}
               <Text style={styles.inputHint}>
                                 Your API key for authenticating with the backend
-                             {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Base URL Input */}           {' '}
+                        {/* Base URL Input */}
             <View style={styles.inputGroup}>
-                            <Text style={styles.inputLabel}>Base URL</Text>     
-                     {' '}
+                            <Text style={styles.inputLabel}>Base URL</Text>
               <TextInput
                 style={styles.input}
                 value={baseURL}
@@ -1448,41 +1298,32 @@ export const SettingsScreen: React.FC = () => {
                 autoCorrect={false}
                 keyboardType="url"
               />
-                           {' '}
               <Text style={styles.inputHint}>
                                 The backend API URL (https:// added
                 automatically if missing)              {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Warning */}           {' '}
+                        {/* Warning */}
             <View style={styles.warningBox}>
-                           {' '}
               <Icon
                 name="warning-outline"
                 size={20}
                 color={Colors.primaryOrange}
               />
-                           {' '}
               <Text style={styles.warningText}>
                                 After saving, you must restart the app for
                 changes to take effect. The SDK will reinitialize with your
                 custom configuration.              {' '}
               </Text>
-                         {' '}
             </View>
-                        {/* Buttons */}           {' '}
+                        {/* Buttons */}
             <View style={styles.modalButtons}>
-                           {' '}
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonCancel]}
                 onPress={handleCancelApiConfig}
               >
-                               {' '}
-                <Text style={styles.modalButtonTextCancel}>Cancel</Text>       
-                     {' '}
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
               </TouchableOpacity>
-                           {' '}
               <TouchableOpacity
                 style={[
                   styles.modalButton,
@@ -1492,7 +1333,6 @@ export const SettingsScreen: React.FC = () => {
                 onPress={saveApiConfiguration}
                 disabled={!apiKey || !baseURL}
               >
-                               {' '}
                 <Text
                   style={[
                     styles.modalButtonTextSave,
@@ -1501,17 +1341,11 @@ export const SettingsScreen: React.FC = () => {
                 >
                   Save
                 </Text>
-                             {' '}
               </TouchableOpacity>
-                         {' '}
             </View>
-                     {' '}
           </View>
-                 {' '}
         </View>
-             {' '}
       </Modal>
-         {' '}
     </SafeAreaView>
   );
 };
@@ -1526,7 +1360,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     backgroundColor: Colors.backgroundPrimary,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,

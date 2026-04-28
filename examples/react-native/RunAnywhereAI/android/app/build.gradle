@@ -11,6 +11,63 @@ react {
     autolinkLibrariesWithApp()
 }
 
+// =============================================================================
+// Auto-sync SDK native libraries into node_modules before each build (B-RN-Setup-001)
+// =============================================================================
+// node_modules/@runanywhere/<pkg> is a real copy (not symlink), so .so files from
+// the SDK source tree never automatically reach the Gradle modules that read from
+// node_modules/. Without this sync, every SDK rebuild requires a manual `cp` step
+// before `assembleDebug`, and stale .so silently ship in the APK.
+// =============================================================================
+// rootProject.projectDir resolves to examples/react-native/RunAnywhereAI/android,
+// so we walk up four levels (android -> RunAnywhereAI -> react-native -> examples -> root).
+def sdkRnPackagesRoot = file("${rootProject.projectDir}/../../../../sdk/runanywhere-react-native/packages")
+def rnExampleNodeModules = file("${rootProject.projectDir}/../node_modules/@runanywhere")
+
+def packageNameMap = [
+    "core"    : "core",
+    "llamacpp": "llamacpp",
+    "onnx"    : "onnx",
+    "genie"   : "genie",
+]
+
+task syncSdkNativeLibs {
+    description = "Copy fresh .so + headers from SDK source tree into node_modules/@runanywhere/* before build."
+    group = "build setup"
+
+    doLast {
+        if (!sdkRnPackagesRoot.exists()) {
+            logger.lifecycle("[syncSdkNativeLibs] Skipping — SDK source tree not present at ${sdkRnPackagesRoot}")
+            return
+        }
+        def synced = 0
+        packageNameMap.each { sdkPkg, npmPkg ->
+            def src = new File(sdkRnPackagesRoot, "${sdkPkg}/android/src/main/jniLibs")
+            def dst = new File(rnExampleNodeModules, "${npmPkg}/android/src/main/jniLibs")
+            if (!src.exists()) {
+                logger.lifecycle("[syncSdkNativeLibs] No source jniLibs at ${src} — skipping ${sdkPkg}")
+                return
+            }
+            if (!dst.parentFile.exists()) {
+                logger.lifecycle("[syncSdkNativeLibs] Skipping ${sdkPkg} — node_modules dest missing (run yarn install?)")
+                return
+            }
+            project.copy {
+                from src
+                into dst
+            }
+            synced++
+            logger.lifecycle("[syncSdkNativeLibs] Synced ${sdkPkg} -> ${dst}")
+        }
+        logger.lifecycle("[syncSdkNativeLibs] Synced ${synced} package(s)")
+    }
+}
+
+// Hook into the standard pre-build task so every assemble/install runs the sync.
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn syncSdkNativeLibs
+}
+
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */

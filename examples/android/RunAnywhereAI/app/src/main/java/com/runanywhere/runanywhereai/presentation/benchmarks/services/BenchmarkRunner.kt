@@ -191,6 +191,15 @@ class BenchmarkRunner {
                     metrics = metrics,
                 ),
             )
+            // B-AK-20-002 — emit progress AFTER scenario completes so the counter advances
+            onProgress(
+                BenchmarkProgressUpdate(
+                    completedCount = index + 1,
+                    totalCount = total,
+                    currentScenario = item.scenario.name,
+                    currentModel = item.model.name,
+                ),
+            )
         }
 
         onProgress(

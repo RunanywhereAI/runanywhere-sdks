@@ -29,6 +29,7 @@
     "@runanywhere/genie": "^0.1.1",
     "@runanywhere/llamacpp": "file:../../../sdk/runanywhere-react-native/packages/llamacpp",
     "@runanywhere/onnx": "file:../../../sdk/runanywhere-react-native/packages/onnx",
+    "@runanywhere/proto-ts": "file:../../../sdk/runanywhere-proto-ts",
     "react": "19.2.0",
     "react-native": "0.83.1",
     "react-native-fs": "^2.20.0",

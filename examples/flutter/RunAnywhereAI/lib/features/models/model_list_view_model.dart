@@ -284,6 +284,26 @@ class ModelListViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // B-FL-4-001: short-circuit if the SDK already has this exact
+      // model loaded for the right capability. Re-calling load() each
+      // time the user taps Send was triggering an unnecessary native
+      // re-init for the same handle.
+      final alreadyLoadedId = switch (model.category) {
+        ModelCategory.language =>
+            await sdk.RunAnywhereSDK.instance.llm.currentModel().then((m) => m?.id),
+        ModelCategory.speechRecognition =>
+            sdk.RunAnywhereSDK.instance.stt.currentModelId,
+        ModelCategory.speechSynthesis =>
+            sdk.RunAnywhereSDK.instance.tts.currentVoiceId,
+        _ => await sdk.RunAnywhereSDK.instance.llm.currentModel().then((m) => m?.id),
+      };
+
+      if (alreadyLoadedId == model.id) {
+        debugPrint('♻️ Model ${model.name} already loaded — skipping reload');
+        _currentModel = model;
+        return;
+      }
+
       debugPrint('⏳ Loading model: ${model.name}');
 
       switch (model.category) {

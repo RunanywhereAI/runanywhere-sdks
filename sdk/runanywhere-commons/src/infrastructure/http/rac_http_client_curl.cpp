@@ -16,6 +16,10 @@
 
 #include <curl/curl.h>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -196,6 +200,20 @@ rac_result_t build_header_slist(const rac_http_request_t* req, curl_slist_owner*
 }
 
 rac_result_t curlcode_to_rac(CURLcode rc) {
+    if (rc != CURLE_OK) {
+        // Diagnostic: surface the exact libcurl error so we can distinguish
+        // INVALID_URL (4) caused by `CURLE_UNSUPPORTED_PROTOCOL` (libcurl built
+        // without HTTPS support), `CURLE_URL_MALFORMAT` (URL parser rejected),
+        // or other classes mapped to RAC_ERROR_NETWORK_ERROR.
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_curl",
+                            "libcurl error: code=%d (%s)",
+                            static_cast<int>(rc), curl_easy_strerror(rc));
+#else
+        RAC_LOG_ERROR(kTag, "libcurl error: code=%d (%s)", static_cast<int>(rc),
+                      curl_easy_strerror(rc));
+#endif
+    }
     switch (rc) {
         case CURLE_OK:
             return RAC_SUCCESS;
@@ -266,11 +284,33 @@ void fill_response_meta(CURL* curl, header_capture_ctx* hdrs, rac_http_response_
 rac_result_t validate_and_setup(CURL* curl, const rac_http_request_t* req,
                                 curl_slist_owner* headers_owner) {
     if (!req || !req->url || !req->method) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_curl",
+                            "validate_and_setup INVALID_ARG: req=%p url=%p method=%p",
+                            static_cast<const void*>(req),
+                            req ? static_cast<const void*>(req->url) : nullptr,
+                            req ? static_cast<const void*>(req->method) : nullptr);
+#endif
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "rac_http_curl",
+                        "validate_and_setup: url=[%s] method=[%s]",
+                        req->url, req->method);
+#endif
+
     curl_easy_reset(curl);
-    curl_easy_setopt(curl, CURLOPT_URL, req->url);
+    CURLcode urlrc = curl_easy_setopt(curl, CURLOPT_URL, req->url);
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "rac_http_curl",
+                        "curl_easy_setopt(CURLOPT_URL) returned: %d (%s)",
+                        static_cast<int>(urlrc),
+                        urlrc == CURLE_OK ? "OK" : curl_easy_strerror(urlrc));
+#endif
+    if (urlrc != CURLE_OK) {
+        return curlcode_to_rac(urlrc);
+    }
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);  // multi-thread safe
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "RunAnywhere-SDK-Commons/1.0");

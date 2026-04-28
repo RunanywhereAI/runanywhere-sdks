@@ -60,6 +60,15 @@ class DartBridgeTelemetry {
     _logger.debug('Telemetry sync init for ${environment.name}');
   }
 
+  /// Detect unfilled .env / dart-define template placeholders.
+  /// Returns true for strings like "YOUR_SUPABASE_PROJECT_URL",
+  /// "<your-key>", "REPLACE_ME", etc. (B-FL-1-004 / B-WEB-9-001).
+  static bool _looksLikePlaceholder(String? value) {
+    if (value == null) return false;
+    return RegExp(r'YOUR_|<your|REPLACE_ME|PLACEHOLDER', caseSensitive: false)
+        .hasMatch(value);
+  }
+
   /// Flush any queued telemetry events.
   /// Static method that delegates to instance if initialized.
   /// Matches Swift: CppBridge.Telemetry.flush()
@@ -86,6 +95,18 @@ class DartBridgeTelemetry {
   }) async {
     if (_isInitialized) {
       _logger.debug('Telemetry already initialized');
+      return;
+    }
+
+    // B-FL-1-004: bail out if the example app forwarded an unfilled
+    // .env / dart-define placeholder. We don't want to POST telemetry
+    // to a literal "YOUR_SUPABASE_PROJECT_URL" string.
+    if (_looksLikePlaceholder(baseURL) || _looksLikePlaceholder(accessToken)) {
+      _logger.warning(
+        'Telemetry skipped — baseURL/accessToken looks like a placeholder. '
+        'Set real values via dart-define or runtime config.',
+      );
+      _isInitialized = true; // Suppress retry.
       return;
     }
 

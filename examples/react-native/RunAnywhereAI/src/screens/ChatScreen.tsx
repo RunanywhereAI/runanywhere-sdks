@@ -33,6 +33,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
@@ -244,6 +245,9 @@ export const ChatScreen: React.FC = () => {
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -634,7 +638,7 @@ export const ChatScreen: React.FC = () => {
    * Render header with actions
    */
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + Padding.padding12 }]}>
       {/* Conversations list button */}
       <TouchableOpacity
         style={styles.headerButton}
@@ -809,7 +813,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
+    paddingTop: 0,
+    paddingBottom: Padding.padding12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },

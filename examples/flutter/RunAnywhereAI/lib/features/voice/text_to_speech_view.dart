@@ -153,6 +153,16 @@ class _TextToSpeechViewState extends State<TextToSpeechView> {
         _errorMessage = 'Failed to load model: $e';
         _isGenerating = false;
       });
+      // B-FL-12-002: surface TTS load failures via SnackBar in addition to the
+      // inline error text.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('TTS load failed: $e'),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 

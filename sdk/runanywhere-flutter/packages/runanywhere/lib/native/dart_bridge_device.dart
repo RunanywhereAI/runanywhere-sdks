@@ -134,7 +134,10 @@ class DartBridgeDevice {
       _callbacksRegistered = true;
       _logger.debug('Device callbacks registered (sync)');
     } catch (e) {
-      _logger.debug('registerCallbacks error: $e');
+      // librac_commons.so may not export rac_device_set_callbacks in some
+      // configurations (B-FL-1-002). Log at warning so it's visible in
+      // non-debug builds; SDK falls back to no device callbacks.
+      _logger.warning('registerCallbacks unavailable: $e');
     }
   }
 

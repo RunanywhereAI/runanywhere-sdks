@@ -120,7 +120,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
             LLMEvent.LLMEventType.GENERATION_COMPLETED -> {
                 Timber.i("✅ Generation completed: ${event.tokensGenerated} tokens")
-                _uiState.value = _uiState.value.copy(isGenerating = false)
+                // B-AK-7-002 — force-clear isGenerating in case generateAndCollect's
+                // Flow never received is_final=true. Also sync the conversation store.
+                if (_uiState.value.isGenerating) {
+                    _uiState.value = _uiState.value.copy(isGenerating = false)
+                    syncCurrentConversationToStore()
+                }
             }
             LLMEvent.LLMEventType.GENERATION_FAILED -> {
                 Timber.e("Generation failed: ${event.error}")
@@ -744,7 +749,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Check model status and load appropriate chat model.
+     * Check model status and best-effort auto-load a chat model.
+     *
+     * IMPORTANT: This runs on cold start before the user has expressed
+     * intent. Failures (e.g. native library missing on a non-Snapdragon
+     * device, error -423 from llama.cpp on Pixel) MUST NOT surface a
+     * Debug Info dialog — they are expected on devices that simply
+     * don't have a model downloaded yet. We only log and leave UI in
+     * the "select a model" state. The dialog is reserved for explicit
+     * user-initiated load failures elsewhere.
      */
     suspend fun checkModelStatus() {
         try {
@@ -780,7 +793,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     Timber.i("📦 Found downloaded chat model: ${chatModel.name}, loading...")
 
                     try {
-                        // Load the chat model into memory
                         RunAnywhere.loadLLMModel(chatModel.id)
 
                         _uiState.value =
@@ -792,13 +804,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         refreshLoraState()
                         Timber.i("✅ Chat model loaded successfully: ${chatModel.name}")
                     } catch (e: Throwable) {
-                        // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
-                        Timber.e(e, "❌ Failed to load chat model: ${e.message}")
+                        // Cold-start best-effort load — DO NOT propagate to UI as
+                        // an error dialog (B-AK-1-002). Just log and let the user
+                        // pick a model from the sheet.
+                        Timber.w(e, "Cold-start auto-load skipped (${e.message})")
                         _uiState.value =
                             _uiState.value.copy(
                                 isModelLoaded = false,
                                 loadedModelName = null,
-                                error = if (e is Exception) e else Exception("Native library not available: ${e.message}", e),
                             )
                     }
                 } else {
@@ -820,13 +833,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 Timber.i("❌ SDK not ready")
             }
         } catch (e: Throwable) {
-            // Catch Throwable to handle both Exception and Error (e.g., UnsatisfiedLinkError)
-            Timber.e(e, "Failed to check model status: ${e.message}")
+            // Outer try also degrades silently on cold start (B-AK-1-002).
+            Timber.w(e, "checkModelStatus skipped: ${e.message}")
             _uiState.value =
                 _uiState.value.copy(
                     isModelLoaded = false,
                     loadedModelName = null,
-                    error = if (e is Exception) e else Exception("Failed to check model status: ${e.message}", e),
                 )
         }
     }

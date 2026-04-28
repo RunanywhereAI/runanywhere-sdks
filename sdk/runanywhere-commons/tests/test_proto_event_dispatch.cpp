@@ -92,13 +92,13 @@ int test_invalid_handle_rejected() {
 
 int test_set_callback_returns_correct_status() {
     rac_result_t rc = rac_voice_agent_set_proto_callback(fake_handle(), test_callback, nullptr);
-#ifdef RAC_HAVE_PROTOBUF
+    // B-AK-15-001 fix: registration now succeeds in both Protobuf and
+    // no-Protobuf builds. The no-Protobuf path serializes via the
+    // hand-encoded wire format in rac_voice_event_abi.cpp (mirrors the
+    // LLM stream fix in rac_llm_stream.cpp).
     ASSERT_EQ(rc, RAC_SUCCESS);
     // Cleanup so other tests start clean.
     rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);
-#else
-    ASSERT_EQ(rc, RAC_ERROR_FEATURE_NOT_AVAILABLE);
-#endif
     return 0;
 }
 

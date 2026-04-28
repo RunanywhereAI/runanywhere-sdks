@@ -122,11 +122,17 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       final temperature =
           prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
       final maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 500;
+      // B-FL-4-002 / B-FL-5-001: fall back to a sane default system
+      // prompt when the user hasn't customised one. Without it, smaller
+      // 0.5-1B models tend to ramble or echo the prompt verbatim.
       final systemPromptRaw =
           prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
-      final systemPrompt = systemPromptRaw.isNotEmpty ? systemPromptRaw : null;
+      const defaultSystemPrompt =
+          'You are a helpful, concise assistant. Keep replies brief unless asked otherwise.';
+      final systemPrompt =
+          systemPromptRaw.isNotEmpty ? systemPromptRaw : defaultSystemPrompt;
 
-      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=${systemPrompt != null ? "set(${systemPrompt.length} chars)" : "nil"}');
+      debugPrint('[PARAMS] App _sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)');
 
       // Check if tool calling is enabled and has registered tools
       final toolSettings = ToolSettingsViewModel.shared;
@@ -467,6 +473,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         title: const Text('Chat'),
       actions: [
           IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: _showConversationHistory,
+            tooltip: 'Conversation history',
+          ),
+          IconButton(
             icon: const Icon(Icons.article_outlined),
             onPressed: () {
               unawaited(
@@ -538,6 +549,22 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           // Model loaded by ModelSelectionSheet via SDK
           // Sync local state after model load
           await _syncModelState();
+        },
+      ),
+    ));
+  }
+
+  /// Show conversation history bottom sheet driven by ConversationStore.
+  void _showConversationHistory() {
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => _ConversationListSheet(
+        store: ConversationStore.shared,
+        onNewChat: () {
+          Navigator.of(sheetContext).pop();
+          _clearChat();
         },
       ),
     ));
@@ -656,10 +683,26 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 
+  /// Heuristic check for small models (<= ~500M params) where tool
+  /// calling tends to be unreliable. Used by the tool-calling reliability
+  /// banner (B-FL-6-003).
+  bool _isLikelySmallModel(String? name) {
+    if (name == null) return false;
+    final n = name.toLowerCase();
+    return n.contains('0.3b') ||
+        n.contains('0.5b') ||
+        n.contains('0.6b') ||
+        n.contains('350m') ||
+        n.contains('360m') ||
+        n.contains('500m');
+  }
+
   Widget _buildInputArea() {
     final toolSettings = ToolSettingsViewModel.shared;
     final showToolBadge = toolSettings.toolCallingEnabled &&
         toolSettings.registeredTools.isNotEmpty;
+    final showSmallModelWarning = toolSettings.toolCallingEnabled &&
+        _isLikelySmallModel(_loadedModelName);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.large),
@@ -678,6 +721,35 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Tool-calling reliability banner for small models (B-FL-6-003).
+            if (showSmallModelWarning) ...[
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.smallMedium),
+                margin: const EdgeInsets.only(bottom: AppSpacing.smallMedium),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryOrange.withValues(alpha: 0.1),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusRegular),
+                  border: Border.all(
+                    color: AppColors.primaryOrange.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: AppColors.primaryOrange),
+                    const SizedBox(width: AppSpacing.smallMedium),
+                    Expanded(
+                      child: Text(
+                        'For reliable tool calling, use a 1.2B+ instruct-tuned model.',
+                        style: AppTypography.caption(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Tool calling badge (matches iOS)
             if (showToolBadge) ...[
               ToolCallingBadge(toolCount: toolSettings.registeredTools.length),
@@ -816,47 +888,53 @@ class _MessageBubbleState extends State<_MessageBubble> {
                 widget.message.thinkingContent!.isNotEmpty)
               _buildThinkingSection(),
 
-            // Main message bubble
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.mediumLarge),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          AppColors.userBubbleGradientStart,
-                          AppColors.userBubbleGradientEnd,
-                        ],
+            // Main message bubble. Long-press an assistant bubble to
+            // open an analytics sheet (B-FL-9-001).
+            GestureDetector(
+              onLongPress: !isUser && widget.message.analytics != null
+                  ? () => _showAnalyticsSheet(context)
+                  : null,
+              child: Container(
+                padding: const EdgeInsets.all(AppSpacing.mediumLarge),
+                decoration: BoxDecoration(
+                  gradient: isUser
+                      ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.userBubbleGradientStart,
+                            AppColors.userBubbleGradientEnd,
+                          ],
+                        )
+                      : null,
+                  color: isUser ? null : AppColors.backgroundGray5(context),
+                  borderRadius:
+                      BorderRadius.circular(AppSpacing.cornerRadiusBubble),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.shadowLight,
+                      blurRadius: AppSpacing.shadowSmall,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: isUser
+                    ? Text(
+                        widget.message.content,
+                        style: AppTypography.body(context).copyWith(
+                          color: AppColors.textWhite,
+                        ),
                       )
-                    : null,
-                color: isUser ? null : AppColors.backgroundGray5(context),
-                borderRadius:
-                    BorderRadius.circular(AppSpacing.cornerRadiusBubble),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.shadowLight,
-                    blurRadius: AppSpacing.shadowSmall,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: isUser
-                  ? Text(
-                      widget.message.content,
-                      style: AppTypography.body(context).copyWith(
-                        color: AppColors.textWhite,
-                      ),
-                    )
-                  : MarkdownBody(
-                      data: widget.message.content,
-                      styleSheet: MarkdownStyleSheet(
-                        p: AppTypography.body(context),
-                        code: AppTypography.monospaced.copyWith(
-                          backgroundColor: AppColors.backgroundGray6(context),
+                    : MarkdownBody(
+                        data: widget.message.content,
+                        styleSheet: MarkdownStyleSheet(
+                          p: AppTypography.body(context),
+                          code: AppTypography.monospaced.copyWith(
+                            backgroundColor: AppColors.backgroundGray6(context),
+                          ),
                         ),
                       ),
-                    ),
+              ),
             ),
 
             // Analytics summary (if present)
@@ -884,6 +962,53 @@ class _MessageBubbleState extends State<_MessageBubble> {
       ),
     );
   }
+
+  /// Show a bottom sheet of message analytics (B-FL-9-001).
+  void _showAnalyticsSheet(BuildContext context) {
+    final analytics = widget.message.analytics;
+    if (analytics == null) return;
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: false,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.large),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Generation analytics', style: AppTypography.title3(context)),
+            const SizedBox(height: AppSpacing.mediumLarge),
+            if (analytics.modelName != null)
+              _analyticsRow('Model', analytics.modelName!),
+            if (analytics.timeToFirstToken != null)
+              _analyticsRow('Time to first token',
+                  '${analytics.timeToFirstToken!.toStringAsFixed(2)} s'),
+            if (analytics.totalGenerationTime != null)
+              _analyticsRow('Total time',
+                  '${analytics.totalGenerationTime!.toStringAsFixed(2)} s'),
+            if (analytics.outputTokens > 0)
+              _analyticsRow('Output tokens', '${analytics.outputTokens}'),
+            if (analytics.tokensPerSecond != null)
+              _analyticsRow('Throughput',
+                  '${analytics.tokensPerSecond!.toStringAsFixed(1)} tok/s'),
+            if (analytics.wasThinkingMode)
+              _analyticsRow('Thinking mode', 'Yes'),
+          ],
+        ),
+      ),
+    ));
+  }
+
+  Widget _analyticsRow(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label),
+            Text(value, style: AppTypography.body(context)),
+          ],
+        ),
+      );
 
   Widget _buildThinkingSection() {
     return Container(
@@ -974,6 +1099,105 @@ class _MessageBubbleState extends State<_MessageBubble> {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet listing past conversations from [ConversationStore].
+///
+/// Provides a "New chat" FAB and per-row delete affordance. Tapping a
+/// row currently just dismisses the sheet (full message restoration is
+/// out of scope for this screen — ChatInterfaceView is in-memory only).
+class _ConversationListSheet extends StatefulWidget {
+  final ConversationStore store;
+  final VoidCallback onNewChat;
+
+  const _ConversationListSheet({
+    required this.store,
+    required this.onNewChat,
+  });
+
+  @override
+  State<_ConversationListSheet> createState() => _ConversationListSheetState();
+}
+
+class _ConversationListSheetState extends State<_ConversationListSheet> {
+  @override
+  void initState() {
+    super.initState();
+    widget.store.addListener(_onStoreChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final conversations = widget.store.conversations;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (context, scrollController) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Conversations'),
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        body: conversations.isEmpty
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Text(
+                    'No conversations yet.\nStart chatting to build history.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              )
+            : ListView.builder(
+                controller: scrollController,
+                itemCount: conversations.length,
+                itemBuilder: (context, index) {
+                  final conv = conversations[index];
+                  return ListTile(
+                    title: Text(
+                      conv.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      conv.lastMessagePreview,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      tooltip: 'Delete conversation',
+                      onPressed: () => widget.store.deleteConversation(conv),
+                    ),
+                  );
+                },
+              ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: widget.onNewChat,
+          icon: const Icon(Icons.add),
+          label: const Text('New chat'),
+        ),
       ),
     );
   }

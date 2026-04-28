@@ -413,6 +413,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     }
   }, [visible, loadData]);
 
+  // B-RN-Sheet-Routing: clear stale lists when context changes so we don't
+  // briefly render the previous tab's models while loadData is in flight.
+  useEffect(() => {
+    setAvailableModels([]);
+    setExpandedFramework(null);
+    setSelectedModelId(null);
+  }, [context]);
+
   /**
    * Get frameworks with their model counts
    */
@@ -506,6 +514,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Supports multiple concurrent downloads
    */
   const handleDownloadModel = async (model: SDKModelInfo) => {
+    // B-RN-3-002: log entry so a missing call is visible in metro/logcat
+    console.warn('[ModelSelectionSheet] Download tapped:', model.id);
     // Add this model to downloading set
     setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
 
@@ -884,10 +894,15 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <Text style={styles.selectButtonText}>Select</Text>
             </TouchableOpacity>
           ) : (
+            // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
+            // downloads are supported (each model has its own progress entry
+            // in `downloadingModels`), so a load-in-progress on a different
+            // model must not block downloads. Per-model `isDownloading` is
+            // managed via `downloadingModels[model.id]`.
             <TouchableOpacity
               style={styles.downloadButton}
               onPress={() => handleDownloadModel(model)}
-              disabled={isLoadingModel}
+              disabled={downloadingModels[model.id] !== undefined}
             >
               <Text style={styles.downloadButtonText}>Download</Text>
             </TouchableOpacity>
@@ -949,7 +964,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         </View>
 
         {/* Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={Colors.primaryBlue} />
@@ -1019,6 +1038,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  // B-RN-3-004: ensure the last model row's CTA button clears the
+  // bottom tab bar so users on shorter devices don't have to overscroll
+  // to reveal it.
+  contentContainer: {
+    paddingBottom: 80,
   },
   loadingContainer: {
     flex: 1,

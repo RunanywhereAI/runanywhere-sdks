@@ -18,6 +18,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -209,7 +210,13 @@ class HTTPClientAdapter {
       followRedirects: followRedirects,
     );
     _logger.debug('${spec.method} ${spec.url}');
-    final res = await Isolate.run<_HttpRequestResult>(() => _sendBlocking(spec));
+    // B-FL-1-003 fix: route HTTPS through Dart's HttpClient on Android because
+    // the bundled libcurl in librac_commons.so is built with CURL_DISABLE_HTTPS=ON
+    // (commons CMakeLists.txt:442-448). On iOS / desktop, libcurl is fine.
+    final useDart = Platform.isAndroid && spec.url.startsWith('https://');
+    final res = useDart
+        ? await _sendViaDartHttpClient(spec)
+        : await Isolate.run<_HttpRequestResult>(() => _sendBlocking(spec));
     if (res.rc != 0) {
       throw HttpClientException(
         'rac_http_request_send failed with code ${res.rc}',
@@ -471,6 +478,83 @@ class HttpClientException implements Exception {
 
   @override
   String toString() => 'HttpClientException($statusCode): $message';
+}
+
+// ============================================================================
+// Dart HttpClient transport (Android HTTPS bypass for libcurl HTTPS-disabled).
+// Mirrors the worker isolate signature so the call site is symmetric.
+// ============================================================================
+
+Future<_HttpRequestResult> _sendViaDartHttpClient(_HttpRequestSpec spec) async {
+  final stopwatch = Stopwatch()..start();
+  HttpClient? client;
+  try {
+    client = HttpClient()
+      ..connectionTimeout = Duration(milliseconds: spec.timeoutMs.clamp(1000, 60000))
+      ..idleTimeout = const Duration(minutes: 2);
+
+    final uri = Uri.parse(spec.url);
+    final HttpClientRequest request;
+    switch (spec.method) {
+      case 'GET':
+        request = await client.getUrl(uri);
+        break;
+      case 'POST':
+        request = await client.postUrl(uri);
+        break;
+      case 'PUT':
+        request = await client.putUrl(uri);
+        break;
+      case 'DELETE':
+        request = await client.deleteUrl(uri);
+        break;
+      case 'PATCH':
+        request = await client.patchUrl(uri);
+        break;
+      default:
+        request = await client.openUrl(spec.method, uri);
+    }
+    request.followRedirects = spec.followRedirects;
+
+    spec.headers.forEach((k, v) => request.headers.set(k, v));
+
+    if (spec.body != null && spec.body!.isNotEmpty) {
+      request.add(spec.body!);
+    }
+
+    final response = await request.close().timeout(
+          Duration(milliseconds: spec.timeoutMs),
+        );
+
+    final headers = <String, String>{};
+    response.headers.forEach((name, values) {
+      headers[name.toLowerCase()] = values.join(', ');
+    });
+
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      builder.add(chunk);
+    }
+    final bodyBytes = builder.toBytes();
+
+    return _HttpRequestResult(
+      rc: 0,
+      status: response.statusCode,
+      headers: headers,
+      body: bodyBytes,
+      elapsedMs: stopwatch.elapsedMilliseconds,
+    );
+  } catch (e) {
+    return _HttpRequestResult(
+      rc: -1, // matches RAC_ERROR_UNKNOWN convention used by libcurl path
+      status: 0,
+      headers: const <String, String>{},
+      body: Uint8List(0),
+      elapsedMs: stopwatch.elapsedMilliseconds,
+    );
+  } finally {
+    client?.close(force: true);
+  }
 }
 
 // ============================================================================

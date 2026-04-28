@@ -35,7 +35,12 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
         .name             = "onnx",
         .display_name     = "ONNX Runtime",
         .engine_version   = nullptr,
-        .priority         = 80,
+        // P0 regression fix (post FIX-AK17 autoregister): the onnx engine
+        // plugin only owns the embeddings primitive on this build (stt/tts/vad
+        // ops are nullptr and shipped by engines/sherpa). Drop priority well
+        // below sherpa's 90 so even a future accidental ops-slot addition can
+        // never out-rank the speech engine on score-based routing.
+        .priority         = 50,
         .capability_flags = 0,
         .runtimes         = k_onnx_runtimes,
         .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
@@ -64,3 +69,26 @@ RAC_PLUGIN_ENTRY_DEF(onnx) {
 }
 
 }  // extern "C"
+
+// B-AK-17-002 fix: librac_backend_onnx.so is loaded via System.loadLibrary by
+// the SDK example apps (Kotlin/Flutter/RN). Without an explicit caller that
+// runs `rac_backend_onnx_register()` BEFORE RAG flow starts, the unified
+// plugin registry never sees the ONNX engine vtable (and its embedding_ops
+// slot), so `rac_plugin_route(RAC_PRIMITIVE_EMBED)` returns NOT_FOUND. This
+// breaks RAG pipeline creation even when the .so ships in the APK.
+//
+// Mirror the Sherpa fix (engines/sherpa/rac_plugin_entry_sherpa.cpp): use the
+// standard ELF constructor attribute so the engine plugin auto-registers when
+// the dynamic linker loads this .so. The plugin registry deduplicates by name,
+// so the explicit `rac_backend_onnx_register()` path remains safe.
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+__attribute__((constructor))
+static void rac_onnx_autoregister_on_load(void) {
+    const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
+    if (vt != nullptr) {
+        (void)rac_plugin_register(vt);
+    }
+}
+}  // extern "C"
+#endif

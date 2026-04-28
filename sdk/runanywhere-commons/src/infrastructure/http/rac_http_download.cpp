@@ -1,3 +1,10 @@
+// Diagnostic logging on Android: the SDK logger callback isn't always
+// installed when this code runs, so use __android_log_print directly to
+// guarantee visibility in `adb logcat -s rac_http_dl`.
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 /**
  * @file rac_http_download.cpp
  * @brief Implementation of `rac_http_download_execute` — native
@@ -257,8 +264,20 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
     if (out_http_status) *out_http_status = 0;
 
     if (!req || !req->url || !req->destination_path) {
+#ifdef __ANDROID__
+        __android_log_print(ANDROID_LOG_ERROR, "rac_http_dl",
+                            "INVALID_URL early-return: req=%p url=%p dest=%p",
+                            static_cast<const void*>(req),
+                            req ? static_cast<const void*>(req->url) : nullptr,
+                            req ? static_cast<const void*>(req->destination_path) : nullptr);
+#endif
         return RAC_HTTP_DL_INVALID_URL;
     }
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "rac_http_dl",
+                        "rac_http_download_execute: url=[%s] dest=[%s]",
+                        req->url, req->destination_path);
+#endif
 
     // ---- Ensure destination directory exists -----------------------
     std::error_code ec;
@@ -349,6 +368,12 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
 
     int32_t http_status = resp_meta.status;
     if (out_http_status) *out_http_status = http_status;
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "rac_http_dl",
+                        "request_stream returned: rc=%d http_status=%d bytes_written=%llu",
+                        static_cast<int>(rc), http_status,
+                        static_cast<unsigned long long>(ctx.bytes_written));
+#endif
     rac_http_response_free(&resp_meta);
     rac_http_client_destroy(client);
 

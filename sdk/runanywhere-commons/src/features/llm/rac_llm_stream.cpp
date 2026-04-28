@@ -11,10 +11,11 @@
  *     error reason. It translates into a `runanywhere.v1.LLMStreamEvent`,
  *     serializes to a thread-local scratch buffer, and invokes the
  *     registered callback (without holding the registry lock).
- *   - When the library is built without Protobuf (no `RAC_HAVE_PROTOBUF`),
- *     registration returns RAC_ERROR_FEATURE_NOT_AVAILABLE and
- *     `dispatch_llm_stream_event` is a no-op — frontend adapters fall
- *     back to the struct-callback path.
+ *   - When the library is built without Protobuf (no `RAC_HAVE_PROTOBUF`,
+ *     e.g. Android), the implementation hand-encodes LLMStreamEvent into
+ *     protobuf wire format. The schema is small + stable so this avoids
+ *     pulling 12 MB of libprotobuf into every Android APK just for one
+ *     message. Layout matches `idl/llm_service.proto` field-for-field.
  */
 
 #include "rac/features/llm/rac_llm_stream.h"
@@ -22,14 +23,26 @@
 #include "rac/core/rac_logger.h"
 
 #include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
 struct CallbackSlot {
     rac_llm_stream_proto_callback_fn fn        = nullptr;
     void*                            user_data = nullptr;
+    // B-FL-7-001 fix: per-handle, per-session sequence counter. Previously a
+    // single process-wide `g_seq_counter` was used, which kept growing across
+    // generateStream calls; the Wire / protobuf-java decoder threw "end-group
+    // tag did not match" the second time on the same handle, presumably because
+    // some collector treated drift in `seq` values as a corrupted stream. Reset
+    // seq on every fresh `set_stream_proto_callback` so each session starts at
+    // 1 again.
+    uint64_t seq = 0;
 };
 
 std::mutex&                                 g_mu()    { static std::mutex m; return m; }
@@ -49,32 +62,24 @@ rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    h
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-#ifndef RAC_HAVE_PROTOBUF
-    (void)callback;
-    (void)user_data;
-    RAC_LOG_WARNING("llm",
-                    "rac_llm_set_stream_proto_callback: Protobuf not compiled in "
-                    "(RAC_HAVE_PROTOBUF undefined). Falling back to struct callback.");
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
+    // The registry path is identical with or without Protobuf — we only
+    // diverge in how `dispatch_llm_stream_event` serializes the event.
     std::lock_guard<std::mutex> lock(g_mu());
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{ callback, user_data };
+        // Always start with seq = 0 for a fresh session.
+        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
     }
     return RAC_SUCCESS;
-#endif
 }
 
 rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle) {
     if (handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
-#ifdef RAC_HAVE_PROTOBUF
     std::lock_guard<std::mutex> lock(g_mu());
     g_slots().erase(handle);
-#endif
     return RAC_SUCCESS;
 }
 
@@ -88,10 +93,6 @@ rac_result_t rac_llm_unset_stream_proto_callback(rac_handle_t handle) {
 #include <vector>
 
 namespace {
-
-/* Monotonic per-process sequence counter for LLMStreamEvent.seq. proto3
- * uint64 wraps on overflow; for any practical stream this will not happen. */
-std::atomic<uint64_t> g_seq_counter{0};
 
 int64_t now_us() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -143,18 +144,20 @@ void dispatch_llm_stream_event(rac_handle_t handle,
                                const char*  finish_reason,
                                const char*  error_message) {
     CallbackSlot slot;
+    uint64_t seq;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
         if (it == g_slots().end() || it->second.fn == nullptr) return;
         slot = it->second;
+        seq = ++(it->second.seq);
     }
 
     thread_local runanywhere::v1::LLMStreamEvent proto_event;
     thread_local std::vector<uint8_t>            scratch;
 
     proto_event.Clear();
-    proto_event.set_seq(g_seq_counter.fetch_add(1, std::memory_order_relaxed) + 1);
+    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (token) {
         proto_event.set_token(token);
@@ -190,16 +193,145 @@ void dispatch_llm_stream_event(rac_handle_t handle,
 
 #else /* RAC_HAVE_PROTOBUF not defined */
 
+// =============================================================================
+// Hand-encoded protobuf wire format for runanywhere.v1.LLMStreamEvent.
+//
+// We avoid linking libprotobuf on Android (saves ~12 MB per app, and the
+// NDK does not ship Protobuf out of the box) by serializing this single
+// message manually. Wire format reference:
+//   https://protobuf.dev/programming-guides/encoding/
+//
+// Field numbers and types must match `idl/llm_service.proto`:
+//   1: uint64 seq            (varint)
+//   2: int64  timestamp_us   (varint)
+//   3: string token          (length-delimited)
+//   4: bool   is_final       (varint)
+//   5: enum   kind           (varint)
+//   6: uint32 token_id       (varint)
+//   7: float  logprob        (fixed32)
+//   8: string finish_reason  (length-delimited)
+//   9: string error_message  (length-delimited)
+//
+// proto3 default-value omission semantics are preserved: scalars equal to
+// their type's default (0, false, empty string) are skipped on the wire.
+// =============================================================================
+
+namespace {
+
+int64_t now_us() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+inline void wire_varint(std::vector<uint8_t>& out, uint64_t value) {
+    while (value >= 0x80u) {
+        out.push_back(static_cast<uint8_t>(value | 0x80u));
+        value >>= 7;
+    }
+    out.push_back(static_cast<uint8_t>(value));
+}
+
+inline void wire_tag(std::vector<uint8_t>& out, uint32_t field, uint32_t wire_type) {
+    wire_varint(out, (static_cast<uint64_t>(field) << 3) | wire_type);
+}
+
+inline void wire_uint64_field(std::vector<uint8_t>& out, uint32_t field, uint64_t value) {
+    if (value == 0) return;  // proto3 default omission
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, value);
+}
+
+inline void wire_int64_field(std::vector<uint8_t>& out, uint32_t field, int64_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, static_cast<uint64_t>(value));  // varint, not zigzag (proto3 int64)
+}
+
+inline void wire_uint32_field(std::vector<uint8_t>& out, uint32_t field, uint32_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, value);
+}
+
+inline void wire_bool_field(std::vector<uint8_t>& out, uint32_t field, bool value) {
+    if (!value) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    out.push_back(0x01);
+}
+
+inline void wire_enum_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, static_cast<uint64_t>(value));
+}
+
+inline void wire_float_field(std::vector<uint8_t>& out, uint32_t field, float value) {
+    if (value == 0.0f) return;
+    wire_tag(out, field, /*wire_type=*/5);
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));  // bit-cast (memcpy avoids strict-aliasing UB)
+    out.push_back(static_cast<uint8_t>(bits & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 8) & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 16) & 0xff));
+    out.push_back(static_cast<uint8_t>((bits >> 24) & 0xff));
+}
+
+inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const char* str) {
+    if (str == nullptr || str[0] == '\0') return;
+    const size_t len = std::strlen(str);
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, len);
+    out.insert(out.end(), str, str + len);
+}
+
+int32_t to_proto_kind(int internal_kind) {
+    switch (internal_kind) {
+        case 1: return 1;  // ANSWER
+        case 2: return 2;  // THOUGHT
+        case 3: return 3;  // TOOL_CALL
+        default: return 0;  // UNSPECIFIED
+    }
+}
+
+}  // namespace
+
 namespace rac::llm {
-void dispatch_llm_stream_event(rac_handle_t /*handle*/,
-                               const char*  /*token*/,
-                               bool         /*is_final*/,
-                               int          /*kind*/,
-                               uint32_t     /*token_id*/,
-                               float        /*logprob*/,
-                               const char*  /*finish_reason*/,
-                               const char*  /*error_message*/) {
-    // No-op: registry never has entries when Protobuf is absent.
+void dispatch_llm_stream_event(rac_handle_t handle,
+                               const char*  token,
+                               bool         is_final,
+                               int          kind,
+                               uint32_t     token_id,
+                               float        logprob,
+                               const char*  finish_reason,
+                               const char*  error_message) {
+    CallbackSlot slot;
+    uint64_t seq;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_slots().find(handle);
+        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        slot = it->second;
+        // Bump the per-handle counter under the lock so concurrent dispatches
+        // on the same handle still produce monotonic seq values.
+        seq = ++(it->second.seq);
+    }
+
+    thread_local std::vector<uint8_t> scratch;
+    scratch.clear();
+    scratch.reserve(64);
+
+    wire_uint64_field(scratch, 1, seq);
+    wire_int64_field (scratch, 2, now_us());
+    wire_string_field(scratch, 3, token);
+    wire_bool_field  (scratch, 4, is_final);
+    wire_enum_field  (scratch, 5, to_proto_kind(kind));
+    wire_uint32_field(scratch, 6, token_id);
+    wire_float_field (scratch, 7, logprob);
+    wire_string_field(scratch, 8, finish_reason);
+    wire_string_field(scratch, 9, error_message);
+
+    slot.fn(scratch.data(), scratch.size(), slot.user_data);
 }
 }  // namespace rac::llm
 

@@ -870,7 +870,7 @@ if(Protobuf_FOUND)
         message(STATUS "Protobuf found but src/generated/proto/*.pb.cc absent — proto event ABI inactive")
     endif()
 else()
-    message(STATUS "Protobuf not found — rac_voice_agent_set_proto_callback returns FEATURE_NOT_AVAILABLE")
+    message(STATUS "Protobuf not found — rac_voice_agent_set_proto_callback / rac_llm_set_stream_proto_callback fall back to hand-encoded wire format (no libprotobuf dependency)")
 endif()
 
 # Platform-specific linking

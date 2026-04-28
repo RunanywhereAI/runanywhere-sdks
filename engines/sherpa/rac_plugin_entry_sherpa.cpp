@@ -123,3 +123,23 @@ RAC_PLUGIN_ENTRY_DEF(sherpa) {
 }
 
 }  // extern "C"
+
+// Android-fix: librac_backend_sherpa.so is loaded via System.loadLibrary by
+// the SDK example apps. Without an explicit caller, neither the static-init
+// macro RAC_STATIC_PLUGIN_REGISTER nor the dlopen plugin loader runs on
+// Android, so STT/TTS/VAD primitives never reach the unified plugin registry
+// and `rac_plugin_route` returns NOT_FOUND (-423). Use the standard ELF
+// constructor attribute so registration runs automatically when this .so is
+// loaded by the dynamic linker. The plugin registry deduplicates by name,
+// so multiple init paths are safe.
+#if defined(__GNUC__) || defined(__clang__)
+extern "C" {
+__attribute__((constructor))
+static void rac_sherpa_autoregister_on_load(void) {
+    const rac_engine_vtable_t* vt = rac_plugin_entry_sherpa();
+    if (vt != nullptr) {
+        (void)rac_plugin_register(vt);
+    }
+}
+}  // extern "C"
+#endif

@@ -39,6 +39,36 @@ int RunAnywhereHttpDownloadReportComplete(const char* task_id,
 
 #ifdef __cplusplus
 } // extern "C"
+
+#include <atomic>
+#include <functional>
+#include <memory>
+#include <string>
+
+namespace runanywhere::platform {
+
+/**
+ * Synchronous HTTP download via the platform adapter (Java HttpURLConnection on
+ * Android, NSURLSession on iOS). Blocks until completion or cancel.
+ *
+ * Used as the canonical RN model-download transport — replaces the C++
+ * `rac_http_download_execute` path which is HTTPS-disabled on Android
+ * (B-RN-3-001). Returns RAC_SUCCESS or a negative error code matching
+ * rac_result_t.
+ *
+ * @param url HTTPS URL
+ * @param destinationPath Local destination path
+ * @param onProgress Optional progress callback (downloaded, total)
+ * @param cancelFlag Optional shared atomic — set true to cancel mid-download
+ * @return 0 on success, negative error code on failure
+ */
+int SyncHttpDownload(
+    const std::string& url,
+    const std::string& destinationPath,
+    const std::function<void(int64_t, int64_t)>& onProgress,
+    const std::shared_ptr<std::atomic<bool>>& cancelFlag);
+
+} // namespace runanywhere::platform
 #endif
 
 #endif // RUNANYWHERE_PLATFORM_DOWNLOAD_BRIDGE_H

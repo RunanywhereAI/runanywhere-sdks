@@ -326,4 +326,29 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt,
     }
 }
 
+// =============================================================================
+// Legacy ABI shim — rac_service_register_provider (B-RN-Genie-002)
+// =============================================================================
+//
+// The unified plugin registry above replaces per-service provider
+// registration. However, older binaries (notably some Genie .so builds
+// shipped with the React Native and Flutter examples) still reference
+// the symbol `rac_service_register_provider`. Without this symbol they
+// fail to dlopen with "undefined reference" and the entire backend goes
+// dark — even features that don't actually need Genie.
+//
+// To keep those binaries loadable we provide a no-op shim that simply
+// returns success. New code must register engines via
+// rac_plugin_register(); this shim only exists so dlopen of a stale
+// librac_backend_genie.so continues to resolve.
+rac_result_t rac_service_register_provider(int /*service_type*/,
+                                           void* /*ops*/,
+                                           void* /*user_data*/) {
+    RAC_LOG_WARNING(LOG_CAT,
+                    "rac_service_register_provider() is a deprecated shim — "
+                    "unified plugin registry has replaced per-service "
+                    "registration; caller should migrate to rac_plugin_register().");
+    return RAC_SUCCESS;
+}
+
 }  // extern "C"

@@ -505,7 +505,21 @@ class ModelDownloadService {
     required InferenceFramework framework,
     required ModelFormat format,
   }) async {
-    _logger.info('Extracting archive: $archivePath');
+    // B-FL-14-001 fix: surface explicit observability for the extraction step.
+    // Previously this only emitted a single "Extracting archive: <path>" line and
+    // a "Extraction complete" line; failures only appeared as "model directory
+    // empty" downstream. Now we log archive size, dest dir, native return code,
+    // and approximate file count so users can debug failed extractions without
+    // attaching a debugger.
+    final stopwatch = Stopwatch()..start();
+    int archiveBytes = -1;
+    try {
+      archiveBytes = await File(archivePath).length();
+    } catch (_) {
+      // ignore — error reported below if extraction itself fails
+    }
+    _logger.info(
+        'Extracting archive: $archivePath (${archiveBytes >= 0 ? "${(archiveBytes / (1024 * 1024)).toStringAsFixed(1)} MB" : "unknown size"}) -> $destDir');
 
     final lib = PlatformLoader.loadCommons();
     final extractFn = lib.lookupFunction<
@@ -540,15 +554,34 @@ class ModelDownloadService {
       );
 
       if (result != 0) {
-        _logger.error('Native extraction failed with code: $result');
-        throw Exception('Native extraction failed with code: $result');
+        _logger.error(
+            'Native extraction FAILED for $archivePath -> $destDir (rc=$result, elapsed=${stopwatch.elapsedMilliseconds} ms)');
+        throw Exception(
+            'Native extraction failed with code $result while extracting '
+            '${p.basename(archivePath)} into $destDir');
       }
     } finally {
       calloc.free(archivePathPtr);
       calloc.free(destPathPtr);
     }
 
-    _logger.info('Extraction complete: $destDir');
+    int extractedFileCount = 0;
+    int extractedTotalBytes = 0;
+    try {
+      await for (final entity
+          in Directory(destDir).list(recursive: true, followLinks: false)) {
+        if (entity is File) {
+          extractedFileCount++;
+          try {
+            extractedTotalBytes += await entity.length();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // best-effort; don't fail the load if we couldn't enumerate
+    }
+    _logger.info(
+        'Extraction complete: $destDir ($extractedFileCount file(s), ${(extractedTotalBytes / (1024 * 1024)).toStringAsFixed(1)} MB on disk, ${stopwatch.elapsedMilliseconds} ms)');
     return destDir;
   }
 
@@ -788,13 +821,115 @@ int _progressCallback(
 
 SendPort? _workerSendPort;
 
-void _downloadWorker(_DownloadSpec spec) {
+// On Android the bundled libcurl in librac_commons.so is built with HTTPS
+// disabled (commons CMakeLists.txt:442-448). We bypass it here with Dart's
+// own HttpClient which uses the JVM's TLS stack — same architectural choice
+// the Kotlin SDK makes via HttpURLConnectionDownloadProvider.
+Future<_DownloadResult> _downloadViaDartHttpClient(
+  _DownloadSpec spec,
+  void Function(int, int) onProgress,
+) async {
+  HttpClient? client;
+  try {
+    client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30)
+      ..idleTimeout = const Duration(minutes: 2);
+    final destFile = File(spec.destinationPath);
+    await destFile.parent.create(recursive: true);
+
+    var currentUri = Uri.parse(spec.url);
+    var redirects = 0;
+    while (redirects < 10) {
+      final request = await client.getUrl(currentUri)
+        ..followRedirects = false;
+      request.headers.set('User-Agent', 'RunAnywhere-SDK-Flutter/1.0');
+      final response = await request.close();
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final total = response.contentLength;
+        final sink = destFile.openWrite();
+        var bytesRead = 0;
+        var lastReport = 0;
+        try {
+          await for (final chunk in response) {
+            if (_workerCancelled) {
+              await sink.close();
+              return _DownloadResult(
+                  status: _DlStatus.cancelled,
+                  httpStatus: response.statusCode);
+            }
+            sink.add(chunk);
+            bytesRead += chunk.length;
+            final now = DateTime.now().millisecondsSinceEpoch;
+            if (now - lastReport >= 200) {
+              onProgress(bytesRead, total);
+              lastReport = now;
+            }
+          }
+          onProgress(bytesRead, total);
+          await sink.flush();
+        } finally {
+          await sink.close();
+        }
+        return _DownloadResult(
+            status: _DlStatus.ok, httpStatus: response.statusCode);
+      }
+
+      // Handle redirects manually so we can preserve absolute / relative
+      // location headers across the chain.
+      if (response.isRedirect) {
+        final loc = response.headers.value(HttpHeaders.locationHeader);
+        if (loc == null) {
+          return _DownloadResult(
+              status: _DlStatus.unknown,
+              httpStatus: response.statusCode,
+              error: 'redirect missing Location header');
+        }
+        currentUri = currentUri.resolve(loc);
+        redirects++;
+        // Drain body
+        await response.drain<void>();
+        continue;
+      }
+
+      return _DownloadResult(
+        status: response.statusCode >= 500
+            ? _DlStatus.serverError
+            : _DlStatus.networkError,
+        httpStatus: response.statusCode,
+        error: 'HTTP ${response.statusCode}',
+      );
+    }
+
+    return const _DownloadResult(
+        status: _DlStatus.networkError,
+        httpStatus: 0,
+        error: 'too many redirects');
+  } catch (e) {
+    return _DownloadResult(
+        status: _DlStatus.unknown, httpStatus: 0, error: e.toString());
+  } finally {
+    client?.close(force: true);
+  }
+}
+
+void _downloadWorker(_DownloadSpec spec) async {
   _workerSendPort = spec.sendPort;
   final cancelPort = ReceivePort();
   spec.sendPort.send(_SendPortMessage(cancelPort.sendPort));
   cancelPort.listen((_) {
     _workerCancelled = true;
   });
+
+  // Android path: skip the libcurl runner entirely.
+  if (Platform.isAndroid) {
+    final result = await _downloadViaDartHttpClient(spec, (bytes, total) {
+      spec.sendPort.send(_ProgressMessage(bytes, total));
+    });
+    spec.sendPort.send(result);
+    cancelPort.close();
+    return;
+  }
 
   final bindings = RacNative.bindings;
 

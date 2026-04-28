@@ -207,7 +207,11 @@ export class VLMWorkerBridge {
     // We just read the decision it already made.
     const bridge = LlamaCppBridge.shared;
     const useWebGPU = bridge.accelerationMode === 'webgpu';
-    const resolvedUrl = wasmJsUrl ?? bridge.wasmUrl ?? '';
+    // Pick the URL that matches the active acceleration mode. After the
+    // bridge stopped overwriting `wasmUrl` for the WebGPU path, callers in
+    // WebGPU mode must read `webgpuWasmUrl`.
+    const accelUrl = useWebGPU ? bridge.webgpuWasmUrl : bridge.wasmUrl;
+    const resolvedUrl = wasmJsUrl ?? accelUrl ?? '';
 
     if (!resolvedUrl) {
       throw new Error('[VLMWorkerBridge] SDK not initialized — no WASM URL available');
@@ -253,9 +257,10 @@ export class VLMWorkerBridge {
     const bridge = LlamaCppBridge.shared;
     const isQwenVL = /qwen.*vl/i.test(params.modelId) || /qwen.*vl/i.test(params.modelName);
     if (isQwenVL && bridge.accelerationMode === 'webgpu') {
-      const currentUrl = bridge.wasmUrl ?? '';
-      const cpuUrl = currentUrl.replace(/-webgpu\.js$/, '.js');
-      if (cpuUrl !== currentUrl) {
+      // Derive the CPU URL from the WebGPU URL (which now lives in webgpuWasmUrl).
+      const currentUrl = bridge.webgpuWasmUrl ?? '';
+      const cpuUrl = bridge.wasmUrl ?? currentUrl.replace(/-webgpu\.js$/, '.js');
+      if (cpuUrl && cpuUrl !== currentUrl) {
         logger.info('Qwen2-VL detected — restarting VLM Worker with CPU WASM (M-RoPE compat)');
         this.terminate();
         await this.init(cpuUrl);

@@ -56,6 +56,22 @@ object RAGBridge {
                 // (provides librac_commons.so with service registry).
                 // The RAG JNI provides backend registration and pipeline functions.
                 System.loadLibrary("rac_backend_rag_jni")
+
+                // B-AK-17-002: explicitly load librac_backend_onnx.so so its ELF
+                // __attribute__((constructor)) auto-registers the ONNX engine plugin
+                // (with embedding_ops) in the unified plugin registry. RAG pipeline
+                // creation routes through `rac_plugin_route(RAC_PRIMITIVE_EMBED, ...)`,
+                // which returns NOT_FOUND if no engine has registered embedding_ops.
+                // Without this load, ragCreatePipeline fails immediately even when the
+                // .so ships in the APK (mirrors the Sherpa fix in ONNXBridge.kt).
+                // Wrapped in try/catch so apps without the ONNX module aren't blocked.
+                try {
+                    System.loadLibrary("rac_backend_onnx")
+                    logger.info("rac_backend_onnx loaded; ONNX autoregister fired (embedding_ops available for RAG)")
+                } catch (e: UnsatisfiedLinkError) {
+                    logger.warning("rac_backend_onnx not present: ${e.message}")
+                }
+
                 nativeLibraryLoaded = true
                 logger.info("RAG native library loaded successfully")
                 return true

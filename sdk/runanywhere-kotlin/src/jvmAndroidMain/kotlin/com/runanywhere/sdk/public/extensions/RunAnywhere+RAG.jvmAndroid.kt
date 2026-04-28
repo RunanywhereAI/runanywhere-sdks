@@ -85,7 +85,18 @@ actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
         }
 
     if (handle == 0L) {
-        throw IllegalStateException("RAG pipeline creation failed")
+        // B-AK-17-002: surface the most likely cause when handle == 0L. The
+        // native side returns 0 from nativeCreatePipeline() when either the
+        // ONNX engine plugin isn't registered (rac_plugin_route returns
+        // NOT_FOUND for RAC_PRIMITIVE_EMBED) or the embedding/LLM model file
+        // isn't accessible. The C++ side logs the exact rac_result_t via
+        // RAC_LOG_ERROR; check logcat for "JNI.RAG: nativeCreatePipeline:
+        // failed with result <N>" to confirm.
+        throw IllegalStateException(
+            "RAG pipeline creation failed — native nativeCreatePipeline returned 0. " +
+                "Check logcat for 'JNI.RAG' / 'RAG.Pipeline' / 'Embeddings.Service' tags " +
+                "for the underlying rac_result_t error code.",
+        )
     }
 
     pipelineHandle = handle

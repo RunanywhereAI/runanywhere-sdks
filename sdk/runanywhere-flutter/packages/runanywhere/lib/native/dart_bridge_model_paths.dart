@@ -170,7 +170,20 @@ class DartBridgeModelPaths {
     final modelFolder = getModelFolder(model.id, model.framework);
     if (modelFolder == null) return null;
 
-    // Use C++ to find the actual model path (handles all frameworks/formats)
+    // B-FL-10-002 fix: for Sherpa-ONNX models the C++ resolver picks the
+    // first child directory (alphabetical) which is `test_wavs/` (sample audio
+    // for STT) or `espeak-ng-data/` (phoneme data for TTS) — neither contains
+    // the encoder/decoder/tokens needed by Sherpa. Sherpa-ONNX itself does its
+    // own glob-style discovery for `*-encoder.onnx`, `*-decoder.onnx`,
+    // `*-tokens.txt`, `espeak-ng-data/` etc., so the safest behaviour is to
+    // hand it the parent directory directly. Skip C++ resolution for ONNX
+    // framework models and return the model folder as-is.
+    if (model.framework == InferenceFramework.onnx) {
+      return modelFolder;
+    }
+
+    // Use C++ to find the actual model path for other frameworks
+    // (LlamaCpp .gguf, etc.).
     final resolved = DartBridgeDownload.findModelPathAfterExtraction(
       extractedDir: modelFolder,
       structure: 99, // RAC_ARCHIVE_STRUCTURE_UNKNOWN - auto-detect

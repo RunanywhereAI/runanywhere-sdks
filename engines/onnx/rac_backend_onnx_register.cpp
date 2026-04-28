@@ -15,6 +15,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
+#include "rac/plugin/rac_plugin_entry.h"
 
 namespace {
 
@@ -165,8 +166,23 @@ rac_result_t rac_backend_onnx_register(void) {
     rac_download_strategy_register(RAC_FRAMEWORK_ONNX, &g_onnx_download_strategy);
     rac_backend_onnx_embeddings_register();
 
+    // Android-fix: same issue as B-AK-1-001 — on Android the JNI bridges call
+    // this `rac_backend_*_register` function but the unified plugin registry
+    // is never populated through dlopen+dlsym. Register the plugin entry here
+    // so `rac_plugin_route` can find the ONNX-backed STT/TTS/VAD primitives.
+    extern const rac_engine_vtable_t* rac_plugin_entry_onnx(void);
+    const rac_engine_vtable_t* vt = rac_plugin_entry_onnx();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'onnx'");
+        }
+    }
+
     g_registered = true;
-    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (module + strategies + embeddings)");
+    RAC_LOG_INFO(LOG_CAT, "ONNX backend registered (module + strategies + embeddings + plugin)");
     return RAC_SUCCESS;
 }
 

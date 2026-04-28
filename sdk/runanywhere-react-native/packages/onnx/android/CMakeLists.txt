@@ -69,6 +69,18 @@ if(EXISTS "${JNILIB_DIR}/libsherpa-onnx-jni.so")
         IMPORTED_NO_SONAME TRUE
     )
 endif()
+# B-RN-10-001 fix: link rac_backend_sherpa so the dynamic linker loads it
+# alongside librunanywhereonnx.so. Its __attribute__((constructor)) registers
+# Sherpa STT/TTS/VAD with the unified plugin registry. Previously the .so
+# shipped in the APK but was never dlopen-ed, so rac_plugin_route returned -423.
+if(EXISTS "${JNILIB_DIR}/librac_backend_sherpa.so")
+    add_library(rac_backend_sherpa SHARED IMPORTED)
+    set_target_properties(rac_backend_sherpa PROPERTIES
+        IMPORTED_LOCATION "${JNILIB_DIR}/librac_backend_sherpa.so"
+        IMPORTED_NO_SONAME TRUE
+    )
+    message(STATUS "[RunAnywhereONNX] Found rac_backend_sherpa at ${JNILIB_DIR}/librac_backend_sherpa.so")
+endif()
 
 # =============================================================================
 # Source files - ONNX bridges
@@ -175,6 +187,12 @@ if(TARGET sherpa_onnx_cxx_api)
 endif()
 if(TARGET sherpa_onnx_jni)
     target_link_libraries(${PACKAGE_NAME} sherpa_onnx_jni)
+endif()
+# B-RN-10-001: rac_backend_sherpa registers itself via __attribute__((constructor))
+# on dlopen — linking it here forces the dynamic linker to load it alongside
+# librunanywhereonnx.so.
+if(TARGET rac_backend_sherpa)
+    target_link_libraries(${PACKAGE_NAME} rac_backend_sherpa)
 endif()
 
 # HAS_ONNX is always defined since ONNX backend is required

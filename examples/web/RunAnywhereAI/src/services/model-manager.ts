@@ -40,55 +40,13 @@ const REGISTERED_MODELS: CompactModelDef[] = [
     modality: ModelCategory.Language,
     memoryRequirement: 500_000_000,
   },
-  {
-    id: 'qwen2.5-0.5b-instruct-q6_k',
-    name: 'Qwen 2.5 0.5B Q6_K',
-    repo: 'Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF',
-    files: ['qwen2.5-0.5b-instruct-q6_k.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 600_000_000,
-  },
-  {
-    id: 'lfm2-350m-q4_k_m',
-    name: 'LFM2 350M Q4_K_M',
-    repo: 'LiquidAI/LFM2-350M-GGUF',
-    files: ['LFM2-350M-Q4_K_M.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 250_000_000,
-  },
-  {
-    id: 'lfm2-350m-q8_0',
-    name: 'LFM2 350M Q8_0',
-    repo: 'LiquidAI/LFM2-350M-GGUF',
-    files: ['LFM2-350M-Q8_0.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 400_000_000,
-  },
-
-  // ── Tool Calling Optimized Models (Liquid AI LFM2-Tool) ──
-  // These models are designed for concise, precise tool/function calling.
-  // Auto-detected as LFM2 Pythonic format by the SDK's ToolCalling extension.
-  {
-    id: 'lfm2-1.2b-tool-q4_k_m',
-    name: 'LFM2 1.2B Tool Q4_K_M',
-    repo: 'LiquidAI/LFM2-1.2B-Tool-GGUF',
-    files: ['LFM2-1.2B-Tool-Q4_K_M.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 800_000_000,
-  },
-  {
-    id: 'lfm2-1.2b-tool-q8_0',
-    name: 'LFM2 1.2B Tool Q8_0',
-    repo: 'LiquidAI/LFM2-1.2B-Tool-GGUF',
-    files: ['LFM2-1.2B-Tool-Q8_0.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 1_400_000_000,
-  },
+  // ── LFM2 + Qwen entries removed from web catalog (B-WEB-4-001b) ──
+  // LFM2 + Qwen architectures hit a generate_stream WASM trap on both CPU
+  // and WebGPU builds (FA cross-backend bug on WebGPU; chat-template /
+  // decode trap on CPU). SmolLM2 360M Q8_0 is the only fully-working chat
+  // model on web. The CPU-fallback regex in
+  // `sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+TextGeneration.ts`
+  // is left in place as scaffolding for when LFM2/Qwen come back.
 
   // =========================================================================
   // VLM models (llama.cpp + mmproj) — hosted on runanywhere HuggingFace org

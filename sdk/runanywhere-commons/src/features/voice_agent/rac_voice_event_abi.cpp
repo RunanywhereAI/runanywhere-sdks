@@ -8,37 +8,45 @@
  *     target ships `voice_events.pb.h` and we serialize each emitted
  *     `rac_voice_agent_event_t` into `runanywhere::v1::VoiceEvent` via
  *     `SerializeToArray()`, calling the registered callback with the bytes.
- *   - When the build was configured without Protobuf, the function returns
- *     `RAC_ERROR_FEATURE_NOT_AVAILABLE` and the frontend falls back to the
- *     struct callback path.
+ *   - When the library is built without Protobuf (no `RAC_HAVE_PROTOBUF`,
+ *     e.g. Android), the implementation hand-encodes VoiceEvent into
+ *     protobuf wire format. The schema is small + stable so this avoids
+ *     pulling 12 MB of libprotobuf into every Android APK just for one
+ *     message. Layout matches `idl/voice_events.proto` field-for-field.
+ *     Mirrors the LLMStreamEvent fix in rac_llm_stream.cpp (Phase A,
+ *     B-AK-4-001) — same root cause, same hand-encoder pattern.
  *
  * The actual hookup of `rac_voice_agent_set_proto_callback()` into the
- * agent's internal event dispatcher lives in the agent's source file
- * (under engines/voice_agent_orchestrator/ or similar) — we provide the
- * registration storage + a helper that the dispatcher calls per event.
- *
- * Today this file only provides the C ABI surface (registration/storage
- * + capability check). The dispatcher integration is queued for the
- * companion commit that wires it into voice_agent.cpp's event loop.
+ * agent's internal event dispatcher lives in voice_agent.cpp / the
+ * pipeline EventDispatcher::emit() — they call dispatch_proto_event()
+ * (declared in rac_voice_event_abi_internal.h) per event.
  */
 
 #include "rac/features/voice_agent/rac_voice_event_abi.h"
 
 #include "rac/core/rac_logger.h"
 
-#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
-/** Registered (callback, user_data) per handle. NULL callback = unregistered. */
+/** Registered (callback, user_data) per handle. */
 struct CallbackSlot {
-    rac_voice_agent_proto_event_callback_fn fn       = nullptr;
+    rac_voice_agent_proto_event_callback_fn fn        = nullptr;
     void*                                   user_data = nullptr;
+    // Per-handle, per-session sequence counter. Mirrors the LLM stream fix
+    // (B-FL-7-001): a process-wide counter caused decoders to reject the
+    // second session on the same handle. Reset on every fresh registration
+    // so each session starts at 1 again.
+    uint64_t                                seq       = 0;
 };
 
-std::mutex&                                              g_mu()    { static std::mutex m; return m; }
+std::mutex&                                                 g_mu()    { static std::mutex m; return m; }
 std::unordered_map<rac_voice_agent_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_voice_agent_handle_t, CallbackSlot> m;
     return m;
@@ -55,26 +63,16 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t        
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-#ifndef RAC_HAVE_PROTOBUF
-    /* Build without Protobuf. The slot will be tracked but the dispatcher
-     * never has anything to serialize, so the callback fires zero times.
-     * Returning FEATURE_NOT_AVAILABLE lets the frontend pick the struct
-     * callback path immediately. */
-    (void)callback;
-    (void)user_data;
-    RAC_LOG_WARNING("voice_agent",
-                    "rac_voice_agent_set_proto_callback: Protobuf not compiled in "
-                    "(RAC_HAVE_PROTOBUF undefined). Falling back to struct callback.");
-    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
-#else
+    // The registry path is identical with or without Protobuf — we only
+    // diverge in how `dispatch_proto_event` serializes the event.
     std::lock_guard<std::mutex> lock(g_mu());
     if (callback == nullptr) {
         g_slots().erase(handle);
     } else {
-        g_slots()[handle] = CallbackSlot{ callback, user_data };
+        // Always start with seq = 0 for a fresh session.
+        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
     }
     return RAC_SUCCESS;
-#endif
 }
 
 }  // extern "C"
@@ -83,15 +81,7 @@ rac_result_t rac_voice_agent_set_proto_callback(rac_voice_agent_handle_t        
 
 #include "voice_events.pb.h"
 
-#include <atomic>
-#include <chrono>
-#include <vector>
-
 namespace {
-
-/* Monotonic per-process sequence counter for VoiceEvent.seq. The proto
- * field is uint64; we wrap on overflow. */
-std::atomic<uint64_t> g_seq_counter{0};
 
 int64_t now_us() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -116,9 +106,6 @@ int64_t now_us() {
  * for the GAP 08 voice barge-in path.
  */
 void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& dst) {
-    dst.set_seq(g_seq_counter.fetch_add(1, std::memory_order_relaxed) + 1);
-    dst.set_timestamp_us(now_us());
-
     switch (src.type) {
         case RAC_VOICE_AGENT_EVENT_PROCESSED: {
             auto* m = dst.mutable_metrics();
@@ -217,17 +204,23 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
     if (event == nullptr) return;
 
     CallbackSlot slot;
+    uint64_t     seq;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
         if (it == g_slots().end() || it->second.fn == nullptr) return;
         slot = it->second;
+        // Bump the per-handle counter under the lock so concurrent dispatches
+        // on the same handle still produce monotonic seq values.
+        seq = ++(it->second.seq);
     }
 
     thread_local runanywhere::v1::VoiceEvent proto_event;
     thread_local std::vector<uint8_t>        scratch;
 
     proto_event.Clear();
+    proto_event.set_seq(seq);
+    proto_event.set_timestamp_us(now_us());
     translate(*event, proto_event);
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
@@ -248,11 +241,322 @@ void dispatch_proto_event(rac_voice_agent_handle_t       handle,
 
 #else /* RAC_HAVE_PROTOBUF not defined */
 
+// =============================================================================
+// Hand-encoded protobuf wire format for runanywhere.v1.VoiceEvent.
+//
+// We avoid linking libprotobuf on Android (saves ~12 MB per app, and the
+// NDK does not ship Protobuf out of the box) by serializing this message
+// manually. Wire format reference:
+//   https://protobuf.dev/programming-guides/encoding/
+//
+// Field numbers and types must match `idl/voice_events.proto`:
+//
+//   message VoiceEvent {
+//     uint64 seq            = 1;   // varint
+//     int64  timestamp_us   = 2;   // varint
+//     oneof payload {              // each is a length-delimited submessage
+//       UserSaidEvent       user_said       = 10;
+//       AssistantTokenEvent assistant_token = 11;
+//       AudioFrameEvent     audio           = 12;
+//       VADEvent            vad             = 13;
+//       InterruptedEvent    interrupted     = 14;   // (no producer today)
+//       StateChangeEvent    state           = 15;
+//       ErrorEvent          error           = 16;
+//       MetricsEvent        metrics         = 17;
+//     }
+//   }
+//
+// proto3 default-value omission semantics are preserved: scalars equal to
+// their type's default (0, false, empty string) are skipped on the wire.
+// Nested messages, however, MUST be emitted whenever the oneof arm is
+// selected even if all sub-fields are at default — otherwise the decoder
+// cannot tell the oneof was set.
+// =============================================================================
+
+namespace {
+
+int64_t now_us() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+
+inline void wire_varint(std::vector<uint8_t>& out, uint64_t value) {
+    while (value >= 0x80u) {
+        out.push_back(static_cast<uint8_t>(value | 0x80u));
+        value >>= 7;
+    }
+    out.push_back(static_cast<uint8_t>(value));
+}
+
+inline void wire_tag(std::vector<uint8_t>& out, uint32_t field, uint32_t wire_type) {
+    wire_varint(out, (static_cast<uint64_t>(field) << 3) | wire_type);
+}
+
+inline void wire_uint64_field(std::vector<uint8_t>& out, uint32_t field, uint64_t value) {
+    if (value == 0) return;  // proto3 default omission
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, value);
+}
+
+inline void wire_int64_field(std::vector<uint8_t>& out, uint32_t field, int64_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, static_cast<uint64_t>(value));  // varint, not zigzag (proto3 int64)
+}
+
+inline void wire_int32_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    /* proto3 int32 encodes negative values as 10-byte varint via sign
+     * extension to 64 bits. Cast through int64 first to preserve the
+     * sign bits. */
+    wire_varint(out, static_cast<uint64_t>(static_cast<int64_t>(value)));
+}
+
+inline void wire_bool_field(std::vector<uint8_t>& out, uint32_t field, bool value) {
+    if (!value) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    out.push_back(0x01);
+}
+
+inline void wire_enum_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
+    if (value == 0) return;
+    wire_tag(out, field, /*wire_type=*/0);
+    wire_varint(out, static_cast<uint64_t>(value));
+}
+
+inline void wire_double_field(std::vector<uint8_t>& out, uint32_t field, double value) {
+    if (value == 0.0) return;
+    wire_tag(out, field, /*wire_type=*/1);  // fixed64
+    uint64_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));  // bit-cast (memcpy avoids strict-aliasing UB)
+    for (int i = 0; i < 8; ++i) {
+        out.push_back(static_cast<uint8_t>((bits >> (i * 8)) & 0xff));
+    }
+}
+
+inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const char* str) {
+    if (str == nullptr || str[0] == '\0') return;
+    const size_t len = std::strlen(str);
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, len);
+    out.insert(out.end(), str, str + len);
+}
+
+inline void wire_string_field_force(std::vector<uint8_t>& out, uint32_t field, const char* str) {
+    /* Variant that emits the string even when empty. Used for fixed
+     * "component" tags inside ErrorEvent so frontends always see the
+     * field set. */
+    if (str == nullptr) return;
+    const size_t len = std::strlen(str);
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, len);
+    if (len > 0) {
+        out.insert(out.end(), str, str + len);
+    }
+}
+
+inline void wire_bytes_field(std::vector<uint8_t>& out, uint32_t field,
+                             const void* data, size_t size) {
+    if (data == nullptr || size == 0) return;
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, size);
+    const auto* p = static_cast<const uint8_t*>(data);
+    out.insert(out.end(), p, p + size);
+}
+
+/* Emit a length-delimited submessage at @p field. The submessage body is
+ * built into a thread_local scratch by @p build, then framed into @p out.
+ * Always emitted (even when body is empty) because oneof arms must be
+ * present for the decoder to pick the right arm. */
+template <typename Build>
+void wire_submessage(std::vector<uint8_t>& out, uint32_t field, Build&& build) {
+    thread_local std::vector<uint8_t> sub;
+    sub.clear();
+    build(sub);
+    wire_tag(out, field, /*wire_type=*/2);
+    wire_varint(out, sub.size());
+    out.insert(out.end(), sub.begin(), sub.end());
+}
+
+// ---------------------------------------------------------------------------
+// Submessage encoders. Field numbers + types match idl/voice_events.proto.
+// ---------------------------------------------------------------------------
+
+void encode_user_said(std::vector<uint8_t>& s, const char* text) {
+    /*  1: string text             */
+    wire_string_field(s, 1, text);
+    /*  2: bool   is_final         (always true for full-utterance) */
+    wire_bool_field  (s, 2, true);
+    /*  3: float  confidence       (default 0.0f → omitted) */
+    /*  4: int64  audio_start_us   (default 0    → omitted) */
+    /*  5: int64  audio_end_us     (default 0    → omitted) */
+}
+
+void encode_assistant_token(std::vector<uint8_t>& s, const char* text) {
+    /*  1: string text             */
+    wire_string_field(s, 1, text);
+    /*  2: bool   is_final         */
+    wire_bool_field  (s, 2, true);
+    /*  3: enum   kind             (1 = TOKEN_KIND_ANSWER) */
+    wire_enum_field  (s, 3, 1);
+}
+
+void encode_audio_frame(std::vector<uint8_t>& s,
+                        const void* pcm, size_t pcm_size) {
+    /*  1: bytes pcm              */
+    wire_bytes_field (s, 1, pcm, pcm_size);
+    /*  2: int32 sample_rate_hz   (24000) */
+    wire_int32_field (s, 2, 24000);
+    /*  3: int32 channels         (1) */
+    wire_int32_field (s, 3, 1);
+    /*  4: enum  encoding         (1 = AUDIO_ENCODING_PCM_F32_LE) */
+    wire_enum_field  (s, 4, 1);
+}
+
+void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
+    /*  1: enum type
+     *     1 = VAD_EVENT_VOICE_START
+     *     2 = VAD_EVENT_VOICE_END_OF_UTTERANCE  */
+    wire_enum_field  (s, 1, speech_active ? 1 : 2);
+    /*  2: int64 frame_offset_us (default 0 → omitted) */
+}
+
+void encode_state_change(std::vector<uint8_t>& s,
+                         int32_t previous, int32_t current) {
+    /*  1: enum previous          */
+    wire_enum_field  (s, 1, previous);
+    /*  2: enum current           */
+    wire_enum_field  (s, 2, current);
+}
+
+void encode_error(std::vector<uint8_t>& s, int32_t code) {
+    /*  1: int32  code            */
+    wire_int32_field (s, 1, code);
+    /*  2: string message         (empty → omitted) */
+    /*  3: string component       (always "pipeline" so the frontend can
+     *                             route by component without a guard) */
+    wire_string_field(s, 3, "pipeline");
+    /*  4: bool   is_recoverable  (false → omitted) */
+}
+
+void encode_metrics(std::vector<uint8_t>& /*s*/) {
+    /*  1: double stt_final_ms       (0 → omitted)
+     *  2: double llm_first_token_ms (0 → omitted)
+     *  3: double tts_first_audio_ms (0 → omitted)
+     *  4: double end_to_end_ms      (0 → omitted)
+     *  5: int64  tokens_generated   (0 → omitted)
+     *  6: int64  audio_samples_played (0 → omitted)
+     *  7: bool   is_over_budget     (false → omitted)
+     *  8: int64  created_at_ns      (0 → omitted)
+     *
+     * The C struct has none of these populated yet, so the submessage is
+     * empty. The frame's outer length-prefix (wire_submessage) still
+     * carries enough information for the decoder to recognize the oneof
+     * arm. */
+}
+
+}  // namespace
+
 namespace rac::voice_agent {
-/* No-op when Protobuf is not compiled in — the registration call returned
- * RAC_ERROR_FEATURE_NOT_AVAILABLE so g_slots() is always empty. */
-void dispatch_proto_event(rac_voice_agent_handle_t       /*handle*/,
-                           const rac_voice_agent_event_t* /*event*/) {}
+
+/**
+ * @brief Internal helper called by the voice agent's event dispatcher per
+ *        emitted event. Serializes the C event struct into a
+ *        runanywhere.v1.VoiceEvent (hand-encoded wire format) + invokes
+ *        the registered callback.
+ *
+ * Threading: the (callback, user_data) pair is captured under the registry
+ * mutex but the lock is NOT held across the user callback (avoids deadlock
+ * if the callback re-enters rac_voice_agent_set_proto_callback). The
+ * scratch buffer is thread_local so concurrent dispatches on different
+ * threads do not contend on heap allocation.
+ */
+void dispatch_proto_event(rac_voice_agent_handle_t       handle,
+                           const rac_voice_agent_event_t* event) {
+    if (event == nullptr) return;
+
+    CallbackSlot slot;
+    uint64_t     seq;
+    {
+        std::lock_guard<std::mutex> lock(g_mu());
+        auto it = g_slots().find(handle);
+        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        slot = it->second;
+        seq = ++(it->second.seq);
+    }
+
+    thread_local std::vector<uint8_t> scratch;
+    scratch.clear();
+    scratch.reserve(64);
+
+    /* Top-level VoiceEvent header. */
+    wire_uint64_field(scratch, 1, seq);
+    wire_int64_field (scratch, 2, now_us());
+
+    /* Oneof payload — exactly one arm per event. Field numbers below match
+     * idl/voice_events.proto; the C → proto routing matches the existing
+     * RAC_HAVE_PROTOBUF translate() above. */
+    switch (event->type) {
+        case RAC_VOICE_AGENT_EVENT_PROCESSED:
+            wire_submessage(scratch, /*field=*/17, [](std::vector<uint8_t>& s) {
+                encode_metrics(s);
+            });
+            break;
+
+        case RAC_VOICE_AGENT_EVENT_VAD_TRIGGERED: {
+            const bool speech_active = (event->data.vad_speech_active == RAC_TRUE);
+            wire_submessage(scratch, /*field=*/13, [&](std::vector<uint8_t>& s) {
+                encode_vad(s, speech_active);
+            });
+            break;
+        }
+
+        case RAC_VOICE_AGENT_EVENT_TRANSCRIPTION: {
+            const char* text = event->data.transcription;
+            wire_submessage(scratch, /*field=*/10, [&](std::vector<uint8_t>& s) {
+                encode_user_said(s, text);
+            });
+            break;
+        }
+
+        case RAC_VOICE_AGENT_EVENT_RESPONSE: {
+            const char* text = event->data.response;
+            wire_submessage(scratch, /*field=*/11, [&](std::vector<uint8_t>& s) {
+                encode_assistant_token(s, text);
+            });
+            break;
+        }
+
+        case RAC_VOICE_AGENT_EVENT_AUDIO_SYNTHESIZED: {
+            const void* pcm  = event->data.audio.audio_data;
+            const size_t len = event->data.audio.audio_size;
+            wire_submessage(scratch, /*field=*/12, [&](std::vector<uint8_t>& s) {
+                encode_audio_frame(s, pcm, len);
+            });
+            break;
+        }
+
+        case RAC_VOICE_AGENT_EVENT_ERROR: {
+            const int32_t code = static_cast<int32_t>(event->data.error_code);
+            wire_submessage(scratch, /*field=*/16, [&](std::vector<uint8_t>& s) {
+                encode_error(s, code);
+            });
+            break;
+        }
+
+        case RAC_VOICE_AGENT_EVENT_WAKEWORD_DETECTED:
+            /* Surface as IDLE → LISTENING (matches the protobuf path). */
+            wire_submessage(scratch, /*field=*/15, [](std::vector<uint8_t>& s) {
+                encode_state_change(s, /*previous=*/1, /*current=*/2);
+            });
+            break;
+    }
+
+    slot.fn(scratch.data(), scratch.size(), slot.user_data);
+}
+
 }  // namespace rac::voice_agent
 
 #endif  /* RAC_HAVE_PROTOBUF */
